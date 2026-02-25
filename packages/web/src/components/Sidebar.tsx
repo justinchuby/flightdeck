@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { Users, ListTodo, Settings } from 'lucide-react';
+import { Users, LayoutDashboard, ListTodo, Settings } from 'lucide-react';
 
 const links = [
   { to: '/', icon: Users, label: 'Agents' },
+  { to: '/overview', icon: LayoutDashboard, label: 'Fleet Overview' },
   { to: '/tasks', icon: ListTodo, label: 'Tasks' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
@@ -14,6 +15,7 @@ export function Sidebar() {
         <NavLink
           key={to}
           to={to}
+          end={to === '/'}
           className={({ isActive }) =>
             `p-2.5 rounded-lg transition-colors ${
               isActive

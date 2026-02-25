@@ -3,6 +3,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
 import { AgentDashboard } from './components/AgentDashboard/AgentDashboard';
+import { FleetOverview } from './components/FleetOverview';
 import { TaskQueuePanel } from './components/TaskQueue/TaskQueuePanel';
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
@@ -56,6 +57,7 @@ export function App() {
               path="/"
               element={<AgentDashboard api={api} ws={ws} />}
             />
+            <Route path="/overview" element={<FleetOverview api={api} ws={ws} />} />
             <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
             <Route path="/settings" element={<SettingsPanel api={api} />} />
           </Routes>
