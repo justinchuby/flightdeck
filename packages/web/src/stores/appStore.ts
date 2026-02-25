@@ -37,7 +37,12 @@ export const useAppStore = create<AppState>((set) => ({
   loading: true,
 
   setAgents: (agents) => set({ agents }),
-  addAgent: (agent) => set((s) => ({ agents: [...s.agents, agent] })),
+  addAgent: (agent) =>
+    set((s) =>
+      s.agents.some((a) => a.id === agent.id)
+        ? { agents: s.agents.map((a) => (a.id === agent.id ? agent : a)) }
+        : { agents: [...s.agents, agent] },
+    ),
   updateAgent: (id, patch) =>
     set((s) => ({
       agents: s.agents.map((a) => (a.id === id ? { ...a, ...patch } : a)),
