@@ -156,7 +156,7 @@ export function AcpOutput({ agentId }: Props) {
                 </div>
               )}
               <div
-                className={`rounded-lg px-3 py-2 max-w-[85%] text-sm whitespace-pre-wrap ${
+                className={`rounded-lg px-3 py-2 max-w-[85%] text-sm font-mono whitespace-pre-wrap ${
                   group.sender === 'user'
                     ? 'bg-accent/20 text-gray-200 border border-accent/30'
                     : 'bg-surface-raised text-gray-300 border border-gray-700'
