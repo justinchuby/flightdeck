@@ -74,6 +74,10 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:exit', agentId, code });
     });
 
+    agentManager.on('agent:status', (data: any) => {
+      this.broadcastAll({ type: 'agent:status', ...data });
+    });
+
     agentManager.on('agent:crashed', (data: any) => {
       this.broadcastAll({ type: 'agent:crashed', ...data });
     });

@@ -52,6 +52,9 @@ export function useWebSocket() {
             status: msg.code === 0 ? 'completed' : 'failed',
           });
           break;
+        case 'agent:status':
+          updateAgent(msg.agentId, { status: msg.status });
+          break;
         case 'agent:sub_spawned':
           addAgent(msg.child);
           updateAgent(msg.parentId, {

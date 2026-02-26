@@ -60,6 +60,7 @@ export class Agent {
   private dataListeners: Array<(data: string) => void> = [];
   private exitListeners: Array<(code: number) => void> = [];
   private hungListeners: Array<(elapsedMs: number) => void> = [];
+  private statusListeners: Array<(status: AgentStatus) => void> = [];
   private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
   private planListeners: Array<(entries: PlanEntry[]) => void> = [];
   private permissionRequestListeners: Array<(request: any) => void> = [];
@@ -190,6 +191,19 @@ export class Agent {
       }
     });
 
+    // When a prompt finishes, mark delegated agents as idle (task done, awaiting next)
+    this.acpConnection.on('prompt_complete', (_stopReason: string) => {
+      if (this.status === 'running' && !this.acpConnection?.isPrompting) {
+        this.status = 'idle';
+        for (const listener of this.statusListeners) {
+          listener(this.status);
+        }
+        for (const listener of this.hungListeners) {
+          listener(0);
+        }
+      }
+    });
+
     this.acpConnection.start({
       cliCommand: this.config.cliCommand,
       cliArgs: [
@@ -275,6 +289,10 @@ CREW_UPDATE -->`;
   write(data: string): void {
     if (this.mode === 'acp') {
       if (this.acpConnection?.isConnected) {
+        this.status = 'running';
+        for (const listener of this.statusListeners) {
+          listener(this.status);
+        }
         this.acpConnection.prompt(data).catch(() => {});
       }
     } else {
@@ -331,6 +349,10 @@ CREW_UPDATE -->`;
 
   onHung(listener: (elapsedMs: number) => void): void {
     this.hungListeners.push(listener);
+  }
+
+  onStatus(listener: (status: AgentStatus) => void): void {
+    this.statusListeners.push(listener);
   }
 
   onToolCall(listener: (info: ToolCallInfo) => void): void {

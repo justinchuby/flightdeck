@@ -153,6 +153,10 @@ export class AgentManager extends EventEmitter {
       this.emit('agent:permission_request', { agentId: agent.id, request });
     });
 
+    agent.onStatus((status) => {
+      this.emit('agent:status', { agentId: agent.id, status });
+    });
+
     agent.onExit((code) => {
       this.clearHungTimer(agent.id);
       this.textBuffers.delete(agent.id);
