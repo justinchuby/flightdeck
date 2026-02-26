@@ -59,10 +59,13 @@ interface LeadState {
   projects: Record<string, ProjectState>;
   /** Currently selected lead agent ID */
   selectedLeadId: string | null;
+  /** Unsent chat drafts per lead */
+  drafts: Record<string, string>;
 
   selectLead: (id: string | null) => void;
   addProject: (id: string) => void;
   removeProject: (id: string) => void;
+  setDraft: (leadId: string, text: string) => void;
 
   setDecisions: (leadId: string, decisions: Decision[]) => void;
   addDecision: (leadId: string, decision: Decision) => void;
@@ -86,6 +89,7 @@ function emptyProject(): ProjectState {
 export const useLeadStore = create<LeadState>((set) => ({
   projects: {},
   selectedLeadId: null,
+  drafts: {},
 
   selectLead: (id) => set({ selectedLeadId: id }),
 
@@ -98,11 +102,16 @@ export const useLeadStore = create<LeadState>((set) => ({
   removeProject: (id) =>
     set((s) => {
       const { [id]: _, ...rest } = s.projects;
+      const { [id]: _d, ...restDrafts } = s.drafts;
       return {
         projects: rest,
+        drafts: restDrafts,
         selectedLeadId: s.selectedLeadId === id ? null : s.selectedLeadId,
       };
     }),
+
+  setDraft: (leadId, text) =>
+    set((s) => ({ drafts: { ...s.drafts, [leadId]: text } })),
 
   setDecisions: (leadId, decisions) =>
     set((s) => {

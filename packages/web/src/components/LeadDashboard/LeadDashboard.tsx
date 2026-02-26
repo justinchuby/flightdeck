@@ -11,9 +11,12 @@ interface Props {
 }
 
 export function LeadDashboard({ api, ws }: Props) {
-  const { projects, selectedLeadId } = useLeadStore();
+  const { projects, selectedLeadId, drafts } = useLeadStore();
   const agents = useAppStore((s) => s.agents);
-  const [input, setInput] = useState('');
+  const input = selectedLeadId ? (drafts[selectedLeadId] ?? '') : '';
+  const setInput = useCallback((text: string) => {
+    if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
+  }, [selectedLeadId]);
   const [starting, setStarting] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
