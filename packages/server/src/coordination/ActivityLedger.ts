@@ -10,6 +10,7 @@ export type ActionType =
   | 'sub_agent_spawned'
   | 'lock_acquired'
   | 'lock_released'
+  | 'lock_denied'
   | 'message_sent'
   | 'delegated'
   | 'error';

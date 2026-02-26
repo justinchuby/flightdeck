@@ -68,7 +68,9 @@ export function FleetOverview({ api, ws }: Props) {
         msg.type === 'agent:exit' ||
         msg.type === 'agent:killed' ||
         msg.type === 'agent:tool_call' ||
-        msg.type === 'agent:plan'
+        msg.type === 'agent:plan' ||
+        msg.type === 'lock:acquired' ||
+        msg.type === 'lock:released'
       ) {
         fetchCoordination();
       }

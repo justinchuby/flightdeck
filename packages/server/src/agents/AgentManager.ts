@@ -190,6 +190,12 @@ export class AgentManager extends EventEmitter {
       });
       this.emit('agent:exit', agent.id, code);
 
+      // Release any file locks held by the exiting agent
+      const releasedCount = this.lockRegistry.releaseAll(agent.id);
+      if (releasedCount > 0) {
+        logger.info('lock', `Auto-released ${releasedCount} lock(s) for exiting agent ${agent.id.slice(0, 8)}`);
+      }
+
       // Notify parent agent of child completion
       this.notifyParentOfCompletion(agent, code);
 
@@ -247,6 +253,11 @@ export class AgentManager extends EventEmitter {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.clearHungTimer(id);
+    // Release any file locks held by the killed agent
+    const releasedCount = this.lockRegistry.releaseAll(id);
+    if (releasedCount > 0) {
+      logger.info('lock', `Auto-released ${releasedCount} lock(s) for killed agent ${id.slice(0, 8)}`);
+    }
     agent.kill();
     this.emit('agent:killed', id);
     return true;
@@ -465,6 +476,14 @@ export class AgentManager extends EventEmitter {
           filePath: request.filePath,
           reason: request.reason,
         });
+        agent.sendMessage(`[System] Lock acquired on \`${request.filePath}\`. You may proceed with edits. Remember to release it when done with <!-- LOCK_RELEASE {"filePath": "${request.filePath}"} -->`);
+      } else {
+        const holderShort = result.holder?.slice(0, 8) ?? 'unknown';
+        agent.sendMessage(`[System] Lock DENIED on \`${request.filePath}\` — currently held by agent ${holderShort}. Wait for them to release it, or coordinate via AGENT_MESSAGE.`);
+        this.activityLedger.log(agent.id, agentRole, 'lock_denied', `Lock denied on ${request.filePath} (held by ${holderShort})`, {
+          filePath: request.filePath,
+          holder: result.holder,
+        });
       }
     } catch {
       // ignore malformed lock requests
@@ -483,6 +502,7 @@ export class AgentManager extends EventEmitter {
         this.activityLedger.log(agent.id, agentRole, 'lock_released', `Released ${request.filePath}`, {
           filePath: request.filePath,
         });
+        agent.sendMessage(`[System] Lock released on \`${request.filePath}\`.`);
       }
     } catch {
       // ignore malformed lock releases
