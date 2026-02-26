@@ -157,6 +157,17 @@ All events are broadcast to connected UI clients in real time:
 | `agent:tool_call` | `{ agentId, toolCallId, ... }` | Tool invocation (ACP mode) |
 | `agent:plan` | `{ agentId, entries[] }` | Agent plan update (ACP mode) |
 | `agent:permission_request` | `{ agentId, ... }` | Tool permission needed |
+| `agent:content` | `{ agentId, content }` | Rich content (image, audio, resource) |
+| `agent:status` | `{ agentId, status }` | Agent status change |
+| `agent:delegated` | `{ parentId, delegation }` | Work delegated to child agent |
+| `agent:completion_reported` | `{ childId, parentId, status }` | Child agent finished work |
+| `agent:message_sent` | `{ from, to, content }` | Inter-agent message |
+
+### Lead Events
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `lead:decision` | `{ agentId, title, rationale, ... }` | Lead made a decision |
+| `lead:progress` | `{ agentId, summary, completed, in_progress, blocked }` | Lead progress report |
 
 ### Task Events
 | Event | Payload | Description |

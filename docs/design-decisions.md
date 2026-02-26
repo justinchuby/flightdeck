@@ -46,18 +46,23 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 **Decision:** Agents are assigned roles with system prompts that constrain their behavior.
 
 **Built-in roles:**
-| Role | Focus | Color |
-|------|-------|-------|
-| Senior Architect | System design, architecture decisions | Orange |
-| Code Reviewer | Bug detection, security, best practices | Purple |
-| Developer | Code writing and modification | Green |
-| Project Manager | Task tracking, coordination | Yellow |
-| Dev Advocate | Documentation, developer experience | Pink |
-| QA Engineer | Testing strategies, test writing | Blue |
+| Role | Focus | Default Model |
+|------|-------|---------------|
+| Architect | System design, architecture decisions | Claude Opus 4.6 |
+| Code Reviewer | Readability, maintainability, patterns | Gemini 3 Pro |
+| Critical Reviewer | Security, performance, edge cases | Claude Sonnet 4.6 |
+| Developer | Code writing and modification | Claude Opus 4.6 |
+| Product Manager | User needs, product quality, UX | GPT-5.2 Codex |
+| Technical Writer | Docs, API design review | GPT-5.2 |
+| Designer | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
+| Generalist | Cross-disciplinary problem solving | Claude Opus 4.6 |
+| Radical Thinker | Challenge assumptions, unconventional ideas | GPT-5.3 Codex |
 
 **Rationale:** Specialization improves output quality — an agent told "you are a code reviewer" catches more bugs than a general-purpose agent. Roles also enable smart task routing (assign review tasks to reviewers, not developers).
 
 **Custom roles:** Users can create custom roles with their own system prompts, colors, and icons via the Settings UI. Built-in roles cannot be deleted.
+
+**Skills format:** Agents record reusable knowledge in `.github/skills/<skill-name>/SKILL.md` with YAML frontmatter (name, description) and Markdown body. Skills are auto-loaded by Copilot CLI when relevant.
 
 ## 5. Autonomous Sub-Agent Spawning
 
