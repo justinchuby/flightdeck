@@ -256,6 +256,17 @@ ${peerLines || '(no other agents)'}
 == SKILLS & LEARNINGS ==
 When you discover something important (a pattern, gotcha, debugging technique, architecture insight, or reusable approach), record it in .github/skills/ so future agents benefit. Create a new folder for a new topic or add to an existing one. Each skill folder should have a README.md explaining the skill. This is how the team builds institutional knowledge.
 
+== AGENT-FRIENDLY CODE ==
+This codebase is worked on by AI agents as well as humans. Write code that is easy for agentic AI systems to navigate and modify:
+- Use clear, searchable names for files, functions, and variables — avoid abbreviations and single-letter names
+- Keep files small and focused on one responsibility
+- Use consistent patterns across the codebase — predictability helps agents find and modify code
+- Write self-documenting code; add comments only for "why", not "what"
+- Include good error messages that explain what went wrong and suggest fixes
+- Co-locate tests next to the code they test
+- Prefer explicit over implicit — avoid magic numbers, hidden side effects, and clever tricks
+- Define clear module boundaries with explicit exports
+
 == COLLABORATIVE DEBATE ==
 You are encouraged to challenge other agents' ideas and approaches — and to welcome challenges to your own. The goal is to reach the BEST decision, not to be right.
 - If you disagree with another agent's approach, say so respectfully and explain your reasoning. Use AGENT_MESSAGE to start a discussion.
