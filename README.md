@@ -65,6 +65,7 @@ Agents communicate via HTML comment commands detected in their output stream:
 ```
 <!-- DELEGATE {"to": "developer", "task": "...", "model": "claude-opus-4.6"} -->
 <!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->
+<!-- BROADCAST {"content": "..."} -->
 <!-- DECISION {"title": "...", "rationale": "..."} -->
 <!-- PROGRESS {"summary": "...", "completed": [...], "in_progress": [...]} -->
 <!-- QUERY_CREW -->
