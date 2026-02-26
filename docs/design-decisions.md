@@ -45,36 +45,44 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Decision:** Agents are assigned roles with system prompts that constrain their behavior.
 
-**Built-in roles:**
+**Built-in roles (10):**
 | Role | Focus | Default Model |
 |------|-------|---------------|
+| Developer | Code writing and modification | Claude Opus 4.6 |
 | Architect | System design, architecture decisions | Claude Opus 4.6 |
 | Code Reviewer | Readability, maintainability, patterns | Gemini 3 Pro |
 | Critical Reviewer | Security, performance, edge cases | Claude Sonnet 4.6 |
-| Developer | Code writing and modification | Claude Opus 4.6 |
 | Product Manager | User needs, product quality, UX | GPT-5.2 Codex |
 | Technical Writer | Docs, API design review | GPT-5.2 |
 | Designer | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
 | Generalist | Cross-disciplinary problem solving | Claude Opus 4.6 |
 | Radical Thinker | Challenge assumptions, unconventional ideas | GPT-5.3 Codex |
+| Project Lead | Orchestration, delegation, team coordination | Claude Opus 4.6 |
 
 **Rationale:** Specialization improves output quality — an agent told "you are a code reviewer" catches more bugs than a general-purpose agent. Roles also enable smart task routing (assign review tasks to reviewers, not developers).
 
 **Custom roles:** Users can create custom roles with their own system prompts, colors, and icons via the Settings UI. Built-in roles cannot be deleted.
 
+**Persistent role instructions:** Each role generates an `.agent.md` file in `~/.copilot/agents/ai-crew-<role-id>.agent.md`. These files are loaded by Copilot CLI via the `--agent` flag, ensuring role instructions survive context compression. The system prompt is also included in the initial message as a belt-and-suspenders approach.
+
 **Skills format:** Agents record reusable knowledge in `.github/skills/<skill-name>/SKILL.md` with YAML frontmatter (name, description) and Markdown body. Skills are auto-loaded by Copilot CLI when relevant.
 
-## 5. Autonomous Sub-Agent Spawning
+## 5. Lead-Controlled Agent Creation
 
-**Decision:** Agents can spawn sub-agents without user approval.
+**Decision:** Only the Project Lead can create agents (`CREATE_AGENT`) and assign tasks (`DELEGATE`). Specialist agents cannot spawn sub-agents.
 
-**Rationale:** A PM agent analyzing a task should be able to delegate to specialists (spawn a reviewer, spawn a developer) without requiring the user to manually create each agent. This enables emergent team behavior.
+**Rationale:** Centralizing agent creation in the lead provides:
+- Explicit control over which models are used for each agent
+- Clear parent-child relationships for accountability
+- Prevention of runaway spawning by specialists
+- The lead can assemble diverse model combinations for different tasks
 
 **Safeguards:**
 - Concurrency limit prevents runaway spawning
 - Parent-child relationships are tracked
 - All spawns are logged to the activity ledger
 - Sub-agents inherit the crew context manifest
+- Non-lead agents that attempt `SPAWN_AGENT` or `CREATE_AGENT` get an error message
 
 **Protocol:** The lead creates agents with `<!-- CREATE_AGENT {"role": "developer", "model": "...", "task": "..."} -->` and assigns tasks to existing agents with `<!-- DELEGATE {"to": "agent-id", "task": "..."} -->`. Both are detected by regex in `AgentManager`.
 
@@ -174,7 +182,7 @@ ai-crew/
 
 **Decision:** Two-tier testing: Vitest unit tests for server logic, Playwright E2E tests for UI workflows.
 
-**Unit tests (76 cases, 8 suites):**
+**Unit tests (110 cases, 10 suites):**
 - Run in-memory SQLite (`:memory:`) for test isolation — no shared state between tests
 - Mock external dependencies (AgentManager stubs via `vi.fn()`) to test subsystems in isolation
 - Suites: FileLockRegistry, ActivityLedger, RoleRegistry, TaskQueue, MessageBus, ConversationStore, ContextRefresher, AgentManager output parsing

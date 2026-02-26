@@ -94,8 +94,22 @@ GET /api/coordination/summary    — aggregate stats
 
 ### Layer 3: Context Refresh
 
-Every **30 seconds** (or immediately on significant events), all running agents receive an updated view of the crew:
+Context updates are pushed to all running agents on significant events (not on a periodic timer, to avoid wasting tokens on idle heartbeats):
 
+For the **Project Lead**, the update shows "YOUR AGENTS" with IDs, roles, models, and status:
+```
+<!-- CREW_UPDATE
+== YOUR AGENTS ==
+- abc12345 — Developer [claude-opus-4.6] — running, task: Implement login endpoint
+- def67890 — Code Reviewer [gemini-3-pro-preview] — idle
+
+== RECENT ACTIVITY ==
+- [13:45:02] Developer abc12345: Acquired lock on src/auth.ts
+- [13:44:58] Architect ghi11111: Decision — use JWT for session tokens
+CREW_UPDATE -->
+```
+
+For **specialist agents**, the update shows peer agents with locked files:
 ```
 <!-- CREW_UPDATE
 == CURRENT CREW STATUS ==
@@ -103,13 +117,11 @@ Every **30 seconds** (or immediately on significant events), all running agents 
 - Agent def67890 (Reviewer) — idle, No task
 
 == RECENT ACTIVITY ==
-- [13:45:02] Developer abc12345: Acquired lock on src/auth.ts
-- [13:44:58] Architect ghi11111: Decision — use JWT for session tokens
 - [13:44:30] QA jkl22222: Completed task write-auth-tests
 CREW_UPDATE -->
 ```
 
-**Triggers for immediate refresh:**
+**Triggers for refresh:**
 - Agent spawned, killed, or exited
 - File lock acquired or released
 - Debounced at 2 seconds to batch rapid events

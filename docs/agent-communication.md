@@ -78,7 +78,15 @@ Since PTY mode has no structured protocol, agents communicate intent via HTML co
 <!-- LOCK_RELEASE {"filePath": "src/auth.ts"} -->
 <!-- ACTIVITY {"actionType": "decision_made", "summary": "chose JWT over sessions"} -->
 <!-- AGENT_MESSAGE {"to": "agent-id", "content": "please review my changes"} -->
+<!-- BROADCAST {"content": "use factory pattern for all services"} -->
+<!-- DECISION {"title": "Use JWT", "rationale": "stateless, scalable"} -->
+<!-- PROGRESS {"summary": "2/4 done", "completed": [...], "in_progress": [...], "blocked": [...]} -->
+<!-- QUERY_CREW -->
 ```
+
+**Lead-only commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `DECISION`, `PROGRESS`.
+
+**All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`.
 
 These are parsed from agent output and routed to the appropriate subsystem (FileLockRegistry, ActivityLedger, AgentManager).
 
@@ -105,38 +113,51 @@ Every agent receives awareness of the entire crew. This happens at two points:
 
 ### Initial Context (on spawn)
 
-Before the role prompt, agents receive a `CREW_CONTEXT` manifest:
+Before the role prompt, agents receive a `[CREW CONTEXT]` manifest. The format differs for leads vs specialists:
 
+**Project Lead** sees its own agents with IDs, roles, and models:
 ```
-<!-- CREW_CONTEXT
-You are agent abc12345 with role "Developer".
+[CREW CONTEXT]
+You are agent abc12345 with role "Project Lead".
 
 == YOUR ASSIGNMENT ==
-- Task: Implement login page
+- Task: Build the authentication system
+
+== YOUR AGENTS ==
+- def67890 — Developer [claude-opus-4.6] — running, task: Implement login endpoint
+- ghi11111 — Code Reviewer [gemini-3-pro-preview] — idle
+Use agent IDs above with DELEGATE to assign tasks, or AGENT_MESSAGE to communicate.
+
+== COORDINATION RULES ==
+...
+[/CREW CONTEXT]
+```
+
+**Specialist agents** see peer agents with locked files:
+```
+[CREW CONTEXT]
+You are agent def67890 with role "Developer".
+
+== YOUR ASSIGNMENT ==
+- Task: Implement login endpoint
 
 == ACTIVE CREW MEMBERS ==
-- Agent def67890 (Senior Architect) — Status: running, Files locked: src/schema.ts
-- Agent ghi11111 (Code Reviewer) — Status: idle
+- Agent ghi11111 (Code Reviewer) — Status: idle, Files locked: none
 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked.
-2. Request locks: <!-- LOCK_REQUEST {"filePath": "...", "reason": "..."} -->
-3. Release locks: <!-- LOCK_RELEASE {"filePath": "..."} -->
-4. Message agents: <!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->
-5. Stay within your role's scope.
-6. Log decisions: <!-- ACTIVITY {"action": "decision_made", "summary": "..."} -->
-CREW_CONTEXT -->
+2. Request locks: `<!-- LOCK_REQUEST {"filePath": "...", "reason": "..."} -->`
+3. Release locks: `<!-- LOCK_RELEASE {"filePath": "..."} -->`
+4. Message agents: `<!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->`
+...
+[/CREW CONTEXT]
 ```
 
-### Periodic Refresh (every 30s)
+### Event-Driven Refresh
 
-The `ContextRefresher` pushes updated context to all running agents. Triggers:
+The `ContextRefresher` pushes updated context (`CREW_UPDATE`) to all running agents when significant events occur (agent spawned/killed/exited, file lock acquired/released). Updates are debounced at 2 seconds to batch rapid events.
 
-- Timer: every 30 seconds
-- Events: agent spawned/killed/exited, file lock acquired/released
-- Debounced: 2-second delay to batch rapid events
-
-The refresh includes current peer status and the 20 most recent activity log entries.
+The refresh includes current peer/agent status and the 20 most recent activity log entries.
 
 ## WebSocket Event Catalog
 
@@ -160,6 +181,7 @@ All events are broadcast to connected UI clients in real time:
 | `agent:permission_request` | `{ agentId, ... }` | Tool permission needed |
 | `agent:content` | `{ agentId, content }` | Rich content (image, audio, resource) |
 | `agent:status` | `{ agentId, status }` | Agent status change |
+| `agent:session_ready` | `{ agentId, sessionId }` | ACP session connected, session ID available |
 | `agent:delegated` | `{ parentId, delegation }` | Work delegated to child agent |
 | `agent:completion_reported` | `{ childId, parentId, status }` | Child agent finished work |
 | `agent:message_sent` | `{ from, to, content }` | Inter-agent message |
