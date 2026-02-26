@@ -5,6 +5,10 @@ const SPAWN_REQUEST_REGEX = /<!--\s*SPAWN_AGENT\s*(\{.*?\})\s*-->/s;
 const LOCK_REQUEST_REGEX = /<!--\s*LOCK_REQUEST\s*(\{.*?\})\s*-->/s;
 const LOCK_RELEASE_REGEX = /<!--\s*LOCK_RELEASE\s*(\{.*?\})\s*-->/s;
 const ACTIVITY_REGEX = /<!--\s*ACTIVITY\s*(\{.*?\})\s*-->/s;
+const AGENT_MESSAGE_REGEX = /<!--\s*AGENT_MESSAGE\s*(\{.*?\})\s*-->/s;
+const DELEGATE_REGEX = /<!--\s*DELEGATE\s*(\{.*?\})\s*-->/s;
+const DECISION_REGEX = /<!--\s*DECISION\s*(\{.*?\})\s*-->/s;
+const PROGRESS_REGEX = /<!--\s*PROGRESS\s*(\{.*?\})\s*-->/s;
 
 describe('AgentManager output parsing regexes', () => {
   describe('SPAWN_REQUEST_REGEX', () => {
@@ -135,6 +139,70 @@ describe('AgentManager output parsing regexes', () => {
       expect(spawn.match(ACTIVITY_REGEX)).toBeNull();
       expect(lock.match(ACTIVITY_REGEX)).toBeNull();
       expect(release.match(ACTIVITY_REGEX)).toBeNull();
+    });
+  });
+
+  describe('DELEGATE_REGEX', () => {
+    it('matches a valid DELEGATE comment', () => {
+      const input = '<!-- DELEGATE {"to": "developer", "task": "Build login API"} -->';
+      const match = input.match(DELEGATE_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.to).toBe('developer');
+      expect(parsed.task).toBe('Build login API');
+    });
+
+    it('matches with optional context field', () => {
+      const input = '<!-- DELEGATE {"to": "reviewer", "task": "Review PR", "context": "Focus on auth module"} -->';
+      const match = input.match(DELEGATE_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.context).toBe('Focus on auth module');
+    });
+
+    it('does not match other patterns', () => {
+      expect('<!-- SPAWN_AGENT {"roleId": "reviewer"} -->'.match(DELEGATE_REGEX)).toBeNull();
+      expect('<!-- DECISION {"title": "test"} -->'.match(DELEGATE_REGEX)).toBeNull();
+    });
+  });
+
+  describe('DECISION_REGEX', () => {
+    it('matches a valid DECISION comment', () => {
+      const input = '<!-- DECISION {"title": "Use PostgreSQL", "rationale": "Better concurrency"} -->';
+      const match = input.match(DECISION_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.title).toBe('Use PostgreSQL');
+      expect(parsed.rationale).toBe('Better concurrency');
+    });
+
+    it('matches without rationale', () => {
+      const input = '<!-- DECISION {"title": "Use TypeScript"} -->';
+      const match = input.match(DECISION_REGEX);
+      expect(match).not.toBeNull();
+      expect(JSON.parse(match![1]).title).toBe('Use TypeScript');
+    });
+  });
+
+  describe('PROGRESS_REGEX', () => {
+    it('matches a valid PROGRESS comment', () => {
+      const input = '<!-- PROGRESS {"summary": "2 of 4 done", "completed": ["API", "DB"], "in_progress": ["UI"]} -->';
+      const match = input.match(PROGRESS_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.summary).toBe('2 of 4 done');
+      expect(parsed.completed).toHaveLength(2);
+    });
+  });
+
+  describe('AGENT_MESSAGE_REGEX', () => {
+    it('matches a valid AGENT_MESSAGE comment', () => {
+      const input = '<!-- AGENT_MESSAGE {"to": "abc123", "content": "Please review my changes"} -->';
+      const match = input.match(AGENT_MESSAGE_REGEX);
+      expect(match).not.toBeNull();
+      const parsed = JSON.parse(match![1]);
+      expect(parsed.to).toBe('abc123');
+      expect(parsed.content).toBe('Please review my changes');
     });
   });
 });
