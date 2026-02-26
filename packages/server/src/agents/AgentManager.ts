@@ -625,7 +625,7 @@ export class AgentManager extends EventEmitter {
       const existingAgent = this.getAll().find((a) =>
         a.role.id === role.id &&
         a.parentId === agent.id &&
-        (a.status === 'idle' || a.status === 'running') &&
+        a.status === 'idle' &&
         a.id !== agent.id
       );
 

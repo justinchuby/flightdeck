@@ -297,6 +297,12 @@ Report progress to your parent/lead REGULARLY while working — don't wait until
 - Include: what you've done so far, what you're working on next, any blockers or questions.
 - This helps the lead coordinate the team and avoids the team stalling because no one knows what's happening.
 
+== SHARING LEARNINGS ==
+When you discover something important about the codebase, a pattern, a gotcha, or a design convention:
+- Use BROADCAST to share it with the whole team so everyone benefits.
+- Examples: "This repo uses factory pattern for services", "Tests must be run with --experimental-vm-modules", "The API uses snake_case not camelCase"
+- This prevents other agents from making the same mistakes or rediscovering the same things.
+
 CREW_CONTEXT -->`;
   }
 
