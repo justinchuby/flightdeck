@@ -959,10 +959,16 @@ function parseAgentReport(content: string): { header: string; task: string; outp
   const taskMatch = content.match(/\nTask:\s*(.*?)(?:\n|$)/);
   const outputMatch = content.match(/\nOutput summary:\s*([\s\S]*)$/);
 
+  // Clean output: strip <!-- ... --> fragments and normalize whitespace
+  let output = outputMatch ? outputMatch[1].trim() : '';
+  output = output.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').replace(/^[\s\S]*?-->/g, '').trim();
+  // Collapse fragmented streaming chunks (single words/chars on separate lines)
+  output = output.replace(/\n\s(?=\S)/g, ' ');
+
   return {
     header,
     task: taskMatch ? taskMatch[1].trim() : '',
-    output: outputMatch ? outputMatch[1].trim() : '',
+    output,
     isReport: true,
   };
 }
@@ -1625,11 +1631,12 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
 }
 
 function AgentTextBlock({ text }: { text: string }) {
-  // Split on <!-- ... --> blocks
+  // Split on <!-- ... --> blocks (complete) and also detect unclosed <!-- blocks
   const segments = text.split(/(<!--[\s\S]*?-->)/g);
   return (
     <>
       {segments.map((seg, i) => {
+        // Complete <!-- --> block
         if (seg.startsWith('<!--') && seg.endsWith('-->')) {
           return (
             <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
@@ -1637,8 +1644,35 @@ function AgentTextBlock({ text }: { text: string }) {
             </pre>
           );
         }
+        // Unclosed <!-- block (still streaming or split across messages)
+        if (seg.includes('<!--') && !seg.includes('-->')) {
+          const idx = seg.indexOf('<!--');
+          const before = seg.slice(0, idx);
+          const cmdBlock = seg.slice(idx);
+          return (
+            <span key={i}>
+              {before.trim() ? <MarkdownWithTables text={before} /> : null}
+              <pre className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
+                {cmdBlock}
+              </pre>
+            </span>
+          );
+        }
+        // Dangling --> from a block that started in a previous message
+        if (seg.includes('-->') && !seg.includes('<!--')) {
+          const idx = seg.indexOf('-->') + 3;
+          const cmdBlock = seg.slice(0, idx);
+          const after = seg.slice(idx);
+          return (
+            <span key={i}>
+              <pre className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
+                {cmdBlock}
+              </pre>
+              {after.trim() ? <MarkdownWithTables text={after} /> : null}
+            </span>
+          );
+        }
         if (!seg.trim()) return null;
-        // Split into table blocks and non-table blocks
         return <MarkdownWithTables key={i} text={seg} />;
       })}
     </>

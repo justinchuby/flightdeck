@@ -788,8 +788,10 @@ CREW_ROSTER -->`;
       }
     }
 
-    const preview = agent.messages.slice(-5).join('\n').slice(0, 3000);
-    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${preview || '(no output)'}`;
+    const rawPreview = agent.messages.slice(-5).join('\n').slice(0, 4000);
+    // Strip <!-- ... --> command blocks from preview
+    const cleanPreview = rawPreview.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').trim().slice(0, 3000);
+    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${cleanPreview || '(no output)'}`;
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
     parent.sendMessage(summary);
@@ -818,8 +820,9 @@ CREW_ROSTER -->`;
     }
 
     const status = exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
-    const preview = agent.messages.slice(-5).join('\n').slice(0, 3000);
-    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${preview || '(no output)'}`;
+    const rawPreview2 = agent.messages.slice(-5).join('\n').slice(0, 4000);
+    const cleanPreview2 = rawPreview2.replace(/<!--[\s\S]*?-->/g, '').replace(/<!--[\s\S]*$/g, '').trim().slice(0, 3000);
+    const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
     parent.sendMessage(summary);
