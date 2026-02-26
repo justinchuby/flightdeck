@@ -91,10 +91,12 @@ export class Agent {
 
   start(): void {
     const contextManifest = this.buildContextManifest(this.peers);
-    // System prompt is now in the .agent.md file loaded via --agent flag.
-    // Only send the context manifest and task assignment as the initial prompt.
+    // Include both the role system prompt and context manifest.
+    // The system prompt is also in the .agent.md file (via --agent flag) for
+    // persistence through context compression, but we include it here too
+    // to ensure the agent always sees its role instructions on first message.
     const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.taskId ? `Your assigned task ID is: ${this.taskId}` : 'Awaiting task assignment.'}`;
-    const initialPrompt = `${contextManifest}\n\n${taskAssignment}`;
+    const initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
 
     if (this.mode === 'acp') {
       if (this.resumeSessionId) {
@@ -299,7 +301,7 @@ export class Agent {
       })
       .join('\n');
 
-    return `<!-- CREW_CONTEXT
+    return `[CREW CONTEXT]
 You are agent ${shortId} with role "${this.role.name}".
 
 == YOUR ASSIGNMENT ==
@@ -311,13 +313,19 @@ ${peerLines || '(no other agents)'}
 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked (listed above).
-2. If you need to modify a shared file, request a lock first by outputting: <!-- LOCK_REQUEST {"filePath": "path/to/file", "reason": "why"} -->
-3. When you finish editing a file, release the lock: <!-- LOCK_RELEASE {"filePath": "path/to/file"} -->
-4. To communicate with another agent, use: <!-- AGENT_MESSAGE {"to": "agent-id", "content": "message"} -->
-5. To broadcast a message to ALL team members, use: <!-- BROADCAST {"content": "message"} -->
-6. To get an updated roster of all agents and their IDs, use: <!-- QUERY_CREW -->
-6. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
-7. Log important decisions by outputting: <!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->
+2. If you need to modify a shared file, request a lock first by outputting:
+\`<!-- LOCK_REQUEST {"filePath": "path/to/file", "reason": "why"} -->\`
+3. When you finish editing a file, release the lock:
+\`<!-- LOCK_RELEASE {"filePath": "path/to/file"} -->\`
+4. To communicate with another agent, use:
+\`<!-- AGENT_MESSAGE {"to": "agent-id", "content": "message"} -->\`
+5. To broadcast a message to ALL team members, use:
+\`<!-- BROADCAST {"content": "message"} -->\`
+6. To get an updated roster of all agents and their IDs, use:
+\`<!-- QUERY_CREW -->\`
+7. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
+8. Log important decisions by outputting:
+\`<!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->\`
 
 == SKILLS (reusable knowledge for future work) ==
 Skills are reusable instructions that Copilot CLI loads automatically when relevant. Use them to capture REUSABLE KNOWLEDGE — patterns, techniques, and approaches that will benefit future work sessions.
@@ -379,8 +387,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 - Use BROADCAST to share it with the whole team so everyone benefits.
 - Examples: "This repo uses factory pattern for services", "Tests must be run with --experimental-vm-modules", "The API uses snake_case not camelCase"
 - This prevents other agents from making the same mistakes or rediscovering the same things.
-
-CREW_CONTEXT -->`;
+[/CREW CONTEXT]`;
   }
 
   injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[]): void {
