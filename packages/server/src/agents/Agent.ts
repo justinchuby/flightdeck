@@ -31,6 +31,7 @@ export interface AgentJSON {
   plan?: PlanEntry[];
   toolCalls?: ToolCallInfo[];
   sessionId?: string | null;
+  projectName?: string;
 }
 
 export class Agent {
@@ -47,6 +48,7 @@ export class Agent {
   public toolCalls: ToolCallInfo[] = [];
   public messages: string[] = [];
   public sessionId: string | null = null;
+  public projectName?: string;
   private killed = false;
 
   private pty: PtyManager;
@@ -357,6 +359,7 @@ CREW_UPDATE -->`;
       plan: this.plan,
       toolCalls: this.toolCalls,
       sessionId: this.sessionId,
+      projectName: this.projectName,
     };
   }
 }

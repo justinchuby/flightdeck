@@ -64,6 +64,7 @@ export interface AgentInfo {
   toolCalls?: AcpToolCall[];
   messages?: AcpTextChunk[];
   pendingPermission?: AcpPermissionRequest;
+  projectName?: string;
 }
 
 export type TaskStatus = 'queued' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed';

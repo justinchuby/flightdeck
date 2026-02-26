@@ -167,20 +167,14 @@ export function apiRouter(
 
   // --- Project Lead ---
   router.post('/lead/start', (req, res) => {
-    const { task } = req.body;
+    const { task, name } = req.body;
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
-    // Check if a lead already exists
-    const existing = agentManager.getAll().find((a) => a.role.id === 'lead' && a.status === 'running');
-    if (existing) {
-      return res.json(existing.toJSON());
-    }
-
     try {
       const agent = agentManager.spawn(role, task, undefined, 'acp', true);
+      agent.projectName = name || task?.slice(0, 60) || `Project ${new Date().toLocaleDateString()}`;
       if (task) {
-        // Send initial task after spawn
         setTimeout(() => agent.sendMessage(task), 2000);
       }
       res.status(201).json(agent.toJSON());
@@ -190,42 +184,39 @@ export function apiRouter(
   });
 
   router.get('/lead', (_req, res) => {
-    const lead = agentManager.getAll().find((a) => a.role.id === 'lead' && a.status === 'running');
-    if (!lead) return res.status(404).json({ error: 'No active Project Lead' });
-    res.json(lead.toJSON());
+    const leads = agentManager.getAll()
+      .filter((a) => a.role.id === 'lead')
+      .map((a) => a.toJSON());
+    res.json(leads);
   });
 
-  router.post('/lead/message', (req, res) => {
+  router.get('/lead/:id', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    res.json(agent.toJSON());
+  });
+
+  router.post('/lead/:id/message', (req, res) => {
     const { text } = req.body;
-    const lead = agentManager.getAll().find((a) => a.role.id === 'lead' && a.status === 'running');
-    if (!lead) return res.status(404).json({ error: 'No active Project Lead' });
-    lead.sendMessage(text);
+    const agent = agentManager.get(req.params.id);
+    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    agent.sendMessage(text);
     res.json({ ok: true });
   });
 
-  router.get('/lead/decisions', (_req, res) => {
-    const lead = agentManager.getAll().find((a) => a.role.id === 'lead');
+  router.get('/lead/:id/decisions', (req, res) => {
     const decisionLog = agentManager.getDecisionLog();
-    if (lead) {
-      res.json(decisionLog.getByAgent(lead.id));
-    } else {
-      res.json(decisionLog.getAll());
-    }
+    res.json(decisionLog.getByAgent(req.params.id));
   });
 
-  router.get('/lead/delegations', (_req, res) => {
-    const lead = agentManager.getAll().find((a) => a.role.id === 'lead');
-    if (lead) {
-      res.json(agentManager.getDelegations(lead.id));
-    } else {
-      res.json(agentManager.getDelegations());
-    }
+  router.get('/lead/:id/delegations', (req, res) => {
+    res.json(agentManager.getDelegations(req.params.id));
   });
 
-  router.get('/lead/progress', (_req, res) => {
-    const lead = agentManager.getAll().find((a) => a.role.id === 'lead');
-    const delegations = lead ? agentManager.getDelegations(lead.id) : agentManager.getDelegations();
-    const children = lead ? agentManager.getAll().filter((a) => a.parentId === lead.id) : [];
+  router.get('/lead/:id/progress', (req, res) => {
+    const leadId = req.params.id;
+    const delegations = agentManager.getDelegations(leadId);
+    const children = agentManager.getAll().filter((a) => a.parentId === leadId);
 
     const active = delegations.filter((d) => d.status === 'active').length;
     const completed = delegations.filter((d) => d.status === 'completed').length;
