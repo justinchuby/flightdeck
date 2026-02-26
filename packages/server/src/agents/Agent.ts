@@ -205,6 +205,16 @@ export class Agent {
       }
     });
 
+    // When a prompt starts (including queued/drained prompts), ensure status is 'running'
+    this.acpConnection.on('prompting', (active: boolean) => {
+      if (active && this.status !== 'running') {
+        this.status = 'running';
+        for (const listener of this.statusListeners) {
+          listener(this.status);
+        }
+      }
+    });
+
     this.acpConnection.start({
       cliCommand: this.config.cliCommand,
       cliArgs: [
