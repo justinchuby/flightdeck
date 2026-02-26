@@ -153,7 +153,7 @@ export function LeadDashboard({ api, ws }: Props) {
             agentId,
             agentRole: roleName,
             type: 'tool_call',
-            summary: toolCall.title || toolCall.kind || 'Working...',
+            summary: (typeof toolCall.title === 'string' ? toolCall.title : toolCall.title?.text ?? JSON.stringify(toolCall.title)) || (typeof toolCall.kind === 'string' ? toolCall.kind : JSON.stringify(toolCall.kind)) || 'Working...',
             status: toolCall.status,
             timestamp: Date.now(),
           });
@@ -1048,7 +1048,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
                   <span className="text-[10px] font-mono text-gray-500">{evt.agentId?.slice(0, 8)}</span>
                   <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
-                <span className="text-xs font-mono text-gray-300 break-words">{evt.summary}</span>
+                <span className="text-xs font-mono text-gray-300 break-words">{typeof evt.summary === 'string' ? evt.summary : JSON.stringify(evt.summary)}</span>
               </div>
             </div>
           );

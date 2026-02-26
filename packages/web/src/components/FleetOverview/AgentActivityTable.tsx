@@ -48,10 +48,12 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
     );
     if (active.length > 0) {
       const latest = active[active.length - 1];
-      return { text: `🔧 ${latest.title}`, detail: latest.kind };
+      const title = typeof latest.title === 'string' ? latest.title : (latest.title as any)?.text ?? JSON.stringify(latest.title);
+      return { text: `🔧 ${title}`, detail: typeof latest.kind === 'string' ? latest.kind : JSON.stringify(latest.kind) };
     }
     const last = agent.toolCalls[agent.toolCalls.length - 1];
-    return { text: `✅ ${last.title}`, detail: 'completed' };
+    const lastTitle = typeof last.title === 'string' ? last.title : (last.title as any)?.text ?? JSON.stringify(last.title);
+    return { text: `✅ ${lastTitle}`, detail: 'completed' };
   }
 
   // Plan progress

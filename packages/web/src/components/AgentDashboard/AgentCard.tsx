@@ -108,7 +108,7 @@ export function AgentCard({ agent, api }: Props) {
         const latest = active[active.length - 1] ?? agent.toolCalls[agent.toolCalls.length - 1];
         return (
           <div className="text-[10px] text-gray-400 mt-1 truncate">
-            🔧 {latest.title}
+            🔧 {typeof latest.title === 'string' ? latest.title : (latest.title as any)?.text ?? JSON.stringify(latest.title)}
           </div>
         );
       })()}
