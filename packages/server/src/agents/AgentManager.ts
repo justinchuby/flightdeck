@@ -12,6 +12,7 @@ import { writeAgentFiles } from './agentFiles.js';
 
 // JSON pattern agents can emit to request sub-agent spawning
 const SPAWN_REQUEST_REGEX = /<!--\s*SPAWN_AGENT\s*(\{.*?\})\s*-->/s;
+const CREATE_AGENT_REGEX = /<!--\s*CREATE_AGENT\s*(\{.*?\})\s*-->/s;
 const LOCK_REQUEST_REGEX = /<!--\s*LOCK_REQUEST\s*(\{.*?\})\s*-->/s;
 const LOCK_RELEASE_REGEX = /<!--\s*LOCK_RELEASE\s*(\{.*?\})\s*-->/s;
 const ACTIVITY_REGEX = /<!--\s*ACTIVITY\s*(\{.*?\})\s*-->/s;
@@ -117,6 +118,8 @@ export class AgentManager extends EventEmitter {
       status: a.status,
       taskId: a.taskId,
       lockedFiles: [],
+      model: a.model,
+      parentId: a.parentId,
     }));
 
     const agent = new Agent(role, this.config, taskId, parentId, peers, mode, autopilot);
@@ -145,7 +148,8 @@ export class AgentManager extends EventEmitter {
       } else {
         this.emit('agent:data', agent.id, data);
         // PTY data arrives in larger chunks — match directly
-        this.detectSpawnRequest(agent.id, data);
+        this.detectSpawnRequest(agent, data);
+        this.detectCreateAgent(agent, data);
         this.detectLockRequest(agent, data);
         this.detectLockRelease(agent, data);
         this.detectActivity(agent, data);
@@ -433,7 +437,8 @@ export class AgentManager extends EventEmitter {
     if (!buf) return;
 
     const patterns: Array<{ regex: RegExp; name: string; handler: (agent: Agent, data: string) => void }> = [
-      { regex: SPAWN_REQUEST_REGEX, name: 'SPAWN', handler: (a, d) => this.detectSpawnRequest(a.id, d) },
+      { regex: SPAWN_REQUEST_REGEX, name: 'SPAWN', handler: (a, d) => this.detectSpawnRequest(a, d) },
+      { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => this.detectCreateAgent(a, d) },
       { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => this.detectLockRequest(a, d) },
       { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => this.detectLockRelease(a, d) },
       { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => this.detectActivity(a, d) },
@@ -470,22 +475,85 @@ export class AgentManager extends EventEmitter {
     this.textBuffers.set(agent.id, buf);
   }
 
-  private detectSpawnRequest(agentId: string, data: string): void {
+  private detectSpawnRequest(agent: Agent, data: string): void {
     const match = data.match(SPAWN_REQUEST_REGEX);
     if (!match) return;
 
+    // SPAWN_AGENT is deprecated — only the lead can create agents via CREATE_AGENT
+    logger.warn('agent', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted SPAWN_AGENT — rejected. Only the lead can create agents.`);
+    agent.sendMessage(`[System] SPAWN_AGENT is not available. Only the Project Lead can create agents using CREATE_AGENT. If you need help, ask the lead via AGENT_MESSAGE.`);
+  }
+
+  private detectCreateAgent(agent: Agent, data: string): void {
+    const match = data.match(CREATE_AGENT_REGEX);
+    if (!match) return;
+
     try {
-      const request = JSON.parse(match[1]);
-      const role = this.roleRegistry.get(request.roleId);
-      if (!role) {
-        this.emit('agent:spawn_error', agentId, `Unknown role: ${request.roleId}`);
+      const req = JSON.parse(match[1]);
+
+      // Only lead agents can create agents
+      if (agent.role.id !== 'lead') {
+        logger.warn('agent', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CREATE_AGENT — rejected.`);
+        agent.sendMessage(`[System] Only the Project Lead can create agents. Ask the lead if you need help from a specialist.`);
         return;
       }
-      const parentAgent = this.agents.get(agentId);
-      const child = this.spawn(role, request.taskId, agentId, undefined, undefined, undefined, parentAgent?.cwd);
-      this.emit('agent:sub_spawned', agentId, child.toJSON());
+
+      if (!req.role) {
+        agent.sendMessage(`[System] CREATE_AGENT requires a "role" field. Available roles: ${this.roleRegistry.getAll().filter(r => r.id !== 'lead').map(r => r.id).join(', ')}`);
+        return;
+      }
+
+      const role = this.roleRegistry.get(req.role);
+      if (!role) {
+        agent.sendMessage(`[System] Unknown role: ${req.role}. Available: ${this.roleRegistry.getAll().filter(r => r.id !== 'lead').map(r => r.id).join(', ')}`);
+        return;
+      }
+
+      const child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd, req.sessionId);
+      logger.info('agent', `${agent.role.name} (${agent.id.slice(0, 8)}) created ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${child.id.slice(0, 8)}`);
+
+      // If task is provided, send it and create a delegation record
+      if (req.task) {
+        const delegation: Delegation = {
+          id: `del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          fromAgentId: agent.id,
+          toAgentId: child.id,
+          toRole: role.id,
+          task: req.task,
+          context: req.context,
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        };
+        this.delegations.set(delegation.id, delegation);
+
+        const taskPrompt = req.context ? `${req.task}\n\nContext: ${req.context}` : req.task;
+        child.sendMessage(taskPrompt);
+
+        const ackMsg = `[Agent ACK] Created ${role.name} (${child.id.slice(0, 8)})${req.model ? ` on ${req.model}` : ''} — task: ${req.task.slice(0, 120)}`;
+        agent.sendMessage(ackMsg);
+        this.emit('agent:message_sent', {
+          from: child.id, fromRole: role.name,
+          to: agent.id, toRole: agent.role.name,
+          content: ackMsg,
+        });
+        this.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
+
+        this.activityLedger.log(agent.id, agent.role.id, 'delegated', `Created & delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
+          childId: child.id, childRole: role.id, delegationId: delegation.id,
+        });
+      } else {
+        const ackMsg = `[Agent ACK] Created ${role.name} (${child.id.slice(0, 8)})${req.model ? ` on ${req.model}` : ''} — ready for tasks. Use DELEGATE to assign work.`;
+        agent.sendMessage(ackMsg);
+        this.emit('agent:message_sent', {
+          from: child.id, fromRole: role.name,
+          to: agent.id, toRole: agent.role.name,
+          content: ackMsg,
+        });
+      }
+
+      this.emit('agent:sub_spawned', agent.id, child.toJSON());
     } catch (err: any) {
-      this.emit('agent:spawn_error', agentId, err.message);
+      this.emit('agent:spawn_error', agent.id, err.message);
     }
   }
 
@@ -629,35 +697,23 @@ export class AgentManager extends EventEmitter {
       const req = JSON.parse(match[1]);
       if (!req.to || !req.task) return;
 
-      // Only lead agents can delegate to role agents
+      // Only lead agents can delegate
       if (agent.role.id !== 'lead') {
-        logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — ignoring. Use SPAWN_AGENT for sub-agents.`);
-        agent.sendMessage(`[System] Only the Project Lead can delegate to role agents. Use <!-- SPAWN_AGENT {"roleId":"worker","taskId":"your task"} --> to create sub-agents for parallel work.`);
+        logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — rejected.`);
+        agent.sendMessage(`[System] Only the Project Lead can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
         return;
       }
 
-      const role = this.roleRegistry.get(req.to);
-      if (!role) {
-        this.emit('agent:delegate_error', agent.id, `Unknown role: ${req.to}`);
-        return;
-      }
-
-      // Try to reuse an idle agent with the same role under the same lead
-      const existingAgent = this.getAll().find((a) =>
-        a.role.id === role.id &&
+      // Find the target agent by ID (partial match supported: first 8 chars)
+      const child = this.getAll().find((a) =>
+        (a.id === req.to || a.id.startsWith(req.to)) &&
         a.parentId === agent.id &&
-        a.status === 'idle' &&
         a.id !== agent.id
       );
 
-      let child: Agent;
-      if (existingAgent) {
-        child = existingAgent;
-        logger.info('delegation', `Reusing idle ${role.name} (${child.id.slice(0, 8)}) for new task from ${agent.role.name}`);
-      } else {
-        // No idle agent available — spawn a new one, with optional model/session override from lead
-        child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd, req.sessionId);
-        logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}${req.model ? ` (model: ${req.model})` : ''}${req.sessionId ? ` (resume: ${req.sessionId.slice(0, 12)})` : ''}: ${req.task.slice(0, 80)}`);
+      if (!child) {
+        agent.sendMessage(`[System] Agent not found: ${req.to}. Use CREATE_AGENT to create a new agent first, or use QUERY_CREW to see available agents.`);
+        return;
       }
 
       // Track delegation
@@ -665,7 +721,7 @@ export class AgentManager extends EventEmitter {
         id: `del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         fromAgentId: agent.id,
         toAgentId: child.id,
-        toRole: role.id,
+        toRole: child.role.id,
         task: req.task,
         context: req.context,
         status: 'active',
@@ -679,26 +735,25 @@ export class AgentManager extends EventEmitter {
         : req.task;
       child.sendMessage(taskPrompt);
 
-      // Acknowledge delegation back to lead so it knows the task was received
-      const ackMsg = `[Agent ACK] ${role.name} (${child.id.slice(0, 8)}) acknowledged task: ${req.task.slice(0, 120)}`;
+      // Acknowledge delegation back to lead
+      const statusNote = child.status === 'running' ? ' (agent is busy — task queued)' : '';
+      const ackMsg = `[Agent ACK] ${child.role.name} (${child.id.slice(0, 8)}) acknowledged task${statusNote}: ${req.task.slice(0, 120)}`;
       agent.sendMessage(ackMsg);
       this.emit('agent:message_sent', {
         from: child.id,
-        fromRole: role.name,
+        fromRole: child.role.name,
         to: agent.id,
         toRole: agent.role.name,
         content: ackMsg,
       });
 
-      const agentRole = agent.role?.id ?? 'unknown';
-      this.activityLedger.log(agent.id, agentRole, 'delegated', `Delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
+      this.activityLedger.log(agent.id, agent.role.id, 'delegated', `Delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 100)}`, {
         childId: child.id,
-        childRole: role.id,
+        childRole: child.role.id,
         delegationId: delegation.id,
       });
 
       this.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
-      this.emit('agent:sub_spawned', agent.id, child.toJSON());
     } catch (err: any) {
       this.emit('agent:delegate_error', agent.id, err.message);
     }
@@ -753,14 +808,17 @@ export class AgentManager extends EventEmitter {
         status: a.status,
         task: a.taskId?.slice(0, 80) || null,
         parentId: a.parentId?.slice(0, 8) || null,
+        model: a.model || a.role.model || 'default',
       }));
 
     const response = `<!-- CREW_ROSTER
 == ACTIVE CREW MEMBERS ==
-${roster.map((r) => `- ${r.id} | ${r.role} (${r.roleId}) | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`).join('\n')}
+${roster.map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`).join('\n')}
 
-To message an agent, use their ID (first 8 chars is enough):
-<!-- AGENT_MESSAGE {"to": "agent-id", "content": "your message"} -->
+To assign a task to an agent, use their ID:
+\`<!-- DELEGATE {"to": "agent-id", "task": "your task"} -->\`
+To create a new agent:
+\`<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} -->\`
 CREW_ROSTER -->`;
 
     logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);

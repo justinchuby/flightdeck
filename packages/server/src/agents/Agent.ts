@@ -17,6 +17,8 @@ export interface AgentContextInfo {
   status: AgentStatus;
   taskId?: string;
   lockedFiles: string[];
+  model?: string;
+  parentId?: string;
 }
 
 export interface AgentJSON {
@@ -293,13 +295,34 @@ export class Agent {
     const shortId = this.id.slice(0, 8);
     const taskLine = this.taskId ? this.taskId : 'Awaiting assignment';
 
-    const peerLines = peers
+    // For leads: show "YOUR AGENTS" (children) separately from other peers
+    const isLead = this.role.id === 'lead';
+    const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
+    const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
+
+    const childLines = myChildren
+      .map((p) => {
+        const pShort = p.id.slice(0, 8);
+        const modelStr = p.model ? ` [${p.model}]` : '';
+        return `- ${pShort} — ${p.roleName}${modelStr} — ${p.status}${p.taskId ? `, task: ${p.taskId.slice(0, 80)}` : ''}`;
+      })
+      .join('\n');
+
+    const peerLines = otherPeers
       .map((p) => {
         const pShort = p.id.slice(0, 8);
         const files = p.lockedFiles.length > 0 ? p.lockedFiles.join(', ') : 'none';
         return `- Agent ${pShort} (${p.roleName}) — Status: ${p.status}, Working on: ${p.taskId || 'idle'}, Files locked: ${files}`;
       })
       .join('\n');
+
+    const crewSection = isLead
+      ? `== YOUR AGENTS ==
+${childLines || '(no agents created yet — use CREATE_AGENT to create specialists)'}
+Use agent IDs above with DELEGATE to assign tasks, or AGENT_MESSAGE to communicate.
+${otherPeers.length > 0 ? `\n== OTHER CREW MEMBERS ==\n${peerLines}` : ''}`
+      : `== ACTIVE CREW MEMBERS ==
+${peerLines || '(no other agents)'}`;
 
     return `[CREW CONTEXT]
 You are agent ${shortId} with role "${this.role.name}".
@@ -308,8 +331,7 @@ You are agent ${shortId} with role "${this.role.name}".
 - Task: ${taskLine}
 - You are responsible for: ${this.role.description}
 
-== ACTIVE CREW MEMBERS ==
-${peerLines || '(no other agents)'}
+${crewSection}
 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked (listed above).
@@ -391,7 +413,19 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   }
 
   injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[]): void {
-    const peerLines = peers
+    const isLead = this.role.id === 'lead';
+    const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
+    const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
+
+    const childLines = myChildren
+      .map((p) => {
+        const pShort = p.id.slice(0, 8);
+        const modelStr = p.model ? ` [${p.model}]` : '';
+        return `- ${pShort} — ${p.roleName}${modelStr} — ${p.status}${p.taskId ? `, task: ${p.taskId.slice(0, 80)}` : ''}`;
+      })
+      .join('\n');
+
+    const peerLines = otherPeers
       .map((p) => {
         const pShort = p.id.slice(0, 8);
         const files = p.lockedFiles.length > 0 ? p.lockedFiles.join(', ') : 'none';
@@ -399,13 +433,16 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       })
       .join('\n');
 
+    const crewStatus = isLead
+      ? `== YOUR AGENTS ==\n${childLines || '(no agents — use CREATE_AGENT)'}${otherPeers.length > 0 ? `\n== OTHER CREW ==\n${peerLines}` : ''}`
+      : `== CURRENT CREW STATUS ==\n${peerLines || '(no other agents)'}`;
+
     const activityLines = recentActivity.length > 0
       ? recentActivity.join('\n')
       : '(no recent activity)';
 
     const update = `<!-- CREW_UPDATE
-== CURRENT CREW STATUS ==
-${peerLines || '(no other agents)'}
+${crewStatus}
 == RECENT ACTIVITY ==
 ${activityLines}
 CREW_UPDATE -->`;
