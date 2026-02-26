@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X, BarChart3 } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
-import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
+import type { ActivityEvent, AgentComm, ProgressSnapshot } from '../../stores/leadStore';
 import type { AcpTextChunk } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 
@@ -24,6 +24,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showProgressDetail, setShowProgressDetail] = useState(false);
   const isResizing = useRef(false);
 
   const leadAgents = agents.filter((a) => a.role.id === 'lead');
@@ -190,6 +191,14 @@ export function LeadDashboard({ api, ws }: Props) {
         if (msg.summary) {
           store.setProgressSummary(leadId, msg.summary);
         }
+        // Store full snapshot for detail view
+        store.addProgressSnapshot(leadId, {
+          summary: msg.summary || 'Progress update',
+          completed: Array.isArray(msg.completed) ? msg.completed : [],
+          inProgress: Array.isArray(msg.in_progress) ? msg.in_progress : [],
+          blocked: Array.isArray(msg.blocked) ? msg.blocked : [],
+          timestamp: Date.now(),
+        });
         // Build a display string for the activity feed
         const parts: string[] = [];
         if (msg.summary) parts.push(msg.summary);
@@ -315,6 +324,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const decisions = currentProject?.decisions ?? [];
   const progress = currentProject?.progress ?? null;
   const progressSummary = currentProject?.progressSummary ?? null;
+  const progressHistory = currentProject?.progressHistory ?? [];
   const activity = currentProject?.activity ?? [];
   const comms = currentProject?.comms ?? [];
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
@@ -494,9 +504,13 @@ export function LeadDashboard({ api, ws }: Props) {
         <>
           {/* Chat area */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Progress banner */}
+            {/* Progress banner — clickable to open detail */}
             {progress && progress.totalDelegations > 0 && (
-              <div className="border-b border-gray-700 px-4 py-2 flex items-center gap-4 text-sm font-mono bg-gray-800/50">
+              <div
+                className="border-b border-gray-700 px-4 py-2 flex items-center gap-4 text-sm font-mono bg-gray-800/50 cursor-pointer hover:bg-gray-800/80 transition-colors"
+                onClick={() => setShowProgressDetail(true)}
+                title="Click for detailed progress view"
+              >
                 <div className="flex items-center gap-1.5">
                   <Users className="w-4 h-4 text-blue-400" />
                   <span>{progress.teamSize} agents</span>
@@ -527,7 +541,11 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
             {progressSummary && (
-              <div className="border-b border-gray-700 px-4 py-1.5 text-xs text-gray-400 bg-gray-800/30 font-mono truncate">
+              <div
+                className="border-b border-gray-700 px-4 py-1.5 text-xs text-gray-400 bg-gray-800/30 font-mono truncate cursor-pointer hover:bg-gray-800/50 transition-colors"
+                onClick={() => setShowProgressDetail(true)}
+                title="Click for detailed progress view"
+              >
                 📋 {progressSummary}
               </div>
             )}
@@ -702,6 +720,162 @@ export function LeadDashboard({ api, ws }: Props) {
             </div>
           )}
         </>
+      )}
+
+      {/* Progress detail popup */}
+      {showProgressDetail && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowProgressDetail(false); }}
+        >
+          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-purple-400" />
+                <span className="text-sm font-semibold text-gray-100">Progress Detail</span>
+              </div>
+              <button onClick={() => setShowProgressDetail(false)} className="text-gray-400 hover:text-gray-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-4">
+              {/* Delegation stats */}
+              {progress && progress.totalDelegations > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 mb-2">Delegation Overview</p>
+                  <div className="flex items-center gap-4 text-sm font-mono mb-2">
+                    <span className="text-blue-400">{progress.teamSize} agents</span>
+                    <span className="text-yellow-400">{progress.active} active</span>
+                    <span className="text-green-400">{progress.completed} done</span>
+                    {progress.failed > 0 && <span className="text-red-400">{progress.failed} failed</span>}
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2.5 mb-1">
+                    <div
+                      className="bg-green-500 h-2.5 rounded-full transition-all"
+                      style={{ width: `${progress.completionPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 font-mono text-right">{progress.completionPct}% complete</p>
+                </div>
+              )}
+
+              {/* Agent team roster */}
+              {progress && progress.teamAgents && progress.teamAgents.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 mb-2">Team Roster</p>
+                  <div className="space-y-1">
+                    {progress.teamAgents.map((ta) => (
+                      <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-gray-700/50 text-xs font-mono">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : 'bg-gray-500'}`} />
+                        <span className="text-gray-200">{ta.role?.name || 'Agent'}</span>
+                        <span className="text-gray-500">{ta.id.slice(0, 8)}</span>
+                        <span className="ml-auto text-gray-400">{ta.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Latest lead progress report */}
+              {progressHistory.length > 0 && (() => {
+                const latest = progressHistory[progressHistory.length - 1];
+                return (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 mb-2">Latest Lead Report</p>
+                    <p className="text-sm font-mono text-gray-200 mb-3">{latest.summary}</p>
+                    {latest.completed.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs text-green-400 font-semibold mb-1">✓ Completed</p>
+                        <ul className="space-y-0.5">
+                          {latest.completed.map((item, i) => (
+                            <li key={i} className="text-xs font-mono text-gray-300 pl-4 flex items-center gap-1.5">
+                              <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {latest.inProgress.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs text-blue-400 font-semibold mb-1">⟳ In Progress</p>
+                        <ul className="space-y-0.5">
+                          {latest.inProgress.map((item, i) => (
+                            <li key={i} className="text-xs font-mono text-gray-300 pl-4 flex items-center gap-1.5">
+                              <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {latest.blocked.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs text-red-400 font-semibold mb-1">⚠ Blocked</p>
+                        <ul className="space-y-0.5">
+                          {latest.blocked.map((item, i) => (
+                            <li key={i} className="text-xs font-mono text-gray-300 pl-4 flex items-center gap-1.5">
+                              <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-gray-600 font-mono mt-2">
+                      {new Date(latest.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Progress history timeline */}
+              {progressHistory.length > 1 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 mb-2">Progress Timeline</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {[...progressHistory].reverse().slice(1).map((snap, i) => (
+                      <div key={i} className="flex items-start gap-2 border-l-2 border-gray-600 pl-3 py-1">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-mono text-gray-300">{snap.summary}</p>
+                          <div className="flex items-center gap-3 mt-0.5 text-[10px] font-mono text-gray-500">
+                            {snap.completed.length > 0 && <span className="text-green-500">✓{snap.completed.length}</span>}
+                            {snap.inProgress.length > 0 && <span className="text-blue-400">⟳{snap.inProgress.length}</span>}
+                            {snap.blocked.length > 0 && <span className="text-red-400">⚠{snap.blocked.length}</span>}
+                            <span>{new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Delegation details */}
+              {progress && progress.delegations && progress.delegations.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 mb-2">Delegations</p>
+                  <div className="space-y-1">
+                    {progress.delegations.map((d: any, i: number) => (
+                      <div key={d.id || i} className="px-2 py-1.5 rounded bg-gray-700/50 text-xs font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-green-500/20 text-green-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                            {d.status}
+                          </span>
+                          <span className="text-gray-300">{d.toRole}</span>
+                          <span className="text-gray-500 ml-auto">{d.childId?.slice(0, 8)}</span>
+                        </div>
+                        {d.task && (
+                          <p className="text-gray-400 mt-1 break-words">{d.task.length > 120 ? d.task.slice(0, 120) + '…' : d.task}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
