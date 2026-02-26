@@ -583,7 +583,7 @@ export function LeadDashboard({ api, ws }: Props) {
                               <span className="text-xs font-mono font-semibold text-indigo-400">{r.fromRole}</span>
                               <span className="text-[10px] text-gray-600 ml-auto">{time}</span>
                             </div>
-                            <p className="text-xs font-mono text-gray-300 truncate">{r.content.length > 150 ? r.content.slice(0, 150) + '…' : r.content}</p>
+                            <AgentReportBlock content={r.content} compact />
                           </div>
                         </div>
                       );
@@ -941,11 +941,64 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
-              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
-                {expandedReport.content}
-              </pre>
+              <AgentReportBlock content={expandedReport.content} />
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Parse [Agent Report] formatted content into structured parts */
+function parseAgentReport(content: string): { header: string; task: string; output: string; isReport: boolean } {
+  const reportMatch = content.match(/^\[Agent Report\]\s*(.+?)(?:\n|$)/);
+  if (!reportMatch) return { header: '', task: '', output: '', isReport: false };
+
+  const header = reportMatch[1].trim();
+  const taskMatch = content.match(/\nTask:\s*(.*?)(?:\n|$)/);
+  const outputMatch = content.match(/\nOutput summary:\s*([\s\S]*)$/);
+
+  return {
+    header,
+    task: taskMatch ? taskMatch[1].trim() : '',
+    output: outputMatch ? outputMatch[1].trim() : '',
+    isReport: true,
+  };
+}
+
+/** Render an agent report with structured formatting */
+function AgentReportBlock({ content, compact }: { content: string; compact?: boolean }) {
+  const parsed = parseAgentReport(content);
+  if (!parsed.isReport) {
+    return <span className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-words">{content}</span>;
+  }
+
+  if (compact) {
+    return (
+      <div className="text-xs font-mono">
+        <span className="text-gray-200">{parsed.header}</span>
+        {parsed.task && <span className="text-gray-500"> — {parsed.task.length > 80 ? parsed.task.slice(0, 80) + '…' : parsed.task}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 text-sm font-mono">
+      <div className="flex items-center gap-2">
+        <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+        <span className="text-gray-200 font-semibold">{parsed.header}</span>
+      </div>
+      {parsed.task && (
+        <div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Task</span>
+          <p className="text-gray-300 whitespace-pre-wrap break-words mt-0.5">{parsed.task}</p>
+        </div>
+      )}
+      {parsed.output && (
+        <div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Output</span>
+          <pre className="text-gray-300 whitespace-pre-wrap break-words mt-0.5 bg-gray-900/50 rounded p-2 text-xs max-h-60 overflow-y-auto">{parsed.output}</pre>
         </div>
       )}
     </div>
@@ -1236,9 +1289,14 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
-              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
-                {selectedComm.content}
-              </pre>
+              {selectedComm.content.startsWith('[Agent Report]')
+                ? <AgentReportBlock content={selectedComm.content} />
+                : (
+                  <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                    {selectedComm.content}
+                  </pre>
+                )
+              }
             </div>
           </div>
         </div>
@@ -1276,9 +1334,12 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
                   <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
                   <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
-                <p className="text-xs font-mono text-gray-300 mt-0.5 truncate">
-                  {c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content}
-                </p>
+                <div className="text-xs font-mono text-gray-300 mt-0.5">
+                  {c.content.startsWith('[Agent Report]')
+                    ? <AgentReportBlock content={c.content} compact />
+                    : <p className="truncate">{c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content}</p>
+                  }
+                </div>
               </div>
             );
           })
@@ -1313,9 +1374,14 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
-              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
-                {selectedComm.content}
-              </pre>
+              {selectedComm.content.startsWith('[Agent Report]')
+                ? <AgentReportBlock content={selectedComm.content} />
+                : (
+                  <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                    {selectedComm.content}
+                  </pre>
+                )
+              }
             </div>
           </div>
         </div>
