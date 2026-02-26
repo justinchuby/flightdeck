@@ -174,16 +174,17 @@ export function apiRouter(
 
   // --- Project Lead ---
   router.post('/lead/start', (req, res) => {
-    const { task, name, model } = req.body;
+    const { task, name, model, cwd } = req.body;
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
     try {
-      const agent = agentManager.spawn(role, task, undefined, 'acp', true, model);
+      const agent = agentManager.spawn(role, task, undefined, 'acp', true, model, cwd);
       agent.projectName = name || task?.slice(0, 60) || `Project ${new Date().toLocaleDateString()}`;
       logger.info('lead', `Started project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
         task: task?.slice(0, 80),
         model: model || role.model,
+        cwd: cwd || process.cwd(),
       });
       if (task) {
         setTimeout(() => {
@@ -218,6 +219,20 @@ export function apiRouter(
     logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
     agent.sendMessage(`[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`);
     res.json({ ok: true });
+  });
+
+  router.patch('/lead/:id', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    const { cwd, projectName } = req.body;
+    if (cwd !== undefined) {
+      agent.cwd = cwd;
+      logger.info('lead', `Updated cwd for ${agent.projectName || agent.id.slice(0, 8)}: ${cwd}`);
+    }
+    if (projectName !== undefined) {
+      agent.projectName = projectName;
+    }
+    res.json(agent.toJSON());
   });
 
   router.get('/lead/:id/decisions', (req, res) => {

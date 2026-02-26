@@ -98,7 +98,7 @@ export class AgentManager extends EventEmitter {
     });
   }
 
-  spawn(role: Role, taskId?: string, parentId?: string, mode?: AgentMode, autopilot?: boolean, model?: string): Agent {
+  spawn(role: Role, taskId?: string, parentId?: string, mode?: AgentMode, autopilot?: boolean, model?: string, cwd?: string): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
       throw new Error(
@@ -117,6 +117,7 @@ export class AgentManager extends EventEmitter {
 
     const agent = new Agent(role, this.config, taskId, parentId, peers, mode, autopilot);
     if (model) agent.model = model;
+    if (cwd) agent.cwd = cwd;
 
     // Track parent-child relationship
     if (parentId) {
@@ -213,7 +214,7 @@ export class AgentManager extends EventEmitter {
         if (this.autoRestart && count < this.maxRestarts) {
           logger.warn('agent', `Auto-restarting ${agent.role.name} (attempt ${count + 1}/${this.maxRestarts})`);
           setTimeout(() => {
-            const newAgent = this.spawn(agent.role, agent.taskId, agent.parentId);
+            const newAgent = this.spawn(agent.role, agent.taskId, agent.parentId, undefined, undefined, undefined, agent.cwd);
             this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
           }, 2000);
         } else if (count >= this.maxRestarts) {
@@ -459,7 +460,8 @@ export class AgentManager extends EventEmitter {
         this.emit('agent:spawn_error', agentId, `Unknown role: ${request.roleId}`);
         return;
       }
-      const child = this.spawn(role, request.taskId, agentId);
+      const parentAgent = this.agents.get(agentId);
+      const child = this.spawn(role, request.taskId, agentId, undefined, undefined, undefined, parentAgent?.cwd);
       this.emit('agent:sub_spawned', agentId, child.toJSON());
     } catch (err: any) {
       this.emit('agent:spawn_error', agentId, err.message);
@@ -633,7 +635,7 @@ export class AgentManager extends EventEmitter {
         logger.info('delegation', `Reusing idle ${role.name} (${child.id.slice(0, 8)}) for new task from ${agent.role.name}`);
       } else {
         // No idle agent available — spawn a new one, with optional model override from lead
-        child = this.spawn(role, req.task, agent.id, 'acp', true, req.model);
+        child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd);
         logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${req.task.slice(0, 80)}`);
       }
 

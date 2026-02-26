@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
@@ -18,6 +18,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectTask, setNewProjectTask] = useState('');
   const [newProjectModel, setNewProjectModel] = useState('');
+  const [newProjectCwd, setNewProjectCwd] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -230,13 +231,13 @@ export function LeadDashboard({ api, ws }: Props) {
     document.addEventListener('mouseup', onMouseUp);
   }, [sidebarWidth]);
 
-  const startLead = useCallback(async (name: string, task?: string, model?: string) => {
+  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string) => {
     setStarting(true);
     try {
       const resp = await fetch('/api/lead/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, task, model: model || undefined }),
+        body: JSON.stringify({ name, task, model: model || undefined, cwd: cwd || undefined }),
       });
       const data = await resp.json();
       if (data.id) {
@@ -370,9 +371,16 @@ export function LeadDashboard({ api, ws }: Props) {
               <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
               <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
             </select>
+            <input
+              type="text"
+              value={newProjectCwd}
+              onChange={(e) => setNewProjectCwd(e.target.value)}
+              placeholder="Working directory (default: server cwd)"
+              className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+            />
             <div className="flex gap-2">
               <button
-                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined)}
+                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined)}
                 disabled={starting}
                 className="flex-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold py-1.5 rounded flex items-center justify-center gap-1"
               >
@@ -380,7 +388,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 {starting ? '...' : 'Create'}
               </button>
               <button
-                onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); }}
+                onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); }}
                 className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200"
               >
                 Cancel
@@ -434,6 +442,9 @@ export function LeadDashboard({ api, ws }: Props) {
                 <span className="text-gray-400">{progress.completionPct}%</span>
               </div>
             )}
+
+            {/* Working directory bar */}
+            <CwdBar leadId={selectedLeadId!} cwd={leadAgent?.cwd} />
 
             {/* Messages */}
             <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -866,6 +877,56 @@ function CollapsibleSection({
             onMouseDown={startResize}
             className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
           />
+        </>
+      )}
+    </div>
+  );
+}
+
+function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(cwd || '');
+  const { updateAgent } = useAppStore();
+
+  useEffect(() => { setValue(cwd || ''); }, [cwd]);
+
+  const save = async () => {
+    const trimmed = value.trim();
+    await fetch(`/api/lead/${leadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: trimmed || undefined }),
+    });
+    updateAgent(leadId, { cwd: trimmed || undefined });
+    setEditing(false);
+  };
+
+  return (
+    <div className="border-b border-gray-700 px-4 py-1.5 flex items-center gap-2 text-xs font-mono bg-gray-800/30">
+      <FolderOpen className="w-3 h-3 text-gray-500 shrink-0" />
+      {editing ? (
+        <>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+            placeholder="/path/to/project"
+            className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+            autoFocus
+          />
+          <button onClick={save} className="text-green-400 hover:text-green-300 p-0.5"><Check className="w-3 h-3" /></button>
+          <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-200 p-0.5"><X className="w-3 h-3" /></button>
+        </>
+      ) : (
+        <>
+          <span className="text-gray-400 truncate flex-1" title={cwd}>{cwd || '(server default)'}</span>
+          <button
+            onClick={() => setEditing(true)}
+            className="text-gray-500 hover:text-yellow-400 text-[10px] shrink-0"
+          >
+            edit
+          </button>
         </>
       )}
     </div>

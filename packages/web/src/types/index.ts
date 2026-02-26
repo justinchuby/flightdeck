@@ -72,6 +72,7 @@ export interface AgentInfo {
   pendingPermission?: AcpPermissionRequest;
   projectName?: string;
   model?: string;
+  cwd?: string;
 }
 
 export type TaskStatus = 'queued' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed';

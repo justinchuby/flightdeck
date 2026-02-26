@@ -34,6 +34,7 @@ export interface AgentJSON {
   sessionId?: string | null;
   projectName?: string;
   model?: string;
+  cwd?: string;
 }
 
 export class Agent {
@@ -53,6 +54,8 @@ export class Agent {
   public projectName?: string;
   /** Model override for this agent (e.g. "claude-opus-4.6"). Overrides role default. */
   public model?: string;
+  /** Working directory for this agent's CLI process */
+  public cwd?: string;
   private killed = false;
 
   private pty: PtyManager;
@@ -99,6 +102,7 @@ export class Agent {
         ...this.config.cliArgs,
         ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
       ],
+      cwd: this.cwd,
       env: {
         AI_CREW_AGENT_ID: this.id,
         AI_CREW_ROLE: this.role.id,
@@ -221,7 +225,7 @@ export class Agent {
         ...this.config.cliArgs,
         ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
       ],
-      cwd: process.cwd(),
+      cwd: this.cwd || process.cwd(),
     }).then((sessionId) => {
       this.sessionId = sessionId;
       return this.acpConnection!.prompt(initialPrompt);
@@ -442,6 +446,7 @@ CREW_UPDATE -->`;
       sessionId: this.sessionId,
       projectName: this.projectName,
       model: this.model || this.role.model,
+      cwd: this.cwd,
     };
   }
 }
