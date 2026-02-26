@@ -1806,15 +1806,15 @@ function CollapsibleCommandBlock({ text }: { text: string }) {
   }
   return (
     <div
-      className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 cursor-pointer hover:border-gray-600 transition-colors"
+      className="my-1 px-2 py-1 bg-gray-800/80 border border-gray-600 rounded text-[11px] text-gray-300 cursor-pointer hover:border-gray-500 transition-colors"
       onClick={() => setExpanded((e) => !e)}
     >
       <div className="flex items-center gap-1 min-w-0">
         {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-gray-400 shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-gray-600 truncate ml-1">— {preview}</span>}
+        <span className="font-mono text-gray-300 shrink-0">{label}</span>
+        {!expanded && preview && <span className="font-mono text-gray-400 truncate ml-1">— {preview}</span>}
       </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words">{text}</pre>}
+      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-gray-400">{text}</pre>}
     </div>
   );
 }
