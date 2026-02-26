@@ -25,7 +25,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const leadAgents = agents.filter((a) => a.role.id === 'lead');
   const currentProject = selectedLeadId ? projects[selectedLeadId] : null;
   const leadAgent = agents.find((a) => a.id === selectedLeadId);
-  const isActive = leadAgent && leadAgent.status === 'running';
+  const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
   // On mount, load existing leads from server
   useEffect(() => {

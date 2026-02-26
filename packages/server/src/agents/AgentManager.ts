@@ -76,7 +76,7 @@ export class AgentManager extends EventEmitter {
     this.messageBus.on('message', (msg) => {
       if (msg.to === '*') return; // broadcasts handled elsewhere
       const target = this.agents.get(msg.to);
-      if (target && target.status === 'running') {
+      if (target && (target.status === 'running' || target.status === 'idle')) {
         const fromAgent = this.agents.get(msg.from);
         const fromLabel = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
         logger.info('message', `Delivering: ${fromLabel} → ${target.role.name} (${msg.to.slice(0, 8)})`, {
@@ -435,26 +435,26 @@ export class AgentManager extends EventEmitter {
       let targetId = msg.to;
       if (!this.agents.has(targetId)) {
         // Try short ID prefix match (agents see 8-char prefixes in context)
-        const byPrefix = this.getAll().find((a) => a.id.startsWith(msg.to) && a.status === 'running');
+        const byPrefix = this.getAll().find((a) => a.id.startsWith(msg.to) && (a.status === 'running' || a.status === 'idle'));
         if (byPrefix) {
           targetId = byPrefix.id;
         } else {
           // Try to find by role ID
-          const byRoleId = this.getAll().find((a) => a.role.id === msg.to && a.status === 'running');
+          const byRoleId = this.getAll().find((a) => a.role.id === msg.to && (a.status === 'running' || a.status === 'idle'));
           if (byRoleId) {
             targetId = byRoleId.id;
           } else {
             // Try by role name (case-insensitive)
             const lower = msg.to.toLowerCase();
             const byRoleName = this.getAll().find((a) =>
-              a.role.name.toLowerCase() === lower && a.status === 'running'
+              a.role.name.toLowerCase() === lower && (a.status === 'running' || a.status === 'idle')
             );
             if (byRoleName) {
               targetId = byRoleName.id;
             } else {
               // Try partial match on role
               const partial = this.getAll().find((a) =>
-                (a.role.id.includes(lower) || a.role.name.toLowerCase().includes(lower)) && a.status === 'running'
+                (a.role.id.includes(lower) || a.role.name.toLowerCase().includes(lower)) && (a.status === 'running' || a.status === 'idle')
               );
               if (partial) targetId = partial.id;
             }
@@ -574,7 +574,7 @@ export class AgentManager extends EventEmitter {
   private notifyParentOfCompletion(agent: Agent, exitCode: number | null): void {
     if (!agent.parentId) return;
     const parent = this.agents.get(agent.parentId);
-    if (!parent || parent.status !== 'running') return;
+    if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
 
     // Update delegation records
     for (const [, del] of this.delegations) {
