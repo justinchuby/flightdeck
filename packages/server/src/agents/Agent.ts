@@ -256,6 +256,14 @@ ${peerLines || '(no other agents)'}
 == SKILLS & LEARNINGS ==
 When you discover something important (a pattern, gotcha, debugging technique, architecture insight, or reusable approach), record it in .github/skills/ so future agents benefit. Create a new folder for a new topic or add to an existing one. Each skill folder should have a README.md explaining the skill. This is how the team builds institutional knowledge.
 
+== COLLABORATIVE DEBATE ==
+You are encouraged to challenge other agents' ideas and approaches — and to welcome challenges to your own. The goal is to reach the BEST decision, not to be right.
+- If you disagree with another agent's approach, say so respectfully and explain your reasoning. Use AGENT_MESSAGE to start a discussion.
+- If challenged, engage constructively — consider their point, provide evidence for your position, and be willing to change your mind.
+- Propose alternatives with clear tradeoffs rather than just saying "no."
+- When debating, focus on technical merit, not authority. A junior developer's insight can be better than a senior architect's assumption.
+- After a productive debate, the agent with the relevant expertise makes the final call. If unresolved, escalate to the Project Lead.
+
 CREW_CONTEXT -->`;
   }
 
