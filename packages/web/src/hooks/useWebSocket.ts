@@ -89,9 +89,8 @@ export function useWebSocket() {
           const last = msgs[msgs.length - 1];
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
-          if (last && (last.sender ?? 'agent') === 'agent') {
-            const separator = needsNewline ? '\n' : '';
-            msgs[msgs.length - 1] = { ...last, text: last.text + separator + msg.text };
+          if (last && (last.sender ?? 'agent') === 'agent' && !needsNewline) {
+            msgs[msgs.length - 1] = { ...last, text: last.text + msg.text };
           } else {
             msgs.push({ type: 'text', text: msg.text, sender: 'agent' });
           }

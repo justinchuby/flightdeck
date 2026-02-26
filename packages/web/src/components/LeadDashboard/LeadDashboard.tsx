@@ -651,20 +651,9 @@ export function LeadDashboard({ api, ws }: Props) {
 
 function DecisionPanelContent({ decisions }: { decisions: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
-  const initialScroll = useRef(false);
   const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
   useEffect(() => {
-    const el = feedRef.current;
-    if (!el) return;
-    if (!initialScroll.current) {
-      initialScroll.current = true;
-      el.scrollTo({ top: el.scrollHeight });
-      return;
-    }
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    }
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
   }, [decisions.length]);
 
   return (
@@ -922,20 +911,9 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
 
 function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
-  const initialScroll = useRef(false);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   useEffect(() => {
-    const el = feedRef.current;
-    if (!el) return;
-    if (!initialScroll.current) {
-      initialScroll.current = true;
-      el.scrollTo({ top: el.scrollHeight });
-      return;
-    }
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    }
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
   }, [comms.length]);
 
   const recent = comms.slice(-50);
@@ -1010,19 +988,8 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
 
 function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
-  const initialScroll = useRef(false);
   useEffect(() => {
-    const el = feedRef.current;
-    if (!el) return;
-    if (!initialScroll.current) {
-      initialScroll.current = true;
-      el.scrollTo({ top: el.scrollHeight });
-      return;
-    }
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    }
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
   }, [activity.length]);
 
   const recent = activity.slice(-30);

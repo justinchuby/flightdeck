@@ -112,11 +112,10 @@ export const useLeadStore = create<LeadState>((set) => ({
       const proj = s.projects[leadId] || emptyProject();
       const msgs = [...proj.messages];
       const lastIdx = msgs.length - 1;
-      if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent') {
-        const separator = proj.pendingNewline ? '\n' : '';
-        msgs[lastIdx] = { ...msgs[lastIdx], text: msgs[lastIdx].text + separator + text };
+      if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent' && !proj.pendingNewline) {
+        msgs[lastIdx] = { ...msgs[lastIdx], text: msgs[lastIdx].text + text };
       } else {
-        msgs.push({ type: 'text', text: text, sender: 'agent' });
+        msgs.push({ type: 'text', text: text, sender: 'agent', timestamp: Date.now() });
       }
       return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now(), pendingNewline: false } } };
     }),
