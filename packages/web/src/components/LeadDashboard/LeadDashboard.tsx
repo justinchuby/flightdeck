@@ -136,14 +136,9 @@ export function LeadDashboard({ api, ws }: Props) {
         });
       }
 
-      // When lead goes back to running after idle, promote queued messages and start a new message bubble
+      // When lead goes back to running after idle, promote queued messages
       if (msg.type === 'agent:status' && msg.agentId === selectedLeadId && msg.status === 'running') {
         store.promoteQueuedMessages(msg.agentId);
-        const proj = store.projects[msg.agentId];
-        const lastMsg = proj?.messages?.[proj.messages.length - 1];
-        if (lastMsg?.sender === 'agent') {
-          store.addMessage(msg.agentId, { type: 'text', text: '---', sender: 'system' });
-        }
       }
 
       // Track tool calls from PL and its children
@@ -633,7 +628,7 @@ export function LeadDashboard({ api, ws }: Props) {
             {/* Messages with prompt navigation */}
             <div className="flex-1 relative min-h-0">
               <div ref={chatContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-1">
-              {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i) => {
+              {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i, filtered) => {
                 if (msg.queued) return null; // queued messages rendered below
                 const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
@@ -664,6 +659,11 @@ export function LeadDashboard({ api, ws }: Props) {
                 }
 
                 // Agent (lead) messages: no bubble, just flowing text
+                // Only show timestamp on the first message in a consecutive agent run
+                const prevMsg = i > 0 ? filtered[i - 1] : null;
+                const isFirstInRun = !prevMsg || prevMsg.sender !== 'agent' || prevMsg.queued;
+                const agentTs = isFirstInRun ? ts : '';
+
                 if (msg.contentType && msg.contentType !== 'text') {
                   return (
                     <div key={i} className="py-1">
@@ -671,18 +671,18 @@ export function LeadDashboard({ api, ws }: Props) {
                         <div className="flex-1 min-w-0">
                           <RichContentBlock msg={msg} />
                         </div>
-                        <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                        {agentTs && <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{agentTs}</span>}
                       </div>
                     </div>
                   );
                 }
                 return (
-                  <div key={i} className="py-1">
+                  <div key={i} className="py-0.5">
                     <div className="flex items-start gap-2">
                       <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
                         <AgentTextBlock text={msg.text} />
                       </div>
-                      <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                      {agentTs && <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{agentTs}</span>}
                     </div>
                   </div>
                 );
