@@ -42,7 +42,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#3fb950',
     icon: '💻',
     builtIn: true,
-    model: 'claude-sonnet-4.6',
+    model: 'claude-opus-4.6',
   },
   {
     id: 'pm',
@@ -102,8 +102,9 @@ You are AMBITIOUS. Think big — aim for the best possible outcome, not the mini
 6. Synthesize progress and report to the user
 
 == AVAILABLE COMMANDS ==
-Delegate a task to a specialist:
+Delegate a task to a specialist (optionally override the model):
 <!-- DELEGATE {"to": "developer", "task": "Implement the login API endpoint", "context": "Use JWT tokens, see auth/ directory"} -->
+<!-- DELEGATE {"to": "reviewer", "task": "Review the auth implementation", "model": "claude-opus-4.6"} -->
 
 Send a message to a running agent (use the agent's ID):
 <!-- AGENT_MESSAGE {"to": "agent-id-here", "content": "Please also add input validation"} -->
@@ -117,13 +118,18 @@ Report progress to the user:
 Query the current crew roster (get all agent IDs and statuses):
 <!-- QUERY_CREW -->
 
-== SPECIALIST ROLES ==
-- "developer" — Code implementation, feature building, bug fixes
-- "reviewer" — Code review, security audit, quality checks. USE THIS to validate developer work.
-- "architect" — System design, architecture decisions, technical strategy. USE THIS for design discussions.
-- "qa" — Test writing, testing strategies, quality assurance
-- "pm" — Task breakdown, timeline planning, coordination
-- "advocate" — Documentation, examples, developer experience
+== SPECIALIST ROLES (with recommended default models) ==
+- "developer" — Code implementation, feature building, bug fixes (default: claude-opus-4.6)
+- "reviewer" — Code review, security audit, quality checks (default: gemini-3-pro-preview)
+- "architect" — System design, architecture decisions (default: claude-opus-4.6)
+- "qa" — Test writing, testing strategies (default: claude-haiku-4.5)
+- "pm" — Task breakdown, timeline planning (default: gpt-5.2-codex)
+- "advocate" — Documentation, examples, DX (default: gpt-5.1-codex)
+
+== MODEL SELECTION ==
+Each role has a recommended default model, but YOU decide the best model for each task. Assemble a diverse set of models — different models have different strengths. You can override the default by adding "model" to DELEGATE.
+Available models: claude-opus-4.6, claude-sonnet-4.6, claude-sonnet-4.5, claude-haiku-4.5, gpt-5.3-codex, gpt-5.2-codex, gpt-5.2, gpt-5.1-codex, gemini-3-pro-preview, gpt-4.1
+Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Haiku/GPT-4.1 for quick simple tasks, Gemini for a fresh perspective.
 
 == TEAMWORK PATTERNS ==
 - After a developer finishes, DELEGATE a review to "reviewer" with context about what was built

@@ -526,9 +526,9 @@ export class AgentManager extends EventEmitter {
         child = existingAgent;
         logger.info('delegation', `Reusing idle ${role.name} (${child.id.slice(0, 8)}) for new task from ${agent.role.name}`);
       } else {
-        // No idle agent available — spawn a new one
-        child = this.spawn(role, req.task, agent.id, 'acp', true);
-        logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}: ${req.task.slice(0, 80)}`);
+        // No idle agent available — spawn a new one, with optional model override from lead
+        child = this.spawn(role, req.task, agent.id, 'acp', true, req.model);
+        logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${req.task.slice(0, 80)}`);
       }
 
       // Track delegation
