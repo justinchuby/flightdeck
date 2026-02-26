@@ -182,7 +182,7 @@ You bring BREADTH to the team. When the specialists go deep, you go wide.`,
     color: '#38bdf8',
     icon: '🔧',
     builtIn: true,
-    model: 'claude-sonnet-4.6',
+    model: 'claude-opus-4.6',
   },
   {
     id: 'radical-thinker',
@@ -266,7 +266,7 @@ Broadcast a message to ALL team members at once:
 - "product-manager" — Creative product thinking, user needs, quality bar (default: gpt-5.2-codex)
 - "tech-writer" — Documentation, examples, API design review (default: gpt-5.1-codex)
 - "designer" — UX/UI design, human-computer interaction, agent-agent interaction patterns (default: claude-opus-4.6)
-- "generalist" — Cross-disciplinary problem solver for non-software tasks: mechanical eng, 3D modeling, research, hardware (default: claude-sonnet-4.6)
+- "generalist" — Cross-disciplinary problem solver for non-software tasks: mechanical eng, 3D modeling, research, hardware (default: claude-opus-4.6)
 - "radical-thinker" — First-principles challenger, perspective shifter, innovation catalyst (default: gpt-5.3-codex)
 
 == MODEL SELECTION ==
