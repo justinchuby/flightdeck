@@ -19,6 +19,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [newProjectTask, setNewProjectTask] = useState('');
   const [newProjectModel, setNewProjectModel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isResizing = useRef(false);
@@ -51,9 +52,14 @@ export function LeadDashboard({ api, ws }: Props) {
     return () => ws.unsubscribe(selectedLeadId);
   }, [selectedLeadId, ws]);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages only if near bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [currentProject?.messages]);
 
   // Poll progress for selected lead
@@ -409,7 +415,7 @@ export function LeadDashboard({ api, ws }: Props) {
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i) => (
                 <div
                   key={i}
@@ -584,7 +590,12 @@ function TeamStatusContent({ agents, delegations }: { agents: any[]; delegations
 function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
+    const el = feedRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (isNearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
   }, [comms.length]);
 
   const recent = comms.slice(-50);
@@ -618,7 +629,12 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
 function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
+    const el = feedRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (isNearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
   }, [activity.length]);
 
   const recent = activity.slice(-30);

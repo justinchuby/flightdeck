@@ -63,17 +63,23 @@ export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const [planOpen, setPlanOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const plan = agent?.plan ?? [];
   const toolCalls = agent?.toolCalls ?? [];
   const messages = agent?.messages ?? [];
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = containerRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 space-y-3">
+    <div ref={containerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
       {/* Plan Section */}
       {plan.length > 0 && (
         <div className="border border-gray-700 rounded-lg bg-surface-raised">
