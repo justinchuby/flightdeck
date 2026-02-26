@@ -59,6 +59,28 @@ function renderMarkdown(text: string): React.ReactNode[] {
   return parts.length > 0 ? parts : [text];
 }
 
+/** Safely render tool call content — handles string, array, or object */
+function stringifyContent(content: any): string {
+  if (typeof content === 'string') return content.slice(0, 500);
+  if (Array.isArray(content)) {
+    return content
+      .map((c: any) => {
+        if (typeof c === 'string') return c;
+        if (c?.text) return c.text;
+        if (c?.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
+        return JSON.stringify(c, null, 2);
+      })
+      .join('\n')
+      .slice(0, 500);
+  }
+  if (content && typeof content === 'object') {
+    if (content.text) return String(content.text).slice(0, 500);
+    if (content.content) return typeof content.content === 'string' ? content.content.slice(0, 500) : JSON.stringify(content.content, null, 2).slice(0, 500);
+    return JSON.stringify(content, null, 2).slice(0, 500);
+  }
+  return String(content).slice(0, 500);
+}
+
 export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const [planOpen, setPlanOpen] = useState(true);
@@ -113,8 +135,8 @@ export function AcpOutput({ agentId }: Props) {
             <div key={tc.toolCallId} className="border border-gray-700 rounded-lg bg-surface-raised p-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-gray-200">{tc.title}</span>
-                  <span className="text-[10px] text-gray-500">{tc.kind}</span>
+                  <span className="text-xs font-medium text-gray-200">{typeof tc.title === 'string' ? tc.title : JSON.stringify(tc.title)}</span>
+                  <span className="text-[10px] text-gray-500">{typeof tc.kind === 'string' ? tc.kind : JSON.stringify(tc.kind)}</span>
                 </div>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] ${TC_STATUS[tc.status]}`}>
                   {tc.status}
@@ -122,9 +144,7 @@ export function AcpOutput({ agentId }: Props) {
               </div>
               {tc.content && tc.status === 'completed' && (
                 <pre className="mt-1 text-[11px] text-gray-400 font-mono overflow-hidden max-h-24 bg-surface/50 rounded p-1">
-                  {Array.isArray(tc.content)
-                    ? tc.content.map((c: any) => typeof c === 'string' ? c : c?.text ?? c?.content ?? JSON.stringify(c)).join('\n').slice(0, 500)
-                    : String(tc.content).slice(0, 500)}
+                  {stringifyContent(tc.content)}
                 </pre>
               )}
             </div>
@@ -154,7 +174,7 @@ export function AcpOutput({ agentId }: Props) {
                       : 'bg-surface-raised text-gray-300 border border-gray-700'
                   }`}
                 >
-                  {msg.text.split('\n').map((line, j) => (
+                  {(typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2)).split('\n').map((line, j) => (
                     <span key={j}>
                       {j > 0 && <br />}
                       {renderMarkdown(line)}
