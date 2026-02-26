@@ -1638,8 +1638,71 @@ function AgentTextBlock({ text }: { text: string }) {
           );
         }
         if (!seg.trim()) return null;
-        return <InlineMarkdown key={i} text={seg} />;
+        // Split into table blocks and non-table blocks
+        return <MarkdownWithTables key={i} text={seg} />;
       })}
     </>
+  );
+}
+
+/** Detect markdown tables and render them; pass other text to InlineMarkdown */
+function MarkdownWithTables({ text }: { text: string }) {
+  // Match contiguous lines that look like table rows (start with |)
+  const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
+  const parts = text.split(TABLE_RE);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        const trimmed = part.trim();
+        if (trimmed.startsWith('|') && trimmed.includes('\n')) {
+          return <MarkdownTable key={i} raw={trimmed} />;
+        }
+        if (!trimmed) return null;
+        return <InlineMarkdown key={i} text={part} />;
+      })}
+    </>
+  );
+}
+
+/** Render a markdown table as an HTML table */
+function MarkdownTable({ raw }: { raw: string }) {
+  const lines = raw.split('\n').filter((l) => l.trim());
+  if (lines.length < 2) return <InlineMarkdown text={raw} />;
+
+  const parseRow = (line: string) =>
+    line.split('|').slice(1, -1).map((cell) => cell.trim());
+
+  const headerCells = parseRow(lines[0]);
+  // Check if line[1] is a separator (e.g., |---|---|)
+  const isSeparator = /^\|[\s:?-]+(\|[\s:?-]+)*\|?\s*$/.test(lines[1]);
+  const dataStart = isSeparator ? 2 : 1;
+  const bodyRows = lines.slice(dataStart).map(parseRow);
+
+  return (
+    <div className="my-2 overflow-x-auto">
+      <table className="text-xs font-mono border-collapse border border-gray-700 w-full">
+        <thead>
+          <tr className="bg-gray-800">
+            {headerCells.map((cell, j) => (
+              <th key={j} className="border border-gray-700 px-2 py-1 text-left text-gray-300 font-semibold">
+                <InlineMarkdown text={cell} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {bodyRows.map((row, ri) => (
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-gray-900/30' : 'bg-gray-800/30'}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="border border-gray-700 px-2 py-1 text-gray-300">
+                  <InlineMarkdown text={cell} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
