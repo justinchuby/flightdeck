@@ -216,7 +216,7 @@ export function apiRouter(
     const agent = agentManager.get(req.params.id);
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
     logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
-    agent.sendMessage(text);
+    agent.sendMessage(`[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`);
     res.json({ ok: true });
   });
 

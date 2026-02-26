@@ -207,7 +207,9 @@ export class AcpConnection extends EventEmitter {
     if (this.promptQueue.length > 0) {
       const next = this.promptQueue.join('\n');
       this.promptQueue.length = 0;
-      this.prompt(next).catch(() => {});
+      this.prompt(next).catch((err) => {
+        logger.error('acp', `Drained prompt failed: ${err?.message || err}`);
+      });
     }
   }
 
