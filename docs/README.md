@@ -10,7 +10,7 @@ This directory contains design documentation for AI Crew. These docs are the sou
 
 ## Quick Reference
 
-### Agent Roles (9 built-in + custom)
+### Agent Roles (10 built-in + custom)
 
 | Icon | Role | Default Model |
 |------|------|---------------|
@@ -28,10 +28,19 @@ This directory contains design documentation for AI Crew. These docs are the sou
 ### Agent Commands (HTML Comments)
 
 ```
-<!-- DELEGATE {"to": "role", "task": "...", "model": "..."} -->
+<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "...", "context": "..."} -->
+<!-- DELEGATE {"to": "agent-id", "task": "...", "context": "..."} -->
 <!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->
 <!-- BROADCAST {"content": "..."} -->
 <!-- DECISION {"title": "...", "rationale": "...", "alternatives": [...]} -->
 <!-- PROGRESS {"summary": "...", "completed": [...], "in_progress": [...], "blocked": [...]} -->
 <!-- QUERY_CREW -->
 ```
+
+- **CREATE_AGENT** (lead-only) — Spawns a new agent with a specific role and model. Optionally assigns a task immediately.
+- **DELEGATE** (lead-only) — Assigns a task to an existing agent by ID. Use `QUERY_CREW` or creation ACK to find agent IDs.
+- **AGENT_MESSAGE** — Send a direct message to another agent by ID.
+- **BROADCAST** — Send a message to all active agents.
+- **DECISION** — Log an architectural or design decision.
+- **PROGRESS** — Report progress to the user.
+- **QUERY_CREW** — Get the current roster of agents with IDs, roles, models, and status.

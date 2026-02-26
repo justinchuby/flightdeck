@@ -20,7 +20,7 @@ A web UI that orchestrates multiple Copilot CLI agents with specialized roles to
   | 🎨 Designer | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
   | 🔧 Generalist | Cross-disciplinary problem solving (mechanical eng, 3D, etc.) | Claude Opus 4.6 |
   | 🚀 Radical Thinker | Challenge assumptions, propose unconventional approaches | GPT-5.3 Codex |
-- **🔄 Agent Reuse** — Idle agents are automatically reused instead of spawning new ones
+- **🔄 Explicit Agent Control** — The lead creates agents with specific roles and models via `CREATE_AGENT`, then assigns tasks via `DELEGATE` by agent ID
 - **💬 Inter-Agent Communication** — Agents message each other, debate approaches, and challenge ideas collaboratively
 - **🧠 Model Diversity** — Each role uses a different AI model by default; the lead can override per task
 - **📡 Real-Time Dashboard** — Live activity feed, agent comms panel, team status, decision log, and progress tracking
@@ -72,7 +72,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP/PTY ←→ Copilot CL
 
 ### Key Components
 
-- **AgentManager** — Spawns/reuses agents, buffers ACP text for command detection, routes messages, manages delegations
+- **AgentManager** — Spawns agents, buffers ACP text for command detection, routes messages, manages delegations. Only the lead can create agents (`CREATE_AGENT`) and delegate tasks (`DELEGATE` by agent ID).
 - **Agent** — Wraps a Copilot CLI process (ACP or PTY mode) with lifecycle management (creating → running → idle → completed)
 - **RoleRegistry** — Defines specialist roles with system prompts, icons, colors, and default models
 - **MessageBus** — Routes inter-agent messages with short ID resolution
@@ -83,7 +83,8 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP/PTY ←→ Copilot CL
 Agents communicate via HTML comment commands detected in their output stream:
 
 ```
-<!-- DELEGATE {"to": "developer", "task": "...", "model": "claude-opus-4.6"} -->
+<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "...", "context": "..."} -->
+<!-- DELEGATE {"to": "agent-id", "task": "...", "context": "..."} -->
 <!-- AGENT_MESSAGE {"to": "agent-id", "content": "..."} -->
 <!-- BROADCAST {"content": "..."} -->
 <!-- DECISION {"title": "...", "rationale": "...", "alternatives": [...], "impact": "..."} -->

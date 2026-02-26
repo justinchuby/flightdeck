@@ -76,7 +76,7 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 - All spawns are logged to the activity ledger
 - Sub-agents inherit the crew context manifest
 
-**Protocol:** Agents emit `<!-- SPAWN_AGENT {"roleId": "reviewer", "taskId": "..."} -->` which is detected by regex in `AgentManager`.
+**Protocol:** The lead creates agents with `<!-- CREATE_AGENT {"role": "developer", "model": "...", "task": "..."} -->` and assigns tasks to existing agents with `<!-- DELEGATE {"to": "agent-id", "task": "..."} -->`. Both are detected by regex in `AgentManager`.
 
 ## 6. HTML Comment Protocol for PTY Mode
 
@@ -88,7 +88,7 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 - JSON payload is flexible and extensible
 - Easy to parse with simple regex
 
-**Commands:** `SPAWN_AGENT`, `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `CREW_CONTEXT`, `CREW_UPDATE`
+**Commands:** `CREATE_AGENT`, `DELEGATE`, `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `DECISION`, `PROGRESS`, `QUERY_CREW`
 
 **Trade-off:** Relies on the AI correctly formatting these patterns. In ACP mode, this is replaced by structured protocol messages.
 

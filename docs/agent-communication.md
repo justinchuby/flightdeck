@@ -72,7 +72,8 @@ Spawns Copilot CLI in a pseudo-terminal via `node-pty`. Raw terminal I/O — the
 Since PTY mode has no structured protocol, agents communicate intent via HTML comment patterns detected by regex in `AgentManager`:
 
 ```
-<!-- SPAWN_AGENT {"roleId": "reviewer", "taskId": "task-123"} -->
+<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "..."} -->
+<!-- DELEGATE {"to": "agent-id", "task": "...", "context": "..."} -->
 <!-- LOCK_REQUEST {"filePath": "src/auth.ts", "reason": "editing auth logic"} -->
 <!-- LOCK_RELEASE {"filePath": "src/auth.ts"} -->
 <!-- ACTIVITY {"actionType": "decision_made", "summary": "chose JWT over sessions"} -->
