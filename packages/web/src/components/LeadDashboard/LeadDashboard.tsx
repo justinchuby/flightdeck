@@ -650,8 +650,24 @@ export function LeadDashboard({ api, ws }: Props) {
 }
 
 function DecisionPanelContent({ decisions }: { decisions: any[] }) {
+  const feedRef = useRef<HTMLDivElement>(null);
+  const initialScroll = useRef(false);
+  useEffect(() => {
+    const el = feedRef.current;
+    if (!el) return;
+    if (!initialScroll.current) {
+      initialScroll.current = true;
+      el.scrollTo({ top: el.scrollHeight });
+      return;
+    }
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (isNearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
+  }, [decisions.length]);
+
   return (
-    <div className="p-2 space-y-2">
+    <div ref={feedRef} className="h-full overflow-y-auto p-2 space-y-2">
       {decisions.length === 0 ? (
         <p className="text-xs text-gray-500 text-center py-4 font-mono">No decisions yet</p>
       ) : (
@@ -869,7 +885,7 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
 
   return (
     <>
-      <div ref={feedRef}>
+      <div ref={feedRef} className="h-full overflow-y-auto">
         {recent.length === 0 ? (
           <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
         ) : (
@@ -964,7 +980,7 @@ function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; 
   };
 
   return (
-    <div ref={feedRef}>
+    <div ref={feedRef} className="h-full overflow-y-auto">
       {recent.length === 0 ? (
         <p className="text-xs text-gray-500 text-center py-4 font-mono">No activity yet</p>
       ) : (
