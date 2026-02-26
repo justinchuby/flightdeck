@@ -29,6 +29,7 @@ export class AcpConnection extends EventEmitter {
   private sessionId: string | null = null;
   private _isConnected = false;
   private _isPrompting = false;
+  private promptQueue: string[] = [];
   private pendingPermission: {
     resolve: (result: acp.RequestPermissionResponse) => void;
     options: acp.PermissionOption[];
@@ -143,6 +144,12 @@ export class AcpConnection extends EventEmitter {
       throw new Error('ACP connection not established');
     }
 
+    // Queue if already prompting — will be sent when current prompt completes
+    if (this._isPrompting) {
+      this.promptQueue.push(text);
+      return { stopReason: 'end_turn' as acp.StopReason };
+    }
+
     this._isPrompting = true;
     this.emit('prompting', true);
 
@@ -156,11 +163,23 @@ export class AcpConnection extends EventEmitter {
       this.emit('prompting', false);
       this.emit('prompt_complete', result.stopReason);
 
+      // Process queued messages
+      this.drainQueue();
+
       return { stopReason: result.stopReason };
     } catch (err) {
       this._isPrompting = false;
       this.emit('prompting', false);
+      this.drainQueue();
       throw err;
+    }
+  }
+
+  private drainQueue(): void {
+    if (this.promptQueue.length > 0) {
+      const next = this.promptQueue.join('\n');
+      this.promptQueue.length = 0;
+      this.prompt(next).catch(() => {});
     }
   }
 
