@@ -972,6 +972,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
     completed: 'text-green-400', failed: 'text-red-400',
   };
   const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
+  const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
 
   const selectedDelegation = selectedAgent ? delegations.find((d: any) => d.toAgentId === selectedAgent.id) : null;
   const agentComms = selectedAgent ? (comms ?? []).filter((c) => c.fromId === selectedAgent.id || c.toId === selectedAgent.id) : [];
@@ -1084,7 +1085,11 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
                       const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                       const isSender = c.fromId === selectedAgent.id;
                       return (
-                        <div key={c.id} className="text-xs font-mono">
+                        <div
+                          key={c.id}
+                          className="text-xs font-mono cursor-pointer hover:bg-gray-700/40 rounded px-1 py-0.5 transition-colors"
+                          onClick={() => setSelectedComm(c)}
+                        >
                           <div className="flex items-center gap-1">
                             <span className={isSender ? 'text-cyan-400' : 'text-green-400'}>{isSender ? c.fromRole : c.toRole}</span>
                             <span className="text-gray-600">{isSender ? '→' : '←'}</span>
@@ -1133,6 +1138,36 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
                   No activity yet for this agent
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comm detail popup */}
+      {selectedComm && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
+        >
+          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <div className="flex items-center gap-2 text-sm">
+                <MessageSquare className="w-4 h-4 text-blue-400" />
+                <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
+                <span className="text-gray-500">→</span>
+                <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-gray-500">
+                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
+                </span>
+                <button onClick={() => setSelectedComm(null)} className="text-gray-400 hover:text-white text-lg leading-none">×</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                {selectedComm.content}
+              </pre>
             </div>
           </div>
         </div>
