@@ -84,29 +84,6 @@ export class AcpConnection extends EventEmitter {
     return sessionId;
   }
 
-  async resumeSession(opts: AcpConnectionOptions, sessionId: string): Promise<string> {
-    await this.spawnAndConnect(opts);
-
-    logger.info('acp', `Attempting to resume session: ${sessionId}`);
-
-    // Check if the connection supports session resume
-    if (typeof (this.connection as any).unstable_resumeSession !== 'function') {
-      throw new Error('ACP SDK does not support unstable_resumeSession');
-    }
-
-    const result = await (this.connection as any).unstable_resumeSession({
-      sessionId,
-      cwd: opts.cwd || process.cwd(),
-    });
-
-    logger.info('acp', `Session resumed successfully: ${sessionId}`);
-    this.sessionId = sessionId;
-    this._isConnected = true;
-    this.emit('connected', sessionId);
-
-    return sessionId;
-  }
-
   private async spawnAndConnect(opts: AcpConnectionOptions): Promise<void> {
     const args = ['--acp', '--stdio', ...(opts.cliArgs || [])];
     this.process = spawn(opts.cliCommand, args, {

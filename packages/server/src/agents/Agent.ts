@@ -98,14 +98,13 @@ export class Agent {
     // persistence through context compression, but we include it here too
     // to ensure the agent always sees its role instructions on first message.
     const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.taskId ? `Your assigned task ID is: ${this.taskId}` : 'Awaiting task assignment.'}`;
-    const initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
+    const resumeHint = this.resumeSessionId
+      ? `\n\n== SESSION RESUME ==\nYou are resuming a previous session. Your prior session ID was: ${this.resumeSessionId}\nPlease review your previous work from that session and continue where you left off.`
+      : '';
+    const initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}${resumeHint}`;
 
     if (this.mode === 'acp') {
-      if (this.resumeSessionId) {
-        this.startAcpResume(this.resumeSessionId, initialPrompt);
-      } else {
-        this.startAcp(initialPrompt);
-      }
+      this.startAcp(initialPrompt);
     } else {
       this.startPty(initialPrompt);
     }
@@ -183,38 +182,6 @@ export class Agent {
     });
   }
 
-  private startAcpResume(resumeId: string, initialPrompt: string): void {
-    this.acpConnection = new AcpConnection({ autopilot: this.autopilot });
-    this.status = 'running';
-    this.wireAcpEvents();
-
-    logger.info('agent', `Attempting session resume for ${this.role.name} (${this.id.slice(0, 8)}): ${resumeId}`);
-
-    this.acpConnection.resumeSession({
-      cliCommand: this.config.cliCommand,
-      cliArgs: [
-        ...this.config.cliArgs,
-        `--agent=${agentFlagForRole(this.role.id)}`,
-        ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
-      ],
-      cwd: this.cwd || process.cwd(),
-    }, resumeId).then((sessionId) => {
-      logger.info('agent', `Session resume succeeded for ${this.role.name} (${this.id.slice(0, 8)}): ${sessionId}`);
-      this.sessionId = sessionId;
-      for (const listener of this.sessionReadyListeners) listener(sessionId);
-      return this.acpConnection!.prompt(initialPrompt);
-    }).catch((err) => {
-      logger.error('agent', `Session resume FAILED for ${this.role.name} (${this.id.slice(0, 8)}): ${err.message}. Falling back to new session.`);
-      // Notify via data listeners so the UI shows the failure
-      const failMsg = `[System] Session resume failed: ${err.message}. Starting a new session instead.\n`;
-      for (const listener of this.dataListeners) listener(failMsg);
-      // Kill the failed connection's process before creating a new one
-      try { this.acpConnection?.kill(); } catch {}
-      this.acpConnection = null as any;
-      // Fallback to new session
-      this.startAcp(initialPrompt);
-    });
-  }
 
   private wireAcpEvents(): void {
     const conn = this.acpConnection!;
