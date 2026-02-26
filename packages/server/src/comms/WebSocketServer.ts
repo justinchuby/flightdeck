@@ -155,6 +155,10 @@ export class WebSocketServer {
     agentManager.on('agent:message_sent', (data: any) => {
       this.broadcastAll({ type: 'agent:message_sent', ...data });
     });
+
+    agentManager.on('agent:session_ready', (data: any) => {
+      this.broadcastAll({ type: 'agent:session_ready', ...data });
+    });
   }
 
   private handleMessage(

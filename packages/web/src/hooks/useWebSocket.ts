@@ -144,6 +144,9 @@ export function useWebSocket() {
         case 'task:removed':
           removeTask(msg.taskId);
           break;
+        case 'agent:session_ready':
+          updateAgent(msg.agentId, { sessionId: msg.sessionId });
+          break;
       }
     };
   }, [setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask]);
