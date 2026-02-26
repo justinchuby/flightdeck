@@ -64,7 +64,10 @@ export class AcpConnection extends EventEmitter {
         return new Promise<acp.RequestPermissionResponse>((resolve) => {
           this.pendingPermission = { resolve, options: params.options };
           this.emit('permission_request', {
-            params,
+            id: `perm-${Date.now()}`,
+            toolName: params.title ?? params.description ?? 'Tool action',
+            arguments: params.metadata ?? {},
+            timestamp: new Date().toISOString(),
           });
 
           // Auto-approve after 60s timeout if no response

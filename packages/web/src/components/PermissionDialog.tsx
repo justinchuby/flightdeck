@@ -10,7 +10,8 @@ function getLocalStorageKey(agentRole: string) {
   return `acp-always-allow:${agentRole}`;
 }
 
-function formatArgs(args: Record<string, any>): string {
+function formatArgs(args: Record<string, any> | undefined): string {
+  if (!args || typeof args !== 'object') return '{}';
   const json = JSON.stringify(args, null, 2);
   return json.length > 400 ? json.slice(0, 400) + '\n…' : json;
 }
