@@ -1,6 +1,6 @@
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
-import { RefreshCw, Square, Terminal } from 'lucide-react';
+import { RefreshCw, Square, Terminal, Hand } from 'lucide-react';
 
 interface Props {
   agent: AgentInfo;
@@ -62,7 +62,19 @@ export function AgentCard({ agent, api }: Props) {
               <RefreshCw size={14} />
             </button>
           )}
-          {agent.status === 'running' && (
+          {(agent.status === 'running' || agent.status === 'idle') && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                api.interruptAgent(agent.id);
+              }}
+              className="p-1 text-gray-400 hover:text-orange-400"
+              title="Interrupt — cancel current work"
+            >
+              <Hand size={14} />
+            </button>
+          )}
+          {(agent.status === 'running' || agent.status === 'idle') && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

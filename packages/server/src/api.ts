@@ -47,6 +47,17 @@ export function apiRouter(
     res.json({ ok });
   });
 
+  router.post('/agents/:id/interrupt', async (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    try {
+      await agent.interrupt();
+      res.json({ ok: true });
+    } catch {
+      res.json({ ok: false, error: 'Cancel not supported for this agent mode' });
+    }
+  });
+
   router.post('/agents/:id/restart', (req, res) => {
     const newAgent = agentManager.restart(req.params.id);
     if (!newAgent) return res.status(404).json({ error: 'Agent not found' });

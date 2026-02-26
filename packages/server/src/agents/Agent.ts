@@ -401,6 +401,13 @@ CREW_UPDATE -->`;
     this.write(message);
   }
 
+  /** Cancel the agent's current work (ACP cancel signal) */
+  async interrupt(): Promise<void> {
+    if (this.mode === 'acp' && this.acpConnection) {
+      await this.acpConnection.cancel();
+    }
+  }
+
   resolvePermission(approved: boolean): void {
     if (this.acpConnection) {
       this.acpConnection.resolvePermission(approved);

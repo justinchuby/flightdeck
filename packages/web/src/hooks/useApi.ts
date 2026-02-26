@@ -36,6 +36,10 @@ export function useApi() {
     return fetchJSON(`/agents/${id}`, { method: 'DELETE' });
   }, []);
 
+  const interruptAgent = useCallback(async (id: string) => {
+    return fetchJSON(`/agents/${id}/interrupt`, { method: 'POST' });
+  }, []);
+
   const restartAgent = useCallback(async (id: string) => {
     return fetchJSON(`/agents/${id}/restart`, { method: 'POST' });
   }, []);
@@ -110,6 +114,7 @@ export function useApi() {
   return {
     spawnAgent,
     killAgent,
+    interruptAgent,
     restartAgent,
     createTask,
     updateTask,

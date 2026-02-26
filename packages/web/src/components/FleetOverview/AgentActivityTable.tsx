@@ -1,7 +1,7 @@
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, Task } from '../../types';
 import type { FileLock } from './FleetOverview';
-import { Square, RefreshCw, Terminal } from 'lucide-react';
+import { Square, RefreshCw, Terminal, Hand } from 'lucide-react';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -249,7 +249,19 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                         <RefreshCw size={14} />
                       </button>
                     )}
-                    {agent.status === 'running' && (
+                    {(agent.status === 'running' || agent.status === 'idle') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          api.interruptAgent(agent.id);
+                        }}
+                        className="p-1 text-gray-400 hover:text-orange-400"
+                        title="Interrupt — cancel current work"
+                      >
+                        <Hand size={14} />
+                      </button>
+                    )}
+                    {(agent.status === 'running' || agent.status === 'idle') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
