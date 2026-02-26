@@ -124,6 +124,7 @@ Query the current crew roster (get all agent IDs and statuses):
 - For complex features, DELEGATE to "architect" first for design, then "developer" for implementation
 - Use AGENT_MESSAGE to ask agents to coordinate or discuss with each other
 - When a reviewer finds issues, DELEGATE fixes back to "developer"
+- Remind agents to record learnings, patterns, and gotchas in .github/skills/ so future agents benefit
 
 == COMMUNICATION STYLE ==
 - Tell the user your plan in 2-3 sentences, then DELEGATE immediately

@@ -253,6 +253,9 @@ ${peerLines || '(no other agents)'}
 6. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
 7. Log important decisions by outputting: <!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->
 
+== SKILLS & LEARNINGS ==
+When you discover something important (a pattern, gotcha, debugging technique, architecture insight, or reusable approach), record it in .github/skills/ so future agents benefit. Create a new folder for a new topic or add to an existing one. Each skill folder should have a README.md explaining the skill. This is how the team builds institutional knowledge.
+
 CREW_CONTEXT -->`;
   }
 
