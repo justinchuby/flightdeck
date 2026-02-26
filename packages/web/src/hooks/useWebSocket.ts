@@ -7,6 +7,8 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnectRef = useRef(true);
+  // Track agents that had a tool call since their last text — next append needs a newline separator
+  const pendingNewlineRef = useRef<Set<string>>(new Set());
   const { setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask } =
     useAppStore();
 
@@ -85,15 +87,19 @@ export function useWebSocket() {
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const msgs = [...(existing?.messages ?? [])];
           const last = msgs[msgs.length - 1];
+          const needsNewline = pendingNewlineRef.current.has(msg.agentId);
+          if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
           if (last && (last.sender ?? 'agent') === 'agent') {
-            msgs[msgs.length - 1] = { ...last, text: last.text + msg.text };
+            const separator = needsNewline ? '\n' : '';
+            msgs[msgs.length - 1] = { ...last, text: last.text + separator + msg.text };
           } else {
-            msgs.push({ type: 'text', text: msg.text.replace(/^\n+/, ''), sender: 'agent' });
+            msgs.push({ type: 'text', text: msg.text, sender: 'agent' });
           }
           updateAgent(msg.agentId, { messages: msgs });
           break;
         }
         case 'agent:tool_call': {
+          pendingNewlineRef.current.add(msg.agentId);
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const calls = existing?.toolCalls ?? [];

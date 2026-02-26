@@ -31,6 +31,8 @@ interface ProjectState {
   comms: AgentComm[];
   /** Timestamp of last text received — used to show "working" indicator */
   lastTextAt: number;
+  /** When true, the next appended text should start on a new line */
+  pendingNewline: boolean;
 }
 
 interface LeadState {
@@ -55,7 +57,7 @@ interface LeadState {
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, toolCalls: [], activity: [], comms: [], lastTextAt: 0 };
+  return { messages: [], decisions: [], progress: null, toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -109,11 +111,12 @@ export const useLeadStore = create<LeadState>((set) => ({
       const msgs = [...proj.messages];
       const lastIdx = msgs.length - 1;
       if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent') {
-        msgs[lastIdx] = { ...msgs[lastIdx], text: msgs[lastIdx].text + text };
+        const separator = proj.pendingNewline ? '\n' : '';
+        msgs[lastIdx] = { ...msgs[lastIdx], text: msgs[lastIdx].text + separator + text };
       } else {
-        msgs.push({ type: 'text', text: text.replace(/^\n+/, ''), sender: 'agent' });
+        msgs.push({ type: 'text', text: text, sender: 'agent' });
       }
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now() } } };
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now(), pendingNewline: false } } };
     }),
 
   updateToolCall: (leadId, toolCall) =>
@@ -129,7 +132,7 @@ export const useLeadStore = create<LeadState>((set) => ({
       }
       // Keep only last 50
       if (toolCalls.length > 50) toolCalls = toolCalls.slice(-50);
-      return { projects: { ...s.projects, [leadId]: { ...proj, toolCalls } } };
+      return { projects: { ...s.projects, [leadId]: { ...proj, toolCalls, pendingNewline: true } } };
     }),
 
   addActivity: (leadId, event) =>
