@@ -662,6 +662,17 @@ export class AgentManager extends EventEmitter {
         : req.task;
       child.sendMessage(taskPrompt);
 
+      // Acknowledge delegation back to lead so it knows the task was received
+      const ackMsg = `[Agent ACK] ${role.name} (${child.id.slice(0, 8)}) acknowledged task: ${req.task.slice(0, 120)}`;
+      agent.sendMessage(ackMsg);
+      this.emit('agent:message_sent', {
+        from: child.id,
+        fromRole: role.name,
+        to: agent.id,
+        toRole: agent.role.name,
+        content: ackMsg,
+      });
+
       const agentRole = agent.role?.id ?? 'unknown';
       this.activityLedger.log(agent.id, agentRole, 'delegated', `Delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
         childId: child.id,

@@ -954,10 +954,25 @@ export function LeadDashboard({ api, ws }: Props) {
   );
 }
 
-/** Parse [Agent Report] formatted content into structured parts */
-function parseAgentReport(content: string): { header: string; task: string; output: string; isReport: boolean } {
+/** Parse [Agent Report] or [Agent ACK] formatted content into structured parts */
+function parseAgentReport(content: string): { header: string; task: string; output: string; isReport: boolean; isAck: boolean } {
+  // Check for ACK first
+  const ackMatch = content.match(/^\[Agent ACK\]\s*(.+?)(?:\n|$)/);
+  if (ackMatch) {
+    const header = ackMatch[1].trim();
+    // ACK format: "[Agent ACK] RoleName (id) acknowledged task: ..."
+    const taskMatch = header.match(/acknowledged task:\s*(.*)/);
+    return {
+      header: header.replace(/\s*acknowledged task:.*/, ''),
+      task: taskMatch ? taskMatch[1].trim() : '',
+      output: '',
+      isReport: true,
+      isAck: true,
+    };
+  }
+
   const reportMatch = content.match(/^\[Agent Report\]\s*(.+?)(?:\n|$)/);
-  if (!reportMatch) return { header: '', task: '', output: '', isReport: false };
+  if (!reportMatch) return { header: '', task: '', output: '', isReport: false, isAck: false };
 
   const header = reportMatch[1].trim();
   const taskMatch = content.match(/\nTask:\s*(.*?)(?:\n|$)/);
@@ -974,6 +989,7 @@ function parseAgentReport(content: string): { header: string; task: string; outp
     task: taskMatch ? taskMatch[1].trim() : '',
     output,
     isReport: true,
+    isAck: false,
   };
 }
 
@@ -982,6 +998,17 @@ function AgentReportBlock({ content, compact }: { content: string; compact?: boo
   const parsed = parseAgentReport(content);
   if (!parsed.isReport) {
     return <span className="text-xs font-mono text-gray-300 whitespace-pre-wrap break-words">{content}</span>;
+  }
+
+  // ACK messages: compact inline rendering
+  if (parsed.isAck) {
+    return (
+      <div className="text-xs font-mono flex items-center gap-1.5">
+        <Check className="w-3 h-3 text-blue-400 shrink-0" />
+        <span className="text-blue-300">{parsed.header}</span>
+        {parsed.task && <span className="text-gray-500"> — {compact && parsed.task.length > 60 ? parsed.task.slice(0, 60) + '…' : parsed.task}</span>}
+      </div>
+    );
   }
 
   if (compact) {
@@ -1299,7 +1326,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
-              {selectedComm.content.startsWith('[Agent Report]')
+              {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
                   <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
@@ -1345,7 +1372,7 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
                   <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
                 <div className="text-xs font-mono text-gray-300 mt-0.5">
-                  {c.content.startsWith('[Agent Report]')
+                  {c.content.startsWith('[Agent Report]') || c.content.startsWith('[Agent ACK]')
                     ? <AgentReportBlock content={c.content} compact />
                     : <p className="truncate">{c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content}</p>
                   }
@@ -1384,7 +1411,7 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3">
-              {selectedComm.content.startsWith('[Agent Report]')
+              {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
                   <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
