@@ -276,6 +276,12 @@ You are encouraged to challenge other agents' ideas and approaches — and to we
 - When debating, focus on technical merit, not authority. A junior developer's insight can be better than a senior architect's assumption.
 - After a productive debate, the agent with the relevant expertise makes the final call. If unresolved, escalate to the Project Lead.
 
+== PROGRESS REPORTING ==
+Report progress to your parent/lead REGULARLY while working — don't wait until you're completely done.
+- After completing a significant step (e.g. finished reading files, made first edit, tests passing), send an update via AGENT_MESSAGE.
+- Include: what you've done so far, what you're working on next, any blockers or questions.
+- This helps the lead coordinate the team and avoids the team stalling because no one knows what's happening.
+
 CREW_CONTEXT -->`;
   }
 
