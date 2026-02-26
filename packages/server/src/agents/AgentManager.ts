@@ -784,11 +784,11 @@ CREW_ROSTER -->`;
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = 'completed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.messages.slice(-3).join('\n').slice(0, 500);
+        del.result = agent.messages.slice(-5).join('\n').slice(0, 4000);
       }
     }
 
-    const preview = agent.messages.slice(-3).join('\n').slice(0, 300);
+    const preview = agent.messages.slice(-5).join('\n').slice(0, 3000);
     const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${preview || '(no output)'}`;
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
@@ -813,12 +813,12 @@ CREW_ROSTER -->`;
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = exitCode === 0 ? 'completed' : 'failed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.messages.slice(-3).join('\n').slice(0, 500);
+        del.result = agent.messages.slice(-5).join('\n').slice(0, 4000);
       }
     }
 
     const status = exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
-    const preview = agent.messages.slice(-3).join('\n').slice(0, 300);
+    const preview = agent.messages.slice(-5).join('\n').slice(0, 3000);
     const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.taskId || 'none'}\nOutput summary: ${preview || '(no output)'}`;
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
