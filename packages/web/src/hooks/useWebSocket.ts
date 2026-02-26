@@ -90,8 +90,11 @@ export function useWebSocket() {
           const last = msgs[msgs.length - 1];
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
-          if (last && (last.sender ?? 'agent') === 'agent' && !needsNewline) {
-            msgs[msgs.length - 1] = { ...last, text: last.text + rawText, timestamp: last.timestamp || Date.now() };
+          // If the last message has an unclosed <!-- block, always append to keep commands intact
+          const lastText = last?.text ?? '';
+          const hasUnclosedCommand = lastText.lastIndexOf('<!--') > lastText.lastIndexOf('-->');
+          if (last && (last.sender ?? 'agent') === 'agent' && (!needsNewline || hasUnclosedCommand)) {
+            msgs[msgs.length - 1] = { ...last, text: lastText + rawText, timestamp: last.timestamp || Date.now() };
           } else {
             msgs.push({ type: 'text', text: rawText, sender: 'agent', timestamp: Date.now() });
           }
