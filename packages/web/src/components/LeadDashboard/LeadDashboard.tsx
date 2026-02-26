@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
@@ -21,6 +21,9 @@ export function LeadDashboard({ api, ws }: Props) {
   const [newProjectTask, setNewProjectTask] = useState('');
   const [newProjectModel, setNewProjectModel] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const isResizing = useRef(false);
 
   const leadAgents = agents.filter((a) => a.role.id === 'lead');
   const currentProject = selectedLeadId ? projects[selectedLeadId] : null;
@@ -173,6 +176,34 @@ export function LeadDashboard({ api, ws }: Props) {
     window.addEventListener('ws-message', handler);
     return () => window.removeEventListener('ws-message', handler);
   }, [selectedLeadId, agents]);
+
+  // Sidebar resize handlers
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = startX - e.clientX;
+      const newWidth = Math.min(600, Math.max(200, startWidth + delta));
+      setSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isResizing.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [sidebarWidth]);
 
   const startLead = useCallback(async (name: string, task?: string, model?: string) => {
     setStarting(true);
@@ -443,12 +474,40 @@ export function LeadDashboard({ api, ws }: Props) {
           </div>
 
           {/* Right sidebar: decisions + comms + activity + team */}
-          <div className="w-80 border-l border-gray-700 flex flex-col overflow-hidden">
-            <DecisionPanel decisions={decisions} />
-            <CommsPanel comms={comms} />
-            <ActivityFeed activity={activity} agents={agents} />
-            <TeamStatus agents={teamAgents} delegations={progress?.delegations ?? []} />
-          </div>
+          {sidebarCollapsed ? (
+            <div className="border-l border-gray-700 flex flex-col items-center py-2 w-10 shrink-0">
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                title="Expand sidebar"
+              >
+                <PanelRightOpen className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex shrink-0" style={{ width: sidebarWidth }}>
+              {/* Drag handle */}
+              <div
+                onMouseDown={startResize}
+                className="w-1 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
+              />
+              <div className="flex-1 border-l border-gray-700 flex flex-col overflow-hidden min-w-0">
+                <div className="px-2 py-1 border-b border-gray-700 flex items-center justify-end shrink-0">
+                  <button
+                    onClick={() => setSidebarCollapsed(true)}
+                    className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                    title="Collapse sidebar"
+                  >
+                    <PanelRightClose className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <DecisionPanel decisions={decisions} />
+                <CommsPanel comms={comms} />
+                <ActivityFeed activity={activity} agents={agents} />
+                <TeamStatus agents={teamAgents} delegations={progress?.delegations ?? []} />
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
