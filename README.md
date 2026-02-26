@@ -22,16 +22,19 @@ A web UI that orchestrates multiple Copilot CLI agents with specialized roles to
   | 🚀 Radical Thinker | Challenge assumptions, propose unconventional approaches | GPT-5.3 Codex |
 - **🔄 Explicit Agent Control** — The lead creates agents with specific roles and models via `CREATE_AGENT`, then assigns tasks via `DELEGATE` by agent ID
 - **💬 Inter-Agent Communication** — Agents message each other, debate approaches, and challenge ideas collaboratively
-- **🧠 Model Diversity** — Each role uses a different AI model by default; the lead can override per task
+- **🧠 Model Diversity** — Each role uses a different AI model by default; the lead can override per agent
 - **📡 Real-Time Dashboard** — Live activity feed, agent comms panel, team status, decision log, and progress tracking
 - **🙋 Human-in-the-Loop** — Send messages to the Project Lead or any agent at any time
 - **📚 Skills & Learnings** — Agents record discoveries in `.github/skills/` using SKILL.md format
 - **🔒 File Locking** — Coordination to prevent conflicts when multiple agents edit files
 - **⏸️ Agent Controls** — Interrupt (cancel current work) and stop agents from the UI
+- **🗑️ Project Removal** — Remove projects from the sidebar; stops the lead and all child agents
 - **📊 Progress Tracking** — Detailed progress popup with team roster, timeline, delegation details, and lead progress reports
 - **🧭 Chat Navigation** — Jump between user prompts in the chat with floating nav buttons
 - **📨 Agent Reports** — Incoming agent messages displayed in a dedicated section, not interleaved with lead output
 - **📋 Rich Content** — Markdown tables, images, audio, and resource rendering in chat
+- **🔄 Session Resume** — Resume from a previous Copilot session by providing a session ID
+- **💾 Persistent Agent Roles** — `.agent.md` files ensure role instructions survive context compression
 
 ## Getting Started
 
