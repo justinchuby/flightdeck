@@ -446,9 +446,7 @@ export class AgentManager extends EventEmitter {
       for (const { regex, name, handler } of patterns) {
         const match = buf.match(regex);
         if (match) {
-          logger.info('agent', `Command detected: ${name} from ${agent.role.name} (${agent.id.slice(0, 8)})`, {
-            matchPreview: match[0].slice(0, 120),
-          });
+          logger.debug('agent', `Command: ${name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
           handler(agent, match[0]);
           buf = buf.slice(0, match.index!) + buf.slice(match.index! + match[0].length);
           found = true;
@@ -465,13 +463,6 @@ export class AgentManager extends EventEmitter {
       buf = buf.slice(-200);
     }
     this.textBuffers.set(agent.id, buf);
-
-    // Debug: periodically log buffer state for lead agents
-    if (agent.role.id === 'lead' && buf.length > 10) {
-      logger.debug('agent', `Buffer for ${agent.id.slice(0, 8)} (${buf.length} chars)`, {
-        tail: buf.slice(-150),
-      });
-    }
   }
 
   private detectSpawnRequest(agentId: string, data: string): void {

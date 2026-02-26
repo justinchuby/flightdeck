@@ -166,9 +166,6 @@ export class AcpConnection extends EventEmitter {
           case 'agent_message_chunk':
             if (update.content.type === 'text') {
               const text = update.content.text;
-              if (text.includes('<!--') || text.includes('DELEGATE') || text.includes('DECISION')) {
-                logger.debug('agent', `ACP text contains command marker`, { text: text.slice(0, 200) });
-              }
               this.emit('text', text);
             } else if (update.content.type === 'resource') {
               const res = update.content.resource;
