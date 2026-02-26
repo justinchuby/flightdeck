@@ -19,6 +19,7 @@ const DELEGATE_REGEX = /<!--\s*DELEGATE\s*(\{.*?\})\s*-->/s;
 const DECISION_REGEX = /<!--\s*DECISION\s*(\{.*?\})\s*-->/s;
 const PROGRESS_REGEX = /<!--\s*PROGRESS\s*(\{.*?\})\s*-->/s;
 const QUERY_CREW_REGEX = /<!--\s*QUERY_CREW\s*-->/s;
+const BROADCAST_REGEX = /<!--\s*BROADCAST\s*(\{.*?\})\s*-->/s;
 
 export interface Delegation {
   id: string;
@@ -320,6 +321,7 @@ export class AgentManager extends EventEmitter {
       { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => this.detectDecision(a, d) },
       { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => this.detectProgress(a, d) },
       { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => this.handleQueryCrew(a) },
+      { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => this.detectBroadcast(a, d) },
     ];
 
     let found = true;
@@ -622,6 +624,48 @@ CREW_ROSTER -->`;
 
     logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);
     agent.sendMessage(response);
+  }
+
+  /** Broadcast a message to all active agents under the same lead (siblings + parent) */
+  private detectBroadcast(agent: Agent, data: string): void {
+    const match = data.match(BROADCAST_REGEX);
+    if (!match) return;
+
+    try {
+      const msg = JSON.parse(match[1]);
+      if (!msg.content) return;
+
+      // Find the lead (parent) for this agent's team
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) {
+        logger.warn('message', `Broadcast from ${agent.role.name} (${agent.id.slice(0, 8)}) — no team lead found`);
+        return;
+      }
+
+      // Find all team members: siblings (same parent) + the lead itself
+      const recipients = this.getAll().filter((a) =>
+        a.id !== agent.id &&
+        (a.id === leadId || a.parentId === leadId) &&
+        (a.status === 'running' || a.status === 'idle')
+      );
+
+      const fromLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
+      logger.info('message', `Broadcast from ${fromLabel} to ${recipients.length} agents: ${msg.content.slice(0, 80)}`);
+
+      for (const recipient of recipients) {
+        recipient.sendMessage(`[Broadcast from ${fromLabel}]: ${msg.content}`);
+      }
+
+      this.emit('agent:message_sent', {
+        from: agent.id,
+        fromRole: agent.role.name,
+        to: 'all',
+        toRole: 'Team',
+        content: msg.content,
+      });
+    } catch {
+      // ignore malformed broadcasts
+    }
   }
 
   /** Notify parent when a child agent finishes its prompt (goes idle) */
