@@ -356,11 +356,10 @@ export function LeadDashboard({ api, ws }: Props) {
       {showNewProject && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); } }}
         >
           <div
             className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-700">
               <Crown className="w-5 h-5 text-yellow-400" />
@@ -721,11 +720,10 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
       {selectedAgent && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedAgent(null)}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedAgent(null); }}
         >
           <div
             className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-700">
@@ -900,11 +898,10 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
       {selectedComm && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedComm(null)}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
         >
           <div
             className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
               <div className="flex items-center gap-2 text-sm">
