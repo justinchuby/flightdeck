@@ -16,6 +16,8 @@ function formatArgs(args: Record<string, any> | undefined): string {
   return json.length > 400 ? json.slice(0, 400) + '\n…' : json;
 }
 
+const TOOL_ICONS = { file: FileText, terminal: Terminal, shield: Shield } as const;
+
 function getToolIcon(toolName: string | undefined) {
   if (!toolName) return Shield;
   if (toolName.startsWith('fs/') || toolName.includes('file')) return FileText;
