@@ -252,14 +252,29 @@ function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
   const nameMatch = text.match(/<!--\s*(\w+)/);
   const label = nameMatch ? nameMatch[1] : 'command';
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  let preview = '';
+  if (jsonMatch) {
+    try {
+      const obj = JSON.parse(jsonMatch[0]);
+      const parts: string[] = [];
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
+      }
+      preview = parts.join(', ');
+    } catch {
+      preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
+    }
+  }
   return (
     <div
       className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 cursor-pointer hover:border-gray-600 transition-colors"
       onClick={() => setExpanded((e) => !e)}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 min-w-0">
         {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-gray-400">{label}</span>
+        <span className="font-mono text-gray-400 shrink-0">{label}</span>
+        {!expanded && preview && <span className="font-mono text-gray-600 truncate ml-1">— {preview}</span>}
       </div>
       {expanded && <pre className="mt-1 whitespace-pre-wrap break-words">{text}</pre>}
     </div>
