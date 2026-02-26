@@ -3,6 +3,17 @@ import type { AgentInfo, Task } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Square, RefreshCw, Terminal } from 'lucide-react';
 
+function shortModelName(model?: string): string {
+  if (!model) return '';
+  const m = model.toLowerCase();
+  if (m.includes('opus')) return `Opus ${m.match(/[\d.]+$/)?.[0] || ''}`.trim();
+  if (m.includes('sonnet')) return `Sonnet ${m.match(/[\d.]+$/)?.[0] || ''}`.trim();
+  if (m.includes('haiku')) return `Haiku ${m.match(/[\d.]+$/)?.[0] || ''}`.trim();
+  if (m.includes('gemini')) return `Gemini`;
+  if (m.includes('gpt')) return m.replace('gpt-', 'GPT-').replace('-codex', ' Codex');
+  return model;
+}
+
 interface Props {
   agents: AgentInfo[];
   tasks: Task[];
@@ -116,7 +127,12 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                     <span className="text-base">{agent.role.icon}</span>
                     <div>
                       <div className="font-medium text-gray-200 text-xs">{agent.role.name}</div>
-                      <div className="text-[10px] text-gray-500 font-mono">{agent.id.slice(0, 8)}</div>
+                      <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1">
+                        {agent.id.slice(0, 8)}
+                        {(agent.model || agent.role.model) && (
+                          <span className="text-gray-600">· {shortModelName(agent.model || agent.role.model)}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </td>

@@ -20,6 +20,18 @@ const STATUS_COLOR: Record<string, string> = {
   failed: 'text-red-400',
 };
 
+/** Shorten model ID for display (e.g. "claude-sonnet-4.6" → "Sonnet 4.6") */
+function shortModel(model?: string): string {
+  if (!model) return '';
+  const m = model.toLowerCase();
+  if (m.includes('opus')) return `Opus ${m.match(/[\d.]+$/)?.[0] || ''}`.trim();
+  if (m.includes('sonnet')) return `Sonnet ${m.match(/[\d.]+$/)?.[0] || ''}`.trim();
+  if (m.includes('haiku')) return `Haiku ${m.match(/[\d.]+$/)?.[0] || ''}`.trim();
+  if (m.includes('gemini')) return `Gemini ${m.replace(/.*gemini-?/, '').replace(/-/g, ' ')}`.trim();
+  if (m.includes('gpt')) return m.replace('gpt-', 'GPT-').replace('-codex', ' Codex');
+  return model;
+}
+
 export function TeamStatus({ agents, delegations }: Props) {
   return (
     <div className="flex-1 overflow-hidden flex flex-col min-h-0 border-t border-gray-700">
@@ -55,7 +67,12 @@ export function TeamStatus({ agents, delegations }: Props) {
                 )}
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-xs font-mono ${colorClass}`}>{agent.status}</span>
-                  <span className="text-xs text-gray-600">{agent.id.slice(0, 8)}</span>
+                  {(agent.model || agent.role.model) && (
+                    <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded" title={agent.model || agent.role.model}>
+                      {shortModel(agent.model || agent.role.model)}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-600 ml-auto">{agent.id.slice(0, 8)}</span>
                 </div>
               </div>
             );

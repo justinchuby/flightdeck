@@ -20,6 +20,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#f0883e',
     icon: '🏗️',
     builtIn: true,
+    model: 'claude-opus-4.6',
   },
   {
     id: 'reviewer',
@@ -30,6 +31,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#a371f7',
     icon: '🔍',
     builtIn: true,
+    model: 'gemini-3-pro-preview',
   },
   {
     id: 'developer',
@@ -40,6 +42,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#3fb950',
     icon: '💻',
     builtIn: true,
+    model: 'claude-sonnet-4.6',
   },
   {
     id: 'pm',
@@ -50,6 +53,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#d29922',
     icon: '📋',
     builtIn: true,
+    model: 'gpt-5.2-codex',
   },
   {
     id: 'advocate',
@@ -60,6 +64,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#f778ba',
     icon: '📣',
     builtIn: true,
+    model: 'gpt-5.1-codex',
   },
   {
     id: 'qa',
@@ -70,6 +75,7 @@ const BUILT_IN_ROLES: Role[] = [
     color: '#79c0ff',
     icon: '🧪',
     builtIn: true,
+    model: 'claude-haiku-4.5',
   },
   {
     id: 'lead',
