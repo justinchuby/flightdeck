@@ -247,6 +247,25 @@ export function AcpOutput({ agentId }: Props) {
   );
 }
 
+/** Collapsed-by-default <!-- command --> block with click to expand */
+function CollapsibleCommandBlockSimple({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const nameMatch = text.match(/<!--\s*(\w+)/);
+  const label = nameMatch ? nameMatch[1] : 'command';
+  return (
+    <div
+      className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 cursor-pointer hover:border-gray-600 transition-colors"
+      onClick={() => setExpanded((e) => !e)}
+    >
+      <div className="flex items-center gap-1">
+        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+        <span className="font-mono text-gray-400">{label}</span>
+      </div>
+      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words">{text}</pre>}
+    </div>
+  );
+}
+
 /** Render agent text with <!-- --> blocks separated and inline markdown + tables */
 function AgentTextBlockSimple({ text }: { text: string }) {
   const segments = text.split(/(<!--[\s\S]*?-->)/g);
@@ -254,11 +273,7 @@ function AgentTextBlockSimple({ text }: { text: string }) {
     <>
       {segments.map((seg, i) => {
         if (seg.startsWith('<!--') && seg.endsWith('-->')) {
-          return (
-            <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
-              {seg}
-            </pre>
-          );
+          return <CollapsibleCommandBlockSimple key={i} text={seg} />;
         }
         // Unclosed <!-- block
         if (seg.includes('<!--') && !seg.includes('-->')) {
@@ -268,9 +283,7 @@ function AgentTextBlockSimple({ text }: { text: string }) {
           return (
             <span key={i}>
               {before.trim() ? <InlineMarkdownSimple text={before} /> : null}
-              <pre className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
-                {cmdBlock}
-              </pre>
+              <CollapsibleCommandBlockSimple text={cmdBlock} />
             </span>
           );
         }

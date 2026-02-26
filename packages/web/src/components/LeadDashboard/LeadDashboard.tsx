@@ -1784,6 +1784,26 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
   return null;
 }
 
+/** Collapsed-by-default <!-- command --> block with click to expand */
+function CollapsibleCommandBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  // Extract command name: <!-- COMMAND_NAME {json} --> → "COMMAND_NAME"
+  const nameMatch = text.match(/<!--\s*(\w+)/);
+  const label = nameMatch ? nameMatch[1] : 'command';
+  return (
+    <div
+      className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 cursor-pointer hover:border-gray-600 transition-colors"
+      onClick={() => setExpanded((e) => !e)}
+    >
+      <div className="flex items-center gap-1">
+        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+        <span className="font-mono text-gray-400">{label}</span>
+      </div>
+      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words">{text}</pre>}
+    </div>
+  );
+}
+
 function AgentTextBlock({ text }: { text: string }) {
   // Split on <!-- ... --> blocks (complete) and also detect unclosed <!-- blocks
   const segments = text.split(/(<!--[\s\S]*?-->)/g);
@@ -1792,11 +1812,7 @@ function AgentTextBlock({ text }: { text: string }) {
       {segments.map((seg, i) => {
         // Complete <!-- --> block
         if (seg.startsWith('<!--') && seg.endsWith('-->')) {
-          return (
-            <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
-              {seg}
-            </pre>
-          );
+          return <CollapsibleCommandBlock key={i} text={seg} />;
         }
         // Unclosed <!-- block (still streaming or split across messages)
         if (seg.includes('<!--') && !seg.includes('-->')) {
@@ -1806,9 +1822,7 @@ function AgentTextBlock({ text }: { text: string }) {
           return (
             <span key={i}>
               {before.trim() ? <MarkdownWithTables text={before} /> : null}
-              <pre className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
-                {cmdBlock}
-              </pre>
+              <CollapsibleCommandBlock text={cmdBlock} />
             </span>
           );
         }
@@ -1819,9 +1833,7 @@ function AgentTextBlock({ text }: { text: string }) {
           const after = seg.slice(idx);
           return (
             <span key={i}>
-              <pre className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
-                {cmdBlock}
-              </pre>
+              <CollapsibleCommandBlock text={cmdBlock} />
               {after.trim() ? <MarkdownWithTables text={after} /> : null}
             </span>
           );
