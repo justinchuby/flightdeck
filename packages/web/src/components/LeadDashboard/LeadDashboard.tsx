@@ -1254,7 +1254,7 @@ function AgentTextBlock({ text }: { text: string }) {
       {segments.map((seg, i) => {
         if (seg.startsWith('<!--') && seg.endsWith('-->')) {
           return (
-            <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 overflow-x-auto">
+            <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
               {seg}
             </pre>
           );
