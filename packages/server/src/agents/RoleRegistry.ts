@@ -170,6 +170,9 @@ Report progress to the user:
 Query the current crew roster (get all agent IDs and statuses):
 <!-- QUERY_CREW -->
 
+Broadcast a message to ALL team members at once:
+<!-- BROADCAST {"content": "We are using factory pattern for all services — please follow this convention"} -->
+
 == SPECIALIST ROLES (with recommended default models) ==
 - "developer" — Code implementation, feature building, bug fixes, writes tests (default: claude-opus-4.6)
 - "code-reviewer" — Readability, maintainability, patterns, best practices (default: gemini-3-pro-preview)
