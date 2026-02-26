@@ -22,11 +22,20 @@ export interface AgentComm {
   timestamp: number;
 }
 
+export interface ProgressSnapshot {
+  summary: string;
+  completed: string[];
+  inProgress: string[];
+  blocked: string[];
+  timestamp: number;
+}
+
 interface ProjectState {
   messages: AcpTextChunk[];
   decisions: Decision[];
   progress: LeadProgress | null;
   progressSummary: string | null;
+  progressHistory: ProgressSnapshot[];
   toolCalls: AcpToolCall[];
   activity: ActivityEvent[];
   comms: AgentComm[];
@@ -50,6 +59,7 @@ interface LeadState {
   addDecision: (leadId: string, decision: Decision) => void;
   setProgress: (leadId: string, progress: LeadProgress) => void;
   setProgressSummary: (leadId: string, summary: string) => void;
+  addProgressSnapshot: (leadId: string, snapshot: ProgressSnapshot) => void;
   addMessage: (leadId: string, msg: AcpTextChunk) => void;
   appendToLastAgentMessage: (leadId: string, text: string) => void;
   promoteQueuedMessages: (leadId: string) => void;
@@ -60,7 +70,7 @@ interface LeadState {
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, progressSummary: null, toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
+  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], toolCalls: [], activity: [], comms: [], lastTextAt: 0, pendingNewline: false };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -106,6 +116,12 @@ export const useLeadStore = create<LeadState>((set) => ({
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       return { projects: { ...s.projects, [leadId]: { ...proj, progressSummary: summary } } };
+    }),
+
+  addProgressSnapshot: (leadId, snapshot) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, progressHistory: [...proj.progressHistory, snapshot] } } };
     }),
 
   addMessage: (leadId, msg) =>
