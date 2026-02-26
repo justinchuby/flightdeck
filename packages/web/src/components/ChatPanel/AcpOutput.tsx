@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
-import { ChevronDown, ChevronRight, User, Bot, FolderOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
 
 interface Props {
   agentId: string;
@@ -173,82 +173,175 @@ export function AcpOutput({ agentId }: Props) {
 
       {/* Messages Section */}
       {messages.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {messages.filter((msg) => msg.sender !== 'system' && (msg.text || msg.contentType)).map((msg, i) => {
             const sender = msg.sender ?? 'agent';
+            const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-            // Rich content (image, audio, resource)
-            if (msg.contentType && msg.contentType !== 'text') {
+            // User messages — right-aligned blue bubble
+            if (sender === 'user') {
               return (
-                <div key={i} className="flex gap-2 justify-start">
-                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-1">
-                    <Bot size={14} className="text-accent" />
-                  </div>
-                  <div className="max-w-[85%]">
-                    {msg.contentType === 'image' && msg.data && (
-                      <div>
-                        <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-gray-700" />
-                        {msg.uri && <p className="text-[10px] text-gray-500 mt-1 font-mono">{msg.uri}</p>}
-                      </div>
-                    )}
-                    {msg.contentType === 'audio' && msg.data && (
-                      <audio controls className="max-w-full">
-                        <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
-                      </audio>
-                    )}
-                    {msg.contentType === 'resource' && (
-                      <div className="rounded-lg px-3 py-2 bg-surface-raised border border-gray-700">
-                        {msg.uri && (
-                          <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
-                            <FolderOpen size={12} />
-                            <span className="font-mono">{msg.uri}</span>
-                          </div>
-                        )}
-                        {msg.text && (
-                          <pre className="text-xs font-mono text-gray-300 max-h-40 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
-                        )}
-                      </div>
-                    )}
+                <div key={i} className="flex justify-end items-start gap-2 py-1">
+                  <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
+                  <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
+                    {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
                   </div>
                 </div>
               );
             }
 
-            return (
-              <div
-                key={i}
-                className={`flex gap-2 ${sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {sender === 'agent' && (
-                  <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0 mt-1">
-                    <Bot size={14} className="text-accent" />
+            // Rich content (image, audio, resource)
+            if (msg.contentType && msg.contentType !== 'text') {
+              return (
+                <div key={i} className="py-1">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      {msg.contentType === 'image' && msg.data && (
+                        <div>
+                          <img src={`data:${msg.mimeType || 'image/png'};base64,${msg.data}`} alt="Agent image" className="max-w-full max-h-64 rounded-lg border border-gray-700" />
+                          {msg.uri && <p className="text-[10px] text-gray-500 mt-1 font-mono">{msg.uri}</p>}
+                        </div>
+                      )}
+                      {msg.contentType === 'audio' && msg.data && (
+                        <audio controls className="max-w-full">
+                          <source src={`data:${msg.mimeType || 'audio/wav'};base64,${msg.data}`} type={msg.mimeType || 'audio/wav'} />
+                        </audio>
+                      )}
+                      {msg.contentType === 'resource' && (
+                        <div>
+                          {msg.uri && (
+                            <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1">
+                              <FolderOpen size={12} />
+                              <span className="font-mono">{msg.uri}</span>
+                            </div>
+                          )}
+                          {msg.text && (
+                            <pre className="text-xs font-mono text-gray-300 bg-gray-800 border border-gray-700 rounded p-2 overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">{msg.text}</pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
                   </div>
-                )}
-                <div
-                  className={`rounded-lg px-3 py-2 max-w-[85%] text-sm font-mono whitespace-pre-wrap ${
-                    sender === 'user'
-                      ? 'bg-accent/20 text-gray-200 border border-accent/30'
-                      : 'bg-surface-raised text-gray-300 border border-gray-700'
-                  }`}
-                >
-                  {(typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2)).split('\n').map((line, j) => (
-                    <span key={j}>
-                      {j > 0 && <br />}
-                      {renderMarkdown(line)}
-                    </span>
-                  ))}
                 </div>
-                {sender === 'user' && (
-                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-1">
-                    <User size={14} className="text-blue-400" />
+              );
+            }
+
+            // Agent messages — flowing text, no bubble
+            const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
+            return (
+              <div key={i} className="py-1">
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 font-mono text-sm text-gray-200 whitespace-pre-wrap min-w-0">
+                    <AgentTextBlockSimple text={text} />
                   </div>
-                )}
+                  <span className="text-[10px] text-gray-600 mt-0.5 shrink-0">{ts}</span>
+                </div>
               </div>
             );
           })}
           <div ref={messagesEndRef} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Render agent text with <!-- --> blocks separated and inline markdown + tables */
+function AgentTextBlockSimple({ text }: { text: string }) {
+  const segments = text.split(/(<!--[\s\S]*?-->)/g);
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('<!--') && seg.endsWith('-->')) {
+          return (
+            <pre key={i} className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
+              {seg}
+            </pre>
+          );
+        }
+        // Unclosed <!-- block
+        if (seg.includes('<!--') && !seg.includes('-->')) {
+          const idx = seg.indexOf('<!--');
+          const before = seg.slice(0, idx);
+          const cmdBlock = seg.slice(idx);
+          return (
+            <span key={i}>
+              {before.trim() ? <InlineMarkdownSimple text={before} /> : null}
+              <pre className="my-1 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-[11px] text-gray-500 whitespace-pre-wrap break-words">
+                {cmdBlock}
+              </pre>
+            </span>
+          );
+        }
+        if (!seg.trim()) return null;
+        // Check for tables
+        const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
+        const parts = seg.split(TABLE_RE);
+        return (
+          <span key={i}>
+            {parts.map((part, j) => {
+              const trimmed = part.trim();
+              if (trimmed.startsWith('|') && trimmed.includes('\n')) {
+                return <SimpleTable key={j} raw={trimmed} />;
+              }
+              if (!trimmed) return null;
+              return <InlineMarkdownSimple key={j} text={part} />;
+            })}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+/** Inline markdown: bold, italic, code */
+function InlineMarkdownSimple({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith('*') && part.endsWith('*')) return <em key={i}>{part.slice(1, -1)}</em>;
+        if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="bg-gray-700 px-1 rounded text-yellow-300">{part.slice(1, -1)}</code>;
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+/** Simple markdown table renderer */
+function SimpleTable({ raw }: { raw: string }) {
+  const lines = raw.split('\n').filter((l) => l.trim());
+  if (lines.length < 2) return <InlineMarkdownSimple text={raw} />;
+  const parseRow = (line: string) => line.split('|').slice(1, -1).map((c) => c.trim());
+  const headerCells = parseRow(lines[0]);
+  const isSep = /^\|[\s:?-]+(\|[\s:?-]+)*\|?\s*$/.test(lines[1]);
+  const bodyRows = lines.slice(isSep ? 2 : 1).map(parseRow);
+  return (
+    <div className="my-2 overflow-x-auto">
+      <table className="text-xs font-mono border-collapse border border-gray-700 w-full">
+        <thead>
+          <tr className="bg-gray-800">
+            {headerCells.map((c, j) => (
+              <th key={j} className="border border-gray-700 px-2 py-1 text-left text-gray-300 font-semibold">
+                <InlineMarkdownSimple text={c} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {bodyRows.map((row, ri) => (
+            <tr key={ri} className={ri % 2 === 0 ? 'bg-gray-900/30' : 'bg-gray-800/30'}>
+              {row.map((c, ci) => (
+                <td key={ci} className="border border-gray-700 px-2 py-1 text-gray-300">
+                  <InlineMarkdownSimple text={c} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
