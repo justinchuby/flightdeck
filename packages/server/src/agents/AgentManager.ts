@@ -172,6 +172,22 @@ export class AgentManager extends EventEmitter {
       this.emit('agent:permission_request', { agentId: agent.id, request });
     });
 
+    // When a child agent's session is established, report session ID to parent
+    agent.onSessionReady((sessionId) => {
+      if (!agent.parentId) return;
+      const parent = this.agents.get(agent.parentId);
+      if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
+      const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
+      parent.sendMessage(msg);
+      this.emit('agent:message_sent', {
+        from: agent.id,
+        fromRole: agent.role.name,
+        to: parent.id,
+        toRole: parent.role.name,
+        content: msg,
+      });
+    });
+
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
 

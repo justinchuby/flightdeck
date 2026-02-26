@@ -70,6 +70,7 @@ export class Agent {
   private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
   private planListeners: Array<(entries: PlanEntry[]) => void> = [];
   private permissionRequestListeners: Array<(request: any) => void> = [];
+  private sessionReadyListeners: Array<(sessionId: string) => void> = [];
   private peers: AgentContextInfo[];
 
   /** Resume a previous session by its Copilot session ID */
@@ -168,6 +169,7 @@ export class Agent {
       cwd: this.cwd || process.cwd(),
     }).then((sessionId) => {
       this.sessionId = sessionId;
+      for (const listener of this.sessionReadyListeners) listener(sessionId);
       return this.acpConnection!.prompt(initialPrompt);
     }).catch((err) => {
       this.status = 'failed';
@@ -192,6 +194,7 @@ export class Agent {
       cwd: this.cwd || process.cwd(),
     }, resumeId).then((sessionId) => {
       this.sessionId = sessionId;
+      for (const listener of this.sessionReadyListeners) listener(sessionId);
       return this.acpConnection!.prompt(initialPrompt);
     }).catch((err) => {
       logger.warn('agent', `Session resume failed (${resumeId}), falling back to new session: ${err.message}`);
@@ -511,6 +514,10 @@ CREW_UPDATE -->`;
 
   onPermissionRequest(listener: (request: any) => void): void {
     this.permissionRequestListeners.push(listener);
+  }
+
+  onSessionReady(listener: (sessionId: string) => void): void {
+    this.sessionReadyListeners.push(listener);
   }
 
   getBufferedOutput(): string {
