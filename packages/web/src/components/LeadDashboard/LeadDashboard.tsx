@@ -338,65 +338,107 @@ export function LeadDashboard({ api, ws }: Props) {
           })}
         </div>
 
-        {/* New project form */}
-        {showNewProject && (
-          <div className="border-t border-gray-700 p-3 space-y-2 bg-gray-800/50">
-            <input
-              type="text"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder="Project name"
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
-              autoFocus
-            />
-            <textarea
-              value={newProjectTask}
-              onChange={(e) => setNewProjectTask(e.target.value)}
-              placeholder="Initial task (optional)"
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 resize-none h-16 focus:outline-none focus:border-yellow-500"
-            />
-            <select
-              value={newProjectModel}
-              onChange={(e) => setNewProjectModel(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+        {/* New project button at bottom of sidebar */}
+        {showNewProject ? null : (
+          <div className="border-t border-gray-700 p-2">
+            <button
+              onClick={() => setShowNewProject(true)}
+              className="w-full flex items-center justify-center gap-1.5 text-sm text-yellow-400 hover:text-yellow-300 py-1.5 rounded hover:bg-gray-800 transition-colors"
             >
-              <option value="">Model (default)</option>
-              <option value="claude-opus-4.6">Claude Opus 4.6</option>
-              <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
-              <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
-              <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
-              <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
-              <option value="gpt-5.2-codex">GPT-5.2 Codex</option>
-              <option value="gpt-5.2">GPT-5.2</option>
-              <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
-              <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
-            </select>
-            <input
-              type="text"
-              value={newProjectCwd}
-              onChange={(e) => setNewProjectCwd(e.target.value)}
-              placeholder="Working directory (default: server cwd)"
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined)}
-                disabled={starting}
-                className="flex-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold py-1.5 rounded flex items-center justify-center gap-1"
-              >
-                {starting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Crown className="w-3 h-3" />}
-                {starting ? '...' : 'Create'}
-              </button>
-              <button
-                onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); }}
-                className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200"
-              >
-                Cancel
-              </button>
-            </div>
+              <Plus className="w-4 h-4" />
+              New Project
+            </button>
           </div>
         )}
       </div>
+
+      {/* New project modal */}
+      {showNewProject && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); }}
+        >
+          <div
+            className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-700">
+              <Crown className="w-5 h-5 text-yellow-400" />
+              <h2 className="text-base font-semibold text-gray-100">New Project</h2>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 font-medium">Project Name</label>
+                <input
+                  type="text"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="My Feature"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 font-medium">Task / Prompt</label>
+                <textarea
+                  value={newProjectTask}
+                  onChange={(e) => setNewProjectTask(e.target.value)}
+                  placeholder="Describe what you want the team to work on..."
+                  rows={6}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500 resize-y"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1 font-medium">Model</label>
+                  <select
+                    value={newProjectModel}
+                    onChange={(e) => setNewProjectModel(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                  >
+                    <option value="">Default</option>
+                    <option value="claude-opus-4.6">Claude Opus 4.6</option>
+                    <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                    <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
+                    <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
+                    <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
+                    <option value="gpt-5.2-codex">GPT-5.2 Codex</option>
+                    <option value="gpt-5.2">GPT-5.2</option>
+                    <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
+                    <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1 font-medium">Working Directory</label>
+                  <input
+                    type="text"
+                    value={newProjectCwd}
+                    onChange={(e) => setNewProjectCwd(e.target.value)}
+                    placeholder="/path/to/project"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-700">
+              <button
+                onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); }}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 rounded-md hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => startLead(newProjectName || 'Untitled', newProjectTask.trim() || undefined, newProjectModel || undefined, newProjectCwd.trim() || undefined)}
+                disabled={starting}
+                className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
+              >
+                {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+                {starting ? 'Starting...' : 'Create Project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       {!selectedLeadId ? (
