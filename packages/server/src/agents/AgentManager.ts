@@ -18,6 +18,7 @@ const AGENT_MESSAGE_REGEX = /<!--\s*AGENT_MESSAGE\s*(\{.*?\})\s*-->/s;
 const DELEGATE_REGEX = /<!--\s*DELEGATE\s*(\{.*?\})\s*-->/s;
 const DECISION_REGEX = /<!--\s*DECISION\s*(\{.*?\})\s*-->/s;
 const PROGRESS_REGEX = /<!--\s*PROGRESS\s*(\{.*?\})\s*-->/s;
+const QUERY_CREW_REGEX = /<!--\s*QUERY_CREW\s*-->/s;
 
 export interface Delegation {
   id: string;
@@ -313,6 +314,7 @@ export class AgentManager extends EventEmitter {
       { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => this.detectDelegate(a, d) },
       { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => this.detectDecision(a, d) },
       { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => this.detectProgress(a, d) },
+      { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => this.handleQueryCrew(a) },
     ];
 
     let found = true;
@@ -498,16 +500,36 @@ export class AgentManager extends EventEmitter {
       const req = JSON.parse(match[1]);
       if (!req.to || !req.task) return;
 
+      // Only lead agents can delegate to role agents
+      if (agent.role.id !== 'lead') {
+        logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — ignoring. Use SPAWN_AGENT for sub-agents.`);
+        agent.sendMessage(`[System] Only the Project Lead can delegate to role agents. Use <!-- SPAWN_AGENT {"roleId":"worker","taskId":"your task"} --> to create sub-agents for parallel work.`);
+        return;
+      }
+
       const role = this.roleRegistry.get(req.to);
       if (!role) {
         this.emit('agent:delegate_error', agent.id, `Unknown role: ${req.to}`);
         return;
       }
 
-      // Spawn child in autopilot mode
-      const child = this.spawn(role, req.task, agent.id, 'acp', true);
+      // Try to reuse an idle agent with the same role under the same lead
+      const existingAgent = this.getAll().find((a) =>
+        a.role.id === role.id &&
+        a.parentId === agent.id &&
+        (a.status === 'idle' || a.status === 'running') &&
+        a.id !== agent.id
+      );
 
-      logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) delegated to ${role.name}: ${req.task.slice(0, 80)}`);
+      let child: Agent;
+      if (existingAgent) {
+        child = existingAgent;
+        logger.info('delegation', `Reusing idle ${role.name} (${child.id.slice(0, 8)}) for new task from ${agent.role.name}`);
+      } else {
+        // No idle agent available — spawn a new one
+        child = this.spawn(role, req.task, agent.id, 'acp', true);
+        logger.info('delegation', `${agent.role.name} (${agent.id.slice(0, 8)}) spawned new ${role.name}: ${req.task.slice(0, 80)}`);
+      }
 
       // Track delegation
       const delegation: Delegation = {
@@ -569,6 +591,32 @@ export class AgentManager extends EventEmitter {
     } catch {
       // ignore malformed progress
     }
+  }
+
+  /** Respond to QUERY_CREW with a full roster of active agents and their IDs */
+  private handleQueryCrew(agent: Agent): void {
+    const roster = this.getAll()
+      .filter((a) => a.status !== 'completed' && a.status !== 'failed')
+      .map((a) => ({
+        id: a.id.slice(0, 8),
+        fullId: a.id,
+        role: a.role.name,
+        roleId: a.role.id,
+        status: a.status,
+        task: a.taskId?.slice(0, 80) || null,
+        parentId: a.parentId?.slice(0, 8) || null,
+      }));
+
+    const response = `<!-- CREW_ROSTER
+== ACTIVE CREW MEMBERS ==
+${roster.map((r) => `- ${r.id} | ${r.role} (${r.roleId}) | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`).join('\n')}
+
+To message an agent, use their ID (first 8 chars is enough):
+<!-- AGENT_MESSAGE {"to": "agent-id", "content": "your message"} -->
+CREW_ROSTER -->`;
+
+    logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);
+    agent.sendMessage(response);
   }
 
   private notifyParentOfCompletion(agent: Agent, exitCode: number | null): void {

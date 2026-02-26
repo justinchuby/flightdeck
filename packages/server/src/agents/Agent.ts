@@ -249,8 +249,9 @@ ${peerLines || '(no other agents)'}
 2. If you need to modify a shared file, request a lock first by outputting: <!-- LOCK_REQUEST {"filePath": "path/to/file", "reason": "why"} -->
 3. When you finish editing a file, release the lock: <!-- LOCK_RELEASE {"filePath": "path/to/file"} -->
 4. To communicate with another agent, use: <!-- AGENT_MESSAGE {"to": "agent-id", "content": "message"} -->
-5. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
-6. Log important decisions by outputting: <!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->
+5. To get an updated roster of all agents and their IDs, use: <!-- QUERY_CREW -->
+6. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
+7. Log important decisions by outputting: <!-- ACTIVITY {"action": "decision_made", "summary": "what you decided"} -->
 
 CREW_CONTEXT -->`;
   }
