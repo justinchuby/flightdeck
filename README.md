@@ -1,5 +1,8 @@
 # AI Crew — Multi-Agent Copilot CLI Orchestrator
 
+> [!WARNING]
+> This is purely AI generated code. Use the project with this understanding in mind.
+
 A web UI that orchestrates multiple Copilot CLI agents with specialized roles to collaborate on software engineering tasks. A **Project Lead** agent coordinates the team, delegates work, and facilitates debate — while you stay in the loop.
 
 ## Features
