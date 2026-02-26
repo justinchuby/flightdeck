@@ -249,6 +249,8 @@ export function LeadDashboard({ api, ws }: Props) {
         setShowNewProject(false);
         setNewProjectName('');
         setNewProjectTask('');
+        setNewProjectModel('');
+        setNewProjectCwd('');
       }
     } catch {
       // ignore
@@ -356,7 +358,7 @@ export function LeadDashboard({ api, ws }: Props) {
       {showNewProject && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); } }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowNewProject(false); }}
         >
           <div
             className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-xl flex flex-col"
@@ -421,7 +423,7 @@ export function LeadDashboard({ api, ws }: Props) {
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-700">
               <button
-                onClick={() => { setShowNewProject(false); setNewProjectName(''); setNewProjectTask(''); setNewProjectModel(''); setNewProjectCwd(''); }}
+                onClick={() => setShowNewProject(false)}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 rounded-md hover:bg-gray-700 transition-colors"
               >
                 Cancel
