@@ -451,29 +451,36 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Input */}
             <div className="border-t border-gray-700 p-3">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  sendMessage();
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  type="text"
+              <div className="flex gap-2 items-end">
+                <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={isActive ? 'Message the Project Lead...' : 'Project Lead is not active'}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  placeholder={isActive ? 'Message the Project Lead... (Shift+Enter for new line)' : 'Project Lead is not active'}
                   disabled={!isActive}
-                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500 disabled:opacity-50"
+                  rows={1}
+                  onInput={(e) => {
+                    const el = e.currentTarget;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+                  }}
+                  className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:border-yellow-500 disabled:opacity-50 resize-none overflow-y-auto"
+                  style={{ maxHeight: 150 }}
                 />
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={sendMessage}
                   disabled={!isActive || !input.trim()}
-                  className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black px-3 py-2 rounded"
+                  className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 text-black px-3 py-2 rounded shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </button>
-              </form>
+              </div>
             </div>
           </div>
 
