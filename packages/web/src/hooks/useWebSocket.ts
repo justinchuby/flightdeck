@@ -69,7 +69,7 @@ export function useWebSocket() {
           if (last && (last.sender ?? 'agent') === 'agent') {
             msgs[msgs.length - 1] = { ...last, text: last.text + msg.text };
           } else {
-            msgs.push({ type: 'text', text: msg.text, sender: 'agent' });
+            msgs.push({ type: 'text', text: msg.text.replace(/^\n+/, ''), sender: 'agent' });
           }
           updateAgent(msg.agentId, { messages: msgs });
           break;
