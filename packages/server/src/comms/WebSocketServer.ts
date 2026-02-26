@@ -143,6 +143,10 @@ export class WebSocketServer {
     agentManager.on('agent:completion_reported', (data: any) => {
       this.broadcastAll({ type: 'agent:completion_reported', ...data });
     });
+
+    agentManager.on('agent:message_sent', (data: any) => {
+      this.broadcastAll({ type: 'agent:message_sent', ...data });
+    });
   }
 
   private handleMessage(

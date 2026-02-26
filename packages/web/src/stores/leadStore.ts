@@ -12,12 +12,23 @@ export interface ActivityEvent {
   timestamp: number;
 }
 
+export interface AgentComm {
+  id: string;
+  fromId: string;
+  fromRole: string;
+  toId: string;
+  toRole: string;
+  content: string;
+  timestamp: number;
+}
+
 interface ProjectState {
   messages: AcpTextChunk[];
   decisions: Decision[];
   progress: LeadProgress | null;
   toolCalls: AcpToolCall[];
   activity: ActivityEvent[];
+  comms: AgentComm[];
   /** Timestamp of last text received — used to show "working" indicator */
   lastTextAt: number;
 }
@@ -39,11 +50,12 @@ interface LeadState {
   appendToLastAgentMessage: (leadId: string, text: string) => void;
   updateToolCall: (leadId: string, toolCall: AcpToolCall) => void;
   addActivity: (leadId: string, event: ActivityEvent) => void;
+  addComm: (leadId: string, comm: AgentComm) => void;
   reset: () => void;
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, toolCalls: [], activity: [], lastTextAt: 0 };
+  return { messages: [], decisions: [], progress: null, toolCalls: [], activity: [], comms: [], lastTextAt: 0 };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -127,6 +139,14 @@ export const useLeadStore = create<LeadState>((set) => ({
       // Keep only last 100
       if (activity.length > 100) activity = activity.slice(-100);
       return { projects: { ...s.projects, [leadId]: { ...proj, activity } } };
+    }),
+
+  addComm: (leadId, comm) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      let comms = [...proj.comms, comm];
+      if (comms.length > 200) comms = comms.slice(-200);
+      return { projects: { ...s.projects, [leadId]: { ...proj, comms } } };
     }),
 
   reset: () => set({ projects: {}, selectedLeadId: null }),

@@ -48,6 +48,8 @@ export class AgentManager extends EventEmitter {
   private maxRestarts: number;
   private autoRestart: boolean;
   private delegations: Map<string, Delegation> = new Map();
+  /** Buffer ACP text chunks per agent so we can match multi-token command patterns */
+  private textBuffers: Map<string, string> = new Map();
 
   constructor(
     config: ServerConfig,
@@ -120,17 +122,22 @@ export class AgentManager extends EventEmitter {
     agent.onData((data) => {
       if (agent.mode === 'acp') {
         this.emit('agent:text', agent.id, data);
+        // Buffer ACP text and scan for complete command patterns
+        const buf = (this.textBuffers.get(agent.id) || '') + data;
+        this.textBuffers.set(agent.id, buf);
+        this.scanBuffer(agent);
       } else {
         this.emit('agent:data', agent.id, data);
+        // PTY data arrives in larger chunks — match directly
+        this.detectSpawnRequest(agent.id, data);
+        this.detectLockRequest(agent, data);
+        this.detectLockRelease(agent, data);
+        this.detectActivity(agent, data);
+        this.detectAgentMessage(agent, data);
+        this.detectDelegate(agent, data);
+        this.detectDecision(agent, data);
+        this.detectProgress(agent, data);
       }
-      this.detectSpawnRequest(agent.id, data);
-      this.detectLockRequest(agent, data);
-      this.detectLockRelease(agent, data);
-      this.detectActivity(agent, data);
-      this.detectAgentMessage(agent, data);
-      this.detectDelegate(agent, data);
-      this.detectDecision(agent, data);
-      this.detectProgress(agent, data);
     });
 
     agent.onToolCall((info) => {
@@ -147,6 +154,7 @@ export class AgentManager extends EventEmitter {
 
     agent.onExit((code) => {
       this.clearHungTimer(agent.id);
+      this.textBuffers.delete(agent.id);
       logger.info('agent', `Exited ${agent.role.name} (${agent.id.slice(0, 8)}) code=${code}`, {
         role: agent.role.id,
         status: agent.status,
@@ -280,6 +288,50 @@ export class AgentManager extends EventEmitter {
         agent.kill();
       }
     }
+  }
+
+  /**
+   * Scan accumulated text buffer for complete command patterns.
+   * When a pattern is found, execute it and remove it from the buffer.
+   * Keep only trailing text that might be the start of a new command.
+   */
+  private scanBuffer(agent: Agent): void {
+    let buf = this.textBuffers.get(agent.id) || '';
+    if (!buf) return;
+
+    const patterns: Array<{ regex: RegExp; handler: (agent: Agent, data: string) => void }> = [
+      { regex: SPAWN_REQUEST_REGEX, handler: (a, d) => this.detectSpawnRequest(a.id, d) },
+      { regex: LOCK_REQUEST_REGEX, handler: (a, d) => this.detectLockRequest(a, d) },
+      { regex: LOCK_RELEASE_REGEX, handler: (a, d) => this.detectLockRelease(a, d) },
+      { regex: ACTIVITY_REGEX, handler: (a, d) => this.detectActivity(a, d) },
+      { regex: AGENT_MESSAGE_REGEX, handler: (a, d) => this.detectAgentMessage(a, d) },
+      { regex: DELEGATE_REGEX, handler: (a, d) => this.detectDelegate(a, d) },
+      { regex: DECISION_REGEX, handler: (a, d) => this.detectDecision(a, d) },
+      { regex: PROGRESS_REGEX, handler: (a, d) => this.detectProgress(a, d) },
+    ];
+
+    let found = true;
+    while (found) {
+      found = false;
+      for (const { regex, handler } of patterns) {
+        const match = buf.match(regex);
+        if (match) {
+          handler(agent, match[0]);
+          buf = buf.slice(0, match.index!) + buf.slice(match.index! + match[0].length);
+          found = true;
+        }
+      }
+    }
+
+    // Keep only last 500 chars that might contain an incomplete command
+    const lastOpen = buf.lastIndexOf('<!--');
+    if (lastOpen >= 0) {
+      // Keep from the last incomplete opening tag
+      buf = buf.slice(lastOpen);
+    } else if (buf.length > 500) {
+      buf = buf.slice(-200);
+    }
+    this.textBuffers.set(agent.id, buf);
   }
 
   private detectSpawnRequest(agentId: string, data: string): void {
@@ -489,6 +541,7 @@ export class AgentManager extends EventEmitter {
 
     logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
     parent.sendMessage(summary);
+    this.emit('agent:message_sent', { from: agent.id, to: parent.id, content: summary });
     this.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status });
   }
 

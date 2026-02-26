@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
-import type { ActivityEvent } from '../../stores/leadStore';
+import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
 import { DecisionPanel } from './DecisionPanel';
 import { TeamStatus } from './TeamStatus';
@@ -140,6 +140,24 @@ export function LeadDashboard({ api, ws }: Props) {
           timestamp: Date.now(),
         });
       }
+
+      // Track inter-agent messages
+      if (msg.type === 'agent:message_sent') {
+        const fromAgent = agents.find((a) => a.id === msg.from);
+        const toAgent = agents.find((a) => a.id === msg.to);
+        const leadId = selectedLeadId;
+        if (leadId && (msg.from === leadId || fromAgent?.parentId === leadId || toAgent?.parentId === leadId)) {
+          store.addComm(leadId, {
+            id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            fromId: msg.from,
+            fromRole: fromAgent?.role?.name ?? 'Unknown',
+            toId: msg.to,
+            toRole: toAgent?.role?.name ?? 'Unknown',
+            content: msg.content?.slice(0, 300) ?? '',
+            timestamp: Date.now(),
+          });
+        }
+      }
     };
     window.addEventListener('ws-message', handler);
     return () => window.removeEventListener('ws-message', handler);
@@ -187,6 +205,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const decisions = currentProject?.decisions ?? [];
   const progress = currentProject?.progress ?? null;
   const activity = currentProject?.activity ?? [];
+  const comms = currentProject?.comms ?? [];
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
 
   return (
@@ -396,14 +415,52 @@ export function LeadDashboard({ api, ws }: Props) {
             </div>
           </div>
 
-          {/* Right sidebar: decisions + activity + team */}
+          {/* Right sidebar: decisions + comms + activity + team */}
           <div className="w-80 border-l border-gray-700 flex flex-col overflow-hidden">
             <DecisionPanel decisions={decisions} />
+            <CommsPanel comms={comms} />
             <ActivityFeed activity={activity} agents={agents} />
             <TeamStatus agents={teamAgents} delegations={progress?.delegations ?? []} />
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function CommsPanel({ comms }: { comms: AgentComm[] }) {
+  const feedRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
+  }, [comms.length]);
+
+  const recent = comms.slice(-50);
+
+  return (
+    <div className="flex-1 overflow-hidden flex flex-col min-h-0 border-t border-gray-700">
+      <div className="px-3 py-2 border-b border-gray-700 flex items-center gap-2 shrink-0">
+        <MessageSquare className="w-4 h-4 text-purple-400" />
+        <span className="text-sm font-semibold">Agent Comms</span>
+        <span className="text-xs text-gray-500 ml-auto">{comms.length}</span>
+      </div>
+      <div ref={feedRef} className="flex-1 overflow-y-auto">
+        {recent.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
+        ) : (
+          recent.map((c) => (
+            <div key={c.id} className="px-3 py-1.5 border-b border-gray-700/30">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
+                <span className="text-gray-500">→</span>
+                <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
+              </div>
+              <p className="text-xs font-mono text-gray-300 mt-0.5 break-words whitespace-pre-wrap">
+                {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
