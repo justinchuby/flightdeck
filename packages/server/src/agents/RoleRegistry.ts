@@ -127,7 +127,7 @@ You have a unique superpower: if something is hard for you to explain, it's prob
     color: '#f778ba',
     icon: '📝',
     builtIn: true,
-    model: 'gpt-5.1-codex',
+    model: 'gpt-5.2',
   },
   {
     id: 'designer',
@@ -264,7 +264,7 @@ Broadcast a message to ALL team members at once:
 - "critical-reviewer" — Security, performance, edge cases, failure modes (default: claude-sonnet-4.6)
 - "architect" — System design, architecture decisions, problem framing (default: claude-opus-4.6)
 - "product-manager" — Creative product thinking, user needs, quality bar (default: gpt-5.2-codex)
-- "tech-writer" — Documentation, examples, API design review (default: gpt-5.1-codex)
+- "tech-writer" — Documentation, examples, API design review (default: gpt-5.2)
 - "designer" — UX/UI design, human-computer interaction, agent-agent interaction patterns (default: claude-opus-4.6)
 - "generalist" — Cross-disciplinary problem solver for non-software tasks: mechanical eng, 3D modeling, research, hardware (default: claude-opus-4.6)
 - "radical-thinker" — First-principles challenger, perspective shifter, innovation catalyst (default: gpt-5.3-codex)
