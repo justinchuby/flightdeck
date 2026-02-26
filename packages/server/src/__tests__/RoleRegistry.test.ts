@@ -17,7 +17,7 @@ describe('RoleRegistry', () => {
   it('can get a role by id', () => {
     const role = registry.get('architect');
     expect(role).toBeDefined();
-    expect(role!.name).toBe('Senior Architect');
+    expect(role!.name).toBe('Architect');
     expect(role!.builtIn).toBe(true);
   });
 

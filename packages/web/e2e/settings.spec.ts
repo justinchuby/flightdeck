@@ -21,7 +21,7 @@ test.describe('Settings', () => {
 
   test('lists all 6 built-in roles', async ({ page }) => {
     for (const role of [
-      'Senior Architect',
+      'Architect',
       'Code Reviewer',
       'Developer',
       'Project Manager',

@@ -13,7 +13,7 @@ export interface Role {
 const BUILT_IN_ROLES: Role[] = [
   {
     id: 'architect',
-    name: 'Senior Architect',
+    name: 'Architect',
     description: 'High-level system design, architecture decisions, and technical leadership',
     systemPrompt:
       `You are a Senior Software Architect with a 10x improvements mindset. Don't settle for incremental changes — look for architectural shifts that deliver order-of-magnitude gains in performance, simplicity, or developer productivity.

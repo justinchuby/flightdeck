@@ -15,29 +15,29 @@ test.describe('Agent Dashboard', () => {
     await expect(page.getByText('Spawn Agent').first()).toBeVisible(); // dialog title
 
     // All 6 built-in roles should be visible
-    for (const role of ['Senior Architect', 'Code Reviewer', 'Developer', 'Project Manager', 'Dev Advocate', 'QA Engineer']) {
+    for (const role of ['Architect', 'Code Reviewer', 'Developer', 'Project Manager', 'Dev Advocate', 'QA Engineer']) {
       await expect(page.getByText(role)).toBeVisible();
     }
   });
 
   test('spawn dialog can be closed with Cancel', async ({ page }) => {
     await page.getByRole('button', { name: /Spawn Agent/i }).click();
-    await expect(page.getByText('Senior Architect')).toBeVisible();
+    await expect(page.getByText('Architect')).toBeVisible();
     await page.getByRole('button', { name: /Cancel/i }).click();
     // Dialog should be gone
-    await expect(page.getByText('Senior Architect')).not.toBeVisible();
+    await expect(page.getByText('Architect')).not.toBeVisible();
   });
 
   test('keyboard shortcut N opens spawn dialog', async ({ page }) => {
     await page.keyboard.press('n');
-    await expect(page.getByText('Senior Architect')).toBeVisible();
+    await expect(page.getByText('Architect')).toBeVisible();
   });
 
   test('Escape closes spawn dialog', async ({ page }) => {
     await page.keyboard.press('n');
-    await expect(page.getByText('Senior Architect')).toBeVisible();
+    await expect(page.getByText('Architect')).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByText('Senior Architect')).not.toBeVisible();
+    await expect(page.getByText('Architect')).not.toBeVisible();
   });
 
   test('spawning an agent shows it in the dashboard', async ({ page }) => {
