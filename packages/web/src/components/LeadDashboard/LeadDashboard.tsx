@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
-import { DecisionPanel } from './DecisionPanel';
-import { TeamStatus } from './TeamStatus';
 
 interface Props {
   api: any;
@@ -501,10 +499,18 @@ export function LeadDashboard({ api, ws }: Props) {
                     <PanelRightClose className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <DecisionPanel decisions={decisions} />
-                <CommsPanel comms={comms} />
-                <ActivityFeed activity={activity} agents={agents} />
-                <TeamStatus agents={teamAgents} delegations={progress?.delegations ?? []} />
+                <CollapsibleSection title="Decisions" icon={<Lightbulb className="w-3.5 h-3.5 text-yellow-400" />} badge={decisions.length} defaultHeight={150}>
+                  <DecisionPanelContent decisions={decisions} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Agent Comms" icon={<MessageSquare className="w-3.5 h-3.5 text-purple-400" />} badge={comms.length} defaultHeight={200}>
+                  <CommsPanelContent comms={comms} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Activity" icon={<Wrench className="w-3.5 h-3.5 text-gray-400" />} badge={activity.length} defaultHeight={180}>
+                  <ActivityFeedContent activity={activity} agents={agents} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Team" icon={<Bot className="w-3.5 h-3.5 text-blue-400" />} badge={teamAgents.length} defaultHeight={180}>
+                  <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} />
+                </CollapsibleSection>
               </div>
             </div>
           )}
@@ -514,7 +520,68 @@ export function LeadDashboard({ api, ws }: Props) {
   );
 }
 
-function CommsPanel({ comms }: { comms: AgentComm[] }) {
+function DecisionPanelContent({ decisions }: { decisions: any[] }) {
+  return (
+    <div className="p-2 space-y-2">
+      {decisions.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4 font-mono">No decisions yet</p>
+      ) : (
+        decisions.map((d: any, i: number) => (
+          <div key={d.id || `dec-${i}`} className="bg-gray-800 border border-gray-700 rounded p-2">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-3.5 h-3.5 text-yellow-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-mono font-semibold text-gray-200">{d.title}</p>
+                {d.rationale && <p className="text-xs font-mono text-gray-400 mt-1">{d.rationale}</p>}
+                <p className="text-xs text-gray-600 mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function TeamStatusContent({ agents, delegations }: { agents: any[]; delegations: any[] }) {
+  const STATUS_COLOR: Record<string, string> = {
+    creating: 'text-gray-400', running: 'text-blue-400', idle: 'text-yellow-400',
+    completed: 'text-green-400', failed: 'text-red-400',
+  };
+
+  return (
+    <div className="p-2 space-y-2">
+      {agents.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
+      ) : (
+        agents.map((agent: any) => {
+          const delegation = delegations.find((d: any) => d.toAgentId === agent.id);
+          const colorClass = STATUS_COLOR[agent.status] || 'text-gray-400';
+          return (
+            <div key={agent.id} className="bg-gray-800 border border-gray-700 rounded p-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{agent.role.icon}</span>
+                <span className="text-sm font-mono font-semibold text-gray-200 truncate">{agent.role.name}</span>
+                <span className={`text-xs font-mono ${colorClass} ml-auto`}>{agent.status}</span>
+              </div>
+              {delegation && (
+                <p className="text-xs font-mono text-gray-400 mt-1 truncate" title={delegation.task}>{delegation.task}</p>
+              )}
+              <div className="flex items-center gap-2 mt-1">
+                {(agent.model || agent.role.model) && (
+                  <span className="text-[10px] font-mono text-gray-500 bg-gray-700/50 px-1 rounded">{agent.model || agent.role.model}</span>
+                )}
+                <span className="text-xs text-gray-600 ml-auto">{agent.id.slice(0, 8)}</span>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
@@ -523,45 +590,37 @@ function CommsPanel({ comms }: { comms: AgentComm[] }) {
   const recent = comms.slice(-50);
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col min-h-0 border-t border-gray-700">
-      <div className="px-3 py-2 border-b border-gray-700 flex items-center gap-2 shrink-0">
-        <MessageSquare className="w-4 h-4 text-purple-400" />
-        <span className="text-sm font-semibold">Agent Comms</span>
-        <span className="text-xs text-gray-500 ml-auto">{comms.length}</span>
-      </div>
-      <div ref={feedRef} className="flex-1 overflow-y-auto">
-        {recent.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
-        ) : (
-          recent.map((c) => {
-            const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            return (
-              <div key={c.id} className="px-3 py-1.5 border-b border-gray-700/30">
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
-                  <span className="text-gray-500">→</span>
-                  <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
-                  <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
-                </div>
-                <p className="text-xs font-mono text-gray-300 mt-0.5 break-words whitespace-pre-wrap">
-                  {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
-                </p>
+    <div ref={feedRef}>
+      {recent.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
+      ) : (
+        recent.map((c) => {
+          const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          return (
+            <div key={c.id} className="px-3 py-1.5 border-b border-gray-700/30">
+              <div className="flex items-center gap-1 text-xs">
+                <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
+                <span className="text-gray-500">→</span>
+                <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
+                <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
               </div>
-            );
-          })
-        )}
-      </div>
+              <p className="text-xs font-mono text-gray-300 mt-0.5 break-words whitespace-pre-wrap">
+                {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
+              </p>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
 
-function ActivityFeed({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
+function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
   }, [activity.length]);
 
-  // Show most recent 30
   const recent = activity.slice(-30);
 
   const getIcon = (type: string, status?: string) => {
@@ -574,35 +633,99 @@ function ActivityFeed({ activity, agents }: { activity: ActivityEvent[]; agents:
   };
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col min-h-0 border-t border-gray-700">
-      <div className="px-3 py-2 border-b border-gray-700 flex items-center gap-2 shrink-0">
-        <Wrench className="w-4 h-4 text-gray-400" />
-        <span className="text-sm font-semibold">Activity</span>
-        <span className="text-xs text-gray-500 ml-auto">{activity.length}</span>
-      </div>
-      <div ref={feedRef} className="flex-1 overflow-y-auto">
-        {recent.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-4 font-mono">No activity yet</p>
-        ) : (
-          recent.map((evt) => {
-            const agent = agents.find((a: any) => a.id === evt.agentId);
-            const label = agent?.role?.name ?? evt.agentRole;
-            const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            return (
-              <div key={evt.id} className="px-3 py-1.5 border-b border-gray-700/30 flex items-start gap-2">
-                {getIcon(evt.type, evt.status)}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-mono text-gray-400">{label}</span>
-                    <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
-                  </div>
-                  <span className="text-xs font-mono text-gray-300 break-words">{evt.summary}</span>
+    <div ref={feedRef}>
+      {recent.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4 font-mono">No activity yet</p>
+      ) : (
+        recent.map((evt) => {
+          const agent = agents.find((a: any) => a.id === evt.agentId);
+          const label = agent?.role?.name ?? evt.agentRole;
+          const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          return (
+            <div key={evt.id} className="px-3 py-1.5 border-b border-gray-700/30 flex items-start gap-2">
+              {getIcon(evt.type, evt.status)}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-mono text-gray-400">{label}</span>
+                  <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
+                <span className="text-xs font-mono text-gray-300 break-words">{evt.summary}</span>
               </div>
-            );
-          })
-        )}
-      </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  icon,
+  badge,
+  defaultHeight = 160,
+  minHeight = 60,
+  maxHeight = 500,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  badge?: number;
+  defaultHeight?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  children: React.ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [height, setHeight] = useState(defaultHeight);
+  const isResizing = useRef(false);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    const startY = e.clientY;
+    const startH = height;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const newH = Math.min(maxHeight, Math.max(minHeight, startH + (e.clientY - startY)));
+      setHeight(newH);
+    };
+
+    const onMouseUp = () => {
+      isResizing.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [height, minHeight, maxHeight]);
+
+  return (
+    <div className="border-t border-gray-700 flex flex-col shrink-0" style={collapsed ? undefined : { height }}>
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="px-3 py-1.5 flex items-center gap-2 shrink-0 hover:bg-gray-800/50 transition-colors w-full text-left"
+      >
+        {collapsed ? <ChevronRight className="w-3 h-3 text-gray-500" /> : <ChevronDown className="w-3 h-3 text-gray-500" />}
+        {icon}
+        <span className="text-xs font-semibold">{title}</span>
+        {badge !== undefined && <span className="text-[10px] text-gray-500 ml-auto">{badge}</span>}
+      </button>
+      {!collapsed && (
+        <>
+          <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
+          <div
+            onMouseDown={startResize}
+            className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
+          />
+        </>
+      )}
     </div>
   );
 }
