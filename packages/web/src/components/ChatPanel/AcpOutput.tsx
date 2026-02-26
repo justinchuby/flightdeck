@@ -59,24 +59,31 @@ function renderMarkdown(text: string): React.ReactNode[] {
   return parts.length > 0 ? parts : [text];
 }
 
+/** Render a single content item — handles text, resource, image, audio, or unknown */
+function renderContentItem(c: any): string {
+  if (typeof c === 'string') return c;
+  if (c?.type === 'text') return c.text ?? '';
+  if (c?.type === 'resource') {
+    const uri = c.resource?.uri ?? '';
+    const text = c.resource?.text ?? '';
+    return uri ? `📎 ${uri}\n${text}` : text;
+  }
+  if (c?.type === 'image') return `[🖼️ image: ${c.mimeType ?? 'unknown'}]`;
+  if (c?.type === 'audio') return `[🔊 audio: ${c.mimeType ?? 'unknown'}]`;
+  // Fallback: extract common fields
+  if (c?.text) return c.text;
+  if (c?.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
+  return JSON.stringify(c, null, 2);
+}
+
 /** Safely render tool call content — handles string, array, or object */
 function stringifyContent(content: any): string {
   if (typeof content === 'string') return content.slice(0, 500);
   if (Array.isArray(content)) {
-    return content
-      .map((c: any) => {
-        if (typeof c === 'string') return c;
-        if (c?.text) return c.text;
-        if (c?.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
-        return JSON.stringify(c, null, 2);
-      })
-      .join('\n')
-      .slice(0, 500);
+    return content.map(renderContentItem).join('\n').slice(0, 500);
   }
   if (content && typeof content === 'object') {
-    if (content.text) return String(content.text).slice(0, 500);
-    if (content.content) return typeof content.content === 'string' ? content.content.slice(0, 500) : JSON.stringify(content.content, null, 2).slice(0, 500);
-    return JSON.stringify(content, null, 2).slice(0, 500);
+    return renderContentItem(content).slice(0, 500);
   }
   return String(content).slice(0, 500);
 }

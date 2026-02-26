@@ -118,6 +118,15 @@ export class AcpConnection extends EventEmitter {
                 logger.debug('agent', `ACP text contains command marker`, { text: text.slice(0, 200) });
               }
               this.emit('text', text);
+            } else if (update.content.type === 'resource') {
+              // Embedded file/resource — extract text content
+              const res = update.content.resource;
+              const label = res?.uri ? `📎 ${res.uri}` : '📎 Resource';
+              const body = res?.text ?? '';
+              this.emit('text', `\n${label}\n${body}\n`);
+            } else {
+              // image, audio, or unknown — emit a placeholder
+              this.emit('text', `\n[${update.content.type} content]\n`);
             }
             break;
 
