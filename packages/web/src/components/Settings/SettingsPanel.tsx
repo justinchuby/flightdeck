@@ -55,7 +55,7 @@ export function SettingsPanel({ api }: Props) {
   }, [theme]);
 
   return (
-    <div className="flex-1 overflow-auto p-6 max-w-3xl mx-auto">
+    <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <Settings className="w-6 h-6 text-gray-400" />
         <h2 className="text-xl font-semibold">Settings</h2>
