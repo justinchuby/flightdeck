@@ -1199,7 +1199,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
 
   return (
     <>
-      <div className="p-2 space-y-2">
+      <div className="h-full overflow-y-auto p-2 space-y-2">
         {agents.length === 0 ? (
           <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
         ) : (
@@ -1591,7 +1591,7 @@ function CollapsibleSection({
       </button>
       {!collapsed && (
         <>
-          <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
+          <div className="flex-1 min-h-0">{children}</div>
           <div
             onMouseDown={startResize}
             className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
