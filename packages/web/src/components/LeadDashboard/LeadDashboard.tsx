@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, Lightbulb, Bot, FolderOpen, Check, X, BarChart3 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3 } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk } from '../../types';
@@ -593,15 +593,16 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
 
-            {/* Messages */}
-            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-1">
+            {/* Messages with prompt navigation */}
+            <div className="flex-1 relative min-h-0">
+              <div ref={chatContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-1">
               {messages.filter((msg) => msg.sender !== 'system' && msg.text).map((msg, i) => {
                 if (msg.queued) return null; // queued messages rendered below
                 const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
                 if (msg.sender === 'user') {
                   return (
-                    <div key={i} className="flex justify-end items-start gap-2 py-1">
+                    <div key={i} data-user-prompt={i} className="flex justify-end items-start gap-2 py-1">
                       <span className="text-[10px] text-gray-600 mt-1.5 shrink-0">{ts}</span>
                       <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
                         {msg.text}
@@ -658,6 +659,9 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
               )}
               <div ref={messagesEndRef} />
+              </div>
+              {/* Prompt navigation */}
+              <PromptNav containerRef={chatContainerRef} messages={messages} />
             </div>
 
             {/* Queued messages (pending) */}
@@ -1559,6 +1563,71 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+/** Floating navigation to jump between user prompts in the chat */
+function PromptNav({ containerRef, messages }: { containerRef: React.RefObject<HTMLDivElement | null>; messages: AcpTextChunk[] }) {
+  const [currentIdx, setCurrentIdx] = useState(-1);
+
+  const userIndices = useMemo(() => {
+    const indices: number[] = [];
+    const visible = messages.filter((m) => m.sender !== 'system' && m.text && !m.queued);
+    visible.forEach((msg, i) => {
+      if (msg.sender === 'user') indices.push(i);
+    });
+    return indices;
+  }, [messages]);
+
+  const total = userIndices.length;
+
+  const jumpTo = useCallback((promptIdx: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const el = container.querySelector(`[data-user-prompt="${userIndices[promptIdx]}"]`) as HTMLElement;
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setCurrentIdx(promptIdx);
+      // Brief highlight
+      el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-1', 'ring-offset-gray-900', 'rounded-lg');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-1', 'ring-offset-gray-900', 'rounded-lg'), 1500);
+    }
+  }, [containerRef, userIndices]);
+
+  const goUp = useCallback(() => {
+    if (total === 0) return;
+    const next = currentIdx <= 0 ? total - 1 : currentIdx - 1;
+    jumpTo(next);
+  }, [currentIdx, total, jumpTo]);
+
+  const goDown = useCallback(() => {
+    if (total === 0) return;
+    const next = currentIdx >= total - 1 ? 0 : currentIdx + 1;
+    jumpTo(next);
+  }, [currentIdx, total, jumpTo]);
+
+  if (total === 0) return null;
+
+  return (
+    <div className="absolute right-3 top-3 flex flex-col items-center gap-0.5 z-10">
+      <button
+        onClick={goUp}
+        className="p-1 rounded bg-gray-800/80 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        title="Previous prompt"
+      >
+        <ChevronUp className="w-3.5 h-3.5" />
+      </button>
+      <span className="text-[10px] font-mono text-gray-500 select-none leading-none py-0.5">
+        {currentIdx >= 0 ? currentIdx + 1 : '·'}/{total}
+      </span>
+      <button
+        onClick={goDown}
+        className="p-1 rounded bg-gray-800/80 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        title="Next prompt"
+      >
+        <ChevronDown className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }
