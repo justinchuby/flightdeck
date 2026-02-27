@@ -47,7 +47,7 @@ export function TeamStatus({ agents, delegations }: Props) {
           </p>
         ) : (
           agents.map((agent) => {
-            const delegation = delegations.find((d) => d.toAgentId === agent.id);
+            const delegation = [...delegations].reverse().find((d) => d.toAgentId === agent.id);
             const Icon = STATUS_ICON[agent.status] || Bot;
             const colorClass = STATUS_COLOR[agent.status] || 'text-gray-400';
 

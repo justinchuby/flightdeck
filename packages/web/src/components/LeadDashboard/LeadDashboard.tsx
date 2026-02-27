@@ -1208,7 +1208,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
   const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
 
-  const selectedDelegation = selectedAgent ? delegations.find((d: any) => d.toAgentId === selectedAgent.id) : null;
+  const selectedDelegation = selectedAgent ? [...delegations].reverse().find((d: any) => d.toAgentId === selectedAgent.id) : null;
   const agentComms = selectedAgent ? (comms ?? []).filter((c) => c.fromId === selectedAgent.id || c.toId === selectedAgent.id) : [];
   const agentActivity = selectedAgent ? (activity ?? []).filter((e) => e.agentId === selectedAgent.id) : [];
 
@@ -1219,7 +1219,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents }: 
           <p className="text-xs text-gray-500 text-center py-4 font-mono">No team members yet</p>
         ) : (
           agents.map((agent: any) => {
-            const delegation = delegations.find((d: any) => d.toAgentId === agent.id);
+            const delegation = [...delegations].reverse().find((d: any) => d.toAgentId === agent.id);
             const colorClass = STATUS_COLOR[agent.status] || 'text-gray-400';
             return (
               <div
