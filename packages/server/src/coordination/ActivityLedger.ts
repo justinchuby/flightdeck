@@ -8,6 +8,7 @@ export type ActionType =
   | 'task_started'
   | 'task_completed'
   | 'sub_agent_spawned'
+  | 'agent_killed'
   | 'lock_acquired'
   | 'lock_released'
   | 'lock_denied'

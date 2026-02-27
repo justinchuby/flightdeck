@@ -22,6 +22,7 @@ const DECISION_REGEX = /<!--\s*DECISION\s*(\{.*?\})\s*-->/s;
 const PROGRESS_REGEX = /<!--\s*PROGRESS\s*(\{.*?\})\s*-->/s;
 const QUERY_CREW_REGEX = /<!--\s*QUERY_CREW\s*-->/s;
 const BROADCAST_REGEX = /<!--\s*BROADCAST\s*(\{.*?\})\s*-->/s;
+const KILL_AGENT_REGEX = /<!--\s*KILL_AGENT\s*(\{.*?\})\s*-->/s;
 
 export interface Delegation {
   id: string;
@@ -126,6 +127,9 @@ export class AgentManager extends EventEmitter {
     if (model) agent.model = model;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
+    if (role.id === 'lead') {
+      agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
+    }
 
     // Track parent-child relationship
     if (parentId) {
@@ -281,6 +285,7 @@ export class AgentManager extends EventEmitter {
       taskId,
     });
     this.emit('agent:spawned', agent.toJSON());
+    this.updateLeadBudgets();
     return agent;
   }
 
@@ -295,6 +300,7 @@ export class AgentManager extends EventEmitter {
     }
     agent.kill();
     this.emit('agent:killed', id);
+    this.updateLeadBudgets();
     return true;
   }
 
@@ -322,7 +328,19 @@ export class AgentManager extends EventEmitter {
   }
 
   setMaxConcurrent(n: number): void {
+    const old = this.maxConcurrent;
     this.maxConcurrent = n;
+    if (n !== old) {
+      // Notify all running leads about the change
+      const running = this.getRunningCount();
+      const available = Math.max(0, n - running);
+      for (const agent of this.getAll()) {
+        if (agent.role.id === 'lead' && (agent.status === 'running' || agent.status === 'idle')) {
+          agent.budget = { maxConcurrent: n, runningCount: running };
+          agent.sendMessage(`[System] Agent concurrency limit changed: ${old} → ${n}. You now have ${available} available slot(s) (${running} running).`);
+        }
+      }
+    }
   }
 
   getRoleRegistry(): RoleRegistry {
@@ -448,6 +466,7 @@ export class AgentManager extends EventEmitter {
       { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => this.detectProgress(a, d) },
       { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => this.handleQueryCrew(a) },
       { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => this.detectBroadcast(a, d) },
+      { regex: KILL_AGENT_REGEX, name: 'KILL_AGENT', handler: (a, d) => this.detectKillAgent(a, d) },
     ];
 
     let found = true;
@@ -553,6 +572,17 @@ export class AgentManager extends EventEmitter {
 
       this.emit('agent:sub_spawned', agent.id, child.toJSON());
     } catch (err: any) {
+      // Send meaningful error back to the lead with budget info
+      if (err.message?.includes('Concurrency limit')) {
+        const running = this.getRunningCount();
+        const idle = this.getAll().filter((a) => a.parentId === agent.id && a.status === 'idle');
+        const idleList = idle.length > 0
+          ? `\nIdle agents you can kill to free slots:\n${idle.map((a) => `- ${a.id.slice(0, 8)} — ${a.role.name}${a.sessionId ? ` (session: ${a.sessionId})` : ''}`).join('\n')}`
+          : '\nNo idle agents to kill — wait for a running agent to finish.';
+        agent.sendMessage(`[System] Cannot create agent: concurrency limit reached (${running}/${this.maxConcurrent}).${idleList}\nUse KILL_AGENT to free a slot, then try CREATE_AGENT again.`);
+      } else {
+        agent.sendMessage(`[System] Failed to create agent: ${err.message}`);
+      }
       this.emit('agent:spawn_error', agent.id, err.message);
     }
   }
@@ -814,14 +844,21 @@ export class AgentManager extends EventEmitter {
         model: a.model || a.role.model || 'default',
       }));
 
+    const running = this.getRunningCount();
+    const budgetLine = agent.role.id === 'lead'
+      ? `\n== AGENT BUDGET ==\nRunning: ${running} / ${this.maxConcurrent} | Available slots: ${Math.max(0, this.maxConcurrent - running)}${running >= this.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}\n`
+      : '';
+
     const response = `<!-- CREW_ROSTER
 == ACTIVE CREW MEMBERS ==
 ${roster.map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`).join('\n')}
-
+${budgetLine}
 To assign a task to an agent, use their ID:
 \`<!-- DELEGATE {"to": "agent-id", "task": "your task"} -->\`
 To create a new agent:
 \`<!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} -->\`
+To kill an agent and free a slot:
+\`<!-- KILL_AGENT {"id": "agent-id", "reason": "no longer needed"} -->\`
 CREW_ROSTER -->`;
 
     logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);
@@ -867,6 +904,53 @@ CREW_ROSTER -->`;
       });
     } catch {
       // ignore malformed broadcasts
+    }
+  }
+
+  private detectKillAgent(agent: Agent, data: string): void {
+    const match = data.match(KILL_AGENT_REGEX);
+    if (!match) return;
+
+    try {
+      const req = JSON.parse(match[1]);
+      if (!req.id) return;
+
+      // Only lead agents can kill agents
+      if (agent.role.id !== 'lead') {
+        agent.sendMessage(`[System] Only the Project Lead can kill agents.`);
+        return;
+      }
+
+      // Find target (partial match)
+      const target = this.getAll().find((a) =>
+        (a.id === req.id || a.id.startsWith(req.id)) &&
+        a.parentId === agent.id &&
+        a.id !== agent.id
+      );
+
+      if (!target) {
+        agent.sendMessage(`[System] Agent not found: ${req.id}. Use QUERY_CREW to see available agents.`);
+        return;
+      }
+
+      const sessionId = target.sessionId;
+      const roleName = target.role.name;
+      const shortId = target.id.slice(0, 8);
+
+      this.kill(target.id);
+
+      const ackMsg = `[System] Killed ${roleName} (${shortId}).${sessionId ? ` Session ID: ${sessionId} — use this in CREATE_AGENT with "sessionId" to resume later.` : ''} Freed 1 agent slot. ${req.reason ? `Reason: ${req.reason}` : ''}`;
+      agent.sendMessage(ackMsg);
+
+      this.activityLedger.log(agent.id, agent.role.id, 'agent_killed', `Killed ${roleName} (${shortId})${req.reason ? ': ' + req.reason.slice(0, 100) : ''}`, {
+        killedAgentId: target.id,
+        killedRole: target.role.id,
+        sessionId: sessionId || null,
+      });
+
+      logger.info('agent', `Lead ${agent.id.slice(0, 8)} killed ${roleName} (${shortId})${req.reason ? ': ' + req.reason : ''}`);
+    } catch {
+      // ignore malformed kill requests
     }
   }
 
@@ -946,5 +1030,15 @@ CREW_ROSTER -->`;
 
   getMessageBus(): MessageBus {
     return this.messageBus;
+  }
+
+  /** Keep all lead agents' budget info in sync with current state */
+  private updateLeadBudgets(): void {
+    const running = this.getRunningCount();
+    for (const agent of this.getAll()) {
+      if (agent.role.id === 'lead') {
+        agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: running };
+      }
+    }
   }
 }

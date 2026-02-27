@@ -63,6 +63,8 @@ export class Agent {
   public model?: string;
   /** Working directory for this agent's CLI process */
   public cwd?: string;
+  /** Concurrency budget info (set by AgentManager for leads) */
+  public budget?: { maxConcurrent: number; runningCount: number };
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
@@ -102,7 +104,7 @@ export class Agent {
   }
 
   start(): void {
-    const contextManifest = this.buildContextManifest(this.peers);
+    const contextManifest = this.buildContextManifest(this.peers, this.budget);
     // Include both the role system prompt and context manifest.
     // The system prompt is also in the .agent.md file (via --agent flag) for
     // persistence through context compression, but we include it here too
@@ -289,7 +291,7 @@ export class Agent {
     });
   }
 
-  buildContextManifest(peers: AgentContextInfo[]): string {
+  buildContextManifest(peers: AgentContextInfo[], budget?: { maxConcurrent: number; runningCount: number }): string {
     const shortId = this.id.slice(0, 8);
     const taskLine = this.taskId ? this.taskId : 'Awaiting assignment';
 
@@ -314,6 +316,14 @@ export class Agent {
       })
       .join('\n');
 
+    const budgetSection = isLead && budget
+      ? `\n== AGENT BUDGET ==
+Max concurrent agents: ${budget.maxConcurrent}
+Currently running: ${budget.runningCount} / ${budget.maxConcurrent}
+Available slots: ${budget.maxConcurrent - budget.runningCount}
+${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — kill idle agents to free slots before creating new ones.' : ''}`
+      : '';
+
     const crewSection = isLead
       ? `== YOUR AGENTS ==
 ${childLines || '(no agents created yet — use CREATE_AGENT to create specialists)'}
@@ -330,6 +340,7 @@ You are agent ${shortId} with role "${this.role.name}".
 - You are responsible for: ${this.role.description}
 
 ${crewSection}
+${budgetSection}
 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked (listed above).
@@ -439,8 +450,12 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       ? recentActivity.join('\n')
       : '(no recent activity)';
 
+    const budgetLine = isLead && this.budget
+      ? `\n== AGENT BUDGET ==\nRunning: ${this.budget.runningCount} / ${this.budget.maxConcurrent} | Available slots: ${Math.max(0, this.budget.maxConcurrent - this.budget.runningCount)}${this.budget.runningCount >= this.budget.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}`
+      : '';
+
     const update = `<!-- CREW_UPDATE
-${crewStatus}
+${crewStatus}${budgetLine}
 == RECENT ACTIVITY ==
 ${activityLines}
 CREW_UPDATE -->`;
