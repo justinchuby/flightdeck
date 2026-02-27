@@ -729,6 +729,9 @@ export class AgentManager extends EventEmitter {
       };
       this.delegations.set(delegation.id, delegation);
 
+      // Update the agent's taskId to reflect the new assignment
+      child.taskId = req.task;
+
       // Send task + context to child
       const taskPrompt = req.context
         ? `${req.task}\n\nContext: ${req.context}`
