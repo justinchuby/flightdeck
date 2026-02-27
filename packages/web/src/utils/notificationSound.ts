@@ -8,9 +8,10 @@ function getAudioContext(): AudioContext {
 }
 
 /** Play a gentle two-tone chime for attention requests */
-export function playAttentionSound(): void {
+export async function playAttentionSound(): Promise<void> {
   try {
     const ctx = getAudioContext();
+    if (ctx.state === 'suspended') await ctx.resume();
     const now = ctx.currentTime;
 
     const osc1 = ctx.createOscillator();
@@ -40,9 +41,10 @@ export function playAttentionSound(): void {
 }
 
 /** Play a soft completion chime (lower pitch, single tone) */
-export function playCompletionSound(): void {
+export async function playCompletionSound(): Promise<void> {
   try {
     const ctx = getAudioContext();
+    if (ctx.state === 'suspended') await ctx.resume();
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
