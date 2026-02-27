@@ -3,28 +3,20 @@ import type { AgentContextInfo } from '../agents/Agent.js';
 import type { FileLockRegistry } from './FileLockRegistry.js';
 import type { ActivityLedger } from './ActivityLedger.js';
 
-export interface ContextRefresherConfig {
-  intervalMs?: number;
-}
-
 export class ContextRefresher {
   private agentManager: AgentManager;
   private lockRegistry: FileLockRegistry;
   private activityLedger: ActivityLedger;
-  private intervalMs: number;
-  private intervalHandle: ReturnType<typeof setInterval> | null = null;
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     agentManager: AgentManager,
     lockRegistry: FileLockRegistry,
     activityLedger: ActivityLedger,
-    config: ContextRefresherConfig = {},
   ) {
     this.agentManager = agentManager;
     this.lockRegistry = lockRegistry;
     this.activityLedger = activityLedger;
-    this.intervalMs = config.intervalMs ?? 30_000;
 
     // Listen to significant events with debounce
     const debouncedRefresh = () => this.scheduleRefresh();
@@ -42,10 +34,6 @@ export class ContextRefresher {
   }
 
   stop(): void {
-    if (this.intervalHandle) {
-      clearInterval(this.intervalHandle);
-      this.intervalHandle = null;
-    }
     if (this.debounceHandle) {
       clearTimeout(this.debounceHandle);
       this.debounceHandle = null;

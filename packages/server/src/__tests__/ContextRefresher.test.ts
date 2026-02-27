@@ -49,7 +49,6 @@ describe('ContextRefresher', () => {
       mocks.agentManager as any,
       mocks.lockRegistry as any,
       mocks.activityLedger as any,
-      { intervalMs: 5000 },
     );
   });
 
