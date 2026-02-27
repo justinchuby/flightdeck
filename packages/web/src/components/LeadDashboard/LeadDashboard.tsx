@@ -1139,7 +1139,9 @@ function DecisionPanelContent({ decisions }: { decisions: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+    requestAnimationFrame(() => {
+      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+    });
   }, [decisions.length]);
 
   return (
@@ -1480,7 +1482,9 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+    requestAnimationFrame(() => {
+      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+    });
   }, [comms.length]);
 
   const recent = comms.slice(-50);
@@ -1564,7 +1568,9 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
 function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+    requestAnimationFrame(() => {
+      feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
+    });
   }, [activity.length]);
 
   const recent = activity.slice(-30);
@@ -1667,7 +1673,7 @@ function CollapsibleSection({
       </button>
       {!collapsed && (
         <>
-          <div className="flex-1 min-h-0">{children}</div>
+          <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
           <div
             onMouseDown={startResize}
             className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
