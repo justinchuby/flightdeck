@@ -404,7 +404,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5 pl-4 font-mono">
-                  {lead.status} · {lead.childIds.length} agents
+                  {lead.status} · {agents.filter((a: any) => a.parentId === lead.id).length} agents
                   {(() => {
                     const allIds = [lead.id, ...(lead.childIds || [])];
                     const total = allIds.reduce((s, id) => {
