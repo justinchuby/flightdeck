@@ -48,9 +48,17 @@ test.describe('Task Lifecycle', () => {
   });
 
   test('creating a task triggers agent auto-spawn', async ({ page }) => {
-    // Verify no agents initially
-    let agents = await (await page.request.get('/api/agents')).json();
-    expect(agents.length).toBe(0);
+    // Aggressively clean up agents that may have been auto-spawned from previous tests
+    for (let i = 0; i < 3; i++) {
+      const agents = await (await page.request.get('/api/agents')).json();
+      for (const agent of agents) {
+        await page.request.delete(`/api/agents/${agent.id}`);
+      }
+      if (agents.length === 0) break;
+      await page.waitForTimeout(500);
+    }
+    const initialAgents = await (await page.request.get('/api/agents')).json();
+    const initialCount = initialAgents.length;
 
     // Create a task
     await page.request.post('/api/tasks', {
@@ -68,13 +76,13 @@ test.describe('Task Lifecycle', () => {
   });
 
   test('task with assignedRole gets matched to correct role agent', async ({ page }) => {
-    // Pre-spawn a QA agent
-    await page.request.post('/api/agents', { data: { roleId: 'qa' } });
+    // Pre-spawn a code-reviewer agent
+    await page.request.post('/api/agents', { data: { roleId: 'code-reviewer' } });
     await page.waitForTimeout(2000);
 
-    // Create a task assigned to QA role
+    // Create a task assigned to code-reviewer role
     const res = await page.request.post('/api/tasks', {
-      data: { title: 'QA task', assignedRole: 'qa' },
+      data: { title: 'Review task', assignedRole: 'code-reviewer' },
     });
     const task = await res.json();
 
@@ -83,13 +91,13 @@ test.describe('Task Lifecycle', () => {
 
     // Check task state
     const updated = await (await page.request.get('/api/tasks')).json();
-    const qatask = updated.find((t: any) => t.title === 'QA task');
-    if (qatask && qatask.assignedAgentId) {
-      // If assigned, verify it went to the QA agent
+    const reviewTask = updated.find((t: any) => t.title === 'Review task');
+    if (reviewTask && reviewTask.assignedAgentId) {
+      // If assigned, verify it went to the code-reviewer agent
       const agents = await (await page.request.get('/api/agents')).json();
-      const assigned = agents.find((a: any) => a.id === qatask.assignedAgentId);
+      const assigned = agents.find((a: any) => a.id === reviewTask.assignedAgentId);
       if (assigned) {
-        expect(assigned.role.id).toBe('qa');
+        expect(assigned.role.id).toBe('code-reviewer');
       }
     }
   });

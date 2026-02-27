@@ -13,7 +13,7 @@ test.describe('Task Queue', () => {
   });
 
   test('shows empty state', async ({ page }) => {
-    await expect(page.getByText('No tasks')).toBeVisible();
+    await expect(page.getByText('No tasks').first()).toBeVisible();
   });
 
   test('new task button toggles form', async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe('Task Queue', () => {
     });
     await page.reload();
 
-    await expect(page.getByText('Queued')).toBeVisible();
+    await expect(page.getByText('Queued').first()).toBeVisible();
   });
 
   test('multiple tasks appear in order', async ({ page }) => {

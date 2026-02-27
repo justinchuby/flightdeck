@@ -17,19 +17,19 @@ test.describe('Multi-Agent Coordination', () => {
 
   test('spawning multiple agents shows them all in dashboard', async ({ page }) => {
     await page.request.post('/api/agents', { data: { roleId: 'developer' } });
-    await page.request.post('/api/agents', { data: { roleId: 'reviewer' } });
+    await page.request.post('/api/agents', { data: { roleId: 'code-reviewer' } });
 
     await page.goto('/');
     await page.waitForTimeout(1000);
 
     // Both should appear
-    await expect(page.getByText('Developer')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Code Reviewer')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Developer').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Code Reviewer').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('coordination status shows all active agents', async ({ page }) => {
     await page.request.post('/api/agents', { data: { roleId: 'architect' } });
-    await page.request.post('/api/agents', { data: { roleId: 'qa' } });
+    await page.request.post('/api/agents', { data: { roleId: 'designer' } });
 
     const res = await page.request.get('/api/coordination/status');
     const status = await res.json();

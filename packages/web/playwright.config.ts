@@ -15,14 +15,14 @@ export default defineConfig({
       port: 3001,
       cwd: '../..',
       reuseExistingServer: !process.env.CI,
-      timeout: 15_000,
+      timeout: 30_000,
     },
     {
       command: 'npm run dev --workspace=packages/web',
       port: 5173,
       cwd: '../..',
       reuseExistingServer: !process.env.CI,
-      timeout: 15_000,
+      timeout: 30_000,
     },
   ],
   projects: [

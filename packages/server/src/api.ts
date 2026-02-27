@@ -158,7 +158,7 @@ export function apiRouter(
   });
 
   router.delete('/coordination/locks/:filePath', (req, res) => {
-    const filePath = decodeURIComponent(req.params.filePath);
+    const filePath = req.params.filePath;
     const agentId = (req.query.agentId as string) ?? req.body?.agentId;
     if (!agentId) {
       return res.status(400).json({ error: 'agentId is required' });
