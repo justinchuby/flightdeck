@@ -2263,12 +2263,12 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
               return (
                 <div
                   key={gm.id || `gm-${i}`}
-                  className="px-3 py-1.5 border-b border-b-purple-400/20 bg-purple-500/[0.06] border-l-2 border-l-purple-400/30 cursor-pointer hover:bg-purple-500/[0.10] transition-colors"
+                  className="px-3 py-1.5 border-b border-b-emerald-400/20 bg-emerald-500/[0.04] border-l-2 border-l-emerald-400/30 cursor-pointer hover:bg-emerald-500/[0.08] transition-colors"
                   onClick={() => setSelectedGroupMsg(gm)}
                 >
                   <div className="flex items-center gap-1 text-xs">
-                    <Users className="w-3 h-3 text-purple-400 shrink-0" />
-                    <span className="font-mono font-semibold text-purple-400 truncate">{gm.groupName}</span>
+                    <Users className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span className="font-mono font-semibold text-emerald-400 truncate">{gm.groupName}</span>
                     <span className="text-gray-500">·</span>
                     <span className="font-mono text-cyan-400">{gm.fromRole}</span>
                     <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
@@ -2357,11 +2357,11 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedGroupMsg(null); }}
         >
-          <div className="bg-gray-800 border border-purple-600/50 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-purple-700/50">
+          <div className="bg-gray-800 border border-emerald-600/40 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-emerald-700/40">
               <div className="flex items-center gap-2 text-sm">
-                <Users className="w-4 h-4 text-purple-400" />
-                <span className="font-mono font-semibold text-purple-400">{selectedGroupMsg.groupName}</span>
+                <Users className="w-4 h-4 text-emerald-400" />
+                <span className="font-mono font-semibold text-emerald-400">{selectedGroupMsg.groupName}</span>
                 <span className="text-gray-500">·</span>
                 <span className="font-mono text-cyan-400">{selectedGroupMsg.fromRole}</span>
               </div>
