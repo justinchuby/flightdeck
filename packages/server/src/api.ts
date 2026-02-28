@@ -333,6 +333,22 @@ export function apiRouter(
     res.json(chatGroups.getGroups(req.params.id));
   });
 
+  router.post('/lead/:id/groups', (req, res) => {
+    const { name, memberIds } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const chatGroups = agentManager.getChatGroupRegistry();
+    const leadId = req.params.id;
+    const members = Array.isArray(memberIds) ? memberIds : [];
+    // Always include 'human' so the user can participate
+    if (!members.includes('human')) members.push('human');
+    try {
+      const group = chatGroups.create(leadId, name, members);
+      res.status(201).json(group);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   router.get('/lead/:id/groups/:name/messages', (req, res) => {
     const chatGroups = agentManager.getChatGroupRegistry();
     const limit = req.query.limit ? Number(req.query.limit) : 50;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useGroupStore, groupKey } from '../../stores/groupStore';
-import { MessageSquare, Send, Users, X } from 'lucide-react';
+import { MessageSquare, Send, Users, X, Plus } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
 
 /* ------------------------------------------------------------------ */
@@ -44,6 +44,11 @@ export function GroupChat(_props: { api: any; ws: any }) {
   const [sending, setSending] = useState(false);
   const [openTabs, setOpenTabs] = useState<Array<{ leadId: string; name: string }>>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
+  const [showCreate, setShowCreate] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupMembers, setNewGroupMembers] = useState<Set<string>>(new Set());
+  const [newGroupLeadId, setNewGroupLeadId] = useState('');
+  const [creating, setCreating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -231,6 +236,49 @@ export function GroupChat(_props: { api: any; ws: any }) {
     ta.style.height = `${Math.min(ta.scrollHeight, 96)}px`;
   }, []);
 
+  /* ---- Create group ---- */
+  const openCreateDialog = useCallback(() => {
+    setNewGroupName('');
+    setNewGroupMembers(new Set());
+    setNewGroupLeadId(leads.length > 0 ? leads[0].id : '');
+    setShowCreate(true);
+  }, [leads]);
+
+  const toggleMember = useCallback((id: string) => {
+    setNewGroupMembers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleCreateGroup = useCallback(async () => {
+    if (!newGroupName.trim() || !newGroupLeadId || creating) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/lead/${newGroupLeadId}/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newGroupName.trim(),
+          memberIds: Array.from(newGroupMembers),
+        }),
+      });
+      if (res.ok) {
+        const group: ChatGroup = await res.json();
+        useGroupStore.getState().addGroup(group);
+        const tab = { leadId: group.leadId, name: group.name };
+        setOpenTabs((prev) => [...prev, tab]);
+        selectGroup(group.leadId, group.name);
+        setShowCreate(false);
+      }
+    } catch { /* skip */ }
+    finally { setCreating(false); }
+  }, [newGroupName, newGroupLeadId, newGroupMembers, creating, selectGroup]);
+
+  // All agents belonging to a selected lead (for the create dialog)
+  const availableAgents = agents.filter((a) => a.parentId === newGroupLeadId || a.id === newGroupLeadId);
+
   /* ---- Selected group metadata ---- */
   const selectedGroupData = selectedGroup
     ? groups.find((g) => g.name === selectedGroup.name && g.leadId === selectedGroup.leadId)
@@ -287,7 +335,18 @@ export function GroupChat(_props: { api: any; ws: any }) {
           })
         )}
 
-        {/* Group directory dropdown */}
+        {/* New group button */}
+        {leads.length > 0 && (
+          <button
+            onClick={openCreateDialog}
+            className="flex items-center gap-1 px-2 h-10 text-xs text-gray-400 hover:text-accent hover:bg-gray-700/50 transition-colors shrink-0 border-b-2 border-transparent"
+            title="Create group chat"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Re-open closed tabs dropdown */}
         {groups.length > openTabs.length && (
           <div className="relative ml-auto px-2">
             <select
@@ -400,6 +459,93 @@ export function GroupChat(_props: { api: any; ws: any }) {
           </div>
         )}
       </div>
+
+      {/* ---- Create group dialog ---- */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCreate(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Create Group Chat</h3>
+              <button onClick={() => setShowCreate(false)} className="text-gray-500 hover:text-gray-300">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Group name */}
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Group name</label>
+              <input
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="e.g. frontend-team"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                autoFocus
+              />
+            </div>
+
+            {/* Select lead/project */}
+            {leads.length > 1 && (
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Project</label>
+                <select
+                  value={newGroupLeadId}
+                  onChange={(e) => { setNewGroupLeadId(e.target.value); setNewGroupMembers(new Set()); }}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                >
+                  {leads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.projectName ?? l.id.slice(0, 8)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Select members */}
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">
+                Members ({newGroupMembers.size} selected)
+              </label>
+              <div className="max-h-48 overflow-y-auto border border-gray-700 rounded-lg divide-y divide-gray-800">
+                {availableAgents.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-gray-500 text-center">No agents in this project yet</div>
+                ) : (
+                  availableAgents.map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-3 px-3 py-2 hover:bg-gray-800 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={newGroupMembers.has(a.id)}
+                        onChange={() => toggleMember(a.id)}
+                        className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent"
+                      />
+                      <span className="text-sm">{a.role.icon} {a.role.name}</span>
+                      <span className="text-xs text-gray-500 ml-auto">{a.id.slice(0, 8)}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="text-[10px] text-gray-600 mt-1">You are always added automatically.</p>
+            </div>
+
+            {/* Create button */}
+            <button
+              onClick={() => void handleCreateGroup()}
+              disabled={!newGroupName.trim() || creating}
+              className="w-full py-2 bg-accent text-black rounded-lg text-sm font-medium hover:bg-accent-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {creating ? 'Creating…' : 'Create Group'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
