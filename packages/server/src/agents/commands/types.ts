@@ -19,6 +19,8 @@ import type { DeferredIssueRegistry } from '../../tasks/DeferredIssueRegistry.js
 import type { TimerRegistry } from '../../coordination/TimerRegistry.js';
 import type { SessionExporter } from '../../coordination/SessionExporter.js';
 import type { CapabilityInjector } from '../capabilities/CapabilityInjector.js';
+import type { TaskTemplateRegistry } from '../../tasks/TaskTemplates.js';
+import type { TaskDecomposer } from '../../tasks/TaskDecomposer.js';
 
 // ── Delegation record ────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ export interface CommandContext {
   timerRegistry?: TimerRegistry;
   sessionExporter?: SessionExporter;
   capabilityInjector?: CapabilityInjector;
+  taskTemplateRegistry?: TaskTemplateRegistry;
+  taskDecomposer?: TaskDecomposer;
   maxConcurrent: number;
   markHumanInterrupt(agentId: string): void;
 }

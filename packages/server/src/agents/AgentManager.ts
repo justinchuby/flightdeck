@@ -15,6 +15,8 @@ import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../coordination/TimerRegistry.js';
 import type { SessionExporter } from '../coordination/SessionExporter.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
+import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
+import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -105,7 +107,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer } = {},
   ) {
     super();
     this.config = config;
@@ -147,6 +149,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       deferredIssueRegistry: this.deferredIssueRegistry,
       timerRegistry: this.timerRegistry,
       capabilityInjector: this.capabilityInjector,
+      taskTemplateRegistry,
+      taskDecomposer,
       get sessionExporter() { return self.sessionExporter; },
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),

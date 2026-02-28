@@ -16,6 +16,8 @@ import type { AgentMatcher } from './coordination/AgentMatcher.js';
 import type { RetryManager } from './agents/RetryManager.js';
 import type { CrashForensics } from './agents/CrashForensics.js';
 import type { WebhookManager } from './coordination/WebhookManager.js';
+import { SearchEngine, type SearchQuery } from './coordination/SearchEngine.js';
+import type { DecisionRecordStore } from './coordination/DecisionRecords.js';
 import { logger } from './utils/logger.js';
 import { writeAgentFiles } from './agents/agentFiles.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -53,6 +55,11 @@ export function apiRouter(
   retryManager?: RetryManager,
   crashForensics?: CrashForensics,
   webhookManager?: WebhookManager,
+  taskTemplateRegistry?: import('./tasks/TaskTemplates.js').TaskTemplateRegistry,
+  taskDecomposer?: import('./tasks/TaskDecomposer.js').TaskDecomposer,
+  searchEngine?: SearchEngine,
+  performanceTracker?: import('./coordination/PerformanceScorecard.js').PerformanceTracker,
+  decisionRecordStore?: DecisionRecordStore,
 ): Router {
   const router = Router();
 
@@ -1209,6 +1216,84 @@ export function apiRouter(
   router.get('/webhooks/:id/deliveries', (req, res) => {
     if (!webhookManager) { res.json([]); return; }
     res.json(webhookManager.getDeliveries(req.params.id));
+  });
+
+  // --- Task Templates ---
+  router.get('/coordination/templates', (_req, res) => {
+    if (!taskTemplateRegistry) { res.json([]); return; }
+    res.json(taskTemplateRegistry.getAll());
+  });
+
+  router.post('/coordination/decompose', (req, res) => {
+    if (!taskDecomposer) { res.status(503).json({ error: 'Task decomposer not available' }); return; }
+    const { task } = req.body;
+    if (!task) { res.status(400).json({ error: 'task description required' }); return; }
+    res.json(taskDecomposer.decompose(task));
+  });
+
+  // --- Performance Scorecards ---
+  router.get('/coordination/scorecards', (req, res) => {
+    if (!performanceTracker) { res.json([]); return; }
+    const leadId = req.query.leadId as string;
+    if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
+    res.json(performanceTracker.getTeamScorecards(leadId));
+  });
+
+  router.get('/coordination/scorecards/:agentId', (req, res) => {
+    if (!performanceTracker) { res.json(null); return; }
+    res.json(performanceTracker.getScorecard(req.params.agentId));
+  });
+
+  router.get('/coordination/leaderboard', (req, res) => {
+    if (!performanceTracker) { res.json([]); return; }
+    const leadId = req.query.leadId as string;
+    if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
+    res.json(performanceTracker.getLeaderboard(leadId));
+  });
+
+  // --- Full-text Search ---
+  router.get('/search', (req, res) => {
+    if (!searchEngine) { res.json([]); return; }
+    const query: SearchQuery = {
+      query: (req.query.q as string) || '',
+      types: req.query.types ? (req.query.types as string).split(',') as any : undefined,
+      agentId: req.query.agentId as string,
+      leadId: req.query.leadId as string,
+      since: req.query.since as string,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
+    };
+    if (!query.query) { res.status(400).json({ error: 'q parameter required' }); return; }
+    res.json(searchEngine.search(query));
+  });
+
+  // --- Decision Records (ADR-style) ---
+  router.get('/coordination/decisions', (req, res) => {
+    if (!decisionRecordStore) { res.json([]); return; }
+    const filter = {
+      status: req.query.status as string | undefined,
+      tag: req.query.tag as string | undefined,
+      since: req.query.since as string | undefined,
+    };
+    res.json(decisionRecordStore.getAll(filter));
+  });
+
+  router.get('/coordination/decisions/tags', (_req, res) => {
+    if (!decisionRecordStore) { res.json([]); return; }
+    res.json(decisionRecordStore.getTags());
+  });
+
+  router.get('/coordination/decisions/search', (req, res) => {
+    if (!decisionRecordStore) { res.json([]); return; }
+    const q = req.query.q as string;
+    if (!q) { res.status(400).json({ error: 'q parameter required' }); return; }
+    res.json(decisionRecordStore.search(q));
+  });
+
+  router.get('/coordination/decisions/:id', (req, res) => {
+    if (!decisionRecordStore) { res.status(404).json(null); return; }
+    const record = decisionRecordStore.get(req.params.id);
+    if (!record) { res.status(404).json({ error: 'not found' }); return; }
+    res.json(record);
   });
 
   return router;

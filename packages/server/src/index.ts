@@ -15,6 +15,8 @@ import { DecisionLog } from './coordination/DecisionLog.js';
 import { AgentMemory } from './agents/AgentMemory.js';
 import { TaskDAG } from './tasks/TaskDAG.js';
 import { DeferredIssueRegistry } from './tasks/DeferredIssueRegistry.js';
+import { TaskTemplateRegistry } from './tasks/TaskTemplates.js';
+import { TaskDecomposer } from './tasks/TaskDecomposer.js';
 import { ChatGroupRegistry } from './comms/ChatGroupRegistry.js';
 import { ContextRefresher } from './coordination/ContextRefresher.js';
 import { Scheduler } from './utils/Scheduler.js';
@@ -105,6 +107,8 @@ const agentMemory = new AgentMemory(db);
 const chatGroupRegistry = new ChatGroupRegistry(db);
 const taskDAG = new TaskDAG(db);
 const deferredIssueRegistry = new DeferredIssueRegistry(db);
+const taskTemplateRegistry = new TaskTemplateRegistry();
+const taskDecomposer = new TaskDecomposer(taskTemplateRegistry);
 const projectRegistry = new ProjectRegistry(db);
 
 // File dependency graph — tracks import relationships for impact analysis
@@ -130,7 +134,7 @@ timerRegistry.start();
 import { CapabilityInjector } from './agents/capabilities/CapabilityInjector.js';
 const capabilityInjector = new CapabilityInjector();
 
-const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry, capabilityInjector });
+const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer });
 agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
@@ -231,8 +235,24 @@ import { SessionExporter } from './coordination/SessionExporter.js';
 const sessionExporter = new SessionExporter(agentManager, activityLedger, decisionLog, taskDAG, chatGroupRegistry);
 agentManager.setSessionExporter(sessionExporter);
 
+// Search engine — full-text search across activities and decisions
+import { SearchEngine } from './coordination/SearchEngine.js';
+const searchEngine = new SearchEngine(activityLedger, decisionLog);
+
+// Decision record store — structured ADR-style architecture decision log
+import { DecisionRecordStore } from './coordination/DecisionRecords.js';
+const decisionRecordStore = new DecisionRecordStore();
+// Auto-sync new decisions into the record store as they are added
+decisionLog.on('decision', (decision: import('./coordination/DecisionLog.js').Decision) => {
+  decisionRecordStore.createFromDecision(decision);
+});
+
+// Performance scorecard tracker
+import { PerformanceTracker } from './coordination/PerformanceScorecard.js';
+const performanceTracker = new PerformanceTracker(activityLedger, agentManager);
+
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore));
 
 // Serve built web frontend in production
 import path from 'path';
