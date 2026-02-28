@@ -135,8 +135,8 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
   if (!open) return null;
 
   return (
-    <div className="cursor-pointer fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
-      <div className="cursor-pointer absolute inset-0 bg-black/60" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60" />
       <div
         className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[60vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -231,7 +231,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                   <button
                     key={`${r.source}-${r.id}-${i}`}
                     onClick={() => handleResultClick(r)}
-                    className="cursor-pointer w-full text-left px-4 py-2.5 hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-0"
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-0"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       {icon}

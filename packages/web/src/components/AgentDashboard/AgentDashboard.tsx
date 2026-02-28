@@ -157,7 +157,7 @@ export function AgentDashboard({ api, ws }: Props) {
           <kbd className="hidden sm:inline-block text-[10px] text-gray-500 bg-surface border border-gray-700 rounded px-1.5 py-0.5">N</kbd>
           <button
             onClick={() => setShowSpawn(true)}
-            className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-accent text-black rounded-lg text-sm font-medium hover:bg-accent-muted transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-black rounded-lg text-sm font-medium hover:bg-accent-muted transition-colors"
           >
             <Plus size={16} />
             Spawn Agent
@@ -175,7 +175,7 @@ export function AgentDashboard({ api, ws }: Props) {
             <div key={leadId} className="border border-gray-700 rounded-lg bg-surface-raised">
               <button
                 onClick={() => toggleGroup(leadId)}
-                className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 hover:bg-surface/50 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 hover:bg-surface/50 transition-colors"
               >
                 {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 <FolderOpen size={13} className="text-yellow-400" />
@@ -198,7 +198,7 @@ export function AgentDashboard({ api, ws }: Props) {
       <div className="border border-gray-700 rounded-lg bg-surface-raised">
         <button
           onClick={() => setBottomOpen((o) => !o)}
-          className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 uppercase tracking-wider hover:bg-surface/50 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 uppercase tracking-wider hover:bg-surface/50 transition-colors"
         >
           {bottomOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           Activity &amp; Locks

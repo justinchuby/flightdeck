@@ -108,13 +108,13 @@ export function ChatPanel({ agentId, ws }: Props) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="cursor-pointer p-1 text-gray-400 hover:text-gray-200"
+            className="p-1 text-gray-400 hover:text-gray-200"
           >
             {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
           <button
             onClick={() => setSelectedAgent(null)}
-            className="cursor-pointer p-1 text-gray-400 hover:text-gray-200"
+            className="p-1 text-gray-400 hover:text-gray-200"
           >
             <X size={14} />
           </button>
@@ -192,7 +192,7 @@ export function ChatPanel({ agentId, ws }: Props) {
           </button>
           <button
             onClick={handleSend}
-            className="cursor-pointer p-2 bg-accent text-black rounded-lg hover:bg-accent-muted transition-colors"
+            className="p-2 bg-accent text-black rounded-lg hover:bg-accent-muted transition-colors"
           >
             <Send size={14} />
           </button>

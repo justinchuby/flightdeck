@@ -148,7 +148,7 @@ function MemoryPanel({ onCountChange }: { onCountChange: () => void }) {
           </div>
           <button
             onClick={() => handleDelete(row.id)}
-            className="cursor-pointer p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+            className="p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
             title="Delete"
           >
             <Trash2 size={13} />
@@ -201,7 +201,7 @@ function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
       {rows.map((row) => (
         <div key={row.id} className="bg-surface-raised border border-gray-700 rounded-lg overflow-hidden group">
           <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => toggleExpand(row.id)}>
-            {expanded === row.id ? <ChevronDown size={14} className="cursor-pointer text-gray-500" /> : <ChevronRight size={14} className="cursor-pointer text-gray-500" />}
+            {expanded === row.id ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-500" />}
             <MessageSquare size={14} className="text-blue-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <span className="text-sm text-gray-200 font-mono">{row.agentId?.slice(0, 12)}</span>
@@ -210,7 +210,7 @@ function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
             <span className="text-[10px] text-gray-600">{row.createdAt}</span>
             <button
               onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}
-              className="cursor-pointer p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+              className="p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
               title="Delete conversation"
             >
               <Trash2 size={13} />
@@ -289,7 +289,7 @@ function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
           </div>
           <button
             onClick={() => handleDelete(row.id)}
-            className="cursor-pointer p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+            className="p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
             title="Delete"
           >
             <Trash2 size={13} />
@@ -335,7 +335,7 @@ function ActivityPanel({ onCountChange }: { onCountChange: () => void }) {
           <span className="text-[10px] text-gray-600 shrink-0">{row.timestamp?.slice(11, 19)}</span>
           <button
             onClick={() => handleDelete(row.id)}
-            className="cursor-pointer p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+            className="p-1 text-gray-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
             title="Delete"
           >
             <Trash2 size={12} />

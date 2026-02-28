@@ -157,7 +157,7 @@ export function AcpOutput({ agentId }: Props) {
         <div className="border border-gray-700 rounded-lg bg-surface-raised">
           <button
             onClick={() => setPlanOpen(!planOpen)}
-            className="cursor-pointer flex items-center gap-1 w-full px-3 py-2 text-xs font-medium text-gray-300"
+            className="flex items-center gap-1 w-full px-3 py-2 text-xs font-medium text-gray-300"
           >
             {planOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             Plan ({plan.filter((e) => e.status === 'completed').length}/{plan.length})

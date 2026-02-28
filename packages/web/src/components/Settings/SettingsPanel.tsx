@@ -191,7 +191,7 @@ export function SettingsPanel({ api }: Props) {
           </h3>
           <button
             onClick={() => setShowRoleForm(!showRoleForm)}
-            className="cursor-pointer flex items-center gap-1.5 text-xs text-accent hover:text-accent-muted transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            className="flex items-center gap-1.5 text-xs text-accent hover:text-accent-muted transition-colors px-2 py-1 rounded hover:bg-gray-800"
           >
             <Plus size={12} />
             Add Custom Role
@@ -247,7 +247,7 @@ export function SettingsPanel({ api }: Props) {
             <div className="flex justify-end gap-2 pt-1">
               <button
                 onClick={() => setShowRoleForm(false)}
-                className="cursor-pointer px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors"
+                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-md hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
@@ -297,7 +297,7 @@ export function SettingsPanel({ api }: Props) {
                   {!role.builtIn && (
                     <button
                       onClick={(e) => { e.stopPropagation(); api.deleteRole(role.id); }}
-                      className="cursor-pointer p-1.5 text-gray-500 hover:text-red-400 rounded hover:bg-gray-800 transition-colors"
+                      className="p-1.5 text-gray-500 hover:text-red-400 rounded hover:bg-gray-800 transition-colors"
                     >
                       <Trash2 size={13} />
                     </button>

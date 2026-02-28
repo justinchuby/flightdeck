@@ -340,7 +340,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
         {leads.length > 0 && (
           <button
             onClick={openCreateDialog}
-            className="cursor-pointer flex items-center gap-1 px-2 h-10 text-xs text-gray-400 hover:text-accent hover:bg-gray-700/50 transition-colors shrink-0 border-b-2 border-transparent"
+            className="flex items-center gap-1 px-2 h-10 text-xs text-gray-400 hover:text-accent hover:bg-gray-700/50 transition-colors shrink-0 border-b-2 border-transparent"
             title="Create group chat"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -478,8 +478,8 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
       {/* ---- Create group dialog ---- */}
       {showCreate && (
-        <div className="cursor-pointer fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCreate(false)}>
-          <div className="cursor-pointer absolute inset-0 bg-black/60" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowCreate(false)}>
+          <div className="absolute inset-0 bg-black/60" />
           <div
             className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}

@@ -13,13 +13,6 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
 }
 
-/* Ensure all interactive elements show pointer cursor */
-[role="button"],
-[onclick],
-.clickable {
-  cursor: pointer;
-}
-
 .xterm {
   padding: 4px;
 }

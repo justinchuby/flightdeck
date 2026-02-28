@@ -181,7 +181,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                     <div className="min-w-0">
                       <button
                         onClick={() => handleSelect(agent.id)}
-                        className="cursor-pointer font-medium text-gray-200 text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
+                        className="font-medium text-gray-200 text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
                         title={`${agent.role.name} — click to open chat`}
                       >
                         {agent.role.name}
