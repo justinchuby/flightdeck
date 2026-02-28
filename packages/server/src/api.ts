@@ -83,6 +83,12 @@ export function apiRouter(
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     if (!text) return res.status(400).json({ error: 'text is required' });
 
+    if (agent.role.id === 'lead') {
+      agent.lastHumanMessageAt = new Date();
+      agent.lastHumanMessageText = text.slice(0, 200);
+      agent.humanMessageResponded = false;
+    }
+
     const prefix = `[USER MESSAGE] The human user says:\n`;
     const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message.`;
 
@@ -268,6 +274,10 @@ export function apiRouter(
     const { text, mode = 'interrupt' } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+
+    agent.lastHumanMessageAt = new Date();
+    agent.lastHumanMessageText = text.slice(0, 200);
+    agent.humanMessageResponded = false;
 
     const formatted = `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`;
 

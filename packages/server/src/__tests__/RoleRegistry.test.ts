@@ -8,9 +8,9 @@ describe('RoleRegistry', () => {
     registry = new RoleRegistry();
   });
 
-  it('has 11 built-in roles on construction', () => {
+  it('has 12 built-in roles on construction', () => {
     const roles = registry.getAll();
-    expect(roles.length).toBe(11);
+    expect(roles.length).toBe(12);
     expect(roles.every((r) => r.builtIn === true)).toBe(true);
   });
 
@@ -33,7 +33,7 @@ describe('RoleRegistry', () => {
 
     expect(custom.builtIn).toBe(false);
     expect(registry.get('devops')).toEqual(custom);
-    expect(registry.getAll().length).toBe(12);
+    expect(registry.getAll().length).toBe(13);
   });
 
   it('can remove a custom role', () => {
@@ -49,7 +49,7 @@ describe('RoleRegistry', () => {
     const removed = registry.remove('devops');
     expect(removed).toBe(true);
     expect(registry.get('devops')).toBeUndefined();
-    expect(registry.getAll().length).toBe(11);
+    expect(registry.getAll().length).toBe(12);
   });
 
   it('cannot remove a built-in role', () => {
@@ -69,7 +69,7 @@ describe('RoleRegistry', () => {
     });
 
     const all = registry.getAll();
-    expect(all.length).toBe(12);
+    expect(all.length).toBe(13);
     const ids = all.map((r) => r.id);
     expect(ids).toContain('architect');
     expect(ids).toContain('developer');

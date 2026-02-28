@@ -45,6 +45,8 @@ export interface AgentJSON {
   contextWindowSize: number;
   contextWindowUsed: number;
   pendingMessages: number;
+  isSubLead: boolean;
+  hierarchyLevel: number;
 }
 
 export class Agent {
@@ -66,8 +68,14 @@ export class Agent {
   public model?: string;
   /** Working directory for this agent's CLI process */
   public cwd?: string;
+  /** Tracks when the last human message was received (for leads) */
+  public lastHumanMessageAt: Date | null = null;
+  public lastHumanMessageText: string | null = null;
+  public humanMessageResponded: boolean = true;
   /** Concurrency budget info (set by AgentManager for leads) */
   public budget?: { maxConcurrent: number; runningCount: number };
+  /** Hierarchy depth: 0 = root lead, 1 = sub-lead, 2 = sub-sub-lead, etc. */
+  public hierarchyLevel: number = 0;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
@@ -356,7 +364,7 @@ ${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — reuse idle 
       ? `== YOUR AGENTS ==
 ${childLines || '(no agents created yet — use CREATE_AGENT to create specialists)'}
 Use agent IDs above with DELEGATE to assign tasks, or AGENT_MESSAGE to communicate.
-${otherPeers.length > 0 ? `\n== OTHER CREW MEMBERS ==\n${peerLines}` : ''}`
+${otherPeers.length > 0 ? `\n== OTHER CREW MEMBERS ==\n${peerLines}` : ''}${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${this.parentId.slice(0, 8)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}`
       : `== ACTIVE CREW MEMBERS ==
 ${peerLines || '(no other agents)'}`;
 
@@ -677,6 +685,8 @@ CREW_UPDATE -->`;
       contextWindowSize: this.contextWindowSize,
       contextWindowUsed: this.contextWindowUsed,
       pendingMessages: this.pendingMessageCount,
+      isSubLead: this.role.id === 'lead' && !!this.parentId,
+      hierarchyLevel: this.hierarchyLevel,
     };
   }
 }

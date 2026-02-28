@@ -62,6 +62,7 @@ export class AgentManager extends EventEmitter {
   private maxRestarts: number;
   private autoRestart: boolean;
   private delegations: Map<string, Delegation> = new Map();
+  private reportedCompletions: Set<string> = new Set();
   /** Buffer ACP text chunks per agent so we can match multi-token command patterns */
   private textBuffers: Map<string, string> = new Map();
   /** Heartbeat: track when each lead went idle and consecutive nudge count */
@@ -256,6 +257,12 @@ export class AgentManager extends EventEmitter {
 
       // Notify parent agent of child completion
       this.notifyParentOfCompletion(agent, code);
+
+      // Clean up dedup tracking after a delay
+      setTimeout(() => {
+        this.reportedCompletions.delete(`${agent.id}:idle`);
+        this.reportedCompletions.delete(`${agent.id}:exit`);
+      }, 10000);
 
       if (code !== null && code !== 0) {
         const agentRole = agent.role?.id ?? 'unknown';
@@ -507,6 +514,11 @@ export class AgentManager extends EventEmitter {
       }
     }
 
+    // Lead processed output — mark human message as responded
+    if (agent.role.id === 'lead' && !agent.humanMessageResponded) {
+      agent.humanMessageResponded = true;
+    }
+
     // Keep only last 500 chars that might contain an incomplete command
     const lastOpen = buf.lastIndexOf('<!--');
     if (lastOpen >= 0) {
@@ -542,17 +554,20 @@ export class AgentManager extends EventEmitter {
       }
 
       if (!req.role) {
-        agent.sendMessage(`[System] CREATE_AGENT requires a "role" field. Available roles: ${this.roleRegistry.getAll().filter(r => r.id !== 'lead').map(r => r.id).join(', ')}`);
+        agent.sendMessage(`[System] CREATE_AGENT requires a "role" field. Available roles: ${this.roleRegistry.getAll().map(r => r.id).join(', ')}`);
         return;
       }
 
       const role = this.roleRegistry.get(req.role);
       if (!role) {
-        agent.sendMessage(`[System] Unknown role: ${req.role}. Available: ${this.roleRegistry.getAll().filter(r => r.id !== 'lead').map(r => r.id).join(', ')}`);
+        agent.sendMessage(`[System] Unknown role: ${req.role}. Available: ${this.roleRegistry.getAll().map(r => r.id).join(', ')}`);
         return;
       }
 
       const child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd, req.sessionId);
+      if (role.id === 'lead') {
+        child.hierarchyLevel = agent.hierarchyLevel + 1;
+      }
       logger.info('agent', `${agent.role.name} (${agent.id.slice(0, 8)}) created ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${child.id.slice(0, 8)}`);
 
       // If task is provided, send it and create a delegation record
@@ -799,9 +814,10 @@ export class AgentManager extends EventEmitter {
       const taskPrompt = req.context
         ? `${req.task}\n\nContext: ${req.context}`
         : req.task;
+      // Reset dedup tracking for re-delegated agent
+      this.reportedCompletions.delete(`${child.id}:idle`);
+      this.reportedCompletions.delete(`${child.id}:exit`);
       child.sendMessage(taskPrompt);
-
-      // Acknowledge delegation back to lead
       const statusNote = child.status === 'running' ? ' (agent is busy — task queued)' : '';
       const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote} — ${req.task.slice(0, 120)}`;
       agent.sendMessage(ackMsg);
@@ -888,6 +904,8 @@ export class AgentManager extends EventEmitter {
         status: a.status,
         task: a.task?.slice(0, 80) || null,
         parentId: a.parentId?.slice(0, 8) || null,
+        fullParentId: a.parentId || null,
+        childCount: a.childIds.length,
         model: a.model || a.role.model || 'default',
       }));
 
@@ -895,6 +913,25 @@ export class AgentManager extends EventEmitter {
     const budgetLine = agent.role.id === 'lead'
       ? `\n== AGENT BUDGET ==\nRunning: ${running} / ${this.maxConcurrent} | Available slots: ${Math.max(0, this.maxConcurrent - running)}${running >= this.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}\n`
       : '';
+
+    // For sub-leads, scope to own children + sibling summary
+    const isSubLead = agent.role.id === 'lead' && !!agent.parentId;
+    let rosterLines: string;
+    let siblingSection = '';
+    if (isSubLead) {
+      const ownChildren = roster.filter(r => r.fullParentId === agent.id);
+      const siblingLeads = roster.filter(r => r.roleId === 'lead' && r.fullParentId === agent.parentId && r.fullId !== agent.id);
+      rosterLines = ownChildren
+        .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}`)
+        .join('\n') || '(no agents created yet — use CREATE_AGENT to create specialists)';
+      if (siblingLeads.length > 0) {
+        siblingSection = `\n== SIBLING LEADS ==\n${siblingLeads.map(r => `- ${r.id} (${r.role}) — ${r.status}, managing ${r.childCount} agents`).join('\n')}\n`;
+      }
+    } else {
+      rosterLines = roster
+        .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`)
+        .join('\n');
+    }
 
     // Include memory entries for the lead
     let memorySection = '';
@@ -917,10 +954,19 @@ export class AgentManager extends EventEmitter {
       }
     }
 
-    const response = `<!-- CREW_ROSTER
+    // Check for unread human messages
+    let humanMsgIndicator = '';
+    if (agent.role.id === 'lead' && !agent.humanMessageResponded && agent.lastHumanMessageAt) {
+      const agoMs = Date.now() - agent.lastHumanMessageAt.getTime();
+      const agoMin = Math.floor(agoMs / 60000);
+      const agoStr = agoMin < 1 ? 'just now' : `${agoMin}m ago`;
+      humanMsgIndicator = `\n⚠️ UNREAD HUMAN MESSAGE (${agoStr}): "${agent.lastHumanMessageText}"\nRespond to this FIRST before continuing other work.\n`;
+    }
+
+    const response = `<!-- CREW_ROSTER${humanMsgIndicator}
 == ACTIVE CREW MEMBERS ==
-${roster.map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}${r.parentId ? ` | Parent: ${r.parentId}` : ''}`).join('\n')}
-${budgetLine}${memorySection}
+${rosterLines}
+${budgetLine}${siblingSection}${memorySection}
 To assign a task to an agent, use their ID:
 \`<!-- DELEGATE {"to": "agent-id", "task": "your task"} -->\`
 To create a new agent:
@@ -1028,6 +1074,11 @@ CREW_ROSTER -->`;
     const parent = this.agents.get(agent.parentId);
     if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
 
+    // Dedup: track that we reported this agent's idle state
+    const dedupKey = `${agent.id}:idle`;
+    if (this.reportedCompletions.has(dedupKey)) return;
+    this.reportedCompletions.add(dedupKey);
+
     // Update delegation records
     for (const [, del] of this.delegations) {
       if (del.toAgentId === agent.id && del.status === 'active') {
@@ -1059,6 +1110,26 @@ CREW_ROSTER -->`;
     if (!agent.parentId) return;
     const parent = this.agents.get(agent.parentId);
     if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
+
+    // Dedup: if idle report was already sent for this agent, skip the exit report
+    // (the idle report already told the parent the work is done)
+    const idleKey = `${agent.id}:idle`;
+    const exitKey = `${agent.id}:exit`;
+    if (this.reportedCompletions.has(exitKey)) return;
+    this.reportedCompletions.add(exitKey);
+
+    // If idle already reported, don't duplicate
+    if (this.reportedCompletions.has(idleKey) && exitCode === 0) {
+      // Still update delegation records but don't send another report
+      for (const [, del] of this.delegations) {
+        if (del.toAgentId === agent.id && del.status === 'active') {
+          del.status = exitCode === 0 ? 'completed' : 'failed';
+          del.completedAt = new Date().toISOString();
+          del.result = agent.getBufferedOutput().slice(-8000);
+        }
+      }
+      return;
+    }
 
     // Update delegation records
     for (const [, del] of this.delegations) {
