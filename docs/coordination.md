@@ -17,13 +17,13 @@ Multiple AI agents working on the same codebase can:
 SQLite-backed mutual exclusion on file paths.
 
 ```
-Agent A: <!-- LOCK_REQUEST {"filePath": "src/auth.ts", "reason": "implementing login"} -->
+Agent A: [[[ LOCK_FILE {"filePath": "src/auth.ts", "reason": "implementing login"} ]]]
 System:  Lock acquired ✓
 
-Agent B: <!-- LOCK_REQUEST {"filePath": "src/auth.ts", "reason": "fixing bug"} -->
+Agent B: [[[ LOCK_FILE {"filePath": "src/auth.ts", "reason": "fixing bug"} ]]]
 System:  Lock denied — held by Agent A (expires in 4m30s)
 
-Agent A: <!-- LOCK_RELEASE {"filePath": "src/auth.ts"} -->
+Agent A: [[[ UNLOCK_FILE {"filePath": "src/auth.ts"} ]]]
 System:  Lock released ✓
 ```
 
@@ -54,6 +54,24 @@ POST /api/coordination/locks          — acquire: { agentId, filePath, reason? 
 DELETE /api/coordination/locks/:path  — release: ?agentId=...
 ```
 
+### Layer 1b: Scoped COMMIT
+
+The `COMMIT` command ensures agents only stage files they've locked, preventing one agent from accidentally committing another agent's uncommitted work.
+
+```
+[[[ COMMIT {"message": "feat: add login endpoint"} ]]]
+```
+
+**How it works:**
+1. Reads the agent's current and recently released file locks
+2. Runs `git add` only on those specific files
+3. Commits with the provided message
+4. Prevents `git add -A` which could stage other agents' changes
+
+### Layer 1c: Task Dedup Detection
+
+When a lead delegates a task, `findSimilarActiveDelegation()` checks for overlapping work using word-overlap similarity (>50% match, words >2 chars, stop-word removal). If a similar active delegation exists, the lead receives an advisory warning — the delegation proceeds but the lead is informed of potential duplication.
+
 ### Layer 2: Activity Ledger
 
 Append-only log of all agent actions, providing a shared "memory" of what's happened. Writes are **batched** for performance — entries are buffered in memory and flushed to SQLite every **250ms** or when the buffer reaches **64 entries**, whichever comes first. Read operations (`getRecent`, `getSummary`) flush the buffer first to guarantee read-after-write consistency. The ledger has a `stop()` method for graceful shutdown that flushes remaining entries and clears the timer.
@@ -69,7 +87,11 @@ Append-only log of all agent actions, providing a shared "memory" of what's happ
 | `sub_agent_spawned` | Agent creates a child agent |
 | `lock_acquired` | File lock taken |
 | `lock_released` | File lock freed |
-| `message_sent` | Inter-agent message |
+| `message_sent` | Inter-agent message (includes `toAgentId`, `toRole` in details) |
+| `delegated` | Task delegated to another agent (includes `toAgentId`, `toRole`) |
+| `agent_terminated` | Agent terminated (includes `toAgentId`, `toRole`) |
+| `delegation_cancelled` | Delegation cancelled (includes `toAgentId`, `toRole`) |
+| `group_message` | Group chat message sent |
 | `error` | Something went wrong |
 
 **Schema:**
@@ -123,7 +145,7 @@ CREW_UPDATE -->
 ```
 
 **Triggers for refresh:**
-- Agent spawned, killed, or exited
+- Agent spawned, terminated, or exited
 - File lock acquired or released
 - **Context compaction** — when Copilot CLI compacts an agent's context window (`agent:context_compacted` event), the `ContextRefresher` immediately re-injects the crew context (team roster, active delegations, coordination rules) into the affected agent so it doesn't lose awareness of its team after compaction
 - Debounced at 2 seconds to batch rapid events

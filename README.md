@@ -22,19 +22,21 @@ A web UI that orchestrates multiple Copilot CLI agents with specialized roles to
   | 🚀 Radical Thinker | Challenge assumptions | Gemini 3 Pro |
   | 📋 Secretary | Plan tracking | GPT-4.1 |
   | 🧪 QA Tester | Test strategy, quality | Claude Sonnet 4.6 |
-- **💬 Inter-Agent Communication** — Direct messages, broadcasts, and group chats between agents
-- **📊 Task DAG** — Visualize task dependencies as a directed acyclic graph (ReactFlow)
-- **✅ Decision Log** — Track architectural decisions with async user confirmation
-- **🔒 File Locking** — Prevents conflicts when multiple agents edit the same files
-- **📡 Real-Time Dashboard** — Live activity feed, team status, progress tracking via WebSocket
+- **💬 Inter-Agent Communication** — Direct messages, @mentions, broadcasts, and group chats between agents
+- **📊 Task DAG** — Declarative task scheduling with dependencies; PROGRESS auto-reads DAG state
+- **✅ Decision Log** — Track architectural decisions with accept/reject and reason comments
+- **🔒 File Locking & COMMIT** — Prevents conflicts when multiple agents edit files; scoped COMMIT stages only locked files
+- **📡 Real-Time Dashboard** — Live activity feed, team status, user-message highlighting via WebSocket
 - **🙋 Human-in-the-Loop** — Message any agent or the lead; queue or interrupt with dedicated buttons
 - **⏸️ Agent Controls** — Interrupt, stop, restart agents; change models on the fly
 - **🔄 Session Resume** — Resume from a previous Copilot session ID
 - **💾 Persistent Projects** — Projects survive lead sessions; resume with full context briefing
 - **🔐 Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path validation
 - **🔍 Global Search** — Search across messages, tasks, decisions, and activity
-- **💬 Group Chat** — Tabbed group chat UI with human participation
+- **💬 Group Chat** — QUERY_GROUPS, role-based CREATE_GROUP, auto-creation for parallel work, auto-archive, unread badges
 - **📡 Context Re-injection** — Automatic crew context recovery after context window compaction
+- **📈 Timeline Visualization** — Swim-lane timeline with filtering, brush time selector, keyboard navigation, and live mode
+- **📦 Project Grouping** — Group and filter projects in the Tasks view
 
 ## Getting Started
 
@@ -77,7 +79,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 
 | Component | Responsibility |
 |-----------|---------------|
-| **AgentManager** | Spawns agents, detects commands in output stream, routes messages, manages delegations. Cascade cleanup on termination. |
+| **AgentManager** | Spawns agents, detects commands in output stream, routes messages, manages delegations. Cascade termination with visited-set guard. |
 | **Agent** | Wraps a Copilot CLI process (ACP) with lifecycle management, message buffering, and memory bounds |
 | **CommandDispatcher** | Parses triple-bracket commands from agent output, enforces ownership rules |
 | **RoleRegistry** | Role definitions with system prompts, icons, colors, default models |
@@ -85,6 +87,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **ActivityLedger** | Batched activity logging (flushes every 250ms or 64 entries) |
 | **ContextRefresher** | Re-injects crew context after agent compaction events |
 | **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
+| **ChatGroupRegistry** | Group lifecycle — create, archive, role-based membership, auto-creation for parallel work |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
 | **HeartbeatMonitor** | DAG-aware stall detection — nudges idle leads with remaining work |
 
@@ -97,13 +100,18 @@ Agents communicate via structured commands detected in their output:
 [[[ DELEGATE {"to": "agent-id", "task": "...", "context": "..."} ]]]
 [[[ TERMINATE_AGENT {"id": "agent-id", "reason": "..."} ]]]
 [[[ AGENT_MESSAGE {"to": "agent-id", "content": "..."} ]]]
-[[[ CREATE_GROUP {"name": "...", "members": ["id1", "id2"]} ]]]
+[[[ CREATE_GROUP {"name": "...", "members": ["id1"], "roles": ["developer"]} ]]]
+[[[ GROUP_MESSAGE {"group": "...", "content": "..."} ]]]
+[[[ QUERY_GROUPS ]]]
 [[[ BROADCAST {"content": "..."} ]]]
 [[[ DECISION {"title": "...", "rationale": "...", "alternatives": [...]} ]]]
 [[[ DECLARE_TASKS {"tasks": [{"id": "...", "title": "...", "depends_on": [...]}]} ]]]
-[[[ PROGRESS {"summary": "...", "completed": [...], "in_progress": [...]} ]]]
+[[[ PROGRESS {"summary": "..."} ]]]
 [[[ COMPLETE_TASK {"summary": "..."} ]]]
+[[[ QUERY_TASKS ]]]
+[[[ CANCEL_DELEGATION {"delegationId": "...", "reason": "..."} ]]]
 [[[ LOCK_FILE {"filePath": "...", "reason": "..."} ]]]
+[[[ COMMIT {"message": "..."} ]]]
 [[[ QUERY_CREW ]]]
 ```
 
@@ -111,10 +119,11 @@ Agents communicate via structured commands detected in their output:
 
 | View | Description |
 |------|-------------|
-| **Lead Dashboard** | Chat with the lead, decisions panel (always visible), team/comms/groups/DAG/activity tabs |
+| **Lead Dashboard** | Chat with the lead, decisions panel with accept/reject + reasons, team/comms/groups/DAG/activity tabs, user-message highlighting |
 | **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls |
-| **Tasks** | Per-project task tabs with DAG status, progress badges, and persistent project archive |
-| **Group Chat** | Tabbed group chat interface with human participation and real-time messaging |
+| **Tasks** | Per-project task tabs with DAG status, progress badges, project grouping, and persistent archive |
+| **Timeline** | Swim-lane visualization of agent activity — filtering by role/comm-type/status, brush time selector, keyboard navigation, live auto-scroll mode |
+| **Group Chat** | Tabbed group chat interface with human participation, unread badges, and real-time messaging |
 | **Overview** | Progress tracking, decision management, and global search |
 | **Settings** | Concurrency limits, model defaults, custom roles |
 
@@ -127,7 +136,7 @@ Agents communicate via structured commands detected in their output:
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
-- **Testing**: Vitest with v8 coverage, Codecov integration (864+ tests)
+- **Testing**: Vitest with v8 coverage, Codecov integration (1000+ tests)
 
 ## Screenshots
 

@@ -13,37 +13,43 @@ Chat groups solve the "middle ground" — targeted communication without routing
 
 ### How Agents Create and Use Groups
 
-The **lead** creates groups and assigns members. Any **member** of a group (including the lead) can send messages to the group. The lead is auto-included in every group for visibility.
+Any agent can create groups (non-leads use their own ID as context). The lead is auto-included for visibility. Groups support both explicit member IDs and **role-based membership**.
 
 #### Commands
 
-**Lead-only:**
+**Group creation (any agent):**
 ```
-<!-- CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} -->
+[[[ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ]]]
 ```
 Creates a named group. Members are agent IDs (short 8-char prefixes work). The lead is automatically added. Responds with a confirmation including the group name and resolved member list.
 
+**Role-based membership:**
 ```
-<!-- ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} -->
+[[[ CREATE_GROUP {"name": "frontend-team", "roles": ["developer", "designer"]} ]]]
+```
+Auto-adds all active agents with matching roles. Terminated/completed agents are excluded via `isTerminalStatus()` filter. Can be combined with explicit `members`.
+
+```
+[[[ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ]]]
 ```
 Adds members to an existing group. The new member receives the group's recent message history (last 20 messages) so they have context.
 
 ```
-<!-- REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} -->
+[[[ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ]]]
 ```
 Removes members. The lead cannot be removed.
 
 **Any group member:**
 ```
-<!-- GROUP_MESSAGE {"group": "config-team", "content": "I found a pattern we should all follow..."} -->
+[[[ GROUP_MESSAGE {"group": "config-team", "content": "I found a pattern we should all follow..."} ]]]
 ```
 Sends a message to all other group members. The sender sees a delivery confirmation. Each recipient receives the message with the sender's role and ID.
 
-**Any agent:**
+**Any agent — discover groups:**
 ```
-<!-- LIST_GROUPS -->
+[[[ QUERY_GROUPS ]]]
 ```
-Lists all groups the agent belongs to, with member counts.
+Lists all groups the agent belongs to, with member names/roles, message count, and last message preview (first 100 chars). Also aliased as `LIST_GROUPS`.
 
 ### Message Format (Delivery to Recipients)
 
@@ -238,3 +244,25 @@ Developer abc12345 responds:
 Architect def67890 (in their context):
 [Group "config-team" — Developer (abc12345)]: Understood. I'll wait for Architect to finish the RoPEConfig extraction before I touch _configs.py.
 ```
+
+## Auto-Creation for Parallel Work
+
+When the lead delegates the same feature to 3+ agents, groups are automatically created based on keyword extraction from task descriptions.
+
+**How it works:**
+1. After each delegation, `maybeAutoCreateGroup()` scans all active delegations from the same lead
+2. Extracts the first significant keyword (>3 chars, excluding stop words) from each task
+3. If 3+ agents share a keyword, a `{keyword}-team` group is created
+4. Stop words include: `the`, `and`, `implement`, `create`, `build`, `fix`, `add`, `review`, `update`, `check`, `test`, `run`, `verify`, `ensure`, `handle`, `process`, `manage`
+5. Only newly added members receive notification messages (dedup guard)
+
+**Example:** If the lead delegates "implement timeline filtering", "implement timeline brush", and "implement timeline keyboard nav" to three devs, a `timeline-team` group is auto-created.
+
+## Auto-Archive (Lifecycle Cleanup)
+
+Groups are automatically archived when all members reach terminal status (completed, failed, or terminated).
+
+- Archived groups are excluded from `QUERY_GROUPS` results
+- Message history is preserved in the database for audit
+- The `archived` column on `chat_groups` table tracks this state
+- `AgentManager` triggers archive checks after each agent termination
