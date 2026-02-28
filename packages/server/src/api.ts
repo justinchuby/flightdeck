@@ -4,8 +4,8 @@ import type { RoleRegistry } from './agents/RoleRegistry.js';
 import type { ServerConfig } from './config.js';
 import { updateConfig, getConfig } from './config.js';
 import type { Database } from './db/database.js';
-import { agentPlans, messages, conversations, chatGroupMessages } from './db/schema.js';
-import { eq, like, desc } from 'drizzle-orm';
+import { agentPlans, messages, conversations, chatGroupMessages, dagTasks, decisions, activityLog } from './db/schema.js';
+import { eq, like, desc, or } from 'drizzle-orm';
 import type { FileLockRegistry } from './coordination/FileLockRegistry.js';
 import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.js';
 import type { DecisionLog } from './coordination/DecisionLog.js';
@@ -496,8 +496,69 @@ export function apiRouter(
       timestamp: m.timestamp,
     }));
 
+    // Search DAG tasks (by id or description)
+    const taskResults = _db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(or(like(dagTasks.id, pattern), like(dagTasks.description, pattern)))
+      .orderBy(desc(dagTasks.createdAt))
+      .limit(limit)
+      .all();
+
+    const enrichedTasks = taskResults.map((t) => ({
+      source: 'task' as const,
+      id: t.id,
+      leadId: t.leadId,
+      content: t.description,
+      status: t.dagStatus,
+      role: t.role,
+      assignedAgentId: t.assignedAgentId,
+      timestamp: t.createdAt,
+    }));
+
+    // Search decisions (by title or rationale)
+    const decisionResults = _db.drizzle
+      .select()
+      .from(decisions)
+      .where(or(like(decisions.title, pattern), like(decisions.rationale, pattern)))
+      .orderBy(desc(decisions.createdAt))
+      .limit(limit)
+      .all();
+
+    const enrichedDecisions = decisionResults.map((d) => ({
+      source: 'decision' as const,
+      id: d.id,
+      agentId: d.agentId,
+      agentRole: d.agentRole,
+      leadId: d.leadId,
+      content: d.title,
+      rationale: d.rationale,
+      status: d.status,
+      needsConfirmation: d.needsConfirmation === 1,
+      timestamp: d.createdAt,
+    }));
+
+    // Search activity log (by summary)
+    const activityResults = _db.drizzle
+      .select()
+      .from(activityLog)
+      .where(like(activityLog.summary, pattern))
+      .orderBy(desc(activityLog.timestamp))
+      .limit(limit)
+      .all();
+
+    const enrichedActivity = activityResults.map((a) => ({
+      source: 'activity' as const,
+      id: a.id,
+      agentId: a.agentId,
+      agentRole: a.agentRole,
+      content: a.summary,
+      actionType: a.actionType,
+      timestamp: a.timestamp,
+    }));
+
     // Merge and sort by timestamp descending
-    const combined = [...enrichedConv, ...enrichedGroup]
+    const combined = [...enrichedConv, ...enrichedGroup, ...enrichedTasks, ...enrichedDecisions, ...enrichedActivity]
       .sort((a, b) => (b.timestamp ?? '').localeCompare(a.timestamp ?? ''))
       .slice(0, limit);
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, MessageSquare, Users } from 'lucide-react';
+import { Search, X, MessageSquare, Users, ListChecks, Scale, Activity } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
 interface SearchResult {
-  source: 'conversation' | 'group';
+  source: 'conversation' | 'group' | 'task' | 'decision' | 'activity';
   id: number | string;
   content: string;
   timestamp: string | null;
@@ -16,6 +16,15 @@ interface SearchResult {
   leadId?: string;
   fromAgentId?: string;
   fromRole?: string;
+  // task fields
+  status?: string | null;
+  role?: string;
+  assignedAgentId?: string | null;
+  // decision fields
+  rationale?: string | null;
+  needsConfirmation?: boolean;
+  // activity fields
+  actionType?: string;
 }
 
 interface SearchResponse {
@@ -170,6 +179,54 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             <div className="py-1">
               {results.map((r, i) => {
                 const preview = r.content.length > 200 ? r.content.slice(0, 200) + '…' : r.content;
+
+                // Source-specific icon, label, and badge
+                let icon: React.ReactNode;
+                let label: string;
+                let badge: React.ReactNode = null;
+
+                switch (r.source) {
+                  case 'conversation':
+                    icon = <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
+                    label = agentLabel(r.agentId, r.agentRole);
+                    if (r.sender) badge = <span className="text-xs text-gray-500">({r.sender})</span>;
+                    break;
+                  case 'group':
+                    icon = <MessageSquare className="w-3.5 h-3.5 text-green-400 shrink-0" />;
+                    label = r.groupName ?? 'Group';
+                    if (r.fromRole) badge = <span className="text-xs text-gray-500">({r.fromRole})</span>;
+                    break;
+                  case 'task':
+                    icon = <ListChecks className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
+                    label = `Task: ${r.id}`;
+                    badge = r.status ? (
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        r.status === 'done' ? 'bg-green-900/50 text-green-400' :
+                        r.status === 'running' ? 'bg-blue-900/50 text-blue-400' :
+                        r.status === 'failed' ? 'bg-red-900/50 text-red-400' :
+                        'bg-gray-800 text-gray-400'
+                      }`}>{r.status}</span>
+                    ) : null;
+                    break;
+                  case 'decision':
+                    icon = <Scale className="w-3.5 h-3.5 text-yellow-400 shrink-0" />;
+                    label = agentLabel(r.agentId, r.agentRole);
+                    badge = (
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        r.status === 'confirmed' ? 'bg-green-900/50 text-green-400' :
+                        r.status === 'rejected' ? 'bg-red-900/50 text-red-400' :
+                        r.needsConfirmation ? 'bg-yellow-900/50 text-yellow-400' :
+                        'bg-gray-800 text-gray-400'
+                      }`}>{r.needsConfirmation && r.status === 'recorded' ? 'needs review' : r.status}</span>
+                    );
+                    break;
+                  case 'activity':
+                    icon = <Activity className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
+                    label = agentLabel(r.agentId, r.agentRole);
+                    if (r.actionType) badge = <span className="text-xs text-gray-500">{r.actionType}</span>;
+                    break;
+                }
+
                 return (
                   <button
                     key={`${r.source}-${r.id}-${i}`}
@@ -177,22 +234,9 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                     className="w-full text-left px-4 py-2.5 hover:bg-gray-800 transition-colors border-b border-gray-800/50 last:border-0"
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      {r.source === 'conversation' ? (
-                        <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      ) : (
-                        <MessageSquare className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                      )}
-                      <span className="text-xs font-medium text-accent">
-                        {r.source === 'conversation'
-                          ? agentLabel(r.agentId, r.agentRole)
-                          : r.groupName ?? 'Group'}
-                      </span>
-                      {r.source === 'conversation' && r.sender && (
-                        <span className="text-xs text-gray-500">({r.sender})</span>
-                      )}
-                      {r.source === 'group' && r.fromRole && (
-                        <span className="text-xs text-gray-500">({r.fromRole})</span>
-                      )}
+                      {icon}
+                      <span className="text-xs font-medium text-accent">{label}</span>
+                      {badge}
                       <span className="text-xs text-gray-600 ml-auto shrink-0">
                         {timeAgo(r.timestamp)}
                       </span>
@@ -200,6 +244,11 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                     <p className="text-sm text-gray-300 whitespace-pre-wrap break-words line-clamp-2">
                       {highlightMatch(preview, query)}
                     </p>
+                    {r.source === 'decision' && r.rationale && (
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1 italic">
+                        {r.rationale}
+                      </p>
+                    )}
                   </button>
                 );
               })}
@@ -209,7 +258,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           {!loading && !searched && (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500 gap-2">
               <Search className="w-6 h-6" />
-              <span className="text-sm">Search across all agent and group messages</span>
+              <span className="text-sm">Search messages, tasks, decisions, and activity</span>
               <span className="text-xs text-gray-600">Type at least 2 characters</span>
             </div>
           )}
