@@ -360,7 +360,7 @@ Add/remove members from a group:
 \`[[[ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ]]]\`
 \`[[[ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ]]]\`
 
-Terminate an agent to free a slot (WARNING: context is permanently lost — avoid unless absolutely necessary):
+Terminate an agent to free a slot (WARNING: context is permanently lost — avoid unless necessary when limit is reached):
 \`[[[ TERMINATE_AGENT {"id": "agent-id", "reason": "need slot for different role"} ]]]\`
 
 == TASK DAG (Declarative Scheduling) ==
