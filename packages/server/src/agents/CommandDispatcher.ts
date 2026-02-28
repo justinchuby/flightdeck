@@ -11,6 +11,7 @@ import type { AgentMemory, MemoryEntry } from './AgentMemory.js';
 import type { ChatGroupRegistry, GroupMessage } from '../comms/ChatGroupRegistry.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DagTaskInput, DagTask } from '../tasks/TaskDAG.js';
+import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import { logger } from '../utils/logger.js';
 
 // ── Regex patterns for ACP commands ──────────────────────────────────
@@ -43,6 +44,9 @@ const RESET_DAG_REGEX = /\[\[\[\s*RESET_DAG\s*\]\]\]/s;
 const HALT_HEARTBEAT_REGEX = /\[\[\[\s*HALT_HEARTBEAT\s*\]\]\]/s;
 const REQUEST_LIMIT_CHANGE_REGEX = /\[\[\[\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*\]\]\]/s;
 const CANCEL_DELEGATION_REGEX = /\[\[\[\s*CANCEL_DELEGATION\s*(\{.*?\})\s*\]\]\]/s;
+const DEFER_ISSUE_REGEX = /\[\[\[\s*DEFER_ISSUE\s*(\{.*?\})\s*\]\]\]/s;
+const QUERY_DEFERRED_REGEX = /\[\[\[\s*QUERY_DEFERRED\s*(\{.*?\})?\s*\]\]\]/s;
+const RESOLVE_DEFERRED_REGEX = /\[\[\[\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*\]\]\]/s;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -79,6 +83,7 @@ export interface CommandContext {
   agentMemory: AgentMemory;
   chatGroupRegistry: ChatGroupRegistry;
   taskDAG: TaskDAG;
+  deferredIssueRegistry: DeferredIssueRegistry;
   maxConcurrent: number;
   markHumanInterrupt(agentId: string): void;
 }
@@ -137,6 +142,9 @@ export class CommandDispatcher {
       { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => this.handleHaltHeartbeat(a) },
       { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => this.handleRequestLimitChange(a, d) },
       { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => this.handleCancelDelegation(a, d) },
+      { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => this.handleDeferIssue(a, d) },
+      { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => this.handleQueryDeferred(a, d) },
+      { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => this.handleResolveDeferred(a, d) },
     ];
 
     let found = true;
@@ -288,13 +296,24 @@ export class CommandDispatcher {
     });
     this.ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status });
 
-    if (agent.parentId && exitCode !== 0) {
+    if (agent.parentId) {
       const dagTask = this.ctx.taskDAG.getTaskByAgent(agent.parentId, agent.id);
       if (dagTask) {
-        this.ctx.taskDAG.failTask(agent.parentId, dagTask.id);
-        const dagParent = this.ctx.getAgent(agent.parentId);
-        if (dagParent) {
-          dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (exit ${exitCode}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
+        if (exitCode === 0) {
+          const newlyReady = this.ctx.taskDAG.completeTask(agent.parentId, dagTask.id);
+          if (newlyReady && newlyReady.length > 0) {
+            const dagParent = this.ctx.getAgent(agent.parentId);
+            if (dagParent) {
+              const readyNames = newlyReady.map(d => d.id).join(', ');
+              dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" done. Newly ready tasks: ${readyNames}. Use DELEGATE or CREATE_AGENT to assign them.`);
+            }
+          }
+        } else {
+          this.ctx.taskDAG.failTask(agent.parentId, dagTask.id);
+          const dagParent = this.ctx.getAgent(agent.parentId);
+          if (dagParent) {
+            dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (exit ${exitCode}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
+          }
         }
       }
     }
@@ -414,7 +433,9 @@ export class CommandDispatcher {
         const taskPrompt = req.context ? `${req.task}\n\nContext: ${req.context}` : req.task;
         child.sendMessage(taskPrompt);
 
-        const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''}`;
+        const dupMatch = req.task ? this.findSimilarActiveDelegation(req.task, child.id) : null;
+        const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
+        const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''}${dupNote}`;
         agent.sendMessage(ackMsg);
         this.ctx.emit('agent:message_sent', {
           from: child.id, fromRole: role.name,
@@ -664,7 +685,9 @@ export class CommandDispatcher {
       this.reportedCompletions.delete(`${child.id}:exit`);
       child.sendMessage(taskPrompt);
       const statusNote = child.status === 'running' ? ' (agent is busy — task queued)' : '';
-      const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote} — ${req.task.slice(0, 120)}`;
+      const dupMatch = this.findSimilarActiveDelegation(req.task, child.id);
+      const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
+      const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote} — ${req.task.slice(0, 120)}${dupNote}`;
       agent.sendMessage(ackMsg);
       this.ctx.emit('agent:message_sent', {
         from: child.id,
@@ -696,7 +719,7 @@ export class CommandDispatcher {
 
       const needsConfirmation = decision.needsConfirmation === true;
       const leadId = agent.parentId || agent.id;
-      const recorded = this.ctx.decisionLog.add(agent.id, agent.role?.id ?? 'unknown', decision.title, decision.rationale ?? '', needsConfirmation, leadId);
+      const recorded = this.ctx.decisionLog.add(agent.id, agent.role?.id ?? 'unknown', decision.title, decision.rationale ?? '', needsConfirmation, leadId, agent.projectId);
       logger.info('lead', `Decision by ${agent.role.name}: "${decision.title}"${needsConfirmation ? ' [needs confirmation]' : ''}`, { rationale: decision.rationale?.slice(0, 100) });
       // Include leadId so frontend routes to the correct project
       this.ctx.emit('lead:decision', {
@@ -704,6 +727,7 @@ export class CommandDispatcher {
         agentId: agent.id,
         agentRole: agent.role?.name ?? 'Unknown',
         leadId,
+        projectId: agent.projectId,
         title: decision.title,
         rationale: decision.rationale,
         needsConfirmation,
@@ -1165,7 +1189,7 @@ CREW_ROSTER ]]]`;
       if (!resolvedIds.includes(agent.id)) {
         resolvedIds.push(agent.id);
       }
-      const group = this.ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds);
+      const group = this.ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds, agent.projectId);
       const memberNames = group.memberIds.map((id) => {
         const a = this.ctx.getAgent(id);
         return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
@@ -1437,5 +1461,131 @@ CREW_ROSTER ]]]`;
       }
     }
     return depth > 0;
+  }
+
+  /** Check active delegations for similar tasks and return a warning if found */
+  private findSimilarActiveDelegation(task: string, excludeAgentId?: string): { agentId: string; role: string; task: string } | null {
+    const STOP_WORDS = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'to', 'of', 'in', 'for', 'on', 'and', 'or', 'with', 'that', 'this', 'it', 'from', 'by', 'as', 'at', 'be', 'do', 'not', 'all', 'if', 'no', 'so']);
+    const extractWords = (text: string): Set<string> => {
+      return new Set(
+        text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+          .filter(w => w.length > 2 && !STOP_WORDS.has(w))
+      );
+    };
+
+    const taskWords = extractWords(task);
+    if (taskWords.size === 0) return null;
+
+    for (const [, del] of this.delegations) {
+      if (del.status !== 'active') continue;
+      if (excludeAgentId && del.toAgentId === excludeAgentId) continue;
+
+      const delWords = extractWords(del.task);
+      if (delWords.size === 0) continue;
+
+      const shared = [...taskWords].filter(w => delWords.has(w)).length;
+      const similarity = shared / Math.min(taskWords.size, delWords.size);
+      if (similarity > 0.5) {
+        const agent = this.ctx.getAgent(del.toAgentId);
+        return {
+          agentId: del.toAgentId,
+          role: agent?.role.name || del.toRole,
+          task: del.task.slice(0, 80),
+        };
+      }
+    }
+    return null;
+  }
+
+  // ── Deferred Issue handlers ────────────────────────────────────────
+
+  private handleDeferIssue(agent: Agent, data: string): void {
+    const match = data.match(DEFER_ISSUE_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (!req.description) {
+        agent.sendMessage('[System] DEFER_ISSUE requires a "description" field.');
+        return;
+      }
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) {
+        agent.sendMessage('[System] Cannot defer issue: no lead context found.');
+        return;
+      }
+      const issue = this.ctx.deferredIssueRegistry.add(
+        leadId,
+        agent.id,
+        agent.role.name,
+        req.description,
+        req.severity || 'P1',
+        req.sourceFile || req.file || '',
+      );
+      agent.sendMessage(`[System] Deferred issue #${issue.id} recorded (${issue.severity}): ${issue.description.slice(0, 100)}`);
+      this.ctx.activityLedger.log(agent.id, agent.role.name, 'deferred_issue', `Deferred ${issue.severity}: ${issue.description.slice(0, 120)}`);
+      this.ctx.emit('deferred_issue:created', { leadId, issue });
+    } catch (err: any) {
+      agent.sendMessage(`[System] DEFER_ISSUE error: ${err.message}`);
+    }
+  }
+
+  private handleQueryDeferred(agent: Agent, data: string): void {
+    const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+    if (!leadId) {
+      agent.sendMessage('[System] No deferred issues context found.');
+      return;
+    }
+    let statusFilter: 'open' | 'resolved' | 'dismissed' | undefined;
+    const match = data.match(QUERY_DEFERRED_REGEX);
+    if (match?.[1]) {
+      try {
+        const req = JSON.parse(match[1]);
+        if (req.status && ['open', 'resolved', 'dismissed'].includes(req.status)) {
+          statusFilter = req.status;
+        }
+      } catch { /* no filter, show all */ }
+    }
+    const issues = this.ctx.deferredIssueRegistry.list(leadId, statusFilter);
+    if (issues.length === 0) {
+      agent.sendMessage(`[System] No deferred issues${statusFilter ? ` with status "${statusFilter}"` : ''}.`);
+      return;
+    }
+    let msg = `== DEFERRED ISSUES (${issues.length}) ==\n`;
+    for (const issue of issues) {
+      const icon = { open: '🔴', resolved: '✅', dismissed: '⚪' }[issue.status] || '?';
+      msg += `\n${icon} #${issue.id} [${issue.severity}] ${issue.status.toUpperCase()}`;
+      msg += `\n   ${issue.description.slice(0, 120)}`;
+      if (issue.sourceFile) msg += `\n   File: ${issue.sourceFile}`;
+      msg += `\n   Flagged by: ${issue.reviewerRole} (${issue.reviewerAgentId.slice(0, 8)}) at ${issue.createdAt}`;
+    }
+    agent.sendMessage(msg);
+  }
+
+  private handleResolveDeferred(agent: Agent, data: string): void {
+    const match = data.match(RESOLVE_DEFERRED_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      if (!req.id) {
+        agent.sendMessage('[System] RESOLVE_DEFERRED requires an "id" field.');
+        return;
+      }
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) {
+        agent.sendMessage('[System] No deferred issues context found.');
+        return;
+      }
+      const action = req.dismiss ? 'dismiss' : 'resolve';
+      const ok = action === 'dismiss'
+        ? this.ctx.deferredIssueRegistry.dismiss(leadId, req.id)
+        : this.ctx.deferredIssueRegistry.resolve(leadId, req.id);
+      if (ok) {
+        agent.sendMessage(`[System] Deferred issue #${req.id} ${action === 'dismiss' ? 'dismissed' : 'resolved'}.`);
+      } else {
+        agent.sendMessage(`[System] Deferred issue #${req.id} not found or already ${action === 'dismiss' ? 'dismissed' : 'resolved'}.`);
+      }
+    } catch (err: any) {
+      agent.sendMessage(`[System] RESOLVE_DEFERRED error: ${err.message}`);
+    }
   }
 }

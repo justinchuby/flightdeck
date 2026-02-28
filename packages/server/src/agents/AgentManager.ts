@@ -11,6 +11,7 @@ import type { ChatGroupRegistry, ChatGroup, GroupMessage } from '../comms/ChatGr
 import type { Database } from '../db/database.js';
 import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
+import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -71,6 +72,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentMemory: AgentMemory;
   private chatGroupRegistry: ChatGroupRegistry;
   private taskDAG: TaskDAG;
+  private deferredIssueRegistry: DeferredIssueRegistry;
   private db?: Database;
   private conversationStore?: ConversationStore;
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
@@ -96,7 +98,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db }: { maxRestarts?: number; autoRestart?: boolean; db?: Database } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry } = {},
   ) {
     super();
     this.config = config;
@@ -108,6 +110,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.agentMemory = agentMemory;
     this.chatGroupRegistry = chatGroupRegistry;
     this.taskDAG = taskDAG;
+    this.deferredIssueRegistry = deferredIssueRegistry!;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -131,6 +134,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       agentMemory: this.agentMemory,
       chatGroupRegistry: this.chatGroupRegistry,
       taskDAG: this.taskDAG,
+      deferredIssueRegistry: this.deferredIssueRegistry,
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
     });

@@ -46,6 +46,7 @@ export interface DagStatus {
 export interface ChatGroup {
   name: string;
   leadId: string;
+  projectId?: string;
   memberIds: string[];
   createdAt: string;
 }
@@ -54,6 +55,7 @@ export interface GroupMessage {
   id: string;
   groupName: string;
   leadId: string;
+  projectId?: string;
   fromAgentId: string;
   fromRole: string;
   content: string;
@@ -178,6 +180,7 @@ export interface Decision {
   id: string;
   agentId: string;
   agentRole: string;
+  projectId?: string;
   title: string;
   rationale: string;
   needsConfirmation?: boolean;

@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useGroupStore, groupKey } from '../../stores/groupStore';
 import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
-import { MarkdownContent, AgentIdBadge, idColor } from '../../utils/markdown';
+import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -65,7 +65,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
   // Filtered groups/tabs by selected project
   const filteredGroups = selectedProjectLeadId
-    ? groups.filter((g) => g.leadId === selectedProjectLeadId)
+    ? groups.filter((g) => (g.projectId ?? g.leadId) === selectedProjectLeadId)
     : groups;
   const filteredTabs = selectedProjectLeadId
     ? openTabs.filter((t) => t.leadId === selectedProjectLeadId)
@@ -347,37 +347,61 @@ export function GroupChat(_props: { api: any; ws: any }) {
             No group chats{selectedProjectLeadId ? ' in this project' : ' yet'}
           </div>
         ) : (
-          filteredTabs.map((tab) => {
-            const key = groupKey(tab.leadId, tab.name);
-            const isActive =
-              selectedGroup?.leadId === tab.leadId &&
-              selectedGroup?.name === tab.name;
-            const badge = unread[key] ?? 0;
+          (() => {
+            // Group tabs by project (leadId)
+            const tabsByProject = new Map<string, typeof filteredTabs>();
+            for (const tab of filteredTabs) {
+              if (!tabsByProject.has(tab.leadId)) tabsByProject.set(tab.leadId, []);
+              tabsByProject.get(tab.leadId)!.push(tab);
+            }
+            const showProjectHeaders = tabsByProject.size > 1;
 
-            return (
-              <button
-                key={key}
-                onClick={() => switchTab(tab.leadId, tab.name)}
-                className={`group flex items-center gap-1.5 px-3 h-10 text-sm border-b-2 whitespace-nowrap transition-colors shrink-0 ${
-                  isActive
-                    ? 'border-accent text-accent bg-accent/10'
-                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
-                }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span className="max-w-[120px] truncate">{tab.name}</span>
-                {badge > 0 && (
-                  <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center">
-                    {badge}
-                  </span>
-                )}
-                <X
-                  className="w-3 h-3 opacity-0 group-hover:opacity-60 hover:!opacity-100 ml-1 shrink-0"
-                  onClick={(e: React.MouseEvent) => closeTab(tab.leadId, tab.name, e)}
-                />
-              </button>
-            );
-          })
+            return Array.from(tabsByProject.entries()).map(([leadId, tabs]) => {
+              const lead = leads.find((l) => l.id === leadId);
+              const projectLabel = lead?.projectName || leadId.slice(0, 8);
+              return (
+                <div key={leadId} className="flex items-center shrink-0">
+                  {showProjectHeaders && (
+                    <span className="flex items-center gap-1 px-2 h-10 text-[10px] font-mono font-semibold text-purple-300/70 uppercase tracking-wider whitespace-nowrap border-r border-gray-700/40">
+                      <Crown className="w-3 h-3 text-purple-400/60" />
+                      {projectLabel}
+                    </span>
+                  )}
+                  {tabs.map((tab) => {
+                    const key = groupKey(tab.leadId, tab.name);
+                    const isActive =
+                      selectedGroup?.leadId === tab.leadId &&
+                      selectedGroup?.name === tab.name;
+                    const badge = unread[key] ?? 0;
+
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => switchTab(tab.leadId, tab.name)}
+                        className={`group flex items-center gap-1.5 px-3 h-10 text-sm border-b-2 whitespace-nowrap transition-colors shrink-0 ${
+                          isActive
+                            ? 'border-accent text-accent bg-accent/10'
+                            : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                        }`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span className="max-w-[120px] truncate">{tab.name}</span>
+                        {badge > 0 && (
+                          <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center">
+                            {badge}
+                          </span>
+                        )}
+                        <X
+                          className="w-3 h-3 opacity-0 group-hover:opacity-60 hover:!opacity-100 ml-1 shrink-0"
+                          onClick={(e: React.MouseEvent) => closeTab(tab.leadId, tab.name, e)}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            });
+          })()
         )}
 
         {/* New group button */}
@@ -407,13 +431,33 @@ export function GroupChat(_props: { api: any; ws: any }) {
               }}
             >
               <option value="" disabled>+ Open group…</option>
-              {filteredGroups
-                .filter((g) => !openTabs.some((t) => t.leadId === g.leadId && t.name === g.name))
-                .map((g) => (
-                  <option key={groupKey(g.leadId, g.name)} value={`${g.leadId}:${g.name}`}>
-                    {g.name}
-                  </option>
-                ))}
+              {(() => {
+                const closed = filteredGroups.filter((g) => !openTabs.some((t) => t.leadId === g.leadId && t.name === g.name));
+                const byProject = new Map<string, typeof closed>();
+                for (const g of closed) {
+                  if (!byProject.has(g.leadId)) byProject.set(g.leadId, []);
+                  byProject.get(g.leadId)!.push(g);
+                }
+                return Array.from(byProject.entries()).map(([leadId, grps]) => {
+                  const lead = leads.find((l) => l.id === leadId);
+                  const projectLabel = lead?.projectName || leadId.slice(0, 8);
+                  return byProject.size > 1 ? (
+                    <optgroup key={leadId} label={projectLabel}>
+                      {grps.map((g) => (
+                        <option key={groupKey(g.leadId, g.name)} value={`${g.leadId}:${g.name}`}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    grps.map((g) => (
+                      <option key={groupKey(g.leadId, g.name)} value={`${g.leadId}:${g.name}`}>
+                        {g.name}
+                      </option>
+                    ))
+                  );
+                });
+              })()}
             </select>
           </div>
         )}
@@ -450,7 +494,9 @@ export function GroupChat(_props: { api: any; ws: any }) {
                 if (isSystem(msg)) {
                   return (
                     <div key={msg.id} className="flex justify-center">
-                      <span className="text-xs text-gray-500 italic">{msg.content}</span>
+                      <span className="text-xs text-gray-500 italic">
+                        <MentionText text={msg.content} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                      </span>
                     </div>
                   );
                 }
@@ -474,7 +520,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                         </div>
                         <div className={`rounded-lg px-3 py-2 text-sm ${human ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
                           <div className="whitespace-pre-wrap break-words prose-sm">
-                            <MarkdownContent text={msg.content} />
+                            <MentionText text={msg.content} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </div>
                         </div>
                         <div className={`text-xs text-gray-500 mt-0.5 ${human ? 'text-right' : ''}`}>

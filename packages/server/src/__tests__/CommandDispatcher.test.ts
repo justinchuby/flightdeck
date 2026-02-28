@@ -106,6 +106,12 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       addTask: vi.fn(),
       cancelTask: vi.fn(),
     } as any,
+    deferredIssueRegistry: {
+      add: vi.fn().mockReturnValue({ id: 'issue-1' }),
+      list: vi.fn().mockReturnValue([]),
+      resolve: vi.fn().mockReturnValue(true),
+      dismiss: vi.fn().mockReturnValue(true),
+    } as any,
     maxConcurrent: 10,
     markHumanInterrupt: vi.fn(),
     ...overrides,
@@ -192,6 +198,7 @@ describe('CommandDispatcher', () => {
         'best fit',
         false,
         leadAgent.id, // leadId fallback to self when no parentId
+        undefined, // projectId
       );
     });
   });
@@ -387,6 +394,22 @@ describe('CommandDispatcher', () => {
       expect(dispatcher.getDelegationsMap().size).toBe(0);
       expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('Only the Project Lead'),
+      );
+    });
+
+    it('warns about similar active delegations', () => {
+      const child1 = makeChildAgent(leadAgent.id, { id: 'agent-child-001' });
+      const child2 = makeChildAgent(leadAgent.id, { id: 'agent-child-002' });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, child1, child2]);
+
+      // First delegation
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child1.id}", "task": "fix the cascade termination bug in AgentManager"} ]]]`);
+      // Second delegation with similar task
+      dispatch(dispatcher, leadAgent, `[[[ DELEGATE {"to": "${child2.id}", "task": "fix the cascade termination issue in AgentManager"} ]]]`);
+
+      // Second delegation should include a duplicate warning
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Similar task already delegated'),
       );
     });
   });
@@ -964,6 +987,82 @@ describe('CommandDispatcher', () => {
         expect.stringContaining('must be a member'),
       );
       expect(ctx.chatGroupRegistry.addMembers).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Auto-DAG-update on completion ──────────────────────────────────
+
+  describe('auto-DAG-update on agent completion', () => {
+    it('auto-completes DAG task when agent exits with code 0', () => {
+      const child = makeChildAgent(leadAgent.id, {
+        getRecentOutput: vi.fn().mockReturnValue('done'),
+      });
+      (ctx.getAgent as any).mockImplementation((id: string) =>
+        id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
+      );
+      const dagTask = { id: 'task-1', leadId: leadAgent.id, dagStatus: 'running' };
+      (ctx.taskDAG.getTaskByAgent as any).mockReturnValue(dagTask);
+      const readyTask = { id: 'task-2' };
+      (ctx.taskDAG.completeTask as any).mockReturnValue([readyTask]);
+
+      dispatcher.notifyParentOfCompletion(child, 0);
+
+      expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('task-1'),
+      );
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('task-2'),
+      );
+    });
+
+    it('auto-fails DAG task when agent exits with non-zero code', () => {
+      const child = makeChildAgent(leadAgent.id, {
+        getRecentOutput: vi.fn().mockReturnValue('error'),
+      });
+      (ctx.getAgent as any).mockImplementation((id: string) =>
+        id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
+      );
+      const dagTask = { id: 'task-1', leadId: leadAgent.id, dagStatus: 'running' };
+      (ctx.taskDAG.getTaskByAgent as any).mockReturnValue(dagTask);
+
+      dispatcher.notifyParentOfCompletion(child, 1);
+
+      expect(ctx.taskDAG.failTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('FAILED'),
+      );
+    });
+
+    it('skips DAG update when no matching DAG task exists', () => {
+      const child = makeChildAgent(leadAgent.id, {
+        getRecentOutput: vi.fn().mockReturnValue('done'),
+      });
+      (ctx.getAgent as any).mockImplementation((id: string) =>
+        id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
+      );
+      (ctx.taskDAG.getTaskByAgent as any).mockReturnValue(null);
+
+      dispatcher.notifyParentOfCompletion(child, 0);
+
+      expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
+      expect(ctx.taskDAG.failTask).not.toHaveBeenCalled();
+    });
+
+    it('auto-completes DAG task via idle notification', () => {
+      const child = makeChildAgent(leadAgent.id, {
+        getRecentOutput: vi.fn().mockReturnValue('done'),
+      });
+      (ctx.getAgent as any).mockImplementation((id: string) =>
+        id === leadAgent.id ? leadAgent : id === child.id ? child : undefined,
+      );
+      const dagTask = { id: 'task-1', leadId: leadAgent.id, dagStatus: 'running' };
+      (ctx.taskDAG.getTaskByAgent as any).mockReturnValue(dagTask);
+      (ctx.taskDAG.completeTask as any).mockReturnValue([]);
+
+      dispatcher.notifyParentOfIdle(child);
+
+      expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
     });
   });
 });

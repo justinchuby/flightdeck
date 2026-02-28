@@ -21,6 +21,7 @@ export type ActionType =
   | 'delegation_cancelled'
   | 'heartbeat_halted'
   | 'limit_change_requested'
+  | 'deferred_issue'
   | 'error';
 
 export interface ActivityEntry {

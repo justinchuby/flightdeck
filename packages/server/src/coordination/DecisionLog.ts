@@ -10,6 +10,7 @@ export interface Decision {
   agentId: string;
   agentRole: string;
   leadId: string | null;
+  projectId: string | null;
   title: string;
   rationale: string;
   needsConfirmation: boolean;
@@ -25,6 +26,7 @@ function rowToDecision(row: typeof decisions.$inferSelect): Decision {
     agentId: row.agentId,
     agentRole: row.agentRole,
     leadId: row.leadId,
+    projectId: row.projectId,
     title: row.title,
     rationale: row.rationale ?? '',
     needsConfirmation: row.needsConfirmation === 1,
@@ -47,7 +49,7 @@ export class DecisionLog extends EventEmitter {
     this.db = db;
   }
 
-  add(agentId: string, agentRole: string, title: string, rationale: string, needsConfirmation = false, leadId?: string): Decision {
+  add(agentId: string, agentRole: string, title: string, rationale: string, needsConfirmation = false, leadId?: string, projectId?: string): Decision {
     const id = `dec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const timestamp = new Date().toISOString();
 
@@ -56,6 +58,7 @@ export class DecisionLog extends EventEmitter {
       agentId,
       agentRole,
       leadId: leadId || null,
+      projectId: projectId || null,
       title,
       rationale,
       needsConfirmation: needsConfirmation ? 1 : 0,
@@ -63,7 +66,7 @@ export class DecisionLog extends EventEmitter {
       createdAt: timestamp,
     }).run();
 
-    const decision: Decision = { id, agentId, agentRole, leadId: leadId || null, title, rationale, needsConfirmation, status: 'recorded', autoApproved: false, confirmedAt: null, timestamp };
+    const decision: Decision = { id, agentId, agentRole, leadId: leadId || null, projectId: projectId || null, title, rationale, needsConfirmation, status: 'recorded', autoApproved: false, confirmedAt: null, timestamp };
     this.emit('decision', decision);
 
     // Schedule auto-approve after 60s unless it's a system-level decision

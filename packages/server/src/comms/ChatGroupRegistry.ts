@@ -6,6 +6,7 @@ import { chatGroups, chatGroupMembers, chatGroupMessages } from '../db/schema.js
 export interface ChatGroup {
   name: string;
   leadId: string;
+  projectId?: string;
   memberIds: string[];
   createdAt: string;
 }
@@ -28,13 +29,13 @@ export class ChatGroupRegistry extends EventEmitter {
     this.db = db;
   }
 
-  create(leadId: string, name: string, memberIds: string[]): ChatGroup {
+  create(leadId: string, name: string, memberIds: string[], projectId?: string): ChatGroup {
     // Ensure lead is always a member
     const allMembers = new Set([leadId, ...memberIds]);
 
     this.db.drizzle
       .insert(chatGroups)
-      .values({ name, leadId })
+      .values({ name, leadId, projectId: projectId || null })
       .onConflictDoNothing()
       .run();
 
@@ -49,6 +50,7 @@ export class ChatGroupRegistry extends EventEmitter {
     const group: ChatGroup = {
       name,
       leadId,
+      projectId: projectId || undefined,
       memberIds: Array.from(allMembers),
       createdAt: new Date().toISOString(),
     };
@@ -140,6 +142,7 @@ export class ChatGroupRegistry extends EventEmitter {
     return rows.map((row) => ({
       name: row.name,
       leadId: row.leadId,
+      projectId: row.projectId || undefined,
       memberIds: this.getMembers(row.name, row.leadId),
       createdAt: row.createdAt!,
     }));
@@ -150,6 +153,7 @@ export class ChatGroupRegistry extends EventEmitter {
       .select({
         name: chatGroups.name,
         leadId: chatGroups.leadId,
+        projectId: chatGroups.projectId,
         createdAt: chatGroups.createdAt,
       })
       .from(chatGroups)
@@ -163,6 +167,7 @@ export class ChatGroupRegistry extends EventEmitter {
     return rows.map((row) => ({
       name: row.name,
       leadId: row.leadId,
+      projectId: row.projectId || undefined,
       memberIds: this.getMembers(row.name, row.leadId),
       createdAt: row.createdAt!,
     }));

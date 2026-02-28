@@ -488,16 +488,38 @@ export function OverviewPage({ api, ws }: Props) {
               Confirmation
             </h2>
           </div>
-          <div className="space-y-2">
-            {pendingDecisions.map((d) => (
-              <PendingDecisionCard
-                key={d.id}
-                decision={d}
-                onApprove={handleApprove}
-                onDeny={handleDeny}
-                onRespond={handleRespond}
-              />
-            ))}
+          <div className="space-y-3">
+            {(() => {
+              const grouped = new Map<string, Decision[]>();
+              for (const d of pendingDecisions) {
+                const proj = d.projectId
+                  ? (agentProjectMap.get(d.projectId) ?? d.projectId.slice(0, 8))
+                  : (agentProjectMap.get(d.agentId) ?? 'Unknown Project');
+                if (!grouped.has(proj)) grouped.set(proj, []);
+                grouped.get(proj)!.push(d);
+              }
+              return Array.from(grouped.entries()).map(([proj, decs]) => (
+                <div key={proj}>
+                  {grouped.size > 1 && (
+                    <div className="text-[11px] font-mono font-semibold text-yellow-300/80 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                      {proj}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {decs.map((d) => (
+                      <PendingDecisionCard
+                        key={d.id}
+                        decision={d}
+                        onApprove={handleApprove}
+                        onDeny={handleDeny}
+                        onRespond={handleRespond}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
         </div>
       )}
@@ -522,7 +544,7 @@ export function OverviewPage({ api, ws }: Props) {
         )}
       </div>
 
-      {/* C. All Decisions Timeline */}
+      {/* C. All Decisions Timeline — grouped by project */}
       <div>
         <h2 className="text-sm font-bold text-gray-300 mb-2 uppercase tracking-wide">
           Decisions Timeline
@@ -532,20 +554,43 @@ export function OverviewPage({ api, ws }: Props) {
             <p className="text-sm text-gray-500 font-mono">No decisions recorded yet.</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {timelineDecisions.map((d) => (
-              <DecisionTimelineItem
-                key={d.id}
-                decision={d}
-                projectName={agentProjectMap.get(d.agentId)}
-                onApprove={handleApprove}
-                onDeny={handleDeny}
-                onRespond={handleRespond}
-                onClickDetail={setSelectedDecision}
-                onFeedback={(id) => { setFeedbackDecisionId(id); setFeedbackText(''); }}
-              />
-            ))}
-          </div>
+          (() => {
+            const grouped = new Map<string, Decision[]>();
+            for (const d of timelineDecisions) {
+              const proj = d.projectId
+                ? (agentProjectMap.get(d.projectId) ?? d.projectId.slice(0, 8))
+                : (agentProjectMap.get(d.agentId) ?? 'Unknown Project');
+              if (!grouped.has(proj)) grouped.set(proj, []);
+              grouped.get(proj)!.push(d);
+            }
+            return (
+              <div className="space-y-4">
+                {Array.from(grouped.entries()).map(([proj, decs]) => (
+                  <div key={proj}>
+                    <div className="text-xs font-mono font-semibold text-purple-300/80 uppercase tracking-wider mb-2 flex items-center gap-2 px-1">
+                      <span className="w-2 h-2 rounded-full bg-purple-400" />
+                      {proj}
+                      <span className="text-gray-500 font-normal">({decs.length})</span>
+                    </div>
+                    <div className="space-y-2">
+                      {decs.map((d) => (
+                        <DecisionTimelineItem
+                          key={d.id}
+                          decision={d}
+                          projectName={agentProjectMap.get(d.agentId)}
+                          onApprove={handleApprove}
+                          onDeny={handleDeny}
+                          onRespond={handleRespond}
+                          onClickDetail={setSelectedDecision}
+                          onFeedback={(id) => { setFeedbackDecisionId(id); setFeedbackText(''); }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()
         )}
       </div>
 

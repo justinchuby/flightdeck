@@ -23,7 +23,45 @@ export function AgentIdBadge({ id, className = '' }: { id: string; className?: s
   );
 }
 
-/** Render inline markdown: **bold**, *italic*, `code` */
+/** Render text with @mentions as clickable agent badges */
+export function MentionText({ text, agents, onClickAgent }: {
+  text: string;
+  agents: Array<{ id: string; role: { name: string } }>;
+  onClickAgent?: (agentId: string) => void;
+}) {
+  const MENTION_RE = /@([a-f0-9]{4,8})\b/g;
+  const parts: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = MENTION_RE.exec(text)) !== null) {
+    const shortId = match[1];
+    const agent = agents.find((a) => a.id.startsWith(shortId));
+    if (agent) {
+      if (match.index > lastIdx) {
+        parts.push(<span key={`t-${lastIdx}`}>{text.slice(lastIdx, match.index)}</span>);
+      }
+      parts.push(
+        <span
+          key={`m-${match.index}`}
+          className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
+          style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
+          title={`${agent.role.name} (${agent.id.slice(0, 8)})`}
+          onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
+        >
+          @{agent.role.name.toLowerCase()}-{shortId.slice(0, 6)}
+        </span>,
+      );
+      lastIdx = match.index + match[0].length;
+    }
+  }
+
+  if (lastIdx === 0) return <>{text}</>;
+  if (lastIdx < text.length) {
+    parts.push(<span key={`t-${lastIdx}`}>{text.slice(lastIdx)}</span>);
+  }
+  return <>{parts}</>;
+}
 export function InlineMarkdown({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
   return (

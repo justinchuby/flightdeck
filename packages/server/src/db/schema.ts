@@ -77,6 +77,7 @@ export const decisions = sqliteTable('decisions', {
   agentId: text('agent_id').notNull(),
   agentRole: text('agent_role').notNull(),
   leadId: text('lead_id'),
+  projectId: text('project_id'),
   title: text('title').notNull(),
   rationale: text('rationale').default(''),
   needsConfirmation: integer('needs_confirmation').default(0),
@@ -88,6 +89,7 @@ export const decisions = sqliteTable('decisions', {
   index('idx_decisions_status').on(table.status),
   index('idx_decisions_needs_confirmation').on(table.needsConfirmation),
   index('idx_decisions_lead_id').on(table.leadId),
+  index('idx_decisions_project_id').on(table.projectId),
 ]);
 
 // ── Agent Memory ─────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ export const agentMemory = sqliteTable('agent_memory', {
 export const chatGroups = sqliteTable('chat_groups', {
   name: text('name').notNull(),
   leadId: text('lead_id').notNull(),
+  projectId: text('project_id'),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
 }, (table) => [
   primaryKey({ columns: [table.name, table.leadId] }),
@@ -155,6 +158,24 @@ export const dagTasks = sqliteTable('dag_tasks', {
   primaryKey({ columns: [table.id, table.leadId] }),
   index('idx_dag_tasks_lead').on(table.leadId),
   index('idx_dag_tasks_status').on(table.dagStatus),
+]);
+
+// ── Deferred Issues ──────────────────────────────────────────────
+
+export const deferredIssues = sqliteTable('deferred_issues', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  leadId: text('lead_id').notNull(),
+  reviewerAgentId: text('reviewer_agent_id').notNull(),
+  reviewerRole: text('reviewer_role').notNull(),
+  severity: text('severity').notNull().default('P1'),
+  description: text('description').notNull(),
+  sourceFile: text('source_file').default(''),
+  status: text('status').notNull().default('open'),       // open | resolved | dismissed
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  resolvedAt: text('resolved_at'),
+}, (table) => [
+  index('idx_deferred_issues_lead').on(table.leadId),
+  index('idx_deferred_issues_status').on(table.status),
 ]);
 
 // ── Agent Plans ──────────────────────────────────────────────────────
