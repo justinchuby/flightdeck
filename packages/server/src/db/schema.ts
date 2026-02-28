@@ -215,3 +215,47 @@ export const projectSessions = sqliteTable('project_sessions', {
   index('idx_project_sessions_project').on(table.projectId),
   index('idx_project_sessions_lead').on(table.leadId),
 ]);
+
+// ── Agent File History (capability tracking) ──────────────────────────
+
+export const agentFileHistory = sqliteTable('agent_file_history', {
+  agentId: text('agent_id').notNull(),
+  agentRole: text('agent_role').notNull(),
+  leadId: text('lead_id').notNull(),
+  filePath: text('file_path').notNull(),
+  firstTouchedAt: text('first_touched_at').default(sql`(datetime('now'))`),
+  lastTouchedAt: text('last_touched_at').default(sql`(datetime('now'))`),
+  touchCount: integer('touch_count').default(1),
+}, (table) => [
+  primaryKey({ columns: [table.agentId, table.leadId, table.filePath] }),
+  index('idx_file_history_file').on(table.filePath, table.leadId),
+  index('idx_file_history_agent').on(table.agentId, table.leadId),
+]);
+
+// ── Collective Memory (cross-session knowledge persistence) ─────────
+
+export const collectiveMemory = sqliteTable('collective_memory', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  category: text('category').notNull(),  // pattern | decision | expertise | gotcha
+  key: text('key').notNull(),
+  value: text('value').notNull(),
+  source: text('source').notNull(),      // agentId who discovered it
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  lastUsedAt: text('last_used_at').default(sql`(datetime('now'))`),
+  useCount: integer('use_count').default(0),
+}, (table) => [
+  index('idx_collective_memory_category').on(table.category),
+  index('idx_collective_memory_key').on(table.key),
+  uniqueIndex('idx_collective_memory_cat_key').on(table.category, table.key),
+]);
+
+// ── Session Retrospectives ──────────────────────────────────────────
+
+export const sessionRetros = sqliteTable('session_retros', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  leadId: text('lead_id').notNull(),
+  data: text('data').notNull(),        // JSON blob with full retro
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+}, (table) => [
+  index('idx_session_retros_lead').on(table.leadId),
+]);

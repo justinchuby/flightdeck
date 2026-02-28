@@ -75,6 +75,7 @@ const eventPipeline = new EventPipeline();
 eventPipeline.register(taskCompletedHandler);
 eventPipeline.register(commitQualityGateHandler);
 eventPipeline.register(delegationTracker);
+
 eventPipeline.connectToLedger(activityLedger);
 
 const roleRegistry = new RoleRegistry(db);
@@ -95,6 +96,20 @@ const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activi
 agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
+
+// CI runner — auto-builds and tests after commits, reports results to agents
+import { CIRunner } from './coordination/CIRunner.js';
+const ciRunner = new CIRunner({
+  cwd: process.cwd(),
+  getAgent: (id) => agentManager.get(id),
+  getAllAgents: () => agentManager.getAll(),
+  activityLedger,
+  taskDAG,
+});
+eventPipeline.register(ciRunner.createHandler());
+ciRunner.on('ci:complete', (result: { success: boolean }) => {
+  wsServer.broadcastEvent({ type: 'ci:complete', success: result.success });
+});
 
 // Proactive alert engine — watches for stuck agents, context pressure, stale decisions
 import { AlertEngine } from './coordination/AlertEngine.js';
@@ -152,8 +167,18 @@ app.get('/health', (_req, res) => {
 // Auth middleware for API routes
 app.use('/api', authMiddleware);
 
+// Session retrospective data collection
+import { SessionRetro } from './coordination/SessionRetro.js';
+const sessionRetro = new SessionRetro(db, agentManager, activityLedger, decisionLog, taskDAG, lockRegistry);
+
+// Session exporter
+import { SessionExporter } from './coordination/SessionExporter.js';
+const sessionExporter = new SessionExporter(agentManager, activityLedger, decisionLog, taskDAG, chatGroupRegistry);
+agentManager.setSessionExporter(sessionExporter);
+agentManager.setSessionExporter(sessionExporter);
+
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter));
 
 // Serve built web frontend in production
 import path from 'path';

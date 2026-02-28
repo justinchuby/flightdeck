@@ -25,6 +25,7 @@ import { getCoordCommands } from './commands/CoordCommands.js';
 import { getDeferredCommands } from './commands/DeferredCommands.js';
 import { getSystemCommands } from './commands/SystemCommands.js';
 import { getTimerCommands } from './commands/TimerCommands.js';
+import { getExportCommands } from './commands/ExportCommands.js';
 
 // Re-export types for backward compatibility (AgentManager, HeartbeatMonitor import from here)
 export type { Delegation, CommandContext } from './commands/types.js';
@@ -63,6 +64,7 @@ export class CommandDispatcher {
       ...getDeferredCommands(this.handlerCtx),
       ...getSystemCommands(this.handlerCtx),
       ...getTimerCommands(this.handlerCtx),
+      ...getExportCommands(this.handlerCtx),
     ];
   }
 
@@ -170,6 +172,11 @@ export class CommandDispatcher {
     const action = this.handlerCtx.pendingSystemActions.get(decisionId);
     if (action) this.handlerCtx.pendingSystemActions.delete(decisionId);
     return action;
+  }
+
+  /** Late-bind sessionExporter (created after AgentManager due to circular dep) */
+  setSessionExporter(exporter: import('../coordination/SessionExporter.js').SessionExporter): void {
+    this.handlerCtx.sessionExporter = exporter;
   }
 
   // ── Static helpers ─────────────────────────────────────────────────

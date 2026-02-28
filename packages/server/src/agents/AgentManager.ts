@@ -13,6 +13,7 @@ import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../coordination/TimerRegistry.js';
+import type { SessionExporter } from '../coordination/SessionExporter.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -75,6 +76,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private taskDAG: TaskDAG;
   private deferredIssueRegistry: DeferredIssueRegistry;
   private timerRegistry: TimerRegistry;
+  private sessionExporter?: SessionExporter;
+
   private db?: Database;
   private conversationStore?: ConversationStore;
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
@@ -121,6 +124,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.autoRestart = autoRestart;
     this.autoTerminateTimeoutMs = null;
 
+    const self = this;
     this.dispatcher = new CommandDispatcher({
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),
@@ -139,6 +143,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       taskDAG: this.taskDAG,
       deferredIssueRegistry: this.deferredIssueRegistry,
       timerRegistry: this.timerRegistry,
+      get sessionExporter() { return self.sessionExporter; },
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
     });
@@ -188,6 +193,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setProjectRegistry(registry: import('../projects/ProjectRegistry.js').ProjectRegistry): void {
     this.projectRegistry = registry;
+  }
+
+  setSessionExporter(exporter: import('../coordination/SessionExporter.js').SessionExporter): void {
+    this.dispatcher.setSessionExporter(exporter);
   }
 
   spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string): Agent {

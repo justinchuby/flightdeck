@@ -3,6 +3,7 @@ import type { AgentContextInfo } from '../agents/Agent.js';
 import { isTerminalStatus } from '../agents/Agent.js';
 import type { FileLockRegistry } from './FileLockRegistry.js';
 import type { ActivityLedger } from './ActivityLedger.js';
+import { SynthesisEngine } from './SynthesisEngine.js';
 
 /** Interval for periodic status updates to roles with receivesStatusUpdates (ms) */
 const PERIODIC_UPDATE_INTERVAL_MS = 60_000;
@@ -11,6 +12,7 @@ export class ContextRefresher {
   private agentManager: AgentManager;
   private lockRegistry: FileLockRegistry;
   private activityLedger: ActivityLedger;
+  private synthesisEngine: SynthesisEngine;
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   private periodicHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -22,6 +24,7 @@ export class ContextRefresher {
     this.agentManager = agentManager;
     this.lockRegistry = lockRegistry;
     this.activityLedger = activityLedger;
+    this.synthesisEngine = new SynthesisEngine(activityLedger, agentManager);
 
     // Listen to significant events with debounce
     const debouncedRefresh = () => this.scheduleRefresh();
@@ -184,7 +187,15 @@ export class ContextRefresher {
     if (dag.failed > 0) line2Parts.push(`${dag.failed} failed task${dag.failed !== 1 ? 's' : ''}`);
     const line2 = line2Parts.length > 0 ? `\n${line2Parts.join(' · ')}` : dagTotal > 0 ? '\n0 blocked tasks' : '';
 
-    return `== PROJECT HEALTH ==\n${icon} ${parts.join(' \u00B7 ')}${line2}`;
+    const healthLine = `== PROJECT HEALTH ==\n${icon} ${parts.join(' \u00B7 ')}${line2}`;
+
+    // Append critical events from SynthesisEngine (for leads only)
+    if (!projectWide) {
+      const criticalSection = this.synthesisEngine.formatCriticalSection(agentId);
+      if (criticalSection) return `${healthLine}\n${criticalSection}`;
+    }
+
+    return healthLine;
   }
 
   private scheduleRefresh(): void {

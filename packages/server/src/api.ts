@@ -39,6 +39,9 @@ export function apiRouter(
   decisionLog: DecisionLog,
   projectRegistry?: import('./projects/ProjectRegistry.js').ProjectRegistry,
   alertEngine?: import('./coordination/AlertEngine.js').AlertEngine,
+  capabilityRegistry?: import('./coordination/CapabilityRegistry.js').CapabilityRegistry,
+  sessionRetro?: import('./coordination/SessionRetro.js').SessionRetro,
+  sessionExporter?: import('./coordination/SessionExporter.js').SessionExporter,
 ): Router {
   const router = Router();
 
@@ -1064,6 +1067,60 @@ export function apiRouter(
       return;
     }
     res.json(alertEngine.getAlerts());
+  });
+
+  // --- Capability Registry ---
+  router.get('/coordination/capabilities', (req, res) => {
+    if (!capabilityRegistry) {
+      res.json([]);
+      return;
+    }
+    const leadId = req.query.leadId as string | undefined;
+    if (!leadId) {
+      res.status(400).json({ error: 'leadId query parameter required' });
+      return;
+    }
+    const query = {
+      file: req.query.file as string | undefined,
+      technology: req.query.technology as string | undefined,
+      keyword: req.query.keyword as string | undefined,
+      domain: req.query.domain as string | undefined,
+      availableOnly: req.query.availableOnly === 'true',
+    };
+    res.json(capabilityRegistry.query(leadId, query));
+  });
+
+  // --- Session Retrospectives ---
+  router.get('/coordination/retros/:leadId', (req, res) => {
+    if (!sessionRetro) {
+      res.json([]);
+      return;
+    }
+    res.json(sessionRetro.getRetros(req.params.leadId));
+  });
+
+  router.post('/coordination/retros/:leadId', (req, res) => {
+    if (!sessionRetro) {
+      res.status(503).json({ error: 'Session retro not available' });
+      return;
+    }
+    const data = sessionRetro.generateRetro(req.params.leadId);
+    res.json(data);
+  });
+
+  // --- Session Export ---
+  router.get('/export/:leadId', (req, res) => {
+    if (!sessionExporter) {
+      res.status(503).json({ error: 'Session exporter not available' });
+      return;
+    }
+    try {
+      const outputDir = join(process.cwd(), '.ai-crew', 'exports');
+      const result = sessionExporter.export(req.params.leadId, outputDir);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return router;

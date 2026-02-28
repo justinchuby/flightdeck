@@ -35,6 +35,7 @@ function createMocks() {
   });
   const activityLedger = {
     getRecent: vi.fn().mockReturnValue([]),
+    getSince: vi.fn().mockReturnValue([]),
   };
   return { agentManager, lockRegistry, activityLedger };
 }
