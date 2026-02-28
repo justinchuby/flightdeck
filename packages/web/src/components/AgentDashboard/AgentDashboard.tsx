@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { SpawnDialog } from './SpawnDialog';
 import { FleetStats } from '../FleetOverview/FleetStats';
@@ -6,7 +6,7 @@ import { AgentActivityTable } from '../FleetOverview/AgentActivityTable';
 import { ActivityFeed } from '../FleetOverview/ActivityFeed';
 import { FileLockPanel } from '../FleetOverview/FileLockPanel';
 import type { FileLock, ActivityEntry } from '../FleetOverview/FleetOverview';
-import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, FolderOpen } from 'lucide-react';
 
 interface CoordinationStatus {
   locks: FileLock[];
@@ -25,6 +25,8 @@ export function AgentDashboard({ api, ws }: Props) {
   const [locks, setLocks] = useState<FileLock[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [bottomOpen, setBottomOpen] = useState(false);
+  const [groupByProject, setGroupByProject] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Keyboard shortcut: 'n' to spawn new agent
   useEffect(() => {
@@ -91,14 +93,53 @@ export function AgentDashboard({ api, ws }: Props) {
     ? locks.filter((l) => l.agentId === selectedAgentFilter)
     : locks;
 
+  // Group agents by project (root lead)
+  const projectGroups = useMemo(() => {
+    if (!groupByProject) return null;
+    const findRootLead = (agentId: string): string | null => {
+      const agent = agents.find((a) => a.id === agentId);
+      if (!agent) return null;
+      if (agent.role.id === 'lead' && !agent.parentId) return agent.id;
+      if (agent.parentId) return findRootLead(agent.parentId);
+      return null;
+    };
+    const groups = new Map<string, typeof filteredAgents>();
+    for (const agent of filteredAgents) {
+      const leadId = findRootLead(agent.id) ?? '_unassigned';
+      const list = groups.get(leadId) ?? [];
+      list.push(agent);
+      groups.set(leadId, list);
+    }
+    return groups;
+  }, [groupByProject, filteredAgents, agents]);
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       {/* Stats bar */}
       <FleetStats agents={agents} locks={locks} />
 
-      {/* Toolbar: filter + spawn */}
+      {/* Toolbar: filter + group + spawn */}
       <div className="flex items-center justify-end">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setGroupByProject((g) => !g)}
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+              groupByProject ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:text-white'
+            }`}
+            title="Group by project"
+          >
+            <FolderOpen size={13} />
+            Group by project
+          </button>
           {agents.length > 0 && (
             <select
               value={selectedAgentFilter ?? ''}
@@ -125,7 +166,33 @@ export function AgentDashboard({ api, ws }: Props) {
       </div>
 
       {/* Agent list */}
-      <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} onSelectAgent={setSelectedAgent} />
+      {groupByProject && projectGroups ? (
+        Array.from(projectGroups.entries()).map(([leadId, groupAgents]) => {
+          const lead = agents.find((a) => a.id === leadId);
+          const label = lead?.projectName || lead?.task?.slice(0, 40) || (leadId === '_unassigned' ? 'Unassigned' : leadId.slice(0, 8));
+          const isCollapsed = collapsedGroups.has(leadId);
+          return (
+            <div key={leadId} className="border border-gray-700 rounded-lg bg-surface-raised">
+              <button
+                onClick={() => toggleGroup(leadId)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-300 hover:bg-surface/50 transition-colors"
+              >
+                {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                <FolderOpen size={13} className="text-yellow-400" />
+                <span className="truncate">{label}</span>
+                <span className="text-[10px] text-gray-500 ml-1">({groupAgents.length})</span>
+              </button>
+              {!isCollapsed && (
+                <div className="px-1 pb-1">
+                  <AgentActivityTable agents={groupAgents} locks={locks} api={api} ws={ws} onSelectAgent={setSelectedAgent} />
+                </div>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} onSelectAgent={setSelectedAgent} />
+      )}
 
       {/* Bottom section: Activity Feed + File Locks (collapsible) */}
       <div className="border border-gray-700 rounded-lg bg-surface-raised">
