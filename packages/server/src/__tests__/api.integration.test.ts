@@ -119,6 +119,8 @@ const mockAgentManager = {
   getChatGroupRegistry: vi.fn().mockReturnValue(mockChatGroupRegistry),
   getDelegations: vi.fn().mockReturnValue([]),
   getTaskDAG: vi.fn().mockReturnValue(mockTaskDAG),
+  markHumanInterrupt: vi.fn(),
+  persistHumanMessage: vi.fn(),
 };
 
 const mockRole = { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '#888', icon: '🤖', model: 'claude-sonnet-4.5' };

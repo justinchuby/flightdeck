@@ -17,6 +17,7 @@ export interface HeartbeatContext {
 export class HeartbeatMonitor {
   private leadIdleSince: Map<string, number> = new Map();
   private leadNudgeCount: Map<string, number> = new Map();
+  private humanInterrupted: Set<string> = new Set();
   private timer: ReturnType<typeof setInterval> | null = null;
   private ctx: HeartbeatContext;
 
@@ -45,12 +46,19 @@ export class HeartbeatMonitor {
   trackActive(agentId: string): void {
     this.leadIdleSince.delete(agentId);
     this.leadNudgeCount.set(agentId, 0);
+    this.humanInterrupted.delete(agentId);
   }
 
   /** Called when a lead agent exits or is killed — clean up all tracking */
   trackRemoved(agentId: string): void {
     this.leadIdleSince.delete(agentId);
     this.leadNudgeCount.delete(agentId);
+    this.humanInterrupted.delete(agentId);
+  }
+
+  /** Called when a human interrupts a lead — suppress nudges until it resumes */
+  trackHumanInterrupt(agentId: string): void {
+    this.humanInterrupted.add(agentId);
   }
 
   /** Periodic heartbeat check: detect stalled teams and nudge the lead */
@@ -60,6 +68,9 @@ export class HeartbeatMonitor {
     for (const lead of leads) {
       const idleSince = this.leadIdleSince.get(lead.id);
       if (!idleSince) continue;
+
+      // Don't nudge if the lead went idle after a human interrupt
+      if (this.humanInterrupted.has(lead.id)) continue;
 
       // Don't nudge if lead went idle less than 60s ago
       const idleDuration = Date.now() - idleSince;

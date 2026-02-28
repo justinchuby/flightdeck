@@ -71,6 +71,7 @@ export function apiRouter(
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     try {
       await agent.interrupt();
+      agentManager.markHumanInterrupt(agent.id);
       res.json({ ok: true });
     } catch (err) {
       logger.debug('api', 'Failed to interrupt agent', { error: (err as Error).message });
@@ -133,6 +134,7 @@ export function apiRouter(
 
     if (mode === 'interrupt') {
       logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+      agentManager.markHumanInterrupt(agent.id);
       await agent.interruptWithMessage(formatted);
       res.json({ ok: true, mode: 'interrupt', status: agent.status });
     } else {
@@ -345,6 +347,7 @@ export function apiRouter(
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount });
     } else {
       logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
+      agentManager.markHumanInterrupt(agent.id);
       await agent.interruptWithMessage(formatted);
       res.json({ ok: true, mode: 'interrupt' });
     }

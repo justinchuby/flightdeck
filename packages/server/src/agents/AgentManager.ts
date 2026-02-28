@@ -618,6 +618,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
+  /** Mark a lead as human-interrupted so the heartbeat won't nudge it */
+  markHumanInterrupt(agentId: string): void {
+    this.heartbeat.trackHumanInterrupt(agentId);
+  }
+
   /** Persist a system message to the agent's conversation history */
   persistSystemMessage(agentId: string, text: string): void {
     const threadId = this.agentThreads.get(agentId);
