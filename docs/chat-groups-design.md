@@ -73,6 +73,7 @@ interface ChatGroup {
   leadId: string;         // lead who created the group
   memberIds: Set<string>; // agent IDs (always includes leadId)
   createdAt: string;      // ISO timestamp
+  archived: boolean;      // true when all members have terminated
 }
 
 interface GroupMessage {
@@ -91,6 +92,7 @@ interface GroupMessage {
 CREATE TABLE IF NOT EXISTS chat_groups (
   name TEXT NOT NULL,
   lead_id TEXT NOT NULL,
+  archived INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (name, lead_id)
 );
@@ -126,9 +128,10 @@ export class ChatGroupRegistry extends EventEmitter {
   create(leadId: string, name: string, memberIds: string[]): ChatGroup
   addMembers(leadId: string, name: string, memberIds: string[]): void
   removeMembers(leadId: string, name: string, memberIds: string[]): void
+  archiveGroup(leadId: string, name: string): void
   sendMessage(group: string, leadId: string, fromId: string, fromRole: string, content: string): GroupMessage
-  getGroups(leadId: string): ChatGroup[]
-  getGroupsForAgent(agentId: string): ChatGroup[]
+  getGroups(leadId: string): ChatGroup[]           // excludes archived
+  getGroupsForAgent(agentId: string): ChatGroup[]  // excludes archived
   getMessages(group: string, leadId: string, limit?: number): GroupMessage[]
   getMembers(group: string, leadId: string): string[]
 
@@ -137,6 +140,7 @@ export class ChatGroupRegistry extends EventEmitter {
   // 'group:message' — { message: GroupMessage, recipientIds: string[] }
   // 'group:member_added' — { group: string, agentId: string }
   // 'group:member_removed' — { group: string, agentId: string }
+  // 'group:archived' — { group: string, leadId: string }
 }
 ```
 
@@ -185,6 +189,39 @@ Send a message to a group:
 | `group:message` | `{ message, groupName, leadId }` | Message sent in a group |
 | `group:member_added` | `{ group, agentId, leadId }` | Member added to group |
 | `group:member_removed` | `{ group, agentId, leadId }` | Member removed from group |
+| `group:archived` | `{ group, leadId }` | Group archived (all members terminated) |
+
+### Auto-Group-Creation for Parallel Delegations
+
+When the lead delegates tasks to multiple agents, the system automatically creates coordination groups:
+
+1. After each delegation, `maybeAutoCreateGroup()` checks all active delegations from the same lead
+2. It extracts the first significant keyword (>3 characters) from each task description
+3. When 3+ active delegations share a keyword, it creates a `{keyword}-team` group
+4. All matching agents + the lead are added to the group
+5. A system message is sent: "Auto-created coordination group for parallel {keyword} work"
+
+The creation is idempotent — if the group already exists, new agents are simply added. This reduces the lead's coordination overhead for parallel work.
+
+### Auto-Archive Lifecycle
+
+Groups are automatically archived when they are no longer active:
+
+1. When an agent is terminated, the system checks all groups the agent belongs to
+2. For each group, if all remaining members (excluding the lead) are in terminal status (completed/failed/terminated), the group is archived
+3. Archived groups are excluded from `QUERY_GROUPS` results
+4. Message history is preserved and remains queryable via the API
+5. The `archived` column is stored as an INTEGER (0/1) in SQLite
+
+### Unread Badges
+
+The frontend tracks unread messages per group:
+
+1. Each group chat tab maintains a `lastSeen` timestamp (persisted to `localStorage`)
+2. Unread count = messages with timestamp > `lastSeen`
+3. A blue badge appears on the Groups sidebar item showing total unread count
+4. Badge shows `99+` for overflow
+5. Visiting a group resets its `lastSeen` to now
 
 ### Frontend: Group Messages Panel
 
@@ -214,13 +251,19 @@ DELETE /api/lead/:id/groups/:name/members/:agentId — remove a member
 
 2. **Lead auto-included** — the lead always sees all group messages for coordination visibility. The lead cannot be removed from a group.
 
-3. **Persistence** — groups and messages are stored in SQLite so they survive server restarts. In-flight agents can re-discover their groups via `LIST_GROUPS`.
+3. **Persistence** — groups and messages are stored in SQLite so they survive server restarts. In-flight agents can re-discover their groups via `QUERY_GROUPS`.
 
 4. **History on join** — when a new member is added, they receive the last 20 messages so they have context. This mirrors how real chat tools work.
 
 5. **No external dependencies** — extends the existing `MessageBus` EventEmitter pattern. At current scale (5-20 agents), in-process messaging is sufficient. If we ever need 100+ agents, consider NATS or Redis pub/sub.
 
 6. **Sub-agents can message groups** — not just the lead. This enables peer coordination (e.g., two developers discussing a shared interface) without lead involvement.
+
+7. **Auto-group-creation** — When 3+ agents are delegated tasks sharing a keyword, a coordination group is auto-created. This reduces lead overhead and ensures agents working on the same feature can communicate directly.
+
+8. **Auto-archive lifecycle** — When all non-lead members of a group reach terminal status, the group is automatically archived. This keeps `QUERY_GROUPS` clean without losing history.
+
+9. **Unread badges** — The frontend tracks per-group `lastSeen` timestamps to show unread counts. This ensures users notice new group messages even when focused on another view.
 
 ### Example Usage
 

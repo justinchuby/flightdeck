@@ -280,3 +280,86 @@ ai-crew/
 - This makes the permission dialog a true gatekeeping mechanism for supervised agents, not just a notification
 
 **Trade-off:** Non-autopilot agents require active user attention. Users who want fire-and-forget should enable autopilot explicitly.
+
+## 19. kill → terminate Rename
+
+**Decision:** Rename all agent termination APIs, events, and UI labels from "kill" to "terminate."
+
+**Rationale:**
+- "Kill" has violent connotations inappropriate for a professional tool
+- "Terminate" is the standard term in process management (SIGTERM, not SIGKILL)
+- Consistent terminology across the entire stack: API routes (`/terminate`), WebSocket events (`agent:terminated`), UI buttons ("Terminate"), activity log entries (`agent_terminated`)
+
+**Scope:** 58 changes across 16 files — methods, events, route handlers, UI labels, tests.
+
+## 20. PROGRESS/DAG Consolidation
+
+**Decision:** When a task DAG exists, the `PROGRESS` command automatically reads DAG state and merges it into the progress report.
+
+**Rationale:**
+- Before: leads had to issue `PROGRESS` and `QUERY_TASKS` separately to get a complete picture
+- After: a single `PROGRESS {"summary": "..."}` auto-attaches DAG status (completed, in_progress, blocked tasks)
+- Eliminates redundant commands and reduces token usage
+- The secretary agent also receives progress reports for tracking
+
+**Implementation:** `detectProgress()` in `CommandDispatcher.ts` checks for an existing DAG via `taskManager.getDagSnapshot(leadId)` and merges the task lists into the progress object.
+
+## 21. Scoped COMMIT Command
+
+**Decision:** The `COMMIT` command stages only files the agent currently has locked, rather than using `git add -A`.
+
+**Rationale:**
+- In multi-agent workflows, several agents may have uncommitted changes in the same repository
+- `git add -A` would stage everyone's changes into one agent's commit
+- Scoped staging ensures each agent's commit contains only the files they were authorized to modify
+- This is enforced server-side by reading the agent's current file locks from `FileLockRegistry`
+
+**Trade-off:** If an agent edits a file without locking it first, the file won't be staged. This is intentional — it encourages proper lock discipline.
+
+## 22. Auto-Group-Creation for Parallel Delegations
+
+**Decision:** When 3+ active delegations from the same lead share a keyword in their task descriptions, automatically create a `{keyword}-team` coordination group.
+
+**Rationale:**
+- Parallel work on the same feature benefits from a shared communication channel
+- Manually creating groups adds overhead to the lead's workflow
+- Keyword extraction (first word >3 chars from task descriptions) is simple but effective
+- Group creation is idempotent (`onConflictDoNothing`) — adding a new agent to the same feature simply adds them to the existing group
+
+**Trade-off:** Keyword matching is heuristic. Tasks like "implement auth" and "fix auth tests" would correctly group, but "update documentation for auth" might not if "update" is the first significant word. Acceptable because the lead can always create groups manually for edge cases.
+
+## 23. Timeline Visualization
+
+**Decision:** Swim-lane timeline built with [visx](https://airbnb.io/visx/) for agent activity visualization.
+
+**Rationale:**
+- Agents running in parallel need a time-based view — the DAG shows dependencies but not timing
+- Swim lanes (one per agent) show when each agent was active, idle, or communicating
+- Interactive features: brush time selector for zooming, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, role/status/comm-type filtering
+- Idle periods shown with hatch patterns to distinguish "doing nothing" from "not yet started"
+- Communication links drawn between lanes when agents message each other
+
+**Trade-off:** visx adds bundle weight but is much more flexible than chart libraries for custom timeline rendering.
+
+## 24. Decision Comments (Accept/Reject with Reasons)
+
+**Decision:** Users can provide a text reason when accepting or rejecting an agent's decision.
+
+**Rationale:**
+- Simple accept/reject gives the agent no context on *why* it was rejected
+- Reason comments are injected back into the agent's context, enabling it to revise its approach
+- Optimistic UI — buttons hide immediately on click before server responds, eliminating perceived lag
+
+**Implementation:** The reason is stored in the `decisions` table and included in context refresh messages to the affected agent.
+
+## 25. Group Chat Auto-Archive Lifecycle
+
+**Decision:** Groups are automatically archived when all non-lead members reach terminal status.
+
+**Rationale:**
+- As a session progresses, completed groups accumulate and clutter `QUERY_GROUPS` results
+- Auto-archive keeps the active group list clean without losing message history
+- Archived groups can still be queried directly via the API for post-mortem review
+- The `archived` column is a simple boolean flag — no complex state machine needed
+
+**Trade-off:** If a terminated agent is restarted, its groups remain archived. The lead would need to create a new group. This is acceptable because restarted agents often have different context anyway.
