@@ -141,3 +141,22 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
+
+/* ── Mobile responsive improvements ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Make sidebar collapsible on mobile */
+  .mobile-sidebar-hidden { transform: translateX(-100%); transition: transform 0.3s ease; }
+  .mobile-sidebar-visible { transform: translateX(0); }
+
+  /* Stack flex children vertically */
+  .mobile-stack { flex-direction: column !important; }
+
+  /* Reduce padding on mobile */
+  .mobile-compact { padding: 0.5rem !important; }
+}
+
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: 1fr; }
+}
