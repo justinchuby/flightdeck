@@ -2,6 +2,29 @@
 
 All endpoints are prefixed with `/api`. Request and response bodies are JSON. All mutation endpoints are validated with [Zod](https://zod.dev/) schemas.
 
+## Authentication
+
+The server auto-generates an auth token at startup (printed to console). All API requests require the token:
+
+```http
+Authorization: Bearer <token>
+```
+
+Set `AUTH=none` environment variable to disable authentication (not recommended).
+
+The web UI receives the token automatically via injection — no manual configuration needed.
+
+## Rate Limits
+
+Spawn and message endpoints are rate-limited:
+
+| Endpoint | Limit |
+|----------|-------|
+| `POST /api/agents`, `POST /api/lead/start` | 30 requests/minute |
+| `POST /api/lead/:id/message` | 50 requests/10 seconds |
+
+Rate limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) are included in responses.
+
 ## Agents
 
 ### List Agents
@@ -89,16 +112,19 @@ Content-Type: application/json
   "projectName": "My Project",
   "task": "Build a REST API",
   "model": "claude-opus-4.6",
-  "workingDirectory": "/path/to/project"
+  "workingDirectory": "/path/to/project",
+  "projectId": "existing-project-id"
 }
 ```
 
-### List Projects
+Optionally pass `projectId` to associate with an existing persistent project.
+
+### List Active Leads
 ```http
 GET /api/lead
 ```
 
-### Get Project
+### Get Lead
 ```http
 GET /api/lead/:id
 ```
@@ -108,10 +134,10 @@ GET /api/lead/:id
 POST /api/lead/:id/message
 Content-Type: application/json
 
-{ "message": "Please also add tests", "interrupt": false }
+{ "text": "Please also add tests", "mode": "interrupt" }
 ```
 
-Set `interrupt: true` to interrupt the lead immediately instead of queueing.
+Mode can be `"interrupt"` (default) or `"queue"`.
 
 ### Update Lead Config
 ```http
@@ -136,10 +162,77 @@ GET /api/lead/:id/groups
 GET /api/lead/:id/groups/:name/messages
 ```
 
+### Send Group Message (Human)
+```http
+POST /api/lead/:id/groups/:name/messages
+Content-Type: application/json
+
+{ "content": "What about using GraphQL instead?" }
+```
+
+Automatically adds the human as a group member.
+
 ### Get Delegations
 ```http
 GET /api/lead/:id/delegations
 ```
+
+### Get DAG Tasks
+```http
+GET /api/lead/:id/tasks
+```
+
+## Persistent Projects
+
+### List All Projects
+```http
+GET /api/projects
+```
+
+### Create Project
+```http
+POST /api/projects
+Content-Type: application/json
+
+{ "name": "My Project", "description": "A REST API service" }
+```
+
+### Get Project
+```http
+GET /api/projects/:id
+```
+
+### Update Project
+```http
+PATCH /api/projects/:id
+Content-Type: application/json
+
+{ "name": "Renamed Project" }
+```
+
+### Get Project Briefing
+```http
+GET /api/projects/:id/briefing
+```
+Returns an aggregated briefing of the project's history — tasks, decisions, and agent memories from all prior sessions.
+
+### Resume Project
+```http
+POST /api/projects/:id/resume
+Content-Type: application/json
+
+{ "task": "Continue implementing the API", "model": "claude-opus-4.6" }
+```
+Starts a new lead session with the project briefing injected as context.
+
+## Search
+
+### Global Search
+```http
+GET /api/search?q=authentication&limit=50
+```
+
+Searches across messages, group chat messages, tasks, decisions, and activity log. Query must be 2–200 characters.
 
 ## Roles
 
@@ -202,6 +295,8 @@ Content-Type: application/json
 
 { "filePath": "src/auth.ts", "agentId": "a1b2c3" }
 ```
+
+File paths are validated against directory traversal attacks.
 
 ### Release Lock
 ```http
