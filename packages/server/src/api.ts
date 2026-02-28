@@ -482,12 +482,24 @@ export function apiRouter(
   router.post('/decisions/:id/confirm', (req, res) => {
     const decision = decisionLog.confirm(req.params.id);
     if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    // Notify the lead agent about the approval
+    const leadId = decision.leadId || decision.agentId;
+    const lead = agentManager.get(leadId);
+    if (lead && (lead.status === 'running' || lead.status === 'idle')) {
+      lead.sendMessage(`[Decision Approved] "${decision.title}" by ${decision.agentRole} has been approved by the user.`);
+    }
     res.json(decision);
   });
 
   router.post('/decisions/:id/reject', (req, res) => {
     const decision = decisionLog.reject(req.params.id);
     if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    // Notify the lead agent about the rejection
+    const leadId = decision.leadId || decision.agentId;
+    const lead = agentManager.get(leadId);
+    if (lead && (lead.status === 'running' || lead.status === 'idle')) {
+      lead.sendMessage(`[Decision Rejected] "${decision.title}" by ${decision.agentRole} has been REJECTED by the user. Please revise your approach.`);
+    }
     res.json(decision);
   });
 
