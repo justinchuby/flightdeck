@@ -400,10 +400,10 @@ export class CommandDispatcher {
     try {
       const req = JSON.parse(match[1]);
 
-      // Only lead agents can create agents
-      if (agent.role.id !== 'lead') {
-        logger.warn('agent', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CREATE_AGENT — rejected.`);
-        agent.sendMessage(`[System] Only the Project Lead can create agents. Ask the lead if you need help from a specialist.`);
+      // Lead and architect agents can create agents
+      if (agent.role.id !== 'lead' && agent.role.id !== 'architect') {
+        logger.warn('agent', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CREATE_AGENT — only leads and architects can create agents.`);
+        agent.sendMessage(`[System] Only the Project Lead and Architects can create agents. Ask the lead if you need help from a specialist.`);
         return;
       }
 
@@ -656,10 +656,11 @@ export class CommandDispatcher {
       const req = JSON.parse(match[1]);
       if (!req.to || !req.task) return;
 
-      // Only lead agents can delegate
-      if (agent.role.id !== 'lead') {
-        logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — rejected.`);
-        agent.sendMessage(`[System] Only the Project Lead can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
+      // Lead and architect agents can delegate; others get a warning
+      const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect';
+      if (!canDelegate) {
+        logger.warn('delegation', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — only leads and architects can delegate.`);
+        agent.sendMessage(`[System] Only the Project Lead and Architects can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
         return;
       }
 

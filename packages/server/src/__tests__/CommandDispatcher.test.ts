@@ -383,7 +383,7 @@ describe('CommandDispatcher', () => {
       expect((child.sendMessage as any)).toHaveBeenCalledWith('review code');
     });
 
-    it('rejects non-lead agents', () => {
+    it('rejects non-lead/non-architect agents', () => {
       const devAgent = makeAgent({
         id: 'agent-dev-0007-0000-000000000007',
         role: makeRole(),
@@ -393,8 +393,25 @@ describe('CommandDispatcher', () => {
 
       expect(dispatcher.getDelegationsMap().size).toBe(0);
       expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
-        expect.stringContaining('Only the Project Lead'),
+        expect.stringContaining('Only the Project Lead and Architects'),
       );
+    });
+
+    it('allows architect agents to delegate to their children', () => {
+      const architectAgent = makeAgent({
+        id: 'agent-arch-0009-0000-000000000009',
+        role: makeRole({ id: 'architect', name: 'Architect' }),
+      });
+      const child = makeChildAgent(architectAgent.id, {
+        id: 'agent-archkid-0010-000000000010',
+        parentId: architectAgent.id,
+      });
+      (ctx.getAllAgents as any).mockReturnValue([architectAgent, child]);
+
+      dispatch(dispatcher, architectAgent, `[[[ DELEGATE {"to": "${child.id}", "task": "implement API"} ]]]`);
+
+      expect(dispatcher.getDelegationsMap().size).toBe(1);
+      expect((child.sendMessage as any)).toHaveBeenCalledWith('implement API');
     });
 
     it('warns about similar active delegations', () => {
