@@ -177,3 +177,50 @@ The sidebar navigation shows unread indicators for group chats:
 - **Per-group tracking** — `lastSeen` timestamp per group stored in `localStorage`
 - **Auto-reset** — Visiting a group resets its unread count
 - **Overflow** — Shows `99+` when count exceeds 99
+
+## Mission Control
+
+The Mission Control page (`/mission-control`) provides a single-screen project overview — answering "how's the project?" in 3 seconds.
+
+### 6 Panels
+
+| Panel | Content |
+|-------|---------|
+| **HealthSummary** | DAG completion %, active/idle/completed agent counts, task status breakdown |
+| **AgentFleet** | All team agents with status badges (running/idle/creating), context pressure bars, model badges |
+| **TokenEconomics** | Per-agent token breakdown (input/output/total), context pressure bars (80% yellow, 90% red), % of total usage |
+| **AlertsPanel** | Proactive alerts derived from store data: context overflow, stuck agents, pending decisions >3min, failures, idle+ready mismatch, blocked tasks. Zero height when no alerts. Color-coded by severity. |
+| **ActivityFeed** | Merged activity + comms feed, last 30 events, live via WebSocket |
+| **DagMinimap** | Stacked horizontal status bar (done=green, running=blue, pending=gray, failed=red), recent completions, running tasks |
+
+### Data Sources
+
+All panels read from existing Zustand stores — no new API endpoints needed. WebSocket events provide real-time updates.
+
+## Token Economics
+
+The Token Economics panel (also available as a tab in the Lead Dashboard) visualizes context window usage:
+
+- **Per-agent breakdown** — Input tokens, output tokens, total, percentage of overall usage
+- **Context pressure bars** — Visual bars showing context window utilization per agent
+  - **80–90%** — Yellow warning ("consider wrapping up")
+  - **90%+** — Red critical ("nearing limit, may lose context")
+- **Totals** — Formatted as M/k (e.g., "1.2M tokens")
+- **Sorted** by total tokens descending
+
+## Queued Message Visibility
+
+When the user sends a message while an agent is busy:
+
+- Messages are marked `queued: true` and shown in a distinct section at the bottom of the chat
+- **Blue bubbles** with a clock icon and "Queued" label distinguish them from delivered messages
+- Right-aligned to match user-message styling
+- Promoted to normal display when the agent responds (next agent message after queued user messages)
+
+## Agent Chat Reply Highlighting
+
+In the agent chat view (`AcpOutput.tsx`), agent responses to user messages receive subtle visual emphasis:
+
+- When the previous timeline item is a user message, the agent's reply gets `bg-blue-500/[0.06]` background + `border-l-2 border-l-blue-400/30` left border
+- Creates a visual connection between user input and agent response
+- Applied to both rich content (images, code) and text messages

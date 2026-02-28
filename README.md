@@ -11,9 +11,10 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 ### 🎯 Team Orchestration
 - **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
+- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
 - **12 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
 - **Task DAG** — Declarative task scheduling with dependencies; `PROGRESS` auto-reads DAG state when one exists
-- **Human-in-the-Loop** — Message any agent directly; queue messages or interrupt with dedicated buttons
+- **Human-in-the-Loop** — Message any agent directly; queued messages show with blue bubbles and a spinner until delivered
 
 ### 💬 Communication
 - **Direct Messaging** — Agents send structured messages to each other by ID
@@ -23,8 +24,11 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 - **Unread Badges** — Sidebar shows unread message counts for group chats
 
 ### 📈 Visualization & Monitoring
+- **Mission Control** — Single-screen project overview with 6 panels: health summary, agent fleet, token economics, alerts, activity feed, and DAG minimap
 - **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, idle hatch patterns, and hover tooltips showing task details and duration
-- **Real-Time Dashboard** — Live activity feed, team status, user-message highlighting (blue tint) via WebSocket
+- **Token Economics** — Per-agent token breakdown with context pressure bars (80% yellow, 90% red warning thresholds)
+- **Proactive Alerts** — Automatic detection of stuck agents (10min), context pressure (>85%), duplicate file edits, idle agents with ready tasks, and stale decisions (>10min)
+- **Real-Time Dashboard** — Live activity feed, team status, user-message highlighting (blue tint), agent reply highlighting via WebSocket
 - **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed) with filter toggles
 - **Catch-Up Summary** — After 60s of inactivity, a floating banner summarizes what happened while you were away
 - **Project Health Header** — `CREW_UPDATE` messages include a health summary: completion %, agent fleet status, pending decisions, blocked tasks
@@ -84,6 +88,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
                    ProjectRegistry  ChatGroupRegistry
                    CommandDispatcher  TimelineStore
                    DeferredIssueRegistry  EventPipeline
+                   AlertEngine  TimerRegistry
 ```
 
 **Monorepo structure** (`npm workspaces`):
@@ -91,21 +96,23 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | Package | Description |
 |---------|-------------|
 | `packages/server` | Express 5 + WebSocket server, ACP agent management, SQLite/Drizzle ORM |
-| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG |
+| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG, Mission Control |
 
 ### Key Components
 
 | Component | Responsibility |
 |-----------|---------------|
 | **AgentManager** | Spawns agents, routes messages, manages delegations. Cascade termination with visited-set guard. |
-| **CommandDispatcher** | Parses triple-bracket commands from agent output, enforces ownership rules, auto-creates groups for parallel work |
+| **CommandDispatcher** | Thin router (~193 lines) that delegates to 7 command modules. Parses triple-bracket commands from agent output. |
+| **Command Modules** | `AgentCommands`, `CommCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands` — domain-grouped command handlers |
 | **Agent** | Wraps a Copilot CLI process (ACP) with lifecycle management, message buffering, and memory bounds |
-| **RoleRegistry** | Role definitions with system prompts, icons, colors, default models |
+| **RoleRegistry** | Role definitions with system prompts, icons, colors, default models. `receivesStatusUpdates` flag for secretary auto-refresh. |
 | **MessageBus** | Routes inter-agent messages and group chats |
 | **ChatGroupRegistry** | Group lifecycle — create, archive, role-based membership, auto-creation for parallel work |
 | **ActivityLedger** | Batched activity logging (flushes every 250ms or 64 entries) |
 | **DecisionLog** | Decision tracking with accept/reject/reason workflow |
-| **ContextRefresher** | Re-injects crew context after agent compaction events |
+| **AlertEngine** | Proactive detection: stuck agents, context pressure, duplicate edits, idle+ready mismatch, stale decisions |
+| **ContextRefresher** | Re-injects crew context with health header after compaction events. Auto-refreshes secretary roles. |
 | **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
 | **HeartbeatMonitor** | DAG-aware stall detection — nudges idle leads with remaining work |
@@ -118,7 +125,7 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 |------|------|-------|---------------|
 | **Project Lead** | 👑 | Orchestration, delegation, team coordination | Claude Opus 4.6 |
 | **Developer** | 💻 | Code implementation, tests, bug fixes | Claude Opus 4.6 |
-| **Architect** | 🏗️ | System design, technical debt, architecture decisions | GPT-5.3 Codex |
+| **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | GPT-5.3 Codex |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
 | **Critical Reviewer** | 🛡️ | Security, performance, edge cases | Gemini 3 Pro |
 | **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.2 Codex |
@@ -135,12 +142,12 @@ Custom roles can be created via the Settings UI with your own system prompts, co
 
 Agents communicate via structured triple-bracket commands detected in their output stream. Commands are parsed by the `CommandDispatcher` and routed to the appropriate subsystem.
 
-### Team Management (Lead-only)
+### Team Management (Lead + Architect)
 
 | Command | Description |
 |---------|-------------|
 | `CREATE_AGENT {"role": "developer", "task": "..."}` | Spawn a new agent with a specific role. Optionally assign a task and model. |
-| `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Use `QUERY_CREW` to find agent IDs. |
+| `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Leads and architects can delegate. |
 | `TERMINATE_AGENT {"id": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
 
 ### Communication (All agents)
@@ -182,10 +189,11 @@ Agents communicate via structured triple-bracket commands detected in their outp
 
 | View | Description |
 |------|-------------|
-| **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), team/comms/groups/DAG tabs, user-message highlighting (blue tint) |
+| **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), team/comms/groups/DAG/tokens tabs, three-tier message hierarchy, catch-up banner |
+| **Mission Control** | Single-screen project overview: health summary, agent fleet, token economics, proactive alerts, activity feed, DAG minimap |
 | **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls, project grouping |
 | **Tasks** | Per-project task tabs with DAG status, progress badges, project grouping, duplicate detection |
-| **Timeline** | Swim-lane visualization — filter by role/comm-type/status, brush time selector, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, idle hatch patterns |
+| **Timeline** | Swim-lane visualization — filter by role/comm-type/status, brush time selector, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, idle hatch patterns, hover tooltips |
 | **Group Chat** | Tabbed group chat with human participation, unread badges in sidebar, real-time messaging |
 | **Overview** | Progress tracking, decision management, global search |
 | **Settings** | Concurrency limits (1–20 agents), model defaults, custom role editor |

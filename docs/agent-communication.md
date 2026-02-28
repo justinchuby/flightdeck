@@ -92,7 +92,9 @@ Since PTY mode has no structured protocol, agents communicate intent via HTML co
 <!-- RESOLVE_DEFERRED {"id": 42} -->
 ```
 
-**Lead-only commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `TERMINATE_AGENT` (terminate agent and free slot), `DECISION`, `PROGRESS`.
+**Lead and Architect commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `TERMINATE_AGENT` (terminate agent and free slot), `DECISION`, `PROGRESS`.
+
+> **Sub-lead delegation:** Architects can use `CREATE_AGENT` and `DELEGATE` in addition to leads. This enables architects to spin up helper agents for sub-tasks without routing everything through the lead.
 
 **All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`, `GROUP_MESSAGE`, `QUERY_GROUPS`, `COMMIT`, `COMPLETE_TASK`, `DEFER_ISSUE`, `QUERY_DEFERRED`, `RESOLVE_DEFERRED`.
 

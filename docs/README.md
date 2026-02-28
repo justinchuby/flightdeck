@@ -52,18 +52,18 @@ This directory contains design documentation for AI Crew. These docs are the sou
 [[[ UNLOCK_FILE {"filePath": "..."} ]]]
 ```
 
-- **CREATE_AGENT** (lead-only) — Spawns a new agent with a specific role and model. Optionally assigns a task immediately.
-- **DELEGATE** (lead-only) — Assigns a task to an existing agent by ID. Use `QUERY_CREW` or creation ACK to find agent IDs.
-- **TERMINATE_AGENT** (lead-only) — Terminates an agent and frees its slot. Validates agent ancestry. Logs session ID for resume.
+- **CREATE_AGENT** (lead + architect) — Spawns a new agent with a specific role and model. Optionally assigns a task immediately.
+- **DELEGATE** (lead + architect) — Assigns a task to an existing agent by ID. Use `QUERY_CREW` or creation ACK to find agent IDs.
+- **TERMINATE_AGENT** (lead + architect) — Terminates an agent and frees its slot. Validates agent ancestry. Logs session ID for resume.
 - **AGENT_MESSAGE** — Send a direct message to another agent by ID.
 - **BROADCAST** — Send a message to all active agents.
 - **DECISION** — Log an architectural or design decision. Users can accept or reject with a reason comment.
 - **PROGRESS** — Report progress to the user. Auto-reads DAG state when a task DAG exists.
 - **QUERY_CREW** — Get the current roster of agents with IDs, roles, models, and status.
-- **CREATE_GROUP** (lead-only) — Create a named chat group. Specify members by ID, by role (auto-adds matching agents), or both. Lead is auto-included. See [chat-groups-design.md](./chat-groups-design.md).
+- **CREATE_GROUP** (lead + architect) — Create a named chat group. Specify members by ID, by role (auto-adds matching agents), or both. Lead is auto-included. See [chat-groups-design.md](./chat-groups-design.md).
 - **GROUP_MESSAGE** — Send a message to all members of a chat group. Sender must be a member.
-- **ADD_TO_GROUP** (lead-only) — Add agents to an existing group. New members receive recent history.
-- **REMOVE_FROM_GROUP** (lead-only) — Remove agents from a group. The lead cannot be removed.
+- **ADD_TO_GROUP** (lead + architect) — Add agents to an existing group. New members receive recent history.
+- **REMOVE_FROM_GROUP** (lead + architect) — Remove agents from a group. The lead cannot be removed.
 - **QUERY_GROUPS** — List all groups the agent belongs to, with member counts and last message preview.
 - **COMMIT** — Scoped git commit. Stages only files the agent has locked, preventing `git add -A` from leaking other agents' work.
 - **COMPLETE_TASK** — Signal that the agent has finished its assigned task, with a status and summary.
