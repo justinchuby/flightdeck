@@ -1,0 +1,36 @@
+name: AI Agent Report
+description: Issue created by an AI agent
+labels: ["ai"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for issues filed by AI agents. The 'ai' label is automatically applied.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the issue or feature request
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: If this is a bug, how can it be reproduced?
+    validations:
+      required: false
+  - type: textarea
+    id: expected-vs-actual
+    attributes:
+      label: Expected vs Actual Behavior
+      description: What should happen vs what actually happens?
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Context & Evidence
+      description: Any additional context, logs, or evidence
+    validations:
+      required: false
