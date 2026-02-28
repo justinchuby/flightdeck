@@ -3,10 +3,12 @@ import { ParentSize } from '@visx/responsive';
 import { scaleTime } from '@visx/scale';
 import { AxisTop } from '@visx/axis';
 import { Group } from '@visx/group';
+import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
 import { CommunicationLinks } from './CommunicationLinks';
 import { BrushTimeSelector } from './BrushTimeSelector';
 import type {
   TimelineAgent,
+  TimelineSegment,
   TimelineLock,
   TimelineData,
 } from './useTimelineData';
@@ -47,6 +49,30 @@ const ROLE_COLORS: Record<string, string> = {
   designer: '#f778ba', secretary: '#79c0ff', qa: '#79c0ff',
 };
 
+const segmentTooltipStyles: React.CSSProperties = {
+  ...defaultStyles,
+  background: '#1e1e2e',
+  border: '1px solid #3f3f46',
+  color: '#e4e4e7',
+  padding: '8px 10px',
+  fontSize: '11px',
+  fontFamily: 'ui-monospace, monospace',
+  lineHeight: 1.5,
+  borderRadius: '6px',
+};
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return '<1s';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs > 0 ? `${m}m ${rs}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
 function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
@@ -75,10 +101,12 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
   );
 }
 
-function AgentLane({ agent, y, height, timeScale, width, locks }: {
+function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, onSegmentLeave }: {
   agent: TimelineAgent; y: number; height: number;
   timeScale: (d: Date) => number; width: number;
   locks: TimelineLock[];
+  onSegmentHover?: (seg: TimelineSegment, event: React.MouseEvent) => void;
+  onSegmentLeave?: () => void;
 }) {
   const agentLocks = locks.filter(l => l.agentId === agent.id);
 
@@ -94,15 +122,21 @@ function AgentLane({ agent, y, height, timeScale, width, locks }: {
         const x2 = timeScale(endDate);
         const segWidth = Math.max(x2 - x1, 4);
         const colors = STATUS_COLORS[seg.status] ?? STATUS_COLORS.idle;
+        const isIdle = seg.status === 'idle';
         return (
-          <g key={i}>
+          <g key={i}
+            onMouseEnter={(e) => onSegmentHover?.(seg, e)}
+            onMouseLeave={onSegmentLeave}
+          >
             <rect
               x={x1} y={y + 4} width={segWidth} height={height - 8}
-              fill={colors.fill} stroke={colors.border} strokeWidth={1} rx={3}
+              fill={isIdle ? 'url(#idle-hatch)' : colors.fill}
+              stroke={colors.border} strokeWidth={1} rx={3}
+              className="cursor-pointer"
             />
             {/* Task label overlay on running segments */}
             {segWidth > 60 && (seg.taskLabel || seg.status === 'running') && (
-              <foreignObject x={x1 + 4} y={y + 6} width={segWidth - 8} height={height - 16}>
+              <foreignObject x={x1 + 4} y={y + 6} width={segWidth - 8} height={height - 16} style={{ pointerEvents: 'none' }}>
                 <div className="text-[10px] text-zinc-300 truncate leading-tight pt-0.5">
                   {seg.taskLabel ?? seg.status}
                 </div>
@@ -131,7 +165,19 @@ function TimelineLegend() {
     <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-zinc-500 border-t border-zinc-800">
       {Object.entries(STATUS_COLORS).map(([status, colors]) => (
         <span key={status} className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-sm border" style={{ background: colors.fill, borderColor: colors.border }} />
+          {status === 'idle' ? (
+            <svg width="12" height="12" className="rounded-sm">
+              <defs>
+                <pattern id="legend-idle-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <rect width="4" height="4" fill="rgba(72,79,88,0.15)" />
+                  <line x1="0" y1="0" x2="0" y2="4" stroke="rgba(113,120,130,0.25)" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect width="12" height="12" fill="url(#legend-idle-hatch)" stroke={colors.border} strokeWidth="1" rx="2" />
+            </svg>
+          ) : (
+            <span className="inline-block w-3 h-3 rounded-sm border" style={{ background: colors.fill, borderColor: colors.border }} />
+          )}
           {status}
         </span>
       ))}
@@ -162,6 +208,22 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const {
+    tooltipOpen, tooltipData, tooltipLeft, tooltipTop,
+    showTooltip, hideTooltip,
+  } = useTooltip<TimelineSegment>();
+
+  const handleSegmentHover = useCallback((seg: TimelineSegment, event: React.MouseEvent) => {
+    const svgEl = event.currentTarget.closest('svg');
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    showTooltip({
+      tooltipData: seg,
+      tooltipLeft: event.clientX - rect.left,
+      tooltipTop: event.clientY - rect.top - 10,
+    });
+  }, [showTooltip]);
 
   const fullRange = useMemo(() => ({
     start: new Date(data.timeRange.start),
@@ -391,7 +453,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             onClick={() => onLiveModeChange?.(!liveMode)}
             aria-label={liveMode ? 'Disable live mode' : 'Enable live mode'}
           >
-            <span className={`inline-block w-1.5 h-1.5 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse motion-reduce:animate-none' : 'bg-zinc-600'}`} />
             Live
           </button>
           <button
@@ -450,7 +512,14 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           className="flex-1 overflow-auto"
           onScroll={() => syncScroll('timeline')}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label="Team collaboration timeline showing agent activity over time">
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label="Team collaboration timeline showing agent activity over time" style={{ position: 'relative' }}>
+            {/* Idle hatch pattern */}
+            <defs>
+              <pattern id="idle-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="6" height="6" fill="rgba(72,79,88,0.15)" />
+                <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(113,120,130,0.25)" strokeWidth="1.5" />
+              </pattern>
+            </defs>
             {/* Time axis (sticky behavior via SVG position) */}
             <Group top={AXIS_HEIGHT - 4}>
               <AxisTop
@@ -479,6 +548,8 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                   timeScale={timeScale}
                   width={chartWidth}
                   locks={data.locks}
+                  onSegmentHover={handleSegmentHover}
+                  onSegmentLeave={hideTooltip}
                 />
               ))}
 
@@ -491,6 +562,36 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
               />
             </Group>
           </svg>
+
+          {/* Segment tooltip */}
+          {tooltipOpen && tooltipData && (
+            <TooltipWithBounds
+              left={tooltipLeft}
+              top={tooltipTop}
+              style={segmentTooltipStyles}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ background: (STATUS_COLORS[tooltipData.status] ?? STATUS_COLORS.idle).border }}
+                />
+                <span className="font-semibold capitalize">{tooltipData.status}</span>
+              </div>
+              {tooltipData.taskLabel && (
+                <div className="text-zinc-400 mb-1">{tooltipData.taskLabel.length > 80 ? tooltipData.taskLabel.slice(0, 80) + '…' : tooltipData.taskLabel}</div>
+              )}
+              <div className="text-zinc-500 text-[10px]">
+                {new Date(tooltipData.startAt).toLocaleTimeString()}
+                {' → '}
+                {tooltipData.endAt ? new Date(tooltipData.endAt).toLocaleTimeString() : 'now'}
+                {' · '}
+                {formatDuration(
+                  (tooltipData.endAt ? new Date(tooltipData.endAt).getTime() : Date.now()) -
+                  new Date(tooltipData.startAt).getTime()
+                )}
+              </div>
+            </TooltipWithBounds>
+          )}
         </div>
       </div>
 

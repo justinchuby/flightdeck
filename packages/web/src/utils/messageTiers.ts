@@ -24,12 +24,21 @@ const CRITICAL_PATTERNS = [
   /\bdecision (?:needed|pending|required)/i,
   /\bneeds(?:Confirmation| confirmation| your (?:input|decision))/i,
   /\bbreaking change/i,
+  /\btimeout\b/i,
+  /\bOOM\b|\bout of memory\b/i,
+  /\bfatal\b/i,
+  /\b5\d{2}\b.*error/i,
+  /\bSIGTERM\b|\bSIGKILL\b/,
+  /\bENOMEM\b/,
+  /\bheap (?:out|limit|exceeded)/i,
+  /\bsegfault\b|\bsegmentation fault\b/i,
+  /\bstack overflow\b/i,
   /⚠️|🔴|❌/,
 ];
 
 const NOTABLE_PATTERNS = [
-  /\bcompleted?\b/i,
-  /\bdone\b/i,
+  /\btask completed\b|\bwork completed\b|completed successfully/i,
+  /\b\[Done\]/,
   /\bfinished\b/i,
   /\ball \d+ tests pass/i,
   /\bbuild (?:passes|succeeded|✅)/i,

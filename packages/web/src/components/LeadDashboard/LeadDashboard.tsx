@@ -1595,7 +1595,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="space-y-1">
                     {progress.teamAgents.map((ta) => (
                       <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-gray-700/50 text-xs font-mono">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse motion-reduce:animate-none' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
                         <span className="text-gray-200">{ta.role?.name || 'Agent'}</span>
                         <span className="text-gray-500">{ta.id.slice(0, 8)}</span>
                         <span className="ml-auto text-gray-400">{ta.status}</span>
@@ -2397,7 +2397,7 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
                     <span className="font-mono font-semibold text-emerald-400 truncate">{gm.groupName}</span>
                     <span className="text-gray-500">·</span>
                     <span className="font-mono text-cyan-400">{gm.fromRole}</span>
-                    {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse text-[10px]">●</span>}
+                    {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse motion-reduce:animate-none text-[10px]">●</span>}
                     <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                   </div>
                   <div className="text-xs font-mono text-gray-300 mt-0.5">
@@ -2421,7 +2421,7 @@ function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[
                   <span className="font-mono font-semibold text-cyan-400">{c.fromRole}</span>
                   <span className="text-gray-500">→</span>
                   <span className="font-mono font-semibold text-green-400">{c.toRole}</span>
-                  {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse text-[10px]">●</span>}
+                  {tier === 'critical' && <span className="ml-1 text-red-400 animate-pulse motion-reduce:animate-none text-[10px]">●</span>}
                   <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
                 </div>
                 <div className="text-xs font-mono text-gray-300 mt-0.5">
