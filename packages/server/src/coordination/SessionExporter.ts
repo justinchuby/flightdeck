@@ -8,6 +8,10 @@ import type { TaskDAG, DagTask } from '../tasks/TaskDAG.js';
 import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { logger } from '../utils/logger.js';
 
+// Safe min/max for large arrays (avoids stack overflow from spread operator)
+function safeMin(arr: number[]): number { return arr.reduce((a, b) => Math.min(a, b), Infinity); }
+function safeMax(arr: number[]): number { return arr.reduce((a, b) => Math.max(a, b), -Infinity); }
+
 // ── Types ─────────────────────────────────────────────────────────
 
 export interface ExportResult {
@@ -129,14 +133,14 @@ export class SessionExporter {
 
     // 8. metadata.json
     const timestamps = teamEvents.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
-    const startTime = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : new Date().toISOString();
+    const startTime = timestamps.length > 0 ? new Date(safeMin(timestamps)).toISOString() : new Date().toISOString();
 
     const metadata: ExportMetadata = {
       leadId,
       startTime,
       exportTime: new Date().toISOString(),
       durationMs: timestamps.length > 1
-        ? Math.max(...timestamps) - Math.min(...timestamps)
+        ? safeMax(timestamps) - safeMin(timestamps)
         : 0,
       agentCount: teamAgents.length,
       commitCount: commits.length,
@@ -171,9 +175,9 @@ export class SessionExporter {
   ): string {
     const lead = agents.find(a => a.id === leadId);
     const timestamps = events.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
-    const startTime = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : 'N/A';
+    const startTime = timestamps.length > 0 ? new Date(safeMin(timestamps)).toISOString() : 'N/A';
     const duration = timestamps.length > 1
-      ? formatDuration(Math.max(...timestamps) - Math.min(...timestamps))
+      ? formatDuration(safeMax(timestamps) - safeMin(timestamps))
       : 'N/A';
 
     const lines: string[] = [

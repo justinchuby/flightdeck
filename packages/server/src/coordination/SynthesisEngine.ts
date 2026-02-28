@@ -148,6 +148,12 @@ export class SynthesisEngine {
         if (lastEventTime < tenMinAgo) {
           stuckAgents.push(`${agent.id.slice(0, 8)} (${agent.role.name})`);
         }
+        // High context pressure: >85% of context window used
+        const used = (agent as any).contextWindowUsed ?? 0;
+        const total = (agent as any).contextWindowSize ?? 0;
+        if (total > 0 && used / total > 0.85) {
+          highContextAgents.push(`${agent.id.slice(0, 8)} (${agent.role.name}, ${Math.round(used / total * 100)}%)`);
+        }
       }
     }
 
