@@ -90,6 +90,14 @@ agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
 
+// Proactive alert engine — watches for stuck agents, context pressure, stale decisions
+import { AlertEngine } from './coordination/AlertEngine.js';
+const alertEngine = new AlertEngine(agentManager, lockRegistry, decisionLog, activityLedger, taskDAG);
+alertEngine.start();
+alertEngine.on('alert:new', (alert) => {
+  wsServer.broadcastEvent({ type: 'alert:new', alert });
+});
+
 // Register scheduled background tasks
 const scheduler = new Scheduler();
 scheduler.register({
@@ -120,7 +128,7 @@ app.get('/health', (_req, res) => {
 app.use('/api', authMiddleware);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine));
 
 // Serve built web frontend in production
 import path from 'path';

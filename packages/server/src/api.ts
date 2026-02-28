@@ -38,6 +38,7 @@ export function apiRouter(
   activityLedger: ActivityLedger,
   decisionLog: DecisionLog,
   projectRegistry?: import('./projects/ProjectRegistry.js').ProjectRegistry,
+  alertEngine?: import('./coordination/AlertEngine.js').AlertEngine,
 ): Router {
   const router = Router();
 
@@ -1054,6 +1055,15 @@ export function apiRouter(
       activity: Number(activityCount?.count ?? 0),
       dagTasks: Number(dagTaskCount?.count ?? 0),
     });
+  });
+
+  // --- Proactive Alerts ---
+  router.get('/coordination/alerts', (_req, res) => {
+    if (!alertEngine) {
+      res.json([]);
+      return;
+    }
+    res.json(alertEngine.getAlerts());
   });
 
   return router;

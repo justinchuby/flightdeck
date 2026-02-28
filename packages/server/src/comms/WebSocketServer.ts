@@ -286,4 +286,9 @@ export class WebSocketServer {
   private broadcastAll(msg: any): void {
     this.broadcast(msg, () => true);
   }
+
+  /** Public broadcast for external event sources (e.g., AlertEngine) */
+  broadcastEvent(msg: any): void {
+    this.broadcastAll(msg);
+  }
 }
