@@ -1,3 +1,24 @@
+export interface DagTask {
+  id: string;
+  leadId: string;
+  role: string;
+  description: string;
+  files: string[];
+  dependsOn: string[];
+  dagStatus: 'pending' | 'ready' | 'running' | 'done' | 'failed' | 'blocked' | 'paused' | 'skipped';
+  priority: number;
+  model?: string;
+  assignedAgentId?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface DagStatus {
+  tasks: DagTask[];
+  fileLockMap: Record<string, { taskId: string; agentId?: string }>;
+  summary: { pending: number; ready: number; running: number; done: number; failed: number; blocked: number; paused: number; skipped: number };
+}
+
 export interface ChatGroup {
   name: string;
   leadId: string;

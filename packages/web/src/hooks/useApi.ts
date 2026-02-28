@@ -126,6 +126,10 @@ export function useApi() {
     return fetchJSON(`/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages`);
   }, []);
 
+  const fetchDagStatus = useCallback(async (leadId: string) => {
+    return fetchJSON(`/lead/${leadId}/dag`);
+  }, []);
+
   return {
     spawnAgent,
     killAgent,
@@ -141,5 +145,6 @@ export function useApi() {
     resolvePermission,
     fetchGroups,
     fetchGroupMessages,
+    fetchDagStatus,
   };
 }

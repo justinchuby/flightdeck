@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage } from '../types';
+import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
 
 export interface ActivityEvent {
   id: string;
@@ -50,6 +50,7 @@ interface ProjectState {
   comms: AgentComm[];
   groups: ChatGroup[];
   groupMessages: Record<string, GroupMessage[]>;
+  dagStatus: DagStatus | null;
   /** Timestamp of last text received — used to show "working" indicator */
   lastTextAt: number;
   /** When true, the next appended text should start on a new line */
@@ -84,11 +85,12 @@ interface LeadState {
   addAgentReport: (leadId: string, report: AgentReport) => void;
   setGroups: (leadId: string, groups: ChatGroup[]) => void;
   addGroupMessage: (leadId: string, groupName: string, message: GroupMessage) => void;
+  setDagStatus: (leadId: string, status: DagStatus) => void;
   reset: () => void;
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, lastTextAt: 0, pendingNewline: false };
+  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, dagStatus: null, lastTextAt: 0, pendingNewline: false };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -251,6 +253,12 @@ export const useLeadStore = create<LeadState>((set) => ({
           },
         },
       };
+    }),
+
+  setDagStatus: (leadId, status) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      return { projects: { ...s.projects, [leadId]: { ...proj, dagStatus: status } } };
     }),
 
   reset: () => set({ projects: {}, selectedLeadId: null }),

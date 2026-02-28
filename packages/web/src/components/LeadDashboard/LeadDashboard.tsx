@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
-import type { AcpTextChunk, ChatGroup, GroupMessage } from '../../types';
+import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus } from '../../types';
 import { useAppStore } from '../../stores/appStore';
+import { TaskDagPanelContent } from './TaskDagPanel';
 
 interface Props {
   api: any;
@@ -112,6 +113,19 @@ export function LeadDashboard({ api, ws }: Props) {
     fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
     }).catch(() => {});
+  }, [selectedLeadId]);
+
+  // Fetch DAG status for selected lead
+  useEffect(() => {
+    if (!selectedLeadId) return;
+    const fetchDag = () => {
+      fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
+        if (data && data.tasks) useLeadStore.getState().setDagStatus(selectedLeadId, data as DagStatus);
+      }).catch(() => {});
+    };
+    fetchDag();
+    const interval = setInterval(fetchDag, 10000);
+    return () => clearInterval(interval);
   }, [selectedLeadId]);
 
   // Listen for lead-specific WebSocket events
@@ -270,6 +284,13 @@ export function LeadDashboard({ api, ws }: Props) {
         store.addGroupMessage(selectedLeadId!, msg.groupName, msg.message);
       }
 
+      // DAG status updates
+      if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
+        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
+          if (data && data.tasks) store.setDagStatus(selectedLeadId!, data as DagStatus);
+        }).catch(() => {});
+      }
+
       // Context compaction — add system message to relevant lead's chat
       if (msg.type === 'agent:context_compacted' && msg.agentId) {
         const compactedId = msg.agentId;
@@ -396,6 +417,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const agentReports = currentProject?.agentReports ?? [];
   const groups = currentProject?.groups ?? [];
   const groupMessages = currentProject?.groupMessages ?? {};
+  const dagStatus = currentProject?.dagStatus ?? null;
   const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
 
   return (
@@ -961,6 +983,9 @@ export function LeadDashboard({ api, ws }: Props) {
                 </CollapsibleSection>
                 <CollapsibleSection title="Groups" icon={<Users className="w-3.5 h-3.5 text-teal-400" />} badge={groups.length} defaultHeight={200}>
                   <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Task DAG" icon={<Network className="w-3.5 h-3.5 text-cyan-400" />} badge={dagStatus?.tasks.length} defaultHeight={220}>
+                  <TaskDagPanelContent dagStatus={dagStatus} />
                 </CollapsibleSection>
                 <CollapsibleSection title="Activity" icon={<Wrench className="w-3.5 h-3.5 text-gray-400" />} badge={activity.length} defaultHeight={180}>
                   <ActivityFeedContent activity={activity} agents={agents} />
