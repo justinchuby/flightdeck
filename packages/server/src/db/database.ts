@@ -1,25 +1,6 @@
 import BetterSqlite3 from 'better-sqlite3';
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS tasks (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT DEFAULT '',
-  status TEXT DEFAULT 'queued',
-  priority INTEGER DEFAULT 0,
-  assigned_role TEXT,
-  assigned_agent_id TEXT,
-  parent_task_id TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS task_deps (
-  task_id TEXT NOT NULL,
-  depends_on TEXT NOT NULL,
-  PRIMARY KEY (task_id, depends_on)
-);
-
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL,

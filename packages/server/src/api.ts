@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import type { AgentManager } from './agents/AgentManager.js';
-import type { TaskQueue } from './tasks/TaskQueue.js';
 import type { RoleRegistry } from './agents/RoleRegistry.js';
 import type { ServerConfig } from './config.js';
 import { updateConfig, getConfig } from './config.js';
@@ -13,7 +12,6 @@ import { writeAgentFiles } from './agents/agentFiles.js';
 
 export function apiRouter(
   agentManager: AgentManager,
-  taskQueue: TaskQueue,
   roleRegistry: RoleRegistry,
   config: ServerConfig,
   _db: Database,
@@ -120,27 +118,6 @@ export function apiRouter(
     const ok = agentManager.resolvePermission(req.params.id, approved);
     if (!ok) return res.status(404).json({ error: 'Agent not found' });
     res.json({ ok: true });
-  });
-
-  // --- Tasks ---
-  router.get('/tasks', (_req, res) => {
-    res.json(taskQueue.getAll());
-  });
-
-  router.post('/tasks', (req, res) => {
-    const task = taskQueue.enqueue(req.body);
-    res.status(201).json(task);
-  });
-
-  router.patch('/tasks/:id', (req, res) => {
-    const task = taskQueue.update(req.params.id, req.body);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-    res.json(task);
-  });
-
-  router.delete('/tasks/:id', (req, res) => {
-    const ok = taskQueue.remove(req.params.id);
-    res.json({ ok });
   });
 
   // --- Roles ---

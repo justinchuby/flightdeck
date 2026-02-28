@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import type { AgentInfo, Task } from '../../types';
+import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Square, RefreshCw, Terminal, Hand, Check } from 'lucide-react';
 
@@ -17,7 +17,6 @@ function shortModelName(model?: string): string {
 
 interface Props {
   agents: AgentInfo[];
-  tasks: Task[];
   locks: FileLock[];
   api: any;
   ws: any;
@@ -82,7 +81,7 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   return { text: 'Idle' };
 }
 
-export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
+export function AgentActivityTable({ agents, locks, api }: Props) {
   const { setSelectedAgent } = useAppStore();
   const [confirmKillIds, setConfirmKillIds] = useState<Set<string>>(new Set());
 
@@ -113,9 +112,6 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
           {agents.map((agent) => {
             const activity = getCurrentActivity(agent);
             const agentLocks = locks.filter((l) => l.agentId === agent.id);
-            const agentTask = agent.task
-              ? tasks.find((t) => t.id === agent.task)
-              : undefined;
             const planTotal = agent.plan?.length ?? 0;
             const planDone = agent.plan?.filter((p) => p.status === 'completed').length ?? 0;
 
@@ -151,12 +147,11 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
 
                 {/* Task */}
                 <td className="px-3 py-2.5 hidden md:table-cell">
-                  {agentTask ? (
+                  {agent.task ? (
                     <div className="max-w-[180px]">
-                      <div className="text-xs text-gray-300 truncate" title={agentTask.title}>
-                        {agentTask.title}
+                      <div className="text-xs text-gray-300 truncate" title={agent.task}>
+                        {agent.task}
                       </div>
-                      <div className="text-[10px] text-gray-500 capitalize">{agentTask.status}</div>
                     </div>
                   ) : (
                     <span className="text-xs text-gray-500">—</span>

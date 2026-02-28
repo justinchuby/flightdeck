@@ -1,7 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { WebSocketServer as WsServer, WebSocket } from 'ws';
 import type { AgentManager } from '../agents/AgentManager.js';
-import type { TaskQueue } from '../tasks/TaskQueue.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
@@ -21,7 +20,6 @@ export class WebSocketServer {
   constructor(
     server: HttpServer,
     agentManager: AgentManager,
-    taskQueue: TaskQueue,
     lockRegistry: FileLockRegistry,
     activityLedger: ActivityLedger,
     decisionLog: DecisionLog,
@@ -48,7 +46,7 @@ export class WebSocketServer {
       ws.on('message', (raw) => {
         try {
           const msg = JSON.parse(raw.toString());
-          this.handleMessage(client, msg, agentManager, taskQueue);
+          this.handleMessage(client, msg, agentManager);
         } catch {
           ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' }));
         }
@@ -63,7 +61,6 @@ export class WebSocketServer {
         JSON.stringify({
           type: 'init',
           agents: agentManager.getAll().map((a) => a.toJSON()),
-          tasks: taskQueue.getAll(),
           locks: lockRegistry.getAll(),
         }),
       );
@@ -71,7 +68,6 @@ export class WebSocketServer {
 
     // Wire events by domain
     this.wireAgentEvents(agentManager);
-    this.wireTaskEvents(taskQueue);
     this.wireCoordinationEvents(lockRegistry, activityLedger);
     this.wireDecisionEvents(decisionLog);
     this.wireGroupEvents(chatGroupRegistry);
@@ -170,16 +166,6 @@ export class WebSocketServer {
     });
   }
 
-  private wireTaskEvents(taskQueue: TaskQueue): void {
-    taskQueue.on('task:updated', (task: any) => {
-      this.broadcastAll({ type: 'task:updated', task });
-    });
-
-    taskQueue.on('task:removed', (taskId: string) => {
-      this.broadcastAll({ type: 'task:removed', taskId });
-    });
-  }
-
   private wireCoordinationEvents(lockRegistry: FileLockRegistry, activityLedger: ActivityLedger): void {
     lockRegistry.on('lock:acquired', (data: any) => {
       this.broadcastAll({ type: 'lock:acquired', ...data });
@@ -223,7 +209,6 @@ export class WebSocketServer {
     client: ClientConnection,
     msg: any,
     agentManager: AgentManager,
-    _taskQueue: TaskQueue,
   ): void {
     switch (msg.type) {
       case 'subscribe':

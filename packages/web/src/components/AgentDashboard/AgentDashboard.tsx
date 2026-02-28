@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function AgentDashboard({ api, ws }: Props) {
-  const { agents, tasks, loading } = useAppStore();
+  const { agents, loading } = useAppStore();
   const [showSpawn, setShowSpawn] = useState(false);
   const [view, setView] = useState<'cards' | 'table'>('cards');
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export function AgentDashboard({ api, ws }: Props) {
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       {/* Stats bar */}
-      <FleetStats agents={agents} tasks={tasks} locks={locks} />
+      <FleetStats agents={agents} locks={locks} />
 
       {/* Toolbar: view toggle, filter, spawn */}
       <div className="flex items-center justify-between">
@@ -191,7 +191,7 @@ export function AgentDashboard({ api, ws }: Props) {
           </>
         )
       ) : (
-        <AgentActivityTable agents={filteredAgents} tasks={tasks} locks={locks} api={api} ws={ws} />
+        <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} />
       )}
 
       {/* Bottom section: Activity Feed + File Locks (collapsible) */}

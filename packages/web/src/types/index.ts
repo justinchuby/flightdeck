@@ -122,21 +122,6 @@ export interface AgentInfo {
   contextWindowUsed?: number;
 }
 
-export type TaskStatus = 'queued' | 'assigned' | 'in_progress' | 'review' | 'done' | 'failed';
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: number;
-  assignedRole?: string;
-  assignedAgentId?: string;
-  parentTaskId?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ServerConfig {
   port: number;
   host: string;

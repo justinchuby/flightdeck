@@ -1,9 +1,8 @@
 import { create } from 'zustand';
-import type { AgentInfo, Task, Role, ServerConfig } from '../types';
+import type { AgentInfo, Role, ServerConfig } from '../types';
 
 interface AppState {
   agents: AgentInfo[];
-  tasks: Task[];
   roles: Role[];
   config: ServerConfig | null;
   selectedAgentId: string | null;
@@ -15,10 +14,6 @@ interface AppState {
   updateAgent: (id: string, patch: Partial<AgentInfo>) => void;
   removeAgent: (id: string) => void;
 
-  setTasks: (tasks: Task[]) => void;
-  updateTask: (task: Task) => void;
-  removeTask: (id: string) => void;
-
   setRoles: (roles: Role[]) => void;
   setConfig: (config: ServerConfig) => void;
   setSelectedAgent: (id: string | null) => void;
@@ -29,7 +24,6 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   agents: [],
-  tasks: [],
   roles: [],
   config: null,
   selectedAgentId: null,
@@ -51,18 +45,6 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => ({
       agents: s.agents.filter((a) => a.id !== id),
       selectedAgentId: s.selectedAgentId === id ? null : s.selectedAgentId,
-    })),
-
-  setTasks: (tasks) => set({ tasks }),
-  updateTask: (task) =>
-    set((s) => ({
-      tasks: s.tasks.some((t) => t.id === task.id)
-        ? s.tasks.map((t) => (t.id === task.id ? task : t))
-        : [...s.tasks, task],
-    })),
-  removeTask: (id) =>
-    set((s) => ({
-      tasks: s.tasks.filter((t) => t.id !== id),
     })),
 
   clearPermission: (agentId) =>

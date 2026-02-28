@@ -6,7 +6,6 @@ import { WebSocketServer } from './comms/WebSocketServer.js';
 import { MessageBus } from './comms/MessageBus.js';
 import { AgentManager } from './agents/AgentManager.js';
 import { RoleRegistry } from './agents/RoleRegistry.js';
-import { TaskQueue } from './tasks/TaskQueue.js';
 import { Database } from './db/database.js';
 import { apiRouter } from './api.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -50,16 +49,14 @@ const agentMemory = new AgentMemory(db);
 const chatGroupRegistry = new ChatGroupRegistry(db);
 const taskDAG = new TaskDAG(db);
 const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG);
-const taskQueue = new TaskQueue(db, agentManager);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
-const wsServer = new WebSocketServer(httpServer, agentManager, taskQueue, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
+const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
 
 // Health check (no auth required)
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     agents: agentManager.getAll().length,
-    queuedTasks: taskQueue.getPending().length,
   });
 });
 
@@ -67,7 +64,7 @@ app.get('/health', (_req, res) => {
 app.use('/api', authMiddleware);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, taskQueue, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog));
 
 httpServer.listen(config.port, config.host, () => {
   console.log(`🚀 AI Crew server running on http://${config.host}:${config.port}`);

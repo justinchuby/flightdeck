@@ -10,7 +10,7 @@ export function useWebSocket() {
   const shouldReconnectRef = useRef(true);
   // Track agents that had a tool call since their last text — next append needs a newline separator
   const pendingNewlineRef = useRef<Set<string>>(new Set());
-  const { setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask } =
+  const { setConnected, setAgents, addAgent, updateAgent, removeAgent } =
     useAppStore();
 
   const connect = useCallback(() => {
@@ -45,7 +45,6 @@ export function useWebSocket() {
       switch (msg.type) {
         case 'init':
           setAgents(msg.agents);
-          setTasks(msg.tasks);
           useAppStore.getState().setLoading(false);
           break;
         case 'agent:spawned':
@@ -146,18 +145,12 @@ export function useWebSocket() {
             useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
           }
           break;
-        case 'task:updated':
-          updateTask(msg.task);
-          break;
-        case 'task:removed':
-          removeTask(msg.taskId);
-          break;
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;
       }
     };
-  }, [setConnected, setAgents, setTasks, addAgent, updateAgent, removeAgent, updateTask, removeTask]);
+  }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;

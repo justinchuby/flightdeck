@@ -36,7 +36,7 @@ interface Props {
 }
 
 export function FleetOverview({ api, ws }: Props) {
-  const { agents, tasks } = useAppStore();
+  const { agents } = useAppStore();
   const [locks, setLocks] = useState<FileLock[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
@@ -114,9 +114,9 @@ export function FleetOverview({ api, ws }: Props) {
         )}
       </div>
 
-      <FleetStats agents={agents} tasks={tasks} locks={locks} />
+      <FleetStats agents={agents} locks={locks} />
 
-      <AgentActivityTable agents={filteredAgents} tasks={tasks} locks={locks} api={api} ws={ws} />
+      <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ActivityFeed activity={filteredActivity} agents={agents} />

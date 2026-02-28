@@ -56,29 +56,6 @@ export function useApi() {
     return fetchJSON(`/agents/${id}/restart`, { method: 'POST' });
   }, []);
 
-  const createTask = useCallback(
-    async (title: string, description?: string, priority?: number, assignedRole?: string) => {
-      return fetchJSON('/tasks', {
-        method: 'POST',
-        body: JSON.stringify({ title, description, priority, assignedRole }),
-      });
-    },
-    [],
-  );
-
-  const updateTask = useCallback(async (id: string, patch: Record<string, any>) => {
-    return fetchJSON(`/tasks/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(patch),
-    });
-  }, []);
-
-  const deleteTask = useCallback(async (id: string) => {
-    // Optimistic removal from store
-    useAppStore.getState().removeTask(id);
-    return fetchJSON(`/tasks/${id}`, { method: 'DELETE' });
-  }, []);
-
   const updateConfig = useCallback(
     async (patch: Partial<ServerConfig>) => {
       const config = await fetchJSON<ServerConfig>('/config', {
@@ -149,9 +126,6 @@ export function useApi() {
     killAgent,
     interruptAgent,
     restartAgent,
-    createTask,
-    updateTask,
-    deleteTask,
     updateAgent,
     updateConfig,
     createRole,
