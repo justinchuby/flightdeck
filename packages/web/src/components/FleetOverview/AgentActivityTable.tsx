@@ -124,7 +124,7 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
 
 export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
   const { setSelectedAgent } = useAppStore();
-  const [confirmKillIds, setConfirmKillIds] = useState<Set<string>>(new Set());
+  const [confirmTerminateIds, setConfirmTerminateIds] = useState<Set<string>>(new Set());
 
   const handleSelect = (id: string) => {
     if (onSelectAgent) onSelectAgent(id);
@@ -341,14 +341,14 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                       </button>
                     )}
                     {isActive && (
-                      confirmKillIds.has(agent.id) ? (
+                      confirmTerminateIds.has(agent.id) ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             api.terminateAgent(agent.id);
-                            setConfirmKillIds((s) => { const n = new Set(s); n.delete(agent.id); return n; });
+                            setConfirmTerminateIds((s) => { const n = new Set(s); n.delete(agent.id); return n; });
                           }}
-                          onBlur={() => setConfirmKillIds((s) => { const n = new Set(s); n.delete(agent.id); return n; })}
+                          onBlur={() => setConfirmTerminateIds((s) => { const n = new Set(s); n.delete(agent.id); return n; })}
                           className="p-1 text-red-400 hover:text-red-300 animate-pulse"
                           title="Confirm stop"
                           autoFocus
@@ -359,7 +359,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setConfirmKillIds((s) => new Set(s).add(agent.id));
+                            setConfirmTerminateIds((s) => new Set(s).add(agent.id));
                           }}
                           className="p-1 text-gray-400 hover:text-red-400"
                           title="Stop agent"
