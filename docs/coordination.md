@@ -33,6 +33,7 @@ System:  Lock released ✓
 - **Auto-cleanup**: Expired locks are cleaned before each acquire operation
 - **Agent exit**: All locks released when an agent exits (`releaseAll`)
 - **Same-agent refresh**: An agent can re-acquire its own lock (refreshes TTL)
+- **Expiry notifications**: When a lock's TTL expires, the server emits a `lock:expired` event. The owning agent receives a system message: _"Your file lock on X has expired."_ This ensures agents know they've lost exclusivity. `cleanExpired()` returns the full `FileLock[]` array of expired locks with file path, agent ID, and role for downstream processing.
 
 **Schema:**
 ```sql
@@ -55,7 +56,7 @@ DELETE /api/coordination/locks/:path  — release: ?agentId=...
 
 ### Layer 2: Activity Ledger
 
-Append-only log of all agent actions, providing a shared "memory" of what's happened.
+Append-only log of all agent actions, providing a shared "memory" of what's happened. Writes are **batched** for performance — entries are buffered in memory and flushed to SQLite every **250ms** or when the buffer reaches **64 entries**, whichever comes first. Read operations (`getRecent`, `getSummary`) flush the buffer first to guarantee read-after-write consistency. The ledger has a `stop()` method for graceful shutdown that flushes remaining entries and clears the timer.
 
 **Action types:**
 | Type | When logged |
@@ -124,6 +125,7 @@ CREW_UPDATE -->
 **Triggers for refresh:**
 - Agent spawned, killed, or exited
 - File lock acquired or released
+- **Context compaction** — when Copilot CLI compacts an agent's context window (`agent:context_compacted` event), the `ContextRefresher` immediately re-injects the crew context (team roster, active delegations, coordination rules) into the affected agent so it doesn't lose awareness of its team after compaction
 - Debounced at 2 seconds to batch rapid events
 
 ## Task Assignment & Auto-Spawn
@@ -162,3 +164,20 @@ The PTY watchdog monitors agent output:
 - Checks every 30 seconds
 - Optionally auto-kills after a second timeout (disabled by default)
 - UI shows toast notification
+
+## Generic Scheduler
+
+Background maintenance tasks are managed by the `Scheduler` class (`packages/server/src/utils/Scheduler.ts`). Tasks are registered with an ID, interval, and async callback. The scheduler runs each task on a `setInterval` and catches errors so one failing task doesn't affect others.
+
+**Registered tasks:**
+
+| Task ID | Interval | Purpose |
+|---------|----------|---------|
+| `expired-lock-cleanup` | 60 seconds | Runs `FileLockRegistry.cleanExpired()` to remove locks past their TTL and notify affected agents |
+| `activity-log-pruning` | 1 hour | Trims the activity log to the 10,000-entry cap, deleting oldest entries |
+
+**API:**
+- `register(task: ScheduledTask)` — registers (or replaces) a task with `{ id, interval, run }`
+- `unregister(id: string)` — stops and removes a task by ID
+- `stop()` — clears all tasks (called during graceful server shutdown)
+- `getRegistered()` — returns array of active task IDs
