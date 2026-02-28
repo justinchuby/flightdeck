@@ -7,6 +7,7 @@ import { useAppStore } from '../../stores/appStore';
 import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { TaskDagPanelContent } from './TaskDagPanel';
+import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
@@ -1496,6 +1497,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
+                        tokens: { icon: <BarChart3 className="w-3 h-3" />, label: 'Tokens' },
                       };
                       const orderedIds = tabOrder.filter((id) => id in allTabs);
                       // Append any missing tabs (safety net)
@@ -1537,6 +1539,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
+                    {sidebarTab === 'tokens' && <TokenEconomics />}
                   </div>
                   {/* Resize handle for tabbed section */}
                   <div
