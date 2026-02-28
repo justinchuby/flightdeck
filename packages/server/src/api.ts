@@ -298,11 +298,11 @@ export function apiRouter(
           summary: ev.summary.slice(0, 120),
           timestamp: ev.timestamp,
         });
-      } else if (ev.actionType === 'message_sent' && ev.details?.to) {
+      } else if (ev.actionType === 'message_sent' && ev.details?.toAgentId) {
         communications.push({
           type: 'message',
           fromAgentId: ev.agentId,
-          toAgentId: ev.details.to,
+          toAgentId: ev.details.toAgentId,
           summary: ev.summary.slice(0, 120),
           timestamp: ev.timestamp,
         });

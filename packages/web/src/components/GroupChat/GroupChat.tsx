@@ -569,7 +569,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                         </div>
                         <div className={`rounded-lg px-3 py-2 text-sm ${human ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
                           <div className="whitespace-pre-wrap break-words prose-sm">
-                            <MentionText text={msg.content} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                            <MarkdownContent text={msg.content} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </div>
                         </div>
                         <div className={`text-xs text-gray-500 mt-0.5 ${human ? 'text-right' : ''}`}>

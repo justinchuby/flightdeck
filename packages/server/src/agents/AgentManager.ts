@@ -110,7 +110,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.agentMemory = agentMemory;
     this.chatGroupRegistry = chatGroupRegistry;
     this.taskDAG = taskDAG;
-    this.deferredIssueRegistry = deferredIssueRegistry!;
+    this.deferredIssueRegistry = deferredIssueRegistry ?? (null as any);
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;

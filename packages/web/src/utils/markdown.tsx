@@ -62,6 +62,40 @@ export function MentionText({ text, agents, onClickAgent }: {
   }
   return <>{parts}</>;
 }
+
+/** Mention-aware inline markdown: handles **bold**, *italic*, `code`, and @mentions */
+function InlineMarkdownWithMentions({ text, mentionAgents, onMentionClick }: {
+  text: string;
+  mentionAgents?: Array<{ id: string; role: { name: string } }>;
+  onMentionClick?: (agentId: string) => void;
+}) {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*')) {
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return (
+            <code key={i} className="bg-gray-700 px-1 rounded text-yellow-300">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        if (mentionAgents && mentionAgents.length > 0 && /@[a-f0-9]{4,8}\b/.test(part)) {
+          return <MentionText key={i} text={part} agents={mentionAgents} onClickAgent={onMentionClick} />;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+/** Render inline markdown: **bold**, *italic*, `code` */
 export function InlineMarkdown({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
   return (
@@ -127,8 +161,12 @@ function MarkdownTable({ raw }: { raw: string }) {
   );
 }
 
-/** Render text with markdown tables detected and inline markdown */
-export function MarkdownContent({ text }: { text: string }) {
+/** Render text with markdown tables detected and inline markdown, with optional @mention support */
+export function MarkdownContent({ text, mentionAgents, onMentionClick }: {
+  text: string;
+  mentionAgents?: Array<{ id: string; role: { name: string } }>;
+  onMentionClick?: (agentId: string) => void;
+}) {
   const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
   const parts = text.split(TABLE_RE);
 
@@ -153,6 +191,10 @@ export function MarkdownContent({ text }: { text: string }) {
                     {content}
                   </pre>
                 );
+              }
+              // Use mention-aware inline markdown when agents are provided
+              if (mentionAgents) {
+                return <InlineMarkdownWithMentions key={j} text={seg} mentionAgents={mentionAgents} onMentionClick={onMentionClick} />;
               }
               return <InlineMarkdown key={j} text={seg} />;
             })}

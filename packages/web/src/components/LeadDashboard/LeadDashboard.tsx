@@ -4,7 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
-import { MentionText } from '../../utils/markdown';
+import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
 

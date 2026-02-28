@@ -962,6 +962,7 @@ CREW_ROSTER ]]]`;
       agent.sendMessage(ackMsg);
 
       this.ctx.activityLedger.log(agent.id, agent.role.id, 'agent_terminated', `Terminated ${roleName} (${shortId})${req.reason ? ': ' + req.reason.slice(0, 100) : ''}`, {
+        toAgentId: target.id, toRole: target.role.id,
         terminatedAgentId: target.id,
         terminatedRole: target.role.id,
         sessionId: sessionId || null,
@@ -1406,6 +1407,7 @@ CREW_ROSTER ]]]`;
         agent.sendMessage(summary);
 
         this.ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegations to ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
+          toAgentId: targetId, toRole: targetAgent.role.id,
           targetAgentId: targetId,
           cancelledDelegations: cancelledCount,
           clearedMessages: cleared.count,
@@ -1438,6 +1440,7 @@ CREW_ROSTER ]]]`;
         agent.sendMessage(`[System] Delegation ${req.delegationId} cancelled. Cleared ${cleared.count} queued message(s) from ${del.toRole} (${del.toAgentId.slice(0, 8)}).`);
 
         this.ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegation ${req.delegationId}`, {
+          toAgentId: del.toAgentId, toRole: del.toRole,
           delegationId: req.delegationId,
           targetAgentId: del.toAgentId,
           clearedMessages: cleared.count,
