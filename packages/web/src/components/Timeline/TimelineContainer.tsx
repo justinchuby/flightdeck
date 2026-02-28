@@ -8,7 +8,6 @@ import type {
   TimelineAgent,
   TimelineLock,
   TimelineData,
-  TimelineComm,
 } from './useTimelineData';
 
 // ── Constants ────────────────────────────────────────────────────────

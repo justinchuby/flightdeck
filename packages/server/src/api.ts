@@ -375,7 +375,11 @@ export function apiRouter(
       end: allTimestamps[allTimestamps.length - 1] ?? new Date().toISOString(),
     };
 
-    res.json({ agents, communications, locks, timeRange });
+    // Find project context from the lead agent
+    const leadAgent = agentManager.getAll().find(a => a.role.id === 'lead' && !a.parentId);
+    const project = leadAgent ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id } : undefined;
+
+    res.json({ agents, communications, locks, timeRange, project });
   });
 
   // --- Project Lead ---
