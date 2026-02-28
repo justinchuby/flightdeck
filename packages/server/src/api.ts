@@ -13,6 +13,9 @@ import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.j
 import type { DecisionLog } from './coordination/DecisionLog.js';
 import type { FileDependencyGraph } from './coordination/FileDependencyGraph.js';
 import type { AgentMatcher } from './coordination/AgentMatcher.js';
+import type { RetryManager } from './agents/RetryManager.js';
+import type { CrashForensics } from './agents/CrashForensics.js';
+import type { WebhookManager } from './coordination/WebhookManager.js';
 import { logger } from './utils/logger.js';
 import { writeAgentFiles } from './agents/agentFiles.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -47,6 +50,9 @@ export function apiRouter(
   eagerScheduler?: import('./tasks/EagerScheduler.js').EagerScheduler,
   fileDependencyGraph?: FileDependencyGraph,
   agentMatcher?: AgentMatcher,
+  retryManager?: RetryManager,
+  crashForensics?: CrashForensics,
+  webhookManager?: WebhookManager,
 ): Router {
   const router = Router();
 
@@ -1165,6 +1171,44 @@ export function apiRouter(
       return;
     }
     res.json(fileDependencyGraph.getImpact(file));
+  });
+
+  // --- Auto-Retry ---
+  router.get('/coordination/retries', (_req, res) => {
+    if (!retryManager) { res.json([]); return; }
+    res.json(retryManager.getRetries());
+  });
+
+  // --- Crash Forensics ---
+  router.get('/coordination/crash-reports', (req, res) => {
+    if (!crashForensics) { res.json([]); return; }
+    const agentId = req.query.agentId as string | undefined;
+    res.json(crashForensics.getReports(agentId));
+  });
+
+  // --- Webhooks ---
+  router.get('/webhooks', (_req, res) => {
+    if (!webhookManager) { res.json([]); return; }
+    res.json(webhookManager.getWebhooks());
+  });
+
+  router.post('/webhooks', (req, res) => {
+    if (!webhookManager) { res.status(503).json({ error: 'Webhooks not available' }); return; }
+    const { url, events, secret, enabled } = req.body;
+    if (!url || !events?.length) { res.status(400).json({ error: 'url and events[] required' }); return; }
+    const webhook = webhookManager.register({ url, events, secret, enabled: enabled ?? true });
+    res.status(201).json(webhook);
+  });
+
+  router.delete('/webhooks/:id', (req, res) => {
+    if (!webhookManager) { res.status(503).json({ error: 'Webhooks not available' }); return; }
+    const removed = webhookManager.unregister(req.params.id);
+    res.json({ removed });
+  });
+
+  router.get('/webhooks/:id/deliveries', (req, res) => {
+    if (!webhookManager) { res.json([]); return; }
+    res.json(webhookManager.getDeliveries(req.params.id));
   });
 
   return router;

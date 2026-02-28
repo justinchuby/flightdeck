@@ -21,6 +21,8 @@ import { Scheduler } from './utils/Scheduler.js';
 import { ProjectRegistry } from './projects/ProjectRegistry.js';
 import { EagerScheduler } from './tasks/EagerScheduler.js';
 import { FileDependencyGraph } from './coordination/FileDependencyGraph.js';
+import { RetryManager } from './agents/RetryManager.js';
+import { CrashForensics } from './agents/CrashForensics.js';
 
 // Initialize auth (auto-generates token if not set)
 const authToken = initAuth();
@@ -80,6 +82,22 @@ eventPipeline.register(delegationTracker);
 
 eventPipeline.connectToLedger(activityLedger);
 
+// Webhook manager — sends HTTP notifications to external services on key events
+import { WebhookManager } from './coordination/WebhookManager.js';
+const webhookManager = new WebhookManager();
+eventPipeline.register({
+  name: 'webhook-relay',
+  eventTypes: '*',
+  handle: (event) => {
+    webhookManager.fire(event.entry.actionType, {
+      agentId: event.entry.agentId,
+      agentRole: event.entry.agentRole,
+      summary: event.entry.summary,
+      details: event.entry.details,
+    });
+  },
+});
+
 const roleRegistry = new RoleRegistry(db);
 const messageBus = new MessageBus();
 const decisionLog = new DecisionLog(db);
@@ -91,6 +109,13 @@ const projectRegistry = new ProjectRegistry(db);
 
 // File dependency graph — tracks import relationships for impact analysis
 const fileDependencyGraph = new FileDependencyGraph(process.cwd());
+
+// Auto-retry with exponential backoff — reschedules failed agent tasks
+const retryManager = new RetryManager();
+retryManager.start();
+
+// Crash forensics — captures diagnostic snapshots when agents crash
+const crashForensics = new CrashForensics();
 
 // Eager Scheduler — pre-assigns tasks that are 1 dep away from ready
 const eagerScheduler = new EagerScheduler(taskDAG);
@@ -207,7 +232,7 @@ const sessionExporter = new SessionExporter(agentManager, activityLedger, decisi
 agentManager.setSessionExporter(sessionExporter);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager));
 
 // Serve built web frontend in production
 import path from 'path';
@@ -256,6 +281,7 @@ function gracefulShutdown(signal: string) {
   contextRefresher.stop();
   scheduler.stop();
   eagerScheduler.stop();
+  retryManager.stop();
   agentManager.shutdownAll();
   activityLedger.stop();
   timerRegistry.stop();

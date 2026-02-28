@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Square, RefreshCw, Terminal, Hand, Check } from 'lucide-react';
+import { TokenSparkline } from './TokenSparkline';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -122,6 +123,37 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   return { text: 'Idle' };
 }
 
+// ── Per-row token-history cell ────────────────────────────────────────────
+// Accumulates a rolling window of token readings in a ref so the sparkline
+// can show a trend without requiring a global store.
+
+const MAX_HISTORY = 20;
+
+function TokenHistoryCell({ totalTokens }: { agentId: string; totalTokens: number }) {
+  const historyRef = useRef<number[]>([]);
+  const prevRef    = useRef<number>(-1);
+
+  // Accumulate during render — safe for refs, deterministic.
+  if (totalTokens !== prevRef.current) {
+    prevRef.current = totalTokens;
+    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), totalTokens];
+  }
+
+  const fmt = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` :
+    n >= 1_000     ? `${(n / 1_000).toFixed(0)}k`     :
+    String(n);
+
+  return (
+    <div className="flex items-center gap-1.5" title={`${totalTokens.toLocaleString()} total tokens`}>
+      <TokenSparkline dataPoints={historyRef.current} width={56} height={18} />
+      {totalTokens > 0 && (
+        <span className="text-[10px] text-th-text-muted tabular-nums">{fmt(totalTokens)}</span>
+      )}
+    </div>
+  );
+}
+
 export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
   const { setSelectedAgent } = useAppStore();
   const [confirmTerminateIds, setConfirmTerminateIds] = useState<Set<string>>(new Set());
@@ -152,6 +184,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
             <th className="text-left px-3 py-2 hidden md:table-cell">Task</th>
             <th className="text-left px-3 py-2">Current Activity</th>
             <th className="text-left px-3 py-2 hidden lg:table-cell">Progress</th>
+            <th className="text-left px-3 py-2 hidden xl:table-cell">Tokens</th>
             <th className="text-left px-3 py-2 hidden lg:table-cell">Locks</th>
             <th className="text-left px-3 py-2 hidden sm:table-cell">Uptime</th>
             <th className="text-right px-3 py-2">Actions</th>
@@ -275,6 +308,18 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                         {planDone}/{planTotal}
                       </span>
                     </div>
+                  ) : (
+                    <span className="text-xs text-th-text-muted">—</span>
+                  )}
+                </td>
+
+                {/* Token sparkline */}
+                <td className="px-3 py-2.5 hidden xl:table-cell">
+                  {(agent.inputTokens ?? 0) + (agent.outputTokens ?? 0) > 0 ? (
+                    <TokenHistoryCell
+                      agentId={agent.id}
+                      totalTokens={(agent.inputTokens ?? 0) + (agent.outputTokens ?? 0)}
+                    />
                   ) : (
                     <span className="text-xs text-th-text-muted">—</span>
                   )}

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
-import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock } from 'lucide-react';
+import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock, BarChart2 } from 'lucide-react';
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
 import { DagGraph } from './DagGraph';
+import { DagGantt } from './DagGantt';
+import type { GanttTask } from './DagGantt';
 import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
 
 interface Props {
@@ -123,7 +125,7 @@ export function TaskQueuePanel({ api }: Props) {
   const { projects: leadProjects } = useLeadStore();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
-  const [dagView, setDagView] = useState<'graph' | 'list' | null>('graph');
+  const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | null>('graph');
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resuming, setResuming] = useState<string | null>(null);
 
@@ -362,15 +364,31 @@ export function TaskQueuePanel({ api }: Props) {
             {(() => {
               const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
               const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
+
+              // Map DagTask → GanttTask for the Gantt view.
+              const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
+                id:          t.id,
+                title:       t.description || t.id,
+                status:      (['pending','running','done','failed','blocked','skipped'] as const)
+                               .includes(t.dagStatus as any)
+                               ? t.dagStatus as GanttTask['status']
+                               : 'pending',
+                assignee:    t.role,
+                dependsOn:   t.dependsOn,
+                createdAt:   new Date(t.createdAt).getTime(),
+                completedAt: t.completedAt ? new Date(t.completedAt).getTime() : undefined,
+              }));
+
+              const viewIcon =
+                effectiveView === 'graph' ? <Network size={14} className="text-blue-400" /> :
+                effectiveView === 'gantt' ? <BarChart2 size={14} className="text-purple-400" /> :
+                <LayoutList size={14} className="text-blue-400" />;
+
               return (
                 <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col">
                   <div className="px-4 py-3 border-b border-th-border flex items-center justify-between">
                     <h3 className="text-sm font-medium text-th-text flex items-center gap-2">
-                      {effectiveView === 'graph' ? (
-                        <Network size={14} className="text-blue-400" />
-                      ) : (
-                        <LayoutList size={14} className="text-blue-400" />
-                      )}
+                      {viewIcon}
                       Tasks
                       {dagStatus && (
                         <span className="text-xs text-th-text-muted font-normal">{dagStatus.tasks.length} total</span>
@@ -395,11 +413,24 @@ export function TaskQueuePanel({ api }: Props) {
                       >
                         <Network size={13} />
                       </button>
+                      <button
+                        onClick={() => setDagView('gantt')}
+                        className={`p-1 rounded transition-colors ${
+                          effectiveView === 'gantt' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+                        }`}
+                        title="Gantt view"
+                      >
+                        <BarChart2 size={13} />
+                      </button>
                     </div>
                   </div>
                   {effectiveView === 'graph' ? (
                     <div className="flex-1" style={{ minHeight: 400 }}>
                       <DagGraph dagStatus={dagStatus} />
+                    </div>
+                  ) : effectiveView === 'gantt' ? (
+                    <div className="p-4 overflow-auto" style={{ maxHeight: 520 }}>
+                      <DagGantt tasks={ganttTasks} />
                     </div>
                   ) : (
                     <div className="max-h-[500px] overflow-y-auto">

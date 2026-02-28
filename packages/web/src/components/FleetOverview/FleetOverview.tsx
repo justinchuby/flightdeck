@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { FleetStats } from './FleetStats';
 import { AgentActivityTable } from './AgentActivityTable';
 import { ActivityFeed } from './ActivityFeed';
 import { FileLockPanel } from './FileLockPanel';
+import { CommHeatmap } from './CommHeatmap';
 import type { AgentInfo } from '../../types';
 
 interface CoordinationStatus {
@@ -40,6 +41,7 @@ export function FleetOverview({ api, ws }: Props) {
   const [locks, setLocks] = useState<FileLock[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const fetchCoordination = useCallback(async () => {
     try {
@@ -91,6 +93,33 @@ export function FleetOverview({ api, ws }: Props) {
     ? locks.filter((l) => l.agentId === selectedAgentFilter)
     : locks;
 
+  // ── CommHeatmap data ─────────────────────────────────────────────────────
+  // Derive agent-to-agent communication counts from parent→child relationships
+  // and message chunks stored on each agent.
+  const heatmapAgents = useMemo(
+    () =>
+      agents.map((a) => ({
+        id:   a.id,
+        role: a.role.id,
+        name: `${a.role.icon}${a.id.slice(0, 5)}`,
+      })),
+    [agents],
+  );
+
+  const heatmapMessages = useMemo(() => {
+    const result: Array<{ from: string; to: string; count: number }> = [];
+    for (const agent of agents) {
+      if (!agent.parentId) continue;
+      // Messages received by this child from its parent.
+      const inbound  = Math.max(1, agent.messages?.filter(m => m.sender === 'external').length ?? 1);
+      // Messages sent by this child back to its parent.
+      const outbound = Math.max(1, agent.messages?.filter(m => m.sender === 'agent').length ?? 1);
+      result.push({ from: agent.parentId, to: agent.id,      count: inbound  });
+      result.push({ from: agent.id,       to: agent.parentId, count: outbound });
+    }
+    return result;
+  }, [agents]);
+
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -117,6 +146,30 @@ export function FleetOverview({ api, ws }: Props) {
       <FleetStats agents={agents} locks={locks} />
 
       <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} />
+
+      {/* ── Communication Heatmap ── */}
+      {agents.length >= 2 && (
+        <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-th-text hover:bg-th-bg-muted/30 transition-colors"
+            onClick={() => setShowHeatmap(v => !v)}
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-base">🗺️</span>
+              Communication Heatmap
+              <span className="text-xs text-th-text-muted font-normal">
+                — agent-to-agent message frequency
+              </span>
+            </span>
+            <span className="text-th-text-muted text-xs">{showHeatmap ? '▲' : '▼'}</span>
+          </button>
+          {showHeatmap && (
+            <div className="p-4 border-t border-th-border">
+              <CommHeatmap agents={heatmapAgents} messages={heatmapMessages} />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ActivityFeed activity={filteredActivity} agents={agents} />
