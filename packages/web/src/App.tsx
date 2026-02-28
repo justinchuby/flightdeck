@@ -4,7 +4,7 @@ import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { AgentDashboard } from './components/AgentDashboard/AgentDashboard';
-import { FleetOverview } from './components/FleetOverview';
+
 import { TaskQueuePanel } from './components/TaskQueue/TaskQueuePanel';
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
@@ -83,7 +83,7 @@ export function App() {
             <Route path="/" element={<LeadDashboard api={api} ws={ws} />} />
             <Route path="/lead" element={<Navigate to="/" replace />} />
             <Route path="/agents" element={<AgentDashboard api={api} ws={ws} />} />
-            <Route path="/overview" element={<FleetOverview api={api} ws={ws} />} />
+            <Route path="/overview" element={<Navigate to="/agents" replace />} />
             <Route path="/org" element={<OrgChart api={api} ws={ws} />} />
             <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
             <Route path="/settings" element={<SettingsPanel api={api} />} />
