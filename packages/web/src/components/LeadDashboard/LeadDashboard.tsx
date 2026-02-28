@@ -37,10 +37,10 @@ export function LeadDashboard({ api, ws }: Props) {
       const stored = localStorage.getItem('ai-crew-sidebar-tabs');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length === 5) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 4) return parsed.filter((id: string) => id !== 'activity');
       }
     } catch {}
-    return ['team', 'comms', 'groups', 'dag', 'activity'];
+    return ['team', 'comms', 'groups', 'dag'];
   });
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [showProgressDetail, setShowProgressDetail] = useState(false);
@@ -1128,7 +1128,6 @@ export function LeadDashboard({ api, ws }: Props) {
                         comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
-                        activity: { icon: <Wrench className="w-3 h-3" />, label: 'Activity', badge: activity.length },
                       };
                       const orderedIds = tabOrder.filter((id) => id in allTabs);
                       // Append any missing tabs (safety net)
@@ -1170,7 +1169,6 @@ export function LeadDashboard({ api, ws }: Props) {
                     {sidebarTab === 'comms' && <CommsPanelContent comms={comms} />}
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
-                    {sidebarTab === 'activity' && <ActivityFeedContent activity={activity} agents={agents} />}
                   </div>
                   {/* Resize handle for tabbed section */}
                   <div
@@ -1658,6 +1656,17 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                     )}
                   </div>
                 )}
+                {(() => {
+                  const latestAct = (activity ?? []).filter((e) => e.agentId === agent.id).slice(-1)[0];
+                  if (!latestAct) return null;
+                  const actTime = new Date(latestAct.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[9px] text-gray-500">{actTime}</span>
+                      <span className="text-[10px] text-gray-400 truncate">{latestAct.summary}</span>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })

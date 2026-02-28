@@ -134,6 +134,20 @@ export function useWebSocket() {
           updateAgent(msg.agentId, { messages: msgs });
           break;
         }
+        case 'agent:thinking': {
+          const state = useAppStore.getState();
+          const existing = state.agents.find((a) => a.id === msg.agentId);
+          const msgs = [...(existing?.messages ?? [])];
+          const last = msgs[msgs.length - 1];
+          // Append to existing thinking message or create new one
+          if (last && last.sender === 'thinking') {
+            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + msg.text, timestamp: last.timestamp || Date.now() };
+          } else {
+            msgs.push({ type: 'text', text: msg.text, sender: 'thinking', timestamp: Date.now() });
+          }
+          updateAgent(msg.agentId, { messages: msgs });
+          break;
+        }
         case 'agent:plan':
           updateAgent(msg.agentId, { plan: msg.plan });
           break;

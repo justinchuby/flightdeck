@@ -125,6 +125,10 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:content', ...data });
     });
 
+    agentManager.on('agent:thinking', (data: any) => {
+      this.broadcastAll({ type: 'agent:thinking', ...data });
+    });
+
     agentManager.on('agent:plan', (data: any) => {
       this.broadcastAll({ type: 'agent:plan', ...data });
     });

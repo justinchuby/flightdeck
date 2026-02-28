@@ -84,6 +84,7 @@ export class Agent {
   private config: ServerConfig;
   private dataListeners: Array<(data: string) => void> = [];
   private contentListeners: Array<(content: any) => void> = [];
+  private thinkingListeners: Array<(text: string) => void> = [];
   private exitListeners: Array<(code: number) => void> = [];
   private hungListeners: Array<(elapsedMs: number) => void> = [];
   private statusListeners: Array<(status: AgentStatus) => void> = [];
@@ -175,6 +176,12 @@ export class Agent {
     conn.on('content', (content: any) => {
       for (const listener of this.contentListeners) {
         listener(content);
+      }
+    });
+
+    conn.on('thinking', (text: string) => {
+      for (const listener of this.thinkingListeners) {
+        listener(text);
       }
     });
 
@@ -540,6 +547,7 @@ CREW_UPDATE ]]]`;
     this.planListeners.length = 0;
     this.permissionRequestListeners.length = 0;
     this.contextCompactedListeners.length = 0;
+    this.thinkingListeners.length = 0;
   }
 
   onData(listener: (data: string) => void): void {
@@ -580,6 +588,10 @@ CREW_UPDATE ]]]`;
 
   onContextCompacted(listener: (info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void): void {
     this.contextCompactedListeners.push(listener);
+  }
+
+  onThinking(listener: (text: string) => void): void {
+    this.thinkingListeners.push(listener);
   }
 
   getBufferedOutput(): string {

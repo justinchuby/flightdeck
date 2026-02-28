@@ -31,6 +31,7 @@ export interface AgentManagerEvents {
   'agent:text': { agentId: string; text: string };
   'agent:tool_call': { agentId: string; toolCall: ToolCallInfo };
   'agent:content': { agentId: string; content: string };
+  'agent:thinking': { agentId: string; text: string };
   'agent:plan': { agentId: string; plan: PlanEntry[] };
   'agent:permission_request': { agentId: string; request: any };
   'agent:session_ready': { agentId: string; sessionId: string };
@@ -212,6 +213,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onContent((content) => {
       this.emit('agent:content', { agentId: agent.id, content });
+    });
+
+    agent.onThinking((text) => {
+      this.emit('agent:thinking', { agentId: agent.id, text });
     });
 
     agent.onPlan((entries) => {

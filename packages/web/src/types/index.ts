@@ -43,7 +43,7 @@ export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'faile
 export interface AcpTextChunk {
   type: 'text';
   text: string;
-  sender?: 'agent' | 'user' | 'system' | 'external';
+  sender?: 'agent' | 'user' | 'system' | 'external' | 'thinking';
   /** Role name of external sender (e.g. "Developer", "Architect") */
   fromRole?: string;
   timestamp?: number;
@@ -142,6 +142,7 @@ export interface WsMessage {
     | 'agent:permission_response'
     | 'agent:delegated'
     | 'agent:completion_reported'
+    | 'agent:thinking'
     | 'lead:decision'
     | 'lead:progress'
     | string;

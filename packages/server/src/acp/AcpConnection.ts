@@ -180,6 +180,12 @@ export class AcpConnection extends EventEmitter {
             }
             break;
 
+          case 'agent_thought_chunk':
+            if (update.content.type === 'text') {
+              this.emit('thinking', update.content.text);
+            }
+            break;
+
           case 'tool_call':
             this.emit('tool_call', {
               toolCallId: update.toolCallId,
