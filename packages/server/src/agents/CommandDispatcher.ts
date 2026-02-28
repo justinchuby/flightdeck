@@ -1729,7 +1729,7 @@ CREW_ROSTER ]]]`;
 
       const escapedMsg = message.replace(/"/g, '\\"');
       const fileList = files.join(' ');
-      agent.sendMessage(`[System] Scoped commit ready. Run:\ngit add ${fileList} && git commit -m "${escapedMsg}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"`);
+      agent.sendMessage(`[System] Scoped commit ready. Run:\ngit add ${fileList} && git commit -m "${escapedMsg}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && npm test --workspace=packages/server`);
       logger.info('commit', `COMMIT helper for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
     } catch (err: any) {
       agent.sendMessage(`[System] COMMIT error: use {"message": "your commit message"}`);
