@@ -262,13 +262,24 @@ export function apiRouter(
     events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
     // Build agent status segments from status_change events
-    const agentSegments = new Map<string, { status: string; startAt: string }[]>();
-    const agentMeta = new Map<string, { role: string; createdAt: string; endedAt?: string }>();
+    const agentSegments = new Map<string, { status: string; startAt: string; taskLabel?: string }[]>();
+    const agentMeta = new Map<string, { role: string; createdAt: string; endedAt?: string; model?: string }>();
+    // Track current task per agent from delegation events
+    const agentCurrentTask = new Map<string, string>();
 
     for (const ev of events) {
       if (!agentSegments.has(ev.agentId)) {
         agentSegments.set(ev.agentId, []);
-        agentMeta.set(ev.agentId, { role: ev.agentRole, createdAt: ev.timestamp });
+        const liveAgent = agentManager.get(ev.agentId);
+        agentMeta.set(ev.agentId, {
+          role: ev.agentRole,
+          createdAt: ev.timestamp,
+          model: liveAgent?.model || liveAgent?.role?.model,
+        });
+      }
+      // Track task assignments from delegation events
+      if (ev.actionType === 'delegated' && ev.details?.childId) {
+        agentCurrentTask.set(ev.details.childId, ev.summary.slice(0, 120));
       }
       if (ev.actionType === 'status_change') {
         const segments = agentSegments.get(ev.agentId)!;
@@ -279,7 +290,8 @@ export function apiRouter(
           const prev = segments[segments.length - 1] as { status: string; startAt: string; endAt?: string };
           prev.endAt = ev.timestamp;
         }
-        segments.push({ status, startAt: ev.timestamp });
+        const taskLabel = agentCurrentTask.get(ev.agentId);
+        segments.push({ status, startAt: ev.timestamp, ...(taskLabel ? { taskLabel } : {}) });
         // Track terminal states
         if (['completed', 'failed', 'terminated'].includes(status)) {
           agentMeta.get(ev.agentId)!.endedAt = ev.timestamp;
@@ -287,7 +299,7 @@ export function apiRouter(
       }
     }
 
-    // Build communication links from delegated and message_sent events
+    // Build communication links from delegated, message_sent, and broadcast events
     const communications: { type: string; fromAgentId: string; toAgentId: string; summary: string; timestamp: string }[] = [];
     for (const ev of events) {
       if (ev.actionType === 'delegated' && ev.details?.childId) {
@@ -299,10 +311,20 @@ export function apiRouter(
           timestamp: ev.timestamp,
         });
       } else if (ev.actionType === 'message_sent' && ev.details?.toAgentId) {
+        // Classify: broadcast (toAgentId='all'), or direct message
+        const isBroadcast = ev.details.toRole === 'broadcast' || ev.details.toAgentId === 'all';
         communications.push({
-          type: 'message',
+          type: isBroadcast ? 'broadcast' : 'message',
           fromAgentId: ev.agentId,
           toAgentId: ev.details.toAgentId,
+          summary: ev.summary.slice(0, 120),
+          timestamp: ev.timestamp,
+        });
+      } else if (ev.actionType === 'group_message' && ev.details?.groupName) {
+        communications.push({
+          type: 'group_message',
+          fromAgentId: ev.agentId,
+          toAgentId: ev.details.groupName,
           summary: ev.summary.slice(0, 120),
           timestamp: ev.timestamp,
         });
@@ -341,11 +363,13 @@ export function apiRouter(
         status: s.status,
         startAt: s.startAt,
         endAt: (s as any).endAt ?? (i === segs.length - 1 ? (meta.endedAt ?? new Date().toISOString()) : undefined),
+        ...(s.taskLabel ? { taskLabel: s.taskLabel } : {}),
       }));
       return {
         id,
         shortId: id.slice(0, 8),
         role: meta.role,
+        model: meta.model,
         createdAt: meta.createdAt,
         endedAt: meta.endedAt,
         segments,

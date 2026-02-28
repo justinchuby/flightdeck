@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Users, Settings, Crown, Network, History, LayoutDashboard, MessageSquare, Database } from 'lucide-react';
+import { Users, Settings, Crown, Network, History, LayoutDashboard, MessageSquare, Database, GanttChart } from 'lucide-react';
 import { Tooltip } from './Tooltip/Tooltip';
 
 const links = [
@@ -10,6 +10,7 @@ const links = [
   { to: '/groups', icon: MessageSquare, label: 'Group Chats' },
   { to: '/org', icon: Network, label: 'Org Chart' },
   { to: '/data', icon: Database, label: 'Database' },
+  { to: '/timeline', icon: GanttChart, label: 'Timeline' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
