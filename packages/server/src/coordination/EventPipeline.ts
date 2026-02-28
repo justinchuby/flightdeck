@@ -20,6 +20,8 @@ export interface EventHandler {
 
 // ── Pipeline ──────────────────────────────────────────────────────
 
+const MAX_QUEUE_SIZE = 10_000;
+
 export class EventPipeline {
   private handlers: EventHandler[] = [];
   private processing = false;
@@ -34,6 +36,10 @@ export class EventPipeline {
 
   /** Enqueue an event from ActivityLedger. Processes async without blocking the caller. */
   emit(entry: ActivityEntry): void {
+    if (this.queue.length >= MAX_QUEUE_SIZE) {
+      this.queue.shift();
+      logger.warn('pipeline', `Queue full (${MAX_QUEUE_SIZE}) — dropping oldest event`);
+    }
     this.queue.push({ entry, meta: {} });
     if (!this.processing) {
       this.processQueue();
