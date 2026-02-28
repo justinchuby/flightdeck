@@ -20,6 +20,7 @@ import { ContextRefresher } from './coordination/ContextRefresher.js';
 import { Scheduler } from './utils/Scheduler.js';
 import { ProjectRegistry } from './projects/ProjectRegistry.js';
 import { EagerScheduler } from './tasks/EagerScheduler.js';
+import { FileDependencyGraph } from './coordination/FileDependencyGraph.js';
 
 // Initialize auth (auto-generates token if not set)
 const authToken = initAuth();
@@ -88,6 +89,9 @@ const taskDAG = new TaskDAG(db);
 const deferredIssueRegistry = new DeferredIssueRegistry(db);
 const projectRegistry = new ProjectRegistry(db);
 
+// File dependency graph — tracks import relationships for impact analysis
+const fileDependencyGraph = new FileDependencyGraph(process.cwd());
+
 // Eager Scheduler — pre-assigns tasks that are 1 dep away from ready
 const eagerScheduler = new EagerScheduler(taskDAG);
 eagerScheduler.start();
@@ -136,6 +140,10 @@ lockRegistry.on('lock:acquired', ({ agentId, agentRole, filePath }: { agentId: s
   const leadId = agent?.parentId ?? agentId;
   capabilityRegistry.recordFileTouch(agentId, agentRole, leadId, filePath);
 });
+
+// Agent matcher — scores and ranks agents for task delegation
+import { AgentMatcher } from './coordination/AgentMatcher.js';
+const agentMatcher = new AgentMatcher(agentManager, capabilityRegistry, activityLedger);
 
 // Wire timer:fired events — inject reminder messages into agents
 // Wrap in [System Timer] prefix to prevent ACP command injection
@@ -199,7 +207,7 @@ const sessionExporter = new SessionExporter(agentManager, activityLedger, decisi
 agentManager.setSessionExporter(sessionExporter);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher));
 
 // Serve built web frontend in production
 import path from 'path';

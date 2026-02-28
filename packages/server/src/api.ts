@@ -11,6 +11,8 @@ import { eq, like, desc, or, sql } from 'drizzle-orm';
 import type { FileLockRegistry } from './coordination/FileLockRegistry.js';
 import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.js';
 import type { DecisionLog } from './coordination/DecisionLog.js';
+import type { FileDependencyGraph } from './coordination/FileDependencyGraph.js';
+import type { AgentMatcher } from './coordination/AgentMatcher.js';
 import { logger } from './utils/logger.js';
 import { writeAgentFiles } from './agents/agentFiles.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -43,6 +45,8 @@ export function apiRouter(
   sessionRetro?: import('./coordination/SessionRetro.js').SessionRetro,
   sessionExporter?: import('./coordination/SessionExporter.js').SessionExporter,
   eagerScheduler?: import('./tasks/EagerScheduler.js').EagerScheduler,
+  fileDependencyGraph?: FileDependencyGraph,
+  agentMatcher?: AgentMatcher,
 ): Router {
   const router = Router();
 
@@ -1100,6 +1104,22 @@ export function apiRouter(
     res.json(capabilityRegistry.query(leadId, query));
   });
 
+  // --- Agent Matcher ---
+  router.get('/coordination/match-agent', (req, res) => {
+    if (!agentMatcher) { res.json([]); return; }
+    const leadId = req.query.leadId as string;
+    if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
+    const query = {
+      task: (req.query.task as string) || '',
+      requiredRole: req.query.role as string | undefined,
+      files: req.query.file ? [req.query.file as string] : undefined,
+      technologies: req.query.tech ? [req.query.tech as string] : undefined,
+      keywords: req.query.keyword ? (req.query.keyword as string).split(',') : undefined,
+      preferIdle: req.query.preferIdle === 'true',
+    };
+    res.json(agentMatcher.match(leadId, query));
+  });
+
   // --- Session Retrospectives ---
   router.get('/coordination/retros/:leadId', (req, res) => {
     if (!sessionRetro) {
@@ -1131,6 +1151,20 @@ export function apiRouter(
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // --- File Dependency Graph ---
+  router.get('/coordination/file-impact', (req, res) => {
+    if (!fileDependencyGraph) {
+      res.json({ directDependents: [], transitiveDependents: [], depth: 0 });
+      return;
+    }
+    const file = req.query.file as string;
+    if (!file) {
+      res.status(400).json({ error: 'file query parameter required' });
+      return;
+    }
+    res.json(fileDependencyGraph.getImpact(file));
   });
 
   return router;
