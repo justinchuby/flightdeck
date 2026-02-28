@@ -568,6 +568,8 @@ export function LeadDashboard({ api, ws }: Props) {
 
   const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
+    // Optimistic update — hide buttons immediately
+    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'confirmed', confirmedAt: new Date().toISOString() });
     const resp = await fetch(`/api/decisions/${decisionId}/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -581,6 +583,8 @@ export function LeadDashboard({ api, ws }: Props) {
 
   const handleRejectDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
+    // Optimistic update — hide buttons immediately
+    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'rejected', confirmedAt: new Date().toISOString() });
     const resp = await fetch(`/api/decisions/${decisionId}/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
