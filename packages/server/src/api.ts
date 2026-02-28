@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { readdirSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
+import { execSync } from 'node:child_process';
 import type { AgentManager } from './agents/AgentManager.js';
 import type { RoleRegistry } from './agents/RoleRegistry.js';
 import type { ServerConfig } from './config.js';
@@ -18,7 +19,11 @@ import type { CrashForensics } from './agents/CrashForensics.js';
 import type { WebhookManager } from './coordination/WebhookManager.js';
 import { SearchEngine, type SearchQuery } from './coordination/SearchEngine.js';
 import type { DecisionRecordStore } from './coordination/DecisionRecords.js';
+import type { ModelSelector } from './agents/ModelSelector.js';
+import type { TokenBudgetOptimizer } from './agents/TokenBudgetOptimizer.js';
+import { ReportGenerator } from './coordination/ReportGenerator.js';
 import { logger } from './utils/logger.js';
+import { ParallelAnalyzer } from './tasks/ParallelAnalyzer.js';
 import { writeAgentFiles } from './agents/agentFiles.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import {
@@ -35,6 +40,23 @@ import {
 // Rate limiters for expensive operations
 const spawnLimiter = rateLimit({ windowMs: 60_000, max: 30, message: 'Too many agent spawn requests' });
 const messageLimiter = rateLimit({ windowMs: 10_000, max: 50, message: 'Too many messages' });
+
+// ── Helper: recent git commits ─────────────────────────────────────────────
+function getRecentCommits(limit = 20): Array<{ hash: string; message: string }> {
+  try {
+    const raw = execSync(
+      `git log --format="%H|%s" -${limit} 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 5_000 },
+    ).trim();
+    if (!raw) return [];
+    return raw.split('\n').map(line => {
+      const idx = line.indexOf('|');
+      return { hash: line.slice(0, idx), message: line.slice(idx + 1) };
+    });
+  } catch {
+    return [];
+  }
+}
 
 export function apiRouter(
   agentManager: AgentManager,
@@ -65,6 +87,12 @@ export function apiRouter(
   dependencyScanner?: import('./coordination/DependencyScanner.js').DependencyScanner,
   notificationManager?: import('./coordination/NotificationManager.js').NotificationManager,
   escalationManager?: import('./coordination/EscalationManager.js').EscalationManager,
+  modelSelector?: ModelSelector,
+  tokenBudgetOptimizer?: TokenBudgetOptimizer,
+  meetingSummarizer?: import('./coordination/MeetingSummarizer.js').MeetingSummarizer,
+  reportGenerator?: ReportGenerator,
+  projectTemplateRegistry?: import('./coordination/ProjectTemplates.js').ProjectTemplateRegistry,
+  knowledgeTransfer?: import('./coordination/KnowledgeTransfer.js').KnowledgeTransfer,
 ): Router {
   const router = Router();
 
@@ -1384,6 +1412,209 @@ export function apiRouter(
     const ok = escalationManager.resolve(req.params.id);
     if (!ok) { res.status(404).json({ error: 'Escalation not found' }); return; }
     res.json({ ok: true });
+  });
+
+  // ── Model Selector ──────────────────────────────────────────────────
+
+  router.get('/coordination/model-selector', (_req, res) => {
+    if (!modelSelector) {
+      res.json({ models: [], overrides: {} });
+      return;
+    }
+    res.json({
+      models: modelSelector.getModels(),
+      overrides: modelSelector.getRoleOverrides(),
+    });
+  });
+
+  // ── Token Budget Optimizer ──────────────────────────────────────────
+
+  router.get('/coordination/token-budgets', (_req, res) => {
+    if (!tokenBudgetOptimizer) {
+      res.json({ budgets: [], totalBudget: 0, totalUsed: 0, utilization: 0 });
+      return;
+    }
+    res.json({
+      budgets: tokenBudgetOptimizer.getAllBudgets(),
+      totalBudget: tokenBudgetOptimizer.getTotalBudget(),
+      totalUsed: tokenBudgetOptimizer.getTotalUsed(),
+      utilization: tokenBudgetOptimizer.getUtilization(),
+    });
+  });
+
+  // ── Parallel Execution Analyzer ─────────────────────────────────────
+
+  router.get('/coordination/parallel-analysis', (_req, res) => {
+    const analyzer = new ParallelAnalyzer(agentManager.getTaskDAG());
+    res.json(analyzer.analyze());
+  });
+
+  // ── Meeting Summarizer ───────────────────────────────────────────────
+
+  router.get('/coordination/meetings', (_req, res) => {
+    if (!meetingSummarizer) { res.json([]); return; }
+    res.json(meetingSummarizer.getSummaries());
+  });
+
+  router.post('/coordination/meetings/summarize', (req, res) => {
+    if (!meetingSummarizer) {
+      res.status(503).json({ error: 'Meeting summarizer not available' });
+      return;
+    }
+    const { groupName, messages } = req.body as {
+      groupName?: string;
+      messages?: Array<{ from: string; content: string; timestamp: number }>;
+    };
+    if (!groupName || typeof groupName !== 'string') {
+      res.status(400).json({ error: 'groupName is required' });
+      return;
+    }
+    if (!Array.isArray(messages) || messages.length === 0) {
+      res.status(400).json({ error: 'messages array is required and must not be empty' });
+      return;
+    }
+    try {
+      const summary = meetingSummarizer.summarize(groupName, messages);
+      res.status(201).json(summary);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // --- Session Report ---
+  router.get('/reports/session', (req, res) => {
+    const rg = reportGenerator ?? new ReportGenerator();
+    const format = req.query.format === 'md' ? 'md' : 'html';
+
+    // Optional leadId filter; defaults to first running lead
+    const leadId = req.query.leadId as string | undefined;
+    const allAgents = agentManager.getAll();
+    const lead = leadId
+      ? allAgents.find(a => a.id === leadId)
+      : allAgents.find(a => a.role?.id === 'lead');
+
+    // Collect agents for the session (lead + its children, or all agents)
+    const teamAgents = lead
+      ? allAgents.filter(a => a.id === lead.id || a.parentId === lead.id)
+      : allAgents;
+
+    // Determine session time bounds from agent creation times
+    const createdAts = teamAgents.map(a => new Date(a.createdAt ?? Date.now()).getTime()).filter(t => !isNaN(t));
+    const sessionStart = createdAts.length > 0 ? Math.min(...createdAts) : Date.now() - 3_600_000;
+    const sessionEnd = Date.now();
+
+    // Tasks from DAG
+    const dagTasks = lead
+      ? (req.app.locals?.taskDAG?.getTasks?.(lead.id) ?? [])
+      : [];
+
+    // Decisions
+    const rawDecisions = lead
+      ? decisionLog.getByLeadId(lead.id)
+      : decisionLog.getAll();
+
+    // Recent git commits
+    const commits = getRecentCommits();
+
+    const projectName = lead?.projectName ?? lead?.task?.slice(0, 60) ?? 'AI Crew Session';
+
+    const data = {
+      projectName,
+      sessionStart,
+      sessionEnd,
+      agents: teamAgents.map(a => ({
+        id: a.id,
+        role: a.role?.name ?? a.role?.id ?? 'unknown',
+        model: a.model ?? 'unknown',
+        status: a.status,
+        tokensUsed: (a.inputTokens ?? 0) + (a.outputTokens ?? 0),
+      })),
+      tasks: dagTasks.map((t: any) => ({
+        id: t.id,
+        description: t.description ?? t.id,
+        status: t.dagStatus ?? t.status ?? 'pending',
+        assignee: t.assignedTo ?? t.role,
+      })),
+      decisions: rawDecisions.map((d: any) => ({
+        title: d.title,
+        rationale: d.rationale,
+        confirmedBy: d.confirmedBy,
+      })),
+      commits,
+      testResults: undefined,
+      highlights: [],
+    };
+
+    if (format === 'md') {
+      res.type('text/markdown').send(rg.generateMarkdown(data));
+    } else {
+      res.type('text/html').send(rg.generateHTML(data));
+    }
+  });
+
+  // --- Project Templates ---
+  // NOTE: /search must be registered before /:id so Express does not match "search" as an ID.
+  router.get('/coordination/project-templates/search', (req, res) => {
+    if (!projectTemplateRegistry) return res.status(503).json({ error: 'Project template registry not available' });
+    const keyword = (req.query.keyword as string ?? '').trim();
+    if (!keyword) return res.status(400).json({ error: 'keyword query parameter required' });
+    res.json(projectTemplateRegistry.findByKeyword(keyword));
+  });
+
+  router.get('/coordination/project-templates', (_req, res) => {
+    if (!projectTemplateRegistry) return res.status(503).json({ error: 'Project template registry not available' });
+    res.json(projectTemplateRegistry.getAll());
+  });
+
+  router.get('/coordination/project-templates/:id', (req, res) => {
+    if (!projectTemplateRegistry) return res.status(503).json({ error: 'Project template registry not available' });
+    const template = projectTemplateRegistry.get(req.params.id);
+    if (!template) return res.status(404).json({ error: `Template '${req.params.id}' not found` });
+    res.json(template);
+  });
+
+  // --- Knowledge Transfer ---
+  router.get('/coordination/knowledge/search', (req, res) => {
+    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    const q = (req.query.q as string ?? '').trim();
+    if (!q) return res.status(400).json({ error: 'q query parameter required' });
+    res.json(knowledgeTransfer.search(q));
+  });
+
+  router.get('/coordination/knowledge/popular', (req, res) => {
+    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
+    res.json(knowledgeTransfer.getPopular(limit));
+  });
+
+  router.get('/coordination/knowledge', (req, res) => {
+    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    const { projectId, category, tag } = req.query;
+    if (typeof projectId === 'string') return res.json(knowledgeTransfer.getByProject(projectId));
+    if (typeof category === 'string') return res.json(knowledgeTransfer.getByCategory(category as import('./coordination/KnowledgeTransfer.js').KnowledgeCategory));
+    if (typeof tag === 'string') return res.json(knowledgeTransfer.getByTag(tag));
+    res.json(knowledgeTransfer.getAll());
+  });
+
+  router.post('/coordination/knowledge', (req, res) => {
+    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    const { projectId, category, title, content, tags } = req.body as Record<string, unknown>;
+    const validCategories = ['pattern', 'pitfall', 'tool', 'architecture', 'process'];
+    if (typeof projectId !== 'string' || !projectId) return res.status(400).json({ error: 'projectId required' });
+    if (typeof category !== 'string' || !validCategories.includes(category)) {
+      return res.status(400).json({ error: `category must be one of: ${validCategories.join(', ')}` });
+    }
+    if (typeof title !== 'string' || !title) return res.status(400).json({ error: 'title required' });
+    if (typeof content !== 'string') return res.status(400).json({ error: 'content required' });
+    const entryTags = Array.isArray(tags) ? (tags as unknown[]).filter((t): t is string => typeof t === 'string') : [];
+    const entry = knowledgeTransfer.capture({
+      projectId,
+      category: category as import('./coordination/KnowledgeTransfer.js').KnowledgeCategory,
+      title,
+      content,
+      tags: entryTags,
+    });
+    res.status(201).json(entry);
   });
 
   return router;
