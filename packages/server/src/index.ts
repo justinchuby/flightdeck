@@ -9,6 +9,7 @@ import { RoleRegistry } from './agents/RoleRegistry.js';
 import { TaskQueue } from './tasks/TaskQueue.js';
 import { Database } from './db/database.js';
 import { apiRouter } from './api.js';
+import { authMiddleware } from './middleware/auth.js';
 import { FileLockRegistry } from './coordination/FileLockRegistry.js';
 import { ActivityLedger } from './coordination/ActivityLedger.js';
 import { DecisionLog } from './coordination/DecisionLog.js';
@@ -53,10 +54,7 @@ const taskQueue = new TaskQueue(db, agentManager);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, taskQueue, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
 
-// Wire up API routes
-app.use('/api', apiRouter(agentManager, taskQueue, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog));
-
-// Health check
+// Health check (no auth required)
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
@@ -64,6 +62,12 @@ app.get('/health', (_req, res) => {
     queuedTasks: taskQueue.getPending().length,
   });
 });
+
+// Auth middleware for API routes
+app.use('/api', authMiddleware);
+
+// Wire up API routes
+app.use('/api', apiRouter(agentManager, taskQueue, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog));
 
 httpServer.listen(config.port, config.host, () => {
   console.log(`🚀 AI Crew server running on http://${config.host}:${config.port}`);

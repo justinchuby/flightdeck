@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
+import { getAuthToken } from './useApi';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -21,7 +22,11 @@ export function useWebSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const token = getAuthToken();
+    const wsUrl = token
+      ? `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`
+      : `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => setConnected(true);

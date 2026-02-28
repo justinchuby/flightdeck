@@ -4,10 +4,22 @@ import { useAppStore } from '../stores/appStore';
 
 const API_BASE = '/api';
 
+export function getAuthToken(): string | null {
+  // Check URL params first, then localStorage
+  const params = new URLSearchParams(window.location.search);
+  return params.get('token') || localStorage.getItem('ai-crew-token');
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  if (token) return { Authorization: `Bearer ${token}` };
+  return {};
+}
+
 async function fetchJSON<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...opts,
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts?.headers },
   });
   return res.json();
 }

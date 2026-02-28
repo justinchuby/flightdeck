@@ -29,7 +29,18 @@ export class WebSocketServer {
   ) {
     this.wss = new WsServer({ server, path: '/ws' });
 
-    this.wss.on('connection', (ws) => {
+    this.wss.on('connection', (ws, req) => {
+      // Check auth if SERVER_SECRET is set
+      const secret = process.env.SERVER_SECRET;
+      if (secret) {
+        const url = new URL(req.url || '', `http://${req.headers.host}`);
+        const token = url.searchParams.get('token');
+        if (token !== secret) {
+          ws.close(4401, 'Authentication required');
+          return;
+        }
+      }
+
       const clientId = uuid();
       const client: ClientConnection = { id: clientId, ws, subscribedAgents: new Set() };
       this.clients.set(clientId, client);
