@@ -12,11 +12,13 @@ import { LeadDashboard } from './components/LeadDashboard';
 import { OrgChart } from './components/OrgChart/OrgChart';
 import { OverviewPage } from './components/OverviewPage/OverviewPage';
 import { GroupChat } from './components/GroupChat/GroupChat';
+import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
+import { Search } from 'lucide-react';
 
 export function App() {
   const ws = useWebSocket();
@@ -25,6 +27,21 @@ export function App() {
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const addToast = useToastStore((s) => s.add);
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map());
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Cmd/Ctrl+K to open search
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
   useEffect(() => {
@@ -71,6 +88,14 @@ export function App() {
           <header className="h-12 border-b border-gray-700 flex items-center px-4 justify-between shrink-0">
             <h1 className="text-lg font-semibold">AI Crew</h1>
             <div className="flex items-center gap-3">
+              <button
+                onClick={openSearch}
+                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600 transition-colors text-xs"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Search</span>
+                <kbd className="text-[10px] text-gray-600 border border-gray-700 rounded px-1 py-0.5 ml-1">⌘K</kbd>
+              </button>
               <span
                 className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`}
               />
@@ -102,6 +127,7 @@ export function App() {
       </div>
       <ToastContainer />
       <PermissionDialog />
+      <SearchDialog open={searchOpen} onClose={closeSearch} />
     </div>
   );
 }

@@ -4,8 +4,8 @@ import type { RoleRegistry } from './agents/RoleRegistry.js';
 import type { ServerConfig } from './config.js';
 import { updateConfig, getConfig } from './config.js';
 import type { Database } from './db/database.js';
-import { agentPlans } from './db/schema.js';
-import { eq } from 'drizzle-orm';
+import { agentPlans, messages, conversations, chatGroupMessages } from './db/schema.js';
+import { eq, like, desc } from 'drizzle-orm';
 import type { FileLockRegistry } from './coordination/FileLockRegistry.js';
 import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.js';
 import type { DecisionLog } from './coordination/DecisionLog.js';
@@ -428,12 +428,80 @@ export function apiRouter(
     if (!message) return res.status(400).json({ error: 'message required' });
     const decision = decisionLog.confirm(req.params.id);
     if (!decision) return res.status(404).json({ error: 'Decision not found' });
-    // Send the user's feedback to the agent that made the decision
     const agent = agentManager.get(decision.agentId);
     if (agent && (agent.status === 'running' || agent.status === 'idle')) {
       agent.sendMessage(`[User feedback on decision "${decision.title}"] ${message}`);
     }
     res.json(decision);
+  });
+
+  // --- Search ---
+  router.get('/search', (req, res) => {
+    const q = (req.query.q as string ?? '').trim();
+    if (!q || q.length < 2) return res.status(400).json({ error: 'query must be at least 2 characters' });
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const pattern = `%${q}%`;
+
+    // Search agent conversation messages
+    const convResults = _db.drizzle
+      .select({
+        id: messages.id,
+        conversationId: messages.conversationId,
+        sender: messages.sender,
+        content: messages.content,
+        timestamp: messages.timestamp,
+      })
+      .from(messages)
+      .where(like(messages.content, pattern))
+      .orderBy(desc(messages.timestamp))
+      .limit(limit)
+      .all();
+
+    // Enrich with agent info from conversations table
+    const enrichedConv = convResults.map((m) => {
+      const conv = _db.drizzle
+        .select({ agentId: conversations.agentId })
+        .from(conversations)
+        .where(eq(conversations.id, m.conversationId))
+        .get();
+      const agent = conv ? agentManager.get(conv.agentId) : null;
+      return {
+        source: 'conversation' as const,
+        id: m.id,
+        agentId: conv?.agentId ?? null,
+        agentRole: agent?.role?.name ?? null,
+        sender: m.sender,
+        content: m.content,
+        timestamp: m.timestamp,
+      };
+    });
+
+    // Search group chat messages
+    const groupResults = _db.drizzle
+      .select()
+      .from(chatGroupMessages)
+      .where(like(chatGroupMessages.content, pattern))
+      .orderBy(desc(chatGroupMessages.timestamp))
+      .limit(limit)
+      .all();
+
+    const enrichedGroup = groupResults.map((m) => ({
+      source: 'group' as const,
+      id: m.id,
+      groupName: m.groupName,
+      leadId: m.leadId,
+      fromAgentId: m.fromAgentId,
+      fromRole: m.fromRole,
+      content: m.content,
+      timestamp: m.timestamp,
+    }));
+
+    // Merge and sort by timestamp descending
+    const combined = [...enrichedConv, ...enrichedGroup]
+      .sort((a, b) => (b.timestamp ?? '').localeCompare(a.timestamp ?? ''))
+      .slice(0, limit);
+
+    res.json({ query: q, count: combined.length, results: combined });
   });
 
   return router;
