@@ -9,6 +9,7 @@ import { TaskQueuePanel } from './components/TaskQueue/TaskQueuePanel';
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { LeadDashboard } from './components/LeadDashboard';
+import { OrgChart } from './components/OrgChart/OrgChart';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
@@ -83,6 +84,7 @@ export function App() {
             <Route path="/lead" element={<Navigate to="/" replace />} />
             <Route path="/agents" element={<AgentDashboard api={api} ws={ws} />} />
             <Route path="/overview" element={<FleetOverview api={api} ws={ws} />} />
+            <Route path="/org" element={<OrgChart api={api} ws={ws} />} />
             <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
             <Route path="/settings" element={<SettingsPanel api={api} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
