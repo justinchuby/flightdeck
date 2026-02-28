@@ -402,3 +402,64 @@ ai-crew/
 - Graceful degradation — if no DAG exists, shows only agent/decision counts
 
 **Trade-off:** Adds ~3 lines of tokens to every context refresh. Acceptable because it saves the lead from issuing separate QUERY_TASKS and PROGRESS commands to understand project state.
+
+## 29. Mission Control — Single-Screen Overview
+
+**Decision:** Add a dedicated `/mission-control` page with 6 data panels (HealthSummary, AgentFleet, TokenEconomics, AlertsPanel, ActivityFeed, DagMinimap) that answers "how's the project?" in 3 seconds.
+
+**Rationale:**
+- The Lead Dashboard is optimized for the lead agent's workflow (chat + decisions); humans need a passive monitoring view
+- All data comes from existing Zustand stores — zero new API endpoints required
+- Panel layout uses CSS Grid (3×2 on desktop, single-column on mobile) for information density
+- Zero-state handling — each panel degrades gracefully when data isn't available yet
+
+**Trade-off:** Another route to maintain. Justified because it serves a fundamentally different use case (monitoring vs. interaction).
+
+## 30. Sub-Lead Delegation
+
+**Decision:** Allow architects (not just leads) to use `CREATE_AGENT` and `DELEGATE` commands.
+
+**Rationale:**
+- Complex tasks benefit from hierarchical decomposition — an architect analyzing tech debt may need to spawn helper agents for specific investigations
+- Reduces lead bottleneck: architect can spin up 2-3 focused agents without routing through lead
+- Guard implemented in `AgentCommands.ts` checks `role === 'lead' || role === 'architect'`
+- Created agents are still visible to the lead via `QUERY_CREW` — transparency is preserved
+
+**Trade-off:** Increases coordination complexity. Mitigated by limiting to architect role (not all agents) and maintaining full visibility.
+
+## 31. CommandDispatcher Decomposition
+
+**Decision:** Break the monolithic `CommandDispatcher.ts` (1,738 lines) into a thin router (~193 lines) plus 7 focused modules: `AgentCommands`, `CommCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands`.
+
+**Rationale:**
+- At 1,738 lines, the file was the biggest source of merge conflicts in multi-agent sessions
+- Each module owns a command category and has clear dependencies
+- The router only does dispatch — no business logic
+- Adding a new command now means editing one focused file, not a monolith
+
+**Trade-off:** More files to navigate. Mitigated by predictable naming and one-to-one command-to-module mapping.
+
+## 32. Proactive Alert Engine
+
+**Decision:** Run an `AlertEngine` on a 60-second interval that detects and broadcasts conditions needing attention (stuck agents, context pressure, stale decisions, idle-ready mismatches, duplicate edits).
+
+**Rationale:**
+- Agents and humans shouldn't have to poll for problems — the system should surface them proactively
+- Five alert types cover the most common multi-agent failure modes
+- Ring buffer of 100 alerts in memory (no persistence — alerts are ephemeral by nature)
+- WebSocket broadcast (`alert:new`) enables real-time UI updates
+- Dedup logic prevents repeated alerts for the same condition
+
+**Trade-off:** 60-second interval is a balance between responsiveness and CPU cost. Configurable if needed.
+
+## 33. Secretary Auto-Refresh
+
+**Decision:** Roles with `receivesStatusUpdates: true` in the RoleRegistry (currently only secretary) automatically receive periodic `CREW_UPDATE` context refreshes.
+
+**Rationale:**
+- The secretary role's job is to track project status, but it can only report what it knows
+- Without auto-refresh, the secretary's information goes stale between explicit queries
+- The `receivesStatusUpdates` flag is a clean role-level opt-in — other roles can be added later
+- Refresh interval matches the existing `CREW_UPDATE` cadence
+
+**Trade-off:** Additional token cost for periodic context updates. Justified because the secretary's core value depends on having current information.

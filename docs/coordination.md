@@ -252,6 +252,26 @@ The `EventPipeline` (`packages/server/src/coordination/EventPipeline.ts`) provid
 - Error isolation — one handler's failure doesn't affect others
 - Async execution — handlers don't block the main event loop
 
+## Proactive Alert Engine
+
+The `AlertEngine` (`packages/server/src/coordination/AlertEngine.ts`) runs on a 60-second interval and detects conditions that need attention:
+
+| Alert Type | Threshold | Severity |
+|------------|-----------|----------|
+| `stuck_agent` | Running 10+ minutes with no activity | warning |
+| `context_pressure` | Context usage >85% | warning (85–95%), critical (>95%) |
+| `duplicate_file_edit` | Multiple agents locking same file | warning |
+| `idle_agents_ready_tasks` | Idle agents while DAG has ready tasks | info |
+| `stale_decision` | Pending decisions >10 minutes old | warning |
+
+**API:** `GET /api/coordination/alerts` — Returns current alert array
+
+**WebSocket:** `alert:new` event broadcast when a new alert fires
+
+**Storage:** Ring buffer of 100 alerts in memory (no persistence needed — alerts are ephemeral)
+
+**Dedup:** Same alert type + agent ID won't fire repeatedly within one check interval
+
 ## Generic Scheduler
 
 Background maintenance tasks are managed by the `Scheduler` class (`packages/server/src/utils/Scheduler.ts`). Tasks are registered with an ID, interval, and async callback. The scheduler runs each task on a `setInterval` and catches errors so one failing task doesn't affect others.
