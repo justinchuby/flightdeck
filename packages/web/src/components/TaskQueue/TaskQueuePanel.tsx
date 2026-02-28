@@ -122,7 +122,7 @@ export function TaskQueuePanel({ api }: Props) {
   const { projects: leadProjects } = useLeadStore();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
-  const [dagView, setDagView] = useState<'graph' | 'list' | null>(null);
+  const [dagView, setDagView] = useState<'graph' | 'list' | null>('graph');
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resuming, setResuming] = useState<string | null>(null);
 
