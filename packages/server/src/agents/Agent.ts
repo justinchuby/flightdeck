@@ -397,11 +397,13 @@ All team members have access to this directory. Create your subdirectory before 
 \`[[[ BROADCAST {"content": "message"} ]]]\`
 6. To send a message to a group you belong to:
 \`[[[ GROUP_MESSAGE {"group": "group-name", "content": "message"} ]]]\`
-7. To list your groups: \`[[[ LIST_GROUPS ]]]\`
-8. To get an updated roster of all agents and their IDs, use:
+7. To create a chat group with other agents for coordination:
+\`[[[ CREATE_GROUP {"name": "group-name", "members": ["agent-id-1", "agent-id-2"]} ]]]\`
+8. To list your groups: \`[[[ LIST_GROUPS ]]]\`
+9. To get an updated roster of all agents and their IDs, use:
 \`[[[ QUERY_CREW ]]]\`
-9. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
-10. Log important decisions by outputting:
+10. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
+11. Log important decisions by outputting:
 \`[[[ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ]]]\`
 
 == SKILLS (reusable knowledge for future work) ==

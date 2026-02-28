@@ -1418,19 +1418,21 @@ CREW_ROSTER ]]]`;
     if (!match) return;
     try {
       const req = JSON.parse(match[1]);
-      if (agent.role.id !== 'lead') {
-        agent.sendMessage('[System] Only the Project Lead can create groups.');
-        return;
-      }
       if (!req.name || !req.members || !Array.isArray(req.members)) {
         agent.sendMessage('[System] CREATE_GROUP requires "name" (string) and "members" (array of agent IDs).');
         return;
       }
-      // Resolve member IDs (support short prefixes)
+      // Determine the lead context for this group
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) {
+        agent.sendMessage('[System] Cannot create group — no lead context found.');
+        return;
+      }
+      // Resolve member IDs (support short prefixes) — find within the same team
       const resolvedIds: string[] = [];
       for (const memberId of req.members) {
         const resolved = this.getAll().find((a) =>
-          (a.id === memberId || a.id.startsWith(memberId)) && a.parentId === agent.id
+          (a.id === memberId || a.id.startsWith(memberId)) && (a.parentId === leadId || a.id === leadId)
         );
         if (resolved) {
           resolvedIds.push(resolved.id);
@@ -1438,14 +1440,14 @@ CREW_ROSTER ]]]`;
           agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
         }
       }
-      const group = this.chatGroupRegistry.create(agent.id, req.name, resolvedIds);
+      const group = this.chatGroupRegistry.create(leadId, req.name, resolvedIds);
       const memberNames = group.memberIds.map((id) => {
         const a = this.agents.get(id);
         return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
       }).join(', ');
       agent.sendMessage(`[System] Group "${req.name}" created with ${group.memberIds.length} members: ${memberNames}.`);
 
-      // Notify all members (except lead)
+      // Notify all members (except creator)
       for (const memberId of group.memberIds) {
         if (memberId === agent.id) continue;
         const member = this.agents.get(memberId);
@@ -1454,8 +1456,8 @@ CREW_ROSTER ]]]`;
         }
       }
 
-      this.emit('group:created', { group, leadId: agent.id });
-      logger.info('groups', `Lead ${agent.id.slice(0, 8)} created group "${req.name}" with ${group.memberIds.length} members`);
+      this.emit('group:created', { group, leadId });
+      logger.info('groups', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) created group "${req.name}" with ${group.memberIds.length} members`);
     } catch { /* ignore malformed */ }
   }
 
@@ -1464,24 +1466,22 @@ CREW_ROSTER ]]]`;
     if (!match) return;
     try {
       const req = JSON.parse(match[1]);
-      if (agent.role.id !== 'lead') {
-        agent.sendMessage('[System] Only the Project Lead can manage group members.');
-        return;
-      }
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) { agent.sendMessage('[System] Cannot manage groups — no lead context found.'); return; }
       if (!req.group || !req.members) return;
       const resolvedIds = req.members.map((m: string) => {
-        const found = this.getAll().find((a) => (a.id === m || a.id.startsWith(m)) && a.parentId === agent.id);
+        const found = this.getAll().find((a) => (a.id === m || a.id.startsWith(m)) && (a.parentId === leadId || a.id === leadId));
         return found?.id;
       }).filter(Boolean) as string[];
 
-      const added = this.chatGroupRegistry.addMembers(agent.id, req.group, resolvedIds);
+      const added = this.chatGroupRegistry.addMembers(leadId, req.group, resolvedIds);
       if (added.length > 0) {
         // Send recent history to new members
-        const history = this.chatGroupRegistry.getMessages(req.group, agent.id, 20);
+        const history = this.chatGroupRegistry.getMessages(req.group, leadId, 20);
         for (const memberId of added) {
           const member = this.agents.get(memberId);
           if (member && (member.status === 'running' || member.status === 'idle')) {
-            const allMembers = this.chatGroupRegistry.getMembers(req.group, agent.id);
+            const allMembers = this.chatGroupRegistry.getMembers(req.group, leadId);
             const memberNames = allMembers.map((id) => {
               const a = this.agents.get(id);
               return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
@@ -1506,17 +1506,15 @@ CREW_ROSTER ]]]`;
     if (!match) return;
     try {
       const req = JSON.parse(match[1]);
-      if (agent.role.id !== 'lead') {
-        agent.sendMessage('[System] Only the Project Lead can manage group members.');
-        return;
-      }
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+      if (!leadId) { agent.sendMessage('[System] Cannot manage groups — no lead context found.'); return; }
       if (!req.group || !req.members) return;
       const resolvedIds = req.members.map((m: string) => {
         const found = this.getAll().find((a) => a.id === m || a.id.startsWith(m));
         return found?.id;
       }).filter(Boolean) as string[];
 
-      const removed = this.chatGroupRegistry.removeMembers(agent.id, req.group, resolvedIds);
+      const removed = this.chatGroupRegistry.removeMembers(leadId, req.group, resolvedIds);
       if (removed.length > 0) {
         const names = removed.map((id) => this.agents.get(id)?.role.name || id.slice(0, 8)).join(', ');
         agent.sendMessage(`[System] Removed ${names} from group "${req.group}".`);
