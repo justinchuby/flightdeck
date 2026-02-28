@@ -10,12 +10,12 @@ The lead dashboard is the primary workspace when managing a team of agents. It's
 
 The sidebar has two zones:
 
-1. **Decisions panel** (always visible, pinned at top) — Shows pending decisions requiring user confirmation. Each decision card has the title, rationale, and Confirm/Reject buttons. This stays visible because decisions are time-sensitive and shouldn't be hidden behind a tab.
+1. **Decisions panel** (always visible, pinned at top) — Shows pending decisions requiring user confirmation. Each decision card has the title, rationale, and Accept/Reject buttons with an optional reason text field. **Optimistic UI** — buttons hide immediately on click before server response for responsive feel.
 
 2. **Tabbed panel** (bottom section) — Four tabs displayed as reorderable drag-and-drop tabs:
    - **Team** — Compact team cards showing each agent's status and latest activity
-   - **Comms** — Inter-agent message bus (direct messages between agents)
-   - **Groups** — Chat group list and group message history
+   - **Comms** — Inter-agent message bus (direct messages + group messages in unified feed)
+   - **Groups** — Chat group list and group message history, with **unread badges** showing per-group unread counts
    - **DAG** — Task dependency graph visualization
 
    Tab order is persisted to `localStorage` so the user's preferred arrangement survives page reloads. Tabs are reordered via drag-and-drop on the tab bar.
@@ -26,6 +26,7 @@ The central panel serves dual purpose:
 
 - **User ↔ Lead conversation** — Messages between the human user and the project lead agent
 - **Interleaved activity** — Agent activity events (spawns, task completions, decisions, errors) appear inline in the chat flow, distinguished by styling. This replaces the old separate Activity tab — activity is now contextual within the conversation timeline.
+- **User-message highlighting** — Messages from the human user are rendered with a **blue tint** (`bg-blue-600 text-white`) to visually distinguish them from agent messages (`bg-gray-800`). The "Human User" label appears in `text-blue-400`.
 
 #### Thinking/Reasoning Text
 
@@ -98,3 +99,53 @@ In the org chart / team hierarchy view:
 - **Message items are clickable** — clicking an inter-agent message in the Comms tab highlights the sender and receiver in the org chart
 - **Expandable message items** — Messages can be expanded to show the full content, with sender role, timestamp, and delivery status
 - Connection lines in the org chart animate briefly when a message flows between two agents
+- **Group messages in comms feed** — Group chat messages appear alongside 1:1 messages with a distinct visual treatment (group icon + group name)
+
+## Timeline Visualization
+
+The Timeline view (`/timeline`) provides a swim-lane visualization of agent activity over time, built with [visx](https://airbnb.io/visx/).
+
+### Layout
+
+- **Swim lanes** — One horizontal lane per agent, labeled with role icon and agent name
+- **Time axis** — Horizontal axis shows elapsed time from session start
+- **Status segments** — Colored bars show agent status over time:
+  - 🟢 Running (active, producing output)
+  - 🟡 Creating (agent is being spawned)
+  - ⚪ Idle (no output, shown with **hatch pattern** to distinguish from "not started")
+  - 🔵 Completed
+  - 🔴 Failed/Terminated
+- **Communication links** — Lines drawn between swim lanes when agents message each other, with directional arrows
+
+### Interactive Features
+
+| Feature | Control | Description |
+|---------|---------|-------------|
+| **Brush time selector** | Click-drag on mini-timeline | Select a time range to zoom into. The mini-timeline at the bottom shows the full session; the main view shows the selected range. |
+| **Keyboard navigation** | ←/→ arrows | Pan the view left/right through time |
+| **Zoom** | +/- keys | Zoom in/out on the time axis |
+| **Filtering** | Dropdown menus | Filter by agent role, communication type (direct/broadcast/group), or agent status |
+| **Live mode** | Toggle button | Auto-scrolls to follow the latest activity as it happens |
+
+### Design Choices
+
+- **visx over chart libraries** — Custom swim-lane rendering required more control than standard chart libraries provide. visx gives D3-like power with React composability.
+- **Idle hatch patterns** — Diagonal line patterns distinguish "agent is idle" from "no data." Without this, users couldn't tell if an agent was waiting or simply hadn't been assigned work yet.
+- **Brush selector** — Long sessions can span hours. The brush selector lets users zoom into a specific time window without losing context of the full session.
+
+## Project Grouping UI
+
+The Tasks view groups agents and tasks by project:
+
+- **Collapsible project sections** — Each lead's project is a collapsible group with the project name as header
+- **Task dedup detection** — When delegating, `findSimilarActiveDelegation()` checks for overlapping work using word-overlap similarity (>50% match). The lead receives a warning if a similar delegation is already active.
+- **Project filtering** — Filter tasks by project to focus on one workstream
+
+## Sidebar Unread Badges
+
+The sidebar navigation shows unread indicators for group chats:
+
+- **Blue dot/number badge** — Appears next to the "Groups" navigation item when unread group messages exist
+- **Per-group tracking** — `lastSeen` timestamp per group stored in `localStorage`
+- **Auto-reset** — Visiting a group resets its unread count
+- **Overflow** — Shows `99+` when count exceeds 99

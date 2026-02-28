@@ -74,6 +74,7 @@ Since PTY mode has no structured protocol, agents communicate intent via HTML co
 ```
 <!-- CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "..."} -->
 <!-- DELEGATE {"to": "agent-id", "task": "...", "context": "..."} -->
+<!-- TERMINATE_AGENT {"id": "agent-id", "reason": "..."} -->
 <!-- LOCK_REQUEST {"filePath": "src/auth.ts", "reason": "editing auth logic"} -->
 <!-- LOCK_RELEASE {"filePath": "src/auth.ts"} -->
 <!-- ACTIVITY {"actionType": "decision_made", "summary": "chose JWT over sessions"} -->
@@ -82,13 +83,43 @@ Since PTY mode has no structured protocol, agents communicate intent via HTML co
 <!-- DECISION {"title": "Use JWT", "rationale": "stateless, scalable"} -->
 <!-- PROGRESS {"summary": "2/4 done", "completed": [...], "in_progress": [...], "blocked": [...]} -->
 <!-- QUERY_CREW -->
+<!-- CREATE_GROUP {"name": "team-name", "members": ["id1"], "roles": ["developer"]} -->
+<!-- GROUP_MESSAGE {"group": "team-name", "content": "..."} -->
+<!-- QUERY_GROUPS -->
+<!-- COMMIT {"message": "..."} -->
 ```
 
-**Lead-only commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `DECISION`, `PROGRESS`.
+**Lead-only commands:** `CREATE_AGENT` (spawn new agent with role/model), `DELEGATE` (assign task to existing agent by ID), `TERMINATE_AGENT` (terminate agent and free slot), `DECISION`, `PROGRESS`.
 
-**All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`.
+**All agents:** `LOCK_REQUEST`, `LOCK_RELEASE`, `ACTIVITY`, `AGENT_MESSAGE`, `BROADCAST`, `QUERY_CREW`, `GROUP_MESSAGE`, `QUERY_GROUPS`, `COMMIT`, `COMPLETE_TASK`.
 
 These are parsed from agent output and routed to the appropriate subsystem (FileLockRegistry, ActivityLedger, AgentManager).
+
+## @Mentions
+
+The chat UI supports `@mention` autocomplete for targeting messages to specific agents:
+
+1. **Trigger** — Typing `@` in the chat input opens an autocomplete dropdown showing active agents (by role and short ID)
+2. **Selection** — Select an agent to insert `@{shortId}` into the message
+3. **Delivery** — When the message is sent, @mentioned agents receive the message in parallel with the primary target
+4. **Rendering** — Mentions are rendered as clickable badges in the message UI, with role-appropriate colors
+5. **Markdown-aware** — The mention parser is integrated with the markdown renderer to avoid breaking formatting
+
+## Scoped COMMIT Command
+
+The `COMMIT` command provides safe git operations for multi-agent workflows:
+
+```
+[[[ COMMIT {"message": "feat: implement login endpoint"} ]]]
+```
+
+**How it works:**
+1. Collects all files the agent currently holds locks on (via `LOCK_FILE`)
+2. Generates a `git add <file1> <file2> ...` command with only those specific files
+3. Creates a commit with the provided message and co-authorship attribution
+4. This prevents `git add -A` from accidentally staging other agents' uncommitted work
+
+**Why this matters:** In multi-agent workflows, several agents may have uncommitted changes in the same repository. Without scoped commits, `git add -A` would stage *everyone's* changes into one agent's commit.
 
 ## Inter-Agent Messaging
 
@@ -155,7 +186,7 @@ You are agent def67890 with role "Developer".
 
 ### Event-Driven Refresh
 
-The `ContextRefresher` pushes updated context (`CREW_UPDATE`) to all running agents when significant events occur (agent spawned/killed/exited, file lock acquired/released). Updates are debounced at 2 seconds to batch rapid events.
+The `ContextRefresher` pushes updated context (`CREW_UPDATE`) to all running agents when significant events occur (agent spawned/terminated/exited, file lock acquired/released). Updates are debounced at 2 seconds to batch rapid events.
 
 The refresh includes current peer/agent status and the 20 most recent activity log entries.
 
@@ -168,7 +199,7 @@ All events are broadcast to connected UI clients in real time:
 |-------|---------|-------------|
 | `agent:data` | `{ agentId, data }` | Raw output (PTY mode) |
 | `agent:spawned` | `{ agent }` | New agent created |
-| `agent:killed` | `{ agentId }` | Agent manually stopped |
+| `agent:terminated` | `{ agentId }` | Agent manually terminated |
 | `agent:exit` | `{ agentId, code }` | Agent process exited |
 | `agent:crashed` | `{ agentId, code }` | Non-zero exit detected |
 | `agent:auto_restarted` | `{ agentId, previousAgentId }` | Automatic restart after crash |
@@ -204,6 +235,15 @@ All events are broadcast to connected UI clients in real time:
 | `lock:acquired` | `{ filePath, agentId, agentRole }` | File lock taken |
 | `lock:released` | `{ filePath, agentId }` | File lock freed |
 | `activity` | `{ entry }` | New activity logged |
+
+### Group Chat Events
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `group:created` | `{ group, leadId }` | New group created |
+| `group:message` | `{ message, groupName, leadId }` | Message sent in a group |
+| `group:member_added` | `{ group, agentId, leadId }` | Member added to group |
+| `group:member_removed` | `{ group, agentId, leadId }` | Member removed from group |
+| `group:archived` | `{ group, leadId }` | Group auto-archived (all members terminated) |
 
 ### Client → Server Messages
 | Message | Payload | Description |

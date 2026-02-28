@@ -105,7 +105,7 @@ The schema defines 13 tables across 5 functional areas. All definitions are in `
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `chat_groups` | Group definitions scoped to a lead | `(name, lead_id)` composite |
+| `chat_groups` | Group definitions scoped to a lead, with `archived` flag | `(name, lead_id)` composite |
 | `chat_group_members` | Group membership mapping | `(group_name, lead_id, agent_id)` composite |
 | `chat_group_messages` | Message history within groups | `id` (text) |
 
@@ -128,14 +128,16 @@ Agent plans (reported via ACP `plan` updates) are persisted to the `agent_plans`
 
 This ensures plan state survives agent restarts and is available for post-mortem review.
 
-## Decision Log with User Confirmation
+## Decision Log with Accept/Reject and Reason Comments
 
-The `decisions` table supports a confirmation workflow:
+The `decisions` table supports a confirmation workflow with reason comments:
 
-1. An agent logs a decision via `<!-- DECISION {...} -->`
-2. If `needsConfirmation` is set, the decision appears in the lead dashboard's Decisions panel with "Confirm" / "Reject" actions
-3. Lead confirms or rejects via `POST /api/lead/:id/decisions/:decisionId/:action`
-4. Status transitions: `recorded` → `confirmed` | `rejected`
-5. Confirmed decisions are fed back to agents in context updates; rejected decisions prompt the agent to reconsider
+1. An agent logs a decision via `[[[ DECISION {...} ]]]`
+2. If `needsConfirmation` is set, the decision appears in the lead dashboard's Decisions panel with "Accept" / "Reject" actions
+3. Users can provide a **reason comment** when accepting or rejecting — this context is fed back to agents
+4. Lead confirms or rejects via `POST /api/lead/:id/decisions/:decisionId/:action`
+5. Status transitions: `recorded` → `confirmed` | `rejected`
+6. Confirmed decisions are fed back to agents in context updates; rejected decisions (with the user's reason) prompt the agent to reconsider
+7. **Optimistic UI** — buttons hide immediately on click before server response for a responsive feel
 
 Indexes on `status` and `needs_confirmation` keep the pending-decisions query fast.
