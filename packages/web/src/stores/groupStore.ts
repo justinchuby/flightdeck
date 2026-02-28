@@ -5,6 +5,7 @@ interface GroupState {
   groups: ChatGroup[];
   messages: Record<string, GroupMessage[]>; // keyed by `${leadId}:${groupName}`
   selectedGroup: { leadId: string; name: string } | null;
+  lastSeenTimestamps: Record<string, string>; // key → ISO timestamp of last view
 
   setGroups: (groups: ChatGroup[]) => void;
   addGroup: (group: ChatGroup) => void;
@@ -14,6 +15,8 @@ interface GroupState {
   removeMember: (leadId: string, groupName: string, agentId: string) => void;
   selectGroup: (leadId: string, name: string) => void;
   clearSelection: () => void;
+  markGroupSeen: (key: string) => void;
+  markAllSeen: () => void;
 }
 
 export function groupKey(leadId: string, name: string): string {
@@ -24,6 +27,7 @@ export const useGroupStore = create<GroupState>((set) => ({
   groups: [],
   messages: {},
   selectedGroup: null,
+  lastSeenTimestamps: {},
 
   setGroups: (groups) => set({ groups }),
 
@@ -66,4 +70,13 @@ export const useGroupStore = create<GroupState>((set) => ({
 
   selectGroup: (leadId, name) => set({ selectedGroup: { leadId, name } }),
   clearSelection: () => set({ selectedGroup: null }),
+  markGroupSeen: (key) =>
+    set((s) => ({ lastSeenTimestamps: { ...s.lastSeenTimestamps, [key]: new Date().toISOString() } })),
+  markAllSeen: () =>
+    set((s) => {
+      const now = new Date().toISOString();
+      const updated = { ...s.lastSeenTimestamps };
+      for (const key of Object.keys(s.messages)) updated[key] = now;
+      return { lastSeenTimestamps: updated };
+    }),
 }));

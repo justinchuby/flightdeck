@@ -1,0 +1,1 @@
+ALTER TABLE `chat_groups` ADD `archived` integer DEFAULT 0;

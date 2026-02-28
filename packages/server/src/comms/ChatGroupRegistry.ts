@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, asc, desc, count } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { chatGroups, chatGroupMembers, chatGroupMessages } from '../db/schema.js';
 
@@ -7,6 +7,7 @@ export interface ChatGroup {
   name: string;
   leadId: string;
   projectId?: string;
+  archived?: boolean;
   memberIds: string[];
   createdAt: string;
 }
@@ -136,13 +137,14 @@ export class ChatGroupRegistry extends EventEmitter {
     const rows = this.db.drizzle
       .select()
       .from(chatGroups)
-      .where(eq(chatGroups.leadId, leadId))
+      .where(and(eq(chatGroups.leadId, leadId), eq(chatGroups.archived, 0)))
       .orderBy(asc(chatGroups.createdAt))
       .all();
     return rows.map((row) => ({
       name: row.name,
       leadId: row.leadId,
       projectId: row.projectId || undefined,
+      archived: !!row.archived,
       memberIds: this.getMembers(row.name, row.leadId),
       createdAt: row.createdAt!,
     }));
@@ -154,6 +156,7 @@ export class ChatGroupRegistry extends EventEmitter {
         name: chatGroups.name,
         leadId: chatGroups.leadId,
         projectId: chatGroups.projectId,
+        archived: chatGroups.archived,
         createdAt: chatGroups.createdAt,
       })
       .from(chatGroups)
@@ -161,13 +164,14 @@ export class ChatGroupRegistry extends EventEmitter {
         eq(chatGroups.name, chatGroupMembers.groupName),
         eq(chatGroups.leadId, chatGroupMembers.leadId),
       ))
-      .where(eq(chatGroupMembers.agentId, agentId))
+      .where(and(eq(chatGroupMembers.agentId, agentId), eq(chatGroups.archived, 0)))
       .orderBy(asc(chatGroups.createdAt))
       .all();
     return rows.map((row) => ({
       name: row.name,
       leadId: row.leadId,
       projectId: row.projectId || undefined,
+      archived: !!row.archived,
       memberIds: this.getMembers(row.name, row.leadId),
       createdAt: row.createdAt!,
     }));
@@ -218,6 +222,41 @@ export class ChatGroupRegistry extends EventEmitter {
   findGroupForAgent(groupName: string, agentId: string): ChatGroup | undefined {
     const groups = this.getGroupsForAgent(agentId);
     return groups.find((g) => g.name === groupName);
+  }
+
+  /** Get message count and last message preview for a group */
+  getGroupSummary(groupName: string, leadId: string): { messageCount: number; lastMessage: string | null } {
+    const countRow = this.db.drizzle
+      .select({ cnt: count() })
+      .from(chatGroupMessages)
+      .where(and(eq(chatGroupMessages.groupName, groupName), eq(chatGroupMessages.leadId, leadId)))
+      .get();
+    const messageCount = countRow?.cnt ?? 0;
+
+    const lastRow = this.db.drizzle
+      .select({ content: chatGroupMessages.content, fromRole: chatGroupMessages.fromRole })
+      .from(chatGroupMessages)
+      .where(and(eq(chatGroupMessages.groupName, groupName), eq(chatGroupMessages.leadId, leadId)))
+      .orderBy(desc(chatGroupMessages.timestamp))
+      .limit(1)
+      .get();
+    const lastMessage = lastRow ? `${lastRow.fromRole}: ${lastRow.content.slice(0, 100)}` : null;
+
+    return { messageCount, lastMessage };
+  }
+
+  /** Archive a group (hides from queries but preserves messages) */
+  archiveGroup(name: string, leadId: string): boolean {
+    const result = this.db.drizzle
+      .update(chatGroups)
+      .set({ archived: 1 })
+      .where(and(eq(chatGroups.name, name), eq(chatGroups.leadId, leadId)))
+      .run();
+    if (result.changes > 0) {
+      this.emit('group:archived', { name, leadId });
+      return true;
+    }
+    return false;
   }
 
   exists(name: string, leadId: string): boolean {

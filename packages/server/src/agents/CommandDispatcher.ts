@@ -148,6 +148,7 @@ export class CommandDispatcher {
       { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => this.handleDeferIssue(a, d) },
       { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => this.handleQueryDeferred(a, d) },
       { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => this.handleResolveDeferred(a, d) },
+      { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => this.handleCommit(a, d) },
     ];
 
     let found = true;
@@ -739,7 +740,7 @@ export class CommandDispatcher {
     if (active.length < 3) return;
 
     // Extract first significant word (>3 chars, lowercase) from each task
-    const stopWords = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'implement', 'create', 'build', 'fix', 'add']);
+    const stopWords = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'implement', 'create', 'build', 'fix', 'add', 'review', 'update', 'check', 'test', 'run', 'verify', 'ensure', 'handle', 'process', 'manage']);
     const getKeyword = (task: string): string | null => {
       const words = task.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
       return words.find(w => w.length > 3 && !stopWords.has(w)) ?? null;
@@ -761,9 +762,11 @@ export class CommandDispatcher {
 
       // create is idempotent (onConflictDoNothing), addMembers handles existing members
       this.ctx.chatGroupRegistry.create(lead.id, groupName, memberIds, lead.projectId);
-      this.ctx.chatGroupRegistry.addMembers(lead.id, groupName, memberIds);
+      const newMembers = this.ctx.chatGroupRegistry.addMembers(lead.id, groupName, memberIds);
 
-      // Notify via system message in the group
+      // Only notify when new members are actually added
+      if (newMembers.length === 0) continue;
+
       const names = [...agentIds].map(id => {
         const a = this.ctx.getAgent(id);
         return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
@@ -772,8 +775,8 @@ export class CommandDispatcher {
         `Auto-created coordination group for parallel ${keyword} work. Members: ${names}`);
       lead.sendMessage(`[System] Auto-created group "${groupName}" for ${agentIds.size} agents working on ${keyword}.`);
 
-      // Notify each member they've been added
-      for (const id of agentIds) {
+      // Notify only newly added members
+      for (const id of newMembers) {
         const member = this.ctx.getAgent(id);
         if (member && (member.status === 'running' || member.status === 'idle')) {
           member.sendMessage(`[System] You've been added to coordination group "${groupName}". Use GROUP_MESSAGE {"group": "${groupName}", "content": "..."} to communicate with your peers.`);
@@ -1274,11 +1277,11 @@ CREW_ROSTER ]]]`;
       // Resolve member IDs (support short prefixes) — find within the same team
       const resolvedIds: string[] = [];
 
-      // Role-based membership: auto-add all agents with matching roles
+      // Role-based membership: auto-add all active agents with matching roles
       if (req.roles && Array.isArray(req.roles)) {
         const roleNames = req.roles.map((r: string) => r.toLowerCase());
         for (const a of this.ctx.getAllAgents()) {
-          if ((a.parentId === leadId || a.id === leadId) && roleNames.includes(a.role.id.toLowerCase())) {
+          if ((a.parentId === leadId || a.id === leadId) && roleNames.includes(a.role.id.toLowerCase()) && !isTerminalStatus(a.status)) {
             if (!resolvedIds.includes(a.id)) resolvedIds.push(a.id);
           }
         }
@@ -1705,6 +1708,31 @@ CREW_ROSTER ]]]`;
       }
     } catch (err: any) {
       agent.sendMessage(`[System] RESOLVE_DEFERRED error: ${err.message}`);
+    }
+  }
+
+  private handleCommit(agent: Agent, data: string): void {
+    const match = data.match(COMMIT_REGEX);
+    if (!match) return;
+    try {
+      const req = JSON.parse(match[1]);
+      const message = req.message || `Changes by ${agent.role.name} (${agent.id.slice(0, 8)})`;
+
+      // Collect files this agent has locked (current + recently released)
+      const currentLocks = this.ctx.lockRegistry.getByAgent(agent.id);
+      const files = currentLocks.map(l => l.filePath);
+
+      if (files.length === 0) {
+        agent.sendMessage('[System] COMMIT: No file locks held. Lock files before committing, or specify files manually with {"message": "...", "files": ["path1", "path2"]}.');
+        return;
+      }
+
+      const escapedMsg = message.replace(/"/g, '\\"');
+      const fileList = files.join(' ');
+      agent.sendMessage(`[System] Scoped commit ready. Run:\ngit add ${fileList} && git commit -m "${escapedMsg}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"`);
+      logger.info('commit', `COMMIT helper for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
+    } catch (err: any) {
+      agent.sendMessage(`[System] COMMIT error: use {"message": "your commit message"}`);
     }
   }
 }

@@ -113,6 +113,7 @@ export const chatGroups = sqliteTable('chat_groups', {
   name: text('name').notNull(),
   leadId: text('lead_id').notNull(),
   projectId: text('project_id'),
+  archived: integer('archived').default(0),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
 }, (table) => [
   primaryKey({ columns: [table.name, table.leadId] }),

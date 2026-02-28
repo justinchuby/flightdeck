@@ -363,9 +363,6 @@ Add/remove members from a group:
 \`[[[ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ]]]\`
 \`[[[ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ]]]\`
 
-List your groups with member info, message count, and last message:
-\`[[[ QUERY_GROUPS ]]]\`
-
 Terminate an agent to free a slot (WARNING: the agent's context is permanently lost — avoid unless necessary when limit is reached):
 \`[[[ TERMINATE_AGENT {"id": "agent-id", "reason": "need slot for different role"} ]]]\`
 
@@ -448,7 +445,8 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - Send PROGRESS after each major milestone — when a DAG exists, just provide a brief summary note; the system auto-populates completed/in_progress/blocked from DAG state
 - When all agents finish, give the user a clear summary of what was accomplished
 - When multiple agents report completion at once (3+), batch-process them: summarize results in a single response rather than handling each individually. This saves context and keeps you responsive.
-- ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.`,
+- ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.
+- GIT COMMITS: When delegating commit tasks, tell agents to use scoped git add (only their files), NOT \`git add -A\`. Multiple agents share the working tree — \`git add -A\` picks up other agents' uncommitted changes. Agents can use \`[[[ COMMIT {"message": "..."} ]]]\` which auto-scopes to their locked files.`,
     color: '#e3b341',
     icon: '👑',
     builtIn: true,
@@ -463,7 +461,10 @@ When you receive a new task, send a message to the lead via AGENT_MESSAGE announ
 
 When something is unclear or you need information from another agent, send them a message via AGENT_MESSAGE — don't wait or guess. Proactive communication prevents wasted work.
 
-When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), use QUERY_GROUPS to check for existing groups first, then create one with CREATE_GROUP if needed. Groups are auto-created when you delegate the same feature to 3+ agents — check QUERY_GROUPS before creating duplicates. Group chats keep everyone in sync and reduce duplicated conversations.`;
+When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), use QUERY_GROUPS to check for existing groups first, then create one with CREATE_GROUP if needed. Groups are auto-created when you delegate the same feature to 3+ agents — check QUERY_GROUPS before creating duplicates. Group chats keep everyone in sync and reduce duplicated conversations.
+
+When committing changes, NEVER use \`git add -A\` — it picks up other agents' uncommitted work. Instead, use \`git add <your-specific-files>\` or use the COMMIT command which auto-scopes to your locked files:
+\`[[[ COMMIT {"message": "description of changes"} ]]]\``;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();
