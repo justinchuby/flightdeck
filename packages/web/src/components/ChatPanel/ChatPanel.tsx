@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
+import { useRef, useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { X, Send, Maximize2, Minimize2, Megaphone } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
-import '@xterm/xterm/css/xterm.css';
 
 interface Props {
   agentId: string;
@@ -20,9 +17,6 @@ interface Props {
 }
 
 export function ChatPanel({ agentId, ws }: Props) {
-  const termRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
   const [inputText, setInputText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [broadcast, setBroadcast] = useState(false);
@@ -69,67 +63,6 @@ export function ChatPanel({ agentId, ws }: Props) {
     setMentionQuery(null);
     inputRef.current?.focus();
   };
-
-  const isPty = agent?.mode !== 'acp';
-
-  useEffect(() => {
-    if (!isPty || !termRef.current) return;
-
-    const terminal = new Terminal({
-      theme: {
-        background: '#0d1117',
-        foreground: '#c9d1d9',
-        cursor: '#58a6ff',
-        selectionBackground: '#388bfd44',
-      },
-      fontSize: 13,
-      fontFamily: 'Menlo, Monaco, Consolas, monospace',
-      cursorBlink: true,
-      scrollback: 5000,
-    });
-
-    const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
-    terminal.open(termRef.current);
-    fitAddon.fit();
-
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-
-    // Subscribe to agent output
-    ws.subscribe(agentId);
-
-    // Handle terminal input
-    terminal.onData((data) => {
-      ws.sendInput(agentId, data);
-    });
-
-    // Handle resize
-    const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
-      ws.resizeAgent(agentId, terminal.cols, terminal.rows);
-    });
-    resizeObserver.observe(termRef.current);
-
-    // Listen for WebSocket messages forwarded via custom window events
-    const handleWsMessage = (event: Event) => {
-      const msg = JSON.parse((event as MessageEvent).data);
-      if (msg.type === 'agent:data' && msg.agentId === agentId) {
-        terminal.write(msg.data);
-      } else if (msg.type === 'agent:buffer' && msg.agentId === agentId) {
-        terminal.write(msg.data);
-      }
-    };
-
-    window.addEventListener('ws-message', handleWsMessage);
-
-    return () => {
-      ws.unsubscribe(agentId);
-      resizeObserver.disconnect();
-      terminal.dispose();
-      window.removeEventListener('ws-message', handleWsMessage);
-    };
-  }, [agentId, ws, isPty]);
 
   const runningAgents = agents.filter((a) => a.status === 'running');
 
@@ -187,11 +120,7 @@ export function ChatPanel({ agentId, ws }: Props) {
         </div>
       </div>
 
-      {agent?.mode === 'acp' ? (
-        <AcpOutput agentId={agentId} />
-      ) : (
-        <div ref={termRef} className="flex-1 overflow-hidden" />
-      )}
+      <AcpOutput agentId={agentId} />
 
       <div className="border-t border-gray-700 p-2 shrink-0 relative">
         {mentionSuggestions.length > 0 && (

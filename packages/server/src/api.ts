@@ -236,7 +236,7 @@ export function apiRouter(
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
     try {
-      const agent = agentManager.spawn(role, task, undefined, 'acp', true, model, cwd, resumeSessionId);
+      const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId);
       agent.projectName = name || task?.slice(0, 60) || `Project ${new Date().toLocaleDateString()}`;
       logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
         task: task?.slice(0, 80),

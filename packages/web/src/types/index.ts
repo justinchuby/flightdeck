@@ -40,8 +40,6 @@ export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'faile
 
 // ACP Protocol Types
 
-export type AgentMode = 'pty' | 'acp';
-
 export interface AcpTextChunk {
   type: 'text';
   text: string;
@@ -85,7 +83,6 @@ export interface AcpPermissionRequest {
 
 export interface AcpSessionInfo {
   sessionId: string;
-  mode: AgentMode;
   isPrompting: boolean;
 }
 
@@ -109,7 +106,6 @@ export interface AgentInfo {
   childIds: string[];
   createdAt: string;
   outputPreview: string;
-  mode: AgentMode;
   autopilot: boolean;
   session?: AcpSessionInfo;
   sessionId?: string | null;

@@ -146,15 +146,6 @@ export function AgentActivityTable({ agents, tasks, locks, api }: Props) {
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${STATUS_DOT[agent.status] ?? 'bg-gray-400'}`} />
                     <span className="text-xs text-gray-300 capitalize">{agent.status}</span>
-                    <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${
-                        agent.mode === 'acp'
-                          ? 'bg-blue-500/20 text-blue-400'
-                          : 'bg-gray-500/20 text-gray-400'
-                      }`}
-                    >
-                      {agent.mode === 'acp' ? 'ACP' : 'PTY'}
-                    </span>
                   </div>
                 </td>
 

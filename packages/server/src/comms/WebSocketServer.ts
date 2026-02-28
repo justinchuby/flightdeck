@@ -237,12 +237,7 @@ export class WebSocketServer {
         break;
 
       case 'resize':
-        if (msg.agentId) {
-          const agent = agentManager.get(msg.agentId);
-          if (agent) {
-            agent.resize(msg.cols, msg.rows);
-          }
-        }
+        // resize is no longer supported (PTY mode removed)
         break;
 
       case 'permission_response':

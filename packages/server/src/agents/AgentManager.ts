@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { Agent } from './Agent.js';
-import type { AgentContextInfo, AgentMode } from './Agent.js';
+import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
@@ -130,7 +130,7 @@ export class AgentManager extends EventEmitter {
     });
   }
 
-  spawn(role: Role, task?: string, parentId?: string, mode?: AgentMode, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string): Agent {
+  spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
       throw new Error(
@@ -156,7 +156,7 @@ export class AgentManager extends EventEmitter {
       effectiveRole = { ...role, systemPrompt: role.systemPrompt.replace('{{ROLE_LIST}}', roleList) };
     }
 
-    const agent = new Agent(effectiveRole, this.config, task, parentId, peers, mode, autopilot, id);
+    const agent = new Agent(effectiveRole, this.config, task, parentId, peers, autopilot, id);
     if (model) agent.model = model;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
@@ -176,25 +176,11 @@ export class AgentManager extends EventEmitter {
 
     // Listen for data to detect sub-agent spawn requests and coordination commands
     agent.onData((data) => {
-      if (agent.mode === 'acp') {
-        this.emit('agent:text', agent.id, data);
-        // Buffer ACP text and scan for complete command patterns
-        const buf = (this.textBuffers.get(agent.id) || '') + data;
-        this.textBuffers.set(agent.id, buf);
-        this.scanBuffer(agent);
-      } else {
-        this.emit('agent:data', agent.id, data);
-        // PTY data arrives in larger chunks — match directly
-        this.detectSpawnRequest(agent, data);
-        this.detectCreateAgent(agent, data);
-        this.detectLockRequest(agent, data);
-        this.detectLockRelease(agent, data);
-        this.detectActivity(agent, data);
-        this.detectAgentMessage(agent, data);
-        this.detectDelegate(agent, data);
-        this.detectDecision(agent, data);
-        this.detectProgress(agent, data);
-      }
+      this.emit('agent:text', agent.id, data);
+      // Buffer ACP text and scan for complete command patterns
+      const buf = (this.textBuffers.get(agent.id) || '') + data;
+      this.textBuffers.set(agent.id, buf);
+      this.scanBuffer(agent);
     });
 
     agent.onToolCall((info) => {
@@ -297,7 +283,7 @@ export class AgentManager extends EventEmitter {
         if (this.autoRestart && count < this.maxRestarts) {
           logger.warn('agent', `Auto-restarting ${agent.role.name} (attempt ${count + 1}/${this.maxRestarts})`);
           setTimeout(() => {
-            const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined);
+            const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined);
             this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
           }, 2000);
         } else if (count >= this.maxRestarts) {
@@ -324,7 +310,6 @@ export class AgentManager extends EventEmitter {
 
     agent.start();
     logger.info('agent', `Spawned ${role.name} (${agent.id.slice(0, 8)})`, {
-      mode: agent.mode,
       autopilot: agent.autopilot,
       parentId: parentId?.slice(0, 8),
       task,
@@ -368,7 +353,7 @@ export class AgentManager extends EventEmitter {
     agent.kill();
     this.agents.delete(id);
     // Re-spawn with same ID and resume the session if available
-    const newAgent = this.spawn(role, task, parentId, undefined, undefined, model || undefined, cwd, sessionId || undefined, id);
+    const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id);
     this.emit('agent:restarted', { oldId: id, newAgent: newAgent.toJSON() });
     return newAgent;
   }
@@ -591,7 +576,7 @@ export class AgentManager extends EventEmitter {
         return;
       }
 
-      const child = this.spawn(role, req.task, agent.id, 'acp', true, req.model, agent.cwd, req.sessionId);
+      const child = this.spawn(role, req.task, agent.id, true, req.model, agent.cwd, req.sessionId);
       if (role.id === 'lead') {
         child.hierarchyLevel = agent.hierarchyLevel + 1;
       }
@@ -1386,7 +1371,7 @@ CREW_ROSTER ]]]`;
         const role = this.roleRegistry?.get(task.role);
         if (role) {
           try {
-            const child = this.spawn(role, task.description, lead.id, 'acp', true, task.model, lead.cwd);
+            const child = this.spawn(role, task.description, lead.id, true, task.model, lead.cwd);
             const taskPrompt = `[DAG Task] ${task.id}: ${task.description}\nFiles: ${task.files.join(', ') || 'none declared'}`;
             child.sendMessage(taskPrompt);
             this.taskDAG.startTask(lead.id, task.id, child.id);

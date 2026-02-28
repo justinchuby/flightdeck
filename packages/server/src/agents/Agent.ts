@@ -1,7 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { PtyManager } from '../pty/PtyManager.js';
 import { AcpConnection } from '../acp/AcpConnection.js';
 import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
 import type { Role } from './RoleRegistry.js';
@@ -9,7 +8,6 @@ import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { agentFlagForRole } from './agentFiles.js';
 
-export type AgentMode = 'pty' | 'acp';
 export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed';
 
 export interface AgentContextInfo {
@@ -27,7 +25,6 @@ export interface AgentJSON {
   id: string;
   role: Role;
   status: AgentStatus;
-  mode: AgentMode;
   autopilot: boolean;
   task?: string;
   parentId?: string;
@@ -53,7 +50,6 @@ export class Agent {
   public readonly id: string;
   public readonly role: Role;
   public readonly createdAt: Date;
-  public readonly mode: AgentMode;
   public readonly autopilot: boolean;
   public status: AgentStatus = 'creating';
   public task?: string;
@@ -84,7 +80,6 @@ export class Agent {
   public contextWindowUsed = 0;
   private killed = false;
 
-  private pty: PtyManager;
   private acpConnection: AcpConnection | null = null;
   private config: ServerConfig;
   private dataListeners: Array<(data: string) => void> = [];
@@ -103,16 +98,14 @@ export class Agent {
   /** Resume a previous session by its Copilot session ID */
   public resumeSessionId?: string;
 
-  constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], mode?: AgentMode, autopilot?: boolean, id?: string) {
+  constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], autopilot?: boolean, id?: string) {
     this.id = id || uuid();
     this.role = role;
     this.config = config;
     this.task = task;
     this.parentId = parentId;
     this.createdAt = new Date();
-    this.mode = mode ?? config.defaultAgentMode;
     this.autopilot = autopilot ?? false;
-    this.pty = new PtyManager();
     this.peers = peers;
   }
 
@@ -121,22 +114,12 @@ export class Agent {
     const isResume = !!this.resumeSessionId;
 
     if (isResume) {
-      // Resume: use --resume flag, send a lighter prompt
-      if (this.mode === 'acp') {
-        this.startAcp(undefined);
-      } else {
-        this.startPty(undefined);
-      }
+      this.startAcp(undefined);
     } else {
       const contextManifest = this.buildContextManifest(this.peers, this.budget);
       const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
       const initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
-
-      if (this.mode === 'acp') {
-        this.startAcp(initialPrompt);
-      } else {
-        this.startPty(initialPrompt);
-      }
+      this.startAcp(initialPrompt);
     }
   }
 
@@ -145,57 +128,6 @@ export class Agent {
     if (!existsSync(sharedDir)) {
       try { mkdirSync(sharedDir, { recursive: true }); } catch {}
     }
-  }
-
-  private startPty(initialPrompt?: string): void {
-    const args = [
-      ...this.config.cliArgs,
-      `--agent=${agentFlagForRole(this.role.id)}`,
-      ...(this.model || this.role.model ? ['--model', this.model || this.role.model!] : []),
-      ...(this.resumeSessionId ? ['--resume', this.resumeSessionId] : []),
-    ];
-    this.pty.spawn({
-      command: this.config.cliCommand,
-      args,
-      cwd: this.cwd,
-      env: {
-        AI_CREW_AGENT_ID: this.id,
-        AI_CREW_ROLE: this.role.id,
-      },
-    });
-
-    this.status = 'running';
-
-    // Send initial role context after a short delay for CLI to initialize (skip for resumes)
-    if (initialPrompt) {
-      setTimeout(() => {
-        if (this.pty.isRunning) {
-          this.pty.write(initialPrompt + '\n');
-        }
-      }, 1000);
-    }
-
-    this.pty.on('data', (data: string) => {
-      for (const listener of this.dataListeners) {
-        listener(data);
-      }
-    });
-
-    this.pty.on('exit', (code: number) => {
-      if (!this.killed) {
-        this.status = code === 0 ? 'completed' : 'failed';
-      }
-      for (const listener of this.exitListeners) {
-        listener(code);
-      }
-    });
-
-    this.pty.on('hung', (elapsedMs: number) => {
-      this.status = 'idle';
-      for (const listener of this.hungListeners) {
-        listener(elapsedMs);
-      }
-    });
   }
 
   private startAcp(initialPrompt?: string): void {
@@ -522,39 +454,27 @@ ${crewStatus}${budgetLine}
 ${activityLines}
 CREW_UPDATE ]]]`;
 
-    if (this.mode === 'acp') {
-      if (this.acpConnection?.isConnected) {
-        this.acpConnection.prompt(update).catch(() => {});
-      }
-    } else {
-      if (this.pty.isRunning) {
-        this.pty.write(update + '\n');
-      }
+    if (this.acpConnection?.isConnected) {
+      this.acpConnection.prompt(update).catch(() => {});
     }
   }
 
   write(data: string): void {
-    if (this.mode === 'acp') {
-      if (this.acpConnection?.isConnected) {
-        this.status = 'running';
-        for (const listener of this.statusListeners) {
-          listener(this.status);
-        }
-        this.acpConnection.prompt(data).catch((err) => {
-          logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
-          // Reset status so agent doesn't get stuck as 'running'
-          if (this.status === 'running') {
-            this.status = 'idle';
-            for (const listener of this.statusListeners) {
-              listener(this.status);
-            }
+    if (this.acpConnection?.isConnected) {
+      this.status = 'running';
+      for (const listener of this.statusListeners) {
+        listener(this.status);
+      }
+      this.acpConnection.prompt(data).catch((err) => {
+        logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
+        // Reset status so agent doesn't get stuck as 'running'
+        if (this.status === 'running') {
+          this.status = 'idle';
+          for (const listener of this.statusListeners) {
+            listener(this.status);
           }
-        });
-      }
-    } else {
-      if (this.pty.isRunning) {
-        this.pty.write(data);
-      }
+        }
+      });
     }
   }
 
@@ -574,7 +494,7 @@ CREW_UPDATE ]]]`;
 
   /** Interrupt current work, then send message */
   async interruptWithMessage(message: string): Promise<void> {
-    if (this.mode === 'acp' && this.acpConnection && this.status === 'running') {
+    if (this.acpConnection && this.status === 'running') {
       // Clear any queued messages — interrupt takes priority
       this.pendingMessages.length = 0;
       await this.acpConnection.cancel();
@@ -591,7 +511,7 @@ CREW_UPDATE ]]]`;
 
   /** Cancel the agent's current work (ACP cancel signal) */
   async interrupt(): Promise<void> {
-    if (this.mode === 'acp' && this.acpConnection) {
+    if (this.acpConnection) {
       await this.acpConnection.cancel();
     }
   }
@@ -605,11 +525,9 @@ CREW_UPDATE ]]]`;
   kill(): void {
     this.killed = true;
     this.status = 'completed';
-    if (this.mode === 'acp' && this.acpConnection) {
+    if (this.acpConnection) {
       this.acpConnection.kill();
       this.acpConnection = null;
-    } else {
-      this.pty.kill();
     }
   }
 
@@ -622,12 +540,6 @@ CREW_UPDATE ]]]`;
     this.planListeners.length = 0;
     this.permissionRequestListeners.length = 0;
     this.contextCompactedListeners.length = 0;
-  }
-
-  resize(cols: number, rows: number): void {
-    if (this.mode === 'pty') {
-      this.pty.resize(cols, rows);
-    }
   }
 
   onData(listener: (data: string) => void): void {
@@ -671,19 +583,15 @@ CREW_UPDATE ]]]`;
   }
 
   getBufferedOutput(): string {
-    if (this.mode === 'acp') {
-      return this.messages.join('');
-    }
-    return this.pty.getBufferedOutput();
+    return this.messages.join('');
   }
 
   toJSON(): AgentJSON {
-    const output = this.mode === 'pty' ? this.pty.getBufferedOutput() : this.messages.join('');
+    const output = this.messages.join('');
     return {
       id: this.id,
       role: this.role,
       status: this.status,
-      mode: this.mode,
       autopilot: this.autopilot,
       task: this.task,
       parentId: this.parentId,

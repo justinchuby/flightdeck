@@ -5,7 +5,6 @@ export interface ServerConfig {
   cliArgs: string[];
   maxConcurrentAgents: number;
   dbPath: string;
-  defaultAgentMode: 'pty' | 'acp';
 }
 
 const defaults: ServerConfig = {
@@ -15,7 +14,6 @@ const defaults: ServerConfig = {
   cliArgs: [],
   maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '10', 10),
   dbPath: process.env.DB_PATH || './ai-crew.db',
-  defaultAgentMode: (process.env.AGENT_MODE as 'pty' | 'acp') || 'acp',
 };
 
 let config: ServerConfig = { ...defaults };
