@@ -111,7 +111,7 @@ const mockAgentManager = {
   getAll: vi.fn().mockReturnValue([]),
   get: vi.fn().mockReturnValue(undefined),
   spawn: vi.fn(),
-  kill: vi.fn().mockReturnValue(true),
+  terminate: vi.fn().mockReturnValue(true),
   restart: vi.fn().mockReturnValue(null),
   resolvePermission: vi.fn().mockReturnValue(true),
   setMaxConcurrent: vi.fn(),
@@ -208,7 +208,7 @@ beforeEach(() => {
   // Reset default return values after clearAllMocks wipes them
   mockAgentManager.getAll.mockReturnValue([]);
   mockAgentManager.get.mockReturnValue(undefined);
-  mockAgentManager.kill.mockReturnValue(true);
+  mockAgentManager.terminate.mockReturnValue(true);
   mockAgentManager.restart.mockReturnValue(null);
   mockAgentManager.resolvePermission.mockReturnValue(true);
   mockAgentManager.getDecisionLog.mockReturnValue(mockDecisionLog);
@@ -330,14 +330,14 @@ describe('Agents', () => {
     expect(body.error).toBe('Validation error');
   });
 
-  it('DELETE /api/agents/:id kills agent', async () => {
-    mockAgentManager.kill.mockReturnValue(true);
+  it('DELETE /api/agents/:id terminates agent', async () => {
+    mockAgentManager.terminate.mockReturnValue(true);
 
     const res = await del('/api/agents/agent-123');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ ok: true });
-    expect(mockAgentManager.kill).toHaveBeenCalledWith('agent-123');
+    expect(mockAgentManager.terminate).toHaveBeenCalledWith('agent-123');
   });
 
   it('POST /api/agents/:id/message queues message (default mode)', async () => {

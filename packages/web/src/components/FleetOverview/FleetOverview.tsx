@@ -66,7 +66,7 @@ export function FleetOverview({ api, ws }: Props) {
       if (
         msg.type === 'agent:spawned' ||
         msg.type === 'agent:exit' ||
-        msg.type === 'agent:killed' ||
+        msg.type === 'agent:terminated' ||
         msg.type === 'agent:tool_call' ||
         msg.type === 'agent:plan' ||
         msg.type === 'lock:acquired' ||

@@ -51,7 +51,7 @@ export function useApi() {
     });
   }, []);
 
-  const killAgent = useCallback(async (id: string) => {
+  const terminateAgent = useCallback(async (id: string) => {
     return apiFetch(`/agents/${id}`, { method: 'DELETE' });
   }, []);
 
@@ -130,7 +130,7 @@ export function useApi() {
 
   return {
     spawnAgent,
-    killAgent,
+    terminateAgent,
     interruptAgent,
     restartAgent,
     updateAgent,

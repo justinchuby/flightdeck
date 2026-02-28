@@ -64,7 +64,7 @@ export function apiRouter(
   });
 
   router.delete('/agents/:id', (req, res) => {
-    const ok = agentManager.kill(req.params.id);
+    const ok = agentManager.terminate(req.params.id);
     res.json({ ok });
   });
 

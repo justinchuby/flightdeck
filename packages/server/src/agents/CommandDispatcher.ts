@@ -72,7 +72,7 @@ export interface CommandContext {
   getAllAgents(): Agent[];
   getRunningCount(): number;
   spawnAgent(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string): Agent;
-  killAgent(id: string): boolean;
+  terminateAgent(id: string): boolean;
   emit(event: string, ...args: any[]): boolean;
   roleRegistry: RoleRegistry;
   config: ServerConfig;
@@ -344,7 +344,7 @@ export class CommandDispatcher {
     this.reportedCompletions.delete(`${agentId}:exit`);
   }
 
-  /** Mark all active delegations involving an agent as failed (used when agent is killed) */
+  /** Mark all active delegations involving an agent as failed (used when agent is terminated) */
   completeDelegationsForAgent(agentId: string): void {
     for (const [, del] of this.delegations) {
       if (del.status === 'active' && del.toAgentId === agentId) {
@@ -759,7 +759,25 @@ export class CommandDispatcher {
     if (!match) return;
 
     try {
-      const progress = JSON.parse(match[1]);
+      const manual = JSON.parse(match[1]);
+      const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
+
+      // When a DAG exists, auto-derive computed fields from it
+      let progress = manual;
+      if (leadId) {
+        const dagStatus = this.ctx.taskDAG.getStatus(leadId);
+        if (dagStatus.tasks.length > 0) {
+          const { summary } = dagStatus;
+          progress = {
+            summary: manual.summary || `${summary.done}/${dagStatus.tasks.length} tasks complete`,
+            completed: dagStatus.tasks.filter(t => t.dagStatus === 'done').map(t => t.id),
+            in_progress: dagStatus.tasks.filter(t => t.dagStatus === 'running').map(t => t.id),
+            blocked: dagStatus.tasks.filter(t => t.dagStatus === 'blocked' || t.dagStatus === 'failed').map(t => t.id),
+            note: manual.summary,
+          };
+        }
+      }
+
       logger.info('lead', `Progress update from ${agent.role.name} (${agent.id.slice(0, 8)})`, progress);
       this.ctx.emit('lead:progress', { agentId: agent.id, ...progress });
 
@@ -956,7 +974,7 @@ CREW_ROSTER ]]]`;
       const roleName = target.role.name;
       const shortId = target.id.slice(0, 8);
 
-      this.ctx.killAgent(target.id);
+      this.ctx.terminateAgent(target.id);
 
       const ackMsg = `[System] Terminated ${roleName} (${shortId}).${sessionId ? ` Session ID: ${sessionId} — use this in CREATE_AGENT with "sessionId" to resume later.` : ''} Freed 1 agent slot. ${req.reason ? `Reason: ${req.reason}` : ''}`;
       agent.sendMessage(ackMsg);

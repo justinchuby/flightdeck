@@ -28,7 +28,7 @@ export type { Delegation } from './CommandDispatcher.js';
 // ── Typed event map for AgentManager ────────────────────────────────
 export interface AgentManagerEvents {
   'agent:spawned': ReturnType<Agent['toJSON']>;
-  'agent:killed': string;
+  'agent:terminated': string;
   'agent:exit': { agentId: string; code: number };
   'agent:text': { agentId: string; text: string };
   'agent:tool_call': { agentId: string; toolCall: ToolCallInfo };
@@ -44,7 +44,7 @@ export interface AgentManagerEvents {
   'agent:auto_restarted': { agentId: string; previousAgentId: string; crashCount: number };
   'agent:restart_limit': { agentId: string };
   'agent:hung': { agentId: string; elapsedMs: number };
-  'agent:hung_killed': { agentId: string };
+  'agent:hung_terminated': { agentId: string };
   'agent:restarted': { oldId: string; newAgent: ReturnType<Agent['toJSON']> };
   // Events emitted via CommandDispatcher pass-through
   'agent:sub_spawned': { parentId: string; child: ReturnType<Agent['toJSON']> };
@@ -78,8 +78,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
   private messageBuffers: Map<string, string> = new Map(); // agentId → buffered text
   private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  /** If set, auto-kill agents after this many ms past the initial hung detection */
-  private autoKillTimeoutMs: number | null;
+  /** If set, auto-terminate agents after this many ms past the initial hung detection */
+  private autoTerminateTimeoutMs: number | null;
   private hungTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private crashCounts: Map<string, number> = new Map();
   private maxRestarts: number;
@@ -116,14 +116,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.maxConcurrent = config.maxConcurrentAgents;
     this.maxRestarts = maxRestarts;
     this.autoRestart = autoRestart;
-    this.autoKillTimeoutMs = null;
+    this.autoTerminateTimeoutMs = null;
 
     this.dispatcher = new CommandDispatcher({
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),
       getRunningCount: () => this.getRunningCount(),
       spawnAgent: (role, task, parentId, autopilot, model, cwd) => this.spawn(role, task, parentId, autopilot, model, cwd),
-      killAgent: (id) => this.kill(id),
+      terminateAgent: (id) => this.terminate(id),
       emit: (event: string, ...args: any[]) => this.emit(event as any, args[0]),
       roleRegistry: this.roleRegistry,
       config: this.config,
@@ -190,7 +190,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
       throw new Error(
-        `Concurrency limit reached (${this.maxConcurrent}). Kill an agent or increase the limit.`,
+        `Concurrency limit reached (${this.maxConcurrent}). Terminate an agent or increase the limit.`,
       );
     }
 
@@ -433,14 +433,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agent.onHung((elapsedMs) => {
       this.emit('agent:hung', { agentId: agent.id, elapsedMs });
 
-      if (this.autoKillTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
+      if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
         const timer = setTimeout(() => {
           this.hungTimers.delete(agent.id);
           if (agent.status === 'idle') {
-            this.kill(agent.id);
-            this.emit('agent:hung_killed', { agentId: agent.id });
+            this.terminate(agent.id);
+            this.emit('agent:hung_terminated', { agentId: agent.id });
           }
-        }, this.autoKillTimeoutMs);
+        }, this.autoTerminateTimeoutMs);
         this.hungTimers.set(agent.id, timer);
       }
     });
@@ -456,7 +456,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return agent;
   }
 
-  kill(id: string, visited: Set<string> = new Set()): boolean {
+  terminate(id: string, visited: Set<string> = new Set()): boolean {
     if (visited.has(id)) return false;
     visited.add(id);
 
@@ -465,18 +465,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.clearHungTimer(id);
     this.dispatcher.clearBuffer(id);
 
-    // Release any file locks held by the killed agent
+    // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
     if (releasedCount > 0) {
-      logger.info('lock', `Auto-released ${releasedCount} lock(s) for killed agent ${id.slice(0, 8)}`);
+      logger.info('lock', `Auto-released ${releasedCount} lock(s) for terminated agent ${id.slice(0, 8)}`);
     }
 
-    // Cascade: kill orphaned children recursively
+    // Cascade: terminate orphaned children recursively
     for (const childId of [...agent.childIds]) {
       const child = this.agents.get(childId);
       if (child && !isTerminalStatus(child.status)) {
-        logger.info('agent', `Cascade-killing orphaned child ${child.role.name} (${childId.slice(0, 8)})`);
-        this.kill(childId, visited);
+        logger.info('agent', `Cascade-terminating orphaned child ${child.role.name} (${childId.slice(0, 8)})`);
+        this.terminate(childId, visited);
       }
     }
 
@@ -492,8 +492,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
 
-    agent.kill();
-    this.emit('agent:killed', id);
+    agent.terminate();
+    this.emit('agent:terminated', id);
 
     // Clean up heartbeat tracking
     this.heartbeat.trackRemoved(id);
@@ -525,7 +525,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return null;
     const { role, task, sessionId, parentId, model, cwd } = agent;
-    agent.kill();
+    agent.terminate();
     this.agents.delete(id);
     // Re-spawn with same ID and resume the session if available
     const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id);
@@ -563,9 +563,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.maxRestarts = n;
   }
 
-  /** Set auto-kill timeout (ms) for hung agents. Pass null to disable. */
-  setAutoKillTimeout(ms: number | null): void {
-    this.autoKillTimeoutMs = ms;
+  /** Set auto-terminate timeout (ms) for hung agents. Pass null to disable. */
+  setAutoTerminateTimeout(ms: number | null): void {
+    this.autoTerminateTimeoutMs = ms;
   }
 
   resolvePermission(agentId: string, approved: boolean): boolean {
@@ -587,7 +587,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.heartbeat.stop();
     for (const agent of this.agents.values()) {
       if (!isTerminalStatus(agent.status)) {
-        agent.kill();
+        agent.terminate();
       }
     }
   }

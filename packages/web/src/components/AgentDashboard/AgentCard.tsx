@@ -96,7 +96,7 @@ export function AgentCard({ agent, api }: Props) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  api.killAgent(agent.id);
+                  api.terminateAgent(agent.id);
                   setConfirmKill(false);
                 }}
                 onBlur={() => setConfirmKill(false)}

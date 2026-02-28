@@ -84,7 +84,7 @@ export class Agent {
   /** Context window info from ACP usage_update */
   public contextWindowSize = 0;
   public contextWindowUsed = 0;
-  private killed = false;
+  private terminated = false;
 
   private acpConnection: AcpConnection | null = null;
   private config: ServerConfig;
@@ -175,7 +175,7 @@ export class Agent {
     const conn = this.acpConnection!;
 
     conn.on('text', (text: string) => {
-      if (this.killed) return;
+      if (this.terminated) return;
       this.messages.push(text);
       if (this.messages.length > Agent.MAX_MESSAGES) {
         this.messages = this.messages.slice(-Agent.MAX_MESSAGES);
@@ -198,7 +198,7 @@ export class Agent {
     });
 
     conn.on('tool_call', (info: ToolCallInfo) => {
-      if (this.killed) return;
+      if (this.terminated) return;
       const idx = this.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
       if (idx >= 0) {
         this.toolCalls[idx] = info;
@@ -258,7 +258,7 @@ export class Agent {
     });
 
     conn.on('exit', (code: number) => {
-      if (!this.killed) {
+      if (!this.terminated) {
         this.status = code === 0 ? 'completed' : 'failed';
       }
       for (const listener of this.exitListeners) {
@@ -268,7 +268,7 @@ export class Agent {
 
     // When a prompt finishes, mark delegated agents as idle (task done, awaiting next)
     conn.on('prompt_complete', (_stopReason: string) => {
-      if (this.killed) return;
+      if (this.terminated) return;
       if (this.status === 'running' && !this.acpConnection?.isPrompting) {
         // Drain queued messages before going idle
         if (this.pendingMessages.length > 0) {
@@ -288,7 +288,7 @@ export class Agent {
 
     // When a prompt starts (including queued/drained prompts), ensure status is 'running'
     conn.on('prompting', (active: boolean) => {
-      if (this.killed) return;
+      if (this.terminated) return;
       if (active && this.status !== 'running') {
         this.status = 'running';
         for (const listener of this.statusListeners) {
@@ -487,7 +487,7 @@ CREW_UPDATE ]]]`;
   }
 
   write(data: string): void {
-    if (this.killed) return;
+    if (this.terminated) return;
     if (this.acpConnection?.isConnected) {
       this.status = 'running';
       for (const listener of this.statusListeners) {
@@ -563,15 +563,15 @@ CREW_UPDATE ]]]`;
     }
   }
 
-  kill(): void {
-    if (this.killed) return;
-    this.killed = true;
+  terminate(): void {
+    if (this.terminated) return;
+    this.terminated = true;
     this.status = 'terminated';
     for (const listener of this.statusListeners) {
       listener(this.status);
     }
     if (this.acpConnection) {
-      this.acpConnection.kill();
+      this.acpConnection.terminate();
       this.acpConnection = null;
     }
   }

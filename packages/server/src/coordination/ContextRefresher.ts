@@ -21,7 +21,7 @@ export class ContextRefresher {
     // Listen to significant events with debounce
     const debouncedRefresh = () => this.scheduleRefresh();
     this.agentManager.on('agent:spawned', debouncedRefresh);
-    this.agentManager.on('agent:killed', debouncedRefresh);
+    this.agentManager.on('agent:terminated', debouncedRefresh);
     this.agentManager.on('agent:exit', debouncedRefresh);
     this.lockRegistry.on('lock:acquired', debouncedRefresh);
     this.lockRegistry.on('lock:released', debouncedRefresh);
@@ -34,7 +34,7 @@ export class ContextRefresher {
 
   start(): void {
     // Event-driven refresh only — no periodic timer.
-    // Context updates are pushed on significant events (spawn, kill, lock changes)
+    // Context updates are pushed on significant events (spawn, terminate, lock changes)
     // to avoid wasting tokens on idle heartbeats.
   }
 

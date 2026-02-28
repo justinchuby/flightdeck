@@ -345,7 +345,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            api.killAgent(agent.id);
+                            api.terminateAgent(agent.id);
                             setConfirmKillIds((s) => { const n = new Set(s); n.delete(agent.id); return n; });
                           }}
                           onBlur={() => setConfirmKillIds((s) => { const n = new Set(s); n.delete(agent.id); return n; })}

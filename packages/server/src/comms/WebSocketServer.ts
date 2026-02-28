@@ -96,8 +96,8 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:spawned', agent: agentJson });
     });
 
-    agentManager.on('agent:killed', (agentId: string) => {
-      this.broadcastAll({ type: 'agent:killed', agentId });
+    agentManager.on('agent:terminated', (agentId: string) => {
+      this.broadcastAll({ type: 'agent:terminated', agentId });
     });
 
     agentManager.on('agent:exit', ({ agentId, code }: { agentId: string; code: number }) => {

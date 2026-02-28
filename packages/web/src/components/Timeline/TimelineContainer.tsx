@@ -18,13 +18,9 @@ const LANE_HEIGHT = 56;
 const LANE_HEIGHT_EXPANDED = 160;
 const LANE_GAP = 2;
 const AXIS_HEIGHT = 32;
-const BRUSH_HEIGHT = 48;
 const ZOOM_FACTOR_IN = 0.6;
 const ZOOM_FACTOR_OUT = 1.5;
 const MIN_VISIBLE_MS = 5_000; // 5 seconds minimum visible range
-const MIN_ZOOM = 0.002;   // px per ms (very zoomed out)
-const MAX_ZOOM = 2;        // px per ms (very zoomed in)
-const DEFAULT_ZOOM = 0.05; // px per ms
 
 const STATUS_COLORS: Record<string, { fill: string; border: string }> = {
   creating:   { fill: 'rgba(210,153,34,0.3)',  border: '#d29922' },
@@ -33,12 +29,6 @@ const STATUS_COLORS: Record<string, { fill: string; border: string }> = {
   completed:  { fill: 'rgba(88,166,255,0.3)',  border: '#58a6ff' },
   failed:     { fill: 'rgba(248,81,73,0.3)',   border: '#f85149' },
   terminated: { fill: 'rgba(240,136,62,0.3)',  border: '#f0883e' },
-};
-
-const COMM_STYLES: Record<string, { stroke: string }> = {
-  delegation: { stroke: 'rgba(88,166,255,0.60)' },
-  message:    { stroke: 'rgba(163,113,247,0.50)' },
-  broadcast:  { stroke: 'rgba(247,120,186,0.40)' },
 };
 
 const ROLE_ICONS: Record<string, string> = {
@@ -172,7 +162,6 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isAutoScrolling = useRef(false);
 
   const fullRange = useMemo(() => ({
     start: new Date(data.timeRange.start),
@@ -181,11 +170,25 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
 
   const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date }>(fullRange);
 
-  // Reset visible range when full range changes (new data)
-  useEffect(() => { setVisibleRange(fullRange); }, [fullRange]);
+  // Live mode: keep visible range pinned to the latest data
+  useEffect(() => {
+    if (liveMode) {
+      // Preserve current zoom span but shift to show latest activity
+      setVisibleRange(prev => {
+        const span = prev.end.getTime() - prev.start.getTime();
+        const newEnd = fullRange.end.getTime();
+        const newStart = Math.max(fullRange.start.getTime(), newEnd - span);
+        return { start: new Date(newStart), end: new Date(newEnd) };
+      });
+    } else {
+      // Not live: reset to full range on first load only
+      setVisibleRange(fullRange);
+    }
+  }, [fullRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Zoom helpers that adjust visibleRange instead of a zoom scalar
   const zoomBy = useCallback((factor: number) => {
+    onLiveModeChange?.(false);
     setVisibleRange(prev => {
       const mid = (prev.start.getTime() + prev.end.getTime()) / 2;
       const halfSpan = (prev.end.getTime() - prev.start.getTime()) / 2 * factor;
@@ -276,46 +279,29 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     return () => el.removeEventListener('wheel', handler);
   }, [zoomBy]);
 
-  // Live mode: auto-scroll to right edge when data updates
-  useEffect(() => {
-    if (!liveMode) return;
-    const el = timelineRef.current;
-    if (!el) return;
-    isAutoScrolling.current = true;
-    el.scrollTo({ left: el.scrollWidth - el.clientWidth, behavior: 'smooth' });
-    // Reset flag after scroll animation completes
-    const timer = setTimeout(() => { isAutoScrolling.current = false; }, 500);
-    return () => clearTimeout(timer);
-  }, [liveMode, data]);
-
-  // Disable live mode on manual horizontal scroll
-  useEffect(() => {
-    const el = timelineRef.current;
-    if (!el) return;
-    const handler = () => {
-      if (isAutoScrolling.current) return;
-      // User scrolled manually — check if NOT at right edge
-      const atRightEdge = el.scrollLeft + el.clientWidth >= el.scrollWidth - 20;
-      if (!atRightEdge && liveMode) {
-        onLiveModeChange?.(false);
-      }
-    };
-    el.addEventListener('scroll', handler, { passive: true });
-    return () => el.removeEventListener('scroll', handler);
-  }, [liveMode, onLiveModeChange]);
-
   // Keyboard navigation
-  const PAN_STEP = 120;
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    const el = timelineRef.current;
     switch (e.key) {
       case 'ArrowLeft':
         e.preventDefault();
-        if (el) el.scrollLeft = Math.max(0, el.scrollLeft - PAN_STEP);
+        onLiveModeChange?.(false);
+        setVisibleRange(prev => {
+          const span = prev.end.getTime() - prev.start.getTime();
+          const shift = span * 0.1;
+          const newStart = Math.max(fullRange.start.getTime(), prev.start.getTime() - shift);
+          const newEnd = newStart + span;
+          return { start: new Date(newStart), end: new Date(Math.min(newEnd, fullRange.end.getTime())) };
+        });
         break;
       case 'ArrowRight':
         e.preventDefault();
-        if (el) el.scrollLeft += PAN_STEP;
+        setVisibleRange(prev => {
+          const span = prev.end.getTime() - prev.start.getTime();
+          const shift = span * 0.1;
+          const newEnd = Math.min(fullRange.end.getTime(), prev.end.getTime() + shift);
+          const newStart = newEnd - span;
+          return { start: new Date(Math.max(newStart, fullRange.start.getTime())), end: new Date(newEnd) };
+        });
         break;
       case 'ArrowDown':
         e.preventDefault();
@@ -340,12 +326,18 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         break;
       case 'Home':
         e.preventDefault();
-        if (el) el.scrollLeft = 0;
+        setVisibleRange(fullRange);
         break;
-      case 'End':
+      case 'End': {
         e.preventDefault();
-        if (el) el.scrollLeft = el.scrollWidth;
+        const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
+        const last20 = fullMs * 0.2;
+        setVisibleRange({
+          start: new Date(fullRange.end.getTime() - last20),
+          end: new Date(fullRange.end.getTime()),
+        });
         break;
+      }
       case 'Enter':
       case ' ':
         if (focusedLaneIdx >= 0 && focusedLaneIdx < sortedAgents.length) {
@@ -359,7 +351,6 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         containerRef.current?.focus();
         break;
       case 'Tab':
-        // Allow natural tab to move between lanes
         if (!e.shiftKey) {
           if (focusedLaneIdx < sortedAgents.length - 1) {
             e.preventDefault();
@@ -373,7 +364,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         }
         break;
     }
-  }, [focusedLaneIdx, sortedAgents, toggleExpand]);
+  }, [focusedLaneIdx, sortedAgents, toggleExpand, zoomBy, fullRange]);
 
   if (data.agents.length === 0) {
     return (

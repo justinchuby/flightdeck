@@ -58,7 +58,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     getAllAgents: vi.fn().mockReturnValue([]),
     getRunningCount: vi.fn().mockReturnValue(1),
     spawnAgent: vi.fn(),
-    killAgent: vi.fn().mockReturnValue(true),
+    terminateAgent: vi.fn().mockReturnValue(true),
     emit: vi.fn().mockReturnValue(true),
     roleRegistry: {
       get: vi.fn(),
@@ -423,7 +423,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, `[[[ TERMINATE_AGENT {"id": "${child.id}", "reason": "done"} ]]]`);
 
-      expect(ctx.killAgent).toHaveBeenCalledWith(child.id);
+      expect(ctx.terminateAgent).toHaveBeenCalledWith(child.id);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('Terminated'),
       );
@@ -437,7 +437,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, devAgent, '[[[ TERMINATE_AGENT {"id": "agent-123", "reason": "done"} ]]]');
 
-      expect(ctx.killAgent).not.toHaveBeenCalled();
+      expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('Only the Project Lead'),
       );
@@ -456,7 +456,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, `[[[ TERMINATE_AGENT {"id": "${grandchild.id}", "reason": "cleanup"} ]]]`);
 
-      expect(ctx.killAgent).toHaveBeenCalledWith(grandchild.id);
+      expect(ctx.terminateAgent).toHaveBeenCalledWith(grandchild.id);
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('Terminated'),
       );
@@ -475,7 +475,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, `[[[ TERMINATE_AGENT {"id": "${otherChild.id}", "reason": "steal"} ]]]`);
 
-      expect(ctx.killAgent).not.toHaveBeenCalled();
+      expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('belongs to another lead'),
       );
@@ -491,7 +491,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, `[[[ TERMINATE_AGENT {"id": "${otherLead.id}", "reason": "remove"} ]]]`);
 
-      expect(ctx.killAgent).not.toHaveBeenCalled();
+      expect(ctx.terminateAgent).not.toHaveBeenCalled();
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('belongs to another lead'),
       );
@@ -515,7 +515,7 @@ describe('CommandDispatcher', () => {
       expect(delegations.length).toBeGreaterThan(0);
       expect(delegations[0].status).toBe('active');
 
-      // Simulate agent killed — complete its delegations
+      // Simulate agent terminated — complete its delegations
       dispatcher.completeDelegationsForAgent(child.id);
 
       const updated = dispatcher.getDelegations(leadAgent.id);

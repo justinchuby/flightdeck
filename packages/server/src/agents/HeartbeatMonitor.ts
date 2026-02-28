@@ -50,7 +50,7 @@ export class HeartbeatMonitor {
     this.humanInterrupted.delete(agentId);
   }
 
-  /** Called when a lead agent exits or is killed — clean up all tracking */
+  /** Called when a lead agent exits or is terminated — clean up all tracking */
   trackRemoved(agentId: string): void {
     this.leadIdleSince.delete(agentId);
     this.leadNudgeCount.delete(agentId);

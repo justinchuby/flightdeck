@@ -20,13 +20,13 @@ describe('DeferredIssueRegistry', () => {
   });
 
   it('adds a deferred issue with all fields', () => {
-    const issue = registry.add('lead-1', 'reviewer-1', 'Critical Reviewer', 'Race condition in kill()', 'P1', 'AgentManager.ts');
+    const issue = registry.add('lead-1', 'reviewer-1', 'Critical Reviewer', 'Race condition in terminate()', 'P1', 'AgentManager.ts');
     expect(issue.id).toBeGreaterThan(0);
     expect(issue.leadId).toBe('lead-1');
     expect(issue.reviewerAgentId).toBe('reviewer-1');
     expect(issue.reviewerRole).toBe('Critical Reviewer');
     expect(issue.severity).toBe('P1');
-    expect(issue.description).toBe('Race condition in kill()');
+    expect(issue.description).toBe('Race condition in terminate()');
     expect(issue.sourceFile).toBe('AgentManager.ts');
     expect(issue.status).toBe('open');
     expect(issue.createdAt).toBeTruthy();

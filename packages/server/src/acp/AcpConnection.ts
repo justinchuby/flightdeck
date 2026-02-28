@@ -298,7 +298,7 @@ export class AcpConnection extends EventEmitter {
     }
   }
 
-  kill(): void {
+  terminate(): void {
     if (this.process) {
       this.process.stdin?.end();
       this.process.kill('SIGTERM');

@@ -51,7 +51,7 @@ export function useWebSocket() {
         case 'agent:spawned':
           addAgent(msg.agent);
           break;
-        case 'agent:killed':
+        case 'agent:terminated':
           removeAgent(msg.agentId);
           break;
         case 'agent:exit':
