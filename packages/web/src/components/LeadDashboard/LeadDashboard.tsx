@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
 import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
 import { useAppStore } from '../../stores/appStore';
+import { MentionText } from '../../utils/markdown';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
 
@@ -2198,7 +2199,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
                   <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
-                    {selectedComm.content}
+                    <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
                   </pre>
                 )
               }
@@ -2244,7 +2245,9 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
                 <div className="text-xs font-mono text-gray-300 mt-0.5">
                   {c.content.startsWith('[Agent Report]') || c.content.startsWith('[Agent ACK]')
                     ? <AgentReportBlock content={c.content} compact />
-                    : <p className="truncate">{c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content}</p>
+                    : <p className="truncate">
+                        <MentionText text={c.content.length > 120 ? c.content.slice(0, 120) + '…' : c.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                      </p>
                   }
                 </div>
               </div>
@@ -2285,7 +2288,7 @@ function CommsPanelContent({ comms }: { comms: AgentComm[] }) {
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
                   <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
-                    {selectedComm.content}
+                    <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
                   </pre>
                 )
               }
@@ -2392,7 +2395,9 @@ function GroupsPanelContent({
                               {m.fromRole}{shortId ? ` (${shortId})` : ''}:
                             </span>
                           </div>
-                          <p className="text-gray-300 break-words mt-0.5 whitespace-pre-wrap">{m.content}</p>
+                          <p className="text-gray-300 break-words mt-0.5 whitespace-pre-wrap">
+                            <MentionText text={m.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                          </p>
                         </div>
                       );
                     })

@@ -318,6 +318,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
+      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`);
       // Flush buffered messages on turn boundaries
       if (status === 'idle' || isTerminalStatus(status)) {
         this.flushAgentMessage(agent.id);

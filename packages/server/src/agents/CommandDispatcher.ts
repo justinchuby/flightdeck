@@ -227,6 +227,9 @@ export class CommandDispatcher {
       toRole: parent.role.name,
       content: summary,
     });
+    this.ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Completion report → ${parent.role.name} (${parent.id.slice(0, 8)})`, {
+      toAgentId: parent.id, toRole: parent.role.id,
+    });
     this.ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status: 'completed' });
 
     // Check if this agent was running a DAG task
@@ -293,6 +296,9 @@ export class CommandDispatcher {
       to: parent.id,
       toRole: parent.role.name,
       content: summary,
+    });
+    this.ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Exit report (${status}) → ${parent.role.name} (${parent.id.slice(0, 8)})`, {
+      toAgentId: parent.id, toRole: parent.role.id,
     });
     this.ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status });
 
@@ -442,10 +448,13 @@ export class CommandDispatcher {
           to: agent.id, toRole: agent.role.name,
           content: ackMsg,
         });
+        this.ctx.activityLedger.log(child.id, role.id, 'message_sent', `Created & delegated ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
+          toAgentId: agent.id, toRole: agent.role.id,
+        });
         this.ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
 
         this.ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Created & delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
-          childId: child.id, childRole: role.id, delegationId: delegation.id,
+          toAgentId: child.id, toRole: role.id, childId: child.id, childRole: role.id, delegationId: delegation.id,
         });
       } else {
         const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''} — ready for tasks.`;
@@ -454,6 +463,9 @@ export class CommandDispatcher {
           from: child.id, fromRole: role.name,
           to: agent.id, toRole: agent.role.name,
           content: ackMsg,
+        });
+        this.ctx.activityLedger.log(child.id, role.id, 'message_sent', `Agent created ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
+          toAgentId: agent.id, toRole: agent.role.id,
         });
       }
 
@@ -624,6 +636,9 @@ export class CommandDispatcher {
         toRole: targetAgent.role.name,
         content: msg.content,
       });
+      this.ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
+        toAgentId: targetId, toRole: targetAgent.role.id,
+      });
     } catch (err) {
       logger.debug('command', 'Failed to parse AGENT_MESSAGE command', { error: (err as Error).message });
     }
@@ -696,11 +711,12 @@ export class CommandDispatcher {
         toRole: agent.role.name,
         content: ackMsg,
       });
+      this.ctx.activityLedger.log(child.id, child.role.id, 'message_sent', `Delegation ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
+        toAgentId: agent.id, toRole: agent.role.id,
+      });
 
       this.ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 100)}`, {
-        childId: child.id,
-        childRole: child.role.id,
-        delegationId: delegation.id,
+        toAgentId: child.id, toRole: child.role.id, childId: child.id, childRole: child.role.id, delegationId: delegation.id,
       });
 
       this.ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
@@ -895,6 +911,9 @@ CREW_ROSTER ]]]`;
         to: 'all',
         toRole: 'Team',
         content: msg.content,
+      });
+      this.ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Broadcast to ${recipients.length} agents: ${msg.content.slice(0, 120)}`, {
+        toAgentId: 'all', toRole: 'broadcast', recipientCount: recipients.length,
       });
     } catch (err) {
       logger.debug('command', 'Failed to parse BROADCAST command', { error: (err as Error).message });

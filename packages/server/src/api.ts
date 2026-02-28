@@ -255,6 +255,113 @@ export function apiRouter(
     res.json(activityLedger.getSummary());
   });
 
+  router.get('/coordination/timeline', (req, res) => {
+    const since = req.query.since as string | undefined;
+    const events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
+    // Sort chronologically (oldest first)
+    events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+    // Build agent status segments from status_change events
+    const agentSegments = new Map<string, { status: string; startAt: string }[]>();
+    const agentMeta = new Map<string, { role: string; createdAt: string; endedAt?: string }>();
+
+    for (const ev of events) {
+      if (!agentSegments.has(ev.agentId)) {
+        agentSegments.set(ev.agentId, []);
+        agentMeta.set(ev.agentId, { role: ev.agentRole, createdAt: ev.timestamp });
+      }
+      if (ev.actionType === 'status_change') {
+        const segments = agentSegments.get(ev.agentId)!;
+        const statusMatch = ev.summary.match(/^Status:\s*(.+)$/);
+        const status = statusMatch ? statusMatch[1] : ev.summary;
+        // Close previous segment
+        if (segments.length > 0) {
+          const prev = segments[segments.length - 1] as { status: string; startAt: string; endAt?: string };
+          prev.endAt = ev.timestamp;
+        }
+        segments.push({ status, startAt: ev.timestamp });
+        // Track terminal states
+        if (['completed', 'failed', 'terminated'].includes(status)) {
+          agentMeta.get(ev.agentId)!.endedAt = ev.timestamp;
+        }
+      }
+    }
+
+    // Build communication links from delegated and message_sent events
+    const communications: { type: string; fromAgentId: string; toAgentId: string; summary: string; timestamp: string }[] = [];
+    for (const ev of events) {
+      if (ev.actionType === 'delegated' && ev.details?.childId) {
+        communications.push({
+          type: 'delegation',
+          fromAgentId: ev.agentId,
+          toAgentId: ev.details.childId,
+          summary: ev.summary.slice(0, 120),
+          timestamp: ev.timestamp,
+        });
+      } else if (ev.actionType === 'message_sent' && ev.details?.to) {
+        communications.push({
+          type: 'message',
+          fromAgentId: ev.agentId,
+          toAgentId: ev.details.to,
+          summary: ev.summary.slice(0, 120),
+          timestamp: ev.timestamp,
+        });
+      }
+    }
+
+    // Pair lock_acquired / lock_released into lock spans
+    const openLocks = new Map<string, { agentId: string; filePath: string; acquiredAt: string }>();
+    const locks: { agentId: string; filePath: string; acquiredAt: string; releasedAt?: string }[] = [];
+    for (const ev of events) {
+      const filePath = ev.details?.filePath as string | undefined;
+      if (!filePath) continue;
+      const key = `${ev.agentId}::${filePath}`;
+      if (ev.actionType === 'lock_acquired') {
+        openLocks.set(key, { agentId: ev.agentId, filePath, acquiredAt: ev.timestamp });
+      } else if (ev.actionType === 'lock_released') {
+        const open = openLocks.get(key);
+        if (open) {
+          locks.push({ ...open, releasedAt: ev.timestamp });
+          openLocks.delete(key);
+        } else {
+          locks.push({ agentId: ev.agentId, filePath, acquiredAt: ev.timestamp, releasedAt: ev.timestamp });
+        }
+      }
+    }
+    // Add still-open locks
+    for (const open of openLocks.values()) {
+      locks.push(open);
+    }
+
+    // Build agents array
+    const agents = [...agentSegments.entries()].map(([id, segs]) => {
+      const meta = agentMeta.get(id)!;
+      // Close last open segment with endedAt or now
+      const segments = segs.map((s, i) => ({
+        status: s.status,
+        startAt: s.startAt,
+        endAt: (s as any).endAt ?? (i === segs.length - 1 ? (meta.endedAt ?? new Date().toISOString()) : undefined),
+      }));
+      return {
+        id,
+        shortId: id.slice(0, 8),
+        role: meta.role,
+        createdAt: meta.createdAt,
+        endedAt: meta.endedAt,
+        segments,
+      };
+    });
+
+    // Compute time range
+    const allTimestamps = events.map(e => e.timestamp);
+    const timeRange = {
+      start: allTimestamps[0] ?? new Date().toISOString(),
+      end: allTimestamps[allTimestamps.length - 1] ?? new Date().toISOString(),
+    };
+
+    res.json({ agents, communications, locks, timeRange });
+  });
+
   // --- Project Lead ---
   router.post('/lead/start', spawnLimiter, (req, res) => {
     const { task, name, model, cwd, sessionId: resumeSessionId, projectId } = req.body;

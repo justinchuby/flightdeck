@@ -19,6 +19,7 @@ export type ActionType =
   | 'message_sent'
   | 'delegated'
   | 'delegation_cancelled'
+  | 'status_change'
   | 'heartbeat_halted'
   | 'limit_change_requested'
   | 'deferred_issue'

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useGroupStore, groupKey } from '../../stores/groupStore';
 import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
@@ -51,10 +51,47 @@ export function GroupChat(_props: { api: any; ws: any }) {
   const [newGroupLeadId, setNewGroupLeadId] = useState('');
   const [creating, setCreating] = useState(false);
   const [selectedProjectLeadId, setSelectedProjectLeadId] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const leads = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
+
+  // Mention autocomplete — scoped to group members when a group is selected
+  const mentionCandidates = useMemo(() => {
+    if (selectedGroup) {
+      const group = groups.find((g) => g.leadId === selectedGroup.leadId && g.name === selectedGroup.name);
+      if (group) return agents.filter((a) => group.memberIds.includes(a.id));
+    }
+    return agents.filter((a) => a.status === 'running' || a.status === 'idle');
+  }, [selectedGroup, groups, agents]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return mentionCandidates.filter(
+      (a) => a.id.slice(0, 8).toLowerCase().startsWith(q) || a.role.name.toLowerCase().includes(q),
+    ).slice(0, 8);
+  }, [mentionQuery, mentionCandidates]);
+
+  const updateMentionState = (value: string, cursorPos: number) => {
+    const before = value.slice(0, cursorPos);
+    const match = before.match(/@(\w*)$/);
+    if (match) { setMentionQuery(match[1]); setMentionIndex(0); } else { setMentionQuery(null); }
+  };
+
+  const insertMention = (agent: typeof agents[0]) => {
+    const shortId = agent.id.slice(0, 8);
+    const cursorPos = textareaRef.current?.selectionStart ?? inputText.length;
+    const before = inputText.slice(0, cursorPos);
+    const after = inputText.slice(cursorPos);
+    const atIdx = before.lastIndexOf('@');
+    const newText = before.slice(0, atIdx) + `@${shortId} ` + after;
+    setInputText(newText);
+    setMentionQuery(null);
+    textareaRef.current?.focus();
+  };
 
   // Auto-select first lead as project filter
   useEffect(() => {
@@ -239,16 +276,28 @@ export function GroupChat(_props: { api: any; ws: any }) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.nativeEvent.isComposing) return;
+      // Mention navigation
+      if (mentionSuggestions.length > 0) {
+        if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex((i) => Math.max(0, i - 1)); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex((i) => Math.min(i + 1, mentionSuggestions.length - 1)); return; }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          if (mentionSuggestions[mentionIndex]) insertMention(mentionSuggestions[mentionIndex]);
+          return;
+        }
+        if (e.key === 'Escape') { setMentionQuery(null); return; }
+      }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         void handleSend();
       }
     },
-    [handleSend],
+    [handleSend, mentionSuggestions, mentionIndex, insertMention],
   );
 
   const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
+    updateMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length);
     const ta = e.target;
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 96)}px`;
@@ -536,7 +585,25 @@ export function GroupChat(_props: { api: any; ws: any }) {
             </div>
 
             {/* Compose bar */}
-            <div className="border-t border-gray-700 p-3 shrink-0">
+            <div className="border-t border-gray-700 p-3 shrink-0 relative">
+              {/* Mention autocomplete dropdown */}
+              {mentionSuggestions.length > 0 && (
+                <div className="absolute bottom-full left-3 right-3 mb-1 bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-h-40 overflow-y-auto z-10">
+                  {mentionSuggestions.map((a, i) => (
+                    <button
+                      key={a.id}
+                      onClick={() => insertMention(a)}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${
+                        i === mentionIndex ? 'bg-accent/20 text-accent' : 'text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      <AgentIdBadge id={a.id} />
+                      <span className="font-mono font-semibold">{a.role.name}</span>
+                      <span className="text-gray-500 text-[10px] ml-auto">{a.status}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex items-end gap-2">
                 <textarea
                   ref={textareaRef}
