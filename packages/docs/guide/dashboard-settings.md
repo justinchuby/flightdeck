@@ -24,4 +24,6 @@ Register new roles with:
 
 ## Tool Permissions
 
-Agents request tool permissions (file writes, shell commands) during operation. The framework **auto-approves** tool requests after a 60-second timeout to enable autonomous operation.
+Agents request tool permissions (file writes, shell commands) during operation. Permission timeout behavior depends on the agent's mode:
+- **Autopilot ON** (lead-spawned or user-enabled): tool calls are auto-approved immediately
+- **Autopilot OFF** (manually spawned): tool calls are **auto-denied** after 60 seconds if the user hasn't responded

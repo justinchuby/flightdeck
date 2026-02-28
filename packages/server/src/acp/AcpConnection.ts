@@ -127,20 +127,13 @@ export class AcpConnection extends EventEmitter {
             timestamp: new Date().toISOString(),
           });
 
-          // Auto-approve after 60s timeout to enable autonomous agent work.
-          // Design decision: agents should operate without human intervention.
-          // The UI still shows permission requests for optional human override.
+          // After 60s without user response:
+          // - Autopilot OFF → auto-deny (cancel) for safety, requiring explicit user approval
+          // - Autopilot ON is handled above (immediate approve), so this path is always non-autopilot
           setTimeout(() => {
             if (this.pendingPermission?.resolve === resolve) {
               this.pendingPermission = null;
-              const allowOption = params.options.find(
-                (o: acp.PermissionOption) => o.kind === 'allow_once'
-              );
-              resolve({
-                outcome: allowOption
-                  ? { outcome: 'selected', optionId: allowOption.optionId }
-                  : { outcome: 'cancelled' },
-              });
+              resolve({ outcome: { outcome: 'cancelled' } });
             }
           }, 60_000);
         });

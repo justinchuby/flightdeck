@@ -133,17 +133,19 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Trade-off:** False positives from overly broad globs. Mitigation: agents are instructed to lock specific files, not directories, when possible.
 
-## 10. Permission Gating with Auto-Approve Timeout
+## 10. Permission Gating — Autopilot vs Manual Mode
 
-**Decision:** Tool calls in ACP mode require user approval, with 60-second auto-approve.
+**Decision:** Permission behavior depends on the agent's autopilot mode:
+- **Autopilot ON** (spawned by a lead, or user-selected): tool calls are immediately auto-approved. No user interaction needed.
+- **Autopilot OFF** (manually spawned without autopilot): tool calls show a permission dialog. If the user doesn't respond within 60 seconds, the tool call is **auto-denied** (cancelled) for safety.
 
 **Rationale:**
-- Safety: users should know when agents modify files or run commands
-- Practicality: requiring approval for every action would be impractical during long-running tasks
-- 60-second auto-approve lets agents proceed if the user is AFK
-- "Always allow" option per agent for trusted workflows
+- Agents managed by a lead are trusted to operate autonomously — the lead already approved the task
+- Manually spawned agents without autopilot should default to a safe, supervised mode
+- Auto-deny after timeout prevents unattended agents from making unexpected changes
+- Users can still approve individual tool calls or enable autopilot to opt into full autonomy
 
-**Trade-off:** Auto-approve means agents can act without explicit consent after timeout. Acceptable because the user has already chosen to spawn the agent and assigned it a task.
+**Trade-off:** Non-autopilot agents will stall if the user is AFK and not approving tool calls. This is intentional — if you want unattended operation, enable autopilot.
 
 ## 11. Task Auto-Assignment with Auto-Spawn
 
@@ -264,14 +266,17 @@ ai-crew/
 
 **Trade-off:** `synchronous=NORMAL` trades a small durability window for speed. In the unlikely event of an OS crash (not app crash), the last few WAL frames may be lost. This is acceptable for a development tool.
 
-## 18. Tool Auto-Approve for Autonomous Operation
+## 18. Tool Permission Timeout Behavior
 
-**Decision:** Tool permission requests auto-approve after a 60-second timeout when the user hasn't responded.
+**Decision:** Tool permission requests have a 60-second timeout. The timeout behavior depends on autopilot mode:
+- **Autopilot ON:** Permissions are auto-approved immediately (timeout never reached).
+- **Autopilot OFF:** After 60 seconds without user response, the tool call is **auto-denied** (cancelled).
 
 **Rationale:**
-- AI Crew is designed for autonomous agent operation — a lead delegates work to a team, and agents should be able to proceed without constant human intervention
-- Blocking on every file write or terminal command would make multi-agent workflows impractical
-- The 60-second window gives the user time to intervene if they're actively watching, while allowing unattended operation
-- Users can also set "Always allow" per agent to skip the dialog entirely
+- AI Crew distinguishes between supervised and autonomous operation modes
+- Lead-spawned agents run in autopilot by default — they are part of a managed workflow and should proceed without blocking
+- Manually spawned agents without autopilot are in supervised mode — the user is expected to be actively watching
+- Auto-deny prevents non-autopilot agents from silently modifying files or running commands when the user is away
+- This makes the permission dialog a true gatekeeping mechanism for supervised agents, not just a notification
 
-**Trade-off:** Agents can modify files and run commands without explicit consent after the timeout. This is an intentional design choice — the user has already opted into autonomous operation by spawning agents and assigning tasks. The permission dialog is a safety net, not a gatekeeping mechanism.
+**Trade-off:** Non-autopilot agents require active user attention. Users who want fire-and-forget should enable autopilot explicitly.

@@ -52,7 +52,7 @@ When an ACP agent wants to execute a tool (file write, terminal command, etc.), 
 
 1. Forwards the request to the UI as a modal dialog
 2. User can **Allow** or **Deny**
-3. If no response within **60 seconds**, auto-approves (configurable)
+3. If no response within **60 seconds**: **auto-deny** (cancel) for non-autopilot agents, or **immediate approve** for autopilot agents
 4. The "Always allow for this agent" option persists in localStorage
 
 ### Sending User Input

@@ -58,7 +58,9 @@ File lock paths are validated against directory traversal attacks (`..`, absolut
 
 ## Tool Permissions
 
-Agents request tool permissions (file writes, shell commands) during operation. The framework **auto-approves** all tool requests after a 60-second timeout. This is by design to enable autonomous team operation.
+Agents request tool permissions (file writes, shell commands) during operation. Permission timeout behavior depends on the agent's autopilot mode:
+- **Autopilot ON** (lead-spawned or user-enabled): tool calls are auto-approved immediately — no user interaction needed
+- **Autopilot OFF** (manually spawned): tool calls are shown in a permission dialog; if the user doesn't respond within 60 seconds, the tool call is **auto-denied** (cancelled) for safety
 
 ## Model Configuration
 
