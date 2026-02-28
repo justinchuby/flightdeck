@@ -363,3 +363,42 @@ ai-crew/
 - The `archived` column is a simple boolean flag — no complex state machine needed
 
 **Trade-off:** If a terminated agent is restarted, its groups remain archived. The lead would need to create a new group. This is acceptable because restarted agents often have different context anyway.
+
+## 26. Three-Tier Message Hierarchy
+
+**Decision:** Classify comms messages into Critical, Notable, and Routine tiers using pattern matching, with client-side filter toggles.
+
+**Rationale:**
+- The comms feed in a busy session can have hundreds of messages — most are routine lock/status updates
+- Classification surfaces what matters: build failures (Critical) vs progress updates (Notable) vs heartbeats (Routine)
+- Client-side classification avoids server changes and lets the user override tier visibility instantly
+- 23 critical patterns (failures, crashes, blocked, OOM, SIGTERM) and 8 notable patterns (completions, merges, reviews)
+- Messages to the lead auto-bump to ≥Notable since they're always relevant
+
+**Trade-off:** Pattern-based classification can misclassify novel messages. Mitigated by defaulting unknown long messages to Notable and providing filter toggles so users always have access to all messages.
+
+## 27. Catch-Up Summary Banner
+
+**Decision:** Show a floating summary banner after 60 seconds of user inactivity, summarizing what happened while they were away.
+
+**Rationale:**
+- Users frequently switch to other tabs/apps while agents work; returning to a wall of messages is disorienting
+- The banner provides instant context: "3 tasks completed, 1 decision pending (5m old), 12 new messages"
+- Uses a snapshot-comparison approach: snapshot counts when active, compare on return
+- Only shows when ≥5 items accumulated or decisions are pending (avoids noise for short absences)
+- Accessible: `role="status"`, `aria-live="polite"`, keyboard-dismissible
+
+**Trade-off:** The 60-second threshold is a heuristic. Too short = annoying; too long = user already scrolled through messages manually. 60s is a reasonable default.
+
+## 28. Lead Health Header in CREW_UPDATE
+
+**Decision:** Prepend a 2-3 line health summary to every `CREW_UPDATE` context refresh sent to lead agents.
+
+**Rationale:**
+- Leads receive long context updates with agent rosters and activity logs, but no synthesized status
+- The health header gives the lead instant situational awareness: completion %, fleet status, pending decisions, blocked tasks
+- Emoji indicators (✅/⚠️/🔴) enable quick triage without reading the full update
+- Follows the "add a lens, don't remove data" principle — raw data is preserved below the header
+- Graceful degradation — if no DAG exists, shows only agent/decision counts
+
+**Trade-off:** Adds ~3 lines of tokens to every context refresh. Acceptable because it saves the lead from issuing separate QUERY_TASKS and PROGRESS commands to understand project state.

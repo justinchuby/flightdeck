@@ -178,7 +178,8 @@ export class TaskDAG extends EventEmitter {
     for (const task of pendingTasks) {
       const allDepsDone = task.dependsOn.every(depId => {
         const dep = this.getTask(leadId, depId);
-        return dep && (dep.dagStatus === 'done' || dep.dagStatus === 'skipped');
+        // null means dep was cancelled (deleted) — treat as satisfied
+        return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
       });
 
       if (allDepsDone) {
@@ -377,6 +378,14 @@ export class TaskDAG extends EventEmitter {
       .delete(dagTasks)
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
+    // Resolve dependents — cancelled task no longer blocks them
+    const newlyReady = this.resolveReady(leadId);
+    for (const t of newlyReady) {
+      this.db.run(
+        `UPDATE dag_tasks SET dag_status = 'ready' WHERE id = ? AND lead_id = ? AND dag_status IN ('pending', 'blocked')`,
+        [t.id, leadId],
+      );
+    }
     this.emit('dag:updated', { leadId });
     return true;
   }

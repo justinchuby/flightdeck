@@ -28,6 +28,33 @@ The central panel serves dual purpose:
 - **Interleaved activity** — Agent activity events (spawns, task completions, decisions, errors) appear inline in the chat flow, distinguished by styling. This replaces the old separate Activity tab — activity is now contextual within the conversation timeline.
 - **User-message highlighting** — Messages from the human user are rendered with a **blue tint** (`bg-blue-600 text-white`) to visually distinguish them from agent messages (`bg-gray-800`). The "Human User" label appears in `text-blue-400`.
 
+### Three-Tier Message Hierarchy
+
+The Comms panel classifies messages into three priority tiers with visual treatment and filter toggles:
+
+| Tier | Style | Triggers |
+|------|-------|----------|
+| **Critical** 🔴 | Red accent, animated pulse dot | Build/test/compile failures, crashes, blocked tasks, P0/URGENT, timeouts, OOM, SIGTERM, segfault, decision needed |
+| **Notable** 🔵 | Blue accent | Task completed, build passes, merged, shipped, review done, progress updates, delegated, new features, fixes |
+| **Routine** ⚪ | Dimmed/collapsed | Secretary messages, short notifications (<200 chars), routine status changes |
+
+**Rules:**
+- Messages addressed to the lead are automatically bumped to ≥Notable
+- Content >200 characters defaults to Notable (unless matched as Critical)
+- Filter toggles: **All** / **Important** (Critical + Notable) / **Critical Only**
+
+### Catch-Up Summary Banner
+
+A floating banner that appears when the user returns after a period of inactivity:
+
+1. **Trigger** — 60+ seconds of no interaction (clicks, keypresses)
+2. **Snapshot** — When the user is active, the system snapshots current counts (tasks, messages, decisions, reports)
+3. **Comparison** — On inactivity threshold, compares current state to snapshot
+4. **Shows if** — ≥5 new items accumulated OR pending decisions exist
+5. **Content** — "While you were away: X tasks completed, Y decisions pending (Zm old), N new messages, M reports"
+6. **Dismiss** — Auto-dismisses on scroll or user interaction; resets on project switch
+7. **Accessibility** — `role="status"`, `aria-live="polite"`, keyboard dismissible (Escape/Enter)
+
 #### Thinking/Reasoning Text
 
 When an agent emits `agent_thought_chunk` ACP events (thinking/reasoning text), these are:
@@ -126,11 +153,12 @@ The Timeline view (`/timeline`) provides a swim-lane visualization of agent acti
 | **Zoom** | +/- keys | Zoom in/out on the time axis |
 | **Filtering** | Dropdown menus | Filter by agent role, communication type (direct/broadcast/group), or agent status |
 | **Live mode** | Toggle button | Auto-scrolls to follow the latest activity as it happens |
+| **Hover tooltips** | Mouse over segment | Shows status badge, task label, time span (start → end), and duration. Uses `@visx/tooltip` with `TooltipWithBounds` for smart positioning. |
 
 ### Design Choices
 
 - **visx over chart libraries** — Custom swim-lane rendering required more control than standard chart libraries provide. visx gives D3-like power with React composability.
-- **Idle hatch patterns** — Diagonal line patterns distinguish "agent is idle" from "no data." Without this, users couldn't tell if an agent was waiting or simply hadn't been assigned work yet.
+- **Idle hatch patterns** — SVG `<pattern>` with diagonal lines (45° rotation, 6×6 pixel repeat) distinguishes "agent is idle" from "no data." Without this, users couldn't tell if an agent was waiting or simply hadn't been assigned work yet.
 - **Brush selector** — Long sessions can span hours. The brush selector lets users zoom into a specific time window without losing context of the full session.
 
 ## Project Grouping UI

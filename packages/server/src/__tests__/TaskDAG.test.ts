@@ -474,6 +474,45 @@ describe('TaskDAG', () => {
     it('returns false for nonexistent task', () => {
       expect(dag.cancelTask('lead-1', 'nope')).toBe(false);
     });
+
+    it('unblocks dependents when cancelled task is removed', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'c', role: 'Dev', depends_on: ['b'] },
+      ]);
+      // a is ready, b and c are pending
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('ready');
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
+      expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('pending');
+
+      // Cancel a → b should become ready (dep removed), c still pending (depends on b)
+      dag.cancelTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'a')).toBeNull();
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('ready');
+      expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('pending');
+
+      // Cancel b → c should become ready
+      dag.cancelTask('lead-1', 'b');
+      expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('ready');
+    });
+
+    it('unblocks dependents with multiple cancelled deps (diamond)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev' },
+        { id: 'c', role: 'Dev', depends_on: ['a', 'b'] },
+      ]);
+      expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('pending');
+
+      // Cancel a — c still pending (depends on b too)
+      dag.cancelTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('pending');
+
+      // Cancel b — c should now be ready (both deps removed)
+      dag.cancelTask('lead-1', 'b');
+      expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('ready');
+    });
   });
 
   describe('addTask', () => {

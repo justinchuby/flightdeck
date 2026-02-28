@@ -23,8 +23,11 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 - **Unread Badges** — Sidebar shows unread message counts for group chats
 
 ### 📈 Visualization & Monitoring
-- **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, and idle hatch patterns
+- **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, idle hatch patterns, and hover tooltips showing task details and duration
 - **Real-Time Dashboard** — Live activity feed, team status, user-message highlighting (blue tint) via WebSocket
+- **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed) with filter toggles
+- **Catch-Up Summary** — After 60s of inactivity, a floating banner summarizes what happened while you were away
+- **Project Health Header** — `CREW_UPDATE` messages include a health summary: completion %, agent fleet status, pending decisions, blocked tasks
 - **Project Grouping** — Group and filter projects in the Tasks view with duplicate task detection
 
 ### ✅ Decision & Progress Tracking
@@ -35,6 +38,7 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 ### 🔒 Coordination & Safety
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
 - **Scoped COMMIT** — The `COMMIT` command stages only files the agent has locked — prevents `git add -A` from leaking other agents' uncommitted work
+- **Event Pipeline** — Reactive event handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
 - **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
 - **Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
 
@@ -195,7 +199,8 @@ Agents communicate via structured triple-bracket commands detected in their outp
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
-- **Testing**: Vitest with v8 coverage, Codecov integration (1000+ tests)
+- **Testing**: Vitest with v8 coverage, Codecov integration (1000+ tests including 30 Task DAG E2E + 40 Timeline E2E)
+- **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
 
 ## Screenshots
 

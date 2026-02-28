@@ -119,9 +119,13 @@ GET /api/coordination/summary    — aggregate stats
 
 Context updates are pushed to all running agents on significant events (not on a periodic timer, to avoid wasting tokens on idle heartbeats):
 
-For the **Project Lead**, the update shows "YOUR AGENTS" with IDs, roles, models, and status:
+For the **Project Lead**, the update includes a **health header** followed by the agent roster:
 ```
 <!-- CREW_UPDATE
+== PROJECT HEALTH ==
+✅ 78% complete · 3 active, 2 idle, 1 done · ⚠️ 1 decision pending (3 min)
+0 blocked tasks
+
 == YOUR AGENTS ==
 - abc12345 — Developer [claude-opus-4.6] — running, task: Implement login endpoint
 - def67890 — Code Reviewer [gemini-3-pro-preview] — idle
@@ -131,6 +135,13 @@ For the **Project Lead**, the update shows "YOUR AGENTS" with IDs, roles, models
 - [13:44:58] Architect ghi11111: Decision — use JWT for session tokens
 CREW_UPDATE -->
 ```
+
+The health header is computed by `buildHealthHeader()` in `ContextRefresher.ts`:
+- **Completion %** — `(done + skipped) / total` from the task DAG (if one exists)
+- **Agent fleet** — Counts of active, idle, and completed agents
+- **Pending decisions** — Count + age of oldest pending decision
+- **Blocked/failed tasks** — From DAG status
+- **Health icon** — 🔴 critical (blocked/failed tasks), ⚠️ warning (pending decisions or many idle agents), ✅ healthy
 
 For **specialist agents**, the update shows peer agents with locked files:
 ```
