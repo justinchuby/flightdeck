@@ -95,9 +95,9 @@ export function Tooltip({ content, children, delay = 400, placement = 'top' }: T
             pointerEvents: 'none',
             ...placementStyles[placement],
           }}
-          className="glass-tooltip"
+          className="tooltip-container"
         >
-          <div className="glass-tooltip-inner">
+          <div className="tooltip-inner">
             {content}
           </div>
         </div>,

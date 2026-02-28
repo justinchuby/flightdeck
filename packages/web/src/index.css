@@ -60,12 +60,7 @@ body {
   animation: pulse-slow 3s ease-in-out infinite;
 }
 
-/* ── Liquid Glass (Apple-style glassmorphism) ─────────────────────────── */
-.glass-tooltip {
-  max-width: 320px;
-}
-
-.glass-tooltip-inner,
+/* ── Liquid Glass Toast (Apple-style glassmorphism) ───────────────────── */
 .glass-toast {
   background: linear-gradient(
     135deg,
@@ -84,12 +79,20 @@ body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.glass-tooltip-inner {
+/* ── Tooltip (plain dark style) ───────────────────────────────────────── */
+.tooltip-container {
+  max-width: 320px;
+}
+
+.tooltip-inner {
   padding: 6px 12px;
   font-size: 12px;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.95);
-  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   white-space: pre-line;
   word-break: break-word;
 }
