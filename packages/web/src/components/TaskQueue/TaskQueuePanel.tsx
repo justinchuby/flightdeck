@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import { Plus, Trash2, GripVertical, LayoutList, Network, Users, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { TaskDetail } from './TaskDetail';
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
+import { DagGraph } from './DagGraph';
 import type { Task, DagStatus, LeadProgress, AgentInfo } from '../../types';
 import { SkeletonRow } from '../Skeleton';
 
@@ -121,6 +122,7 @@ function SessionsView({ api }: { api: any }) {
   const { projects } = useLeadStore();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
+  const [dagView, setDagView] = useState<'graph' | 'list' | null>(null);
 
   // Find all leads
   const leads = agents.filter((a: AgentInfo) => a.role?.id === 'lead' && !a.parentId);
@@ -218,20 +220,58 @@ function SessionsView({ api }: { api: any }) {
       </div>
 
       {/* DAG tasks */}
-      <div className="bg-gray-800/50 rounded-lg border border-gray-700">
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white flex items-center gap-2">
-            <LayoutList size={14} className="text-blue-400" />
-            Tasks
-            {dagStatus && (
-              <span className="text-xs text-gray-500 font-normal">{dagStatus.tasks.length} total</span>
+      {(() => {
+        // Default to graph when there are tasks with dependencies, list otherwise
+        const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
+        const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
+        return (
+          <div className="bg-gray-800/50 rounded-lg border border-gray-700 flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                {effectiveView === 'graph' ? (
+                  <Network size={14} className="text-blue-400" />
+                ) : (
+                  <LayoutList size={14} className="text-blue-400" />
+                )}
+                Tasks
+                {dagStatus && (
+                  <span className="text-xs text-gray-500 font-normal">{dagStatus.tasks.length} total</span>
+                )}
+              </h3>
+              {/* View toggle */}
+              <div className="flex bg-gray-900 rounded p-0.5 border border-gray-700">
+                <button
+                  onClick={() => setDagView('list')}
+                  className={`p-1 rounded transition-colors ${
+                    effectiveView === 'list' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                  title="List view"
+                >
+                  <LayoutList size={13} />
+                </button>
+                <button
+                  onClick={() => setDagView('graph')}
+                  className={`p-1 rounded transition-colors ${
+                    effectiveView === 'graph' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                  title="Graph view"
+                >
+                  <Network size={13} />
+                </button>
+              </div>
+            </div>
+            {effectiveView === 'graph' ? (
+              <div className="flex-1" style={{ minHeight: 400 }}>
+                <DagGraph dagStatus={dagStatus} />
+              </div>
+            ) : (
+              <div className="max-h-[500px] overflow-y-auto">
+                <TaskDagPanelContent dagStatus={dagStatus} />
+              </div>
             )}
-          </h3>
-        </div>
-        <div className="max-h-[500px] overflow-y-auto">
-          <TaskDagPanelContent dagStatus={dagStatus} />
-        </div>
-      </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
