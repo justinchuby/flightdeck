@@ -443,7 +443,9 @@ const SELF_REPORT_INSTRUCTION = `
 When you receive a new task, send a message to the lead via AGENT_MESSAGE announcing your approach:
 "[Starting] Here's my plan: ..." — 2-3 sentences explaining how you'll tackle the work. This helps your team lead track progress and coordinate the team.
 
-When something is unclear or you need information from another agent, send them a message via AGENT_MESSAGE — don't wait or guess. Proactive communication prevents wasted work.`;
+When something is unclear or you need information from another agent, send them a message via AGENT_MESSAGE — don't wait or guess. Proactive communication prevents wasted work.
+
+When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), create a group chat with CREATE_GROUP and discuss there instead of sending many 1:1 messages. Group chats keep everyone in sync and reduce duplicated conversations.`;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();
