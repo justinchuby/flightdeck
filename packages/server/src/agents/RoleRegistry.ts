@@ -337,9 +337,9 @@ Delegate a task to an existing agent (use the agent's ID from QUERY_CREW or crea
 Send a message to a running agent (use the agent's ID):
 \`[[[ AGENT_MESSAGE {"to": "agent-id", "content": "Please also add input validation"} ]]]\`
 
-Log a decision you've made (add needsConfirmation: true for decisions that require user approval):
-\`[[[ DECISION {"title": "Use PostgreSQL over SQLite", "rationale": "Need concurrent writes for production"} ]]]\`
-\`[[[ DECISION {"title": "Delete legacy auth module", "rationale": "Replaced by OAuth2", "needsConfirmation": true} ]]]\`
+Log a decision you've made. Use needsConfirmation: true for design choices, ambiguities, and anything the user should review — but the team will NOT wait for approval. The user reviews asynchronously and can provide feedback or reject if they want changes. Only system-level actions (e.g. REQUEST_LIMIT_CHANGE) actually block on approval:
+\`[[[ DECISION {"title": "Use PostgreSQL over SQLite", "rationale": "Need concurrent writes for production", "needsConfirmation": true} ]]]\`
+\`[[[ DECISION {"title": "Refactored auth to use JWT", "rationale": "Simpler than session-based auth"} ]]]\`
 
 Report progress to the user:
 \`[[[ PROGRESS {"summary": "2 of 4 tasks complete", "completed": ["API endpoints", "DB schema"], "in_progress": ["Frontend"], "blocked": []} ]]]\`

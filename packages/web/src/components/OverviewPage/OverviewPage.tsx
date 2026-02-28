@@ -146,6 +146,7 @@ function DecisionTimelineItem({
   onDeny,
   onRespond,
   onClickDetail,
+  onFeedback,
 }: {
   decision: Decision;
   projectName?: string;
@@ -153,8 +154,11 @@ function DecisionTimelineItem({
   onDeny: (id: string) => void;
   onRespond: (id: string, message: string) => void;
   onClickDetail: (d: Decision) => void;
+  onFeedback: (id: string) => void;
 }) {
   const isPending = decision.needsConfirmation && decision.status === 'recorded';
+  const isRecordedNonBlocking = !decision.needsConfirmation && decision.status === 'recorded';
+  const showFeedback = !isPending; // Show feedback on any non-pending decision
   const statusColor =
     decision.status === 'confirmed'
       ? 'border-green-500/40 bg-green-900/10'
@@ -204,6 +208,15 @@ function DecisionTimelineItem({
               <span className="text-[10px] font-mono text-purple-400/70 bg-gray-700/50 px-1 rounded">
                 {projectName}
               </span>
+            )}
+            {showFeedback && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onFeedback(decision.id); }}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors"
+                title="Give feedback on this decision"
+              >
+                <MessageSquare className="w-3 h-3 inline mr-0.5" /> Feedback
+              </button>
             )}
             <span className="text-[10px] text-gray-500 ml-auto">
               <Clock className="w-3 h-3 inline mr-0.5" />
@@ -321,6 +334,8 @@ export function OverviewPage({ api, ws }: Props) {
   const [allDecisions, setAllDecisions] = useState<Decision[]>([]);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
   const [selectedProject, setSelectedProject] = useState<{ leadId: string; projectName: string; teamSize: number; completionPct: number; latestSnapshot: ProgressSnapshot | null } | null>(null);
+  const [feedbackDecisionId, setFeedbackDecisionId] = useState<string | null>(null);
+  const [feedbackText, setFeedbackText] = useState('');
   const agents = useAppStore((s) => s.agents);
   const { projects } = useLeadStore();
 
@@ -383,6 +398,19 @@ export function OverviewPage({ api, ws }: Props) {
       loadDecisions();
     },
     [loadDecisions],
+  );
+
+  const handleFeedback = useCallback(
+    async (message: string) => {
+      if (!feedbackDecisionId || !message.trim()) return;
+      await apiFetch(`/decisions/${feedbackDecisionId}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({ message: message.trim() }),
+      });
+      setFeedbackDecisionId(null);
+      setFeedbackText('');
+    },
+    [feedbackDecisionId],
   );
 
   // Pending decisions (needs confirmation + still recorded)
@@ -493,6 +521,7 @@ export function OverviewPage({ api, ws }: Props) {
                 onDeny={handleDeny}
                 onRespond={handleRespond}
                 onClickDetail={setSelectedDecision}
+                onFeedback={(id) => { setFeedbackDecisionId(id); setFeedbackText(''); }}
               />
             ))}
           </div>
@@ -519,6 +548,12 @@ export function OverviewPage({ api, ws }: Props) {
               <span>{fmtTime(selectedDecision.timestamp)}</span>
               <span className="font-mono text-gray-600">{selectedDecision.agentId?.slice(0, 8)}</span>
             </div>
+            <button
+              onClick={() => { setFeedbackDecisionId(selectedDecision.id); setFeedbackText(''); setSelectedDecision(null); }}
+              className="mt-2 flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5" /> Give Feedback
+            </button>
           </div>
         </DetailPopup>
       )}
@@ -579,6 +614,49 @@ export function OverviewPage({ api, ws }: Props) {
             )}
           </div>
         </DetailPopup>
+      )}
+
+      {/* Feedback dialog */}
+      {feedbackDecisionId && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setFeedbackDecisionId(null); }}
+        >
+          <div className="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full max-w-md">
+            <div className="px-4 py-3 border-b border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-100">Feedback on Decision</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {allDecisions.find((d) => d.id === feedbackDecisionId)?.title}
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { handleFeedback(feedbackText); } }}
+                placeholder="Tell the team what you'd like done differently..."
+                rows={3}
+                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 resize-y"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-700">
+              <button
+                onClick={() => setFeedbackDecisionId(null)}
+                className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleFeedback(feedbackText)}
+                disabled={!feedbackText.trim()}
+                className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white font-semibold rounded"
+              >
+                <Send className="w-3 h-3 inline mr-1" /> Send Feedback
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

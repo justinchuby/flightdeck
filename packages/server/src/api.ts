@@ -532,6 +532,21 @@ export function apiRouter(
     res.json(decision);
   });
 
+  // User feedback on a non-confirmation decision (doesn't change status, just notifies the lead)
+  router.post('/decisions/:id/feedback', (req, res) => {
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'message required' });
+    const decision = decisionLog.getById(req.params.id as string);
+    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    // Send feedback to the lead agent
+    const leadId = decision.leadId || decision.agentId;
+    const lead = agentManager.get(leadId);
+    if (lead && (lead.status === 'running' || lead.status === 'idle')) {
+      lead.sendMessage(`[User Feedback on Decision] "${decision.title}": ${message}\n\nPlease consider this feedback. If the user disagrees with this decision, revise your approach accordingly.`);
+    }
+    res.json({ ok: true, decision });
+  });
+
   // --- Search ---
   router.get('/search', (req, res) => {
     const q = (req.query.q as string ?? '').trim();
