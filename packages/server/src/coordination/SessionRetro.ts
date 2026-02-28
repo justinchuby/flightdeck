@@ -185,8 +185,8 @@ export class SessionRetro {
   private buildSummary(leadId: string, teamAgents: any[], teamEvents: any[]): SessionSummary {
     // Time span
     const timestamps = teamEvents.map(e => new Date(e.timestamp).getTime()).filter(t => !isNaN(t));
-    const start = timestamps.length > 0 ? Math.min(...timestamps) : Date.now();
-    const end = timestamps.length > 0 ? Math.max(...timestamps) : Date.now();
+    const start = timestamps.length > 0 ? timestamps.reduce((a, b) => Math.min(a, b), Infinity) : Date.now();
+    const end = timestamps.length > 0 ? timestamps.reduce((a, b) => Math.max(a, b), -Infinity) : Date.now();
 
     // Token totals
     const totalTokens = teamAgents.reduce((sum, a) => sum + (a.contextWindowUsed ?? 0), 0);

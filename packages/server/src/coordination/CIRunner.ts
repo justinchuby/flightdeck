@@ -61,6 +61,7 @@ interface CIRunnerDeps {
 const MAX_STEP_OUTPUT = 2000; // chars of output to keep per step
 const STEP_TIMEOUT_MS = 120_000; // 2 minutes per step
 const DEBOUNCE_MS = 5_000; // wait 5s after last commit before running
+const MAX_QUEUE_SIZE = 50;
 
 export class CIRunner extends EventEmitter {
   private deps: CIRunnerDeps;
@@ -68,6 +69,7 @@ export class CIRunner extends EventEmitter {
   private queue: CIRunRequest[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastResult: CIResult | null = null;
+  private activeProc: ReturnType<typeof exec> | null = null;
 
   constructor(deps: CIRunnerDeps) {
     super();
@@ -77,12 +79,26 @@ export class CIRunner extends EventEmitter {
   /** Enqueue a CI run. Debounces rapid commits. */
   enqueue(request: CIRunRequest): void {
     this.queue.push(request);
+    if (this.queue.length > MAX_QUEUE_SIZE) {
+      this.queue = this.queue.slice(-MAX_QUEUE_SIZE);
+    }
     // Debounce: wait for commits to settle before running
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null;
       this.processQueue();
     }, DEBOUNCE_MS);
+  }
+
+  /** Clean up timers and kill active processes. */
+  dispose(): void {
+    if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
+    if (this.activeProc) {
+      this.activeProc.kill('SIGTERM');
+      this.activeProc = null;
+    }
+    this.queue = [];
+    this.running = false;
   }
 
   getLastResult(): CIResult | null {
@@ -124,6 +140,7 @@ export class CIRunner extends EventEmitter {
     if (this.running || this.queue.length === 0) return;
     this.running = true;
 
+    try {
     // Collapse multiple queued commits into one run, track all committers
     const batch = [...this.queue];
     this.queue = [];
@@ -176,8 +193,9 @@ export class CIRunner extends EventEmitter {
       `CI ${result.success ? '✅ passed' : '❌ failed'} (${Math.round(result.durationMs / 1000)}s): ${result.steps.map(s => `${s.name}:${s.success ? '✅' : '❌'}`).join(' ')}`,
       { type: 'ci_run', success: result.success, steps: result.steps.map(s => ({ name: s.name, success: s.success, durationMs: s.durationMs })) },
     );
-
-    this.running = false;
+    } finally {
+      this.running = false;
+    }
 
     // Process any commits that arrived while we were running
     if (this.queue.length > 0) {
@@ -194,6 +212,7 @@ export class CIRunner extends EventEmitter {
         maxBuffer: 5 * 1024 * 1024, // 5MB
         env: { ...process.env, CI: 'true', FORCE_COLOR: '0' },
       }, (error, stdout, stderr) => {
+        this.activeProc = null;
         const output = (stdout + '\n' + stderr).trim();
         const truncated = output.length > MAX_STEP_OUTPUT
           ? '...(truncated)\n' + output.slice(-MAX_STEP_OUTPUT)
@@ -206,8 +225,11 @@ export class CIRunner extends EventEmitter {
         });
       });
 
+      this.activeProc = proc;
+
       // Safety: kill if timeout fires before exec callback
       proc.on('error', () => {
+        this.activeProc = null;
         resolve({
           name,
           success: false,

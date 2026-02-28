@@ -2,6 +2,11 @@ import { eq, and, desc, like, sql } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { collectiveMemory } from '../db/schema.js';
 
+// Escape LIKE wildcards to prevent pattern injection
+function escapeLike(s: string): string {
+  return s.replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 // ── Types ────────────────────────────────────────────────────────────
 
 export type MemoryCategory = 'pattern' | 'decision' | 'expertise' | 'gotcha';
@@ -76,7 +81,7 @@ export class CollectiveMemory {
   recall(category: MemoryCategory, keyPrefix?: string): CollectiveMemoryEntry[] {
     const conditions = [eq(collectiveMemory.category, category)];
     if (keyPrefix) {
-      conditions.push(like(collectiveMemory.key, `${keyPrefix}%`));
+      conditions.push(like(collectiveMemory.key, `${escapeLike(keyPrefix)}%`));
     }
 
     const rows = this.db.drizzle
@@ -86,16 +91,14 @@ export class CollectiveMemory {
       .orderBy(desc(collectiveMemory.useCount))
       .all();
 
-    // Bump lastUsedAt for recalled entries
+    // Bump lastUsedAt for recalled entries (batch update)
     const ids = rows.map(r => r.id);
     if (ids.length > 0) {
-      for (const id of ids) {
-        this.db.drizzle
-          .update(collectiveMemory)
-          .set({ lastUsedAt: sql`datetime('now')`, useCount: sql`use_count + 1` })
-          .where(eq(collectiveMemory.id, id))
-          .run();
-      }
+      this.db.drizzle
+        .update(collectiveMemory)
+        .set({ lastUsedAt: sql`datetime('now')`, useCount: sql`use_count + 1` })
+        .where(sql`id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`)
+        .run();
     }
 
     return rows.map(rowToEntry);
@@ -106,7 +109,7 @@ export class CollectiveMemory {
     const rows = this.db.drizzle
       .select()
       .from(collectiveMemory)
-      .where(like(collectiveMemory.key, `%${filepath}%`))
+      .where(like(collectiveMemory.key, `%${escapeLike(filepath)}%`))
       .orderBy(desc(collectiveMemory.useCount))
       .all();
 

@@ -175,7 +175,6 @@ const sessionRetro = new SessionRetro(db, agentManager, activityLedger, decision
 import { SessionExporter } from './coordination/SessionExporter.js';
 const sessionExporter = new SessionExporter(agentManager, activityLedger, decisionLog, taskDAG, chatGroupRegistry);
 agentManager.setSessionExporter(sessionExporter);
-agentManager.setSessionExporter(sessionExporter);
 
 // Wire up API routes
 app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter));
