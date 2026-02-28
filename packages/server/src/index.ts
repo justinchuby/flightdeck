@@ -68,6 +68,15 @@ config = getConfig();
 
 const lockRegistry = new FileLockRegistry(db);
 const activityLedger = new ActivityLedger(db);
+
+// Reactive event pipeline — auto-triggers on ActivityLedger events
+import { EventPipeline, taskCompletedHandler, commitQualityGateHandler, delegationTracker } from './coordination/EventPipeline.js';
+const eventPipeline = new EventPipeline();
+eventPipeline.register(taskCompletedHandler);
+eventPipeline.register(commitQualityGateHandler);
+eventPipeline.register(delegationTracker);
+eventPipeline.connectToLedger(activityLedger);
+
 const roleRegistry = new RoleRegistry(db);
 const messageBus = new MessageBus();
 const decisionLog = new DecisionLog(db);
