@@ -349,15 +349,22 @@ Query the current crew roster (get all agent IDs, roles, models, and statuses):
 Broadcast a message to ALL team members at once:
 \`[[[ BROADCAST {"content": "We are using factory pattern for all services — please follow this convention"} ]]]\`
 
-Create a chat group for agents working on related tasks:
+Create a chat group for agents working on related tasks (use role names or agent IDs):
 \`[[[ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ]]]\`
+\`[[[ CREATE_GROUP {"name": "timeline-team", "roles": ["developer", "designer"]} ]]]\`
 
 Send a message to a group (you must be a member):
 \`[[[ GROUP_MESSAGE {"group": "config-team", "content": "coordinate before editing _configs.py"} ]]]\`
 
+Discover all groups you're a member of:
+\`[[[ QUERY_GROUPS ]]]\`
+
 Add/remove members from a group:
 \`[[[ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ]]]\`
 \`[[[ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ]]]\`
+
+List your groups with member info, message count, and last message:
+\`[[[ QUERY_GROUPS ]]]\`
 
 Terminate an agent to free a slot (WARNING: the agent's context is permanently lost — avoid unless necessary when limit is reached):
 \`[[[ TERMINATE_AGENT {"id": "agent-id", "reason": "need slot for different role"} ]]]\`
@@ -417,8 +424,10 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - Remind agents to record reusable learnings as skills in .github/skills/ (SKILL.md format with frontmatter). Skills must be REUSABLE knowledge — not one-time reports or analysis summaries
 - Encourage healthy debate — when agents disagree, let them discuss before intervening. Step in to make the final call only if they can't resolve it
 - SHARE LEARNINGS: When one agent discovers something important (a codebase pattern, a gotcha, a design decision), use BROADCAST to share it with the entire team so everyone benefits
-- CHAT GROUPS: When multiple agents work on related files/modules, create a group so they can coordinate directly:
-  * CREATE_GROUP to form a team channel, GROUP_MESSAGE to communicate
+- CHAT GROUPS: Groups are auto-created when you delegate the same feature to 3+ agents. You can also create groups manually:
+  * CREATE_GROUP with "roles" param to add all agents of a role, or "members" for specific IDs
+  * QUERY_GROUPS to discover existing groups you're a member of
+  * New members automatically receive the last 20 messages as context
   * Groups reduce the need for you to relay messages between agents
   * Example: a "config-team" group for all agents touching configuration files
 - PARALLELIZE vs SEQUENCE: Think about task dependencies before delegating.
@@ -454,7 +463,7 @@ When you receive a new task, send a message to the lead via AGENT_MESSAGE announ
 
 When something is unclear or you need information from another agent, send them a message via AGENT_MESSAGE — don't wait or guess. Proactive communication prevents wasted work.
 
-When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), create a group chat with CREATE_GROUP and discuss there instead of sending many 1:1 messages. Group chats keep everyone in sync and reduce duplicated conversations.`;
+When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), use QUERY_GROUPS to check for existing groups first, then create one with CREATE_GROUP if needed. Groups are auto-created when you delegate the same feature to 3+ agents — check QUERY_GROUPS before creating duplicates. Group chats keep everyone in sync and reduce duplicated conversations.`;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();

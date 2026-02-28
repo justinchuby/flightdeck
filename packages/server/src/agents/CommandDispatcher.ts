@@ -32,6 +32,7 @@ const ADD_TO_GROUP_REGEX = /\[\[\[\s*ADD_TO_GROUP\s*(\{.*?\})\s*\]\]\]/s;
 const REMOVE_FROM_GROUP_REGEX = /\[\[\[\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*\]\]\]/s;
 const GROUP_MESSAGE_REGEX = /\[\[\[\s*GROUP_MESSAGE\s*(\{.*?\})\s*\]\]\]/s;
 const LIST_GROUPS_REGEX = /\[\[\[\s*LIST_GROUPS\s*\]\]\]/s;
+const QUERY_GROUPS_REGEX = /\[\[\[\s*QUERY_GROUPS\s*\]\]\]/s;
 const DECLARE_TASKS_REGEX = /\[\[\[\s*DECLARE_TASKS\s*(\{.*?\})\s*\]\]\]/s;
 const TASK_STATUS_REGEX = /\[\[\[\s*TASK_STATUS\s*\]\]\]/s;
 const QUERY_TASKS_REGEX = /\[\[\[\s*QUERY_TASKS\s*\]\]\]/s;
@@ -47,6 +48,7 @@ const CANCEL_DELEGATION_REGEX = /\[\[\[\s*CANCEL_DELEGATION\s*(\{.*?\})\s*\]\]\]
 const DEFER_ISSUE_REGEX = /\[\[\[\s*DEFER_ISSUE\s*(\{.*?\})\s*\]\]\]/s;
 const QUERY_DEFERRED_REGEX = /\[\[\[\s*QUERY_DEFERRED\s*(\{.*?\})?\s*\]\]\]/s;
 const RESOLVE_DEFERRED_REGEX = /\[\[\[\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*\]\]\]/s;
+const COMMIT_REGEX = /\[\[\[\s*COMMIT\s*(\{.*?\})\s*\]\]\]/s;
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -130,6 +132,7 @@ export class CommandDispatcher {
       { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => this.detectRemoveFromGroup(a, d) },
       { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MSG', handler: (a, d) => this.detectGroupMessage(a, d) },
       { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => this.handleListGroups(a) },
+      { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => this.handleListGroups(a) },
       { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => this.handleDeclareTasks(a, d) },
       { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => this.handleTaskStatus(a) },
       { regex: QUERY_TASKS_REGEX, name: 'QUERY_TASKS', handler: (a, _d) => this.handleTaskStatus(a) },
@@ -720,8 +723,63 @@ export class CommandDispatcher {
       });
 
       this.ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
+
+      // Auto-create coordination group when 3+ agents share a keyword
+      this.maybeAutoCreateGroup(agent);
     } catch (err: any) {
       this.ctx.emit('agent:delegate_error', { agentId: agent.id, message: err.message });
+    }
+  }
+
+  /** When 3+ active delegations from the same lead share a keyword, auto-create a group. */
+  private maybeAutoCreateGroup(lead: Agent): void {
+    const active = [...this.delegations.values()].filter(
+      d => d.fromAgentId === lead.id && d.status === 'active',
+    );
+    if (active.length < 3) return;
+
+    // Extract first significant word (>3 chars, lowercase) from each task
+    const stopWords = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'implement', 'create', 'build', 'fix', 'add']);
+    const getKeyword = (task: string): string | null => {
+      const words = task.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+      return words.find(w => w.length > 3 && !stopWords.has(w)) ?? null;
+    };
+
+    // Count keyword frequency across delegations
+    const keywordAgents = new Map<string, Set<string>>();
+    for (const d of active) {
+      const kw = getKeyword(d.task);
+      if (!kw) continue;
+      if (!keywordAgents.has(kw)) keywordAgents.set(kw, new Set());
+      keywordAgents.get(kw)!.add(d.toAgentId);
+    }
+
+    for (const [keyword, agentIds] of keywordAgents) {
+      if (agentIds.size < 3) continue;
+      const groupName = `${keyword}-team`;
+      const memberIds = [...agentIds, lead.id];
+
+      // create is idempotent (onConflictDoNothing), addMembers handles existing members
+      this.ctx.chatGroupRegistry.create(lead.id, groupName, memberIds, lead.projectId);
+      this.ctx.chatGroupRegistry.addMembers(lead.id, groupName, memberIds);
+
+      // Notify via system message in the group
+      const names = [...agentIds].map(id => {
+        const a = this.ctx.getAgent(id);
+        return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      }).join(', ');
+      this.ctx.chatGroupRegistry.sendMessage(groupName, lead.id, 'system', 'system',
+        `Auto-created coordination group for parallel ${keyword} work. Members: ${names}`);
+      lead.sendMessage(`[System] Auto-created group "${groupName}" for ${agentIds.size} agents working on ${keyword}.`);
+
+      // Notify each member they've been added
+      for (const id of agentIds) {
+        const member = this.ctx.getAgent(id);
+        if (member && (member.status === 'running' || member.status === 'idle')) {
+          member.sendMessage(`[System] You've been added to coordination group "${groupName}". Use GROUP_MESSAGE {"group": "${groupName}", "content": "..."} to communicate with your peers.`);
+        }
+      }
+      break; // One auto-group per delegation event
     }
   }
 
@@ -1203,8 +1261,8 @@ CREW_ROSTER ]]]`;
     if (!match) return;
     try {
       const req = JSON.parse(match[1]);
-      if (!req.name || !req.members || !Array.isArray(req.members)) {
-        agent.sendMessage('[System] CREATE_GROUP requires "name" (string) and "members" (array of agent IDs).');
+      if (!req.name || (!req.members && !req.roles) || (req.members && !Array.isArray(req.members))) {
+        agent.sendMessage('[System] CREATE_GROUP requires "name" and either "members" (array of agent IDs) or "roles" (array of role names like ["developer", "designer"]).');
         return;
       }
       // Determine the lead context for this group
@@ -1215,7 +1273,19 @@ CREW_ROSTER ]]]`;
       }
       // Resolve member IDs (support short prefixes) — find within the same team
       const resolvedIds: string[] = [];
-      for (const memberId of req.members) {
+
+      // Role-based membership: auto-add all agents with matching roles
+      if (req.roles && Array.isArray(req.roles)) {
+        const roleNames = req.roles.map((r: string) => r.toLowerCase());
+        for (const a of this.ctx.getAllAgents()) {
+          if ((a.parentId === leadId || a.id === leadId) && roleNames.includes(a.role.id.toLowerCase())) {
+            if (!resolvedIds.includes(a.id)) resolvedIds.push(a.id);
+          }
+        }
+      }
+
+      // Explicit member IDs (merged with role-based)
+      for (const memberId of (req.members ?? [])) {
         const resolved = this.ctx.getAllAgents().find((a) =>
           (a.id === memberId || a.id.startsWith(memberId)) && (a.parentId === leadId || a.id === leadId)
         );
@@ -1372,7 +1442,7 @@ CREW_ROSTER ]]]`;
   private handleListGroups(agent: Agent): void {
     const groups = this.ctx.chatGroupRegistry.getGroupsForAgent(agent.id);
     if (groups.length === 0) {
-      agent.sendMessage('[System] You are not a member of any groups.');
+      agent.sendMessage('[System] You are not a member of any groups. Use CREATE_GROUP to create one.');
       return;
     }
     const lines = groups.map((g) => {
@@ -1380,9 +1450,13 @@ CREW_ROSTER ]]]`;
         const a = this.ctx.getAgent(id);
         return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
       }).join(', ');
-      return `- "${g.name}" — ${g.memberIds.length} members: ${memberNames}`;
+      const { messageCount, lastMessage } = this.ctx.chatGroupRegistry.getGroupSummary(g.name, g.leadId);
+      const msgInfo = messageCount > 0
+        ? `${messageCount} msgs — last: ${lastMessage}`
+        : 'no messages yet';
+      return `- "${g.name}" — ${g.memberIds.length} members: ${memberNames}\n  ${msgInfo}`;
     });
-    agent.sendMessage(`[System] Your groups:\n${lines.join('\n')}\nSend messages: [[[ GROUP_MESSAGE {"group": "name", "content": "..."} ]]]`);
+    agent.sendMessage(`[System] Your groups (${groups.length}):\n${lines.join('\n')}\nSend messages: [[[ GROUP_MESSAGE {"group": "name", "content": "..."} ]]]`);
   }
 
   private handleCancelDelegation(agent: Agent, data: string): void {

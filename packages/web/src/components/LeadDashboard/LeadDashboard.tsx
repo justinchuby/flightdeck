@@ -1444,7 +1444,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
                     {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
-                    {sidebarTab === 'comms' && <CommsPanelContent comms={comms} leadId={selectedLeadId} />}
+                    {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
                   </div>
@@ -2218,24 +2218,66 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
   );
 }
 
-function CommsPanelContent({ comms, leadId }: { comms: AgentComm[]; leadId?: string }) {
+function CommsPanelContent({ comms, groupMessages, leadId }: { comms: AgentComm[]; groupMessages: Record<string, GroupMessage[]>; leadId?: string }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
+  const [selectedGroupMsg, setSelectedGroupMsg] = useState<GroupMessage | null>(null);
+
+  // Merge 1:1 comms and group messages into a unified feed sorted by timestamp
+  type FeedItem = { type: '1:1'; item: AgentComm } | { type: 'group'; item: GroupMessage };
+  const feed = useMemo(() => {
+    const items: FeedItem[] = comms.map(c => ({ type: '1:1' as const, item: c }));
+    for (const msgs of Object.values(groupMessages)) {
+      for (const m of msgs) {
+        items.push({ type: 'group' as const, item: m });
+      }
+    }
+    items.sort((a, b) => {
+      const ta = typeof a.item.timestamp === 'string' ? new Date(a.item.timestamp).getTime() : a.item.timestamp;
+      const tb = typeof b.item.timestamp === 'string' ? new Date(b.item.timestamp).getTime() : b.item.timestamp;
+      return ta - tb;
+    });
+    return items.slice(-50);
+  }, [comms, groupMessages]);
+
   useEffect(() => {
     requestAnimationFrame(() => {
       feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
     });
-  }, [comms.length]);
-
-  const recent = comms.slice(-50);
+  }, [feed.length]);
 
   return (
     <>
       <div ref={feedRef} className="h-full overflow-y-auto">
-        {recent.length === 0 ? (
+        {feed.length === 0 ? (
           <p className="text-xs text-gray-500 text-center py-4 font-mono">No messages yet</p>
         ) : (
-          recent.map((c) => {
+          feed.map((entry, i) => {
+            if (entry.type === 'group') {
+              const gm = entry.item;
+              const time = new Date(gm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              return (
+                <div
+                  key={gm.id || `gm-${i}`}
+                  className="px-3 py-1.5 border-b border-b-purple-400/20 bg-purple-500/[0.06] border-l-2 border-l-purple-400/30 cursor-pointer hover:bg-purple-500/[0.10] transition-colors"
+                  onClick={() => setSelectedGroupMsg(gm)}
+                >
+                  <div className="flex items-center gap-1 text-xs">
+                    <Users className="w-3 h-3 text-purple-400 shrink-0" />
+                    <span className="font-mono font-semibold text-purple-400 truncate">{gm.groupName}</span>
+                    <span className="text-gray-500">·</span>
+                    <span className="font-mono text-cyan-400">{gm.fromRole}</span>
+                    <span className="text-xs font-mono text-gray-600 ml-auto shrink-0">{time}</span>
+                  </div>
+                  <div className="text-xs font-mono text-gray-300 mt-0.5">
+                    <p className="truncate">
+                      <MentionText text={gm.content.length > 120 ? gm.content.slice(0, 120) + '…' : gm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            const c = entry.item as AgentComm;
             const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const isToUser = leadId && c.toId === leadId;
             return (
@@ -2304,11 +2346,44 @@ function CommsPanelContent({ comms, leadId }: { comms: AgentComm[]; leadId?: str
           </div>
         </div>
       )}
+
+      {/* Group message popup */}
+      {selectedGroupMsg && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedGroupMsg(null); }}
+        >
+          <div className="bg-gray-800 border border-purple-600/50 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-purple-700/50">
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="w-4 h-4 text-purple-400" />
+                <span className="font-mono font-semibold text-purple-400">{selectedGroupMsg.groupName}</span>
+                <span className="text-gray-500">·</span>
+                <span className="font-mono text-cyan-400">{selectedGroupMsg.fromRole}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-gray-500">
+                  {new Date(selectedGroupMsg.timestamp).toLocaleTimeString()}
+                </span>
+                <button
+                  onClick={() => setSelectedGroupMsg(null)}
+                  className="text-gray-400 hover:text-white text-lg leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <pre className="text-sm font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed">
+                <MentionText text={selectedGroupMsg.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedGroupMsg(null); }} />
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
-/** Simple hash to pick a color for a role name */
 function roleColor(role: string): string {
   const colors = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#60a5fa', '#e879f9', '#fb923c'];
   let hash = 0;
