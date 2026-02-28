@@ -3,6 +3,8 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore } from './stores/settingsStore';
+import { useCommandPalette } from './hooks/useCommandPalette';
+import { CommandPalette } from './components/CommandPalette/CommandPalette';
 import { AgentDashboard } from './components/AgentDashboard/AgentDashboard';
 
 import { TaskQueuePanel } from './components/TaskQueue/TaskQueuePanel';
@@ -29,21 +31,14 @@ export function App() {
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const addToast = useToastStore((s) => s.add);
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map());
-  const [searchOpen, setSearchOpen] = useState(false);
 
-  // Cmd/Ctrl+K to open search
+  // Full-text search dialog (separate from command palette)
+  const [searchOpen, setSearchOpen] = useState(false);
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setSearchOpen((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+
+  // Command palette — Cmd/Ctrl+K is handled by the hook
+  const { isOpen: cmdOpen, open: openCmd, close: closeCmd } = useCommandPalette();
 
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
   useEffect(() => {
@@ -98,11 +93,11 @@ export function App() {
             <h1 className="text-lg font-semibold">AI Crew</h1>
             <div className="flex items-center gap-3">
               <button
-                onClick={openSearch}
+                onClick={openCmd}
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
               >
                 <Search className="w-3.5 h-3.5" />
-                <span>Search</span>
+                <span>Commands</span>
                 <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
               <span
@@ -140,6 +135,7 @@ export function App() {
       <ToastContainer />
       <PermissionDialog />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
+      {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
     </div>
   );
 }
