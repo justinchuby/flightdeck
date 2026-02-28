@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
-import { TaskDAG } from '../coordination/TaskDAG.js';
-import type { DagTaskInput, DagTask } from '../coordination/TaskDAG.js';
+import { TaskDAG } from '../tasks/TaskDAG.js';
+import type { DagTaskInput, DagTask } from '../tasks/TaskDAG.js';
 
 const TEST_DB = ':memory:';
 

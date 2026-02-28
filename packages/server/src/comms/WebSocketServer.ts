@@ -69,7 +69,15 @@ export class WebSocketServer {
       );
     });
 
-    // Forward agent events to subscribed clients
+    // Wire events by domain
+    this.wireAgentEvents(agentManager);
+    this.wireTaskEvents(taskQueue);
+    this.wireCoordinationEvents(lockRegistry, activityLedger);
+    this.wireDecisionEvents(decisionLog);
+    this.wireGroupEvents(chatGroupRegistry);
+  }
+
+  private wireAgentEvents(agentManager: AgentManager): void {
     agentManager.on('agent:data', (agentId: string, data: string) => {
       this.broadcast(
         { type: 'agent:data', agentId, data },
@@ -129,28 +137,6 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:permission_request', ...data });
     });
 
-    taskQueue.on('task:updated', (task: any) => {
-      this.broadcastAll({ type: 'task:updated', task });
-    });
-
-    taskQueue.on('task:removed', (taskId: string) => {
-      this.broadcastAll({ type: 'task:removed', taskId });
-    });
-
-    // Forward coordination events
-    lockRegistry.on('lock:acquired', (data: any) => {
-      this.broadcastAll({ type: 'lock:acquired', ...data });
-    });
-
-    lockRegistry.on('lock:released', (data: any) => {
-      this.broadcastAll({ type: 'lock:released', ...data });
-    });
-
-    activityLedger.on('activity', (entry: any) => {
-      this.broadcastAll({ type: 'activity', entry });
-    });
-
-    // Forward lead events
     agentManager.on('lead:decision', (data: any) => {
       this.broadcastAll({ type: 'lead:decision', ...data });
     });
@@ -179,7 +165,36 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'agent:context_compacted', ...data });
     });
 
-    // Decision confirmation/rejection events
+    agentManager.on('dag:updated', (data: any) => {
+      this.broadcastAll({ type: 'dag:updated', ...data });
+    });
+  }
+
+  private wireTaskEvents(taskQueue: TaskQueue): void {
+    taskQueue.on('task:updated', (task: any) => {
+      this.broadcastAll({ type: 'task:updated', task });
+    });
+
+    taskQueue.on('task:removed', (taskId: string) => {
+      this.broadcastAll({ type: 'task:removed', taskId });
+    });
+  }
+
+  private wireCoordinationEvents(lockRegistry: FileLockRegistry, activityLedger: ActivityLedger): void {
+    lockRegistry.on('lock:acquired', (data: any) => {
+      this.broadcastAll({ type: 'lock:acquired', ...data });
+    });
+
+    lockRegistry.on('lock:released', (data: any) => {
+      this.broadcastAll({ type: 'lock:released', ...data });
+    });
+
+    activityLedger.on('activity', (entry: any) => {
+      this.broadcastAll({ type: 'activity', entry });
+    });
+  }
+
+  private wireDecisionEvents(decisionLog: DecisionLog): void {
     decisionLog.on('decision:confirmed', (decision: any) => {
       this.broadcastAll({ type: 'decision:confirmed', decision });
     });
@@ -187,8 +202,9 @@ export class WebSocketServer {
     decisionLog.on('decision:rejected', (decision: any) => {
       this.broadcastAll({ type: 'decision:rejected', decision });
     });
+  }
 
-    // Forward chat group events
+  private wireGroupEvents(chatGroupRegistry: ChatGroupRegistry): void {
     chatGroupRegistry.on('group:created', (data: any) => {
       this.broadcastAll({ type: 'group:created', ...data });
     });
@@ -200,11 +216,6 @@ export class WebSocketServer {
     });
     chatGroupRegistry.on('group:member_removed', (data: any) => {
       this.broadcastAll({ type: 'group:member_removed', ...data });
-    });
-
-    // Forward DAG events
-    agentManager.on('dag:updated', (data: any) => {
-      this.broadcastAll({ type: 'dag:updated', ...data });
     });
   }
 

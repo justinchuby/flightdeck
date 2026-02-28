@@ -13,8 +13,8 @@ import { authMiddleware } from './middleware/auth.js';
 import { FileLockRegistry } from './coordination/FileLockRegistry.js';
 import { ActivityLedger } from './coordination/ActivityLedger.js';
 import { DecisionLog } from './coordination/DecisionLog.js';
-import { AgentMemory } from './coordination/AgentMemory.js';
-import { TaskDAG } from './coordination/TaskDAG.js';
+import { AgentMemory } from './agents/AgentMemory.js';
+import { TaskDAG } from './tasks/TaskDAG.js';
 import { ChatGroupRegistry } from './comms/ChatGroupRegistry.js';
 import { ContextRefresher } from './coordination/ContextRefresher.js';
 

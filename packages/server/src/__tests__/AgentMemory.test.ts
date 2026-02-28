@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AgentMemory } from '../coordination/AgentMemory.js';
+import { AgentMemory } from '../agents/AgentMemory.js';
 import { Database } from '../db/database.js';
 
 describe('AgentMemory', () => {

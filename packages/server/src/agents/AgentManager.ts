@@ -7,12 +7,13 @@ import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
-import type { AgentMemory } from '../coordination/AgentMemory.js';
+import type { AgentMemory } from './AgentMemory.js';
 import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
-import { TaskDAG } from '../coordination/TaskDAG.js';
+import { TaskDAG } from '../tasks/TaskDAG.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
+import { HeartbeatMonitor } from './HeartbeatMonitor.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -36,10 +37,7 @@ export class AgentManager extends EventEmitter {
   private maxRestarts: number;
   private autoRestart: boolean;
   private dispatcher: CommandDispatcher;
-  /** Heartbeat: track when each lead went idle and consecutive nudge count */
-  private leadIdleSince: Map<string, number> = new Map();
-  private leadNudgeCount: Map<string, number> = new Map();
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeat: HeartbeatMonitor;
 
   constructor(
     config: ServerConfig,
@@ -87,8 +85,13 @@ export class AgentManager extends EventEmitter {
       maxConcurrent: this.maxConcurrent,
     });
 
-    // Start heartbeat timer to detect stalled teams
-    this.heartbeatTimer = setInterval(() => this.heartbeatCheck(), 120_000);
+    // Start heartbeat monitor to detect stalled teams
+    this.heartbeat = new HeartbeatMonitor({
+      getAllAgents: () => this.getAll(),
+      getDelegationsMap: () => this.dispatcher.getDelegationsMap(),
+      emit: (event, ...args) => this.emit(event, ...args),
+    });
+    this.heartbeat.start();
 
     // Write .agent.md files for all roles so Copilot CLI can load them
     writeAgentFiles(this.roleRegistry.getAll());
@@ -211,10 +214,9 @@ export class AgentManager extends EventEmitter {
       // Track lead idle timing for heartbeat
       if (agent.role.id === 'lead') {
         if (status === 'idle') {
-          this.leadIdleSince.set(agent.id, Date.now());
+          this.heartbeat.trackIdle(agent.id);
         } else if (status === 'running') {
-          this.leadIdleSince.delete(agent.id);
-          this.leadNudgeCount.set(agent.id, 0);
+          this.heartbeat.trackActive(agent.id);
         }
       }
 
@@ -385,71 +387,10 @@ export class AgentManager extends EventEmitter {
   }
 
   shutdownAll(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
+    this.heartbeat.stop();
     for (const agent of this.agents.values()) {
       if (agent.status === 'running') {
         agent.kill();
-      }
-    }
-  }
-
-  /** Periodic heartbeat check: detect stalled teams and nudge the lead */
-  private heartbeatCheck(): void {
-    const leads = this.getAll().filter((a) => a.role.id === 'lead' && a.status === 'idle');
-
-    for (const lead of leads) {
-      const idleSince = this.leadIdleSince.get(lead.id);
-      if (!idleSince) continue;
-
-      // Don't nudge if lead went idle less than 60s ago
-      const idleDuration = Date.now() - idleSince;
-      if (idleDuration < 60_000) continue;
-
-      // Find children of this lead
-      const children = this.getAll().filter((a) => a.parentId === lead.id);
-      if (children.length === 0) continue; // no team → legitimately idle
-
-      // If any child is still running, work is in progress — wait
-      const anyRunning = children.some((a) => a.status === 'running');
-      if (anyRunning) continue;
-
-      // Check if there are active (incomplete) delegations — if none, work is done
-      const activeDelegations = Array.from(this.dispatcher.getDelegationsMap().values()).filter(
-        (d) => d.fromAgentId === lead.id && d.status === 'active'
-      );
-      if (activeDelegations.length === 0) continue; // all delegations completed → legitimately idle
-
-      // All children are idle/completed but there are uncompleted delegations — team is stalled
-      const idleChildren = children.filter((a) => a.status === 'idle');
-      const completedChildren = children.filter((a) => a.status === 'completed' || a.status === 'failed');
-
-      const nudgeCount = (this.leadNudgeCount.get(lead.id) ?? 0) + 1;
-      this.leadNudgeCount.set(lead.id, nudgeCount);
-
-      const roster = children.map((c) => `  - ${c.role.name} (${c.id.slice(0, 8)}): ${c.status}`).join('\n');
-      const nudge = `[System Heartbeat] Your team appears stalled — you've been idle for ${Math.floor(idleDuration / 1000)}s. ` +
-        `${idleChildren.length} agents idle, ${completedChildren.length} completed/failed, ${activeDelegations.length} active delegations.\n` +
-        `Team status:\n${roster}\n` +
-        `Please review agent reports and continue: delegate reviews, assign next tasks, or report final results to the user.`;
-
-      logger.warn('lead', `Heartbeat nudge #${nudgeCount} → ${lead.role.name} (${lead.id.slice(0, 8)}): idle ${Math.floor(idleDuration / 1000)}s, ${children.length} children`);
-      lead.sendMessage(nudge);
-
-      this.emit('agent:message_sent', {
-        from: 'system',
-        fromRole: 'System',
-        to: lead.id,
-        toRole: lead.role.name,
-        content: nudge,
-      });
-
-      // Escalate after 2 consecutive nudges
-      if (nudgeCount >= 2) {
-        logger.error('lead', `Lead ${lead.id.slice(0, 8)} stalled after ${nudgeCount} nudges`);
-        this.emit('lead:stalled', { leadId: lead.id, nudgeCount, idleDuration });
       }
     }
   }

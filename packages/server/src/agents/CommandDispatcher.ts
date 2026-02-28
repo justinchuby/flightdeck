@@ -6,10 +6,10 @@ import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
 import type { DecisionLog } from '../coordination/DecisionLog.js';
-import type { AgentMemory, MemoryEntry } from '../coordination/AgentMemory.js';
+import type { AgentMemory, MemoryEntry } from './AgentMemory.js';
 import type { ChatGroupRegistry, GroupMessage } from '../comms/ChatGroupRegistry.js';
-import { TaskDAG } from '../coordination/TaskDAG.js';
-import type { DagTaskInput, DagTask } from '../coordination/TaskDAG.js';
+import { TaskDAG } from '../tasks/TaskDAG.js';
+import type { DagTaskInput, DagTask } from '../tasks/TaskDAG.js';
 import { logger } from '../utils/logger.js';
 
 // ── Regex patterns for ACP commands ──────────────────────────────────
