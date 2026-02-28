@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
 import type { ScaleTime } from '@visx/vendor/d3-scale';
 
@@ -7,7 +7,7 @@ import type { ScaleTime } from '@visx/vendor/d3-scale';
 export interface Communication {
   type: string;
   fromAgentId: string;
-  toAgentId: string;
+  toAgentId?: string;
   summary: string;
   timestamp: string;
 }
@@ -18,13 +18,42 @@ export interface CommunicationLinksProps {
   agentPositions: Map<string, number>;
   xScale: ScaleTime<number, number>;
   laneHeight: number;
+  /** Optional visible time range for performance culling */
+  visibleTimeRange?: [Date, Date];
+}
+
+// ── Style config per comm type ───────────────────────────────────────────
+
+interface LinkStyle {
+  color: string;
+  width: number;
+  dasharray: string;
+  markerId: string;
+  label: string;
+}
+
+const LINK_STYLES: Record<string, LinkStyle> = {
+  delegated:      { color: 'rgba(88,166,255,0.60)',  width: 2,   dasharray: '',    markerId: 'marker-arrow',   label: 'Delegation' },
+  delegation:     { color: 'rgba(88,166,255,0.60)',  width: 2,   dasharray: '',    markerId: 'marker-arrow',   label: 'Delegation' },
+  agent_message:  { color: 'rgba(163,113,247,0.50)', width: 1.5, dasharray: '6,4', markerId: 'marker-circle',  label: 'Message' },
+  message_sent:   { color: 'rgba(163,113,247,0.50)', width: 1.5, dasharray: '6,4', markerId: 'marker-circle',  label: 'Message' },
+  group_message:  { color: 'rgba(210,153,34,0.50)',  width: 1.5, dasharray: '2,4', markerId: 'marker-diamond', label: 'Group Message' },
+  broadcast:      { color: 'rgba(247,120,186,0.40)', width: 1,   dasharray: '2,4', markerId: 'marker-star',    label: 'Broadcast' },
+};
+
+const DEFAULT_STYLE: LinkStyle = {
+  color: 'rgba(163,113,247,0.50)', width: 1.5, dasharray: '6,4', markerId: 'marker-circle', label: 'Message',
+};
+
+function getStyle(type: string): LinkStyle {
+  return LINK_STYLES[type] ?? DEFAULT_STYLE;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
 
-const LINK_COLOR = '#6366f1';
-const LINK_COLOR_HOVER = '#818cf8';
 const HIT_AREA_WIDTH = 12;
+const CURVE_OFFSET = 20;
+const MAX_VISIBLE_LINKS = 500;
 
 const tooltipStyles: React.CSSProperties = {
   ...defaultStyles,
@@ -42,42 +71,52 @@ const tooltipStyles: React.CSSProperties = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-function getStrokeStyle(type: string): { width: number; dasharray: string } {
-  switch (type) {
-    case 'delegated':
-    case 'delegation':
-      return { width: 2, dasharray: '' };
-    case 'broadcast':
-      return { width: 1, dasharray: '2 3' };
-    default:
-      // message_sent, agent_message, group_message, etc.
-      return { width: 1.5, dasharray: '5 3' };
-  }
+/** Cubic bezier S-curve between (x, y1) and (x, y2) */
+function buildCurve(x: number, y1: number, y2: number): string {
+  const midX = x + CURVE_OFFSET;
+  return `M ${x} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x} ${y2}`;
 }
 
-function getLinkLabel(type: string): string {
-  switch (type) {
-    case 'delegated':
-    case 'delegation':
-      return 'Delegation';
-    case 'broadcast':
-      return 'Broadcast';
-    case 'message_sent':
-    case 'agent_message':
-      return 'Message';
-    case 'group_message':
-      return 'Group Message';
-    default:
-      return type;
-  }
+/** Short horizontal stub for comms with missing toAgentId */
+function buildStub(x: number, y: number): string {
+  return `M ${x} ${y} L ${x + 24} ${y}`;
 }
 
-/** Build a quadratic bezier path from (x, y1) to (x, y2) with a horizontal curve */
-function buildBezierPath(x: number, y1: number, y2: number): string {
-  const dy = y2 - y1;
-  // Control point offset: curve out to the right proportional to vertical distance
-  const cpOffset = Math.min(Math.abs(dy) * 0.4, 60);
-  return `M ${x} ${y1} Q ${x + cpOffset} ${(y1 + y2) / 2} ${x} ${y2}`;
+// ── SVG Marker definitions ───────────────────────────────────────────────
+
+function MarkerDefs() {
+  return (
+    <defs>
+      <marker id="marker-arrow" viewBox="0 0 10 10" refX="10" refY="5"
+        markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(88,166,255,0.6)" />
+      </marker>
+      <marker id="marker-circle" viewBox="0 0 10 10" refX="5" refY="5"
+        markerWidth="5" markerHeight="5" orient="auto">
+        <circle cx="5" cy="5" r="4" fill="rgba(163,113,247,0.5)" />
+      </marker>
+      <marker id="marker-diamond" viewBox="0 0 10 10" refX="5" refY="5"
+        markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 5 0 L 10 5 L 5 10 L 0 5 z" fill="rgba(210,153,34,0.5)" />
+      </marker>
+      <marker id="marker-star" viewBox="0 0 12 12" refX="6" refY="6"
+        markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 6 0 L 7.5 4.5 L 12 4.5 L 8.25 7.5 L 9.75 12 L 6 9 L 2.25 12 L 3.75 7.5 L 0 4.5 L 4.5 4.5 z"
+          fill="rgba(247,120,186,0.4)" />
+      </marker>
+    </defs>
+  );
+}
+
+// ── Resolved link data ───────────────────────────────────────────────────
+
+interface ResolvedLink {
+  comm: Communication;
+  idx: number;
+  x: number;
+  y1: number;
+  y2: number | null; // null = missing toAgentId
+  style: LinkStyle;
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -87,6 +126,7 @@ export function CommunicationLinks({
   agentPositions,
   xScale,
   laneHeight,
+  visibleTimeRange,
 }: CommunicationLinksProps) {
   const {
     showTooltip,
@@ -119,59 +159,92 @@ export function CommunicationLinks({
     hideTooltip();
   }, [hideTooltip]);
 
-  // Filter to only renderable links (both agents visible)
-  const links = communications
-    .map((comm, i) => {
+  const links = useMemo<ResolvedLink[]>(() => {
+    const result: ResolvedLink[] = [];
+
+    for (let i = 0; i < communications.length; i++) {
+      const comm = communications[i];
+      const ts = new Date(comm.timestamp);
+
+      // Performance: skip links outside visible time range
+      if (visibleTimeRange) {
+        if (ts < visibleTimeRange[0] || ts > visibleTimeRange[1]) continue;
+      }
+
       const fromY = agentPositions.get(comm.fromAgentId);
-      const toY = agentPositions.get(comm.toAgentId);
-      if (fromY === undefined || toY === undefined) return null;
-      const x = xScale(new Date(comm.timestamp));
-      if (x === undefined || !isFinite(x)) return null;
+      if (fromY === undefined) continue;
+
+      const x = xScale(ts);
+      if (x === undefined || !isFinite(x)) continue;
+
       const y1 = fromY + laneHeight / 2;
-      const y2 = toY + laneHeight / 2;
-      return { comm, idx: i, x, y1, y2 };
-    })
-    .filter(Boolean) as Array<{ comm: Communication; idx: number; x: number; y1: number; y2: number }>;
+      let y2: number | null = null;
+
+      if (comm.toAgentId) {
+        const toY = agentPositions.get(comm.toAgentId);
+        if (toY !== undefined) {
+          y2 = toY + laneHeight / 2;
+        }
+      }
+
+      result.push({ comm, idx: i, x, y1, y2, style: getStyle(comm.type) });
+
+      // Hard cap for performance
+      if (result.length >= MAX_VISIBLE_LINKS) break;
+    }
+    return result;
+  }, [communications, agentPositions, xScale, laneHeight, visibleTimeRange]);
 
   return (
     <>
-      <g className="communication-links">
-        {links.map(({ comm, idx, x, y1, y2 }) => {
-          const { width, dasharray } = getStrokeStyle(comm.type);
+      <g className="communication-links" style={{ pointerEvents: 'none' }}>
+        <MarkerDefs />
+
+        {links.map(({ comm, idx, x, y1, y2, style }) => {
           const isHovered = hoveredIdx === idx;
-          const path = buildBezierPath(x, y1, y2);
+          const isMissing = y2 === null;
+          const path = isMissing ? buildStub(x, y1) : buildCurve(x, y1, y2);
+          const glowFilter = isHovered
+            ? `drop-shadow(0 0 4px ${style.color})`
+            : undefined;
 
           return (
             <g key={idx}>
-              {/* Invisible wider hit area for easier hovering */}
+              {/* Invisible wider hit area for hover */}
               <path
                 d={path}
                 fill="none"
                 stroke="transparent"
                 strokeWidth={HIT_AREA_WIDTH}
+                style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
                 onMouseEnter={(e) => handleMouseEnter(comm, idx, e)}
                 onMouseLeave={handleMouseLeave}
-                style={{ cursor: 'pointer' }}
               />
               {/* Visible link */}
               <path
                 d={path}
                 fill="none"
-                stroke={isHovered ? LINK_COLOR_HOVER : LINK_COLOR}
-                strokeWidth={isHovered ? width + 0.5 : width}
-                strokeDasharray={dasharray}
-                strokeOpacity={isHovered ? 1 : 0.5}
-                pointerEvents="none"
+                stroke={style.color}
+                strokeWidth={isHovered ? style.width + 0.5 : style.width}
+                strokeDasharray={style.dasharray || undefined}
+                opacity={isHovered ? 1 : 0.7}
+                markerEnd={isMissing ? undefined : `url(#${style.markerId})`}
+                style={{ filter: glowFilter, pointerEvents: 'none' }}
               />
-              {/* Small dot at the endpoints */}
-              <circle cx={x} cy={y1} r={isHovered ? 3 : 2} fill={isHovered ? LINK_COLOR_HOVER : LINK_COLOR} opacity={isHovered ? 1 : 0.6} pointerEvents="none" />
-              <circle cx={x} cy={y2} r={isHovered ? 3 : 2} fill={isHovered ? LINK_COLOR_HOVER : LINK_COLOR} opacity={isHovered ? 1 : 0.6} pointerEvents="none" />
+              {/* '?' label for missing toAgentId */}
+              {isMissing && (
+                <text
+                  x={x + 28} y={y1 + 4}
+                  fontSize={10} fill="#9ca3af"
+                  style={{ pointerEvents: 'none' }}
+                >?</text>
+              )}
             </g>
           );
         })}
       </g>
 
-      {/* Tooltip rendered outside SVG */}
+      {/* Tooltip rendered outside SVG via portal */}
       {tooltipOpen && tooltipData && (
         <TooltipWithBounds
           left={tooltipLeft}
@@ -180,18 +253,26 @@ export function CommunicationLinks({
         >
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-indigo-300">{getLinkLabel(tooltipData.type)}</span>
+              <span
+                className="font-semibold"
+                style={{ color: getStyle(tooltipData.type).color }}
+              >
+                {getStyle(tooltipData.type).label}
+              </span>
               <span className="text-gray-500 text-[10px]">
                 {new Date(tooltipData.timestamp).toLocaleTimeString()}
               </span>
             </div>
             <div className="text-[10px] text-gray-400">
-              {tooltipData.fromAgentId.slice(0, 8)} → {tooltipData.toAgentId.slice(0, 8)}
+              {tooltipData.fromAgentId.slice(0, 8)}
+              {tooltipData.toAgentId
+                ? ` → ${tooltipData.toAgentId.slice(0, 8)}`
+                : ' → ?'}
             </div>
             {tooltipData.summary && (
               <p className="text-gray-300 text-[11px] line-clamp-3 mt-1">
-                {tooltipData.summary.length > 200
-                  ? tooltipData.summary.slice(0, 200) + '…'
+                {tooltipData.summary.length > 80
+                  ? tooltipData.summary.slice(0, 80) + '…'
                   : tooltipData.summary}
               </p>
             )}

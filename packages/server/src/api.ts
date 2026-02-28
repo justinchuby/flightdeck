@@ -320,14 +320,6 @@ export function apiRouter(
           summary: ev.summary.slice(0, 120),
           timestamp: ev.timestamp,
         });
-      } else if (ev.actionType === 'group_message' && ev.details?.groupName) {
-        communications.push({
-          type: 'group_message',
-          fromAgentId: ev.agentId,
-          toAgentId: ev.details.groupName,
-          summary: ev.summary.slice(0, 120),
-          timestamp: ev.timestamp,
-        });
       }
     }
 

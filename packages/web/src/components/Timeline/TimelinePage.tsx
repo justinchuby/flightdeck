@@ -1,66 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAppStore } from '../../stores/appStore';
-import { apiFetch } from '../../hooks/useApi';
+import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { useTimelineData } from './useTimelineData';
+import { TimelineContainer } from './TimelineContainer';
 
 interface Props {
   api: any;
   ws: any;
-}
-
-interface TimelineData {
-  agents: Array<{
-    agentId: string;
-    role: string;
-    segments: Array<{ status: string; startAt: string; endAt?: string }>;
-  }>;
-  communications: Array<{
-    fromAgentId: string;
-    toAgentId: string;
-    timestamp: string;
-    type: string;
-    summary: string;
-  }>;
-  locks: Array<{
-    agentId: string;
-    filePath: string;
-    acquiredAt: string;
-    releasedAt?: string;
-  }>;
-  timeRange: { start: string; end: string };
+  agents?: Array<{ id: string; role: string; parentId?: string }>;
 }
 
 /** Timeline visualization page — shows agent activity over time using visx. */
-export function TimelinePage({ api, ws }: Props) {
-  const agents = useAppStore((s) => s.agents);
-  const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchTimeline = useCallback(async () => {
-    try {
-      const data = await apiFetch('/coordination/timeline');
-      setTimelineData(data);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load timeline data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTimeline();
-  }, [fetchTimeline]);
+export function TimelinePage({ api, ws, agents = [] }: Props) {
+  // Find lead agents for selection
+  const leads = agents.filter(a => !a.parentId || a.role === 'lead');
+  const [selectedLead, setSelectedLead] = useState<string | null>(leads[0]?.id ?? null);
+  const { data, loading, error, refetch } = useTimelineData(selectedLead);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Team Collaboration Timeline</h1>
+        <button
+          onClick={refetch}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          Refresh
+        </button>
       </div>
 
-      {loading && (
+      {loading && !data && (
         <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-8 min-h-[400px] flex items-center justify-center">
-          <p className="text-zinc-500 text-sm">Loading timeline data…</p>
+          <RefreshCw size={24} className="animate-spin text-zinc-500" />
         </div>
       )}
 
@@ -70,15 +42,9 @@ export function TimelinePage({ api, ws }: Props) {
         </div>
       )}
 
-      {!loading && !error && (
-        <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-8 min-h-[400px] flex items-center justify-center">
-          <p className="text-zinc-500 text-sm">
-            Timeline visualization — implementation pending.
-            <br />
-            {timelineData
-              ? `${timelineData.agents.length} agents, ${timelineData.communications.length} communications loaded.`
-              : 'No data available.'}
-          </p>
+      {data && (
+        <div className="flex-1 min-h-0">
+          <TimelineContainer data={data} />
         </div>
       )}
     </div>
