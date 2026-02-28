@@ -9,6 +9,16 @@ import type { ActivityLedger, ActionType } from './coordination/ActivityLedger.j
 import type { DecisionLog } from './coordination/DecisionLog.js';
 import { logger } from './utils/logger.js';
 import { writeAgentFiles } from './agents/agentFiles.js';
+import {
+  validateBody,
+  spawnAgentSchema,
+  sendMessageSchema,
+  leadMessageSchema,
+  configPatchSchema,
+  registerRoleSchema,
+  agentInputSchema,
+  acquireLockSchema,
+} from './validation/schemas.js';
 
 export function apiRouter(
   agentManager: AgentManager,
@@ -26,7 +36,7 @@ export function apiRouter(
     res.json(agentManager.getAll().map((a) => a.toJSON()));
   });
 
-  router.post('/agents', (req, res) => {
+  router.post('/agents', validateBody(spawnAgentSchema), (req, res) => {
     const { roleId, task, mode, autopilot, model } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) {
@@ -66,7 +76,7 @@ export function apiRouter(
     res.status(201).json(newAgent.toJSON());
   });
 
-  router.post('/agents/:id/input', (req, res) => {
+  router.post('/agents/:id/input', validateBody(agentInputSchema), (req, res) => {
     const { text } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
@@ -76,11 +86,10 @@ export function apiRouter(
   });
 
   // Send a message to an agent: mode "queue" (default) waits for idle, "interrupt" cancels current work first
-  router.post('/agents/:id/message', async (req, res) => {
+  router.post('/agents/:id/message', validateBody(sendMessageSchema), async (req, res) => {
     const { text, mode = 'queue' } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
-    if (!text) return res.status(400).json({ error: 'text is required' });
 
     if (agent.role.id === 'lead') {
       agent.lastHumanMessageAt = new Date();
@@ -125,7 +134,7 @@ export function apiRouter(
     res.json(roleRegistry.getAll());
   });
 
-  router.post('/roles', (req, res) => {
+  router.post('/roles', validateBody(registerRoleSchema), (req, res) => {
     const role = roleRegistry.register(req.body);
     writeAgentFiles([role]);
     res.status(201).json(role);
@@ -141,29 +150,13 @@ export function apiRouter(
     res.json(getConfig());
   });
 
-  router.patch('/config', (req, res) => {
-    // Whitelist: only these fields can be modified at runtime
-    const MUTABLE_FIELDS = ['maxConcurrentAgents', 'host'] as const;
+  router.patch('/config', validateBody(configPatchSchema), (req, res) => {
     const sanitized: Partial<ServerConfig> = {};
-    for (const key of MUTABLE_FIELDS) {
-      if (req.body[key] !== undefined) {
-        (sanitized as any)[key] = req.body[key];
-      }
+    if (req.body.maxConcurrentAgents !== undefined) {
+      sanitized.maxConcurrentAgents = req.body.maxConcurrentAgents;
     }
-    if (Object.keys(sanitized).length === 0) {
-      return res.status(400).json({ error: 'No valid fields to update. Allowed: ' + MUTABLE_FIELDS.join(', ') });
-    }
-    // Type validation
-    if (sanitized.maxConcurrentAgents !== undefined) {
-      const val = sanitized.maxConcurrentAgents;
-      if (typeof val !== 'number' || !Number.isInteger(val) || val < 1) {
-        return res.status(400).json({ error: 'maxConcurrentAgents must be a positive integer' });
-      }
-    }
-    if (sanitized.host !== undefined) {
-      if (typeof sanitized.host !== 'string' || sanitized.host.length === 0) {
-        return res.status(400).json({ error: 'host must be a non-empty string' });
-      }
+    if (req.body.host !== undefined) {
+      sanitized.host = req.body.host;
     }
     const updated = updateConfig(sanitized);
     agentManager.setMaxConcurrent(updated.maxConcurrentAgents);
@@ -187,11 +180,8 @@ export function apiRouter(
     res.json(lockRegistry.getAll());
   });
 
-  router.post('/coordination/locks', (req, res) => {
+  router.post('/coordination/locks', validateBody(acquireLockSchema), (req, res) => {
     const { agentId, filePath, reason } = req.body;
-    if (!agentId || !filePath) {
-      return res.status(400).json({ error: 'agentId and filePath are required' });
-    }
     const agent = agentManager.get(agentId);
     const agentRole = agent?.role?.id ?? 'unknown';
     const result = lockRegistry.acquire(agentId, agentRole, filePath, reason);
@@ -271,7 +261,7 @@ export function apiRouter(
     res.json(agent.toJSON());
   });
 
-  router.post('/lead/:id/message', async (req, res) => {
+  router.post('/lead/:id/message', validateBody(leadMessageSchema), async (req, res) => {
     const { text, mode = 'interrupt' } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
