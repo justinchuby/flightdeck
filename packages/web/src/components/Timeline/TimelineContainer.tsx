@@ -6,6 +6,7 @@ import { Group } from '@visx/group';
 import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
 import { CommunicationLinks } from './CommunicationLinks';
 import { BrushTimeSelector } from './BrushTimeSelector';
+import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import type {
   TimelineAgent,
   TimelineSegment,
@@ -198,15 +199,20 @@ function TimelineLegend() {
 
 // ── Main component ───────────────────────────────────────────────────
 
+type SortDirection = 'newest-first' | 'oldest-first';
+
 interface TimelineContainerProps {
   data: TimelineData;
   liveMode?: boolean;
   onLiveModeChange?: (live: boolean) => void;
+  lastSeenTimestamp?: Date;
 }
 
-function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange }: TimelineContainerProps & { width: number }) {
+function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps & { width: number }) {
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
   const [focusedLaneIdx, setFocusedLaneIdx] = useState(-1);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('oldest-first');
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -273,19 +279,20 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       newStart = Math.max(newStart, fullRange.start.getTime());
       return { start: new Date(newStart), end: new Date(newEnd) };
     });
-  }, [fullRange]);
+  }, [fullRange, onLiveModeChange]);
 
   const fitToView = useCallback(() => { setVisibleRange(fullRange); }, [fullRange]);
 
   // Sort agents: lead first, then by role hierarchy, then by spawn time
   const sortedAgents = useMemo(() => {
-    return [...data.agents].sort((a, b) => {
+    const sorted = [...data.agents].sort((a, b) => {
       const ra = ROLE_ORDER[a.role] ?? 99;
       const rb = ROLE_ORDER[b.role] ?? 99;
       if (ra !== rb) return ra - rb;
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
-  }, [data.agents]);
+    return sortDirection === 'newest-first' ? sorted.reverse() : sorted;
+  }, [data.agents, sortDirection]);
 
   const chartWidth = Math.max(containerWidth - LABEL_WIDTH, 400);
 
@@ -326,6 +333,23 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       return next;
     });
   }, []);
+
+  // Auto-expand agents with failed segments so errors are visible
+  useEffect(() => {
+    const failedIds = data.agents
+      .filter(a => a.segments.some(s => s.status === 'failed'))
+      .map(a => a.id);
+    if (failedIds.length > 0) {
+      setExpandedAgents(prev => {
+        const next = new Set(prev);
+        let changed = false;
+        for (const id of failedIds) {
+          if (!next.has(id)) { next.add(id); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [data.agents]);
 
   // Synced vertical scrolling between labels and timeline
   const syncScroll = useCallback((source: 'label' | 'timeline') => {
@@ -580,6 +604,20 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 xScale={timeScale}
                 laneHeight={LANE_HEIGHT}
               />
+
+              {/* 'You left off here' marker */}
+              {lastSeenTimestamp && (() => {
+                const x = timeScale(lastSeenTimestamp);
+                if (x >= 0 && x <= chartWidth) {
+                  return (
+                    <g aria-label="You left off here marker">
+                      <line x1={x} y1={0} x2={x} y2={totalHeight} stroke="#58a6ff" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.7} />
+                      <text x={x + 4} y={12} fontSize={9} fill="#58a6ff" fontFamily="monospace" opacity={0.8}>You left off here</text>
+                    </g>
+                  );
+                }
+                return null;
+              })()}
             </Group>
           </svg>
 
