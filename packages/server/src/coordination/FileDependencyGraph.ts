@@ -1,6 +1,11 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, sep } from 'path';
 import { logger } from '../utils/logger.js';
+
+/** Normalize a file path to use forward slashes (POSIX style) regardless of platform */
+function toPosix(p: string): string {
+  return sep === '\\' ? p.replace(/\\/g, '/') : p;
+}
 
 interface FileNode {
   path: string;
@@ -115,12 +120,12 @@ export class FileDependencyGraph {
     return [...new Set(imports)];
   }
 
-  /** Resolve a relative import to a project-relative path */
+  /** Resolve a relative import to a project-relative path (always POSIX slashes) */
   private resolveImport(importPath: string, fromDir: string): string | null {
     // Remove .js/.ts extension for normalization
     const clean = importPath.replace(/\.(js|ts|tsx|jsx)$/, '');
     const absPath = resolve(fromDir, clean);
-    const relPath = absPath.replace(this.projectRoot + '/', '');
+    const relPath = toPosix(absPath).replace(toPosix(this.projectRoot) + '/', '');
 
     // Try common extensions
     for (const ext of ['.ts', '.tsx', '.js', '.jsx']) {
@@ -128,7 +133,7 @@ export class FileDependencyGraph {
     }
     // Try index file
     for (const ext of ['.ts', '.tsx', '.js', '.jsx']) {
-      if (existsSync(join(absPath, 'index' + ext))) return join(relPath, 'index' + ext);
+      if (existsSync(join(absPath, 'index' + ext))) return toPosix(join(relPath, 'index' + ext));
     }
     return relPath + '.ts'; // Default assumption
   }
@@ -145,7 +150,7 @@ export class FileDependencyGraph {
           const stat = statSync(full);
           if (stat.isDirectory()) walk(full);
           else if (/\.(ts|tsx|js|jsx)$/.test(entry)) {
-            this.analyzeFile(full.replace(this.projectRoot + '/', ''));
+            this.analyzeFile(toPosix(full).replace(toPosix(this.projectRoot) + '/', ''));
             count++;
           }
         }
