@@ -1,5 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
+import crypto from 'crypto';
 import { createServer } from 'http';
 import cors from 'cors';
 import path from 'path';
@@ -60,8 +61,21 @@ app.use(cors({
   credentials: true,
 }));
 
+// Generate a per-request nonce for inline scripts (used by token injection)
+app.use((_req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
+
 // Security headers (helmet sets X-Frame-Options, CSP, HSTS, etc.)
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", (_req, res) => `'nonce-${(res as express.Response).locals.cspNonce}'`],
+    },
+  },
+}));
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -315,9 +329,10 @@ if (fs.existsSync(webDistPath)) {
   app.get('/{*path}', (_req, res) => {
     const secret = getAuthSecret();
     if (secret) {
+      const nonce = res.locals.cspNonce;
       const injected = indexHtml.replace(
         '</head>',
-        `<script>window.__AI_CREW_TOKEN__=${JSON.stringify(secret)}</script></head>`,
+        `<script nonce="${nonce}">window.__AI_CREW_TOKEN__=${JSON.stringify(secret)}</script></head>`,
       );
       res.type('html').send(injected);
     } else {
