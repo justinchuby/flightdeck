@@ -17,6 +17,7 @@ interface ClientConnection {
 export class WebSocketServer {
   private wss: WsServer;
   private clients: Map<string, ClientConnection> = new Map();
+  private eventCleanups: Array<() => void> = [];
 
   constructor(
     server: HttpServer,
@@ -36,7 +37,8 @@ export class WebSocketServer {
         const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
         const url = new URL(req.url || '', `http://${req.headers.host}`);
         const token = url.searchParams.get('token');
-        if (!isLocalhost && token !== secret) {
+        const cookieToken = this.parseCookie(req.headers.cookie, 'ai-crew-token');
+        if (!isLocalhost && token !== secret && cookieToken !== secret) {
           ws.close(4401, 'Authentication required');
           return;
         }
@@ -85,149 +87,155 @@ export class WebSocketServer {
     this.wireGroupEvents(chatGroupRegistry);
   }
 
+  /** Track an event listener so close() can remove it */
+  private track(emitter: any, event: string, handler: (...args: any[]) => void): void {
+    emitter.on(event, handler);
+    this.eventCleanups.push(() => emitter.off(event, handler));
+  }
+
   private wireAgentEvents(agentManager: AgentManager): void {
-    agentManager.on('agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
+    this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       this.broadcast(
         { type: 'agent:data', agentId, data: text },
         (c) => c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*'),
       );
     });
 
-    agentManager.on('agent:spawned', (agentJson: any) => {
+    this.track(agentManager, 'agent:spawned', (agentJson: any) => {
       this.broadcastAll({ type: 'agent:spawned', agent: agentJson });
     });
 
-    agentManager.on('agent:terminated', (agentId: string) => {
+    this.track(agentManager, 'agent:terminated', (agentId: string) => {
       this.broadcastAll({ type: 'agent:terminated', agentId });
     });
 
-    agentManager.on('agent:exit', ({ agentId, code }: { agentId: string; code: number }) => {
+    this.track(agentManager, 'agent:exit', ({ agentId, code }: { agentId: string; code: number }) => {
       this.broadcastAll({ type: 'agent:exit', agentId, code });
     });
 
-    agentManager.on('agent:status', (data: any) => {
+    this.track(agentManager, 'agent:status', (data: any) => {
       this.broadcastAll({ type: 'agent:status', ...data });
     });
 
-    agentManager.on('agent:crashed', (data: any) => {
+    this.track(agentManager, 'agent:crashed', (data: any) => {
       this.broadcastAll({ type: 'agent:crashed', ...data });
     });
 
-    agentManager.on('agent:auto_restarted', (data: any) => {
+    this.track(agentManager, 'agent:auto_restarted', (data: any) => {
       this.broadcastAll({ type: 'agent:auto_restarted', ...data });
     });
 
-    agentManager.on('agent:restart_limit', (data: any) => {
+    this.track(agentManager, 'agent:restart_limit', (data: any) => {
       this.broadcastAll({ type: 'agent:restart_limit', ...data });
     });
 
-    agentManager.on('agent:sub_spawned', (data: any) => {
+    this.track(agentManager, 'agent:sub_spawned', (data: any) => {
       this.broadcastAll({ type: 'agent:sub_spawned', parentId: data.parentId, child: data.child });
     });
 
-    agentManager.on('agent:tool_call', (data: any) => {
+    this.track(agentManager, 'agent:tool_call', (data: any) => {
       this.broadcastAll({ type: 'agent:tool_call', ...data });
     });
 
-    agentManager.on('agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
+    this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       this.broadcastAll({ type: 'agent:text', agentId, text });
     });
 
-    agentManager.on('agent:content', (data: any) => {
+    this.track(agentManager, 'agent:content', (data: any) => {
       this.broadcastAll({ type: 'agent:content', ...data });
     });
 
-    agentManager.on('agent:thinking', (data: any) => {
+    this.track(agentManager, 'agent:thinking', (data: any) => {
       this.broadcastAll({ type: 'agent:thinking', ...data });
     });
 
-    agentManager.on('agent:plan', (data: any) => {
+    this.track(agentManager, 'agent:plan', (data: any) => {
       this.broadcastAll({ type: 'agent:plan', ...data });
     });
 
-    agentManager.on('agent:permission_request', (data: any) => {
+    this.track(agentManager, 'agent:permission_request', (data: any) => {
       this.broadcastAll({ type: 'agent:permission_request', ...data });
     });
 
-    agentManager.on('lead:decision', (data: any) => {
+    this.track(agentManager, 'lead:decision', (data: any) => {
       this.broadcastAll({ type: 'lead:decision', ...data });
     });
 
-    agentManager.on('lead:progress', (data: any) => {
+    this.track(agentManager, 'lead:progress', (data: any) => {
       this.broadcastAll({ type: 'lead:progress', ...data });
     });
 
-    agentManager.on('agent:delegated', (data: any) => {
+    this.track(agentManager, 'agent:delegated', (data: any) => {
       this.broadcastAll({ type: 'agent:delegated', ...data });
     });
 
-    agentManager.on('agent:completion_reported', (data: any) => {
+    this.track(agentManager, 'agent:completion_reported', (data: any) => {
       this.broadcastAll({ type: 'agent:completion_reported', ...data });
     });
 
-    agentManager.on('agent:message_sent', (data: any) => {
+    this.track(agentManager, 'agent:message_sent', (data: any) => {
       this.broadcastAll({ type: 'agent:message_sent', ...data });
     });
 
-    agentManager.on('agent:session_ready', (data: any) => {
+    this.track(agentManager, 'agent:session_ready', (data: any) => {
       this.broadcastAll({ type: 'agent:session_ready', ...data });
     });
 
-    agentManager.on('agent:context_compacted', (data: any) => {
+    this.track(agentManager, 'agent:context_compacted', (data: any) => {
       this.broadcastAll({ type: 'agent:context_compacted', ...data });
     });
 
-    agentManager.on('dag:updated', (data: any) => {
+    this.track(agentManager, 'dag:updated', (data: any) => {
       this.broadcastAll({ type: 'dag:updated', ...data });
     });
 
-    agentManager.on('system:paused', (data: any) => {
+    this.track(agentManager, 'system:paused', (data: any) => {
       this.broadcastAll({ type: 'system:paused', ...data });
     });
   }
 
   private wireCoordinationEvents(lockRegistry: FileLockRegistry, activityLedger: ActivityLedger): void {
-    lockRegistry.on('lock:acquired', (data: any) => {
+    this.track(lockRegistry, 'lock:acquired', (data: any) => {
       this.broadcastAll({ type: 'lock:acquired', ...data });
     });
 
-    lockRegistry.on('lock:released', (data: any) => {
+    this.track(lockRegistry, 'lock:released', (data: any) => {
       this.broadcastAll({ type: 'lock:released', ...data });
     });
 
-    lockRegistry.on('lock:expired', (data: any) => {
+    this.track(lockRegistry, 'lock:expired', (data: any) => {
       this.broadcastAll({ type: 'lock:expired', ...data });
     });
 
-    activityLedger.on('activity', (entry: any) => {
+    this.track(activityLedger, 'activity', (entry: any) => {
       this.broadcastAll({ type: 'activity', entry });
     });
   }
 
   private wireDecisionEvents(decisionLog: DecisionLog): void {
-    decisionLog.on('decision:confirmed', (decision: any) => {
+    this.track(decisionLog, 'decision:confirmed', (decision: any) => {
       this.broadcastAll({ type: 'decision:confirmed', decision });
     });
 
-    decisionLog.on('decision:rejected', (decision: any) => {
+    this.track(decisionLog, 'decision:rejected', (decision: any) => {
       this.broadcastAll({ type: 'decision:rejected', decision });
     });
   }
 
   private wireGroupEvents(chatGroupRegistry: ChatGroupRegistry): void {
-    chatGroupRegistry.on('group:created', (data: any) => {
+    this.track(chatGroupRegistry, 'group:created', (data: any) => {
       this.broadcastAll({ type: 'group:created', ...data });
     });
-    chatGroupRegistry.on('group:message', (data: any) => {
+    this.track(chatGroupRegistry, 'group:message', (data: any) => {
       this.broadcastAll({ type: 'group:message', ...data });
     });
-    chatGroupRegistry.on('group:member_added', (data: any) => {
+    this.track(chatGroupRegistry, 'group:member_added', (data: any) => {
       this.broadcastAll({ type: 'group:member_added', ...data });
     });
-    chatGroupRegistry.on('group:member_removed', (data: any) => {
+    this.track(chatGroupRegistry, 'group:member_removed', (data: any) => {
       this.broadcastAll({ type: 'group:member_removed', ...data });
     });
-    chatGroupRegistry.on('group:reaction', (data: any) => {
+    this.track(chatGroupRegistry, 'group:reaction', (data: any) => {
       this.broadcastAll({ type: 'group:reaction', ...data });
     });
   }
@@ -302,5 +310,25 @@ export class WebSocketServer {
   /** Public broadcast for external event sources (e.g., AlertEngine) */
   broadcastEvent(msg: any): void {
     this.broadcastAll(msg);
+  }
+
+  /** Remove all event listeners and close the WebSocket server */
+  close(): void {
+    for (const cleanup of this.eventCleanups) {
+      cleanup();
+    }
+    this.eventCleanups.length = 0;
+
+    for (const client of this.clients.values()) {
+      try { client.ws.close(1001, 'Server shutting down'); } catch { /* already closed */ }
+    }
+    this.clients.clear();
+    this.wss.close();
+  }
+
+  private parseCookie(header: string | undefined, name: string): string | null {
+    if (!header) return null;
+    const match = header.split(';').find(c => c.trim().startsWith(`${name}=`));
+    return match ? decodeURIComponent(match.split('=')[1].trim()) : null;
   }
 }

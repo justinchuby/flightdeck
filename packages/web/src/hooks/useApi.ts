@@ -5,9 +5,9 @@ import { useAppStore } from '../stores/appStore';
 const API_BASE = '/api';
 
 export function getAuthToken(): string | null {
-  // Check injected token from server (production), then URL params, then localStorage
-  const injected = (window as any).__AI_CREW_TOKEN__;
-  if (injected) return injected;
+  // URL param or localStorage — for cross-machine access or manual token entry.
+  // In production, the server sets an HttpOnly cookie that handles auth automatically
+  // (cookie is sent by the browser with every request, no JS access needed).
   const params = new URLSearchParams(window.location.search);
   return params.get('token') || localStorage.getItem('ai-crew-token');
 }

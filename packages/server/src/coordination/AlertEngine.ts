@@ -35,6 +35,7 @@ export class AlertEngine extends EventEmitter {
   private alerts: Alert[] = [];
   private nextId = 1;
   private checkTimer: ReturnType<typeof setInterval> | null = null;
+  private boundActivityHandler: ((entry: { agentId: string }) => void) | null = null;
 
   // Track recent activity per agent to detect "stuck" state
   private lastActivityByAgent = new Map<string, number>();
@@ -54,9 +55,10 @@ export class AlertEngine extends EventEmitter {
     if (this.checkTimer) return;
 
     // Subscribe to activity events to track last-activity timestamps
-    this.activityLedger.on('activity', (entry: { agentId: string }) => {
+    this.boundActivityHandler = (entry: { agentId: string }) => {
       this.lastActivityByAgent.set(entry.agentId, Date.now());
-    });
+    };
+    this.activityLedger.on('activity', this.boundActivityHandler);
 
     this.checkTimer = setInterval(() => this.runChecks(), CHECK_INTERVAL_MS);
     // Run immediately on start
@@ -65,6 +67,10 @@ export class AlertEngine extends EventEmitter {
   }
 
   stop(): void {
+    if (this.boundActivityHandler) {
+      this.activityLedger.off('activity', this.boundActivityHandler);
+      this.boundActivityHandler = null;
+    }
     if (this.checkTimer) {
       clearInterval(this.checkTimer);
       this.checkTimer = null;

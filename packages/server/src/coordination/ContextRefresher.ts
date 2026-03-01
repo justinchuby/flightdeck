@@ -17,6 +17,8 @@ export class ContextRefresher {
   private activityFilter: SmartActivityFilter;
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   private periodicHandle: ReturnType<typeof setInterval> | null = null;
+  private boundRefresh: () => void;
+  private boundCompacted: (data: { agentId: string }) => void;
 
   constructor(
     agentManager: AgentManager,
@@ -29,18 +31,19 @@ export class ContextRefresher {
     this.synthesisEngine = new SynthesisEngine(activityLedger, agentManager);
     this.activityFilter = new SmartActivityFilter();
 
+    // Store bound references so we can remove them in stop()
+    this.boundRefresh = () => this.scheduleRefresh();
+    this.boundCompacted = (data) => this.refreshOne(data.agentId);
+
     // Listen to significant events with debounce
-    const debouncedRefresh = () => this.scheduleRefresh();
-    this.agentManager.on('agent:spawned', debouncedRefresh);
-    this.agentManager.on('agent:terminated', debouncedRefresh);
-    this.agentManager.on('agent:exit', debouncedRefresh);
-    this.lockRegistry.on('lock:acquired', debouncedRefresh);
-    this.lockRegistry.on('lock:released', debouncedRefresh);
+    this.agentManager.on('agent:spawned', this.boundRefresh);
+    this.agentManager.on('agent:terminated', this.boundRefresh);
+    this.agentManager.on('agent:exit', this.boundRefresh);
+    this.lockRegistry.on('lock:acquired', this.boundRefresh);
+    this.lockRegistry.on('lock:released', this.boundRefresh);
 
     // Re-inject crew context immediately after Copilot CLI compacts an agent's context
-    this.agentManager.on('agent:context_compacted', (data: { agentId: string }) => {
-      this.refreshOne(data.agentId);
-    });
+    this.agentManager.on('agent:context_compacted', this.boundCompacted);
   }
 
   start(): void {
@@ -54,6 +57,14 @@ export class ContextRefresher {
   }
 
   stop(): void {
+    // Remove event listeners to prevent leaks
+    this.agentManager.off('agent:spawned', this.boundRefresh);
+    this.agentManager.off('agent:terminated', this.boundRefresh);
+    this.agentManager.off('agent:exit', this.boundRefresh);
+    this.lockRegistry.off('lock:acquired', this.boundRefresh);
+    this.lockRegistry.off('lock:released', this.boundRefresh);
+    this.agentManager.off('agent:context_compacted', this.boundCompacted);
+
     if (this.debounceHandle) {
       clearTimeout(this.debounceHandle);
       this.debounceHandle = null;

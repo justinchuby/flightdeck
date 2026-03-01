@@ -48,16 +48,28 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authentication required. Set Authorization: Bearer <token> header.' });
-    return;
-  }
-
-  const token = authHeader.slice(7);
-  if (token !== secret) {
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    if (token === secret) {
+      next();
+      return;
+    }
     res.status(403).json({ error: 'Invalid authentication token.' });
     return;
   }
 
-  next();
+  // Check HttpOnly cookie (set by server on page load)
+  const cookieToken = parseCookie(req.headers.cookie, 'ai-crew-token');
+  if (cookieToken === secret) {
+    next();
+    return;
+  }
+
+  res.status(401).json({ error: 'Authentication required. Set Authorization: Bearer <token> header.' });
+}
+
+function parseCookie(header: string | undefined, name: string): string | null {
+  if (!header) return null;
+  const match = header.split(';').find(c => c.trim().startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.split('=')[1].trim()) : null;
 }
