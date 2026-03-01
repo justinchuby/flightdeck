@@ -113,12 +113,13 @@ not hypothetical. That's what happened.
 </div>
 
 <!--
-Here's the sequence. The lead AI read the GitHub issue. Analyzed 10 items.
-Built a dependency graph — which tasks block which. Then it started spawning
-specialists. Not random agents — specific roles chosen for specific tasks.
-A developer for each feature. Reviewers who'd check the work. A secretary
-to track progress. Within 2 minutes, 13 agents were running simultaneously.
-Each one has its own terminal session with full access to the codebase.
+Walk through the sequence crisply. The lead AI read the GitHub issue.
+Analyzed 10 items. Built a dependency graph — like a project manager
+mapping out "this blocks that." Then it started hiring. Not random
+generalists — specific specialists for specific tasks. Within 2 minutes,
+13 agents were running simultaneously, each with its own terminal. Think
+of it as spinning up an entire engineering team in the time it takes to
+make coffee.
 -->
 
 ---
@@ -200,8 +201,6 @@ miscommunications. Task ownership is explicit via the DAG. File access is
 locked, not shared. So every new agent is pure throughput. 13 agents
 means 13x the work, not 78x the coordination cost. This is genuinely new.
 -->
-Each one has its own terminal session with full access to the codebase.
--->
 
 ---
 
@@ -211,50 +210,58 @@ Each one has its own terminal session with full access to the codebase.
 <div class="bg-gray-800 rounded-lg p-3 border border-blue-500">
 
 ### 🎯 The Lead
-Reads your goal, makes the plan, hires the team, manages everything
+<span class="text-sm text-gray-400">Think: senior engineering manager</span><br/>
+Plans the work, hires the team, makes decisions — never writes a line of code
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-green-500">
 
 ### 👷 The Developers
-Write the actual code. Each one owns specific files. They write their own tests — quality is their job.
+<span class="text-sm text-gray-400">Think: your best IC engineers</span><br/>
+Write code and tests. Each one owns specific files — no stepping on toes
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
 
 ### 🔍 The Reviewers
-Read every line of code the developers write. Only flag real bugs — no style nits.
+<span class="text-sm text-gray-400">Think: that colleague who always finds the bug</span><br/>
+Read every line. Only flag real problems — zero style nits
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-red-500">
 
 ### 🛡️ The Security Reviewer
-Looks for vulnerabilities, edge cases, and failure modes. Found a real one this session.
+<span class="text-sm text-gray-400">Think: a paranoid pen-tester</span><br/>
+Hunts for vulnerabilities and failure modes. Found a real one this session.
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-purple-500">
 
 ### 🏗️ The Architect
-Designs the system structure. Plans how to split large files so agents don't block each other.
+<span class="text-sm text-gray-400">Think: the person who draws on whiteboards</span><br/>
+Designs the structure so agents can work in parallel without blocking each other
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-500">
 
 ### 📝 The Secretary
-Tracks every task. Flagged when the progress dashboard said 86% but reality was 40%.
+<span class="text-sm text-gray-400">Think: a project manager who reads every ticket</span><br/>
+Tracks every task. Caught a major data discrepancy this session.
 
 </div>
 </div>
 
-<p class="text-sm text-gray-500 mt-2">Each agent is a real Copilot CLI session — same as what you use every day. Full terminal, file editing, search, everything.</p>
+<p class="text-sm text-gray-500 mt-2">Each agent is a real Copilot CLI session — the same tool you already use. Full terminal, file editing, everything.</p>
 
 <!--
-These aren't toy agents with limited capabilities. Each one is a full
-Copilot CLI session — the same tool you use. Terminal access, file editing,
-web search, everything. The Lead is like a tech lead — it doesn't code,
-it manages. Developers do the work. Reviewers check it. The secretary
-caught a major bug this session — we'll get to that. The key insight:
-specialization makes each agent better at its job.
+Spend a moment on this slide — let the audience absorb the roles. The key
+comparison: this is like a real engineering team. The lead is like a senior
+EM who never opens an IDE. The developers are ICs who own their code. The
+reviewers are that teammate who always finds the edge case. The secretary
+is a project manager who reads every status update. The difference? They
+all start working in the same minute. No onboarding, no standups, no
+context switching. Point out that each agent is the exact same Copilot CLI
+the audience already uses — this isn't sci-fi, it's a multiplier.
 -->
 
 ---
@@ -265,14 +272,16 @@ layout: center
 
 # Now let's watch them work
 
-<div class="text-xl text-gray-400 mt-4">Five stories from a single 30-minute session</div>
+<div class="text-xl text-gray-400 mt-4">Real stories from a single 30-minute session</div>
 
 </div>
 
 <!--
-I want to show you five specific moments from this session. Not
-architecture diagrams — actual things that happened. Behaviors that
-surprised us. Things that went wrong and how the agents handled them.
+Transition moment. Shift your energy here — you're moving from setup to
+the good stuff. Say: "Enough background. Let me show you what actually
+happened. Not architecture diagrams — real moments. Things that surprised
+us. Things that went wrong. And how the agents handled it." This is where
+the audience should lean forward.
 -->
 
 ---
@@ -484,13 +493,32 @@ That's emergent behavior from a multi-agent system.
 <p class="text-sm text-gray-500 mt-2">In a 7-minute window: 6 decisions, 4 delegations, 1 broadcast, 1 redirect. This is what orchestration looks like.</p>
 
 <!--
-Let me zoom into a 7-minute window of the lead's activity. It's receiving
+Zoom into a 7-minute window of the lead's activity. It's receiving
 completion reports, delegating follow-up work, broadcasting warnings,
-redirecting questions to the right expert. It delegated two tasks
-simultaneously — a commit system audit to the architect and safety tests
-to a developer. It noticed uncommitted files and assigned cleanup. This is
-what managing a team looks like — and it's happening autonomously. The lead
-made 6 decisions in 7 minutes, keeping 12 other agents productive.
+redirecting questions to the right expert — all simultaneously. In 7
+minutes: 6 decisions, 4 delegations, 1 broadcast, 1 redirect. Compare
+this to a human tech lead: "Imagine your best manager, but they can
+context-switch instantly and never lose track of 12 threads." This is
+what autonomous orchestration looks like.
+-->
+
+---
+layout: center
+---
+
+<div class="text-center">
+
+# How did they pull this off?
+
+<div class="text-xl text-gray-400 mt-4">The coordination patterns behind the stories</div>
+
+</div>
+
+<!--
+Transition moment. Say: "You've seen the stories — the bugs caught, the
+contention solved, the lead orchestrating everything. Now let me show you
+the three mechanisms that made this possible: file ownership, layered
+reviews, and peer-to-peer communication."
 -->
 
 ---
@@ -613,19 +641,20 @@ environments. Three passes, three different perspectives, bulletproof result.
 
 <div class="bg-gray-800 rounded-lg p-3 border border-blue-500 mt-3">
 
-💡 **Not everything goes through the Lead.** Agents message each other directly for peer coordination — the architect sends specs to developers, one developer shares investigation results with another. The lead only gets involved for decisions and delegation.
+💡 **Not everything goes through the Lead.** Agents message each other directly — the architect sends specs to developers, one developer shares findings with another. The lead stays focused on decisions, not message routing. It's like a team on Slack, not a call center.
 
 </div>
 
 <!--
-The communication patterns are fascinating. Not everything flows through
-the lead — that would be a bottleneck. The architect sends design specs
-directly to the developers who need them. Developer f026d3d1 investigated
-a UI bug and sent the findings directly to developer 3811edef who was
-assigned to fix it. The secretary tracked progress independently and
-flagged anomalies. This is organic team communication — agents figuring
-out who needs what information and sending it directly. The lead stays
-focused on decisions, not message routing.
+The communication patterns are key. Not everything flows through the lead —
+that would create a bottleneck, like routing every email through one
+manager. The architect sends design specs directly to the developers who
+need them. One developer investigated a UI bug and sent findings directly
+to the developer assigned to fix it. The secretary tracked progress
+independently. This is organic coordination — agents figuring out who
+needs what and communicating directly. The lead manages decisions, not
+traffic. Mention that this is the same communication pattern successful
+remote teams use.
 -->
 
 ---
@@ -650,27 +679,26 @@ focused on decisions, not message routing.
 
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3">
 
-**Why this matters:** This bug is *invisible* in single-agent systems. It only appears when multiple agents share a git working directory and commit concurrently. The critical reviewer — who never wrote any code — found it by reasoning about concurrent execution.
+**Why this matters:** This bug is *invisible* in single-agent systems. It only appears when multiple agents share a git working directory. The critical reviewer — who never wrote a line of code — found it by reasoning about what happens at the millisecond level.
 
 </div>
 
 <div class="bg-gray-800 rounded-lg p-3 border border-green-500 mt-2">
 
-**Fix:** <code>git commit -m "msg" -- file1 file2</code> — atomic, no shared state.
+**The fix:** <code>git commit -m "msg" -- file1 file2</code> — bypass the shared index entirely. Atomic and clean.
 
 </div>
 
 <!--
-This is the most interesting bug of the session. It only exists because
-multiple agents share one git working directory. Git's staging area — the
-index — is a single file. When Agent A runs "git add" and then "git commit",
-there's a window where Agent B's "git add" can slip in between. Agent A's
-commit now includes Agent B's file. The critical reviewer found this by
-thinking about what happens when two agents commit at the exact same time.
-No single-agent system would ever have this bug. The fix is elegant: pass
-files directly to git commit, bypassing the shared index entirely. This is
-why specialized reviewers matter — they think about failure modes that
-developers don't.
+This is the "aha" moment. Pause and let the audience absorb it. Git's staging
+area — the index — is a single file on disk. When Agent A runs "git add" and
+then "git commit", there's a tiny window where Agent B's "git add" can slip in.
+Agent A's commit now includes Agent B's files. No single-developer workflow
+would EVER hit this bug. It only exists because multiple agents share one
+working directory. The critical reviewer found it just by thinking — not by
+running code, not by testing, but by reasoning about concurrent execution.
+The fix is one line: pass files directly to git commit, skipping the index.
+This is why you want specialists who think about failure modes for a living.
 -->
 
 ---
@@ -703,12 +731,12 @@ layout: center
 <div class="text-center text-gray-500 mt-4">~30 minutes of wall clock time. One human. One command.</div>
 
 <!--
-Let this sink in. 13 agents. 10 features. 52 files changed. Over 6,000
-lines of code. Three bugs caught by code review. A security vulnerability
-discovered and patched. 1,752 tests passing. All in about 30 minutes.
-One human typed one sentence. The system did the rest. And it didn't just
-write code — it caught bugs in its own infrastructure, improved its own
-processes, and built a presentation about itself.
+Let this sink in. Read the numbers slowly. 13 agents. 10 features. Over
+6,000 lines. Three bugs caught in review. A security vulnerability
+discovered and patched. All in 30 minutes. One human typed one sentence.
+[Pause.] And it didn't just write code — it caught bugs in its own
+infrastructure, improved its own processes, and debugged its own
+coordination system. That's the power of a team.
 -->
 
 ---
@@ -736,23 +764,22 @@ graph LR
 
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3 text-sm">
 
-- **You** describe the goal — that's it
-- **The Lead** plans the work and hires specialists
-- **Developers** code in parallel, each with their own files
-- **Reviewers** check everything before it ships
-- Everyone communicates through structured messages — no chaos
+- **You** describe the goal in one sentence — that's your only job
+- **The Lead** reads it, makes a plan, and hires the right specialists
+- **Developers** code in parallel — each with their own files, like separate desks
+- **Reviewers** check everything before it merges — quality is automatic, not optional
 
 </div>
 
 <!--
-If someone asks "how does it work" — here's the simplest explanation.
-You're the CEO. You give a goal to a tech lead. The tech lead builds a
-plan — which tasks need to happen, in what order, and who should do each one.
-Then it hires specialists. Developers work in parallel, each with their own
-files — like desks in an office. Reviewers check the work. A secretary tracks
-progress. They communicate through structured channels. You can watch
-everything happen in real time through a dashboard. That's it. That's the
-whole model.
+If someone asks "how does it work" — simplify it to a company metaphor.
+You're the CEO. You give one sentence to a tech lead. The tech lead breaks
+it down — what needs doing, in what order, who's best for each task. Then
+it hires specialists. Developers each get their own files — like separate
+desks in an office. Nobody bumps elbows. Reviewers check the work. A
+secretary tracks progress. Everything flows through structured channels.
+You watch it all happen in real-time on a dashboard, like mission control.
+That's the whole model. If they get this slide, they get the system.
 -->
 
 ---
@@ -827,15 +854,15 @@ executive assistant who manages a department.
 </div>
 
 <!--
-These behaviors weren't programmed. The secretary wasn't told to find bugs
-— its job is tracking progress. But it noticed the numbers didn't add up
-and spoke up. The lead wasn't told to broadcast process changes — it
-decided that the commit problem was systemic and needed a team-wide fix.
-Agents debated design choices through messages. And here's the recursive
-part — pause for effect — this presentation? The one you're looking at
-right now? It was written by agent bf1ec2c1, a developer in the crew.
-Revised three times based on review feedback. You're watching a product
-of the system we're describing. Let that sink in.
+These behaviors weren't programmed. Nobody told the secretary to find bugs —
+its job was tracking progress. But it noticed the numbers were wrong and
+spoke up. The lead wasn't told to broadcast process changes — it decided on
+its own that the commit problem was systemic and needed a team-wide fix.
+Agents debated design choices through messages — and reached a resolution
+without human intervention. This is emergent behavior. Give specialized
+agents the ability to communicate and act independently, and team dynamics
+just... appear. That last bullet is the mic drop — this very presentation
+was written by the system you're hearing about. Let that land.
 -->
 
 ---
@@ -889,13 +916,13 @@ of the system we're describing. Let that sink in.
 <p class="text-sm text-gray-500 mt-2">Everything updates in real time. You can message any agent, pause the whole system, or just watch.</p>
 
 <!--
-You're not flying blind. There's a full dashboard — mission control style.
-Eight panels showing: health metrics, who's doing what, a live activity
-feed, the task dependency graph, swim-lane timelines, a communication
-heatmap showing who's talking to whom, token costs per agent, and alerts
-for problems. Everything streams in real time. You can click on any agent
-and message them directly. Or hit pause and freeze the entire system to
-review state. You're always in control.
+You're not flying blind — this is your mission control. Eight panels,
+all streaming live. You can see who's doing what, how they're communicating,
+what's blocked, and what's costing the most. Think of it like NASA mission
+control: dozens of things happening simultaneously, but you have full
+visibility and can intervene at any point. You can click on any agent and
+message them. Or hit pause and freeze everything to review state. You're
+always in control. This is a good moment to mention the demo coming up.
 -->
 
 ---
@@ -928,12 +955,13 @@ Large refactors, multi-file changes, cross-cutting concerns — the things that 
 </div>
 
 <!--
-Why does this matter? Three reasons. Productivity — parallel work is
-genuinely faster. Quality — every change is reviewed, not because you
-remembered to ask, but because the system forces it. And complexity — the
-hardest tasks for a single agent are exactly where a team excels. A
-single agent struggles with a 50-file refactor. A team of 7 developers
-with an architect splitting it up? That's Tuesday.
+Three reasons. Productivity — parallel work is genuinely faster, like
+adding lanes to a highway. Quality — review is baked into the process,
+not an afterthought. You don't need to remember to ask for code review;
+it happens automatically on every change. And complexity — the hardest
+tasks for a single agent (50-file refactors, cross-cutting changes) are
+exactly where a team excels. A single agent drowns. A team with an
+architect splits it up and conquers it.
 -->
 
 ---
@@ -942,12 +970,14 @@ layout: center
 
 # Imagine where this goes next
 
-<div class="text-xl text-gray-400 mt-2">Seven ideas that keep us up at night</div>
+<div class="text-xl text-gray-400 mt-2">What's possible when this technology matures</div>
 
 <!--
-We've shown you what's possible today. Now let's talk about where this is
-going. These aren't just roadmap items — they're paradigm shifts in how
-software gets built. Each one of these is within reach.
+Shift energy again. Say: "We've shown you what works today. Now let me
+show you where this is going. These aren't science fiction — they're
+logical next steps. And honestly? Some of them keep us up at night."
+This is the INSPIRATION part of the emotional arc. The audience should
+feel excited about the future, not anxious.
 -->
 
 ---
@@ -982,13 +1012,13 @@ AI handles 80% of implementation. Humans review, make judgment calls, and ship. 
 </div>
 
 <!--
-Institutional memory means agents learn from past sessions — "last time
-we split api.ts by route and it worked great, let's do that again." Smart
-model routing matches the right model to each task — why use the most
-expensive model for a formatting fix? Overnight autonomy means you push a
-backlog, go home, and wake up to pull requests. Human-AI mixed teams means
-your 5-person team operates like a 50-person team — AI does the bulk work,
-humans make the decisions.
+Walk through each quadrant briefly. Institutional memory: imagine your AI
+team remembering what worked last time — like a senior engineer with years
+of project context. Smart model routing: why hire a surgeon to put on a
+bandaid? Use the expensive model for architecture, the fast model for
+formatting. Overnight autonomy: push your backlog before bed, wake up to
+PRs. Human-AI mixed teams: your 5-person team operates like 50. Don't
+linger on any one — let the audience imagine the implications.
 -->
 
 ---
@@ -1031,13 +1061,15 @@ Knowledge flows between projects. A pattern discovered in Project A **automatica
 </div>
 
 <!--
-Predictive planning uses historical data to estimate cost, time, and
-complexity before you start. Emergent specialization means agents that
-collaborate well get paired together again — the system builds its own
-dream teams. And cross-project intelligence means knowledge flows between
-projects automatically. A pattern one team discovers improves every other
-team. This is organizational learning at machine speed. The question isn't
-if this is coming. It's whether you'll be leading it or following.
+These three are the bigger leaps. Predictive planning: "before you write
+a line of code, the system tells you it'll take 3 agents, 45 minutes,
+and $2.40." That changes how you plan sprints. Emergent specialization
+is fascinating — agents that collaborate well get paired again, like a
+sports team building chemistry. Cross-project intelligence is the real
+game-changer: a pattern discovered in one project automatically improves
+every other project. That's organizational learning at machine speed.
+End with the closing line — let it land. It's meant to make them think
+about their own role in this future.
 -->
 
 ---
@@ -1072,10 +1104,12 @@ cd ai-crew && npm install && npm run dev
 </div>
 
 <!--
-Let's see it live. I'll give the lead a small task and we'll watch the
-whole cycle: planning, delegation, parallel work, communication, review.
-If anything goes wrong during the demo — that's fine, I can hit System
-Pause, which freezes everything. That's actually a feature demo too.
+Let's see it live. I'll give the lead a small, real task and we'll watch
+the full cycle: planning, hiring, parallel coding, communication, and
+review. If anything goes wrong during the demo — that's actually fine,
+I can hit System Pause, which freezes everything. Pro tip: that pause
+feature IS a demo in itself. After the demo, take a breath and
+transition into the closing slide.
 -->
 
 ---
@@ -1103,11 +1137,16 @@ layout: center
 </div>
 
 <!--
-That's the story. Not a system that replaces you — a system that gives
-you a team. Specialists that work in parallel, catch each other's bugs,
-and manage themselves. You set the direction, they do the work. I'm happy
-to answer questions about anything — the architecture, the coordination
-challenges, cost, how to adapt it, or anything else you're curious about.
+Let the closing statement breathe. Read it slowly. Then say: "That's the
+story. Not a system that replaces you — a system that multiplies you.
+Specialists that work in parallel, catch each other's bugs, and manage
+themselves. You set the direction, they handle the execution." Pause.
+"I'm happy to take questions about anything — the architecture, the
+coordination challenges, cost, how to set this up for your own team, or
+anything you're curious about." Expect questions about: cost, reliability,
+how to handle mistakes, whether this works for non-coding tasks, and
+whether this threatens developer jobs. For that last one: "This makes
+developers more valuable, not less. You're the one directing the team."
 -->
 
 ---
