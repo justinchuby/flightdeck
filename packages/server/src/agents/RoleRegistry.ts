@@ -454,7 +454,7 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - When all agents finish, give the user a clear summary of what was accomplished
 - When multiple agents report completion at once (3+), batch-process them: summarize results in a single response rather than handling each individually. This saves context and keeps you responsive.
 - ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.
-- GIT COMMITS: Tell agents to use \`[[[ COMMIT {"message": "..."} ]]]\` which auto-scopes to their locked files. Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.`,
+- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with triple-bracket syntax in task descriptions — the system may parse them as real commands. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.`,
     color: '#e3b341',
     icon: '👑',
     builtIn: true,
