@@ -468,9 +468,9 @@ export function apiRouter(
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
     try {
-      const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId);
-      // Set initial project name from explicit name only; task is NOT used as name
-      agent.projectName = name || `Project ${new Date().toLocaleDateString()}`;
+      // Calculate project name BEFORE spawn so it's included in the agent:spawned event
+      const projectName = name || `Project ${new Date().toLocaleDateString()}`;
+      const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId, undefined, { projectName });
       logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
         task: task?.slice(0, 80),
         model: model || role.model,
@@ -979,9 +979,7 @@ export function apiRouter(
 
     const { task, model } = req.body;
     try {
-      const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined);
-      agent.projectName = project.name;
-      agent.projectId = project.id;
+      const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, undefined, undefined, { projectName: project.name, projectId: project.id });
       projectRegistry.startSession(project.id, agent.id, task);
 
       // Gather context from previous session

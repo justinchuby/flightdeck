@@ -225,10 +225,16 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       return;
     }
 
-    const child = ctx.spawnAgent(role, req.task, agent.id, true, req.model, agent.cwd);
+    const subLeadName = role.id === 'lead'
+      ? (req.name || req.task?.slice(0, 60) || `Sub-project ${new Date().toLocaleDateString()}`)
+      : undefined;
+    const spawnOptions: { projectName?: string; projectId?: string } | undefined =
+      (subLeadName || agent.projectId)
+        ? { projectName: subLeadName, projectId: agent.projectId }
+        : undefined;
+    const child = ctx.spawnAgent(role, req.task, agent.id, true, req.model, agent.cwd, spawnOptions);
     if (role.id === 'lead') {
       child.hierarchyLevel = agent.hierarchyLevel + 1;
-      child.projectName = req.name || req.task?.slice(0, 60) || `Sub-project ${new Date().toLocaleDateString()}`;
     }
     logger.info('agent', `${agent.role.name} (${agent.id.slice(0, 8)}) created ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${child.id.slice(0, 8)}`);
 

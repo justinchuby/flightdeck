@@ -43,7 +43,7 @@ export interface CommandContext {
   getAgent(id: string): Agent | undefined;
   getAllAgents(): Agent[];
   getRunningCount(): number;
-  spawnAgent(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string): Agent;
+  spawnAgent(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string }): Agent;
   terminateAgent(id: string): boolean;
   emit(event: string, ...args: any[]): boolean;
   roleRegistry: RoleRegistry;
