@@ -4,6 +4,7 @@ import { useGroupStore, groupKey } from '../../stores/groupStore';
 import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
 import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
+import { FilterTabs } from '../FilterTabs';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -445,29 +446,17 @@ export function GroupChat(_props: { api: any; ws: any }) {
     <div className="flex flex-col h-full bg-th-bg text-th-text-alt">
       {/* ---- Project tabs (first level) ---- */}
       {leads.length > 0 && (
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-th-border/50 shrink-0 overflow-x-auto bg-th-bg/50">
-          {leads.map((lead) => {
-            const isActive = selectedProjectLeadId === lead.id;
-            const projectGroups = groups.filter((g) => (g.projectId ?? g.leadId) === lead.id);
-            return (
-              <button
-                key={lead.id}
-                onClick={() => setSelectedProjectLeadId(lead.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'bg-accent/20 text-accent font-medium'
-                    : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
-                }`}
-              >
-                <Crown className="w-3 h-3" />
-                <span className="truncate max-w-[120px]">{lead.projectName || lead.id.slice(0, 8)}</span>
-                {projectGroups.length > 0 && (
-                  <span className="text-[10px] text-th-text-muted ml-0.5">({projectGroups.length})</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <FilterTabs
+          className="px-3 py-1.5 border-b border-th-border/50 shrink-0 bg-th-bg/50"
+          items={leads.map((lead) => ({
+            value: lead.id,
+            label: lead.projectName || lead.id.slice(0, 8),
+            count: groups.filter((g) => (g.projectId ?? g.leadId) === lead.id).length || undefined,
+            icon: <Crown className="w-3 h-3" />,
+          }))}
+          activeValue={selectedProjectLeadId}
+          onSelect={(v) => setSelectedProjectLeadId(v!)}
+        />
       )}
 
       {/* ---- Tab bar ---- */}

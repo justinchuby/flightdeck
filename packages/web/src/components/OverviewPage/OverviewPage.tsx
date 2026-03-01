@@ -6,6 +6,7 @@ import type { Decision } from '../../types';
 import { AlertTriangle, Check, X, MessageSquare, Send, Clock } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { MarkdownContent } from '../../utils/markdown';
+import { FilterTabs } from '../FilterTabs';
 
 interface Props {
   api: any;
@@ -591,34 +592,17 @@ export function OverviewPage({ api, ws }: Props) {
         </h2>
         {/* Project tabs */}
         {timelineProjectNames.length > 1 && (
-          <div className="flex items-center gap-1 mb-3 overflow-x-auto">
-            <button
-              onClick={() => setTimelineProjectFilter(null)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                timelineProjectFilter === null
-                  ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
-                  : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 border border-transparent'
-              }`}
-            >
-              All ({timelineDecisions.length})
-            </button>
-            {timelineProjectNames.map((projName) => {
-              const count = timelineDecisions.filter((d) => resolveProjectName(d) === projName).length;
-              return (
-                <button
-                  key={projName}
-                  onClick={() => setTimelineProjectFilter(projName)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                    timelineProjectFilter === projName
-                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
-                      : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 border border-transparent'
-                  }`}
-                >
-                  {projName} ({count})
-                </button>
-              );
-            })}
-          </div>
+          <FilterTabs
+            className="mb-3"
+            items={timelineProjectNames.map((projName) => ({
+              value: projName,
+              label: projName,
+              count: timelineDecisions.filter((d) => resolveProjectName(d) === projName).length,
+            }))}
+            activeValue={timelineProjectFilter}
+            onSelect={setTimelineProjectFilter}
+            allCount={timelineDecisions.length}
+          />
         )}
         {filteredTimelineDecisions.length === 0 ? (
           <div className="bg-th-bg-alt border border-th-border rounded-lg p-6 text-center">
