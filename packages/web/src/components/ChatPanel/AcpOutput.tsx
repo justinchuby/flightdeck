@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
-import { ChevronDown, ChevronRight, FolderOpen, Clock, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X } from 'lucide-react';
 
 interface Props {
   agentId: string;
@@ -160,6 +160,35 @@ export function AcpOutput({ agentId }: Props) {
       useAppStore.getState().updateAgent(agentId, { messages: updated });
     }
   }, [messages, agentId]);
+
+  const removeQueuedMessage = useCallback(async (queueIndex: number) => {
+    const resp = await fetch(`/api/agents/${agentId}/queue/${queueIndex}`, { method: 'DELETE' });
+    if (resp.ok) {
+      let seen = 0;
+      const updated = messages.filter((m) => {
+        if (!m.queued) return true;
+        return seen++ !== queueIndex;
+      });
+      useAppStore.getState().updateAgent(agentId, { messages: updated });
+    }
+  }, [agentId, messages]);
+
+  const reorderQueuedMessage = useCallback(async (fromIndex: number, toIndex: number) => {
+    const resp = await fetch(`/api/agents/${agentId}/queue/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: fromIndex, to: toIndex }),
+    });
+    if (resp.ok) {
+      const queued = messages.filter((m) => m.queued);
+      const nonQueued = messages.filter((m) => !m.queued);
+      if (fromIndex < queued.length && toIndex < queued.length) {
+        const [moved] = queued.splice(fromIndex, 1);
+        queued.splice(toIndex, 0, moved);
+        useAppStore.getState().updateAgent(agentId, { messages: [...nonQueued, ...queued] });
+      }
+    }
+  }, [agentId, messages]);
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -347,14 +376,29 @@ export function AcpOutput({ agentId }: Props) {
         <div className="border-t border-dashed border-th-border px-3 py-2 bg-th-bg-alt/50">
           <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Queued
+            Queued ({messages.filter((m) => m.queued).length})
           </div>
-          {messages.filter((m) => m.queued).map((msg, i) => (
-            <div key={`q-${i}`} className="flex justify-end items-center gap-2 py-0.5">
+          {messages.filter((m) => m.queued).map((msg, i, arr) => (
+            <div key={`q-${i}`} className="flex justify-end items-center gap-1.5 py-0.5 group">
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                {i > 0 && (
+                  <button onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
+                    <ChevronUp className="w-3 h-3" />
+                  </button>
+                )}
+                {i < arr.length - 1 && (
+                  <button onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                )}
+                <button onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
               <span className="text-[10px] text-th-text-muted">
                 {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
               </span>
-              <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+              <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
                 {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
               </div>
               <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />

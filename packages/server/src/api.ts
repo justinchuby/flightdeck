@@ -212,6 +212,33 @@ export function apiRouter(
     res.json(agent.toJSON());
   });
 
+  // --- Pending message queue management ---
+  router.get('/agents/:id/queue', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ agentId: agent.id, queue: agent.getPendingMessageSummaries() });
+  });
+
+  router.delete('/agents/:id/queue/:index', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    const index = parseInt(req.params.index, 10);
+    if (isNaN(index)) return res.status(400).json({ error: 'Invalid index' });
+    const ok = agent.removePendingMessage(index);
+    if (!ok) return res.status(404).json({ error: 'Index out of range' });
+    res.json({ ok: true, queue: agent.getPendingMessageSummaries() });
+  });
+
+  router.post('/agents/:id/queue/reorder', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    const { from, to } = req.body;
+    if (typeof from !== 'number' || typeof to !== 'number') return res.status(400).json({ error: 'from and to must be numbers' });
+    const ok = agent.reorderPendingMessage(from, to);
+    if (!ok) return res.status(400).json({ error: 'Invalid indices' });
+    res.json({ ok: true, queue: agent.getPendingMessageSummaries() });
+  });
+
   router.post('/agents/:id/permission', (req, res) => {
     const { approved } = req.body;
     const ok = agentManager.resolvePermission(req.params.id, approved);
