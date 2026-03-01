@@ -82,7 +82,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
 
   if (agent.parentId) {
     const dagTask = ctx.taskDAG.getTaskByAgent(agent.parentId, agent.id);
-    if (dagTask) {
+    if (dagTask && dagTask.dagStatus === 'running') {
       const newlyReady = ctx.taskDAG.completeTask(agent.parentId, dagTask.id);
       if (newlyReady && newlyReady.length > 0) {
         const dagParent = ctx.getAgent(agent.parentId);
@@ -91,7 +91,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
           dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" done. Newly ready tasks: ${readyNames}. Use DELEGATE or CREATE_AGENT to assign them.`);
         }
       }
-    } else {
+    } else if (!dagTask) {
       // Task not in DAG — nudge the lead to track it
       const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
       if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
@@ -154,7 +154,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
 
   if (agent.parentId) {
     const dagTask = ctx.taskDAG.getTaskByAgent(agent.parentId, agent.id);
-    if (dagTask) {
+    if (dagTask && dagTask.dagStatus === 'running') {
       if (exitCode === 0) {
         const newlyReady = ctx.taskDAG.completeTask(agent.parentId, dagTask.id);
         if (newlyReady && newlyReady.length > 0) {
@@ -171,7 +171,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
           dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (exit ${exitCode}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
         }
       }
-    } else {
+    } else if (!dagTask) {
       // Task not in DAG — nudge the lead to track it
       const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
       if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {

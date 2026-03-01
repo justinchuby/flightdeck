@@ -9,6 +9,7 @@ import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
+import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
@@ -1641,6 +1642,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
                         tokens: { icon: <BarChart3 className="w-3 h-3" />, label: 'Tokens' },
+                        costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Costs' },
                       };
                       const orderedIds = tabOrder.filter((id) => id in allTabs);
                       // Append any missing tabs (safety net)
@@ -1683,6 +1685,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
                     {sidebarTab === 'tokens' && <TokenEconomics />}
+                    {sidebarTab === 'costs' && <CostBreakdown />}
                   </div>
                   {/* Resize handle for tabbed section */}
                   <div
@@ -3139,27 +3142,38 @@ function CollapsibleCommandBlock({ text }: { text: string }) {
   );
 }
 
+/** Check if a [[[ ... ]]] block looks like a real command (ALL_CAPS name after [[[) */
+function isRealCommandBlock(text: string): boolean {
+  return /^\[\[\[\s*[A-Z][A-Z_]{2,}/.test(text);
+}
+
 function AgentTextBlock({ text }: { text: string }) {
   // Split on [[[ ... ]]] blocks (complete) and also detect unclosed [[[ blocks
   const segments = text.split(/(\[\[\[[\s\S]*?\]\]\])/g);
   return (
     <>
       {segments.map((seg, i) => {
-        // Complete [[[ ]]] block
+        // Complete [[[ ]]] block — only collapse if it looks like a real command
         if (seg.startsWith('[[[') && seg.endsWith(']]]')) {
-          return <CollapsibleCommandBlock key={i} text={seg} />;
+          if (isRealCommandBlock(seg)) {
+            return <CollapsibleCommandBlock key={i} text={seg} />;
+          }
+          return <MarkdownWithTables key={i} text={seg} />;
         }
         // Unclosed [[[ block (still streaming or split across messages)
         if (seg.includes('[[[') && !seg.includes(']]]')) {
           const idx = seg.indexOf('[[[');
           const before = seg.slice(0, idx);
           const cmdBlock = seg.slice(idx);
-          return (
-            <span key={i}>
-              {before.trim() ? <MarkdownWithTables text={before} /> : null}
-              <CollapsibleCommandBlock text={cmdBlock} />
-            </span>
-          );
+          if (isRealCommandBlock(cmdBlock)) {
+            return (
+              <span key={i}>
+                {before.trim() ? <MarkdownWithTables text={before} /> : null}
+                <CollapsibleCommandBlock text={cmdBlock} />
+              </span>
+            );
+          }
+          return <MarkdownWithTables key={i} text={seg} />;
         }
         // Dangling ]]] from a block that started in a previous message
         if (seg.includes(']]]') && !seg.includes('[[[')) {

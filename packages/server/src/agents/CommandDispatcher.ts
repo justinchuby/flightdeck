@@ -191,21 +191,45 @@ export class CommandDispatcher {
   // ── Static helpers ─────────────────────────────────────────────────
 
   /**
-   * Check if a position in the buffer is nested inside a [[[ ]]] command block.
-   * Counts unmatched [[[ before the given position — depth > 0 means nested.
-   * This prevents command injection via task text containing [[[ delimiters (#26).
+   * Check if a position in the buffer is nested inside a [[[ ]]] command block
+   * OR inside a JSON string literal. This prevents:
+   * - Command injection via task text containing [[[ delimiters (#26)
+   * - Parsing [[[ inside JSON string values (e.g. task descriptions)
+   * - Parsing [[[ inside quoted examples in agent output
    */
   static isInsideCommandBlock(buf: string, pos: number): boolean {
     let depth = 0;
-    for (let i = 0; i < pos - 2; i++) {
-      if (buf[i] === '[' && buf[i + 1] === '[' && buf[i + 2] === '[') {
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < pos; i++) {
+      const ch = buf[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (ch === '\\' && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (i + 2 < pos && buf[i] === '[' && buf[i + 1] === '[' && buf[i + 2] === '[') {
         depth++;
         i += 2;
-      } else if (buf[i] === ']' && buf[i + 1] === ']' && buf[i + 2] === ']') {
+      } else if (i + 2 <= pos && buf[i] === ']' && buf[i + 1] === ']' && buf[i + 2] === ']') {
         depth = Math.max(0, depth - 1);
         i += 2;
       }
     }
-    return depth > 0;
+    return depth > 0 || inString;
   }
 }

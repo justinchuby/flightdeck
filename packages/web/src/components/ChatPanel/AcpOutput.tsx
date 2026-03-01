@@ -443,6 +443,11 @@ function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   );
 }
 
+/** Check if a [[[ ... ]]] block looks like a real command (ALL_CAPS name after [[[) */
+function isRealCommandBlock(text: string): boolean {
+  return /^\[\[\[\s*[A-Z][A-Z_]{2,}/.test(text);
+}
+
 /** Render agent text with [[[ ]]] blocks separated and inline markdown + tables */
 function AgentTextBlockSimple({ text }: { text: string }) {
   const segments = text.split(/(\[\[\[[\s\S]*?\]\]\])/g);
@@ -450,19 +455,27 @@ function AgentTextBlockSimple({ text }: { text: string }) {
     <>
       {segments.map((seg, i) => {
         if (seg.startsWith('[[[') && seg.endsWith(']]]')) {
-          return <CollapsibleCommandBlockSimple key={i} text={seg} />;
+          if (isRealCommandBlock(seg)) {
+            return <CollapsibleCommandBlockSimple key={i} text={seg} />;
+          }
+          // Not a real command — render as plain text
+          return <InlineMarkdownSimple key={i} text={seg} />;
         }
         // Unclosed [[[ block
         if (seg.includes('[[[') && !seg.includes(']]]')) {
           const idx = seg.indexOf('[[[');
           const before = seg.slice(0, idx);
           const cmdBlock = seg.slice(idx);
-          return (
-            <span key={i}>
-              {before.trim() ? <InlineMarkdownSimple text={before} /> : null}
-              <CollapsibleCommandBlockSimple text={cmdBlock} />
-            </span>
-          );
+          if (isRealCommandBlock(cmdBlock)) {
+            return (
+              <span key={i}>
+                {before.trim() ? <InlineMarkdownSimple text={before} /> : null}
+                <CollapsibleCommandBlockSimple text={cmdBlock} />
+              </span>
+            );
+          }
+          // Not a real command — render entire segment as text
+          return seg.trim() ? <InlineMarkdownSimple key={i} text={seg} /> : null;
         }
         if (!seg.trim()) return null;
         // Check for tables
