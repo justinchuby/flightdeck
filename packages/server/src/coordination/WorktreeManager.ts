@@ -17,6 +17,11 @@ import { logger } from '../utils/logger.js';
 
 const execAsync = promisify(exec);
 
+/** Normalize path separators to forward slashes (cross-platform). */
+function normPath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
+
 // ── Types ─────────────────────────────────────────────────────────
 
 export interface WorktreeInfo {
@@ -56,7 +61,7 @@ export class WorktreeManager extends EventEmitter {
   async create(agentId: string): Promise<string> {
     const shortId = agentId.slice(0, 8);
     const branch = `agent-wt-${shortId}`;
-    const worktreePath = join(this.repoRoot, '.worktrees', shortId);
+    const worktreePath = normPath(join(this.repoRoot, '.worktrees', shortId));
 
     // Clean up stale worktree if one already exists at this path
     if (existsSync(worktreePath)) {
@@ -70,8 +75,8 @@ export class WorktreeManager extends EventEmitter {
       );
 
       // Symlink shared workspace so agents can communicate via .ai-crew/
-      const sharedDir = join(this.repoRoot, '.ai-crew');
-      const targetShared = join(worktreePath, '.ai-crew');
+      const sharedDir = normPath(join(this.repoRoot, '.ai-crew'));
+      const targetShared = normPath(join(worktreePath, '.ai-crew'));
       if (existsSync(sharedDir) && !existsSync(targetShared)) {
         await execAsync(`ln -s "${sharedDir}" "${targetShared}"`, { timeout: 5_000 });
       }
@@ -137,7 +142,7 @@ export class WorktreeManager extends EventEmitter {
     const info = this.worktrees.get(agentId);
     const shortId = agentId.slice(0, 8);
     const branch = info?.branch ?? `agent-wt-${shortId}`;
-    const worktreePath = info?.path ?? join(this.repoRoot, '.worktrees', shortId);
+    const worktreePath = info?.path ?? normPath(join(this.repoRoot, '.worktrees', shortId));
 
     try {
       if (existsSync(worktreePath)) {
@@ -171,14 +176,14 @@ export class WorktreeManager extends EventEmitter {
 
   /** Remove orphaned worktrees left by previous crashes. */
   async cleanupOrphans(): Promise<number> {
-    const worktreeDir = join(this.repoRoot, '.worktrees');
+    const worktreeDir = normPath(join(this.repoRoot, '.worktrees'));
     if (!existsSync(worktreeDir)) return 0;
 
     const { stdout } = await execAsync('git worktree list --porcelain', { cwd: this.repoRoot });
     const orphanPaths = stdout
       .split('\n')
       .filter(line => line.startsWith('worktree '))
-      .map(line => line.replace('worktree ', ''))
+      .map(line => normPath(line.replace('worktree ', '')))
       .filter(p => p.startsWith(worktreeDir));
 
     let cleaned = 0;
