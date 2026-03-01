@@ -249,8 +249,7 @@ export function useWebSocket() {
           const timerId = msg.timerId ?? msg.timer?.id;
           if (timerId) {
             ts.fireTimer(timerId);
-            // Flash green for 2s then remove
-            setTimeout(() => useTimerStore.getState().removeTimer(timerId), 2000);
+            ts.scheduleFireRemoval(timerId);
           }
           break;
         }

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useTimerStore, selectActiveTimerCount } from '../timerStore';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { useTimerStore, selectActiveTimerCount, _clearAllFireTimeouts } from '../timerStore';
 import type { TimerInfo } from '../../types';
 
 function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {
@@ -20,7 +20,14 @@ function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {
 
 describe('timerStore', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    _clearAllFireTimeouts();
     useTimerStore.setState({ timers: [], recentlyFiredIds: [] });
+  });
+
+  afterEach(() => {
+    _clearAllFireTimeouts();
+    vi.useRealTimers();
   });
 
   it('initializes with empty state', () => {
@@ -134,6 +141,74 @@ describe('timerStore', () => {
         clearRecentlyFired: () => {},
       };
       expect(selectActiveTimerCount(state)).toBe(0);
+    });
+  });
+
+  describe('race condition: timer:fired before timer:created', () => {
+    it('addTimer marks timer as fired if already in recentlyFiredIds', () => {
+      const store = useTimerStore.getState();
+      // Simulate timer:fired arriving first
+      store.fireTimer('t1');
+      expect(useTimerStore.getState().recentlyFiredIds).toContain('t1');
+      // Timer doesn't exist in timers yet — fireTimer only maps over existing
+      expect(useTimerStore.getState().timers).toHaveLength(0);
+
+      // Now timer:created arrives — addTimer should mark it as fired
+      store.addTimer(makeTimer({ id: 't1', status: 'pending' }));
+      const timer = useTimerStore.getState().timers.find((t) => t.id === 't1');
+      expect(timer?.status).toBe('fired');
+      expect(timer?.remainingMs).toBe(0);
+    });
+
+    it('addTimer leaves status alone if not in recentlyFiredIds', () => {
+      const store = useTimerStore.getState();
+      store.addTimer(makeTimer({ id: 't1', status: 'pending' }));
+      expect(useTimerStore.getState().timers[0].status).toBe('pending');
+    });
+  });
+
+  describe('scheduleFireRemoval', () => {
+    it('removes timer after delay', () => {
+      const store = useTimerStore.getState();
+      store.addTimer(makeTimer({ id: 't1' }));
+      store.fireTimer('t1');
+      store.scheduleFireRemoval('t1', 2000);
+
+      expect(useTimerStore.getState().timers).toHaveLength(1);
+      vi.advanceTimersByTime(2000);
+      expect(useTimerStore.getState().timers).toHaveLength(0);
+    });
+
+    it('clears previous timeout if called again', () => {
+      const store = useTimerStore.getState();
+      store.addTimer(makeTimer({ id: 't1' }));
+      store.fireTimer('t1');
+      store.scheduleFireRemoval('t1', 2000);
+      // Reschedule — resets the timeout
+      store.scheduleFireRemoval('t1', 5000);
+
+      vi.advanceTimersByTime(2000);
+      // Should still exist (first timeout was cleared)
+      expect(useTimerStore.getState().timers).toHaveLength(1);
+
+      vi.advanceTimersByTime(3000);
+      // Now it should be removed
+      expect(useTimerStore.getState().timers).toHaveLength(0);
+    });
+
+    it('removeTimer clears pending fire timeout', () => {
+      const store = useTimerStore.getState();
+      store.addTimer(makeTimer({ id: 't1' }));
+      store.fireTimer('t1');
+      store.scheduleFireRemoval('t1', 2000);
+
+      // Manual removal before timeout fires
+      store.removeTimer('t1');
+      expect(useTimerStore.getState().timers).toHaveLength(0);
+
+      // Advance past timeout — should not throw or cause issues
+      vi.advanceTimersByTime(3000);
+      expect(useTimerStore.getState().timers).toHaveLength(0);
     });
   });
 });
