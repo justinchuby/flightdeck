@@ -228,8 +228,7 @@ const agentMatcher = new AgentMatcher(agentManager, capabilityRegistry, activity
 timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
   const agent = agentManager.get(timer.agentId);
   if (agent && agent.status === 'running') {
-    const safeMsg = timer.message.replace(/\[\[\[/g, '(((').replace(/\]\]\]/g, ')))');
-    agent.sendMessage(`[System Timer "${timer.label}"] ${safeMsg}`);
+    agent.sendMessage(`[System Timer "${timer.label}"] ${timer.message}`);
   }
   wsServer.broadcastEvent({ type: 'timer:fired', timer });
 });

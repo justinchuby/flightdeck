@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, lt, or } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../db/schema.js';
@@ -31,6 +31,8 @@ export interface TimerInput {
 
 const MAX_TIMERS_PER_AGENT = 20;
 const CHECK_INTERVAL_MS = 5_000;
+/** Clean up fired/cancelled timers older than 7 days */
+const CLEANUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * DB-backed timer registry. Persists timers to SQLite and schedules
@@ -49,6 +51,7 @@ export class TimerRegistry extends EventEmitter {
 
   start(): void {
     if (this.interval) return;
+    this.cleanupOld();
     this.loadPending();
     this.interval = setInterval(() => this.tick(), CHECK_INTERVAL_MS);
     logger.info('timer', `TimerRegistry started — ${this.pending.size} pending timers loaded`);
@@ -69,6 +72,22 @@ export class TimerRegistry extends EventEmitter {
     this.pending.clear();
     for (const row of rows) {
       this.pending.set(row.id, this.rowToTimer(row));
+    }
+  }
+
+  /** Remove fired/cancelled timers older than CLEANUP_TTL_MS */
+  private cleanupOld(): void {
+    const cutoff = new Date(Date.now() - CLEANUP_TTL_MS).toISOString();
+    const result = this.db.delete(schema.timers)
+      .where(
+        and(
+          or(eq(schema.timers.status, 'fired'), eq(schema.timers.status, 'cancelled')),
+          lt(schema.timers.createdAt, cutoff),
+        ),
+      )
+      .run();
+    if (result.changes > 0) {
+      logger.info('timer', `Cleaned up ${result.changes} old fired/cancelled timers`);
     }
   }
 
@@ -155,24 +174,28 @@ export class TimerRegistry extends EventEmitter {
     const now = Date.now();
     for (const timer of this.pending.values()) {
       if (timer.fireAt <= now) {
-        timer.status = 'fired';
-        this.emit('timer:fired', timer);
-        logger.info('timer', `Timer "${timer.label}" fired for ${timer.agentId.slice(0, 8)}`);
-
         if (timer.repeat) {
-          // Reschedule: update fireAt in DB and memory
-          timer.status = 'pending';
-          timer.fireAt = now + timer.delaySeconds * 1000;
+          // Reschedule: update fireAt in DB and memory BEFORE emitting
+          const newFireAt = now + timer.delaySeconds * 1000;
           this.db.update(schema.timers)
-            .set({ fireAt: new Date(timer.fireAt).toISOString(), status: 'pending' })
+            .set({ fireAt: new Date(newFireAt).toISOString(), status: 'pending' })
             .where(eq(schema.timers.id, timer.id))
             .run();
+          timer.status = 'fired';
+          this.emit('timer:fired', timer);
+          logger.info('timer', `Timer "${timer.label}" fired for ${timer.agentId.slice(0, 8)}`);
+          timer.status = 'pending';
+          timer.fireAt = newFireAt;
         } else {
+          // Persist fired status BEFORE emitting to prevent double-fire on crash
           this.pending.delete(timer.id);
           this.db.update(schema.timers)
             .set({ status: 'fired' })
             .where(eq(schema.timers.id, timer.id))
             .run();
+          timer.status = 'fired';
+          this.emit('timer:fired', timer);
+          logger.info('timer', `Timer "${timer.label}" fired for ${timer.agentId.slice(0, 8)}`);
         }
       }
     }

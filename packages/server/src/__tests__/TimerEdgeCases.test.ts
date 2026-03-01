@@ -65,17 +65,16 @@ describe('SET_TIMER delay validation', () => {
     expect(result.success).toBe(false);
   });
 
-  it('string "30m" parseFloat gives 30 (valid >= 5)', () => {
-    // parseFloat("30m") === 30 — this is how the current schema works
+  it('string "30m" parses as 1800 seconds (30 minutes)', () => {
     const result = setTimerSchema.safeParse({ ...base, delay: '30m' });
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.delay).toBe(30);
+    if (result.success) expect(result.data.delay).toBe(1800);
   });
 
-  it('string "2h" parseFloat gives 2 (rejected < 5)', () => {
-    // parseFloat("2h") === 2 — below minimum of 5
+  it('string "2h" parses as 7200 seconds (2 hours)', () => {
     const result = setTimerSchema.safeParse({ ...base, delay: '2h' });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(7200);
   });
 
   it('accepts optional repeat boolean', () => {

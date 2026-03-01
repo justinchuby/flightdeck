@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TimerRegistry } from '../coordination/TimerRegistry.js';
 import { createTestTimerDb } from './helpers/createTestTimerDb.js';
+import { setTimerSchema } from '../agents/commands/commandSchemas.js';
 
 describe('Timer API data shape', () => {
   let registry: TimerRegistry;
@@ -116,5 +117,73 @@ describe('Timer API data shape', () => {
       const ok = registry.cancel(timer.id, 'agent-1');
       expect(ok).toBe(false);
     });
+  });
+});
+
+describe('Duration parsing in SET_TIMER schema', () => {
+  const parse = (delay: string | number) =>
+    setTimerSchema.safeParse({ label: 'test', delay, message: 'msg' });
+
+  it('accepts raw seconds as number', () => {
+    const result = parse(300);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(300);
+  });
+
+  it('accepts seconds as numeric string', () => {
+    const result = parse('300');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(300);
+  });
+
+  it('parses "30m" as 1800 seconds', () => {
+    const result = parse('30m');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(1800);
+  });
+
+  it('parses "2h" as 7200 seconds', () => {
+    const result = parse('2h');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(7200);
+  });
+
+  it('parses "1d" as 86400 seconds', () => {
+    const result = parse('1d');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(86400);
+  });
+
+  it('parses "5min" as 300 seconds', () => {
+    const result = parse('5min');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(300);
+  });
+
+  it('parses "30s" as 30 seconds', () => {
+    const result = parse('30s');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(30);
+  });
+
+  it('parses "1hour" as 3600 seconds', () => {
+    const result = parse('1hour');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.delay).toBe(3600);
+  });
+
+  it('rejects invalid format like "abc"', () => {
+    const result = parse('abc');
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects "2h" value below min (if numeric part maps below 5s)', () => {
+    const result = parse('1s');
+    expect(result.success).toBe(false); // 1 second < 5s minimum
+  });
+
+  it('rejects "2d" value above max (172800 > 86400)', () => {
+    const result = parse('2d');
+    expect(result.success).toBe(false); // 172800 > 86400 max
   });
 });

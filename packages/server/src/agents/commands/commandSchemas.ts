@@ -140,12 +140,25 @@ export const requestLimitChangeSchema = z.object({
 
 // ── Timer Commands ───────────────────────────────────────────────────
 
+/** Parse a duration value to seconds. Accepts: number, numeric string, or human-readable (e.g. '30s', '5m', '2h', '1d'). */
+function parseDuration(val: number | string): number {
+  if (typeof val === 'number') return val;
+  const str = val.trim().toLowerCase();
+  const match = str.match(/^(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hrs|hours?|d|days?)?$/);
+  if (!match) return NaN;
+  const num = parseFloat(match[1]);
+  const unit = match[2] ?? 's';
+  if (unit.startsWith('d')) return num * 86400;
+  if (unit.startsWith('h')) return num * 3600;
+  if (unit.startsWith('m')) return num * 60;
+  return num; // seconds
+}
+
 export const setTimerSchema = z.object({
   label: z.string({ message: 'Missing required field "label"' }).min(1, 'Missing required field "label"').max(MAX_NAME_LENGTH, `"label" too long (max ${MAX_NAME_LENGTH})`),
   delay: z.union([z.number(), z.string()]).transform((val) => {
-    const num = typeof val === 'string' ? parseFloat(val) : val;
-    return num;
-  }).pipe(z.number().min(5, 'Delay must be at least 5 seconds').max(86400, 'Delay must be at most 86400 seconds (24 hours)')),
+    return parseDuration(val);
+  }).pipe(z.number({ message: 'Invalid delay format. Use seconds (300), or durations like "5m", "2h", "1d"' }).min(5, 'Delay must be at least 5 seconds').max(86400, 'Delay must be at most 86400 seconds (24 hours)')),
   message: z.string({ message: 'Missing required field "message"' }).min(1, 'Missing required field "message"').max(MAX_CONTENT_LENGTH, `"message" too long (max ${MAX_CONTENT_LENGTH})`),
   repeat: z.boolean().optional(),
 });
