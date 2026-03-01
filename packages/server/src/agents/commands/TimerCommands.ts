@@ -84,7 +84,7 @@ function handleCancelTimer(ctx: CommandHandlerContext, agent: Agent, data: strin
 function handleListTimers(ctx: CommandHandlerContext, agent: Agent, _data: string): void {
   const isLeadOrSecretary = agent.role.id === 'lead' || agent.role.id === 'secretary';
   const timers = isLeadOrSecretary
-    ? ctx.timerRegistry!.getAllTimers()
+    ? ctx.timerRegistry!.getAllTimers().filter(t => t.status === 'pending')
     : ctx.timerRegistry!.getAgentTimers(agent.id);
 
   if (timers.length === 0) {
