@@ -119,24 +119,40 @@ describe('classifyMessage — agent coordination', () => {
 // Positive: user-directed language
 // ══════════════════════════════════════════════════════════════════════
 describe('classifyMessage — user-directed language', () => {
-  it('"Here\'s the progress report" is user-directed', () => {
-    expect(classifyMessage("Here's the progress report. 3 tasks complete, 2 in progress.")).toBe('user-directed');
+  it('"Here\'s the progress report" with user context is user-directed', () => {
+    expect(classifyMessage("Here's the progress report. 3 tasks complete, 2 in progress.", { prevSenderIsUser: true })).toBe('user-directed');
   });
 
-  it('"Summary: ..." is user-directed', () => {
+  it('"Here\'s the progress report" without context is internal (too broad)', () => {
+    expect(classifyMessage("Here's the progress report. 3 tasks complete, 2 in progress.")).toBe('internal');
+  });
+
+  it('"Summary: ..." is user-directed (specific pattern, no context needed)', () => {
     expect(classifyMessage('Summary: The team has completed 5 of 8 items.')).toBe('user-directed');
   });
 
-  it('"I\'ve completed ..." is user-directed', () => {
-    expect(classifyMessage("I've completed the timeline fix. All tests pass.")).toBe('user-directed');
+  it('"I\'ve completed ..." with user context is user-directed', () => {
+    expect(classifyMessage("I've completed the timeline fix. All tests pass.", { prevSenderIsUser: true })).toBe('user-directed');
   });
 
-  it('"Let me explain ..." is user-directed', () => {
-    expect(classifyMessage('Let me explain the architecture changes.')).toBe('user-directed');
+  it('"I\'ve completed ..." without context is internal (too broad)', () => {
+    expect(classifyMessage("I've completed the timeline fix. All tests pass.")).toBe('internal');
   });
 
-  it('"Sure, I can do that" is user-directed', () => {
-    expect(classifyMessage('Sure, I can do that. Starting now.')).toBe('user-directed');
+  it('"Let me explain ..." with user context is user-directed', () => {
+    expect(classifyMessage('Let me explain the architecture changes.', { prevSenderIsUser: true })).toBe('user-directed');
+  });
+
+  it('"Let me explain ..." without context is internal (too broad)', () => {
+    expect(classifyMessage('Let me explain the architecture changes.')).toBe('internal');
+  });
+
+  it('"Sure, I can do that" with user context is user-directed', () => {
+    expect(classifyMessage('Sure, I can do that. Starting now.', { prevSenderIsUser: true })).toBe('user-directed');
+  });
+
+  it('"Sure, I can do that" without context is internal (too broad)', () => {
+    expect(classifyMessage('Sure, I can do that. Starting now.')).toBe('internal');
   });
 
   it('"acknowledged" is user-directed', () => {
@@ -147,7 +163,7 @@ describe('classifyMessage — user-directed language', () => {
     expect(classifyMessage('The docs have been updated as you requested.')).toBe('user-directed');
   });
 
-  it('"Status report:" is user-directed', () => {
+  it('"Status report:" is user-directed (specific pattern)', () => {
     expect(classifyMessage('Status report:\n- 3 tasks done\n- 2 in progress')).toBe('user-directed');
   });
 
@@ -212,8 +228,16 @@ describe('classifyMessage — context (prevSenderIsUser)', () => {
 // isUserDirected boolean helper
 // ══════════════════════════════════════════════════════════════════════
 describe('isUserDirected — boolean helper', () => {
-  it('returns true for user-directed messages', () => {
-    expect(isUserDirected("Here's what we've done so far.")).toBe(true);
+  it('returns true for user-directed messages (specific pattern)', () => {
+    expect(isUserDirected('Summary: all tasks complete.')).toBe(true);
+  });
+
+  it('returns false for broad pattern without context', () => {
+    expect(isUserDirected("Here's what we've done so far.")).toBe(false);
+  });
+
+  it('returns true for broad pattern with context', () => {
+    expect(isUserDirected("Here's what we've done so far.", { prevSenderIsUser: true })).toBe(true);
   });
 
   it('returns true for reply-to-user messages', () => {
@@ -233,9 +257,14 @@ describe('isUserDirected — boolean helper', () => {
 // Mixed content / realistic messages
 // ══════════════════════════════════════════════════════════════════════
 describe('classifyMessage — realistic messages', () => {
-  it('lead progress report is user-directed', () => {
+  it('lead progress report with context is user-directed', () => {
     const text = "Here's the current status:\n\n- Timeline zoom: Fixed (commit b5ce004)\n- Minimap: Fixed (commit dcae2ce)\n- DAG viz: Complete\n\n3 of 5 items done.";
-    expect(classifyMessage(text)).toBe('user-directed');
+    expect(classifyMessage(text, { prevSenderIsUser: true })).toBe('user-directed');
+  });
+
+  it('lead progress report without context is internal (broad pattern)', () => {
+    const text = "Here's the current status:\n\n- Timeline zoom: Fixed (commit b5ce004)\n- Minimap: Fixed (commit dcae2ce)\n- DAG viz: Complete\n\n3 of 5 items done.";
+    expect(classifyMessage(text)).toBe('internal');
   });
 
   it('lead delegating work is internal', () => {
@@ -254,6 +283,14 @@ describe('classifyMessage — realistic messages', () => {
 
   it('lead brief acknowledgment after user message is reply-to-user', () => {
     expect(classifyMessage('Good work. Move on to the next task.', { prevSenderIsUser: true })).toBe('reply-to-user');
+  });
+
+  it('lead→agent plain text with broad pattern is internal (false positive prevention)', () => {
+    expect(classifyMessage("I've assigned you the task. Start immediately.")).toBe('internal');
+  });
+
+  it('lead→agent "Here\'s the context" is internal without user context', () => {
+    expect(classifyMessage("Here's the context for your work: fix the timeline zoom.")).toBe('internal');
   });
 
   it('multi-line with @user tag and commands is user-directed (@user wins)', () => {

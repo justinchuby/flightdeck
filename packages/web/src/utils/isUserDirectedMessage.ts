@@ -43,8 +43,11 @@ const COMMAND_ONLY = /^(?:\s*(?:⟦|\[\[\[)[\s\S]*?(?:⟧|\]\]\])\s*)+$/;
 
 // ── Positive signal patterns ──────────────────────────────────────────
 
-/** Lead explicitly addressing the user at the start of a line */
-const USER_ADDRESS = /(?:^|\n)\s*(?:User:|To (?:the )?user:|Hi!|Hello!|Sure[,!]|Here(?:'s| is| are)|I(?:'ve|'ll| have| will| can)|Let me|Summary:|Progress:|Status report:|Update:)/im;
+/** Specific user-addressing patterns — safe as standalone signals */
+const USER_ADDRESS_SPECIFIC = /(?:^|\n)\s*(?:User:|To (?:the )?user:|Summary:|Progress:|Status report:|Update:)/im;
+
+/** Broad sentence-starter patterns — only meaningful when following a user message */
+const USER_ADDRESS_BROAD = /(?:^|\n)\s*(?:Hi!|Hello!|Sure[,!]|Here(?:'s| is| are)|I(?:'ve|'ll| have| will| can)|Let me)/im;
 
 /** Acknowledgment language */
 const ACKNOWLEDGMENT = /(?:acknowledged|as you (?:requested|asked)|per your (?:request|instructions)|you(?:'re| are) right|good (?:point|question|idea)|understood|will do|on it)/i;
@@ -75,7 +78,7 @@ export function classifyHighlight(
   // ── Definite negative: agent coordination ──
   if (AGENT_COORD_PREFIX.test(text)) return 'internal';
   if (ROUTING_ARROW.test(text)) return 'internal';
-  if (STATUS_EVENT_LINE.test(text) && !USER_ADDRESS.test(text)) return 'internal';
+  if (STATUS_EVENT_LINE.test(text) && !USER_ADDRESS_SPECIFIC.test(text)) return 'internal';
 
   // ── Strong positive: contains embedded user message ──
   if (USER_MESSAGE_MARKER.test(text)) return 'user-directed';
@@ -85,7 +88,12 @@ export function classifyHighlight(
 
   // If the text has explicit user-addressing language, it's user-directed
   // even if it also contains some commands (lead might issue commands while talking to user)
-  if (USER_ADDRESS.test(text) && !hasCrewCommands) return 'user-directed';
+  if (USER_ADDRESS_SPECIFIC.test(text) && !hasCrewCommands) return 'user-directed';
+
+  // Broad sentence starters (I've, Here's, Let me, etc.) are only meaningful
+  // when following a user message — they're too common in lead→agent messages
+  if (USER_ADDRESS_BROAD.test(text) && !hasCrewCommands && context.prevSenderIsUser) return 'user-directed';
+
   if (ACKNOWLEDGMENT.test(text) && !hasCrewCommands) return 'user-directed';
 
   // ── Context-based: previous message was from user ──
