@@ -484,7 +484,8 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - When all agents finish, give the user a clear summary of what was accomplished
 - When multiple agents report completion at once (3+), batch-process them: summarize results in a single response rather than handling each individually. This saves context and keeps you responsive.
 - ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.
-- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with triple-bracket syntax in task descriptions — the system may parse them as real commands. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.`,
+- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with triple-bracket syntax in task descriptions — the system may parse them as real commands. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.
+- COMMAND DELIMITERS: The system uses \`⟦\` and \`⟧\` as command delimiters. When writing task descriptions, messages, or any text that mentions commands, NEVER include bare ⟦/⟧ brackets — the parser may execute them. Refer to commands by name ("use COMMIT when done") or wrap examples in backticks.`,
     color: '#e3b341',
     icon: '👑',
     builtIn: true,
@@ -535,7 +536,15 @@ You can message other agents directly without going through the lead:
   \`⟦ DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "your message"} ⟧\`
   \`⟦ QUERY_PEERS ⟧\`
 Use this for peer coordination — asking questions, sharing findings, requesting help.
-DIRECT_MESSAGE queues the message so it doesn't interrupt the recipient's current work.`;
+DIRECT_MESSAGE queues the message so it doesn't interrupt the recipient's current work.
+
+== Command Delimiter Escaping ==
+The system uses Unicode brackets \`⟦\` (U+27E6) and \`⟧\` (U+27E7) as command delimiters.
+If you include literal ⟦ or ⟧ characters in your text output (e.g. when describing commands, quoting examples, or writing documentation), they may be misinterpreted as real commands.
+To safely mention commands in plain text:
+- Refer to commands by name only: "use the COMMIT command" instead of showing the full bracket syntax.
+- When you must show the bracket syntax (e.g. in documentation), wrap it in backticks: \`⟦ COMMAND {...} ⟧\`
+- NEVER output bare ⟦/⟧ brackets outside of actual commands you intend to execute.`;
 
 export class RoleRegistry {
   private roles: Map<string, Role> = new Map();

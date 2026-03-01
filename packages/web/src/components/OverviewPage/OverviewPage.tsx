@@ -351,6 +351,7 @@ export function OverviewPage({ api, ws }: Props) {
   const [selectedProject, setSelectedProject] = useState<{ leadId: string; projectName: string; teamSize: number; completionPct: number; latestSnapshot: ProgressSnapshot | null } | null>(null);
   const [feedbackDecisionId, setFeedbackDecisionId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
+  const [timelineProjectFilter, setTimelineProjectFilter] = useState<string | null>(null);
   const agents = useAppStore((s) => s.agents);
   const projects = useLeadStore((s) => s.projects);
 
@@ -496,6 +497,20 @@ export function OverviewPage({ api, ws }: Props) {
   // Timeline: all decisions, newest first
   const timelineDecisions = [...allDecisions].reverse();
 
+  // Build project names list for timeline tabs
+  const timelineProjectNames = (() => {
+    const names = new Set<string>();
+    for (const d of timelineDecisions) {
+      names.add(resolveProjectName(d));
+    }
+    return Array.from(names);
+  })();
+
+  // Filter decisions for the selected project tab
+  const filteredTimelineDecisions = timelineProjectFilter
+    ? timelineDecisions.filter((d) => resolveProjectName(d) === timelineProjectFilter)
+    : timelineDecisions;
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {/* A. Pending Decisions Banner */}
@@ -567,14 +582,47 @@ export function OverviewPage({ api, ws }: Props) {
         <h2 className="text-sm font-bold text-th-text-alt mb-2 uppercase tracking-wide">
           Decisions Timeline
         </h2>
-        {timelineDecisions.length === 0 ? (
+        {/* Project tabs */}
+        {timelineProjectNames.length > 1 && (
+          <div className="flex items-center gap-1 mb-3 overflow-x-auto">
+            <button
+              onClick={() => setTimelineProjectFilter(null)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                timelineProjectFilter === null
+                  ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
+                  : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 border border-transparent'
+              }`}
+            >
+              All ({timelineDecisions.length})
+            </button>
+            {timelineProjectNames.map((projName) => {
+              const count = timelineDecisions.filter((d) => resolveProjectName(d) === projName).length;
+              return (
+                <button
+                  key={projName}
+                  onClick={() => setTimelineProjectFilter(projName)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                    timelineProjectFilter === projName
+                      ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40'
+                      : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50 border border-transparent'
+                  }`}
+                >
+                  {projName} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {filteredTimelineDecisions.length === 0 ? (
           <div className="bg-th-bg-alt border border-th-border rounded-lg p-6 text-center">
-            <p className="text-sm text-th-text-muted font-mono">No decisions recorded yet.</p>
+            <p className="text-sm text-th-text-muted font-mono">
+              {timelineProjectFilter ? `No decisions for ${timelineProjectFilter}.` : 'No decisions recorded yet.'}
+            </p>
           </div>
         ) : (
           (() => {
             const grouped = new Map<string, Decision[]>();
-            for (const d of timelineDecisions) {
+            for (const d of filteredTimelineDecisions) {
               const proj = resolveProjectName(d);
               if (!grouped.has(proj)) grouped.set(proj, []);
               grouped.get(proj)!.push(d);
