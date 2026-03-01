@@ -8,6 +8,9 @@
  * include a `type` field.
  */
 import { useMemo, useState } from 'react';
+import type { CommType } from '../../stores/leadStore';
+
+export type { CommType };
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -16,8 +19,6 @@ interface HeatmapAgent {
   role: string;
   name: string;
 }
-
-export type CommType = 'delegation' | 'message' | 'group_message' | 'broadcast' | 'report';
 
 export interface HeatmapMessage {
   from: string;
@@ -33,6 +34,18 @@ export interface CommHeatmapProps {
   hideFilters?: boolean;
 }
 
+// ── Filter chip labels & colours ──────────────────────────────────────────
+
+const COMM_TYPE_META: Record<CommType, { label: string; color: string }> = {
+  message:       { label: 'DMs',         color: 'bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30' },
+  delegation:    { label: 'Delegations', color: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-300 border-yellow-500/30' },
+  group_message: { label: 'Groups',      color: 'bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/30' },
+  broadcast:     { label: 'Broadcasts',  color: 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border-cyan-500/30' },
+  report:        { label: 'Reports',     color: 'bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30' },
+};
+
+const ALL_COMM_TYPES: CommType[] = ['message', 'delegation', 'group_message', 'broadcast', 'report'];
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /** Maps a count → a Tailwind bg-accent opacity class based on percentile. */
@@ -46,18 +59,6 @@ function intensityClass(count: number, max: number): string {
   if (ratio < 0.9) return 'bg-accent/80';
   return 'bg-accent';
 }
-
-// ── Filter labels ─────────────────────────────────────────────────────────
-
-const COMM_TYPE_LABELS: Record<CommType, string> = {
-  delegation:    'Delegation',
-  message:       'Direct Message',
-  group_message: 'Group Chat',
-  broadcast:     'Broadcast',
-  report:        'Report',
-};
-
-const ALL_COMM_TYPES: CommType[] = Object.keys(COMM_TYPE_LABELS) as CommType[];
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -125,20 +126,22 @@ export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps)
       {/* ── Comm type filter chips ── */}
       {hasTypeInfo && !hideFilters && (
         <div className="flex flex-wrap items-center gap-1.5 mb-3" role="group" aria-label="Filter by communication type">
-          {ALL_COMM_TYPES.map(type => (
-            <button
-              key={type}
-              onClick={() => toggleType(type)}
-              aria-pressed={activeTypes.has(type)}
-              className={`px-2.5 py-1 text-[11px] rounded-full transition-colors border ${
-                activeTypes.has(type)
-                  ? 'bg-accent/20 border-accent/40 text-accent'
-                  : 'bg-th-bg-alt/30 border-th-border/30 text-th-text-muted hover:text-th-text'
-              }`}
-            >
-              {COMM_TYPE_LABELS[type]}
-            </button>
-          ))}
+          {ALL_COMM_TYPES.map(type => {
+            const meta = COMM_TYPE_META[type];
+            const isActive = activeTypes.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => toggleType(type)}
+                aria-pressed={isActive}
+                className={`px-2.5 py-1 text-[11px] rounded-full transition-colors border ${
+                  isActive ? meta.color : 'bg-th-bg-alt/30 border-th-border/30 text-th-text-muted opacity-50 hover:opacity-75'
+                }`}
+              >
+                {meta.label}
+              </button>
+            );
+          })}
         </div>
       )}
 

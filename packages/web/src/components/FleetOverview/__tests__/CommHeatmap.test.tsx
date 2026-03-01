@@ -159,9 +159,8 @@ describe('CommHeatmap', () => {
       { from: 'dev-1', to: 'lead-1', count: 3, type: 'message' },
     ];
     render(<CommHeatmap agents={AGENTS} messages={messages} />);
-    expect(screen.getByText('Delegation')).toBeInTheDocument();
-    expect(screen.getByText('Direct Message')).toBeInTheDocument();
-    expect(screen.getByText('Group Chat')).toBeInTheDocument();
+    expect(screen.getByText('Delegations')).toBeInTheDocument();
+    expect(screen.getByText('DMs')).toBeInTheDocument();
   });
 
   it('does not show filter chips when messages have no type info', () => {
@@ -169,7 +168,7 @@ describe('CommHeatmap', () => {
       { from: 'lead-1', to: 'dev-1', count: 5 },
     ];
     render(<CommHeatmap agents={AGENTS} messages={messages} />);
-    expect(screen.queryByText('Delegation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delegations')).not.toBeInTheDocument();
   });
 
   it('filters messages when a type chip is toggled off', () => {
@@ -182,8 +181,8 @@ describe('CommHeatmap', () => {
     // Max count shown in legend should include both types initially.
     expect(container.textContent).toContain('10');
 
-    // Toggle off 'Delegation' — only 'message' (count=5) remains.
-    fireEvent.click(screen.getByText('Delegation'));
+    // Toggle off 'Delegations' — only 'message' (count=5) remains.
+    fireEvent.click(screen.getByText('Delegations'));
     expect(container.textContent).toContain('5');
   });
 
@@ -192,7 +191,7 @@ describe('CommHeatmap', () => {
       { from: 'lead-1', to: 'dev-1', count: 5, type: 'delegation' },
     ];
     render(<CommHeatmap agents={AGENTS} messages={messages} hideFilters />);
-    expect(screen.queryByText('Delegation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delegations')).not.toBeInTheDocument();
   });
 
   it('keeps at least one filter active (cannot deselect all)', () => {
@@ -201,8 +200,8 @@ describe('CommHeatmap', () => {
     ];
     render(<CommHeatmap agents={AGENTS} messages={messages} />);
 
-    // All chips start active. Click Delegation — it deactivates.
-    const delegationBtn = screen.getByText('Delegation');
+    // All chips start active. Click Delegations — it deactivates.
+    const delegationBtn = screen.getByText('Delegations');
     fireEvent.click(delegationBtn);
     // Now re-click all remaining active types except one — the last one should stay.
     // Simpler: just verify at least one chip stays aria-pressed=true after toggling all.

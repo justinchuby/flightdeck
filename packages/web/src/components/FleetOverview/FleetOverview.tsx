@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useLeadStore } from '../../stores/leadStore';
 import { FleetStats } from './FleetStats';
 import { AgentActivityTable } from './AgentActivityTable';
 import { ActivityFeed } from './ActivityFeed';
 import { FileLockPanel } from './FileLockPanel';
 import { CommHeatmap } from './CommHeatmap';
+import type { HeatmapMessage } from './CommHeatmap';
 import type { AgentInfo } from '../../types';
 
 interface CoordinationStatus {
@@ -94,8 +96,9 @@ export function FleetOverview({ api, ws }: Props) {
     : locks;
 
   // ── CommHeatmap data ─────────────────────────────────────────────────────
-  // Derive agent-to-agent communication counts from parent→child relationships
-  // and message chunks stored on each agent.
+  // Derive heatmap data from leadStore comms (covers all comm types).
+  const projects = useLeadStore((s) => s.projects);
+
   const heatmapAgents = useMemo(
     () =>
       agents.map((a) => ({
@@ -106,19 +109,23 @@ export function FleetOverview({ api, ws }: Props) {
     [agents],
   );
 
-  const heatmapMessages = useMemo(() => {
-    const result: Array<{ from: string; to: string; count: number }> = [];
-    for (const agent of agents) {
-      if (!agent.parentId) continue;
-      // Messages received by this child from its parent.
-      const inbound  = Math.max(1, agent.messages?.filter(m => m.sender === 'external').length ?? 1);
-      // Messages sent by this child back to its parent.
-      const outbound = Math.max(1, agent.messages?.filter(m => m.sender === 'agent').length ?? 1);
-      result.push({ from: agent.parentId, to: agent.id,      count: inbound  });
-      result.push({ from: agent.id,       to: agent.parentId, count: outbound });
+  const heatmapMessages: HeatmapMessage[] = useMemo(() => {
+    const result: HeatmapMessage[] = [];
+    // Aggregate comms from all projects
+    for (const proj of Object.values(projects)) {
+      for (const comm of proj.comms) {
+        if (comm.fromId && comm.toId) {
+          result.push({
+            from: comm.fromId,
+            to:   comm.toId,
+            count: 1,
+            type: comm.type,
+          });
+        }
+      }
     }
     return result;
-  }, [agents]);
+  }, [projects]);
 
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
