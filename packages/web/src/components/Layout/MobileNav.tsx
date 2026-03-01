@@ -5,7 +5,7 @@ import {
   X,
   Crown,
   LayoutDashboard,
-  History,
+  ListChecks,
   Users,
   MessageSquare,
   Network,
@@ -19,7 +19,7 @@ import {
 const links = [
   { to: '/', icon: Crown, label: 'Project Lead' },
   { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
-  { to: '/tasks', icon: History, label: 'Tasks' },
+  { to: '/tasks', icon: ListChecks, label: 'Tasks' },
   { to: '/agents', icon: Users, label: 'Agents' },
   { to: '/groups', icon: MessageSquare, label: 'Group Chats' },
   { to: '/org', icon: Network, label: 'Org Chart' },
