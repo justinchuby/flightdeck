@@ -36,6 +36,23 @@ function handleDeclareTasks(ctx: CommandHandlerContext, agent: Agent, data: stri
       agent.sendMessage('[System] DECLARE_TASKS requires a "tasks" array.');
       return;
     }
+    // Validate each task before passing to DAG (match ADD_TASK validation)
+    for (let i = 0; i < req.tasks.length; i++) {
+      const t = req.tasks[i];
+      const id = typeof t.id === 'string' ? t.id.trim() : '';
+      if (!id) {
+        agent.sendMessage(`[System] DECLARE_TASKS error: Task at index ${i} is missing required field "id".`);
+        return;
+      }
+      if (id.length > 100) {
+        agent.sendMessage(`[System] DECLARE_TASKS error: Task "${id.slice(0, 20)}..." has invalid id (too long, max 100 chars).`);
+        return;
+      }
+      if (!t.role || (typeof t.role === 'string' && !t.role.trim())) {
+        agent.sendMessage(`[System] DECLARE_TASKS error: Task at index ${i} is missing required field "role".`);
+        return;
+      }
+    }
     const { tasks, conflicts } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
     let msg = `[System] Task DAG declared: ${tasks.length} tasks added.`;
     const readyCount = tasks.filter(t => t.dagStatus === 'ready').length;
