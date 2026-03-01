@@ -844,6 +844,17 @@ describe('PROGRESS validation', () => {
       expect.stringContaining('PROGRESS validation error'),
     );
   });
+
+  it('rejects oversized payload', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    const bigPayload = `{"data": "${'x'.repeat(50_001)}"}`;
+    cmd.handler(agent, `⟦ PROGRESS ${bigPayload} ⟧`);
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('payload too large'),
+    );
+  });
 });
 
 // ── RELEASE_CAPABILITY validation ────────────────────────────────────

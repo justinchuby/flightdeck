@@ -149,6 +149,11 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
   if (!match) return;
 
   try {
+    // Guard against oversized payloads before parsing (passthrough allows arbitrary extra keys)
+    if (match[1].length > 50_000) {
+      agent.sendMessage('[System] PROGRESS error: payload too large (max 50,000 characters).');
+      return;
+    }
     const parsed = parseCommandPayload(agent, match[1], progressSchema, 'PROGRESS');
     if (!parsed) return;
     const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
