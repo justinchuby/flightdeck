@@ -1,21 +1,22 @@
 import type { DagStatus, DagTask } from '../../types';
+import { dagTaskText } from '../../utils/statusColors';
 
-const STATUS_CONFIG: Record<DagTask['dagStatus'], { icon: string; color: string; label: string; strikethrough?: boolean }> = {
-  pending:  { icon: '⏳', color: 'text-th-text-muted',    label: 'pending' },
-  ready:    { icon: '🟢', color: 'text-green-400',   label: 'ready' },
-  running:  { icon: '🔵', color: 'text-blue-400',    label: 'running' },
-  done:     { icon: '✅', color: 'text-emerald-400',  label: 'done' },
-  failed:   { icon: '❌', color: 'text-red-400',      label: 'failed' },
-  blocked:  { icon: '🟠', color: 'text-orange-400',   label: 'blocked' },
-  paused:   { icon: '⏸️', color: 'text-yellow-600 dark:text-yellow-400',   label: 'paused' },
-  skipped:  { icon: '⏭️', color: 'text-th-text-muted',     label: 'skipped', strikethrough: true },
+const STATUS_CONFIG: Record<DagTask['dagStatus'], { icon: string; label: string; strikethrough?: boolean }> = {
+  pending:  { icon: '⏳', label: 'pending' },
+  ready:    { icon: '🟢', label: 'ready' },
+  running:  { icon: '🔵', label: 'running' },
+  done:     { icon: '✅', label: 'done' },
+  failed:   { icon: '❌', label: 'failed' },
+  blocked:  { icon: '🟠', label: 'blocked' },
+  paused:   { icon: '⏸️', label: 'paused' },
+  skipped:  { icon: '⏭️', label: 'skipped', strikethrough: true },
 };
 
 /** Badge pill for a task status */
 function StatusBadge({ status }: { status: DagTask['dagStatus'] }) {
   const cfg = STATUS_CONFIG[status];
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${cfg.color} ${cfg.strikethrough ? 'line-through' : ''}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${dagTaskText(status)} ${cfg.strikethrough ? 'line-through' : ''}`}>
       <span>{cfg.icon}</span>
       <span>{cfg.label}</span>
     </span>
@@ -42,7 +43,7 @@ function SummaryBar({ summary }: { summary: DagStatus['summary'] }) {
       {entries.map((e) => {
         const cfg = STATUS_CONFIG[e.key];
         return (
-          <span key={e.key} className={`${cfg.color} whitespace-nowrap`}>
+          <span key={e.key} className={`${dagTaskText(e.key)} whitespace-nowrap`}>
             {cfg.icon} {e.count} {cfg.label}
           </span>
         );

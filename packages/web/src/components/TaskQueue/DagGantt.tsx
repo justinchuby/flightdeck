@@ -27,14 +27,7 @@ export interface DagGanttProps {
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  done:    'bg-green-500 dark:bg-green-600',
-  running: 'bg-blue-500 dark:bg-blue-600 animate-pulse',
-  pending: 'bg-yellow-500 dark:bg-yellow-600',
-  blocked: 'bg-th-bg-muted',
-  failed:  'bg-red-500 dark:bg-red-600',
-  skipped: 'bg-th-text-muted/30',
-};
+import { dagStatusBar } from '../../utils/statusColors';
 
 const ROW_H   = 28; // bar height in px
 const ROW_GAP = 6;  // vertical gap between rows
@@ -182,7 +175,8 @@ export function DagGantt({ tasks }: DagGanttProps) {
                 <div
                   key={task.id}
                   className={`absolute rounded flex items-center px-1.5 overflow-hidden cursor-default
-                    ${STATUS_COLORS[task.status] ?? 'bg-gray-500'}
+                    ${dagStatusBar(task.status)}
+                    ${task.status === 'running' ? 'animate-pulse' : ''}
                     ${onCrit ? 'ring-1 ring-orange-400/80' : ''}
                   `}
                   style={{
@@ -258,7 +252,7 @@ export function DagGantt({ tasks }: DagGanttProps) {
       <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-th-text-muted">
         {(['done','running','pending','blocked','failed','skipped'] as const).map(s => (
           <span key={s} className="flex items-center gap-1">
-            <span className={`inline-block w-3 h-2 rounded-sm ${STATUS_COLORS[s]}`} />
+            <span className={`inline-block w-3 h-2 rounded-sm ${dagStatusBar(s)}`} />
             <span className="capitalize">{s}</span>
           </span>
         ))}

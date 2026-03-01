@@ -3,21 +3,13 @@ import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import { RefreshCw, Square, Terminal, Hand, Check, Play } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
+import { agentStatusText } from '../../utils/statusColors';
 
 interface Props {
   agent: AgentInfo;
   api: any;
   ws: any;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  creating: 'text-yellow-600 dark:text-yellow-400',
-  running: 'text-green-400',
-  idle: 'text-blue-400',
-  completed: 'text-th-text-muted',
-  failed: 'text-red-400',
-  terminated: 'text-orange-400',
-};
 
 const AVAILABLE_MODELS = [
   'claude-opus-4.6',
@@ -51,7 +43,7 @@ export function AgentCard({ agent, api }: Props) {
           <span className="text-lg">{agent.role.icon}</span>
           <div>
             <h3 className="text-sm font-medium">{agent.role.name}</h3>
-            <span className={`text-xs ${STATUS_COLORS[agent.status] || 'text-th-text-muted'}`}>
+            <span className={`text-xs ${agentStatusText(agent.status)}`}>
               {agent.status}
             </span>
           </div>

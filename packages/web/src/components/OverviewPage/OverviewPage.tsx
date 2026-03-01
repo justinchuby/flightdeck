@@ -6,6 +6,7 @@ import type { Decision } from '../../types';
 import { AlertTriangle, Check, X, MessageSquare, Send, Clock } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { MarkdownContent } from '../../utils/markdown';
+import { decisionStatusCard } from '../../utils/statusColors';
 import { FilterTabs } from '../FilterTabs';
 
 interface Props {
@@ -171,14 +172,7 @@ function DecisionTimelineItem({
   const isPending = decision.needsConfirmation && decision.status === 'recorded';
   const isRecordedNonBlocking = !decision.needsConfirmation && decision.status === 'recorded';
   const showFeedback = !isPending; // Show feedback on any non-pending decision
-  const statusColor =
-    decision.status === 'confirmed'
-      ? 'border-green-500/40 bg-green-900/10'
-      : decision.status === 'rejected'
-        ? 'border-red-500/40 bg-red-900/10'
-        : isPending
-          ? 'border-yellow-500/40 bg-yellow-900/10'
-          : 'border-th-border bg-th-bg-alt/50';
+  const statusColorClass = decisionStatusCard(decision.status, isPending);
 
   const statusBadge =
     decision.status === 'confirmed' && decision.autoApproved ? (
@@ -197,7 +191,7 @@ function DecisionTimelineItem({
 
   return (
     <div
-      className={`border rounded-lg p-3 cursor-pointer hover:brightness-110 transition-all ${statusColor}`}
+      className={`border rounded-lg p-3 cursor-pointer hover:brightness-110 transition-all ${statusColorClass}`}
       onClick={() => onClickDetail(decision)}
     >
       {isPending ? (

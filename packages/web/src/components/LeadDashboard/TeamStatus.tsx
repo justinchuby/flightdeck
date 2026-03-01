@@ -1,6 +1,7 @@
 import { Bot, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import type { AgentInfo, Delegation } from '../../types';
 import { AgentIdBadge } from '../../utils/markdown';
+import { agentStatusText } from '../../utils/statusColors';
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -18,15 +19,6 @@ const STATUS_ICON: Record<string, typeof CheckCircle> = {
   completed: CheckCircle,
   failed: XCircle,
   terminated: XCircle,
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  creating: 'text-th-text-muted',
-  running: 'text-blue-400',
-  idle: 'text-yellow-600 dark:text-yellow-400',
-  completed: 'text-green-400',
-  failed: 'text-red-400',
-  terminated: 'text-orange-400',
 };
 
 /** Shorten model ID for display (e.g. "claude-sonnet-4.6" → "Sonnet 4.6") */
@@ -58,7 +50,7 @@ export function TeamStatus({ agents, delegations }: Props) {
           agents.map((agent) => {
             const delegation = [...delegations].reverse().find((d) => d.toAgentId === agent.id);
             const Icon = STATUS_ICON[agent.status] || Bot;
-            const colorClass = STATUS_COLOR[agent.status] || 'text-th-text-muted';
+            const colorClass = agentStatusText(agent.status);
 
             return (
               <div key={agent.id} className="bg-th-bg-alt border border-th-border rounded p-2">

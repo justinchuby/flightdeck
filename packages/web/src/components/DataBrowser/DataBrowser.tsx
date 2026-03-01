@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Database, Brain, MessageSquare, CheckCircle, Activity, Trash2, ChevronDown, ChevronRight, RefreshCw, BarChart3 } from 'lucide-react';
+import { decisionStatusText } from '../../utils/statusColors';
 
 interface DbStats {
   memory: number;
@@ -260,23 +261,16 @@ function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
   if (loading) return <Loading />;
   if (rows.length === 0) return <Empty label="No decisions recorded" />;
 
-  const statusColor = (s: string) => {
-    if (s === 'confirmed') return 'text-green-400';
-    if (s === 'rejected') return 'text-red-400';
-    if (s === 'pending') return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-th-text-muted';
-  };
-
   return (
     <div className="space-y-2">
       <div className="text-xs text-th-text-muted mb-2">{rows.length} decisions</div>
       {rows.map((row) => (
         <div key={row.id} className="bg-surface-raised border border-th-border rounded-lg p-3 flex items-start gap-3 group">
-          <CheckCircle size={14} className={`mt-0.5 shrink-0 ${statusColor(row.status)}`} />
+          <CheckCircle size={14} className={`mt-0.5 shrink-0 ${decisionStatusText(row.status)}`} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium text-th-text-alt">{row.title}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusColor(row.status)} bg-th-bg-alt`}>{row.status}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${decisionStatusText(row.status)} bg-th-bg-alt`}>{row.status}</span>
               {row.needsConfirmation === 1 && <span className="text-[10px] text-yellow-500 bg-yellow-900/30 px-1.5 py-0.5 rounded">needs confirmation</span>}
             </div>
             {row.rationale && <div className="text-xs text-th-text-muted mb-1">{row.rationale}</div>}

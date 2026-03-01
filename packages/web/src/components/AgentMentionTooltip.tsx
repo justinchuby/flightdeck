@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useId } from 'react';
 import { idColor } from '../utils/markdown';
+import { agentStatusDot } from '../utils/statusColors';
 
 export interface MentionAgent {
   id: string;
@@ -8,15 +9,6 @@ export interface MentionAgent {
   task?: string;
   model?: string;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  running: 'bg-green-500',
-  idle: 'bg-yellow-500',
-  creating: 'bg-blue-500',
-  completed: 'bg-gray-500',
-  failed: 'bg-red-500',
-  terminated: 'bg-gray-600',
-};
 
 /**
  * Wraps a mention badge with a hover tooltip showing agent details.
@@ -49,7 +41,7 @@ export function AgentMentionTooltip({
     setVisible(false);
   }, []);
 
-  const statusDot = STATUS_COLORS[agent.status ?? ''] ?? 'bg-gray-400';
+  const statusDot = agentStatusDot(agent.status ?? '');
   const taskPreview = agent.task
     ? agent.task.length > 80
       ? agent.task.slice(0, 80) + '…'

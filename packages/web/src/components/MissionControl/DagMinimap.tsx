@@ -1,5 +1,6 @@
 import { GitBranch } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
+import { dagMinimapColor } from '../../utils/statusColors';
 import type { DagStatus } from '../../types';
 
 // ── Stacked status bar ───────────────────────────────────────────────
@@ -9,14 +10,14 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
   if (total === 0) return null;
 
   const segments = [
-    { status: 'done',    count: summary.done,    color: 'bg-green-500' },
-    { status: 'running', count: summary.running, color: 'bg-blue-500' },
-    { status: 'ready',   count: summary.ready,   color: 'bg-emerald-400' },
-    { status: 'blocked', count: summary.blocked, color: 'bg-red-500' },
-    { status: 'paused',  count: summary.paused,  color: 'bg-yellow-500' },
-    { status: 'pending', count: summary.pending, color: 'bg-zinc-600' },
-    { status: 'skipped', count: summary.skipped, color: 'bg-th-bg-muted' },
-    { status: 'failed',  count: summary.failed,  color: 'bg-red-600' },
+    { status: 'done',    count: summary.done },
+    { status: 'running', count: summary.running },
+    { status: 'ready',   count: summary.ready },
+    { status: 'blocked', count: summary.blocked },
+    { status: 'paused',  count: summary.paused },
+    { status: 'pending', count: summary.pending },
+    { status: 'skipped', count: summary.skipped },
+    { status: 'failed',  count: summary.failed },
   ].filter((s) => s.count > 0);
 
   return (
@@ -25,7 +26,7 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
         {segments.map((seg) => (
           <div
             key={seg.status}
-            className={`${seg.color} relative`}
+            className={`${dagMinimapColor(seg.status)} relative`}
             style={{ width: `${(seg.count / total) * 100}%` }}
           >
             {seg.count / total > 0.08 && (
@@ -39,7 +40,7 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
       <div className="flex flex-wrap gap-3 text-[10px] text-th-text-muted">
         {segments.map((seg) => (
           <span key={seg.status} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-sm ${seg.color}`} />
+            <span className={`w-2 h-2 rounded-sm ${dagMinimapColor(seg.status)}`} />
             {seg.status} ({seg.count})
           </span>
         ))}

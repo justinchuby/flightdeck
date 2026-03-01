@@ -1,18 +1,10 @@
 import { useMemo } from 'react';
 import { Users } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { agentStatusDot } from '../../utils/statusColors';
 import type { AgentInfo } from '../../types';
 
 // ── Constants ────────────────────────────────────────────────────────
-
-const STATUS_DOT_COLORS: Record<string, string> = {
-  creating:   'bg-yellow-400',
-  running:    'bg-green-400',
-  idle:       'bg-blue-400',
-  completed:  'bg-zinc-400',
-  failed:     'bg-red-400',
-  terminated: 'bg-orange-400',
-};
 
 const STATUS_ORDER: Record<string, number> = {
   running: 0,
@@ -26,7 +18,7 @@ const STATUS_ORDER: Record<string, number> = {
 // ── Agent row ────────────────────────────────────────────────────────
 
 function AgentRow({ agent }: { agent: AgentInfo }) {
-  const statusColor = STATUS_DOT_COLORS[agent.status] ?? 'bg-zinc-500';
+  const statusColor = agentStatusDot(agent.status);
   const ctxPct = agent.contextWindowSize
     ? Math.round(((agent.contextWindowUsed ?? 0) / agent.contextWindowSize) * 100)
     : null;
