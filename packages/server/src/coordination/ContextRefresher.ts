@@ -4,6 +4,7 @@ import { isTerminalStatus } from '../agents/Agent.js';
 import type { FileLockRegistry } from './FileLockRegistry.js';
 import type { ActivityLedger } from './ActivityLedger.js';
 import { SynthesisEngine } from './SynthesisEngine.js';
+import { SmartActivityFilter } from './SmartActivityFilter.js';
 
 /** Interval for periodic status updates to roles with receivesStatusUpdates (ms) */
 const PERIODIC_UPDATE_INTERVAL_MS = 60_000;
@@ -13,6 +14,7 @@ export class ContextRefresher {
   private lockRegistry: FileLockRegistry;
   private activityLedger: ActivityLedger;
   private synthesisEngine: SynthesisEngine;
+  private activityFilter: SmartActivityFilter;
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   private periodicHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -25,6 +27,7 @@ export class ContextRefresher {
     this.lockRegistry = lockRegistry;
     this.activityLedger = activityLedger;
     this.synthesisEngine = new SynthesisEngine(activityLedger, agentManager);
+    this.activityFilter = new SmartActivityFilter();
 
     // Listen to significant events with debounce
     const debouncedRefresh = () => this.scheduleRefresh();
@@ -124,8 +127,10 @@ export class ContextRefresher {
   }
 
   buildRecentActivity(limit: number = 20): string[] {
-    const entries = this.activityLedger.getRecent(limit);
-    return entries.map((entry) => {
+    // Fetch extra entries so the smart filter has enough high/medium priority events
+    const rawEntries = this.activityLedger.getRecent(limit * 3);
+    const filtered = this.activityFilter.filter(rawEntries, limit);
+    return filtered.map((entry) => {
       const shortId = entry.agentId.slice(0, 8);
       return `[${entry.timestamp}] Agent ${shortId} (${entry.agentRole}): ${entry.actionType} — ${entry.summary}`;
     });
