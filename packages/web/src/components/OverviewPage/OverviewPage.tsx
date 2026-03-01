@@ -172,7 +172,7 @@ function DecisionTimelineItem({
   const isPending = decision.needsConfirmation && decision.status === 'recorded';
   const isRecordedNonBlocking = !decision.needsConfirmation && decision.status === 'recorded';
   const showFeedback = !isPending; // Show feedback on any non-pending decision
-  const statusColorClass = decisionStatusCard(decision.status, isPending);
+  const statusColorClass = decisionStatusCard(decision.status ?? '', !!isPending);
 
   const statusBadge =
     decision.status === 'confirmed' && decision.autoApproved ? (
