@@ -55,7 +55,8 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   const rawOutput = agent.getRecentOutput(16000);
   const cleanPreview = rawOutput.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
-  const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.task || 'none'}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
+  const taskBrief = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
+  const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
 
   logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
   parent.sendMessage(summary);
@@ -119,7 +120,8 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
   const rawOutput2 = agent.getRecentOutput(16000);
   const cleanPreview2 = rawOutput2.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
-  const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.task || 'none'}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
+  const taskBrief2 = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
+  const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
 
   logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
   parent.sendMessage(summary);
