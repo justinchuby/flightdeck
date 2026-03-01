@@ -20,8 +20,8 @@ const USER_MESSAGE_MARKER = /\[USER MESSAGE/;
 
 // ── Definite negative patterns (internal coordination) ────────────────
 
-/** Crew command fences: ⟦ CMD ... ⟧  or  [[[ CMD ... ]]] */
-const CREW_COMMAND_FENCE = /(?:⟦|\[\[\[)\s*[A-Z_]+/;
+/** Crew command fences: ⟦⟦ CMD ... ⟧⟧ */
+const CREW_COMMAND_FENCE = /⟦⟦\s*[A-Z_]+/;
 
 /** System-injected messages */
 const SYSTEM_PREFIX = /^\[(?:System|Message from|Broadcast from|DAG Task|CREW_UPDATE)/m;
@@ -39,7 +39,7 @@ const ROUTING_ARROW = /(?:Message|Delegation|Completion report|DM) →/;
 const STATUS_EVENT_LINE = /^Agent [0-9a-f]{6,} \(/m;
 
 /** Command-only messages (nothing but commands in the text) */
-const COMMAND_ONLY = /^(?:\s*(?:⟦|\[\[\[)[\s\S]*?(?:⟧|\]\]\])\s*)+$/;
+const COMMAND_ONLY = /^(?:\s*⟦⟦[\s\S]*?⟧⟧\s*)+$/;
 
 // ── Positive signal patterns ──────────────────────────────────────────
 

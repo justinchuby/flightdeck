@@ -182,9 +182,9 @@ export const useLeadStore = create<LeadState>((set) => ({
       const proj = s.projects[leadId] || emptyProject();
       const msgs = [...proj.messages];
       const lastIdx = msgs.length - 1;
-      // If the last message has an unclosed ⟦ block, always append to keep the command intact
+      // If the last message has an unclosed ⟦⟦ block, always append to keep the command intact
       const lastText = lastIdx >= 0 ? msgs[lastIdx].text : '';
-      const hasUnclosedCommand = lastText.lastIndexOf('⟦') > lastText.lastIndexOf('⟧');
+      const hasUnclosedCommand = lastText.lastIndexOf('⟦⟦') > lastText.lastIndexOf('⟧⟧');
       if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent' && (!proj.pendingNewline || hasUnclosedCommand)) {
         msgs[lastIdx] = { ...msgs[lastIdx], text: lastText + text, timestamp: msgs[lastIdx].timestamp || Date.now() };
       } else {
