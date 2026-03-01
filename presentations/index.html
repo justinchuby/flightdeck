@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Crew — Multi-Agent Copilot CLI Orchestrator</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+  <style>
+    :root {
+      --accent: #58a6ff;      /* GitHub blue */
+      --accent-green: #3fb950;
+      --accent-yellow: #d29922;
+      --accent-red: #f85149;
+      --bg-dark: #0d1117;
+      --bg-card: #161b22;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+    }
+    .reveal { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    .reveal h1, .reveal h2, .reveal h3 { color: var(--accent); font-weight: 600; }
+    .reveal h1 { font-size: 2.2em; }
+    .reveal h2 { font-size: 1.6em; }
+    .reveal h3 { font-size: 1.2em; color: var(--text-secondary); }
+    .reveal p, .reveal li { color: var(--text-primary); font-size: 0.85em; line-height: 1.6; }
+    .reveal .small { font-size: 0.7em; color: var(--text-secondary); }
+    .reveal .accent { color: var(--accent); }
+    .reveal .green { color: var(--accent-green); }
+    .reveal .yellow { color: var(--accent-yellow); }
+    .reveal .red { color: var(--accent-red); }
+    .reveal section { text-align: left; }
+    .reveal .center { text-align: center; }
+    .reveal .columns { display: flex; gap: 2em; }
+    .reveal .columns > * { flex: 1; }
+    .reveal .card {
+      background: var(--bg-card);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 1em;
+      margin: 0.5em 0;
+    }
+    .reveal .card h3 { margin-top: 0; }
+    .reveal .stat { font-size: 2em; font-weight: 700; color: var(--accent); }
+    .reveal .stat-label { font-size: 0.7em; color: var(--text-secondary); }
+    .reveal .emoji { font-size: 1.4em; }
+    .reveal .diagram-box {
+      background: var(--bg-card);
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.8em 1.2em;
+      display: inline-block;
+      margin: 0.3em;
+      font-size: 0.8em;
+      color: var(--text-primary);
+    }
+    .reveal .diagram-arrow { color: var(--accent); font-size: 1.5em; margin: 0 0.3em; }
+    .reveal .flow-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; margin: 0.5em 0; }
+    .reveal code { color: var(--accent); background: var(--bg-card); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.85em; }
+    .reveal .timeline-bar {
+      height: 8px;
+      border-radius: 4px;
+      margin: 4px 0;
+    }
+    .reveal ul { list-style: none; padding-left: 0; }
+    .reveal ul li::before { content: "→ "; color: var(--accent); font-weight: bold; }
+    .reveal .slide-number { color: var(--text-secondary); font-size: 0.7em; }
+    .reveal .progress span { background: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 1: Title -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="center">
+  <h1>🤖 AI Crew</h1>
+  <h3>Multi-Agent Copilot CLI Orchestrator</h3>
+  <p class="small" style="margin-top: 2em;">Parallel AI agents that collaborate like a real engineering team</p>
+  <aside class="notes">
+    Welcome everyone. Today I'll introduce AI Crew — a system that orchestrates
+    multiple Copilot CLI agents working in parallel, each with a specialized role.
+    Think of it as having an entire engineering team of AI agents that communicate,
+    coordinate, and build software together. Let's dive in.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 2: The Problem -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>The Problem</h2>
+  <div class="card">
+    <p><span class="emoji">⏳</span> Single-agent AI coding is <strong class="yellow">sequential</strong></p>
+    <ul>
+      <li>One agent does everything: design → code → test → review</li>
+      <li>Context window fills up fast on large tasks</li>
+      <li>No checks and balances — one perspective</li>
+      <li>Long tasks block progress on other fronts</li>
+    </ul>
+  </div>
+  <p style="margin-top: 1em;" class="small">Real engineering teams don't work this way. Why should AI?</p>
+  <aside class="notes">
+    The core problem is that current AI coding assistants work sequentially.
+    One agent has to do everything — and its context window is a hard ceiling.
+    Real engineering teams parallelize work: an architect designs while developers
+    code, reviewers check work, and a project lead coordinates. AI Crew brings
+    that same structure to AI-assisted development.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 3: The Solution -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>The Solution: AI Crew</h2>
+  <div class="columns">
+    <div class="card">
+      <h3 class="green">Parallel Agents</h3>
+      <p>Multiple Copilot CLI agents running simultaneously, each focused on what they do best</p>
+    </div>
+    <div class="card">
+      <h3 class="green">Specialized Roles</h3>
+      <p>13 purpose-built roles: lead, architect, developer, reviewer, tester, designer, and more</p>
+    </div>
+    <div class="card">
+      <h3 class="green">Structured Coordination</h3>
+      <p>Task DAGs, file locking, messaging, and real-time monitoring keep the team in sync</p>
+    </div>
+  </div>
+  <aside class="notes">
+    AI Crew solves this with three key ideas. First, parallel agents — up to 20
+    Copilot CLI sessions running at once. Second, specialized roles — each agent
+    has a distinct system prompt optimized for its job. Third, structured
+    coordination — a task DAG ensures work happens in the right order, file locks
+    prevent conflicts, and messaging keeps everyone informed.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 4: How It Works (High Level) -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>How It Works</h2>
+  <div class="flow-row">
+    <div class="diagram-box">👤 You</div>
+    <span class="diagram-arrow">→</span>
+    <div class="diagram-box" style="border-color: var(--accent-green);">🎯 Project Lead</div>
+    <span class="diagram-arrow">→</span>
+    <div class="diagram-box">📋 Task DAG</div>
+  </div>
+  <div class="flow-row" style="margin-top: 0.5em;">
+    <div class="diagram-box">👷 Developer</div>
+    <div class="diagram-box">🏗️ Architect</div>
+    <div class="diagram-box">🔍 Reviewer</div>
+    <div class="diagram-box">🧪 Tester</div>
+    <div class="diagram-box">📝 Secretary</div>
+  </div>
+  <div class="card" style="margin-top: 1em;">
+    <ol style="padding-left: 1.2em; list-style: decimal;">
+      <li style="color: var(--text-primary);">You describe your goal to the Project Lead</li>
+      <li style="color: var(--text-primary);">Lead creates a task DAG with dependencies</li>
+      <li style="color: var(--text-primary);">Lead spawns agents and delegates tasks</li>
+      <li style="color: var(--text-primary);">Agents work in parallel, communicate, and report back</li>
+      <li style="color: var(--text-primary);">You monitor progress and intervene when needed</li>
+    </ol>
+  </div>
+  <aside class="notes">
+    Here's the flow. You give a high-level goal to the Project Lead agent.
+    The lead breaks it into a task DAG — a directed acyclic graph of dependent
+    tasks. Then it spawns specialized agents: developers to code, an architect
+    for design, reviewers for quality, testers for verification. Each agent
+    works independently within its own Copilot CLI session. You can watch
+    everything happen in real time through the web UI.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 5: Architecture Overview -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Architecture</h2>
+  <div class="columns">
+    <div>
+      <div class="card">
+        <h3>🖥️ Web UI <span class="small">(React + Vite)</span></h3>
+        <p>Real-time dashboard, timeline, org chart, DAG visualization, token economics</p>
+      </div>
+      <div class="card">
+        <h3>⚡ Server <span class="small">(Express + WebSocket + SSE)</span></h3>
+        <p>Agent lifecycle, command dispatch, coordination, file locks, persistence</p>
+      </div>
+      <div class="card">
+        <h3>🔌 ACP Bridge <span class="small">(Agent Communication Protocol)</span></h3>
+        <p>Bidirectional connection to each Copilot CLI session</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>📦 Packages</h3>
+        <ul>
+          <li><code>packages/server</code> — Node.js backend</li>
+          <li><code>packages/web</code> — React frontend</li>
+          <li><code>packages/docs</code> — Documentation</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🗄️ Storage</h3>
+        <ul>
+          <li>SQLite (Drizzle ORM) for persistence</li>
+          <li>In-memory state for real-time ops</li>
+          <li>WebSocket + SSE for live updates</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    The architecture is a monorepo with three packages. The web UI is React
+    with Vite — it gives you real-time visibility into everything. The server
+    is Express with WebSocket and SSE for streaming updates. Under the hood,
+    each agent is a Copilot CLI session connected via the Agent Communication
+    Protocol. State is persisted in SQLite via Drizzle ORM, with hot data
+    kept in memory for speed.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 6: Agent Roles -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>13 Specialized Agent Roles</h2>
+  <div class="columns">
+    <div>
+      <div class="card">
+        <p><span class="emoji">🎯</span> <strong>Project Lead</strong> — Orchestrates team</p>
+        <p><span class="emoji">🏗️</span> <strong>Architect</strong> — System design</p>
+        <p><span class="emoji">👷</span> <strong>Developer</strong> — Writes code + tests</p>
+        <p><span class="emoji">🔍</span> <strong>Code Reviewer</strong> — Quality gates</p>
+        <p><span class="emoji">🛡️</span> <strong>Critical Reviewer</strong> — Security & edge cases</p>
+        <p><span class="emoji">🧪</span> <strong>QA Tester</strong> — End-to-end verification</p>
+        <p><span class="emoji">📝</span> <strong>Secretary</strong> — Tracks progress</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <p><span class="emoji">🎨</span> <strong>Designer</strong> — UX/UI patterns</p>
+        <p><span class="emoji">📚</span> <strong>Tech Writer</strong> — Documentation</p>
+        <p><span class="emoji">💡</span> <strong>Radical Thinker</strong> — First-principles</p>
+        <p><span class="emoji">📦</span> <strong>Product Manager</strong> — Requirements</p>
+        <p><span class="emoji">🔧</span> <strong>Generalist</strong> — Cross-domain tasks</p>
+        <p><span class="emoji">🤖</span> <strong>Agent</strong> — General purpose</p>
+      </div>
+      <p class="small" style="margin-top: 1em;">Each role has a purpose-built system prompt with role-specific instructions, model preferences, and behavioral guidelines.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    There are 13 built-in roles, each with a tailored system prompt. The Project
+    Lead is the orchestrator — it breaks down work, spawns agents, and manages
+    the team. Developers write code AND tests — quality is their responsibility.
+    Code Reviewers only surface issues that truly matter — no style nits. Critical
+    Reviewers focus on security, performance, and failure modes. The Secretary
+    tracks progress and provides status reports. You can also define custom roles.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 7: Task DAG -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Task DAG — Declarative Work Planning</h2>
+  <div class="card">
+    <pre style="font-size: 0.65em; color: var(--text-primary); margin: 0;"><code>[[[ DECLARE_TASKS {"tasks": [
+  {"id": "design",      "role": "architect",  "description": "Design API schema"},
+  {"id": "implement",   "role": "developer",  "description": "Build endpoints", "deps": ["design"]},
+  {"id": "test",        "role": "qa-tester",  "description": "Write E2E tests",  "deps": ["implement"]},
+  {"id": "review",      "role": "code-review","description": "Review changes",   "deps": ["implement"]},
+  {"id": "docs",        "role": "tech-writer","description": "Update API docs",  "deps": ["review", "test"]}
+]} ]]]</code></pre>
+  </div>
+  <div class="columns" style="margin-top: 0.8em;">
+    <div class="card">
+      <h3>Auto-Linking</h3>
+      <p>Tasks automatically link to agents when delegated — no manual tracking needed</p>
+    </div>
+    <div class="card">
+      <h3>Dependency Resolution</h3>
+      <p>Blocked tasks auto-promote to "ready" when dependencies complete</p>
+    </div>
+    <div class="card">
+      <h3>Task States</h3>
+      <p><span class="green">pending → ready → running → done</span><br/>
+      <span class="small">Also: failed, blocked, paused, skipped, cancelled</span></p>
+    </div>
+  </div>
+  <aside class="notes">
+    The task DAG is the brain of work coordination. The lead declares tasks with
+    dependencies — like a build system for work items. Tasks auto-link to agents
+    when delegated, and blocked tasks automatically become ready when their
+    dependencies complete. The system supports 9 task states with validated
+    transitions. This eliminates the need for manual progress tracking — the
+    DAG IS the source of truth.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 8: Communication -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Agent Communication</h2>
+  <div class="columns">
+    <div>
+      <div class="card">
+        <h3>💬 Direct Messages</h3>
+        <p><code>AGENT_MESSAGE</code> — Point-to-point communication between agents by ID</p>
+      </div>
+      <div class="card">
+        <h3>📢 Broadcasts</h3>
+        <p><code>BROADCAST</code> — Send to all active agents at once (learnings, warnings)</p>
+      </div>
+      <div class="card">
+        <h3>👥 Group Chat</h3>
+        <p><code>CREATE_GROUP</code> — Topic-based channels, auto-created when 3+ agents share a feature</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>📊 CREW_UPDATE</h3>
+        <p>Periodic context refresh with agent status, recent activity, and budget info. Content-hashed to skip duplicates.</p>
+      </div>
+      <div class="card">
+        <h3>🧑 Human-in-the-Loop</h3>
+        <p>Message any agent directly. @mention to route messages. Queued messages show as pending bubbles.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    Communication is structured, not ad-hoc. Agents send direct messages by ID,
+    broadcast learnings to the whole team, or create group chats for feature
+    coordination. CREW_UPDATE is a periodic context refresh that keeps everyone
+    informed — it's content-hashed so duplicates are suppressed, saving tokens.
+    And you're always in the loop — you can message any agent, @mention them,
+    or pause the entire system to review progress.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 9: Coordination & Safety -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Coordination & Safety</h2>
+  <div class="columns">
+    <div>
+      <div class="card">
+        <h3>🔒 File Locking</h3>
+        <p>Pessimistic locks with TTL and glob patterns prevent concurrent edits to the same files</p>
+      </div>
+      <div class="card">
+        <h3>📌 Scoped Commits</h3>
+        <p><code>COMMIT</code> only stages files the agent has locked — prevents cross-contamination from <code>git add -A</code></p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>⏸️ System Pause/Resume</h3>
+        <p>Halt all message delivery system-wide. Agents hold position; messages queue until resumed.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ Input Validation</h3>
+        <p>Zod schemas validate every command. Clear error messages on bad input — no silent failures.</p>
+      </div>
+    </div>
+  </div>
+  <p class="small" style="margin-top: 0.5em;">Security: auto-generated auth tokens, CORS lockdown, rate limiting, path traversal protection</p>
+  <aside class="notes">
+    Coordination and safety are critical when multiple agents edit the same
+    codebase. File locking prevents concurrent edits — agents must lock files
+    before editing. The COMMIT command only stages locked files, preventing
+    the classic "git add -A picks up other agents' work" problem. System pause
+    lets you freeze everything to review state. And every command is validated
+    with Zod schemas — bad input gets a clear error, not silent corruption.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 10: Real-time Dashboard -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Mission Control Dashboard</h2>
+  <div class="card center" style="padding: 1.5em;">
+    <div class="columns" style="text-align: center;">
+      <div>
+        <p class="stat">8</p>
+        <p class="stat-label">Configurable Panels</p>
+      </div>
+      <div>
+        <p class="stat">⚡</p>
+        <p class="stat-label">Real-time Updates</p>
+      </div>
+      <div>
+        <p class="stat">🎛️</p>
+        <p class="stat-label">Drag & Drop Layout</p>
+      </div>
+    </div>
+  </div>
+  <div class="columns" style="margin-top: 0.8em;">
+    <div class="card">
+      <ul>
+        <li>Health summary with completion %</li>
+        <li>Agent fleet status overview</li>
+        <li>Token economics per agent</li>
+        <li>Alert feed (context pressure, idle agents)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <ul>
+        <li>Live activity feed</li>
+        <li>DAG progress minimap</li>
+        <li>Communication heatmap (real-time SSE)</li>
+        <li>Performance scorecards</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Mission Control is the single-screen overview. Eight configurable panels:
+    health summary, agent fleet, token economics, alerts, activity feed, DAG
+    minimap, communication heatmap, and performance scorecards. Everything
+    updates in real time via WebSocket and SSE. You can drag and drop panels
+    to customize your layout. The comm heatmap shows who's talking to whom —
+    it updates live via Server-Sent Events.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 11: Timeline & Visualization -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Timeline & Visualization</h2>
+  <div class="card">
+    <h3>📊 Swim-Lane Timeline</h3>
+    <p>Each agent gets a lane showing activity over time. Filter by role, status, or communication type.</p>
+    <div style="margin: 0.8em 0;">
+      <div style="display: flex; gap: 0.5em; align-items: center;">
+        <span class="small" style="width: 80px;">Lead</span>
+        <div class="timeline-bar" style="width: 40%; background: var(--accent);"></div>
+        <div class="timeline-bar" style="width: 10%; background: var(--accent-yellow);"></div>
+        <div class="timeline-bar" style="width: 30%; background: var(--accent);"></div>
+      </div>
+      <div style="display: flex; gap: 0.5em; align-items: center;">
+        <span class="small" style="width: 80px;">Dev 1</span>
+        <div class="timeline-bar" style="width: 15%; background: transparent;"></div>
+        <div class="timeline-bar" style="width: 55%; background: var(--accent-green);"></div>
+        <div class="timeline-bar" style="width: 10%; background: #30363d;"></div>
+      </div>
+      <div style="display: flex; gap: 0.5em; align-items: center;">
+        <span class="small" style="width: 80px;">Reviewer</span>
+        <div class="timeline-bar" style="width: 45%; background: transparent;"></div>
+        <div class="timeline-bar" style="width: 35%; background: var(--accent-yellow);"></div>
+      </div>
+    </div>
+    <p class="small">Features: brush time selector, keyboard nav, auto-scroll, idle hatch patterns, hover tooltips</p>
+  </div>
+  <div class="columns" style="margin-top: 0.5em;">
+    <div class="card">
+      <h3>🏗️ Org Chart</h3>
+      <p>Hierarchical team view with project tabs</p>
+    </div>
+    <div class="card">
+      <h3>📈 Gantt Chart</h3>
+      <p>Scrollable/zoomable DAG visualization with critical path highlighting</p>
+    </div>
+  </div>
+  <aside class="notes">
+    The timeline gives you a swim-lane view of all agent activity over time.
+    Each agent gets a row — blue for running, green for completed work, gray
+    for idle periods. You can filter by role, zoom with a brush selector, and
+    hover for details. The org chart shows team hierarchy. The Gantt chart
+    visualizes the task DAG with critical path highlighting and elapsed time
+    tracking.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 12: Token Economics -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Token Economics & Cost Tracking</h2>
+  <div class="columns">
+    <div class="card">
+      <h3>📊 Per-Agent Breakdown</h3>
+      <ul>
+        <li>Input/output token counts per agent</li>
+        <li>Context window pressure bars</li>
+        <li>80% yellow / 90% red thresholds</li>
+        <li>Cost attribution per DAG task</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🧠 Smart Optimizations</h3>
+      <ul>
+        <li>Content-hashed CREW_UPDATEs skip duplicates</li>
+        <li>Debounced status notifications reduce churn</li>
+        <li>Sliding window caps (500 comms, 200 tool calls)</li>
+        <li>Context compaction detection and recovery</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top: 0.8em;">
+    <p><span class="emoji">💡</span> <strong>Why it matters:</strong> 10 agents × 200K context = 2M tokens/session. Every optimization reduces cost and improves quality by keeping agents focused on relevant context.</p>
+  </div>
+  <aside class="notes">
+    With up to 20 agents, token management is crucial. The Token Economics panel
+    shows per-agent usage with context pressure indicators. We've built several
+    optimizations: content hashing skips duplicate context updates, saving 40-60%
+    of CREW_UPDATE tokens. Status notifications are debounced. Communication and
+    tool call arrays have sliding window caps. And when context compaction happens,
+    the system automatically re-injects crew context so agents don't lose their
+    bearings.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 13: Real Session Stats -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="center">
+  <h2>Real Session: This Sprint</h2>
+  <div class="columns" style="text-align: center; margin-top: 1em;">
+    <div class="card">
+      <p class="stat">10</p>
+      <p class="stat-label">Parallel Agents</p>
+    </div>
+    <div class="card">
+      <p class="stat">9</p>
+      <p class="stat-label">Features Shipped</p>
+    </div>
+    <div class="card">
+      <p class="stat">1,752</p>
+      <p class="stat-label">Tests Passing</p>
+    </div>
+    <div class="card">
+      <p class="stat">~30min</p>
+      <p class="stat-label">Wall Clock Time</p>
+    </div>
+  </div>
+  <div class="card" style="margin-top: 1em; text-align: left;">
+    <p class="small">Features completed in one session: Auto-link accuracy fix, COMPLETE_TASK from agents, smarter status updates, agent session resume, real-time comm heatmap, DAG visualization improvements, input validation, cost tracking, and file decomposition refactoring.</p>
+  </div>
+  <aside class="notes">
+    Here are real numbers from the session that built this very presentation.
+    10 agents running in parallel shipped 9 features in about 30 minutes of
+    wall clock time. That includes a security fix, multiple code reviews,
+    critical reviews, and 1,752 tests passing. A single developer couldn't
+    have done this sequentially in the same timeframe — the parallelism is
+    the key multiplier.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 14: Demo Walkthrough -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Demo Walkthrough</h2>
+  <div class="card">
+    <h3>Step 1: Start</h3>
+    <pre style="font-size: 0.7em; color: var(--text-primary); margin: 0;"><code>npm install && npm run dev</code></pre>
+    <p class="small">Opens web UI at localhost:5173 + server at localhost:3001</p>
+  </div>
+  <div class="card">
+    <h3>Step 2: Give the Lead a Task</h3>
+    <p>"Build a REST API for user management with authentication, CRUD endpoints, tests, and documentation"</p>
+  </div>
+  <div class="card">
+    <h3>Step 3: Watch It Work</h3>
+    <ul>
+      <li>Lead creates task DAG → spawns architect, developers, reviewers</li>
+      <li>Agents communicate, coordinate file locks, and push commits</li>
+      <li>Reviewers flag issues → developers fix them</li>
+      <li>You can intervene at any time via the chat interface</li>
+    </ul>
+  </div>
+  <aside class="notes">
+    Let me walk through what a demo looks like. You start the dev server,
+    open the UI, and give the Project Lead a high-level task. The lead
+    analyzes the task, creates a DAG, and starts spawning specialists.
+    You'll see agents appear in the fleet view, tasks moving through the
+    DAG, and messages flowing in real time. The key moment is when a
+    reviewer flags an issue and the developer fixes it — that's the
+    checks-and-balances system working autonomously.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 15: Key Differentiators -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>What Makes AI Crew Different</h2>
+  <div class="columns">
+    <div>
+      <div class="card">
+        <h3>🔄 vs. Single Agent</h3>
+        <ul>
+          <li>10x parallelism on large tasks</li>
+          <li>Built-in peer review catches bugs</li>
+          <li>Each agent has focused context</li>
+          <li>Human stays in control</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>🔄 vs. Other Multi-Agent</h3>
+        <ul>
+          <li>Real Copilot CLI sessions (full tool access)</li>
+          <li>Persistent state across sessions</li>
+          <li>Production-grade coordination (DAG, locks, validation)</li>
+          <li>Rich real-time observability</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    Compared to single-agent approaches, AI Crew offers real parallelism
+    with built-in quality gates. Compared to other multi-agent frameworks,
+    the key difference is that each agent is a real Copilot CLI session with
+    full tool access — file editing, terminal commands, web search, everything.
+    The coordination layer is production-grade with dependency resolution,
+    file locking, input validation, and rich observability.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 16: Lessons Learned -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Lessons Learned</h2>
+  <div class="columns">
+    <div class="card">
+      <h3 class="yellow">Challenges</h3>
+      <ul>
+        <li>Cross-contamination when agents commit each other's changes</li>
+        <li>File lock contention on monolithic files</li>
+        <li>Token cost scales with agent count</li>
+        <li>Context loss during compaction</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 class="green">Solutions</h3>
+      <ul>
+        <li>Scoped COMMIT only stages locked files</li>
+        <li>File decomposition eliminates contention</li>
+        <li>Content hashing reduces token waste</li>
+        <li>Auto re-injection after compaction</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    We've learned a lot building and using AI Crew. The biggest challenge is
+    coordination at scale — when 10 agents edit the same repo, things like
+    cross-contaminated commits and file lock contention are real. Our solutions:
+    scoped commits, file decomposition, and input validation. Token cost is
+    another factor — content hashing and sliding windows help. And context loss
+    during compaction is solved by automatic crew context re-injection.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 17: Future Roadmap -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Roadmap</h2>
+  <div class="card">
+    <h3>🔜 Near Term</h3>
+    <ul>
+      <li>Git worktree isolation — each agent gets its own branch</li>
+      <li>Smarter context management with priority-based trimming</li>
+      <li>Agent skill system — persistent reusable knowledge across sessions</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🔮 Medium Term</h3>
+    <ul>
+      <li>Multi-repo support — agents spanning codebases</li>
+      <li>CI/CD integration — automatic test verification after commits</li>
+      <li>Agent memory — learned patterns and preferences persist</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>🚀 Long Term</h3>
+    <ul>
+      <li>Self-improving teams — agents create skills from experience</li>
+      <li>Cross-team coordination — multiple AI crews on the same project</li>
+      <li>Cost optimization — automatic model selection per task complexity</li>
+    </ul>
+  </div>
+  <aside class="notes">
+    The roadmap focuses on three horizons. Near term: git worktree isolation
+    to eliminate file contention entirely, smarter context management, and
+    persistent skills. Medium term: multi-repo support and CI/CD integration.
+    Long term: self-improving teams where agents learn from experience and
+    automatically create reusable skills. The vision is teams of AI agents
+    that get better at working together over time.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 18: Getting Started -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section>
+  <h2>Getting Started</h2>
+  <div class="card">
+    <pre style="font-size: 0.75em; color: var(--text-primary); margin: 0;"><code># Clone and install
+git clone https://github.com/justinchuby/ai-crew.git
+cd ai-crew
+npm install
+
+# Development mode (hot reload)
+npm run dev
+
+# Production
+npm run build && npm start</code></pre>
+  </div>
+  <div class="columns" style="margin-top: 1em;">
+    <div class="card">
+      <h3>Requirements</h3>
+      <ul>
+        <li>Node.js 18+</li>
+        <li>GitHub Copilot CLI access</li>
+        <li>Copilot subscription</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Resources</h3>
+      <ul>
+        <li>README.md — Full feature list</li>
+        <li>packages/docs/ — Guides</li>
+        <li>.github/skills/ — Reusable patterns</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">
+    Getting started is straightforward — clone, install, and run. You need
+    Node.js 18+ and Copilot CLI access. The dev mode gives you hot reload
+    for the web UI. Check the README for the full feature list and the docs
+    package for detailed guides. The skills directory contains reusable
+    patterns discovered during development.
+  </aside>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SLIDE 19: Q&A -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="center">
+  <h1>Questions?</h1>
+  <p style="margin-top: 1.5em; font-size: 1.1em;">🤖 AI Crew — <span class="accent">Parallel AI agents that collaborate like a real engineering team</span></p>
+  <p class="small" style="margin-top: 2em;">
+    github.com/justinchuby/ai-crew
+  </p>
+  <aside class="notes">
+    That's the overview. I'm happy to take questions — whether about the
+    architecture, how agents coordinate, cost considerations, or anything
+    else. I can also do a live demo if there's interest.
+  </aside>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    showNotes: false,
+    transition: 'slide',
+    transitionSpeed: 'default',
+    width: 1280,
+    height: 720,
+    margin: 0.08,
+    plugins: [RevealNotes, RevealHighlight],
+  });
+</script>
+</body>
+</html>
