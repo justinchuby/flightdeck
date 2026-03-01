@@ -614,9 +614,32 @@ export function apiRouter(
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
     try {
-      // Calculate project name BEFORE spawn so it's included in the agent:spawned event
+      // Resolve project name and ID BEFORE spawn so both are included in the agent:spawned SSE event.
+      // (Previously projectId was set after spawn, so agent:spawned had projectId=undefined,
+      //  causing the web client's dedup filter to fail and show duplicate project entries.)
       const projectName = name || `Project ${new Date().toLocaleDateString()}`;
-      const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId, undefined, { projectName });
+      let resolvedProjectId: string | undefined;
+      let resolvedProjectName = projectName;
+      let resumingProject = false;
+
+      if (projectRegistry) {
+        let project;
+        if (projectId) {
+          project = projectRegistry.get(projectId);
+          if (project) {
+            resolvedProjectName = project.name;
+            resumingProject = true;
+          } else {
+            logger.warn('lead', `Project ${projectId} not found — creating new`);
+          }
+        }
+        if (!project) {
+          project = projectRegistry.create(projectName, task ?? '', cwd);
+        }
+        resolvedProjectId = project.id;
+      }
+
+      const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId, undefined, { projectName: resolvedProjectName, projectId: resolvedProjectId });
       logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
         task: task?.slice(0, 80),
         model: model || role.model,
@@ -624,28 +647,12 @@ export function apiRouter(
         resumeSessionId,
       });
 
-      // Project persistence — create or resume
-      if (projectRegistry) {
-        let project;
-        if (projectId) {
-          // Resume an existing project — keep its original name
-          project = projectRegistry.get(projectId);
-          if (project) {
-            agent.projectName = project.name;
-          } else {
-            logger.warn('lead', `Project ${projectId} not found — creating new`);
-          }
-        }
-        if (!project) {
-          // Create a new project
-          project = projectRegistry.create(agent.projectName!, task ?? '', cwd);
-        }
-        agent.projectId = project.id;
-        projectRegistry.startSession(project.id, agent.id, task);
+      // Start session and send briefing after spawn
+      if (projectRegistry && resolvedProjectId) {
+        projectRegistry.startSession(resolvedProjectId, agent.id, task);
 
-        // If resuming, send project briefing to the lead after session starts
-        if (projectId && project) {
-          const briefing = projectRegistry.buildBriefing(project.id);
+        if (resumingProject) {
+          const briefing = projectRegistry.buildBriefing(resolvedProjectId);
           if (briefing && briefing.sessions.length > 1) {
             const briefingText = projectRegistry.formatBriefing(briefing);
             setTimeout(() => {
