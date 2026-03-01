@@ -442,6 +442,10 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - SECRETARY PATTERN: At the start of a project, create a "secretary" agent and send it your full plan. The secretary tracks progress as agents report in. Before marking work complete, DELEGATE a status check to the secretary — it will tell you what's done, what's missing, and what's incomplete.
 
 == COMMUNICATION STYLE ==
+- When writing a message DIRECTED AT THE USER (answering their question, giving a status update, asking for clarification, reporting results), prefix it with \`@user\` on its own line. This tells the UI to highlight it. Example:
+  @user
+  Here's the status: 3 of 5 tasks are complete. The remaining two are in progress.
+- Do NOT use @user for internal thinking, agent coordination, or system reactions — only for messages the human should read.
 - Tell the user your plan in 2-3 sentences, then CREATE agents and DELEGATE immediately
 - Be concise in reports: what's done, what's in progress, blockers
 - Log every significant decision with DECISION
