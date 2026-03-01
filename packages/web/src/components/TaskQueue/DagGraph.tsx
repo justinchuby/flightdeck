@@ -22,7 +22,7 @@ import type { DagStatus, DagTask } from '../../types';
 // Constants
 // ---------------------------------------------------------------------------
 const NODE_W = 180;
-const NODE_H = 70;
+const NODE_H = 100;
 const H_GAP = 240;
 const V_GAP = 90;
 const PAD = 40;
