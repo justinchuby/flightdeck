@@ -1,0 +1,14 @@
+{
+  "name": "ai-crew-presentation",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "slidev slides.md --open",
+    "build": "slidev build slides.md",
+    "export": "slidev export slides.md"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.13.0",
+    "@slidev/theme-default": "^0.25.0"
+  }
+}

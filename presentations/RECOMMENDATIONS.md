@@ -56,29 +56,35 @@ Tips for presenting AI Crew to your team.
 
 ### Running the Presentation
 ```bash
-# Option 1: Open directly in browser
-open presentations/index.html
+cd presentations
 
-# Option 2: Serve locally (for remote sharing)
-npx serve presentations/
+# Development mode (live reload at localhost:3030)
+npm run dev
+
+# Build static site
+npm run build
+
+# Export to PDF
+npm run export
 ```
 
-### Keyboard Shortcuts (reveal.js)
+### Keyboard Shortcuts (Slidev)
 | Key | Action |
 |-----|--------|
 | `→` / `Space` | Next slide |
 | `←` | Previous slide |
-| `S` | Speaker notes (opens a new window) |
-| `F` | Fullscreen |
-| `O` | Overview mode |
+| `p` | Presenter mode (speaker notes) |
+| `f` | Fullscreen |
+| `o` | Overview mode |
 | `Esc` | Exit overview/fullscreen |
-| `B` | Black screen (pause) |
+| `d` | Toggle dark mode |
 
 ### Customization
-- Edit `presentations/index.html` — it's a single self-contained file
-- Theme colors are CSS variables at the top (GitHub's color palette)
-- Reveal.js is loaded from CDN — no build step needed
-- To add slides, copy an existing `<section>` block and edit content
+- Edit `presentations/slides.md` — single Markdown file with all slides
+- Slides are separated by `---` with optional YAML frontmatter per slide
+- Speaker notes go in `<!-- HTML comments -->` at the end of each slide
+- Supports Mermaid diagrams, code highlighting, and UnoCSS utility classes
+- Theme and global settings are in the first frontmatter block
 
 ## Common Questions & Answers
 
