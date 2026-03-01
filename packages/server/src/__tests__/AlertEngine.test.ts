@@ -16,6 +16,7 @@ function makeAgent(overrides: Partial<{
   parentId: string | undefined;
   createdAt: Date;
   isPrompting: boolean;
+  promptingStartedAt: number | null;
   contextWindowSize: number;
   contextWindowUsed: number;
 }> = {}): Agent {
@@ -26,6 +27,7 @@ function makeAgent(overrides: Partial<{
     parentId: overrides.parentId ?? undefined,
     createdAt: overrides.createdAt ?? new Date(Date.now() - 20 * 60 * 1000), // 20 min ago by default
     isPrompting: overrides.isPrompting ?? false,
+    promptingStartedAt: overrides.promptingStartedAt ?? (overrides.isPrompting ? Date.now() : null),
     contextWindowSize: overrides.contextWindowSize ?? 0,
     contextWindowUsed: overrides.contextWindowUsed ?? 0,
   } as unknown as Agent;
@@ -179,5 +181,21 @@ describe('AlertEngine — checkStuckAgents exemptions', () => {
     const alerts = engine.getAlerts();
     const stuckAlerts = alerts.filter(a => a.type === 'stuck_agent');
     expect(stuckAlerts.length).toBe(0);
+  });
+
+  it('flags agents prompting for over 30 minutes as stuck', () => {
+    deps.agents.push(makeAgent({
+      id: 'hung-prompt-dev',
+      status: 'running',
+      createdAt: new Date(Date.now() - 60 * 60 * 1000),
+      isPrompting: true,
+      promptingStartedAt: Date.now() - 35 * 60 * 1000, // 35 min ago
+    }));
+
+    engine.start();
+    const alerts = engine.getAlerts();
+    const stuckAlerts = alerts.filter(a => a.type === 'stuck_agent');
+    expect(stuckAlerts.length).toBe(1);
+    expect(stuckAlerts[0].agentId).toBe('hung-prompt-dev');
   });
 });

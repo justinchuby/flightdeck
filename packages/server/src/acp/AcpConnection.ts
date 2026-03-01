@@ -52,6 +52,7 @@ export class AcpConnection extends EventEmitter {
   private sessionId: string | null = null;
   private _isConnected = false;
   private _isPrompting = false;
+  private _promptingStartedAt: number | null = null;
   private promptQueue: string[] = [];
   private autopilot: boolean;
   private pendingPermission: {
@@ -66,6 +67,7 @@ export class AcpConnection extends EventEmitter {
 
   get isConnected(): boolean { return this._isConnected; }
   get isPrompting(): boolean { return this._isPrompting; }
+  get promptingStartedAt(): number | null { return this._promptingStartedAt; }
   get currentSessionId(): string | null { return this.sessionId; }
 
   async start(opts: AcpConnectionOptions): Promise<string> {
@@ -232,6 +234,7 @@ export class AcpConnection extends EventEmitter {
     }
 
     this._isPrompting = true;
+    this._promptingStartedAt = Date.now();
     this.emit('prompting', true);
 
     try {
@@ -241,6 +244,7 @@ export class AcpConnection extends EventEmitter {
       });
 
       this._isPrompting = false;
+      this._promptingStartedAt = null;
       this.emit('prompting', false);
 
       // Emit usage if available
@@ -257,6 +261,7 @@ export class AcpConnection extends EventEmitter {
       return { stopReason: result.stopReason, usage: usage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens } : undefined };
     } catch (err) {
       this._isPrompting = false;
+      this._promptingStartedAt = null;
       this.emit('prompting', false);
       this.emit('prompt_complete', 'error');
       this.drainQueue();
@@ -306,5 +311,6 @@ export class AcpConnection extends EventEmitter {
     }
     this._isConnected = false;
     this._isPrompting = false;
+    this._promptingStartedAt = null;
   }
 }

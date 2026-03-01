@@ -548,6 +548,11 @@ CREW_UPDATE ]]]`;
     return this.acpConnection?.isPrompting ?? false;
   }
 
+  /** When the current LLM call started (null if not prompting) */
+  get promptingStartedAt(): number | null {
+    return this.acpConnection?.promptingStartedAt ?? null;
+  }
+
   /** Drain one pending message if idle — called when system resumes */
   drainPendingMessages(): void {
     if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {

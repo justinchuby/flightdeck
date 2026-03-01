@@ -281,6 +281,7 @@ export function LeadDashboard({ api, ws }: Props) {
     const handler = (event: Event) => {
       const msg = JSON.parse((event as MessageEvent).data);
       const store = useLeadStore.getState();
+      const selectedLeadId = store.selectedLeadId;
 
       if (msg.type === 'lead:decision' && msg.agentId) {
         // Route to correct lead project (child decisions go under their parent lead)
@@ -471,7 +472,7 @@ export function LeadDashboard({ api, ws }: Props) {
     };
     window.addEventListener('ws-message', handler);
     return () => window.removeEventListener('ws-message', handler);
-  }, [selectedLeadId, agents]);
+  }, [agents]);
 
   // Sidebar resize handlers
   const startResize = useCallback((e: React.MouseEvent) => {

@@ -24,6 +24,7 @@ export interface Alert {
 const MAX_ALERTS = 100;
 const STUCK_AGENT_MS = 10 * 60 * 1000;       // 10 minutes
 const NEW_AGENT_GRACE_MS = 5 * 60 * 1000;   // 5 minutes grace for newly created agents
+const MAX_PROMPTING_MS = 30 * 60 * 1000;     // 30 minutes max before prompting is considered stuck
 const CONTEXT_PRESSURE_THRESHOLD = 0.85;       // 85%
 const STALE_DECISION_MS = 10 * 60 * 1000;     // 10 minutes
 const CHECK_INTERVAL_MS = 60 * 1000;           // 1 minute
@@ -95,8 +96,11 @@ export class AlertEngine extends EventEmitter {
       if (agent.role.id === 'lead') continue;
       // Skip recently-created agents — give them time to start
       if (now - agent.createdAt.getTime() < NEW_AGENT_GRACE_MS) continue;
-      // Skip agents with an active LLM call — they're working, just slow
-      if (agent.isPrompting) continue;
+      // Skip agents with an active LLM call — but only if it started recently (< 30 min)
+      if (agent.isPrompting) {
+        const promptStart = agent.promptingStartedAt;
+        if (promptStart && (now - promptStart) < MAX_PROMPTING_MS) continue;
+      }
       const lastActivity = this.lastActivityByAgent.get(agent.id) ?? agent.createdAt.getTime();
       if (now - lastActivity > STUCK_AGENT_MS) {
         this.addAlert({
