@@ -126,6 +126,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
         const segWidth = Math.max(x2 - x1, 4);
         const colors = STATUS_COLORS[seg.status] ?? STATUS_COLORS.idle;
         const isIdle = seg.status === 'idle';
+        const isFailed = seg.status === 'failed';
         return (
           <g key={i}
             onMouseEnter={(e) => onSegmentHover?.(seg, e)}
@@ -134,8 +135,9 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
             <rect
               x={x1} y={y + 4} width={segWidth} height={height - 8}
               fill={isIdle ? 'url(#idle-hatch)' : colors.fill}
-              stroke={colors.border} strokeWidth={1} rx={3}
-              className="cursor-pointer"
+              stroke={colors.border} strokeWidth={isFailed ? 2 : 1} rx={3}
+              className={`cursor-pointer${isFailed ? ' timeline-error-highlight' : ''}`}
+              filter={isFailed ? 'url(#error-glow)' : undefined}
             />
             {/* Task label overlay on running segments */}
             {segWidth > 60 && (seg.taskLabel || seg.status === 'running') && (
@@ -165,7 +167,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
 
 function TimelineLegend() {
   return (
-    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted timeline-legend" role="legend" aria-label="Timeline legend: status colors and communication types">
+    <div className="flex flex-wrap gap-4 px-3 py-2 text-xs text-th-text-muted border-t border-th-border-muted timeline-legend" role="group" aria-label="Timeline legend: status colors and communication types">
       {Object.entries(STATUS_COLORS).map(([status, colors]) => (
         <span key={status} className="flex items-center gap-1">
           {status === 'idle' ? (
@@ -469,8 +471,18 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           }
         }
         break;
+      case 'f':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          containerRef.current?.dispatchEvent(new CustomEvent('timeline:focus-filter', { bubbles: true }));
+        }
+        break;
+      case '?':
+        e.preventDefault();
+        setShowShortcutHelp(prev => !prev);
+        break;
     }
-  }, [focusedLaneIdx, sortedAgents, toggleExpand, zoomBy, fullRange]);
+  }, [focusedLaneIdx, sortedAgents, toggleExpand, zoomBy, fullRange, onLiveModeChange]);
 
   if (data.agents.length === 0) {
     return (
@@ -563,6 +575,9 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 <rect width="6" height="6" fill="rgba(72,79,88,0.15)" />
                 <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(113,120,130,0.25)" strokeWidth="1.5" />
               </pattern>
+              <filter id="error-glow">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#f85149" floodOpacity="0.5" />
+              </filter>
             </defs>
             {/* Time axis (sticky behavior via SVG position) */}
             <Group top={AXIS_HEIGHT - 4}>
@@ -654,15 +669,17 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       </div>
 
       <TimelineLegend />
+
+      <KeyboardShortcutHelp isOpen={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
     </div>
   );
 }
 
-export function TimelineContainer({ data, liveMode, onLiveModeChange }: TimelineContainerProps) {
+export function TimelineContainer({ data, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps) {
   return (
     <div className="bg-th-bg rounded-lg border border-th-border-muted min-h-[300px] flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
       <ParentSize>
-        {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} /> : null}
+        {({ width }) => width > 0 ? <TimelineContent data={data} width={width} liveMode={liveMode} onLiveModeChange={onLiveModeChange} lastSeenTimestamp={lastSeenTimestamp} /> : null}
       </ParentSize>
     </div>
   );
