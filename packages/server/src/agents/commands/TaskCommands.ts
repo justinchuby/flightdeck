@@ -2,7 +2,7 @@
  * Task DAG command handlers.
  *
  * Commands: DECLARE_TASKS, COMPLETE_TASK, TASK_STATUS, QUERY_TASKS, PAUSE_TASK,
- *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG, FORCE_READY
+ *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG, FORCE_READY, ASSIGN_TASK
  */
 import type { Agent } from '../Agent.js';
 import type { DagTaskInput } from '../../tasks/TaskDAG.js';
@@ -14,6 +14,7 @@ import {
   taskIdSchema,
   completeTaskSchema,
   addDependencySchema,
+  assignTaskSchema,
 } from './commandSchemas.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
@@ -29,7 +30,9 @@ const CANCEL_TASK_REGEX = /⟦⟦\s*CANCEL_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const COMPLETE_TASK_REGEX = /⟦⟦\s*COMPLETE_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const RESET_DAG_REGEX = /⟦⟦\s*RESET_DAG\s*⟧⟧/s;
 const ADD_DEPENDENCY_REGEX = /⟦⟦\s*ADD_DEPENDENCY\s*(\{.*?\})\s*⟧⟧/s;
+const REASSIGN_TASK_REGEX = /⟦⟦\s*REASSIGN_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const FORCE_READY_REGEX = /⟦⟦\s*FORCE_READY\s*(\{.*?\})\s*⟧⟧/s;
+const ASSIGN_TASK_REGEX = /⟦⟦\s*ASSIGN_TASK\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -368,6 +371,98 @@ function handleForceReady(ctx: CommandHandlerContext, agent: Agent, data: string
   } catch { agent.sendMessage('[System] FORCE_READY error: invalid payload.'); }
 }
 
+function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can reassign tasks.'); return; }
+  const match = data.match(REASSIGN_TASK_REGEX);
+  if (!match) return;
+  try {
+    const req = parseCommandPayload(agent, match[1], assignTaskSchema, 'REASSIGN_TASK');
+    if (!req) return;
+
+    // Resolve the new agent (supports short ID prefix matching)
+    const newAgent = ctx.getAllAgents().find(a =>
+      (a.id === req.agentId || a.id.startsWith(req.agentId)) &&
+      a.parentId === agent.id &&
+      a.id !== agent.id
+    );
+    if (!newAgent) {
+      agent.sendMessage(`[System] Agent not found: "${req.agentId}". Use QUERY_CREW to see available agents.`);
+      return;
+    }
+
+    const result = ctx.taskDAG.reassignTask(agent.id, req.taskId, newAgent.id);
+    if (!result) {
+      const existing = ctx.taskDAG.getTask(agent.id, req.taskId);
+      const hint = existing ? ` Current status: "${existing.dagStatus}". Must be running with an assigned agent.` : ' Task not found.';
+      agent.sendMessage(`[System] Cannot reassign task "${req.taskId}".${hint}`);
+      return;
+    }
+
+    // Clean up old agent: cancel delegation, release locks, notify
+    const oldAgent = ctx.getAgent(result.oldAgentId);
+    if (oldAgent) {
+      oldAgent.sendMessage(`[System] Task "${req.taskId}" has been reassigned to another agent. Please stop working on it.`);
+      oldAgent.dagTaskId = undefined;
+    }
+    ctx.lockRegistry.releaseAll(result.oldAgentId);
+    for (const [, del] of ctx.delegations) {
+      if (del.toAgentId === result.oldAgentId && del.status === 'active') {
+        del.status = 'cancelled';
+        del.completedAt = new Date().toISOString();
+      }
+    }
+
+    // Set up new agent: create delegation, set dagTaskId, notify
+    const task = ctx.taskDAG.getTask(agent.id, req.taskId);
+    const taskText = task?.description || req.taskId;
+    const delegation: import('./types.js').Delegation = {
+      id: `del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fromAgentId: agent.id,
+      toAgentId: newAgent.id,
+      toRole: newAgent.role.id,
+      task: taskText,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+    ctx.delegations.set(delegation.id, delegation);
+    newAgent.dagTaskId = req.taskId;
+    newAgent.task = taskText;
+    newAgent.sendMessage(`[DAG Task: ${req.taskId}]\n${taskText}`);
+
+    const oldLabel = oldAgent ? `@${result.oldAgentId.slice(0, 8)}` : result.oldAgentId.slice(0, 8);
+    agent.sendMessage(`[System] Task "${req.taskId}" reassigned from ${oldLabel} to @${newAgent.id.slice(0, 8)}. Old agent notified to stop; new agent has the task.`);
+  } catch { agent.sendMessage('[System] REASSIGN_TASK error: invalid payload.'); }
+}
+
+function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can assign tasks.'); return; }
+  const match = data.match(ASSIGN_TASK_REGEX);
+  if (!match) return;
+  try {
+    const req = parseCommandPayload(agent, match[1], assignTaskSchema, 'ASSIGN_TASK');
+    if (!req) return;
+
+    const existing = ctx.taskDAG.getTask(agent.id, req.taskId);
+    if (!existing) {
+      agent.sendMessage(`[System] Cannot assign task "${req.taskId}": task not found.`);
+      return;
+    }
+
+    // Try normal start first (works for ready tasks), then fall back to forceStart
+    let task = ctx.taskDAG.startTask(agent.id, req.taskId, req.agentId);
+    if (!task) {
+      task = ctx.taskDAG.forceStartTask(agent.id, req.taskId, req.agentId);
+    }
+
+    if (task) {
+      agent.sendMessage(`[System] Task "${req.taskId}" assigned to agent ${req.agentId.slice(0, 8)} and moved to running.`);
+      ctx.emit('dag:updated', { leadId: agent.id });
+    } else {
+      agent.sendMessage(`[System] Cannot assign task "${req.taskId}": current status is "${existing.dagStatus}". Task may already be running or completed.`);
+    }
+  } catch (err: any) { agent.sendMessage(`[System] ASSIGN_TASK error: ${err.message}`); }
+}
+
 // ── Module export ─────────────────────────────────────────────────────
 
 export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
@@ -384,5 +479,7 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d) },
     { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d) },
     { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d) },
+    { regex: ASSIGN_TASK_REGEX, name: 'ASSIGN_TASK', handler: (a, d) => handleAssignTask(ctx, a, d) },
+    { regex: REASSIGN_TASK_REGEX, name: 'REASSIGN_TASK', handler: (a, d) => handleReassignTask(ctx, a, d) },
   ];
 }
