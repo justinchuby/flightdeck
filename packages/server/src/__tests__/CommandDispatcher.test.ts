@@ -95,6 +95,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     taskDAG: {
       declareTaskBatch: vi.fn().mockReturnValue({ tasks: [], conflicts: [] }),
       getStatus: vi.fn().mockReturnValue({ tasks: [], fileLockMap: {}, summary: {} }),
+      getTasks: vi.fn().mockReturnValue([]),
       hasAnyTasks: vi.fn().mockReturnValue(false),
       hasActiveTasks: vi.fn().mockReturnValue(false),
       getTaskByAgent: vi.fn().mockReturnValue(null),
@@ -109,7 +110,8 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       retryTask: vi.fn(),
       skipTask: vi.fn(),
       resolveReady: vi.fn().mockReturnValue([]),
-      addTask: vi.fn(),
+      addTask: vi.fn().mockImplementation((_leadId: string, opts: any) => ({ id: opts.id || 'auto-task', ...opts })),
+      addDependency: vi.fn().mockReturnValue(false),
       cancelTask: vi.fn(),
       resetDAG: vi.fn().mockReturnValue(0),
     } as any,
@@ -1180,14 +1182,16 @@ describe('CommandDispatcher', () => {
       expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(leadAgent.id, 'api-build', child.id);
     });
 
-    it('skips DAG linking when no matching task found', () => {
+    it('auto-creates DAG task when no matching task found', () => {
       const child = makeChildAgent(leadAgent.id);
       (ctx.getAllAgents as any).mockReturnValue([leadAgent, child]);
       (ctx.taskDAG.findReadyTask as any).mockReturnValue(null);
 
       dispatch(dispatcher, leadAgent, `⟦ DELEGATE {"to": "${child.id}", "task": "review code"} ⟧`);
 
-      expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
+      // Auto-DAG creates a task and attempts to start it
+      expect(ctx.taskDAG.addTask).toHaveBeenCalled();
+      expect(ctx.taskDAG.startTask).toHaveBeenCalled();
     });
 
     it('does not link DAG for non-lead delegators (architect)', () => {
