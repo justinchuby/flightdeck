@@ -25,12 +25,17 @@ export function AgentIdBadge({ id, className = '' }: { id: string; className?: s
   );
 }
 
+/** Synthetic agent object for @user mentions */
+const SYNTHETIC_USER: MentionAgent = { id: 'user', role: { name: 'User', icon: '👤' }, status: 'active' };
+
 /**
  * Resolve a mention token to an agent.
- * Supports @hexId (e.g. @a1b2c3d4) and @role-name (e.g. @developer, @code-reviewer).
+ * Supports @user (human), @hexId (e.g. @a1b2c3d4) and @role-name (e.g. @developer, @code-reviewer).
  * For role matches, returns the first agent with that role. Hex ID takes priority.
  */
 function resolveMention(token: string, agents: Array<MentionAgent>): MentionAgent | undefined {
+  // Special-case @user — not an agent, but renders as an inline badge
+  if (token.toLowerCase() === 'user') return SYNTHETIC_USER;
   // Try hex ID match first
   if (/^[a-f0-9]{4,8}$/.test(token)) {
     return agents.find((a) => a.id.startsWith(token));
@@ -63,15 +68,20 @@ export function MentionText({ text, agents, onClickAgent }: {
       if (match.index > lastIdx) {
         parts.push(<span key={`t-${lastIdx}`}>{text.slice(lastIdx, match.index)}</span>);
       }
+      const isUser = agent.id === 'user';
       parts.push(
         <AgentMentionTooltip key={`m-${match.index}`} agent={agent}>
           <span
-            className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
-            style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
+            className={`inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded cursor-pointer transition-colors ${
+              isUser
+                ? 'bg-green-500/20 text-green-600 dark:text-green-300 hover:bg-green-500/30'
+                : 'bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:bg-blue-500/30'
+            }`}
+            style={isUser ? undefined : { borderBottom: `1px solid ${idColor(agent.id)}` }}
             tabIndex={0}
             onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
           >
-            @{agent.role.name.toLowerCase()}-{agent.id.slice(0, 6)}
+            @{isUser ? 'user' : `${agent.role.name.toLowerCase()}-${agent.id.slice(0, 6)}`}
           </span>
         </AgentMentionTooltip>,
       );

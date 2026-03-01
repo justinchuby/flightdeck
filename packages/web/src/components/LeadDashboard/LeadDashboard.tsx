@@ -8,7 +8,6 @@ import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '
 import { useAppStore } from '../../stores/appStore';
 import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
-import { classifyHighlight } from '../../utils/isUserDirectedMessage';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
@@ -17,6 +16,7 @@ import { FolderPicker } from '../FolderPicker/FolderPicker';
 import { agentStatusText } from '../../utils/statusColors';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
+import { PromptNav, hasUserMention } from '../PromptNav';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
@@ -1418,20 +1418,10 @@ export function LeadDashboard({ api, ws }: Props) {
                 const isFirstInRun = !prevMsg || prevMsg.sender !== 'agent' || prevMsg.queued;
                 const agentTs = isFirstInRun ? ts : '';
 
-                // Highlight detection using shared utility
-                const prevSenderIsUser = (prevMsg?.sender === 'user' && isFirstInRun);
-                const highlight = classifyHighlight(msg.text, { prevSenderIsUser });
-                const isUserDir = highlight === 'user-directed';
-
-                const msgHighlight = highlight === 'user-directed'
-                  ? 'bg-accent/[0.08] border-l-2 border-l-accent/40 pl-2 rounded-md'
-                  : highlight === 'reply-to-user'
-                    ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md'
-                    : '';
 
                 if (msg.contentType && msg.contentType !== 'text') {
                   return (
-                    <div key={i} className={`py-1 ${msgHighlight}`}>
+                    <div key={i} className="py-1" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <RichContentBlock msg={msg} />
@@ -1442,9 +1432,9 @@ export function LeadDashboard({ api, ws }: Props) {
                   );
                 }
                 return (
-                  <div key={i} className={`py-0.5 ${msgHighlight}`}>
+                  <div key={i} className="py-0.5" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
                     <div className="flex items-start gap-2">
-                      <div className={`flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 ${isUserDir ? 'text-th-text' : 'text-th-text-alt'}`}>
+                      <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
                         <AgentTextBlock text={msg.text} />
                       </div>
                       {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
@@ -3000,71 +2990,6 @@ function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
           </button>
         </>
       )}
-    </div>
-  );
-}
-
-/** Floating navigation to jump between user prompts in the chat */
-function PromptNav({ containerRef, messages }: { containerRef: React.RefObject<HTMLDivElement | null>; messages: AcpTextChunk[] }) {
-  const [currentIdx, setCurrentIdx] = useState(-1);
-
-  const userIndices = useMemo(() => {
-    const indices: number[] = [];
-    const visible = messages.filter((m) => m.sender !== 'system' && m.text && !m.queued);
-    visible.forEach((msg, i) => {
-      if (msg.sender === 'user') indices.push(i);
-    });
-    return indices;
-  }, [messages]);
-
-  const total = userIndices.length;
-
-  const jumpTo = useCallback((promptIdx: number) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const el = container.querySelector(`[data-user-prompt="${userIndices[promptIdx]}"]`) as HTMLElement;
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setCurrentIdx(promptIdx);
-      // Brief highlight
-      el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-1', 'ring-offset-gray-900', 'rounded-lg');
-      setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-1', 'ring-offset-gray-900', 'rounded-lg'), 1500);
-    }
-  }, [containerRef, userIndices]);
-
-  const goUp = useCallback(() => {
-    if (total === 0) return;
-    const next = currentIdx <= 0 ? total - 1 : currentIdx - 1;
-    jumpTo(next);
-  }, [currentIdx, total, jumpTo]);
-
-  const goDown = useCallback(() => {
-    if (total === 0) return;
-    const next = currentIdx >= total - 1 ? 0 : currentIdx + 1;
-    jumpTo(next);
-  }, [currentIdx, total, jumpTo]);
-
-  if (total === 0) return null;
-
-  return (
-    <div className="absolute right-3 top-3 flex flex-col items-center gap-0.5 z-10">
-      <button
-        onClick={goUp}
-        className="p-1 rounded bg-th-bg-alt/80 border border-th-border text-th-text-muted hover:text-th-text hover:bg-th-bg-muted transition-colors"
-        title="Previous prompt"
-      >
-        <ChevronUp className="w-3.5 h-3.5" />
-      </button>
-      <span className="text-[10px] font-mono text-th-text-muted select-none leading-none py-0.5">
-        {currentIdx >= 0 ? currentIdx + 1 : '·'}/{total}
-      </span>
-      <button
-        onClick={goDown}
-        className="p-1 rounded bg-th-bg-alt/80 border border-th-border text-th-text-muted hover:text-th-text hover:bg-th-bg-muted transition-colors"
-        title="Next prompt"
-      >
-        <ChevronDown className="w-3.5 h-3.5" />
-      </button>
     </div>
   );
 }
