@@ -1388,7 +1388,7 @@ export function LeadDashboard({ api, ws }: Props) {
                           <MessageSquare className="w-3 h-3" />
                           {msg.fromRole || 'Agent'}
                         </div>
-                        <InlineMarkdown text={msg.text} />
+                        <MarkdownContent text={msg.text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
                       </div>
                       <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                     </div>

@@ -5,6 +5,7 @@ import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X } from 'lucide-react';
 import { classifyHighlight } from '../../utils/isUserDirectedMessage';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
+import { InlineMarkdownWithMentions } from '../../utils/markdown';
 
 interface Props {
   agentId: string;
@@ -501,19 +502,10 @@ function AgentTextBlockSimple({ text }: { text: string }) {
   );
 }
 
-/** Inline markdown: bold, italic, code */
+/** Inline markdown with @mention support — delegates to shared component */
 function InlineMarkdownSimple({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>;
-        if (part.startsWith('*') && part.endsWith('*')) return <em key={i}>{part.slice(1, -1)}</em>;
-        if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="bg-th-bg-muted px-1 rounded text-yellow-600 dark:text-yellow-300">{part.slice(1, -1)}</code>;
-        return <span key={i}>{part}</span>;
-      })}
-    </>
-  );
+  const agents = useAppStore((s) => s.agents);
+  return <InlineMarkdownWithMentions text={text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />;
 }
 
 /** Simple markdown table renderer */

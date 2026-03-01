@@ -87,7 +87,7 @@ export function MentionText({ text, agents, onClickAgent }: {
 }
 
 /** Mention-aware inline markdown: handles **bold**, *italic*, `code`, and @mentions */
-function InlineMarkdownWithMentions({ text, mentionAgents, onMentionClick }: {
+export function InlineMarkdownWithMentions({ text, mentionAgents, onMentionClick }: {
   text: string;
   mentionAgents?: Array<MentionAgent>;
   onMentionClick?: (agentId: string) => void;
