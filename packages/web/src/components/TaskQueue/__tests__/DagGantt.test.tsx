@@ -145,40 +145,6 @@ describe('DagGantt', () => {
     expect(screen.getByText('failed')).toBeInTheDocument();
   });
 
-  // ── Zoom controls ────────────────────────────────────────────────────
-
-  it('renders zoom controls toolbar', () => {
-    render(<DagGantt tasks={[makeTask({ id: 'z', status: 'done' })]} />);
-    expect(screen.getByLabelText('Zoom in')).toBeInTheDocument();
-    expect(screen.getByLabelText('Zoom out')).toBeInTheDocument();
-  });
-
-  it('zoom out is disabled at 1× (minimum zoom)', () => {
-    render(<DagGantt tasks={[makeTask({ id: 'z', status: 'done' })]} />);
-    expect(screen.getByLabelText('Zoom out')).toBeDisabled();
-  });
-
-  it('zoom in increases chart width', () => {
-    const { container } = render(<DagGantt tasks={[makeTask({ id: 'z', status: 'done', completedAt: BASE + 10_000 })]} />);
-    const scrollArea = container.querySelector('[role="region"]') as HTMLElement;
-    const innerBefore = scrollArea?.querySelector('.flex')?.getAttribute('style') ?? '';
-    expect(innerBefore).toContain('min-width: 100%');
-
-    fireEvent.click(screen.getByLabelText('Zoom in'));
-
-    const innerAfter = scrollArea?.querySelector('.flex')?.getAttribute('style') ?? '';
-    expect(innerAfter).toContain('min-width: 150%');
-  });
-
-  it('shows reset button after zooming in', () => {
-    render(<DagGantt tasks={[makeTask({ id: 'z', status: 'done' })]} />);
-    expect(screen.queryByLabelText('Reset zoom')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText('Zoom in'));
-
-    expect(screen.getByLabelText('Reset zoom')).toBeInTheDocument();
-  });
-
   // ── Scrollable container ─────────────────────────────────────────────
 
   it('renders a scrollable container with overflow-auto', () => {

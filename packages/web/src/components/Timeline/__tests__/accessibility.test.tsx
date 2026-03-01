@@ -291,16 +291,6 @@ describe('Semantic Roles', () => {
     expect(status).toBeInTheDocument();
     expect(status.textContent).toContain('No agent activity');
   });
-
-  it('minimap has role="region" with aria-label', () => {
-    const data = makeTestData();
-    const { container } = render(<TimelineContainer data={data} />);
-
-    const regions = container.querySelectorAll('[role="region"]');
-    const minimap = Array.from(regions).find(r => r.getAttribute('aria-roledescription') === 'minimap');
-    expect(minimap).not.toBeNull();
-    expect(minimap!.getAttribute('aria-label')).toContain('range selector');
-  });
 });
 
 // ── Keyboard Focus ────────────────────────────────────────────────────
@@ -324,18 +314,12 @@ describe('Keyboard Focus', () => {
     });
   });
 
-  it('toolbar buttons are focusable', () => {
+  it('sort button is focusable', () => {
     const data = makeTestData();
     render(<TimelineContainer data={data} />);
 
-    const zoomIn = screen.getByLabelText('Zoom in');
-    const zoomOut = screen.getByLabelText('Zoom out');
-    const fit = screen.getByLabelText('Fit timeline to view');
-
-    // HTML buttons are focusable by default
-    expect(zoomIn.tagName).toBe('BUTTON');
-    expect(zoomOut.tagName).toBe('BUTTON');
-    expect(fit.tagName).toBe('BUTTON');
+    const sort = screen.getByLabelText(/Sort/);
+    expect(sort.tagName).toBe('BUTTON');
   });
 });
 
@@ -407,17 +391,6 @@ describe('Color Contrast', () => {
 // ── Reduced Motion ────────────────────────────────────────────────────
 
 describe('Reduced Motion', () => {
-  it('live mode pulse has motion-reduce:animate-none class', () => {
-    const data = makeTestData();
-    const { container } = render(
-      <TimelineContainer data={data} liveMode={true} onLiveModeChange={() => {}} />,
-    );
-
-    const pulseDot = container.querySelector('.animate-pulse');
-    expect(pulseDot).not.toBeNull();
-    expect(pulseDot!.classList.contains('motion-reduce:animate-none')).toBe(true);
-  });
-
   it('timeline-a11y.css contains prefers-reduced-motion rule', async () => {
     // Verify the CSS file exists by reading it as a module
     // vitest with css: false doesn't process raw CSS imports

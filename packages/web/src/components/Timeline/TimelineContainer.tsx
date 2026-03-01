@@ -5,7 +5,6 @@ import { AxisTop } from '@visx/axis';
 import { Group } from '@visx/group';
 import { useTooltip, defaultStyles } from '@visx/tooltip';
 import { CommunicationLinks } from './CommunicationLinks';
-import { BrushTimeSelector } from './BrushTimeSelector';
 import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import { formatTimestamp } from './formatTimestamp';
 import type { TimeRange } from './formatTimestamp';
@@ -28,9 +27,6 @@ const LANE_HEIGHT_EXPANDED = 160;
 const EMPTY_EXPANDED: ReadonlySet<string> = new Set<string>();
 const LANE_GAP = 2;
 const AXIS_HEIGHT = 32;
-const ZOOM_FACTOR_IN = 0.6;
-const ZOOM_FACTOR_OUT = 1.5;
-const MIN_VISIBLE_MS = 5_000; // 5 seconds minimum visible range
 
 const STATUS_COLORS: Record<string, { fill: string; border: string }> = {
   creating:   { fill: 'var(--st-creating-fill)',  border: 'var(--st-creating)' },
@@ -228,8 +224,6 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   const [focusedLaneIdx, setFocusedLaneIdx] = useState(-1);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const userCollapsedRef = useRef<Set<string>>(new Set());
-  const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef<{ startX: number; startRange: { start: number; end: number }; movedBeyondThreshold: boolean } | null>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -290,69 +284,8 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     end: new Date(data.timeRange.end),
   }), [data.timeRange]);
 
-  const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date }>(fullRange);
-
-  // Track liveMode synchronously via ref to avoid race conditions.
-  // When user zooms/pans, setLiveMode(false) updates the ref immediately,
-  // preventing the live-mode effect from overwriting the zoom before the
-  // parent re-renders with the new liveMode prop.
-  const liveModeRef = useRef(liveMode ?? true);
-  useEffect(() => { liveModeRef.current = liveMode ?? true; }, [liveMode]);
-
-  const setLiveMode = useCallback((live: boolean) => {
-    liveModeRef.current = live;
-    onLiveModeChange?.(live);
-  }, [onLiveModeChange]);
-
-  // Live mode: keep visible range pinned to the latest data
-  useEffect(() => {
-    if (!liveModeRef.current) return;
-    // Preserve current zoom span but shift to show latest activity
-    setVisibleRange(prev => {
-      const span = prev.end.getTime() - prev.start.getTime();
-      const newEnd = fullRange.end.getTime();
-      const newStart = Math.max(fullRange.start.getTime(), newEnd - span);
-      return { start: new Date(newStart), end: new Date(newEnd) };
-    });
-    // When not live, preserve user's current zoom/pan — don't reset visibleRange
-  }, [fullRange, liveMode]);
-
-  // Zoom helpers that adjust visibleRange instead of a zoom scalar
-  // anchorFraction: 0..1 position within visible range to zoom toward (0.5 = center)
-  const zoomBy = useCallback((factor: number, anchorFraction = 0.5) => {
-    setLiveMode(false);
-    setVisibleRange(prev => {
-      const start = prev.start.getTime();
-      const end = prev.end.getTime();
-      const span = end - start;
-      const anchor = start + span * anchorFraction;
-      const newSpan = span * factor;
-      const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
-      const clampedSpan = Math.max(MIN_VISIBLE_MS, Math.min(fullMs, newSpan));
-      let newStart = anchor - clampedSpan * anchorFraction;
-      let newEnd = anchor + clampedSpan * (1 - anchorFraction);
-      if (newStart < fullRange.start.getTime()) {
-        newStart = fullRange.start.getTime();
-        newEnd = newStart + clampedSpan;
-      }
-      if (newEnd > fullRange.end.getTime()) {
-        newEnd = fullRange.end.getTime();
-        newStart = newEnd - clampedSpan;
-      }
-      newStart = Math.max(newStart, fullRange.start.getTime());
-      return { start: new Date(newStart), end: new Date(newEnd) };
-    });
-  }, [fullRange, setLiveMode]);
-
-  const fitToView = useCallback(() => { setVisibleRange(fullRange); setLiveMode(true); }, [fullRange, setLiveMode]);
-
-  // Zoom percentage: how much of the full range is currently visible
-  const zoomPct = useMemo(() => {
-    const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
-    if (fullMs <= 0) return 100;
-    const visMs = visibleRange.end.getTime() - visibleRange.start.getTime();
-    return Math.round((visMs / fullMs) * 100);
-  }, [fullRange, visibleRange]);
+  // Always show the full range — no zoom/pan
+  const visibleRange = fullRange;
 
   // Sort agents: lead first, then by role hierarchy, then by spawn time
   const sortedAgents = useMemo(() => {
@@ -433,103 +366,9 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     }
   }, []);
 
-  // Ctrl/Cmd+Wheel = zoom, plain wheel = vertical scroll
-  useEffect(() => {
-    const el = timelineRef.current;
-    if (!el) return;
-    const handler = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const factor = e.deltaY > 0 ? ZOOM_FACTOR_OUT : ZOOM_FACTOR_IN;
-        const svgEl = el.querySelector('svg');
-        if (svgEl) {
-          const rect = svgEl.getBoundingClientRect();
-          const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-          zoomBy(factor, fraction);
-        } else {
-          zoomBy(factor);
-        }
-      }
-    };
-    el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  }, [zoomBy]);
-
-  // Drag-to-pan: mousedown on SVG background starts drag
-  const handleDragStart = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
-    const target = e.target as Element;
-    if (target.closest('.cursor-pointer')) return;
-    e.preventDefault();
-    setLiveMode(false);
-    dragRef.current = {
-      startX: e.clientX,
-      startRange: { start: visibleRange.start.getTime(), end: visibleRange.end.getTime() },
-      movedBeyondThreshold: false,
-    };
-    setIsDragging(true);
-  }, [visibleRange, setLiveMode]);
-
-  // Drag-to-pan: window-level mousemove/mouseup while dragging
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleMove = (e: MouseEvent) => {
-      if (!dragRef.current) return;
-      const pixelDelta = e.clientX - dragRef.current.startX;
-      if (Math.abs(pixelDelta) >= 5) dragRef.current.movedBeyondThreshold = true;
-      if (!dragRef.current.movedBeyondThreshold) return;
-      const { startRange } = dragRef.current;
-      const span = startRange.end - startRange.start;
-      const timeDelta = -(pixelDelta / chartWidth) * span;
-      let newStart = startRange.start + timeDelta;
-      let newEnd = startRange.end + timeDelta;
-      if (newStart < fullRange.start.getTime()) {
-        newStart = fullRange.start.getTime();
-        newEnd = newStart + span;
-      }
-      if (newEnd > fullRange.end.getTime()) {
-        newEnd = fullRange.end.getTime();
-        newStart = newEnd - span;
-      }
-      newStart = Math.max(newStart, fullRange.start.getTime());
-      setVisibleRange({ start: new Date(newStart), end: new Date(newEnd) });
-    };
-    const handleUp = () => {
-      setIsDragging(false);
-      dragRef.current = null;
-    };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, [isDragging, chartWidth, fullRange]);
-
-  // Keyboard navigation
+  // Keyboard navigation (lane focus, expand/collapse, shortcuts)
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
-      case 'ArrowLeft':
-        e.preventDefault();
-        setLiveMode(false);
-        setVisibleRange(prev => {
-          const span = prev.end.getTime() - prev.start.getTime();
-          const shift = span * 0.1;
-          const newStart = Math.max(fullRange.start.getTime(), prev.start.getTime() - shift);
-          const newEnd = newStart + span;
-          return { start: new Date(newStart), end: new Date(Math.min(newEnd, fullRange.end.getTime())) };
-        });
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        setVisibleRange(prev => {
-          const span = prev.end.getTime() - prev.start.getTime();
-          const shift = span * 0.1;
-          const newEnd = Math.min(fullRange.end.getTime(), prev.end.getTime() + shift);
-          const newStart = newEnd - span;
-          return { start: new Date(Math.max(newStart, fullRange.start.getTime())), end: new Date(newEnd) };
-        });
-        break;
       case 'ArrowDown':
         e.preventDefault();
         setFocusedLaneIdx(prev => Math.min(prev + 1, sortedAgents.length - 1));
@@ -538,33 +377,6 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         e.preventDefault();
         setFocusedLaneIdx(prev => Math.max(prev - 1, 0));
         break;
-      case '+':
-      case '=':
-        if (e.ctrlKey || e.metaKey || e.key === '+') {
-          e.preventDefault();
-          zoomBy(ZOOM_FACTOR_IN);
-        }
-        break;
-      case '-':
-        if (e.ctrlKey || e.metaKey || e.key === '-') {
-          e.preventDefault();
-          zoomBy(ZOOM_FACTOR_OUT);
-        }
-        break;
-      case 'Home':
-        e.preventDefault();
-        setVisibleRange(fullRange);
-        break;
-      case 'End': {
-        e.preventDefault();
-        const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
-        const last20 = fullMs * 0.2;
-        setVisibleRange({
-          start: new Date(fullRange.end.getTime() - last20),
-          end: new Date(fullRange.end.getTime()),
-        });
-        break;
-      }
       case 'Enter':
       case ' ':
         if (focusedLaneIdx >= 0 && focusedLaneIdx < sortedAgents.length) {
@@ -601,7 +413,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         setShowShortcutHelp(prev => !prev);
         break;
     }
-  }, [focusedLaneIdx, sortedAgents, toggleExpand, zoomBy, fullRange, setLiveMode]);
+  }, [focusedLaneIdx, sortedAgents, toggleExpand]);
 
   if (data.agents.length === 0) {
     return (
@@ -612,52 +424,13 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   }
 
   return (
-    <div className="flex flex-col h-full timeline-container" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} role="application" aria-label="Timeline navigation: use arrow keys to pan, +/- to zoom, Tab to navigate lanes, Enter to expand" aria-roledescription="interactive timeline">
-      {/* Zoom controls */}
+    <div className="flex flex-col h-full timeline-container" ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} role="application" aria-label="Timeline navigation: use arrow keys to navigate lanes, Enter to expand" aria-roledescription="interactive timeline">
+      {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-th-border-muted timeline-toolbar" role="toolbar" aria-label="Timeline controls">
         <span className="text-sm text-th-text-muted">
           {sortedAgents.length} agents · {data.communications.length} communications
         </span>
         <div className="flex items-center gap-2">
-          <button
-            className={`flex items-center gap-1.5 px-2 py-0.5 text-xs rounded transition-colors ${
-              liveMode
-                ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/50'
-                : 'text-th-text-muted bg-th-bg-alt hover:bg-th-bg-muted'
-            }`}
-            onClick={() => setLiveMode(!liveMode)}
-            aria-label={liveMode ? 'Disable live mode' : 'Enable live mode'}
-          >
-            <span className={`inline-block w-1.5 h-1.5 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse motion-reduce:animate-none' : 'bg-zinc-600'}`} />
-            Live
-          </button>
-          <div className="flex items-center border border-th-border/50 rounded overflow-hidden" role="group" aria-label="Zoom controls">
-            <button
-              className="px-2 py-0.5 text-xs text-th-text-muted hover:bg-th-bg-muted hover:text-th-text transition-colors"
-              onClick={() => zoomBy(ZOOM_FACTOR_IN)}
-              aria-label="Zoom in"
-            >+</button>
-            {zoomPct < 100 && (
-              <span className="px-1.5 py-0.5 text-[10px] text-cyan-400 bg-cyan-900/20 font-mono min-w-[3.5ch] text-center" aria-label={`Showing ${zoomPct}% of timeline`}>
-                {zoomPct}%
-              </span>
-            )}
-            <button
-              className="px-2 py-0.5 text-xs text-th-text-muted hover:bg-th-bg-muted hover:text-th-text transition-colors"
-              onClick={() => zoomBy(ZOOM_FACTOR_OUT)}
-              disabled={zoomPct >= 100}
-              aria-label="Zoom out"
-            >−</button>
-          </div>
-          <button
-            className={`px-2 py-0.5 text-xs rounded transition-colors ${
-              zoomPct < 100
-                ? 'text-cyan-400 bg-cyan-900/20 hover:bg-cyan-900/40'
-                : 'text-th-text-muted bg-th-bg-alt hover:bg-th-bg-muted'
-            }`}
-            onClick={fitToView}
-            aria-label="Fit timeline to view"
-          >Fit</button>
           <button
             className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
             onClick={() => setSortDirection(sortDirection === 'oldest-first' ? 'newest-first' : 'oldest-first')}
@@ -665,16 +438,6 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           >{sortDirection === 'oldest-first' ? '↑' : '↓'}</button>
         </div>
       </div>
-
-      {/* Brush time range selector */}
-      <BrushTimeSelector
-        fullRange={fullRange}
-        visibleRange={visibleRange}
-        onRangeChange={(range) => { setLiveMode(false); setVisibleRange(range); }}
-        agents={sortedAgents}
-        width={containerWidth}
-        leftOffset={LABEL_WIDTH}
-      />
 
       {/* Main area: fixed labels + scrollable timeline */}
       <div className="flex flex-1 overflow-hidden">
@@ -707,7 +470,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           style={{ position: 'relative' }}
           onScroll={() => { syncScroll('timeline'); hideTooltip(); }}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`} style={{ position: 'relative', cursor: isDragging ? 'grabbing' : 'grab', userSelect: isDragging ? 'none' : undefined }} onMouseDown={handleDragStart}>
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`}>
             {/* Idle hatch pattern */}
             <defs>
               <pattern id="idle-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
