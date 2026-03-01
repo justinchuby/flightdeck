@@ -600,7 +600,7 @@ function isReviewRole(role: string): boolean {
  * Infer dependencies for review tasks by detecting what's being reviewed.
  * Strategies: agent ID reference, task ID reference, role reference.
  */
-function inferReviewDependencies(
+export function inferReviewDependencies(
   ctx: CommandHandlerContext,
   leadId: string,
   taskDesc: string,

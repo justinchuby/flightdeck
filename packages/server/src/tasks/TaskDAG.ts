@@ -480,7 +480,7 @@ export class TaskDAG extends EventEmitter {
   }
 
   /** Check if adding dependsOnId as a dependency of taskId would create a cycle */
-  private wouldCreateCycle(leadId: string, taskId: string, dependsOnId: string): boolean {
+  wouldCreateCycle(leadId: string, taskId: string, dependsOnId: string): boolean {
     // If dependsOnId transitively depends on taskId, adding this edge creates a cycle
     const visited = new Set<string>();
     const queue = [dependsOnId];
