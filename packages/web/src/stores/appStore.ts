@@ -8,6 +8,7 @@ interface AppState {
   selectedAgentId: string | null;
   connected: boolean;
   loading: boolean;
+  systemPaused: boolean;
 
   setAgents: (agents: AgentInfo[]) => void;
   addAgent: (agent: AgentInfo) => void;
@@ -20,6 +21,7 @@ interface AppState {
   clearPermission: (agentId: string) => void;
   setConnected: (connected: boolean) => void;
   setLoading: (loading: boolean) => void;
+  setSystemPaused: (paused: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -29,6 +31,7 @@ export const useAppStore = create<AppState>((set) => ({
   selectedAgentId: null,
   connected: false,
   loading: true,
+  systemPaused: false,
 
   setAgents: (agents) => set({ agents }),
   addAgent: (agent) =>
@@ -58,4 +61,5 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedAgent: (selectedAgentId) => set({ selectedAgentId }),
   setConnected: (connected) => set({ connected }),
   setLoading: (loading) => set({ loading }),
+  setSystemPaused: (systemPaused) => set({ systemPaused }),
 }));

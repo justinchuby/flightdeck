@@ -47,6 +47,9 @@ export function useWebSocket() {
         case 'init':
           setAgents(msg.agents);
           useAppStore.getState().setLoading(false);
+          if (msg.systemPaused !== undefined) {
+            useAppStore.getState().setSystemPaused(msg.systemPaused);
+          }
           break;
         case 'agent:spawned':
           addAgent(msg.agent);
@@ -217,6 +220,9 @@ export function useWebSocket() {
           }
           break;
         }
+        case 'system:paused':
+          useAppStore.getState().setSystemPaused(msg.paused);
+          break;
       }
     };
   }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);

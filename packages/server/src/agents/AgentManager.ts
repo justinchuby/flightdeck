@@ -63,6 +63,7 @@ export interface AgentManagerEvents {
   'dag:updated': { leadId: string };
   'group:created': { group: ChatGroup; leadId: string };
   'group:message': { message: GroupMessage; groupName: string; leadId: string };
+  'system:paused': { paused: boolean };
 }
 
 export class AgentManager extends TypedEmitter<AgentManagerEvents> {
@@ -96,6 +97,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private dispatcher: CommandDispatcher;
   private heartbeat: HeartbeatMonitor;
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
+  private _systemPaused = false;
 
   constructor(
     config: ServerConfig,
@@ -241,6 +243,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (options?.projectId) agent.projectId = options.projectId;
     if (role.id === 'lead') {
       agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
+    }
+    if (this._systemPaused) {
+      agent.systemPaused = true;
     }
 
     // Track parent-child relationship (deduplicate for restart with same ID)
@@ -604,6 +609,42 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setAutoRestart(enabled: boolean): void {
     this.autoRestart = enabled;
+  }
+
+  /** Pause the entire system — halt message delivery, notify agents */
+  pauseSystem(): void {
+    if (this._systemPaused) return;
+    this._systemPaused = true;
+    for (const agent of this.agents.values()) {
+      agent.systemPaused = true;
+      // Notify running/idle agents that the system is paused
+      if (agent.status === 'running' || agent.status === 'idle') {
+        agent.queueMessage('[System] ⏸️ The system has been paused by the user. Hold your current position — do not start new work or delegate tasks until resumed.');
+      }
+    }
+    this.emit('system:paused', { paused: true });
+    logger.info('system', 'System paused by user');
+  }
+
+  /** Resume the system — deliver queued messages, notify agents */
+  resumeSystem(): void {
+    if (!this._systemPaused) return;
+    this._systemPaused = false;
+    for (const agent of this.agents.values()) {
+      agent.systemPaused = false;
+    }
+    this.emit('system:paused', { paused: false });
+    logger.info('system', 'System resumed by user');
+    // Drain pending messages on all idle agents
+    for (const agent of this.agents.values()) {
+      if (agent.status === 'idle' || agent.status === 'running') {
+        agent.drainPendingMessages();
+      }
+    }
+  }
+
+  get isSystemPaused(): boolean {
+    return this._systemPaused;
   }
 
   setMaxRestarts(n: number): void {

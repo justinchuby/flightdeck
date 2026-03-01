@@ -257,6 +257,21 @@ export function apiRouter(
     res.json(updated);
   });
 
+  // --- System pause/resume ---
+  router.post('/system/pause', (_req, res) => {
+    agentManager.pauseSystem();
+    res.json({ paused: true });
+  });
+
+  router.post('/system/resume', (_req, res) => {
+    agentManager.resumeSystem();
+    res.json({ paused: false });
+  });
+
+  router.get('/system/status', (_req, res) => {
+    res.json({ paused: agentManager.isSystemPaused });
+  });
+
   // --- Coordination ---
   router.get('/coordination/status', (_req, res) => {
     res.json({

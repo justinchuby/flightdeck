@@ -73,6 +73,7 @@ export class WebSocketServer {
           type: 'init',
           agents: agentManager.getAll().map((a) => a.toJSON()),
           locks: lockRegistry.getAll(),
+          systemPaused: agentManager.isSystemPaused,
         }),
       );
     });
@@ -178,6 +179,10 @@ export class WebSocketServer {
 
     agentManager.on('dag:updated', (data: any) => {
       this.broadcastAll({ type: 'dag:updated', ...data });
+    });
+
+    agentManager.on('system:paused', (data: any) => {
+      this.broadcastAll({ type: 'system:paused', ...data });
     });
   }
 

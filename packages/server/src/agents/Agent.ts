@@ -85,6 +85,8 @@ export class Agent {
   public contextWindowSize = 0;
   public contextWindowUsed = 0;
   private terminated = false;
+  /** When true, message delivery is halted — messages stay queued */
+  public systemPaused = false;
 
   private acpConnection: AcpConnection | null = null;
   private config: ServerConfig;
@@ -270,8 +272,8 @@ export class Agent {
     conn.on('prompt_complete', (_stopReason: string) => {
       if (this.terminated) return;
       if (this.status === 'running' && !this.acpConnection?.isPrompting) {
-        // Drain queued messages before going idle
-        if (this.pendingMessages.length > 0) {
+        // Drain queued messages before going idle (unless system is paused)
+        if (!this.systemPaused && this.pendingMessages.length > 0) {
           const next = this.pendingMessages.shift()!;
           this.write(next);
           return;
@@ -513,6 +515,10 @@ CREW_UPDATE ]]]`;
 
   /** Queue a message — delivered after the agent finishes its current prompt */
   queueMessage(message: string): void {
+    if (this.systemPaused) {
+      this.pendingMessages.push(message);
+      return;
+    }
     if (this.status === 'idle') {
       this.write(message);
     } else {
@@ -535,6 +541,14 @@ CREW_UPDATE ]]]`;
   /** Get the number of pending queued messages */
   get pendingMessageCount(): number {
     return this.pendingMessages.length;
+  }
+
+  /** Drain one pending message if idle — called when system resumes */
+  drainPendingMessages(): void {
+    if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
+      const next = this.pendingMessages.shift()!;
+      this.write(next);
+    }
   }
 
   /** Clear all pending (queued, not yet started) messages. Returns the count and previews of cleared messages. */

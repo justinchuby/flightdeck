@@ -23,15 +23,17 @@ import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
-import { Search } from 'lucide-react';
+import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
+import { apiFetch } from './hooks/useApi';
 
 export function App() {
   const ws = useWebSocket();
   const api = useApi();
-  const { connected, agents, selectedAgentId } = useAppStore();
+  const { connected, agents, selectedAgentId, systemPaused } = useAppStore();
+  const setSystemPaused = useAppStore((s) => s.setSystemPaused);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const addToast = useToastStore((s) => s.add);
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map());
@@ -43,6 +45,15 @@ export function App() {
 
   // Command palette — Cmd/Ctrl+K is handled by the hook
   const { isOpen: cmdOpen, open: openCmd, close: closeCmd } = useCommandPalette();
+
+  const togglePause = useCallback(async () => {
+    try {
+      const endpoint = systemPaused ? '/system/resume' : '/system/pause';
+      await apiFetch(endpoint, { method: 'POST' });
+    } catch (err: any) {
+      addToast('error', `Failed to ${systemPaused ? 'resume' : 'pause'}: ${err.message}`);
+    }
+  }, [systemPaused, addToast]);
 
   // Onboarding wizard — show on first visit
   const { shouldShow } = useOnboarding();
@@ -152,6 +163,18 @@ export function App() {
             <h1 className="text-lg font-semibold">AI Crew</h1>
             <div className="flex items-center gap-3">
               <button
+                onClick={togglePause}
+                title={systemPaused ? 'Resume system' : 'Pause system'}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors ${
+                  systemPaused
+                    ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/30'
+                    : 'bg-th-bg-alt border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover'
+                }`}
+              >
+                {systemPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                <span>{systemPaused ? 'Resume' : 'Pause'}</span>
+              </button>
+              <button
                 onClick={openCmd}
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
               >
@@ -160,10 +183,10 @@ export function App() {
                 <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
               <span
-                className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`}
+                className={`inline-block w-2 h-2 rounded-full ${connected ? (systemPaused ? 'bg-yellow-400' : 'bg-green-400') : 'bg-red-400'}`}
               />
               <span className="text-sm text-th-text-muted">
-                {connected ? 'Connected' : 'Reconnecting...'}
+                {!connected ? 'Reconnecting...' : systemPaused ? 'Paused' : 'Connected'}
               </span>
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
