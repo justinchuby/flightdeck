@@ -454,6 +454,17 @@ export function OverviewPage({ api, ws }: Props) {
     }
   }
 
+  // Build projectId → projectName from lead agents (projectId = lead's agentId)
+  const projectNameMap = new Map<string, string>();
+  for (const lead of leadAgents) {
+    projectNameMap.set(lead.id, lead.projectName || `Project ${lead.id.slice(0, 8)}`);
+  }
+
+  const resolveProjectName = (d: Decision) => {
+    if (d.projectId) return projectNameMap.get(d.projectId) ?? agentProjectMap.get(d.projectId) ?? `Project ${d.projectId.slice(0, 8)}`;
+    return agentProjectMap.get(d.agentId) ?? 'Unknown Project';
+  };
+
   // Build project progress data
   const projectCards = leadAgents.map((lead) => {
     const proj = projects[lead.id];
@@ -492,9 +503,7 @@ export function OverviewPage({ api, ws }: Props) {
             {(() => {
               const grouped = new Map<string, Decision[]>();
               for (const d of pendingDecisions) {
-                const proj = d.projectId
-                  ? (agentProjectMap.get(d.projectId) ?? d.projectId.slice(0, 8))
-                  : (agentProjectMap.get(d.agentId) ?? 'Unknown Project');
+                const proj = resolveProjectName(d);
                 if (!grouped.has(proj)) grouped.set(proj, []);
                 grouped.get(proj)!.push(d);
               }
@@ -557,9 +566,7 @@ export function OverviewPage({ api, ws }: Props) {
           (() => {
             const grouped = new Map<string, Decision[]>();
             for (const d of timelineDecisions) {
-              const proj = d.projectId
-                ? (agentProjectMap.get(d.projectId) ?? d.projectId.slice(0, 8))
-                : (agentProjectMap.get(d.agentId) ?? 'Unknown Project');
+              const proj = resolveProjectName(d);
               if (!grouped.has(proj)) grouped.set(proj, []);
               grouped.get(proj)!.push(d);
             }
