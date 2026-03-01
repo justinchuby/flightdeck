@@ -7,17 +7,23 @@ How data flows from the server to the timeline visualization, the component hier
 ```
 Server (SQLite + ActivityLedger)
     │
+    ├─► SSE: /api/coordination/timeline/stream?leadId={id}  (preferred)
+    │       EventSource → useTimelineSSE hook
+    │
+    └─► Polling fallback: GET /api/coordination/timeline?leadId={id}
+            fetch every 5s → useTimelinePolling hook
+    │
     ▼
-GET /api/coordination/timeline?leadId={id}
-    │  (every 5 seconds via polling)
-    ▼
-useTimelineData hook → TimelineData
+useTimelineData hook → { data, loading, error, connectionHealth, refetch }
     │
     ▼
 TimelinePage (filters)
     │
     ▼
 TimelineContainer (zoom, layout, keyboard nav)
+    ├── StatusBar (crew health, connection, errors)
+    ├── AccessibilityAnnouncer (screen reader live regions)
+    ├── ErrorBanner (sticky error list)
     ├── BrushTimeSelector (minimap)
     ├── AgentLane × N (status segments, lock icons)
     └── CommunicationLinks (SVG overlay)
@@ -25,14 +31,16 @@ TimelineContainer (zoom, layout, keyboard nav)
 
 ### Server → Client
 
-The server's `ActivityLedger` stores all agent events in SQLite. The `/coordination/timeline` endpoint processes these events on every request to build:
+The server's `ActivityLedger` stores all agent events in SQLite. The `/coordination/timeline` endpoint processes these events to build:
 
 - **Agent segments** — contiguous status periods (creating → running → idle → completed)
 - **Communications** — inter-agent messages, delegations, broadcasts, group chats
 - **Locks** — file lock acquisitions and releases
 
-> [!IMPORTANT]
-> The current implementation re-fetches the full timeline on every poll (no incremental updates). This works well for typical crew sizes (3–8 agents, 30–100 events per session). SSE-based incremental updates are planned for v2.
+**Transport:** `useTimelineData` tries SSE first via `useTimelineSSE`. If SSE is unavailable (server doesn't support it, or connection fails), it falls back to HTTP polling every 5 seconds via `useTimelinePolling`. The hook exposes a unified `connectionHealth` indicator regardless of transport.
+
+> [!TIP]
+> The `connectionHealth` value (`'connected'` | `'connecting'` | `'reconnecting'` | `'degraded'` | `'offline'`) is available from the hook and can be passed directly to `StatusBar`.
 
 ### Client State
 
@@ -103,7 +111,7 @@ Resolves each communication to source/target Y positions, computes cubic bezier 
 | `@visx/brush` | Minimap brush selection |
 | `lucide-react` | Filter and RefreshCw icons |
 
-No d3-zoom, no @tanstack/virtual, no SSE/EventSource libraries are used.
+No d3-zoom, no @tanstack/virtual are used. SSE uses native `EventSource`.
 
 ## Known Bugs
 
@@ -113,27 +121,23 @@ These bugs are documented in the codebase exploration and are being tracked:
 
 `initialBrushPosition` is memoized with `[]` deps — it only reflects the initial `visibleRange`, not subsequent changes. If `visibleRange` is already zoomed on mount, the brush starts at the wrong position. Additionally, the `updateBrush` call in the render body mutates refs during render, which is a React anti-pattern.
 
-### Group Chat Display
-
-Group messages and broadcasts show a **?** stub because `toAgentId` is null. The `groupName` field exists on the server response and in the `Communication` type, but `TimelineComm` doesn't declare it and the rendering doesn't use it for link resolution.
-
 ## v1 → v2 Migration Roadmap
 
 The current architecture supports incremental improvement without a rewrite:
 
-### Step 1: Fix Bugs (Current Architecture)
+### ✅ Step 1: SSE Transport (Done)
 
-Fix the 4 known bugs without introducing new patterns. No architectural changes.
+`useTimelineSSE` provides real-time event delivery via Server-Sent Events. `useTimelineData` auto-selects SSE with polling fallback. Connection health is exposed for the StatusBar.
 
-### Step 2: Extract Timeline Zustand Store
+### ✅ Step 2: StatusBar + ErrorBanner + EmptyState (Done)
+
+New v1 components added: `StatusBar` (crew health), `ErrorBanner` (sticky error list with scroll-to), `EmptyState` (welcome screen), `AccessibilityAnnouncer` (screen reader live regions), `useSinceLastVisit` (localStorage-based new-event tracking).
+
+### Step 3: Extract Timeline Zustand Store
 
 Move `visibleRange`, `expandedAgents`, `focusedLaneIdx`, and filter state from local React state into a dedicated Zustand store. Pattern already exists in `appStore.ts` and `settingsStore.ts`.
 
-**Why:** Enables the StatusBar and other new components to read timeline state without prop drilling.
-
-### Step 3: Add StatusBar Component
-
-New component that reads from the timeline store. Displays unfiltered crew health. This is the first component addition in v1.
+**Why:** Enables new components to read timeline state without prop drilling.
 
 ### Step 4: Decompose TimelineContainer
 
@@ -144,13 +148,7 @@ Break the 610-line monolith into focused components:
 
 **Why:** Each component becomes independently testable and documentable.
 
-### Step 5: Replace Polling with SSE
-
-Add SSE subscription for real-time event delivery. Keep polling as a fallback.
-
-**Why:** Eliminates the 5-second delay and reduces server load for large crews.
-
-### Step 6: Add Projections
+### Step 5: Add Projections
 
 Introduce projection functions that derive view-specific state from raw events:
 - Chronological projection (Stream View)

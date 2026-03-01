@@ -56,13 +56,11 @@ interface TimelineComm {
   type: CommType;
   fromAgentId: string;
   toAgentId?: string;    // undefined for broadcasts and group messages
+  groupName?: string;    // Present on group_message events
   summary: string;       // Message content preview
   timestamp: string;     // ISO 8601
 }
 ```
-
-> [!NOTE]
-> The server sends `groupName` on group message events, but the `TimelineComm` type does not currently declare it. The `Communication` interface in `CommunicationLinks.tsx` does include `groupName`. This type mismatch is a known issue.
 
 ### TimelineLock
 
@@ -234,71 +232,127 @@ interface CommunicationLinksProps {
 
 **Performance:** Links are capped at 500 visible links (`MAX_VISIBLE_LINKS`). Links outside `visibleTimeRange` are skipped.
 
-### StatusBar <Badge type="warning" text="v1" />
+### StatusBar
 
-> [!NOTE]
-> This component is being added in v1 ([issue #43](https://github.com/justinc/ai-crew/issues/43)). API may change.
-
-Displays unfiltered crew health at a glance. Always shows global status regardless of timeline filters.
+Displays unfiltered crew health at a glance. Derives status counts internally from the raw `TimelineData` — always shows global status regardless of timeline filters.
 
 ```typescript
+type ConnectionHealth = 'connected' | 'connecting' | 'reconnecting' | 'degraded' | 'offline';
+type OverallHealth = 'green' | 'yellow' | 'red';
+
 interface StatusBarProps {
-  statusCounts: Record<TimelineStatus, number>;
-  lastActivityTimestamp?: string;        // ISO 8601
-  showLastActivity?: boolean;            // default: true
-  staleThresholdMs?: number;             // default: 60000
-  onStaleDetected?: () => void;
-  connectionHealth: 'connecting' | 'connected' | 'degraded' | 'reconnecting' | 'offline';
-  lastSeenEventId?: string;
-  newEventCount?: number;
-  onJumpToNewEvents?: () => void;
-  className?: string;
+  data: TimelineData | null;
+  connectionHealth?: ConnectionHealth;   // default: 'connected'
+  newEventCount?: number;                // default: 0
+  onErrorClick?: () => void;
 }
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `statusCounts` | `Record<TimelineStatus, number>` | required | Count of agents per status (always unfiltered) |
-| `lastActivityTimestamp` | `string` | — | ISO 8601 timestamp of last crew activity |
-| `showLastActivity` | `boolean` | `true` | Show "Last activity: 30s ago" text |
-| `staleThresholdMs` | `number` | `60000` | Time in ms before crew is considered stale |
-| `onStaleDetected` | `() => void` | — | Called when crew goes stale (no activity for `staleThresholdMs`) |
-| `connectionHealth` | `string` | required | Server connection status indicator |
-| `lastSeenEventId` | `string` | — | Event ID of last visit, enables "X new events" badge |
-| `newEventCount` | `number` | — | Count of events since `lastSeenEventId` |
-| `onJumpToNewEvents` | `() => void` | — | Called when user clicks the new events badge |
+| `data` | `TimelineData \| null` | required | Unfiltered timeline data — StatusBar always shows full crew state |
+| `connectionHealth` | `ConnectionHealth` | `'connected'` | Server connection status indicator (5 states) |
+| `newEventCount` | `number` | `0` | Count of new events since last visit (from `useSinceLastVisit` hook) |
+| `onErrorClick` | `() => void` | — | Called when user clicks the error count link |
 
-**Accessibility:** Renders with `role="status"` and `aria-live="polite"`. Error count is a clickable link that scrolls to the first error in the timeline.
+**Internal derivation:** StatusBar computes status buckets, error count, overall health (green/yellow/red), and a template narrative sentence internally from `data`. No pre-computed counts needed.
 
-### ErrorBanner <Badge type="warning" text="v1" />
+**Overall health logic:**
+- 🟢 **Green** — No errors, connection healthy
+- 🟡 **Yellow** — Terminated agents, or connection degraded/reconnecting
+- 🔴 **Red** — Failed agents, or connection offline
 
-> [!NOTE]
-> This component is being added in v1 ([issue #43](https://github.com/justinc/ai-crew/issues/43)). API may change.
+**Template narrative:** Displayed on medium+ screens: "Your crew has N active agents. M errors need attention." or "All systems normal."
 
-Persistent error indicator that appears when errors exist below the viewport fold. Lives inside StatusBar.
+**Accessibility:** Renders with `role="status"`, `aria-live="polite"`, `aria-atomic="true"`. Error count button uses `aria-live="assertive"`. Connection health changes announced via dedicated `aria-live` region.
+
+### ErrorBanner
+
+Persistent error indicator that appears when errors exist below the viewport fold. Shows an expandable list of errors with click-to-scroll.
+
+```typescript
+interface ErrorEntry {
+  id: string;              // Unique identifier for scrolling to this error
+  agentLabel: string;      // Agent role or name that produced the error
+  message: string;         // Short error description
+}
+
+interface ErrorBannerProps {
+  errors: ErrorEntry[];
+  onScrollToError: (errorId: string) => void;
+  onDismiss?: () => void;
+}
+```
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `errors` | `ErrorEntry[]` | Yes | Errors currently below the fold |
+| `onScrollToError` | `(errorId: string) => void` | Yes | Called when user clicks an error to scroll to it |
+| `onDismiss` | `() => void` | No | Called when banner is dismissed |
 
 **Behavior:**
-- Shows: `⚠️ {count} error(s) — click to view`
-- Clicking scrolls to the first error event in the timeline
-- Auto-dismisses when the error is visible in the viewport
-- Errors auto-expand and receive red highlight treatment in the timeline
+- Expands/collapses to show individual error entries
+- Clicking an error scrolls to it and auto-dismisses the banner
+- Auto-dismisses via IntersectionObserver when user scrolls past errors
+- Reappears when new errors arrive (tracks error count changes)
+- User can manually dismiss with X button
 
-### EmptyState <Badge type="warning" text="v1" />
+**Accessibility:** `role="alert"`, `aria-live="assertive"`. Expand toggle and dismiss button have descriptive `aria-label`. Error list uses `role="list"` with individual `aria-label` on each entry.
 
-> [!NOTE]
-> This component is being added in v1 ([issue #43](https://github.com/justinc/ai-crew/issues/43)). API may change.
+### EmptyState
 
 Welcoming screen shown when no agents are active.
 
-**Default content:** "No activity yet — agents will appear here when your crew starts working" with a call-to-action button.
-
 ```typescript
 interface EmptyStateProps {
-  message?: string;       // Override default message
-  action?: () => void;    // CTA button click handler
-  className?: string;
+  title?: string;          // default: 'No crew activity yet'
+  description?: string;    // default: 'Start a project to see your AI agents...'
 }
 ```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `title` | `string` | `'No crew activity yet'` | Override the heading |
+| `description` | `string` | `'Start a project to see your AI agents collaborate in real time...'` | Override the description text |
+
+**Accessibility:** `role="status"` with `aria-label` matching the title.
+
+### useSinceLastVisit
+
+Hook that tracks the last-seen event ID in localStorage. Enables "since last visit" badges and markers.
+
+```typescript
+function useSinceLastVisit(
+  eventIds: string[],      // Ordered array of all event IDs (oldest first)
+  sessionKey: string,      // Unique key for this session (e.g., lead agent ID)
+): SinceLastVisitResult;
+
+interface SinceLastVisitResult {
+  newEventCount: number;            // Events since last visit (0 on first visit)
+  lastSeenMarkerPosition: number;   // Index in eventIds, or -1 if not found
+  markAsSeen: () => void;           // Persist current latest event as seen
+}
+```
+
+**Behavior:**
+- Reads `lastSeenEventId` from `localStorage` on mount
+- If the stored ID references a pruned/missing event, treats as first visit (graceful fallback)
+- Auto-persists on page unload (`beforeunload`) and visibility change (`visibilitychange`)
+- Call `markAsSeen()` manually to mark all current events as seen
+
+### AccessibilityAnnouncer
+
+Renders invisible ARIA live regions for screen reader announcements. Place once at the top of the Timeline component tree.
+
+```typescript
+interface AccessibilityAnnouncerProps {
+  announcements: AccessibilityAnnouncements;  // from useAccessibilityAnnouncements hook
+}
+```
+
+Renders two hidden `<div>` elements:
+- **Polite** (`aria-live="polite"`, `role="log"`) — new events, status updates (throttled)
+- **Assertive** (`aria-live="assertive"`, `role="alert"`) — errors, connection changes (immediate)
 
 ## Visual Reference
 
@@ -341,7 +395,8 @@ interface EmptyStateProps {
 
 ## Known Issues
 
-| Issue | Description | Workaround |
-|-------|-------------|------------|
-| Group messages show **?** | `group_message` and `broadcast` types render a stub with "?" instead of meaningful links because `toAgentId` is null | Hover to see tooltip with group name |
-| `TimelineComm` missing `groupName` | Type mismatch between `TimelineComm` (useTimelineData.ts) and `Communication` (CommunicationLinks.tsx) | Works at runtime; TypeScript type is incomplete |
+| Issue | Description | Status |
+|-------|-------------|--------|
+| Zoom at cursor | Zooming snaps to viewport center instead of cursor position | Open |
+| Zoom pops back | After zooming via brush, the view range occasionally resets to full extent | Open |
+| Minimap stale | BrushTimeSelector can show stale selection after rapid zoom interactions | Open |

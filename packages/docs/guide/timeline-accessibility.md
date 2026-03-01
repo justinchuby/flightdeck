@@ -68,30 +68,42 @@ The main SVG area uses:
 - `role="img"` on the SVG container
 - `role="row"` with `aria-label` on each agent lane group
 
-### StatusBar (v1)
+### StatusBar
 
-The StatusBar will use:
-- `role="status"` — automatically announces changes
-- `aria-live="polite"` — non-intrusive updates
+The StatusBar uses:
+- `role="status"` with `aria-live="polite"` and `aria-atomic="true"` — announces full status on every change
+- Error count button: `aria-live="assertive"` with descriptive label ("N errors. Click to view.")
+- Connection indicator: `aria-live="polite"` (or `"assertive"` when offline) with `aria-label`
+- Health indicator: `aria-label="Crew health: Healthy/Attention needed/Errors detected"`
+- Narrative sentence: visible text on medium+ screens provides natural-language summary
 
-### v1 Additions (Planned)
+### AccessibilityAnnouncer (v1)
 
-These accessibility improvements are being added in v1:
+The `AccessibilityAnnouncer` component renders two invisible ARIA live regions:
+- **Polite** (`aria-live="polite"`, `role="log"`) — new events, status updates (throttled)
+- **Assertive** (`aria-live="assertive"`, `role="alert"`) — errors, connection changes (immediate)
+
+Place at the top of the Timeline component tree with announcements from `useAccessibilityAnnouncements()`.
+
+### v1 Additions
+
+These accessibility features are implemented or in progress for v1:
 
 | Feature | ARIA Pattern | Description |
 |---------|-------------|-------------|
 | StatusBar | `role="status"`, `aria-live="polite"` | Screen readers announce status count changes |
-| Error count link | Clickable with keyboard | StatusBar error count is a link that scrolls to the first error |
-| ErrorBanner | `role="alert"` | Assertive announcement when errors appear below fold |
-| Empty state | Descriptive text | Screen readers read the welcome message and CTA |
+| Error count link | Clickable button with `aria-live="assertive"` | Keyboard-accessible error count that scrolls to errors |
+| ErrorBanner | `role="alert"`, `aria-live="assertive"` | Expandable error list with click-to-scroll |
+| Empty state | `role="status"`, `aria-label` | Screen readers read the welcome message |
+| AccessibilityAnnouncer | Dual live regions (polite + assertive) | Centralized screen reader announcements |
+| `role="feed"` | Stream View semantics | Feed-based navigation for timeline events |
+| `role="grid"` | Lanes View semantics | Grid navigation for parallel agent lanes |
 
 ### v2 Roadmap
 
 Future accessibility improvements:
-- `aria-live` regions for real-time event announcements
-- `role="feed"` semantics for Stream View
-- `role="grid"` semantics for Lanes View
 - Screen reader linearization of parallel swim lanes
+- AI Narrative view with semantic heading structure
 
 ## Reduced Motion
 
