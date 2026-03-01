@@ -19,6 +19,8 @@ export interface BrushTimeSelectorProps {
   agents: TimelineAgent[];
   /** Component width from parent */
   width: number;
+  /** Left offset to align brush area with the main chart (e.g. label column width) */
+  leftOffset?: number;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -45,10 +47,12 @@ export function BrushTimeSelector({
   onRangeChange,
   agents,
   width,
+  leftOffset = 0,
 }: BrushTimeSelectorProps) {
   const brushRef = useRef<BaseBrush | null>(null);
 
-  const innerWidth = width - PADDING.left - PADDING.right;
+  const effectiveLeft = PADDING.left + leftOffset;
+  const innerWidth = width - effectiveLeft - PADDING.right;
   const innerHeight = BRUSH_HEIGHT - PADDING.top - PADDING.bottom;
 
   const xScale = useMemo(
@@ -108,7 +112,7 @@ export function BrushTimeSelector({
   return (
     <div className="border-b border-th-border-muted bg-th-bg/50" style={{ height: BRUSH_HEIGHT }} role="region" aria-label="Timeline range selector: drag handles to adjust visible time range" aria-roledescription="minimap">
       <svg width={width} height={BRUSH_HEIGHT} aria-hidden="true">
-        <Group top={PADDING.top} left={PADDING.left}>
+        <Group top={PADDING.top} left={effectiveLeft}>
           {/* Mini agent lanes background */}
           {agents.map((agent, i) => {
             const y = i * (MINI_LANE_HEIGHT + MINI_LANE_GAP);

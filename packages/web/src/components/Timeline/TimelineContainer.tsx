@@ -7,6 +7,8 @@ import { useTooltip, defaultStyles } from '@visx/tooltip';
 import { CommunicationLinks } from './CommunicationLinks';
 import { BrushTimeSelector } from './BrushTimeSelector';
 import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
+import { formatTimestamp } from './formatTimestamp';
+import type { TimeRange } from './formatTimestamp';
 import type {
   TimelineAgent,
   TimelineSegment,
@@ -76,8 +78,8 @@ function formatDuration(ms: number): string {
 
 // ── Sub-components ───────────────────────────────────────────────────
 
-function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
-  agent: TimelineAgent; height: number; isExpanded: boolean; isFocused: boolean; onClick: () => void;
+function AgentLabel({ agent, height, isExpanded, isFocused, onClick, fullRange }: {
+  agent: TimelineAgent; height: number; isExpanded: boolean; isFocused: boolean; onClick: () => void; fullRange: TimeRange;
 }) {
   return (
     <div
@@ -96,8 +98,8 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
       <span className="text-xs font-mono text-th-text-muted">{agent.shortId}</span>
       {isExpanded && (
         <span className="text-xs text-th-text-muted mt-1">
-          {new Date(agent.createdAt).toLocaleTimeString()}
-          {agent.endedAt ? ` – ${new Date(agent.endedAt).toLocaleTimeString()}` : ' – active'}
+          {formatTimestamp(new Date(agent.createdAt), fullRange)}
+          {agent.endedAt ? ` – ${formatTimestamp(new Date(agent.endedAt), fullRange)}` : ' – active'}
         </span>
       )}
     </div>
@@ -640,6 +642,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         onRangeChange={(range) => { onLiveModeChange?.(false); setVisibleRange(range); }}
         agents={sortedAgents}
         width={containerWidth}
+        leftOffset={LABEL_WIDTH}
       />
 
       {/* Main area: fixed labels + scrollable timeline */}
@@ -661,6 +664,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
               isExpanded={expandedAgents.has(agent.id)}
               isFocused={idx === focusedLaneIdx}
               onClick={() => toggleExpand(agent.id)}
+              fullRange={fullRange}
             />
           ))}
         </div>
@@ -724,6 +728,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 xScale={timeScale}
                 laneHeight={LANE_HEIGHT}
                 tooltipContainer={timelineRef.current}
+                fullRange={fullRange}
               />
 
               {/* 'You left off here' marker */}
@@ -769,9 +774,9 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 <div className="text-th-text-muted mb-1">{tooltipData.taskLabel.length > 80 ? tooltipData.taskLabel.slice(0, 80) + '…' : tooltipData.taskLabel}</div>
               )}
               <div className="text-th-text-muted text-[10px]">
-                {new Date(tooltipData.startAt).toLocaleTimeString()}
+                {formatTimestamp(new Date(tooltipData.startAt), fullRange)}
                 {' → '}
-                {tooltipData.endAt ? new Date(tooltipData.endAt).toLocaleTimeString() : 'now'}
+                {tooltipData.endAt ? formatTimestamp(new Date(tooltipData.endAt), fullRange) : 'now'}
                 {' · '}
                 {formatDuration(
                   (tooltipData.endAt ? new Date(tooltipData.endAt).getTime() : Date.now()) -
