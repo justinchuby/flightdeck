@@ -48,12 +48,12 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
     if (del.toAgentId === agent.id && del.status === 'active') {
       del.status = 'completed';
       del.completedAt = new Date().toISOString();
-      del.result = agent.getRecentOutput(8000);
+      del.result = agent.getRecentOutput(16000);
     }
   }
 
-  const rawOutput = agent.getRecentOutput(8000);
-  const cleanPreview = rawOutput.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-6000);
+  const rawOutput = agent.getRecentOutput(16000);
+  const cleanPreview = rawOutput.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${agent.task || 'none'}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
 
@@ -101,7 +101,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = exitCode === 0 ? 'completed' : 'failed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.getRecentOutput(8000);
+        del.result = agent.getRecentOutput(16000);
       }
     }
     return;
@@ -111,13 +111,13 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
     if (del.toAgentId === agent.id && del.status === 'active') {
       del.status = exitCode === 0 ? 'completed' : 'failed';
       del.completedAt = new Date().toISOString();
-      del.result = agent.getRecentOutput(8000);
+      del.result = agent.getRecentOutput(16000);
     }
   }
 
   const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
-  const rawOutput2 = agent.getRecentOutput(8000);
-  const cleanPreview2 = rawOutput2.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-6000);
+  const rawOutput2 = agent.getRecentOutput(16000);
+  const cleanPreview2 = rawOutput2.replace(/\[\[\[[\s\S]*?\]\]\]/g, '').replace(/\[\[\[[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const summary = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${agent.task || 'none'}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
 
