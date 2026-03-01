@@ -100,6 +100,7 @@ export function TimelinePage({ api, ws }: Props) {
   const storeAgents = useAppStore((s) => s.agents);
   const announcements = useAccessibilityAnnouncements();
   const prevErrorRef = useRef<string | null>(null);
+  const prevCommCountRef = useRef<number>(0);
 
   // Lead selection
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
@@ -120,6 +121,18 @@ export function TimelinePage({ api, ws }: Props) {
     }
     prevErrorRef.current = error;
   }, [error, announcements]);
+
+  // Announce new events for screen readers
+  useEffect(() => {
+    if (!data) return;
+    const count = data.communications.length;
+    const newCount = count - prevCommCountRef.current;
+    if (prevCommCountRef.current > 0 && newCount > 0) {
+      const latest = data.communications[count - 1];
+      announcements.announceNewEvents(newCount, latest?.type);
+    }
+    prevCommCountRef.current = count;
+  }, [data, announcements]);
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
