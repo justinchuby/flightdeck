@@ -153,7 +153,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
                   type: 'text' as const,
                   text: m.content,
-                  sender: m.sender as 'agent' | 'user' | 'system',
+                  sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                   timestamp: new Date(m.timestamp).getTime(),
                 }));
                 const current = useLeadStore.getState().projects[l.id];
@@ -196,7 +196,7 @@ export function LeadDashboard({ api, ws }: Props) {
             const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
               type: 'text' as const,
               text: m.content,
-              sender: m.sender as 'agent' | 'user' | 'system',
+              sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
               timestamp: new Date(m.timestamp).getTime(),
             }));
             // Only set if still no messages (avoid overwriting live data)
@@ -292,6 +292,12 @@ export function LeadDashboard({ api, ws }: Props) {
       if (msg.type === 'agent:text' && msg.agentId === selectedLeadId) {
         const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
         store.appendToLastAgentMessage(msg.agentId, rawText);
+      }
+
+      // Stream PL reasoning/thinking into chat (collapsed in UI)
+      if (msg.type === 'agent:thinking' && msg.agentId === selectedLeadId) {
+        const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
+        store.appendToThinkingMessage(msg.agentId, rawText);
       }
 
       // Stream PL rich content into chat
@@ -1350,6 +1356,11 @@ export function LeadDashboard({ api, ws }: Props) {
                       </div>
                     </div>
                   );
+                }
+
+                // Thinking/reasoning — collapsed by default, expandable on click
+                if (msg.sender === 'thinking') {
+                  return <CollapsibleReasoningBlock key={i} text={msg.text} timestamp={ts} />;
                 }
 
                 // Agent (lead) messages: no bubble, just flowing text
@@ -3020,6 +3031,35 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
     );
   }
   return null;
+}
+
+/** Collapsed-by-default reasoning block for lead thinking — click to expand */
+function CollapsibleReasoningBlock({ text, timestamp }: { text: string; timestamp: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const preview = text.replace(/[\n\r]+/g, ' ').slice(0, 80);
+  return (
+    <div className="py-0.5">
+      <div
+        className="flex items-start gap-2 cursor-pointer group"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 text-xs text-th-text-muted">
+            {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+            <Lightbulb className="w-3 h-3 shrink-0" />
+            <span className="italic">Reasoning</span>
+            {!expanded && preview && <span className="text-th-text-muted/60 truncate ml-1">— {preview}{text.length > 80 ? '…' : ''}</span>}
+          </div>
+          {expanded && (
+            <div className="mt-1 ml-5 font-mono text-xs text-th-text-muted italic whitespace-pre-wrap max-h-60 overflow-y-auto">
+              {text}
+            </div>
+          )}
+        </div>
+        <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{timestamp}</span>
+      </div>
+    </div>
+  );
 }
 
 /** Collapsed-by-default [[[ command ]]] block with click to expand */

@@ -79,6 +79,7 @@ interface LeadState {
   addMessage: (leadId: string, msg: AcpTextChunk) => void;
   setMessages: (leadId: string, messages: AcpTextChunk[]) => void;
   appendToLastAgentMessage: (leadId: string, text: string) => void;
+  appendToThinkingMessage: (leadId: string, text: string) => void;
   promoteQueuedMessages: (leadId: string) => void;
   updateToolCall: (leadId: string, toolCall: AcpToolCall) => void;
   addActivity: (leadId: string, event: ActivityEvent) => void;
@@ -187,6 +188,20 @@ export const useLeadStore = create<LeadState>((set) => ({
         msgs.push({ type: 'text', text: text, sender: 'agent', timestamp: Date.now() });
       }
       return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now(), pendingNewline: false } } };
+    }),
+
+  appendToThinkingMessage: (leadId, text) =>
+    set((s) => {
+      const proj = s.projects[leadId] || emptyProject();
+      const msgs = [...proj.messages];
+      const lastIdx = msgs.length - 1;
+      if (lastIdx >= 0 && msgs[lastIdx].sender === 'thinking') {
+        msgs[lastIdx] = { ...msgs[lastIdx], text: (msgs[lastIdx].text || '') + text };
+      } else {
+        msgs.push({ type: 'text', text, sender: 'thinking', timestamp: Date.now() });
+      }
+      // Set pendingNewline so next agent text starts a new message (paragraph break after reasoning)
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, pendingNewline: true } } };
     }),
 
   promoteQueuedMessages: (leadId) =>
