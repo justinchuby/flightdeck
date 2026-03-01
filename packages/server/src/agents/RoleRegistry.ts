@@ -338,6 +338,9 @@ Delegate a task to an existing agent (use the agent's ID from QUERY_CREW or crea
 Send a message to a running agent (use the agent's ID):
 \`⟦⟦ AGENT_MESSAGE {"to": "agent-id", "content": "Please also add input validation"} ⟧⟧\`
 
+Interrupt an agent to cancel its current work and deliver a new message:
+\`⟦⟦ INTERRUPT {"to": "agent-id", "content": "Stop current work — priorities changed, work on X instead"} ⟧⟧\`
+
 Log a decision you've made. Use needsConfirmation: true for design choices, ambiguities, and anything the user should review — but the team will NOT wait for approval. The user reviews asynchronously and can provide feedback or reject if they want changes. Only system-level actions (e.g. REQUEST_LIMIT_CHANGE) actually block on approval:
 \`⟦⟦ DECISION {"title": "Use PostgreSQL over SQLite", "rationale": "Need concurrent writes for production", "needsConfirmation": true} ⟧⟧\`
 \`⟦⟦ DECISION {"title": "Refactored auth to use JWT", "rationale": "Simpler than session-based auth"} ⟧⟧\`
