@@ -406,7 +406,7 @@ Management commands:
 - \`⟦⟦ CANCEL_TASK {"id": "task-id"} ⟧⟧\` — remove from DAG
 - \`⟦⟦ ADD_DEPENDENCY {"taskId": "task-b", "depends_on": ["task-a"]} ⟧⟧\` — add a dependency between tasks
 - \`⟦⟦ RESET_DAG ⟧⟧\` — clear all tasks and start over
-- \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause heartbeat nudges (e.g. when waiting for user input). Resumes automatically when you start running again.
+- \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause idle heartbeat nudge messages only (e.g. when waiting for user input). Resumes automatically when you start running again. Note: CREW_UPDATE status messages are separate from heartbeat nudges — they are always delivered periodically and cannot be paused with HALT_HEARTBEAT.
 - \`⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
 
 == AUTO-DAG FROM DELEGATIONS ==
