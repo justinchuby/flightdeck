@@ -6,6 +6,10 @@
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -167,15 +171,43 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
       return;
     }
 
-    const escapedMsg = message.replace(/"/g, '\\"');
-    const fileList = files.join(' ');
-    agent.sendMessage(`[System] Scoped commit ready. Run:\ngit add ${fileList} && git commit -m "${escapedMsg}\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"`);
-    // Log to ActivityLedger so EventPipeline (CIRunner) can detect the commit
-    ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'file_edit',
-      `Commit: ${message.slice(0, 120)} (${files.length} files)`,
-      { type: 'commit', files, message },
-    );
-    logger.info('commit', `COMMIT helper for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
+    const cwd = agent.cwd || process.cwd();
+    // Shell-quote each file path to handle spaces and special characters
+    const quotedFiles = files.map(f => `'${f.replace(/'/g, "'\\''")}'`).join(' ');
+    const escapedMsg = message.replace(/'/g, "'\\''");
+    const trailer = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>';
+    const commitMsg = `${escapedMsg}\n\n${trailer}`;
+
+    // Execute scoped git add + commit directly (enforced, not suggested)
+    execAsync(`git add ${quotedFiles} && git commit -m '${commitMsg}'`, { cwd, timeout: 30_000 })
+      .then(async ({ stdout }) => {
+        agent.sendMessage(`[System] COMMIT succeeded: ${stdout.trim().split('\n')[0]}`);
+
+        // A6: Post-commit verification — confirm files actually landed on HEAD
+        try {
+          const { stdout: diffOut } = await execAsync('git diff --name-only HEAD~1', { cwd, timeout: 10_000 });
+          const committedFiles = diffOut.trim().split('\n').filter(Boolean);
+          const missing = files.filter(f => !committedFiles.includes(f));
+          if (missing.length > 0) {
+            agent.sendMessage(`[System] Warning: ${missing.length} expected file(s) not found in commit: ${missing.join(', ')}`);
+            logger.warn('commit', `Post-commit verification: ${missing.length} files missing for ${agent.id.slice(0, 8)}: ${missing.join(', ')}`);
+          }
+        } catch {
+          // Verification is best-effort — don't fail the commit if diff fails
+          logger.debug('commit', `Post-commit verification skipped for ${agent.id.slice(0, 8)} (git diff failed)`);
+        }
+
+        // Log to ActivityLedger only after verified commit
+        ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'file_edit',
+          `Commit: ${message.slice(0, 120)} (${files.length} files)`,
+          { type: 'commit', files, message },
+        );
+        logger.info('commit', `COMMIT for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
+      })
+      .catch((err: any) => {
+        agent.sendMessage(`[System] COMMIT failed: ${err.message?.split('\n')[0] ?? 'unknown error'}`);
+        logger.warn('commit', `COMMIT exec failed for ${agent.id.slice(0, 8)}: ${err.message}`);
+      });
   } catch (err: any) {
     agent.sendMessage(`[System] COMMIT error: use {"message": "your commit message"}`);
   }
