@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Database } from '../db/database.js';
 import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
 
@@ -12,6 +12,7 @@ describe('FileLockRegistry', () => {
   });
 
   afterEach(() => {
+    registry.stopExpiryCheck();
     db.close();
   });
 
@@ -123,5 +124,92 @@ describe('FileLockRegistry', () => {
     const locks = registry.getByAgent('agent-1');
     expect(locks.length).toBe(2);
     expect(locks.every((l) => l.agentId === 'agent-1')).toBe(true);
+  });
+
+  describe('TTL expiry timer', () => {
+    it('emits lock:expired events when timer fires', () => {
+      vi.useFakeTimers();
+      const expiredEvents: any[] = [];
+      registry.on('lock:expired', (data) => expiredEvents.push(data));
+
+      // Insert an already-expired lock
+      const pastTime = '2000-01-01 00:00:00';
+      db.run(
+        `INSERT INTO file_locks (file_path, agent_id, agent_role, reason, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        ['src/stale.ts', 'agent-1', 'developer', 'editing', pastTime],
+      );
+
+      registry.startExpiryCheck(100);
+      vi.advanceTimersByTime(100);
+
+      expect(expiredEvents.length).toBe(1);
+      expect(expiredEvents[0].filePath).toBe('src/stale.ts');
+      expect(expiredEvents[0].agentId).toBe('agent-1');
+
+      vi.useRealTimers();
+    });
+
+    it('stopExpiryCheck stops the timer', () => {
+      vi.useFakeTimers();
+      const expiredEvents: any[] = [];
+      registry.on('lock:expired', (data) => expiredEvents.push(data));
+
+      registry.startExpiryCheck(100);
+      registry.stopExpiryCheck();
+
+      // Insert expired lock after stop
+      const pastTime = '2000-01-01 00:00:00';
+      db.run(
+        `INSERT INTO file_locks (file_path, agent_id, agent_role, reason, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        ['src/stale.ts', 'agent-1', 'developer', 'editing', pastTime],
+      );
+
+      vi.advanceTimersByTime(200);
+      expect(expiredEvents.length).toBe(0);
+
+      vi.useRealTimers();
+    });
+
+    it('startExpiryCheck is idempotent', () => {
+      vi.useFakeTimers();
+      const expiredEvents: any[] = [];
+      registry.on('lock:expired', (data) => expiredEvents.push(data));
+
+      // Insert expired lock
+      const pastTime = '2000-01-01 00:00:00';
+      db.run(
+        `INSERT INTO file_locks (file_path, agent_id, agent_role, reason, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        ['src/stale.ts', 'agent-1', 'developer', 'editing', pastTime],
+      );
+
+      // Call start twice — should not create duplicate timers
+      registry.startExpiryCheck(100);
+      registry.startExpiryCheck(100);
+      vi.advanceTimersByTime(100);
+
+      expect(expiredEvents.length).toBe(1);
+
+      vi.useRealTimers();
+    });
+
+    it('expired lock is removed and file becomes available', () => {
+      vi.useFakeTimers();
+      registry.startExpiryCheck(100);
+
+      // Insert expired lock
+      const pastTime = '2000-01-01 00:00:00';
+      db.run(
+        `INSERT INTO file_locks (file_path, agent_id, agent_role, reason, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        ['src/freed.ts', 'agent-1', 'developer', 'editing', pastTime],
+      );
+
+      vi.advanceTimersByTime(100);
+
+      // Lock should now be available for another agent
+      const result = registry.acquire('agent-2', 'reviewer', 'src/freed.ts');
+      expect(result.ok).toBe(true);
+
+      vi.useRealTimers();
+    });
   });
 });

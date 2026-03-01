@@ -587,9 +587,15 @@ export function apiRouter(
       writeSSE('lock', { type: 'released', ...data });
     };
 
+    const onLockExpired = (data: any) => {
+      if (teamAgentIds.size > 0 && !teamAgentIds.has(data.agentId)) return;
+      writeSSE('lock', { type: 'expired', ...data });
+    };
+
     activityLedger.on('activity', onActivity);
     lockRegistry.on('lock:acquired', onLockAcquired);
     lockRegistry.on('lock:released', onLockReleased);
+    lockRegistry.on('lock:expired', onLockExpired);
 
     // Keepalive every 30s to prevent proxy/load-balancer timeouts
     const keepaliveTimer = setInterval(() => {
@@ -603,6 +609,7 @@ export function apiRouter(
       activityLedger.off('activity', onActivity);
       lockRegistry.off('lock:acquired', onLockAcquired);
       lockRegistry.off('lock:released', onLockReleased);
+      lockRegistry.off('lock:expired', onLockExpired);
       clearInterval(keepaliveTimer);
     });
   });

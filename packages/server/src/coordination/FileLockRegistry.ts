@@ -45,10 +45,25 @@ const expiredFilter = sql`${fileLocks.expiresAt} <= datetime('now')`;
 
 export class FileLockRegistry extends EventEmitter {
   private db: Database;
+  private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(db: Database) {
     super();
     this.db = db;
+  }
+
+  /** Start a periodic timer that actively cleans expired locks and emits events. */
+  startExpiryCheck(intervalMs = 30_000): void {
+    if (this.expiryTimer) return;
+    this.expiryTimer = setInterval(() => this._cleanExpired(), intervalMs);
+  }
+
+  /** Stop the periodic expiry check timer. */
+  stopExpiryCheck(): void {
+    if (this.expiryTimer) {
+      clearInterval(this.expiryTimer);
+      this.expiryTimer = null;
+    }
   }
 
   /** Validate file path to prevent traversal attacks */

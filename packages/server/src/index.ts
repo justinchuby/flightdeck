@@ -81,6 +81,7 @@ if (persistedMaxAgents) {
 config = getConfig();
 
 const lockRegistry = new FileLockRegistry(db);
+lockRegistry.startExpiryCheck(); // actively clean expired locks every 30s
 const activityLedger = new ActivityLedger(db);
 
 // Reactive event pipeline — auto-triggers on ActivityLedger events
@@ -232,11 +233,6 @@ eagerScheduler.on('task:ready', ({ taskId }: { taskId: string }) => {
 // Register scheduled background tasks
 const scheduler = new Scheduler();
 scheduler.register({
-  id: 'expired-lock-cleanup',
-  interval: 60_000, // every minute
-  run: () => { lockRegistry.cleanExpired(); },
-});
-scheduler.register({
   id: 'activity-log-prune',
   interval: 3_600_000, // every hour
   run: () => activityLedger.prune(50_000),
@@ -347,6 +343,7 @@ function gracefulShutdown(signal: string) {
   agentManager.shutdownAll();
   activityLedger.stop();
   timerRegistry.stop();
+  lockRegistry.stopExpiryCheck();
   lockRegistry.cleanExpired();
   db.close();
   httpServer.close(() => {

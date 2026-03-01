@@ -195,6 +195,10 @@ export class WebSocketServer {
       this.broadcastAll({ type: 'lock:released', ...data });
     });
 
+    lockRegistry.on('lock:expired', (data: any) => {
+      this.broadcastAll({ type: 'lock:expired', ...data });
+    });
+
     activityLedger.on('activity', (entry: any) => {
       this.broadcastAll({ type: 'activity', entry });
     });
