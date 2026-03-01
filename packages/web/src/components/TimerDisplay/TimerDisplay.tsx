@@ -131,12 +131,12 @@ export function TimerDisplay() {
 
   const handleCancel = useCallback(
     async (timerId: string) => {
-      // Optimistic removal
+      // Optimistic removal — server returns 200/404/409, all safe after local removal
       removeTimer(timerId);
       try {
         await apiFetch(`/timers/${timerId}`, { method: 'DELETE' });
       } catch {
-        // Server may not have DELETE endpoint yet — removal already done optimistically
+        // 404 (not found) or 409 (already fired/cancelled) are fine — timer already removed locally
       }
     },
     [removeTimer],
