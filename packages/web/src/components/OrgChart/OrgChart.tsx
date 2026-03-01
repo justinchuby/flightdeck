@@ -360,28 +360,32 @@ export function OrgChart({ api, ws }: Props) {
     : agents; // Show all when no lead selected
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* Page header + Lead selector */}
+    <div className="flex-1 overflow-y-auto space-y-0">
+      {/* Project tabs — always visible */}
+      {leads.length > 0 && (
+        <nav className="flex items-center gap-1 px-4 pt-2 overflow-x-auto border-b border-th-border-muted" role="tablist" aria-label="Project selection">
+          {leads.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => setSelectedLeadId(l.id)}
+              role="tab"
+              aria-selected={selectedLeadId === l.id}
+              className={`px-4 py-2 text-xs whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                selectedLeadId === l.id
+                  ? 'border-accent text-accent font-medium bg-th-bg'
+                  : 'border-transparent text-th-text-muted hover:text-th-text hover:border-th-border'
+              }`}
+            >
+              {l.projectName || l.role?.name || l.id.slice(0, 8)}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <div className="p-4 space-y-4">
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Org Chart</h2>
-        {leads.length > 1 && (
-          <div className="flex gap-2 items-center">
-            <span className="text-sm text-th-text-muted">Lead:</span>
-            {leads.map((l) => (
-              <button
-                key={l.id}
-                onClick={() => setSelectedLeadId(l.id)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
-                  selectedLeadId === l.id
-                    ? 'bg-accent/20 text-accent'
-                    : 'bg-th-bg-muted/50 text-th-text-muted hover:text-th-text'
-                }`}
-              >
-                {l.projectName || l.id.slice(0, 8)}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Hierarchy section */}
@@ -430,6 +434,7 @@ export function OrgChart({ api, ws }: Props) {
           <CommsMatrix entries={allEntries} agents={teamAgents} />
         )}
       </section>
+      </div>
     </div>
   );
 }
