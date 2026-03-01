@@ -822,13 +822,32 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
-  /** Keep all lead agents' budget info in sync with current state */
+  /** Keep all agents' budget info in sync with current state */
   private updateLeadBudgets(): void {
     const running = this.getRunningCount();
+    const budget = { maxConcurrent: this.maxConcurrent, runningCount: running };
     for (const agent of this.getAll()) {
-      if (agent.role.id === 'lead') {
-        agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: running };
+      agent.budget = budget;
+    }
+  }
+
+  /** Auto-add a newly spawned agent to groups that have matching role criteria */
+  private autoAddToRoleGroups(agent: Agent): void {
+    const leadId = agent.parentId;
+    if (!leadId) return;
+    try {
+      const roleGroups = this.chatGroupRegistry.getGroupsWithRoles(leadId);
+      for (const group of roleGroups) {
+        if (group.roles.some((r) => r.toLowerCase() === agent.role.id.toLowerCase())) {
+          const added = this.chatGroupRegistry.addMembers(leadId, group.name, [agent.id]);
+          if (added.length > 0) {
+            agent.sendMessage(`[System] You've been auto-added to group "${group.name}" (matches your role "${agent.role.id}"). Send messages: [[[ GROUP_MESSAGE {"group": "${group.name}", "content": "your message"} ]]]`);
+            logger.info('groups', `Auto-added ${agent.role.name} (${agent.id.slice(0, 8)}) to group "${group.name}" via role criteria`);
+          }
+        }
       }
+    } catch (err) {
+      logger.warn('groups', `Failed to auto-add agent to role groups: ${(err as Error).message}`);
     }
   }
 }
