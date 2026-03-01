@@ -56,6 +56,37 @@ export interface FileConflict {
   tasks: string[];
 }
 
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'to', 'of', 'in', 'for', 'on',
+  'and', 'or', 'with', 'that', 'this', 'it', 'from', 'by', 'as', 'at',
+  'be', 'do', 'not', 'all', 'if', 'no', 'so', 'implement', 'fix', 'add',
+  'update', 'create', 'write', 'make', 'use', 'task', 'work',
+]);
+
+/** Extract meaningful words from text for similarity comparison */
+function extractWords(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter(w => w.length > 2 && !STOP_WORDS.has(w))
+  );
+}
+
+/**
+ * Compute similarity between a delegation task description and a DAG task's description/title.
+ * Returns a score between 0 and 1 (Dice coefficient of meaningful word overlap).
+ */
+export function descriptionSimilarity(delegationText: string, dagDescription: string, dagTitle?: string): number {
+  const delegationWords = extractWords(delegationText);
+  if (delegationWords.size === 0) return 0;
+
+  const dagText = dagTitle ? `${dagTitle} ${dagDescription}` : dagDescription;
+  const dagWords = extractWords(dagText);
+  if (dagWords.size === 0) return 0;
+
+  const shared = [...delegationWords].filter(w => dagWords.has(w)).length;
+  return (2 * shared) / (delegationWords.size + dagWords.size);
+}
+
 function rowToTask(row: typeof dagTasks.$inferSelect): DagTask {
   return {
     id: row.id,
@@ -521,6 +552,51 @@ export class TaskDAG extends EventEmitter {
       .orderBy(desc(dagTasks.priority), asc(dagTasks.createdAt))
       .get();
     return row ? rowToTask(row) : null;
+  }
+
+  /**
+   * Find a ready DAG task using smart matching.
+   * Priority: 1) explicit dagTaskId, 2) role + description fuzzy match, 3) role-only fallback.
+   */
+  findReadyTask(leadId: string, options: { dagTaskId?: string; role: string; taskDescription?: string }): DagTask | null {
+    // Primary: explicit dagTaskId lookup
+    if (options.dagTaskId) {
+      const task = this.getTask(leadId, options.dagTaskId);
+      if (task && task.dagStatus === 'ready') return task;
+      return null;
+    }
+
+    // Get all ready tasks for this role
+    const candidates = this.db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(and(
+        eq(dagTasks.leadId, leadId),
+        eq(dagTasks.role, options.role),
+        eq(dagTasks.dagStatus, 'ready'),
+      ))
+      .orderBy(desc(dagTasks.priority), asc(dagTasks.createdAt))
+      .all()
+      .map(rowToTask);
+
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    // Multiple candidates with same role — use description to disambiguate
+    if (options.taskDescription) {
+      const scored = candidates.map(task => ({
+        task,
+        score: descriptionSimilarity(options.taskDescription!, task.description, task.title),
+      }));
+      scored.sort((a, b) => b.score - a.score);
+
+      if (scored[0].score > 0.2) {
+        return scored[0].task;
+      }
+    }
+
+    // Fallback: first by priority/createdAt (original behavior)
+    return candidates[0];
   }
 
   /** Get a transition validation error (for use by CommandDispatcher error messages) */

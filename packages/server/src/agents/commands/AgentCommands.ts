@@ -12,6 +12,13 @@ import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
+import {
+  parseCommandPayload,
+  createAgentSchema,
+  delegateSchema,
+  terminateAgentSchema,
+  cancelDelegationSchema,
+} from './commandSchemas.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -219,7 +226,8 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
   if (!match) return;
 
   try {
-    const req = JSON.parse(match[1]);
+    const req = parseCommandPayload(agent, match[1], createAgentSchema, 'CREATE_AGENT');
+    if (!req) return;
 
     // Lead, architect, and agents with delegation capability can create agents
     const canCreate = agent.role.id === 'lead' || agent.role.id === 'architect'
@@ -227,11 +235,6 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
     if (!canCreate) {
       logger.warn('agent', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CREATE_AGENT — only leads and architects can create agents.`);
       agent.sendMessage(`[System] Only the Project Lead and Architects can create agents. Ask the lead if you need help from a specialist.`);
-      return;
-    }
-
-    if (!req.role) {
-      agent.sendMessage(`[System] CREATE_AGENT requires a "role" field. Available roles: ${ctx.roleRegistry.getAll().map(r => r.id).join(', ')}`);
       return;
     }
 
@@ -270,9 +273,11 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       // Link to DAG: mark the corresponding DAG task as running
       let dagNote = '';
       if (agent.role.id === 'lead') {
-        const dagTask = req.dagTaskId
-          ? ctx.taskDAG.getTask(agent.id, req.dagTaskId)
-          : ctx.taskDAG.findReadyTaskByRole(agent.id, role.id);
+        const dagTask = ctx.taskDAG.findReadyTask(agent.id, {
+          dagTaskId: req.dagTaskId,
+          role: role.id,
+          taskDescription: req.task,
+        });
         if (dagTask) {
           const started = ctx.taskDAG.startTask(agent.id, dagTask.id, child.id);
           if (started) {
@@ -280,6 +285,8 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
             child.dagTaskId = dagTask.id;
             logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
           }
+        } else if (req.dagTaskId) {
+          dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
         } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
           dagNote = `\n⚠️ You have an active DAG plan. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
         } else if (ctx.taskDAG.hasAnyTasks(agent.id)) {
@@ -361,8 +368,8 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
   if (!match) return;
 
   try {
-    const req = JSON.parse(match[1]);
-    if (!req.to || !req.task) return;
+    const req = parseCommandPayload(agent, match[1], delegateSchema, 'DELEGATE');
+    if (!req) return;
 
     // Lead, architect, and agents with delegation capability can delegate
     const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect'
@@ -401,9 +408,11 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     // Link to DAG: mark the corresponding DAG task as running
     let dagNote = '';
     if (agent.role.id === 'lead') {
-      const dagTask = req.dagTaskId
-        ? ctx.taskDAG.getTask(agent.id, req.dagTaskId)
-        : ctx.taskDAG.findReadyTaskByRole(agent.id, child.role.id);
+      const dagTask = ctx.taskDAG.findReadyTask(agent.id, {
+        dagTaskId: req.dagTaskId,
+        role: child.role.id,
+        taskDescription: req.task,
+      });
       if (dagTask) {
         const started = ctx.taskDAG.startTask(agent.id, dagTask.id, child.id);
         if (started) {
@@ -411,6 +420,8 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
           child.dagTaskId = dagTask.id;
           logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
         }
+      } else if (req.dagTaskId) {
+        dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
       } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
         dagNote = `\n⚠️ You have an active DAG plan. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
       } else if (ctx.taskDAG.hasAnyTasks(agent.id)) {
@@ -460,8 +471,8 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
   if (!match) return;
 
   try {
-    const req = JSON.parse(match[1]);
-    if (!req.id) return;
+    const req = parseCommandPayload(agent, match[1], terminateAgentSchema, 'TERMINATE_AGENT');
+    if (!req) return;
 
     if (agent.role.id !== 'lead') {
       agent.sendMessage(`[System] Only the Project Lead can terminate agents.`);
@@ -511,7 +522,8 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
   if (!match) return;
 
   try {
-    const req = JSON.parse(match[1]);
+    const req = parseCommandPayload(agent, match[1], cancelDelegationSchema, 'CANCEL_DELEGATION');
+    if (!req) return;
 
     if (agent.role.id !== 'lead') {
       logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CANCEL_DELEGATION — rejected.`);
@@ -587,8 +599,6 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
 
       logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled delegation ${req.delegationId} to ${del.toRole} (${del.toAgentId.slice(0, 8)})`);
 
-    } else {
-      agent.sendMessage(`[System] CANCEL_DELEGATION requires either "agentId" or "delegationId". Example: [[[ CANCEL_DELEGATION {"agentId": "agent-id"} ]]]`);
     }
   } catch (err) {
     logger.debug('command', 'Failed to parse CANCEL_DELEGATION command', { error: (err as Error).message });
