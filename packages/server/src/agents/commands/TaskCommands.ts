@@ -145,6 +145,13 @@ function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string):
           skippedAgent.sendMessage(`[System] Task "${req.id}" was skipped by the Project Lead. Please stop working on it.`);
         }
         ctx.lockRegistry.releaseAll(result.skippedAgentId);
+        // Cancel the active delegation to the orphaned agent
+        for (const [, del] of ctx.delegations) {
+          if (del.toAgentId === result.skippedAgentId && del.status === 'active') {
+            del.status = 'cancelled';
+            del.completedAt = new Date().toISOString();
+          }
+        }
       }
       agent.sendMessage(`[System] Task "${req.id}" skipped. Dependents may now be ready. Use TASK_STATUS to check.`);
     } else {
