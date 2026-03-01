@@ -117,10 +117,15 @@ export function BrushTimeSelector({
     }));
   }, [visibleRange, xScale, innerHeight]);
 
+  // Pixel positions for dimming overlays outside the brush selection
+  const brushX0 = Math.max(0, xScale(visibleRange.start));
+  const brushX1 = Math.min(innerWidth, xScale(visibleRange.end));
+  const isZoomed = brushX1 - brushX0 < innerWidth - 2; // 2px tolerance
+
   if (innerWidth <= 0) return null;
 
   return (
-    <div className="border-b border-th-border-muted bg-th-bg/50" style={{ height: BRUSH_HEIGHT }} role="region" aria-label="Timeline range selector: drag handles to adjust visible time range" aria-roledescription="minimap">
+    <div className="relative border-b border-th-border-muted bg-th-bg/50" style={{ height: BRUSH_HEIGHT }} role="region" aria-label="Timeline range selector: drag handles to adjust visible time range" aria-roledescription="minimap">
       <svg width={width} height={BRUSH_HEIGHT} aria-hidden="true">
         <Group top={PADDING.top} left={effectiveLeft}>
           {/* Mini agent lanes background */}
@@ -151,6 +156,20 @@ export function BrushTimeSelector({
             );
           })}
 
+          {/* Dimming overlays outside the brush selection */}
+          {isZoomed && (
+            <>
+              {brushX0 > 0 && (
+                <rect x={0} y={0} width={brushX0} height={innerHeight}
+                  fill="rgba(0, 0, 0, 0.5)" pointerEvents="none" />
+              )}
+              {brushX1 < innerWidth && (
+                <rect x={brushX1} y={0} width={innerWidth - brushX1} height={innerHeight}
+                  fill="rgba(0, 0, 0, 0.5)" pointerEvents="none" />
+              )}
+            </>
+          )}
+
           {/* Brush overlay */}
           <Brush
             xScale={xScale}
@@ -176,6 +195,13 @@ export function BrushTimeSelector({
           />
         </Group>
       </svg>
+
+      {/* Hint text when not zoomed */}
+      {!isZoomed && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-[10px] text-th-text-muted/50">Zoom in to pan minimap</span>
+        </div>
+      )}
     </div>
   );
 }
