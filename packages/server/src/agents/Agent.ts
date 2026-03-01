@@ -564,6 +564,23 @@ CREW_UPDATE ]]]`;
     return this.pendingMessages.map((msg) => msg.slice(0, 100));
   }
 
+  /** Remove a pending message by index. Returns true if removed. */
+  removePendingMessage(index: number): boolean {
+    if (index < 0 || index >= this.pendingMessages.length) return false;
+    this.pendingMessages.splice(index, 1);
+    return true;
+  }
+
+  /** Move a pending message from one index to another. Returns true if moved. */
+  reorderPendingMessage(fromIndex: number, toIndex: number): boolean {
+    if (fromIndex < 0 || fromIndex >= this.pendingMessages.length) return false;
+    if (toIndex < 0 || toIndex >= this.pendingMessages.length) return false;
+    if (fromIndex === toIndex) return true;
+    const [msg] = this.pendingMessages.splice(fromIndex, 1);
+    this.pendingMessages.splice(toIndex, 0, msg);
+    return true;
+  }
+
   /** Cancel the agent's current work (ACP cancel signal) */
   async interrupt(): Promise<void> {
     if (this.acpConnection) {

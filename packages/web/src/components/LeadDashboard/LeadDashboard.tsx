@@ -630,6 +630,41 @@ export function LeadDashboard({ api, ws }: Props) {
     });
   }, [input, selectedLeadId]);
 
+  const removeQueuedMessage = useCallback(async (queueIndex: number) => {
+    if (!selectedLeadId) return;
+    const resp = await fetch(`/api/agents/${selectedLeadId}/queue/${queueIndex}`, { method: 'DELETE' });
+    if (resp.ok) {
+      const store = useLeadStore.getState();
+      const msgs = store.projects[selectedLeadId]?.messages || [];
+      let seen = 0;
+      const updated = msgs.filter((m: AcpTextChunk) => {
+        if (!m.queued) return true;
+        return seen++ !== queueIndex;
+      });
+      store.setMessages(selectedLeadId, updated);
+    }
+  }, [selectedLeadId]);
+
+  const reorderQueuedMessage = useCallback(async (fromIndex: number, toIndex: number) => {
+    if (!selectedLeadId) return;
+    const resp = await fetch(`/api/agents/${selectedLeadId}/queue/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: fromIndex, to: toIndex }),
+    });
+    if (resp.ok) {
+      const store = useLeadStore.getState();
+      const msgs = store.projects[selectedLeadId]?.messages || [];
+      const queued = msgs.filter((m: AcpTextChunk) => m.queued);
+      const nonQueued = msgs.filter((m: AcpTextChunk) => !m.queued);
+      if (fromIndex < queued.length && toIndex < queued.length) {
+        const [moved] = queued.splice(fromIndex, 1);
+        queued.splice(toIndex, 0, moved);
+        store.setMessages(selectedLeadId, [...nonQueued, ...queued]);
+      }
+    }
+  }, [selectedLeadId]);
+
   const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
     // Optimistic update — hide buttons immediately
@@ -1379,14 +1414,29 @@ export function LeadDashboard({ api, ws }: Props) {
               <div className="border-t border-dashed border-th-border px-4 py-2 bg-th-bg-alt/50">
                 <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  Queued
+                  Queued ({messages.filter((m) => m.queued).length})
                 </div>
-                {messages.filter((m) => m.queued).map((msg, i) => (
-                  <div key={`q-${i}`} className="flex justify-end items-center gap-2 py-0.5">
+                {messages.filter((m) => m.queued).map((msg, i, arr) => (
+                  <div key={`q-${i}`} className="flex justify-end items-center gap-1.5 py-0.5 group">
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      {i > 0 && (
+                        <button onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                      )}
+                      {i < arr.length - 1 && (
+                        <button onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                     <span className="text-[10px] text-th-text-muted">
                       {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
-                    <div className="max-w-[80%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
+                    <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
                       {msg.text}
                     </div>
                     <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
