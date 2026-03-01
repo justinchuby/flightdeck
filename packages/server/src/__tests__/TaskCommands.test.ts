@@ -410,7 +410,7 @@ describe('COMPLETE_TASK security', () => {
     expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'task-x');
   });
 
-  it('allows completion when task has no assignedAgentId (unassigned task)', () => {
+  it('denies completion when task is unassigned (no assignedAgentId)', () => {
     const ctx = makeCtx({
       taskDAG: {
         ...makeCtx().taskDAG,
@@ -423,7 +423,8 @@ describe('COMPLETE_TASK security', () => {
     const agent = makeChildAgent('lead-001', { dagTaskId: 'my-task' });
     const handler = getCompleteHandler(ctx);
     handler.handler(agent, '⟦ COMPLETE_TASK {"id": "task-x", "summary": "done"} ⟧');
-    expect(ctx.taskDAG.completeTask).toHaveBeenCalledWith('lead-001', 'task-x');
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('denied'));
+    expect(ctx.taskDAG.completeTask).not.toHaveBeenCalled();
   });
 
   it('skips auth check when using own dagTaskId (not explicit id)', () => {
@@ -488,10 +489,11 @@ describe('ADD_DEPENDENCY command', () => {
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('✓'));
   });
 
-  it('adds dependency via non-lead agent (uses parentId)', () => {
+  it('adds dependency via non-lead agent assigned to the task', () => {
     const ctx = makeCtx({
       taskDAG: {
         ...makeCtx().taskDAG,
+        getTask: vi.fn().mockReturnValue({ id: 'task-a', assignedAgentId: 'child-001', dagStatus: 'running' }),
         addDependency: vi.fn().mockReturnValue(true),
       },
     });
@@ -501,6 +503,23 @@ describe('ADD_DEPENDENCY command', () => {
     handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
+  });
+
+  it('denies non-lead agent adding dependency to unassigned task', () => {
+    const ctx = makeCtx({
+      taskDAG: {
+        ...makeCtx().taskDAG,
+        getTask: vi.fn().mockReturnValue({ id: 'task-a', assignedAgentId: 'other-agent', dagStatus: 'running' }),
+        addDependency: vi.fn(),
+      },
+    });
+    const agent = makeChildAgent('lead-001');
+    const handler = getAddDependencyHandler(ctx);
+
+    handler.handler(agent, '⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧');
+
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('denied'));
+    expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
   });
 
   it('adds multiple dependencies at once', () => {
