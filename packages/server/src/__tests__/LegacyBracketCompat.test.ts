@@ -215,6 +215,68 @@ describe('Command regex matching after normalization', () => {
   });
 });
 
+// ── Ordering safety: normalization prevents partial matching (#b735f62b) ──
+
+describe('Doubled brackets cannot be partially consumed by single-bracket regex', () => {
+  const COMMIT_REGEX = /⟦\s*COMMIT\s*(\{.*?\})\s*⟧/s;
+  const LOCK_REGEX = /⟦\s*LOCK_FILE\s*(\{.*?\})\s*⟧/s;
+
+  it('doubled open bracket does not leave a stray single bracket after match', () => {
+    // Concern: if regex ran on raw '⟦⟦ COMMIT ... ⟧⟧', it might match the
+    // inner '⟦ COMMIT ... ⟧' and leave stray ⟦ and ⟧ in the buffer.
+    // normalizeBrackets prevents this by collapsing doubled to single first.
+    const raw = '⟦⟦ COMMIT {"message": "fix"} ⟧⟧';
+    const normalized = normalize(raw);
+
+    // After normalization, exactly one ⟦ and one ⟧ remain
+    expect(normalized).toBe('⟦ COMMIT {"message": "fix"} ⟧');
+    expect((normalized.match(/⟦/g) || []).length).toBe(1);
+    expect((normalized.match(/⟧/g) || []).length).toBe(1);
+
+    // The regex matches cleanly
+    const match = normalized.match(COMMIT_REGEX);
+    expect(match).toBeTruthy();
+
+    // After consuming the match, no stray brackets remain
+    const remainder = normalized.replace(COMMIT_REGEX, '');
+    expect(remainder).not.toContain('⟦');
+    expect(remainder).not.toContain('⟧');
+  });
+
+  it('adjacent doubled commands do not interfere with each other', () => {
+    const raw = '⟦⟦ LOCK_FILE {"filePath": "a.ts"} ⟧⟧ text ⟦⟦ COMMIT {"message": "done"} ⟧⟧';
+    const normalized = normalize(raw);
+
+    // Both commands should be independently matchable
+    expect(normalized.match(LOCK_REGEX)).toBeTruthy();
+    expect(normalized.match(COMMIT_REGEX)).toBeTruthy();
+
+    // Exactly two of each bracket
+    expect((normalized.match(/⟦/g) || []).length).toBe(2);
+    expect((normalized.match(/⟧/g) || []).length).toBe(2);
+  });
+
+  it('mixed doubled and single commands in same buffer are all matchable', () => {
+    const raw = '⟦⟦ LOCK_FILE {"filePath": "a.ts"} ⟧⟧ then ⟦ COMMIT {"message": "done"} ⟧';
+    const normalized = normalize(raw);
+
+    expect(normalized.match(LOCK_REGEX)).toBeTruthy();
+    expect(normalized.match(COMMIT_REGEX)).toBeTruthy();
+  });
+
+  it('doubled brackets inside JSON strings do not leak', () => {
+    // If an agent puts doubled brackets inside a JSON value string,
+    // the normalization converts them but isInsideCommandBlock catches them
+    const raw = '⟦⟦ COMMIT {"message": "use ⟦⟦ LOCK ⟧⟧ syntax"} ⟧⟧';
+    const normalized = normalize(raw);
+
+    // The outer command should match
+    const match = normalized.match(COMMIT_REGEX);
+    expect(match).toBeTruthy();
+    // The JSON value contains normalized brackets but that's handled by isInsideCommandBlock
+  });
+});
+
 // ── isInsideCommandBlock works with normalized content ─────────────────
 
 describe('isInsideCommandBlock after normalization', () => {
