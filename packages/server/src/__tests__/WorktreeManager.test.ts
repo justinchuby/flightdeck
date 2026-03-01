@@ -171,7 +171,7 @@ describe('WorktreeManager', () => {
       if (typeof cb === 'function') {
         if (cmd.includes('git merge --no-ff')) {
           setTimeout(() => cb(new Error('CONFLICT'), '', ''), 0);
-        } else if (cmd.includes('git diff --name-only')) {
+        } else if (cmd.includes('git diff --name-only --diff-filter=U')) {
           setTimeout(() => cb(null, 'src/index.ts\nsrc/utils.ts\n', ''), 0);
         } else {
           setTimeout(() => cb(null, '', ''), 0);
@@ -184,6 +184,172 @@ describe('WorktreeManager', () => {
 
     expect(result.ok).toBe(false);
     expect(result.conflicts).toEqual(['src/index.ts', 'src/utils.ts']);
+  });
+
+  // ── merge scope validation (A4) ──────────────────────────────
+
+  it('merge reports unlocked files when lockChecker is provided', async () => {
+    const lockChecker = {
+      getByAgent: vi.fn().mockReturnValue([
+        { filePath: 'src/auth.ts' },
+      ]),
+    };
+    const mgrWithLock = new WorktreeManager(REPO, lockChecker);
+
+    // Need to set up the default exec for this new manager
+    await mgrWithLock.create(AGENT_ID);
+    execCalls = [];
+
+    // diff --name-only HEAD...branch returns 2 files, only 1 is locked
+    execHandler.fn = (cmd: string, opts: any, cb: any) => {
+      execCalls.push({ cmd, opts });
+      if (typeof cb === 'function') {
+        if (cmd.includes('git diff --name-only HEAD...')) {
+          setTimeout(() => cb(null, 'src/auth.ts\nsrc/secret.ts\n', ''), 0);
+        } else {
+          setTimeout(() => cb(null, '', ''), 0);
+        }
+      }
+      return { on: vi.fn() } as any;
+    };
+
+    const result = await mgrWithLock.merge(AGENT_ID);
+
+    expect(result.ok).toBe(true);
+    expect(result.unlockedFiles).toEqual(['src/secret.ts']);
+    expect(lockChecker.getByAgent).toHaveBeenCalledWith(AGENT_ID);
+  });
+
+  it('merge emits worktree:unlocked_files event for unlocked files', async () => {
+    const lockChecker = {
+      getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/ok.ts' }]),
+    };
+    const mgrWithLock = new WorktreeManager(REPO, lockChecker);
+    await mgrWithLock.create(AGENT_ID);
+
+    const spy = vi.fn();
+    mgrWithLock.on('worktree:unlocked_files', spy);
+
+    execCalls = [];
+    execHandler.fn = (cmd: string, opts: any, cb: any) => {
+      execCalls.push({ cmd, opts });
+      if (typeof cb === 'function') {
+        if (cmd.includes('git diff --name-only HEAD...')) {
+          setTimeout(() => cb(null, 'src/ok.ts\nsrc/bad.ts\n', ''), 0);
+        } else {
+          setTimeout(() => cb(null, '', ''), 0);
+        }
+      }
+      return { on: vi.fn() } as any;
+    };
+
+    await mgrWithLock.merge(AGENT_ID);
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: AGENT_ID,
+        files: ['src/bad.ts'],
+      }),
+    );
+  });
+
+  it('merge returns no unlockedFiles when all changed files are locked', async () => {
+    const lockChecker = {
+      getByAgent: vi.fn().mockReturnValue([
+        { filePath: 'src/a.ts' },
+        { filePath: 'src/b.ts' },
+      ]),
+    };
+    const mgrWithLock = new WorktreeManager(REPO, lockChecker);
+    await mgrWithLock.create(AGENT_ID);
+
+    execCalls = [];
+    execHandler.fn = (cmd: string, opts: any, cb: any) => {
+      execCalls.push({ cmd, opts });
+      if (typeof cb === 'function') {
+        if (cmd.includes('git diff --name-only HEAD...')) {
+          setTimeout(() => cb(null, 'src/a.ts\nsrc/b.ts\n', ''), 0);
+        } else {
+          setTimeout(() => cb(null, '', ''), 0);
+        }
+      }
+      return { on: vi.fn() } as any;
+    };
+
+    const result = await mgrWithLock.merge(AGENT_ID);
+
+    expect(result.ok).toBe(true);
+    expect(result.unlockedFiles).toBeUndefined();
+  });
+
+  it('merge validation handles glob prefix locks (src/*)', async () => {
+    const lockChecker = {
+      getByAgent: vi.fn().mockReturnValue([
+        { filePath: 'src/*' },
+      ]),
+    };
+    const mgrWithLock = new WorktreeManager(REPO, lockChecker);
+    await mgrWithLock.create(AGENT_ID);
+
+    execCalls = [];
+    execHandler.fn = (cmd: string, opts: any, cb: any) => {
+      execCalls.push({ cmd, opts });
+      if (typeof cb === 'function') {
+        if (cmd.includes('git diff --name-only HEAD...')) {
+          setTimeout(() => cb(null, 'src/deep/nested.ts\ndocs/readme.md\n', ''), 0);
+        } else {
+          setTimeout(() => cb(null, '', ''), 0);
+        }
+      }
+      return { on: vi.fn() } as any;
+    };
+
+    const result = await mgrWithLock.merge(AGENT_ID);
+
+    expect(result.ok).toBe(true);
+    // src/deep/nested.ts is covered by src/*; docs/readme.md is NOT
+    expect(result.unlockedFiles).toEqual(['docs/readme.md']);
+  });
+
+  it('merge skips validation when no lockChecker provided', async () => {
+    await mgr.create(AGENT_ID);
+    execCalls = [];
+
+    const result = await mgr.merge(AGENT_ID);
+
+    expect(result.ok).toBe(true);
+    expect(result.unlockedFiles).toBeUndefined();
+    // No diff --name-only HEAD... call (only the git add/commit and merge commands)
+    const diffScopeCmd = execCalls.find(c => c.cmd.includes('git diff --name-only HEAD...'));
+    expect(diffScopeCmd).toBeUndefined();
+  });
+
+  it('merge validation is defense-in-depth: does not block merge on diff failure', async () => {
+    const lockChecker = {
+      getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/ok.ts' }]),
+    };
+    const mgrWithLock = new WorktreeManager(REPO, lockChecker);
+    await mgrWithLock.create(AGENT_ID);
+
+    execCalls = [];
+    execHandler.fn = (cmd: string, opts: any, cb: any) => {
+      execCalls.push({ cmd, opts });
+      if (typeof cb === 'function') {
+        if (cmd.includes('git diff --name-only HEAD...')) {
+          // Diff command fails
+          setTimeout(() => cb(new Error('git diff failed'), '', ''), 0);
+        } else {
+          setTimeout(() => cb(null, '', ''), 0);
+        }
+      }
+      return { on: vi.fn() } as any;
+    };
+
+    const result = await mgrWithLock.merge(AGENT_ID);
+
+    // Merge still succeeds even if validation fails
+    expect(result.ok).toBe(true);
+    expect(result.unlockedFiles).toBeUndefined();
   });
 
   // ── cleanup ───────────────────────────────────────────────────

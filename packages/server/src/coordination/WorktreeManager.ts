@@ -30,6 +30,13 @@ export interface MergeResult {
   ok: boolean;
   conflicts?: string[];
   mergeCommit?: string;
+  /** Files modified by the agent that were NOT in its lock set. */
+  unlockedFiles?: string[];
+}
+
+/** Minimal interface for lock checking — avoids hard dependency on FileLockRegistry. */
+export interface LockChecker {
+  getByAgent(agentId: string): Array<{ filePath: string }>;
 }
 
 // ── Manager ───────────────────────────────────────────────────────
@@ -37,10 +44,12 @@ export interface MergeResult {
 export class WorktreeManager extends EventEmitter {
   private worktrees: Map<string, WorktreeInfo> = new Map();
   private repoRoot: string;
+  private lockChecker: LockChecker | null = null;
 
-  constructor(repoRoot: string) {
+  constructor(repoRoot: string, lockChecker?: LockChecker) {
     super();
     this.repoRoot = repoRoot;
+    this.lockChecker = lockChecker ?? null;
   }
 
   /** Create an isolated worktree for an agent. */
@@ -90,14 +99,22 @@ export class WorktreeManager extends EventEmitter {
         { cwd: info.path, timeout: 10_000, shell: '/bin/bash' },
       ).catch(() => {}); // Ignore if nothing to commit
 
+      // A4: Validate merge only includes files the agent had locked
+      const unlockedFiles = await this.validateMergeScope(agentId, info);
+
       // Attempt a no-ff merge of the agent branch
       await execAsync(
         `git merge --no-ff "${info.branch}" -m "Merge ${info.branch}"`,
         { cwd: this.repoRoot, timeout: 15_000 },
       );
 
+      if (unlockedFiles.length > 0) {
+        this.emit('worktree:unlocked_files', { agentId, branch: info.branch, files: unlockedFiles });
+        logger.warn('worktree', `Agent ${agentId.slice(0, 8)} merged ${unlockedFiles.length} unlocked file(s): ${unlockedFiles.join(', ')}`);
+      }
+
       this.emit('worktree:merged', { agentId, branch: info.branch });
-      return { ok: true };
+      return { ok: true, unlockedFiles: unlockedFiles.length > 0 ? unlockedFiles : undefined };
     } catch (err: any) {
       // Merge failed — collect conflicting file list, then abort
       try {
@@ -181,6 +198,42 @@ export class WorktreeManager extends EventEmitter {
       logger.info('worktree', `Cleaned ${cleaned} orphaned worktrees`);
     }
     return cleaned;
+  }
+
+  /**
+   * A4: Validate that the agent's branch only modifies files it had locked.
+   * Returns list of modified files NOT covered by the agent's locks.
+   * This is defense-in-depth — worktree isolation and COMMIT enforcement
+   * should prevent this, but the hook catches anything that slips through.
+   */
+  private async validateMergeScope(agentId: string, info: WorktreeInfo): Promise<string[]> {
+    if (!this.lockChecker) return [];
+
+    try {
+      // Get files changed in the agent's branch relative to the merge base
+      const { stdout } = await execAsync(
+        `git diff --name-only HEAD..."${info.branch}"`,
+        { cwd: this.repoRoot, timeout: 10_000 },
+      );
+      const changedFiles = stdout.trim().split('\n').filter(Boolean);
+      if (changedFiles.length === 0) return [];
+
+      const lockedFiles = this.lockChecker.getByAgent(agentId).map(l => l.filePath);
+      const lockedSet = new Set(lockedFiles);
+
+      // Check each changed file against the agent's locks (including glob/prefix patterns)
+      return changedFiles.filter(file => {
+        if (lockedSet.has(file)) return false;
+        // Check glob prefix patterns (e.g. "src/*" covers "src/foo.ts")
+        for (const locked of lockedFiles) {
+          if (locked.endsWith('/*') && file.startsWith(locked.slice(0, -1))) return false;
+        }
+        return true;
+      });
+    } catch {
+      // If diff fails, don't block the merge — this is defense-in-depth
+      return [];
+    }
   }
 
   getWorktree(agentId: string): WorktreeInfo | undefined {
