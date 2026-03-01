@@ -40,6 +40,7 @@ interface TimelineState {
   setSortDirection: (dir: SortDirection) => void;
   setCachedData: (leadId: string, data: TimelineData) => void;
   getCachedData: (leadId: string) => TimelineData | null;
+  clearCachedData: (leadId: string) => void;
   reset: () => void;
 }
 
@@ -83,6 +84,12 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     set((s) => ({ cachedData: { ...s.cachedData, [leadId]: data } })),
 
   getCachedData: (leadId) => get().cachedData[leadId] ?? null,
+
+  clearCachedData: (leadId) =>
+    set((s) => {
+      const { [leadId]: _, ...rest } = s.cachedData;
+      return { cachedData: rest };
+    }),
 
   reset: () =>
     set({

@@ -135,6 +135,27 @@ describe('timelineStore', () => {
     expect(useTimelineStore.getState().getCachedData('lead-2')!.agents[0].id).toBe('b1');
   });
 
+  it('clearCachedData removes data for a specific lead', () => {
+    const data1 = makeTimelineData({ agents: [{ id: 'a1', shortId: 'a1', role: 'dev', createdAt: '2026-03-01T10:00:00Z', segments: [] }] });
+    const data2 = makeTimelineData({ agents: [{ id: 'b1', shortId: 'b1', role: 'arch', createdAt: '2026-03-01T10:00:00Z', segments: [] }] });
+    useTimelineStore.getState().setCachedData('lead-1', data1);
+    useTimelineStore.getState().setCachedData('lead-2', data2);
+
+    useTimelineStore.getState().clearCachedData('lead-1');
+
+    expect(useTimelineStore.getState().getCachedData('lead-1')).toBeNull();
+    expect(useTimelineStore.getState().getCachedData('lead-2')!.agents[0].id).toBe('b1');
+  });
+
+  it('clearCachedData is a no-op for unknown lead', () => {
+    const data = makeTimelineData();
+    useTimelineStore.getState().setCachedData('lead-1', data);
+
+    useTimelineStore.getState().clearCachedData('unknown');
+
+    expect(useTimelineStore.getState().getCachedData('lead-1')).not.toBeNull();
+  });
+
   // ── Reset ────────────────────────────────────────────────────────
 
   it('reset clears all state to defaults', () => {
