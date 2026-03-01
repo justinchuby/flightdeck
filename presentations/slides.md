@@ -326,73 +326,57 @@ tool execution, permissions, and token tracking.
 
 # Built with
 
-<div class="grid grid-cols-4 gap-2 mt-2 text-sm">
+<div class="grid grid-cols-3 gap-3 mt-3 text-sm">
 <div class="bg-gray-800 rounded-lg p-3 border border-blue-500 text-center">
 
 ### 🧠 Agents
 Copilot CLI + ACP
-<div class="text-xs text-gray-500">Full coding agents with tools</div>
+<div class="text-xs text-gray-400">stdio pipes, NDJSON streaming</div>
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-green-500 text-center">
 
-### 🔧 Server
-Node.js + TypeScript
-<div class="text-xs text-gray-500">Event-driven, type-safe</div>
+### 💾 Database
+SQLite + better-sqlite3
+<div class="text-xs text-gray-400">WAL mode, 5 registries, zero ops</div>
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-yellow-500 text-center">
 
-### 💾 Database
-SQLite + Drizzle ORM
-<div class="text-xs text-gray-500">Zero-config, embedded</div>
+### 🔧 Server
+Node.js + TypeScript
+<div class="text-xs text-gray-400">Event-driven orchestration</div>
 
 </div>
+</div>
+
+<div class="grid grid-cols-2 gap-3 mt-3 text-sm">
 <div class="bg-gray-800 rounded-lg p-3 border border-purple-500 text-center">
 
-### ⚡ Real-time
-WebSocket + SSE
-<div class="text-xs text-gray-500">Live dashboard updates</div>
+### 📡 Messaging
+ACP protocol + agent routing
+<div class="text-xs text-gray-400">Direct, group, broadcast channels</div>
 
 </div>
-</div>
-
-<div class="grid grid-cols-4 gap-2 mt-2 text-sm">
 <div class="bg-gray-800 rounded-lg p-3 border border-cyan-500 text-center">
 
-### 🖥️ Dashboard
-React + Vite
-
-</div>
-<div class="bg-gray-800 rounded-lg p-3 border border-orange-500 text-center">
-
-### 📖 Docs
-VitePress
-
-</div>
-<div class="bg-gray-800 rounded-lg p-3 border border-pink-500 text-center">
-
-### 🎬 This Presentation
-Slidev
-
-</div>
-<div class="bg-gray-800 rounded-lg p-3 border border-teal-500 text-center">
-
-### 🤖 Models
-Claude, GPT, Gemini
+### 🧠 Context Management
+Content-hashed status updates
+<div class="text-xs text-gray-400">40-60% token savings on unchanged state</div>
 
 </div>
 </div>
 
-<p class="text-sm text-gray-500 mt-2">Intentionally simple — no Kubernetes, no microservices. Single Node.js process + N Copilot CLI child processes. SQLite handles everything.</p>
+<p class="text-sm text-gray-500 mt-2">Intentionally simple — single Node.js process + N Copilot CLI child processes. SQLite handles all state.</p>
 
 <!--
-Intentionally simple stack. The entire system is one Node.js process plus
-N Copilot CLI child processes. SQLite handles all persistence — agent
-state, task DAG, file locks, group chats, activity logs. One file, zero
-ops. TypeScript end-to-end. This presentation itself is Slidev — built
-by an AI agent in this session. The point: you don't need a complex
-infrastructure to run a team of AI agents.
+Focus: agent coordination infrastructure. Each agent is a Copilot CLI
+process connected via ACP (stdio pipes, NDJSON protocol). SQLite in WAL
+mode handles all persistence — agent state, task DAG, file locks, group
+chats, activity logs. Content-hashed status updates save 40-60% of
+context tokens. The messaging layer routes between agents via three
+channels. No complex infrastructure needed.
+-->
 -->
 
 ---
@@ -1248,7 +1232,7 @@ questions. Skip these during the main presentation.
 
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mb-2">
 
-### 🖥️ Web UI <span class="text-gray-500 text-xs">React + Vite</span>
+### 🖥️ Web UI <span class="text-gray-500 text-xs">Dashboard</span>
 Real-time dashboard, timeline, org chart, DAG, token economics
 
 </div>
@@ -1272,7 +1256,7 @@ Bidirectional connection to each Copilot CLI session
 
 ### 📦 Monorepo
 - `packages/server` — Node.js backend
-- `packages/web` — React frontend
+- `packages/web` — Web dashboard
 - `packages/docs` — Documentation
 
 </div>
@@ -1289,7 +1273,7 @@ Bidirectional connection to each Copilot CLI session
 </div>
 
 <!--
-Architecture reference. Monorepo with three packages. React frontend,
+Architecture reference. Monorepo with three packages. Web dashboard,
 Express backend, SQLite for persistence, WebSocket and SSE for streaming.
 Each agent connects via ACP — the Agent Communication Protocol.
 -->
