@@ -3036,6 +3036,7 @@ function RichContentBlock({ msg }: { msg: AcpTextChunk }) {
 
 /** Collapsed-by-default reasoning block for lead thinking — click to expand */
 function CollapsibleReasoningBlock({ text, timestamp }: { text: string; timestamp: string }) {
+  if (!text?.trim()) return null;
   const [expanded, setExpanded] = useState(false);
   const preview = text.replace(/[\n\r]+/g, ' ').slice(0, 80);
   return (
