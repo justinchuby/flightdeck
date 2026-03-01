@@ -292,7 +292,7 @@ const complexityMonitor = new ComplexityMonitor(process.cwd());
 const dependencyScanner = new DependencyScanner(process.cwd());
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore, coverageTracker, complexityMonitor, dependencyScanner, notificationManager, escalationManager, modelSelector, tokenBudgetOptimizer, meetingSummarizer, reportGenerator, projectTemplateRegistry, knowledgeTransfer));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore, coverageTracker, complexityMonitor, dependencyScanner, notificationManager, escalationManager, modelSelector, tokenBudgetOptimizer, meetingSummarizer, reportGenerator, projectTemplateRegistry, knowledgeTransfer, eventPipeline));
 
 // Serve built web frontend in production
 import path from 'path';

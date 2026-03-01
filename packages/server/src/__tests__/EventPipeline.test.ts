@@ -178,4 +178,25 @@ describe('EventPipeline', () => {
 
     expect(received).toHaveLength(2);
   });
+
+  it('caps seenEventIds set to prevent unbounded memory growth', async () => {
+    const pipeline = new EventPipeline();
+    pipeline.register({
+      eventTypes: '*',
+      name: 'noop',
+      handle: () => {},
+    });
+
+    // Emit 2×MAX_QUEUE_SIZE + 1 unique events to trigger the cap
+    for (let i = 0; i <= 20_000; i++) {
+      pipeline.emit(makeEntry({ id: i + 1, actionType: 'file_edit', agentId: `cap-${i}`, timestamp: `2025-01-01T00:00:00.${String(i).padStart(5, '0')}Z` }));
+    }
+    await new Promise(r => setTimeout(r, 50));
+
+    // After cap: set should have been pruned to ~MAX_QUEUE_SIZE + new entries
+    // The key point: it should NOT be 20_001 (unbounded)
+    // Access via any: seenEventIds is private
+    const seenSize = (pipeline as any).seenEventIds.size;
+    expect(seenSize).toBeLessThanOrEqual(10_001); // MAX_QUEUE_SIZE + 1
+  });
 });

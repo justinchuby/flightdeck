@@ -60,6 +60,14 @@ export class EventPipeline {
     }
     this.seenEventIds.add(eventKey);
 
+    // Cap dedup set to prevent unbounded memory growth
+    if (this.seenEventIds.size > MAX_QUEUE_SIZE * 2) {
+      const iter = this.seenEventIds.values();
+      for (let i = 0; i < MAX_QUEUE_SIZE; i++) {
+        this.seenEventIds.delete(iter.next().value as string);
+      }
+    }
+
     if (this.queue.length >= MAX_QUEUE_SIZE) {
       const dropped: PipelineEvent = { entry: this.queue.shift()!.entry, meta: {} };
       this._dropCount++;
