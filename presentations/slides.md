@@ -377,7 +377,6 @@ chats, activity logs. Content-hashed status updates save 40-60% of
 context tokens. The messaging layer routes between agents via three
 channels. No complex infrastructure needed.
 -->
--->
 
 ---
 
@@ -433,7 +432,7 @@ layout: center
 
 That's how agents talk to the system.
 
-Now let's see how they talk to **each other**.
+Now let's see how the lead **keeps it all running**.
 
 </div>
 
