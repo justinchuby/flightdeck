@@ -136,8 +136,16 @@ function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string):
   try {
     const req = parseCommandPayload(agent, match[1], taskIdSchema, 'SKIP_TASK');
     if (!req) return;
-    const ok = ctx.taskDAG.skipTask(agent.id, req.id);
-    if (ok) {
+    const result = ctx.taskDAG.skipTask(agent.id, req.id);
+    if (result) {
+      // If a running task was skipped, clean up the orphaned agent
+      if (typeof result === 'object' && result.skippedAgentId) {
+        const skippedAgent = ctx.getAgent(result.skippedAgentId);
+        if (skippedAgent) {
+          skippedAgent.sendMessage(`[System] Task "${req.id}" was skipped by the Project Lead. Please stop working on it.`);
+        }
+        ctx.lockRegistry.releaseAll(result.skippedAgentId);
+      }
       agent.sendMessage(`[System] Task "${req.id}" skipped. Dependents may now be ready. Use TASK_STATUS to check.`);
     } else {
       agent.sendMessage(`[System] Cannot skip task "${req.id}".`);

@@ -409,13 +409,17 @@ export class TaskDAG extends EventEmitter {
     return true;
   }
 
-  /** Skip a task (mark as skipped, unblock dependents with warning) */
-  skipTask(leadId: string, taskId: string): boolean {
+  /** Skip a task (mark as skipped, unblock dependents with warning).
+   *  Returns the previously assigned agent ID if the task was running, or true/false. */
+  skipTask(leadId: string, taskId: string): boolean | { skippedAgentId: string } {
     const error = this.validateTransition(leadId, taskId, 'skip');
     if (error) return false;
+    const task = this.getTask(leadId, taskId);
+    const wasRunning = task?.dagStatus === 'running';
+    const previousAgentId = task?.assignedAgentId;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'skipped', completedAt: sql`datetime('now')` })
+      .set({ dagStatus: 'skipped', assignedAgentId: null, completedAt: sql`datetime('now')` })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     // Resolve newly ready tasks (skipped counts as "done" for dependency resolution)
@@ -427,6 +431,9 @@ export class TaskDAG extends EventEmitter {
       );
     }
     this.emit('dag:updated', { leadId });
+    if (wasRunning && previousAgentId) {
+      return { skippedAgentId: previousAgentId };
+    }
     return true;
   }
 
