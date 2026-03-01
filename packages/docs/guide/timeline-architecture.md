@@ -109,9 +109,18 @@ Resolves each communication to source/target Y positions, computes cubic bezier 
 | `@visx/group` | SVG `<g>` grouping |
 | `@visx/tooltip` | Segment and communication tooltips |
 | `@visx/brush` | Minimap brush selection |
-| `lucide-react` | Filter and RefreshCw icons |
+| `lucide-react` | Icons (Filter, RefreshCw, Wifi, AlertTriangle, etc.) |
 
 No d3-zoom, no @tanstack/virtual are used. SSE uses native `EventSource`.
+
+### Memory Caps
+
+| Resource | Cap | Behavior |
+|----------|-----|----------|
+| Client `seenEventIds` (SSE dedup) | 10,000 | Prunes oldest half when exceeded |
+| Server `EventPipeline.seenEventIds` | 20,000 (`MAX_QUEUE_SIZE * 2`) | Same prune strategy |
+| Communication links rendered | 500 | Hard cap per render |
+| Orphan events (server `OrphanManager`) | 500 | Oldest-first promotion to root |
 
 ## Known Bugs
 

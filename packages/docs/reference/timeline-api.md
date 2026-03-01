@@ -85,14 +85,28 @@ interface TimelineData {
   communications: TimelineComm[];
   locks: TimelineLock[];
   timeRange: { start: string; end: string };
+  sessionId?: string;
+  ledgerVersion?: number;  // Increments on prune/reorder/clear — use for cache invalidation
 }
+```
+
+### AgentRole
+
+Union type for all known agent roles.
+
+```typescript
+type AgentRole =
+  | 'architect' | 'developer' | 'code-reviewer' | 'critical-reviewer'
+  | 'product-manager' | 'technical-writer' | 'tech-writer' | 'designer'
+  | 'generalist' | 'secretary' | 'qa-tester' | 'radical-thinker'
+  | 'project-lead' | 'agent' | string;
 ```
 
 ## Hooks
 
 ### useTimelineData
 
-Fetches timeline data for a given lead and polls every 5 seconds.
+Primary data hook. Uses SSE (via `useTimelineSSE`) with automatic HTTP polling fallback.
 
 ```typescript
 function useTimelineData(leadId: string | null): {
@@ -100,17 +114,47 @@ function useTimelineData(leadId: string | null): {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  connectionHealth: ConnectionHealth;
 }
 ```
 
 | Return | Type | Description |
 |--------|------|-------------|
 | `data` | `TimelineData \| null` | Timeline data, or `null` before first load |
-| `loading` | `boolean` | `true` during fetch |
-| `error` | `string \| null` | Error message if fetch failed |
-| `refetch` | `() => Promise<void>` | Manually trigger a re-fetch |
+| `loading` | `boolean` | `true` during initial connection |
+| `error` | `string \| null` | Error message if connection failed |
+| `refetch` | `() => Promise<void>` | Manually trigger a re-fetch (polling mode only) |
+| `connectionHealth` | `ConnectionHealth` | Current connection state (pass to StatusBar) |
 
-**Polling:** Every 5 seconds via `setInterval`. Polling starts when `leadId` is non-null and stops on unmount or when `leadId` changes.
+**Transport:** SSE preferred → polling fallback. SSE connects to `/api/coordination/timeline/stream?leadId={id}`. If SSE fails after 3 consecutive errors, falls back to HTTP polling every 5 seconds at `/api/coordination/timeline?leadId={id}`.
+
+### useTimelineSSE
+
+Low-level SSE hook used internally by `useTimelineData`. Use directly only if you need SSE-specific behavior.
+
+```typescript
+type ConnectionHealth = 'connected' | 'connecting' | 'reconnecting' | 'degraded' | 'offline';
+
+function useTimelineSSE(leadId: string | null): UseTimelineSSEResult;
+
+interface UseTimelineSSEResult {
+  data: TimelineData | null;
+  loading: boolean;
+  error: string | null;
+  connectionHealth: ConnectionHealth;
+  sseUnavailable: boolean;       // true → caller should use polling fallback
+}
+```
+
+**SSE Events:**
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| `init` | Full `TimelineData` | Initial state on first connect |
+| `reconnect` | Full `TimelineData` | Full state on reconnect (gap-fill) |
+| `activity` | `{ entry }` | Incremental status/communication update |
+| `lock` | Lock event | File lock acquire/release |
+
+**Reconnection:** Exponential backoff from 1s to 30s max. After 3 consecutive failures, marks `sseUnavailable: true` to trigger polling fallback. Client-side dedup via `seenEventIds` Set (capped at 10K entries, prunes oldest half on overflow).
 
 ### getLocksForAgent
 
@@ -153,6 +197,7 @@ interface TimelineContainerProps {
   data: TimelineData;
   liveMode?: boolean;
   onLiveModeChange?: (live: boolean) => void;
+  lastSeenTimestamp?: Date;
 }
 ```
 
@@ -161,13 +206,20 @@ interface TimelineContainerProps {
 | `data` | `TimelineData` | required | The timeline data to render |
 | `liveMode` | `boolean` | `undefined` | When true, auto-scrolls to show latest activity |
 | `onLiveModeChange` | `(live: boolean) => void` | `undefined` | Called when live mode is toggled (e.g., user zooms, disabling live mode) |
+| `lastSeenTimestamp` | `Date` | `undefined` | Renders a "You left off here" dashed horizontal marker at this time position (from `useSinceLastVisit`) |
 
 **Internal state:**
 - `expandedAgents` — Set of agent IDs with expanded lanes (56px → 160px)
 - `focusedLaneIdx` — Currently focused lane for keyboard navigation
 - `visibleRange` — Visible time window `{ start: Date; end: Date }`
+- `sortDirection` — `'oldest-first'` (default) or `'newest-first'`
+- `showShortcutHelp` — Toggles the keyboard shortcut overlay
 
-**Agent sorting:** Agents are sorted by role hierarchy (Lead → Architect → Secretary → Developer → Code Reviewer → Critical Reviewer → Designer → QA), then by spawn time.
+**Agent sorting:** Agents are sorted by role hierarchy (Lead → Architect → Secretary → Developer → Code Reviewer → Critical Reviewer → Designer → QA), then by spawn time. Toggle sort direction via the ↑/↓ toolbar button.
+
+**Error auto-expand:** Agents with `failed` segments are auto-expanded on data load. If the user manually collapses them, the collapse is respected (tracked via `userCollapsedRef`).
+
+**Agent color borders:** Each agent label has a 3px left border colored by role (from `ROLE_COLORS`). Use `getAgentColor(agentId)` for a deterministic per-agent color from an 8-color WCAG AA palette.
 
 **Empty state:** When `data.agents` is empty, shows "No agent activity to display."
 
@@ -353,6 +405,32 @@ interface AccessibilityAnnouncerProps {
 Renders two hidden `<div>` elements:
 - **Polite** (`aria-live="polite"`, `role="log"`) — new events, status updates (throttled)
 - **Assertive** (`aria-live="assertive"`, `role="alert"`) — errors, connection changes (immediate)
+
+### KeyboardShortcutHelp
+
+Modal overlay showing all keyboard shortcuts. Toggled with `?` key.
+
+```typescript
+interface KeyboardShortcutHelpProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+```
+
+**Accessibility:** `role="dialog"`, `aria-modal="true"`, `aria-label="Keyboard shortcuts"`. Auto-focuses panel on open, closes on `Escape` or `?` or clicking outside.
+
+### getAgentColor
+
+Utility function that returns a deterministic WCAG AA color for an agent.
+
+```typescript
+function getAgentColor(agentId: string): string;
+
+const AGENT_COLORS: readonly string[];
+// ['#2563eb', '#dc2626', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2', '#65a30d']
+```
+
+Uses a hash of `agentId` to map to one of 8 colors. All colors pass 4.5:1 contrast ratio against dark backgrounds (`#1e1e2e`). Same agent always gets the same color across renders.
 
 ## Visual Reference
 

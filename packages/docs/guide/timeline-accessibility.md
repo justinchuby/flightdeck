@@ -32,7 +32,9 @@ The timeline container uses `role="application"` with full keyboard support. Cli
 | Key | Action |
 |-----|--------|
 | `Enter` or `Space` | Expand/collapse focused agent lane |
-| `Escape` | Clear lane focus, return to container |
+| `Escape` | Clear lane focus / close overlay |
+| `f` | Focus the filter bar (dispatches `timeline:focus-filter` event) |
+| `?` | Toggle keyboard shortcut help overlay |
 
 > [!TIP]
 > Expanded lanes show additional detail: agent creation time, end time (or "active"), and a taller lane (160px vs 56px) that makes status segments and lock indicators easier to see.

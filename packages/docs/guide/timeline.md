@@ -3,7 +3,7 @@
 The Timeline UI visualizes your AI crew's activity over time. It shows agent lifecycles, status changes, inter-agent communications, and file locks on an interactive swim-lane chart.
 
 > [!TIP]
-> The Timeline is accessible from the dashboard sidebar. It updates in real-time via polling (with SSE planned for v2).
+> The Timeline is accessible from the dashboard sidebar. It updates in real-time via SSE (Server-Sent Events), with automatic HTTP polling fallback.
 
 ## What You See
 
@@ -16,16 +16,15 @@ The timeline displays four types of information:
 | **File locks** | 🔒 icons on agent lanes indicating when files are locked |
 | **Minimap** | A compressed overview at the top with a draggable brush for time range selection |
 
-### v1 Additions (In Progress)
-
-These components are being added as part of the v1 design spec ([issue #43](https://github.com/justinc/ai-crew/issues/43)):
+### v1 Components
 
 | Component | Purpose |
 |-----------|---------|
-| **StatusBar** | Crew health at a glance — agent status counts, last activity, stale detection |
-| **ErrorBanner** | Persistent notification when errors exist below the viewport fold |
+| **StatusBar** | Crew health at a glance — status buckets, overall health (green/yellow/red), connection indicator, narrative sentence |
+| **ErrorBanner** | Expandable sticky notification when errors exist below the viewport fold |
 | **EmptyState** | Welcoming screen when no agents are active yet |
-| **Template Summary** | One-line plain-English summary above the timeline (e.g., "Your crew has 3 active agents. 1 error needs attention.") |
+| **KeyboardShortcutHelp** | Keyboard shortcut overlay toggled with `?` key |
+| **AccessibilityAnnouncer** | Invisible ARIA live regions for screen reader announcements |
 
 ## Quick Start
 
@@ -41,20 +40,22 @@ import { TimelinePage } from '@/components/Timeline';
 For direct access to the core visualization (e.g., embedding in a custom layout):
 
 ```tsx
-import { TimelineContainer } from '@/components/Timeline';
-import { useTimelineData } from '@/components/Timeline';
+import { TimelineContainer, useTimelineData, StatusBar } from '@/components/Timeline';
 
 function MyTimeline({ leadId }: { leadId: string }) {
-  const { data, loading, error } = useTimelineData(leadId);
+  const { data, loading, error, connectionHealth } = useTimelineData(leadId);
 
   if (loading || !data) return <div>Loading...</div>;
 
   return (
-    <TimelineContainer
-      data={data}
-      liveMode={true}
-      onLiveModeChange={(live) => console.log('Live mode:', live)}
-    />
+    <>
+      <StatusBar data={data} connectionHealth={connectionHealth} />
+      <TimelineContainer
+        data={data}
+        liveMode={true}
+        onLiveModeChange={(live) => console.log('Live mode:', live)}
+      />
+    </>
   );
 }
 ```
@@ -67,16 +68,19 @@ The Timeline is composed of several components:
 TimelinePage
 ├── Lead selector (when multiple leads exist)
 ├── Filter toolbar (roles, communication types, status toggles)
-├── StatusBar          ← v1 addition
-├── Template Summary   ← v1 addition
-├── ErrorBanner        ← v1 addition
+├── StatusBar (crew health, connection, errors, narrative sentence)
+├── ErrorBanner (sticky expandable error list)
+├── AccessibilityAnnouncer (invisible live regions)
+├── EmptyState (shown when no agents/project)
 └── TimelineContainer
-    ├── Zoom controls + Live mode toggle
+    ├── Zoom controls + Live mode toggle + Sort direction toggle
     ├── BrushTimeSelector (minimap)
-    ├── Agent labels (fixed left column)
+    ├── Agent labels (fixed left column, color-coded borders)
+    ├── "You left off here" marker (from useSinceLastVisit)
+    ├── KeyboardShortcutHelp overlay (toggled with ?)
     └── SVG timeline area
         ├── Time axis (@visx/axis)
-        ├── Agent lanes (status segments + lock indicators)
+        ├── Agent lanes (status segments + lock indicators, error auto-expand)
         └── CommunicationLinks (SVG overlay)
 ```
 
@@ -104,6 +108,9 @@ Active filter count is shown on the Filter button. Click **Reset all** to clear 
 | Pan left/right | `←` / `→` arrow keys |
 | Fit to view | **Fit** button or `Home` key |
 | Jump to recent | `End` key (shows last 20% of timeline) |
+| Sort direction | Toggle button in toolbar (↑ oldest-first / ↓ newest-first) |
+| Focus filter bar | `f` key (dispatches `timeline:focus-filter` custom event) |
+| Keyboard help | `?` key — opens/closes shortcut overlay |
 
 Zoom anchors to the cursor position when using scroll wheel, and to the center when using keyboard shortcuts.
 
@@ -115,9 +122,17 @@ When **Live** is enabled (green indicator), the timeline auto-scrolls to show th
 
 The minimap at the top shows a compressed overview of all agent activity. Drag the brush handles to select a time range, or drag the brush body to pan. The minimap and zoom controls stay in sync.
 
+### Agent Colors
+
+Each agent lane has a 3px color-coded left border, deterministically assigned from an 8-color WCAG AA palette based on agent ID hash. Import `getAgentColor(agentId)` from `getAgentColor.ts` if you need the same color elsewhere.
+
+### Error Auto-Expand
+
+Agents with `failed` segments are automatically expanded so errors are visible immediately. If a user manually collapses an error lane, it stays collapsed (user intent is respected).
+
 ## Data Model
 
-Timeline data is fetched from `GET /api/coordination/timeline?leadId={leadId}` and polled every 5 seconds.
+Timeline data is delivered via SSE (`/api/coordination/timeline/stream?leadId={leadId}`) with HTTP polling fallback every 5 seconds.
 
 ```typescript
 interface TimelineData {
@@ -125,6 +140,8 @@ interface TimelineData {
   communications: TimelineComm[];   // Inter-agent messages and delegations
   locks: TimelineLock[];            // File lock events
   timeRange: { start: string; end: string };
+  sessionId?: string;
+  ledgerVersion?: number;           // Increments on prune/reorder — use for cache invalidation
 }
 ```
 
