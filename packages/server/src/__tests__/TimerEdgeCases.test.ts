@@ -8,41 +8,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TimerRegistry } from '../coordination/TimerRegistry.js';
 import type { Timer, TimerInput } from '../coordination/TimerRegistry.js';
-import BetterSqlite3 from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '../db/schema.js';
 import {
-  parseCommandPayload,
   setTimerSchema,
   cancelTimerSchema,
 } from '../agents/commands/commandSchemas.js';
+import { createTestTimerDb } from './helpers/createTestTimerDb.js';
 
-// ── Test DB helper ──────────────────────────────────────────────────
-
-function createTestDb() {
-  const sqlite = new BetterSqlite3(':memory:');
-  sqlite.exec(`CREATE TABLE timers (
-    id TEXT PRIMARY KEY NOT NULL,
-    agent_id TEXT NOT NULL,
-    agent_role TEXT NOT NULL,
-    lead_id TEXT,
-    label TEXT NOT NULL,
-    message TEXT NOT NULL,
-    delay_seconds INTEGER NOT NULL,
-    fire_at TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    status TEXT NOT NULL DEFAULT 'pending',
-    repeat INTEGER DEFAULT 0
-  )`);
-  sqlite.exec(`CREATE INDEX idx_timers_agent ON timers (agent_id)`);
-  sqlite.exec(`CREATE INDEX idx_timers_status ON timers (status)`);
-  return drizzle(sqlite, { schema });
-}
-
-// Minimal mock agent for parseCommandPayload tests
-function mockAgent(): { sendMessage: ReturnType<typeof vi.fn> } {
-  return { sendMessage: vi.fn() };
-}
+const createTestDb = createTestTimerDb;
 
 // ── Delay validation (setTimerSchema) ───────────────────────────────
 
