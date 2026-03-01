@@ -184,7 +184,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
-    cmd.handler(agent, '⟦ AGENT_MESSAGE {"content": "hello"} ⟧');
+    cmd.handler(agent, '⟦⟦ AGENT_MESSAGE {"content": "hello"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('AGENT_MESSAGE validation error'),
     );
@@ -194,7 +194,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
-    cmd.handler(agent, '⟦ AGENT_MESSAGE {"to": "someone"} ⟧');
+    cmd.handler(agent, '⟦⟦ AGENT_MESSAGE {"to": "someone"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "content"'),
     );
@@ -204,7 +204,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
-    cmd.handler(agent, '⟦ AGENT_MESSAGE {broken} ⟧');
+    cmd.handler(agent, '⟦⟦ AGENT_MESSAGE {broken} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
     );
@@ -214,7 +214,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'BROADCAST');
-    cmd.handler(agent, '⟦ BROADCAST {} ⟧');
+    cmd.handler(agent, '⟦⟦ BROADCAST {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "content"'),
     );
@@ -224,7 +224,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getCommCommands(ctx), 'CREATE_GROUP');
-    cmd.handler(agent, '⟦ CREATE_GROUP {"members": ["a"]} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_GROUP {"members": ["a"]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('CREATE_GROUP validation error'),
     );
@@ -234,7 +234,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getCommCommands(ctx), 'CREATE_GROUP');
-    cmd.handler(agent, '⟦ CREATE_GROUP {"name": "test-group"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_GROUP {"name": "test-group"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('members'),
     );
@@ -244,7 +244,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'GROUP_MSG');
-    cmd.handler(agent, '⟦ GROUP_MESSAGE {"content": "hello"} ⟧');
+    cmd.handler(agent, '⟦⟦ GROUP_MESSAGE {"content": "hello"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "group"'),
     );
@@ -254,7 +254,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'GROUP_MSG');
-    cmd.handler(agent, '⟦ GROUP_MESSAGE {"group": "my-group"} ⟧');
+    cmd.handler(agent, '⟦⟦ GROUP_MESSAGE {"group": "my-group"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "content"'),
     );
@@ -264,7 +264,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'ADD_TO_GROUP');
-    cmd.handler(agent, '⟦ ADD_TO_GROUP {"members": ["a"]} ⟧');
+    cmd.handler(agent, '⟦⟦ ADD_TO_GROUP {"members": ["a"]} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "group"'),
     );
@@ -274,7 +274,7 @@ describe('CommCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'REMOVE_FROM_GROUP');
-    cmd.handler(agent, '⟦ REMOVE_FROM_GROUP {"group": "grp"} ⟧');
+    cmd.handler(agent, '⟦⟦ REMOVE_FROM_GROUP {"group": "grp"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('REMOVE_FROM_GROUP validation error'),
     );
@@ -288,7 +288,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'CREATE_AGENT');
-    cmd.handler(agent, '⟦ CREATE_AGENT {"task": "do stuff"} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"task": "do stuff"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('CREATE_AGENT validation error'),
     );
@@ -298,7 +298,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'CREATE_AGENT');
-    cmd.handler(agent, '⟦ CREATE_AGENT {"role": ""} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": ""} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('CREATE_AGENT validation error'),
     );
@@ -308,7 +308,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'CREATE_AGENT');
-    cmd.handler(agent, '⟦ CREATE_AGENT {not json} ⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {not json} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
     );
@@ -318,7 +318,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'DELEGATE');
-    cmd.handler(agent, '⟦ DELEGATE {"task": "do stuff"} ⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"task": "do stuff"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('DELEGATE validation error'),
     );
@@ -328,7 +328,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'DELEGATE');
-    cmd.handler(agent, '⟦ DELEGATE {"to": "agent-123"} ⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "agent-123"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "task"'),
     );
@@ -338,7 +338,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'TERMINATE_AGENT');
-    cmd.handler(agent, '⟦ TERMINATE_AGENT {} ⟧');
+    cmd.handler(agent, '⟦⟦ TERMINATE_AGENT {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -348,7 +348,7 @@ describe('AgentCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'CANCEL_DELEGATION');
-    cmd.handler(agent, '⟦ CANCEL_DELEGATION {} ⟧');
+    cmd.handler(agent, '⟦⟦ CANCEL_DELEGATION {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('requires either "agentId" or "delegationId"'),
     );
@@ -362,7 +362,7 @@ describe('CoordCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'LOCK');
-    cmd.handler(agent, '⟦ LOCK_FILE {} ⟧');
+    cmd.handler(agent, '⟦⟦ LOCK_FILE {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "filePath"'),
     );
@@ -372,7 +372,7 @@ describe('CoordCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'LOCK');
-    cmd.handler(agent, '⟦ LOCK_FILE {bad} ⟧');
+    cmd.handler(agent, '⟦⟦ LOCK_FILE {bad} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
     );
@@ -382,7 +382,7 @@ describe('CoordCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'UNLOCK');
-    cmd.handler(agent, '⟦ UNLOCK_FILE {} ⟧');
+    cmd.handler(agent, '⟦⟦ UNLOCK_FILE {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "filePath"'),
     );
@@ -392,7 +392,7 @@ describe('CoordCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'DECISION');
-    cmd.handler(agent, '⟦ DECISION {"rationale": "because"} ⟧');
+    cmd.handler(agent, '⟦⟦ DECISION {"rationale": "because"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "title"'),
     );
@@ -402,7 +402,7 @@ describe('CoordCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'COMMIT');
-    cmd.handler(agent, '⟦ COMMIT {not valid} ⟧');
+    cmd.handler(agent, '⟦⟦ COMMIT {not valid} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT error'),
     );
@@ -416,7 +416,7 @@ describe('SystemCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getSystemCommands(ctx), 'REQUEST_LIMIT_CHANGE');
-    cmd.handler(agent, '⟦ REQUEST_LIMIT_CHANGE {"limit": "abc"} ⟧');
+    cmd.handler(agent, '⟦⟦ REQUEST_LIMIT_CHANGE {"limit": "abc"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('REQUEST_LIMIT_CHANGE validation error'),
     );
@@ -426,7 +426,7 @@ describe('SystemCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getSystemCommands(ctx), 'REQUEST_LIMIT_CHANGE');
-    cmd.handler(agent, '⟦ REQUEST_LIMIT_CHANGE {"limit": 0} ⟧');
+    cmd.handler(agent, '⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 0} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('REQUEST_LIMIT_CHANGE validation error'),
     );
@@ -436,7 +436,7 @@ describe('SystemCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getSystemCommands(ctx), 'REQUEST_LIMIT_CHANGE');
-    cmd.handler(agent, '⟦ REQUEST_LIMIT_CHANGE {"limit": 150} ⟧');
+    cmd.handler(agent, '⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 150} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('REQUEST_LIMIT_CHANGE validation error'),
     );
@@ -450,7 +450,7 @@ describe('TimerCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'SET_TIMER');
-    cmd.handler(agent, '⟦ SET_TIMER {"delay": 30, "message": "check"} ⟧');
+    cmd.handler(agent, '⟦⟦ SET_TIMER {"delay": 30, "message": "check"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "label"'),
     );
@@ -460,7 +460,7 @@ describe('TimerCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'SET_TIMER');
-    cmd.handler(agent, '⟦ SET_TIMER {"label": "test", "delay": 30} ⟧');
+    cmd.handler(agent, '⟦⟦ SET_TIMER {"label": "test", "delay": 30} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "message"'),
     );
@@ -470,7 +470,7 @@ describe('TimerCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'SET_TIMER');
-    cmd.handler(agent, '⟦ SET_TIMER {"label": "test", "delay": 2, "message": "check"} ⟧');
+    cmd.handler(agent, '⟦⟦ SET_TIMER {"label": "test", "delay": 2, "message": "check"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('at least 5 seconds'),
     );
@@ -480,7 +480,7 @@ describe('TimerCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'SET_TIMER');
-    cmd.handler(agent, '⟦ SET_TIMER {"label": "test", "delay": 100000, "message": "check"} ⟧');
+    cmd.handler(agent, '⟦⟦ SET_TIMER {"label": "test", "delay": 100000, "message": "check"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('at most 86400'),
     );
@@ -490,7 +490,7 @@ describe('TimerCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'CANCEL_TIMER');
-    cmd.handler(agent, '⟦ CANCEL_TIMER {} ⟧');
+    cmd.handler(agent, '⟦⟦ CANCEL_TIMER {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('CANCEL_TIMER validation error'),
     );
@@ -504,7 +504,7 @@ describe('DeferredCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'DEFER_ISSUE');
-    cmd.handler(agent, '⟦ DEFER_ISSUE {"severity": "P2"} ⟧');
+    cmd.handler(agent, '⟦⟦ DEFER_ISSUE {"severity": "P2"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "description"'),
     );
@@ -514,7 +514,7 @@ describe('DeferredCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'RESOLVE_DEFERRED');
-    cmd.handler(agent, '⟦ RESOLVE_DEFERRED {} ⟧');
+    cmd.handler(agent, '⟦⟦ RESOLVE_DEFERRED {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('RESOLVE_DEFERRED validation error'),
     );
@@ -528,7 +528,7 @@ describe('CapabilityCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCapabilityCommands(ctx), 'ACQUIRE_CAPABILITY');
-    cmd.handler(agent, '⟦ ACQUIRE_CAPABILITY {"reason": "need it"} ⟧');
+    cmd.handler(agent, '⟦⟦ ACQUIRE_CAPABILITY {"reason": "need it"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('ACQUIRE_CAPABILITY validation error'),
     );
@@ -538,7 +538,7 @@ describe('CapabilityCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCapabilityCommands(ctx), 'ACQUIRE_CAPABILITY');
-    cmd.handler(agent, '⟦ ACQUIRE_CAPABILITY {bad} ⟧');
+    cmd.handler(agent, '⟦⟦ ACQUIRE_CAPABILITY {bad} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
     );
@@ -552,7 +552,7 @@ describe('DirectMessageCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDirectMessageCommands(ctx), 'DIRECT_MESSAGE');
-    cmd.handler(agent, '⟦ DIRECT_MESSAGE {"content": "hello"} ⟧');
+    cmd.handler(agent, '⟦⟦ DIRECT_MESSAGE {"content": "hello"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "to"'),
     );
@@ -562,7 +562,7 @@ describe('DirectMessageCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDirectMessageCommands(ctx), 'DIRECT_MESSAGE');
-    cmd.handler(agent, '⟦ DIRECT_MESSAGE {"to": "agent-123"} ⟧');
+    cmd.handler(agent, '⟦⟦ DIRECT_MESSAGE {"to": "agent-123"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "content"'),
     );
@@ -572,7 +572,7 @@ describe('DirectMessageCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDirectMessageCommands(ctx), 'DIRECT_MESSAGE');
-    cmd.handler(agent, '⟦ DIRECT_MESSAGE {bad} ⟧');
+    cmd.handler(agent, '⟦⟦ DIRECT_MESSAGE {bad} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
     );
@@ -586,7 +586,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'ADD_TASK');
-    cmd.handler(agent, '⟦ ADD_TASK {"role": "developer"} ⟧');
+    cmd.handler(agent, '⟦⟦ ADD_TASK {"role": "developer"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('ADD_TASK validation error'),
     );
@@ -596,7 +596,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'ADD_TASK');
-    cmd.handler(agent, '⟦ ADD_TASK {"id": "task-1"} ⟧');
+    cmd.handler(agent, '⟦⟦ ADD_TASK {"id": "task-1"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "role"'),
     );
@@ -606,7 +606,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'PAUSE_TASK');
-    cmd.handler(agent, '⟦ PAUSE_TASK {} ⟧');
+    cmd.handler(agent, '⟦⟦ PAUSE_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -616,7 +616,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'RETRY_TASK');
-    cmd.handler(agent, '⟦ RETRY_TASK {} ⟧');
+    cmd.handler(agent, '⟦⟦ RETRY_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -626,7 +626,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'SKIP_TASK');
-    cmd.handler(agent, '⟦ SKIP_TASK {} ⟧');
+    cmd.handler(agent, '⟦⟦ SKIP_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -636,7 +636,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'CANCEL_TASK');
-    cmd.handler(agent, '⟦ CANCEL_TASK {} ⟧');
+    cmd.handler(agent, '⟦⟦ CANCEL_TASK {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Missing required field "id"'),
     );
@@ -646,7 +646,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'DECLARE_TASKS');
-    cmd.handler(agent, '⟦ DECLARE_TASKS {not json} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {not json} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('invalid JSON payload'),
     );
@@ -656,7 +656,7 @@ describe('TaskCommands validation', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'DECLARE_TASKS');
-    cmd.handler(agent, '⟦ DECLARE_TASKS {"tasks": []} ⟧');
+    cmd.handler(agent, '⟦⟦ DECLARE_TASKS {"tasks": []} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('DECLARE_TASKS validation error'),
     );
@@ -669,7 +669,7 @@ describe('TaskCommands validation', () => {
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'AGENT_MSG');
     const bigContent = 'x'.repeat(50_001);
-    cmd.handler(agent, `⟦ AGENT_MESSAGE {"to":"lead","content":"${bigContent}"} ⟧`);
+    cmd.handler(agent, `⟦⟦ AGENT_MESSAGE {"to":"lead","content":"${bigContent}"} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('AGENT_MESSAGE validation error'),
     );
@@ -680,7 +680,7 @@ describe('TaskCommands validation', () => {
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'BROADCAST');
     const bigContent = 'x'.repeat(50_001);
-    cmd.handler(agent, `⟦ BROADCAST {"content":"${bigContent}"} ⟧`);
+    cmd.handler(agent, `⟦⟦ BROADCAST {"content":"${bigContent}"} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('BROADCAST validation error'),
     );
@@ -691,7 +691,7 @@ describe('TaskCommands validation', () => {
     const agent = makeAgent();
     const cmd = findHandler(getCommCommands(ctx), 'CREATE_GROUP');
     const members = Array.from({ length: 101 }, (_, i) => `m${i}`);
-    cmd.handler(agent, `⟦ CREATE_GROUP ${JSON.stringify({ name: 'grp', members })} ⟧`);
+    cmd.handler(agent, `⟦⟦ CREATE_GROUP ${JSON.stringify({ name: 'grp', members })} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('CREATE_GROUP validation error'),
     );
@@ -702,7 +702,7 @@ describe('TaskCommands validation', () => {
     const agent = makeLeadAgent();
     const cmd = findHandler(getTaskCommands(ctx), 'DECLARE_TASKS');
     const tasks = Array.from({ length: 501 }, (_, i) => ({ id: `t${i}`, role: 'dev' }));
-    cmd.handler(agent, `⟦ DECLARE_TASKS ${JSON.stringify({ tasks })} ⟧`);
+    cmd.handler(agent, `⟦⟦ DECLARE_TASKS ${JSON.stringify({ tasks })} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('DECLARE_TASKS validation error'),
     );
@@ -713,7 +713,7 @@ describe('TaskCommands validation', () => {
     const agent = makeLeadAgent();
     const cmd = findHandler(getAgentCommands(ctx), 'DELEGATE');
     const bigTask = 'x'.repeat(50_001);
-    cmd.handler(agent, `⟦ DELEGATE {"to":"dev","task":"${bigTask}"} ⟧`);
+    cmd.handler(agent, `⟦⟦ DELEGATE {"to":"dev","task":"${bigTask}"} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('DELEGATE validation error'),
     );
@@ -727,7 +727,7 @@ describe('QUERY_DEFERRED validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦ QUERY_DEFERRED {"status": "open"} ⟧');
+    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED {"status": "open"} ⟧⟧');
     // Should not get a validation error (may get "no deferred issues" which is fine)
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('QUERY_DEFERRED validation error'),
@@ -738,7 +738,7 @@ describe('QUERY_DEFERRED validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦ QUERY_DEFERRED ⟧');
+    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED ⟧⟧');
     // Should not get a validation error
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('QUERY_DEFERRED validation error'),
@@ -749,7 +749,7 @@ describe('QUERY_DEFERRED validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦ QUERY_DEFERRED {"status": "invalid"} ⟧');
+    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED {"status": "invalid"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('QUERY_DEFERRED validation error'),
     );
@@ -759,7 +759,7 @@ describe('QUERY_DEFERRED validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦ QUERY_DEFERRED {bad json} ⟧');
+    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED {bad json} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('QUERY_DEFERRED error: invalid JSON'),
     );
@@ -773,7 +773,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {"summary": "50% done", "percent": 50} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {"summary": "50% done", "percent": 50} ⟧⟧');
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
     );
@@ -786,7 +786,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {not valid json} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {not valid json} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS error: invalid JSON'),
     );
@@ -796,7 +796,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {"percent": 150} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {"percent": 150} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
     );
@@ -806,7 +806,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {"percent": -10} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {"percent": -10} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
     );
@@ -816,7 +816,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {"custom_field": "value", "summary": "working"} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {"custom_field": "value", "summary": "working"} ⟧⟧');
     // Should not error — unknown keys are silently stripped
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
@@ -827,7 +827,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {"percent": "50", "summary": "halfway"} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {"percent": "50", "summary": "halfway"} ⟧⟧');
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
     );
@@ -840,7 +840,7 @@ describe('PROGRESS validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
-    cmd.handler(agent, '⟦ PROGRESS {"percent": "abc"} ⟧');
+    cmd.handler(agent, '⟦⟦ PROGRESS {"percent": "abc"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('PROGRESS validation error'),
     );
@@ -851,7 +851,7 @@ describe('PROGRESS validation', () => {
     const agent = makeAgent();
     const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
     const bigPayload = `{"data": "${'x'.repeat(50_001)}"}`;
-    cmd.handler(agent, `⟦ PROGRESS ${bigPayload} ⟧`);
+    cmd.handler(agent, `⟦⟦ PROGRESS ${bigPayload} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('payload too large'),
     );
@@ -865,7 +865,7 @@ describe('RELEASE_CAPABILITY validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
-    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {"capability": "code-review"} ⟧');
+    cmd.handler(agent, '⟦⟦ RELEASE_CAPABILITY {"capability": "code-review"} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('Capabilities are retained'),
     );
@@ -875,7 +875,7 @@ describe('RELEASE_CAPABILITY validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
-    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {} ⟧');
+    cmd.handler(agent, '⟦⟦ RELEASE_CAPABILITY {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('RELEASE_CAPABILITY validation error'),
     );
@@ -885,7 +885,7 @@ describe('RELEASE_CAPABILITY validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
-    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {bad} ⟧');
+    cmd.handler(agent, '⟦⟦ RELEASE_CAPABILITY {bad} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('RELEASE_CAPABILITY error: invalid JSON'),
     );
@@ -895,7 +895,7 @@ describe('RELEASE_CAPABILITY validation', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
-    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {"capability": ""} ⟧');
+    cmd.handler(agent, '⟦⟦ RELEASE_CAPABILITY {"capability": ""} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('RELEASE_CAPABILITY validation error'),
     );
