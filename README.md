@@ -186,12 +186,14 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | Command | Description |
 |---------|-------------|
 | `AGENT_MESSAGE {"to": "agent-id", "content": "..."}` | Send a direct message to another agent by ID. |
+| `DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "..."}` | Queue a message to another agent without interrupting their current work. Matches by ID prefix. |
 | `BROADCAST {"content": "..."}` | Send a message to all active agents. |
 | `CREATE_GROUP {"name": "...", "members": ["id1"], "roles": ["developer"]}` | Create a named chat group. Specify members by ID, by role, or both. Lead is auto-included. |
 | `GROUP_MESSAGE {"group": "...", "content": "..."}` | Send a message to all members of a group. Sender must be a member. |
 | `ADD_TO_GROUP {"group": "...", "members": ["id"]}` | Add agents to an existing group. New members receive recent message history. |
 | `REMOVE_FROM_GROUP {"group": "...", "members": ["id"]}` | Remove agents from a group. The lead cannot be removed. |
 | `QUERY_GROUPS` | List all groups the agent belongs to, with member counts and last message preview. |
+| `QUERY_PEERS` | Discover other active agents for direct messaging. |
 
 ### Task & Progress (Lead-only unless noted)
 
@@ -199,7 +201,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 |---------|-------------|
 | `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `title`, `depends_on`. |
 | `PROGRESS {"summary": "..."}` | Report progress. Auto-reads DAG state when a DAG exists — no need to query separately. |
-| `COMPLETE_TASK {"summary": "..."}` | Signal that the agent has finished its assigned task. Lead: completes a DAG task. Non-lead: signals done to parent. *(Any agent)* |
+| `COMPLETE_TASK {"id": "task-id", "summary": "...", "output": "..."}` | Mark a DAG task as done. Non-lead agents relay to parent's DAG with auth validation. Supports `id`, `summary`, `status`, `output` fields. *(Any agent)* |
 | `TASK_STATUS` | Query current task DAG status. |
 | `PAUSE_TASK {"taskId": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
 | `RETRY_TASK {"taskId": "..."}` | Retry a failed task. *(Lead-only)* |
@@ -222,6 +224,17 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
 | `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
 | `RESOLVE_DEFERRED {"id": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
+
+### Capabilities & Timers (All agents)
+
+| Command | Description |
+|---------|-------------|
+| `ACQUIRE_CAPABILITY {"capability": "code-review", "reason": "..."}` | Temporarily gain capabilities beyond the agent's role (code-review, architecture, delegation, testing, devops). |
+| `RELEASE_CAPABILITY {"capability": "code-review"}` | Release a previously acquired capability. |
+| `LIST_CAPABILITIES` | List currently held capabilities. |
+| `SET_TIMER {"label": "name", "delay": 300, "message": "...", "repeat": false}` | Set a reminder that fires after a delay (in seconds). Optionally repeats. |
+| `CANCEL_TIMER {"name": "name"}` | Cancel an active timer. |
+| `LIST_TIMERS` | List all active timers. |
 
 ### UI Views
 
