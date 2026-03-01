@@ -1165,4 +1165,87 @@ describe('TaskDAG', () => {
       expect(result.tasks).toHaveLength(1);
     });
   });
+
+  describe('addDependency', () => {
+    it('adds a dependency between two tasks', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev' },
+      ]);
+      const result = dag.addDependency('lead-1', 'b', 'a');
+      expect(result).toBe(true);
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dependsOn).toContain('a');
+    });
+
+    it('blocks task when dependency is not done', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev' },
+      ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.addDependency('lead-1', 'b', 'a');
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dagStatus).toBe('blocked');
+    });
+
+    it('does not block task when dependency is already done', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev' },
+      ]);
+      dag.completeTask('lead-1', 'a');
+      dag.addDependency('lead-1', 'b', 'a');
+      const task = dag.getTask('lead-1', 'b');
+      expect(task!.dagStatus).toBe('ready');
+      expect(task!.dependsOn).toContain('a');
+    });
+
+    it('returns true for duplicate dependency (idempotent)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      const result = dag.addDependency('lead-1', 'b', 'a');
+      expect(result).toBe(true);
+    });
+
+    it('returns false when task does not exist', () => {
+      dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
+      expect(dag.addDependency('lead-1', 'nonexistent', 'a')).toBe(false);
+      expect(dag.addDependency('lead-1', 'a', 'nonexistent')).toBe(false);
+    });
+
+    it('prevents cycle: A→B→A', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+      ]);
+      // b depends on a, so adding a depends on b would create a cycle
+      const result = dag.addDependency('lead-1', 'a', 'b');
+      expect(result).toBe(false);
+    });
+
+    it('prevents transitive cycle: A→B→C→A', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'c', role: 'Dev', depends_on: ['b'] },
+      ]);
+      // c→b→a, so adding a→c would create A→B→C→A cycle
+      const result = dag.addDependency('lead-1', 'a', 'c');
+      expect(result).toBe(false);
+    });
+
+    it('emits dag:updated event', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'a', role: 'Dev' },
+        { id: 'b', role: 'Dev' },
+      ]);
+      let emitted = false;
+      dag.on('dag:updated', () => { emitted = true; });
+      dag.addDependency('lead-1', 'b', 'a');
+      expect(emitted).toBe(true);
+    });
+  });
 });

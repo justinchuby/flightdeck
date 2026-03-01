@@ -5,6 +5,8 @@
  */
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js';
+import type { DagTask } from '../../tasks/TaskDAG.js';
+import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
@@ -112,10 +114,16 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
           }
         } else if (req.dagTaskId) {
           dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
-        } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
-          dagNote = `\n⚠️ You have an active DAG plan. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
-        } else if (ctx.taskDAG.hasAnyTasks(agent.id)) {
-          dagNote = `\n💡 Your previous plan is complete. Consider using DECLARE_TASKS to plan this new phase of work.`;
+        } else {
+          // Auto-create DAG task for untracked delegation
+          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id);
+          if (autoResult.created) {
+            dagNote = ` [DAG: auto-created "${autoResult.taskId}" → running]`;
+            child.dagTaskId = autoResult.taskId;
+            logger.info('delegation', `DAG auto-created: task "${autoResult.taskId}" → agent ${child.id.slice(0, 8)}`);
+          } else if (autoResult.duplicate) {
+            dagNote = `\n⚠️ Similar DAG task exists: "${autoResult.duplicate}". Use dagTaskId: "${autoResult.duplicate}" to link explicitly.`;
+          }
         }
       }
 
@@ -247,10 +255,16 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
         }
       } else if (req.dagTaskId) {
         dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
-      } else if (ctx.taskDAG.hasActiveTasks(agent.id)) {
-        dagNote = `\n⚠️ You have an active DAG plan. Use ADD_TASK to track this delegation, or include dagTaskId to link to an existing task.`;
-      } else if (ctx.taskDAG.hasAnyTasks(agent.id)) {
-        dagNote = `\n💡 Your previous plan is complete. Consider using DECLARE_TASKS to plan this new phase of work.`;
+      } else {
+        // Auto-create DAG task for untracked delegation
+        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id);
+        if (autoResult.created) {
+          dagNote = ` [DAG: auto-created "${autoResult.taskId}" → running]`;
+          child.dagTaskId = autoResult.taskId;
+          logger.info('delegation', `DAG auto-created: task "${autoResult.taskId}" → agent ${child.id.slice(0, 8)}`);
+        } else if (autoResult.duplicate) {
+          dagNote = `\n⚠️ Similar DAG task exists: "${autoResult.duplicate}". Use dagTaskId: "${autoResult.duplicate}" to link explicitly.`;
+        }
       }
     }
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
@@ -482,6 +496,103 @@ function findSimilarActiveDelegation(ctx: CommandHandlerContext, task: string, e
         task: del.task.slice(0, 80),
       };
     }
+  }
+  return null;
+}
+
+// ── Auto-DAG helpers ──────────────────────────────────────────────────
+
+/** Threshold for near-duplicate detection (reuses descriptionSimilarity from TaskDAG) */
+const NEAR_DUPLICATE_THRESHOLD = 0.6;
+
+interface AutoCreateResult {
+  created: boolean;
+  taskId: string;
+  duplicate?: string;
+}
+
+/**
+ * Auto-create a DAG task for an untracked delegation.
+ * Returns the created task ID, or flags a near-duplicate if one exists.
+ */
+function autoCreateDagTask(
+  ctx: CommandHandlerContext,
+  leadId: string,
+  role: string,
+  taskText: string,
+  agentId: string,
+): AutoCreateResult {
+  // Check for near-duplicate before auto-creating
+  const existingTasks = ctx.taskDAG.getTasks(leadId);
+  const nearDuplicate = existingTasks.find(
+    t => descriptionSimilarity(taskText, t.description, t.title) > NEAR_DUPLICATE_THRESHOLD
+  );
+  if (nearDuplicate) {
+    return { created: false, taskId: '', duplicate: nearDuplicate.id };
+  }
+
+  const autoId = generateAutoTaskId(role, taskText);
+  const autoTask = ctx.taskDAG.addTask(leadId, {
+    id: autoId,
+    role,
+    title: taskText.slice(0, 120),
+    description: taskText,
+  });
+
+  const started = ctx.taskDAG.startTask(leadId, autoTask.id, agentId);
+  if (!started) {
+    return { created: false, taskId: autoId };
+  }
+
+  // Auto-link review dependencies
+  if (isReviewRole(role)) {
+    autoLinkReviewDependency(ctx, leadId, autoTask.id, taskText);
+  }
+
+  return { created: true, taskId: autoId };
+}
+
+/** Generate a readable auto-task ID from role and task description */
+export function generateAutoTaskId(role: string, task: string): string {
+  const words = task.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+    .slice(0, 3)
+    .join('-');
+  const suffix = Date.now().toString(36).slice(-4);
+  return `auto-${role}-${words || 'task'}-${suffix}`;
+}
+
+function isReviewRole(role: string): boolean {
+  return ['code-reviewer', 'critical-reviewer'].includes(role);
+}
+
+/** Try to auto-link a review task as dependent on the task being reviewed */
+function autoLinkReviewDependency(
+  ctx: CommandHandlerContext,
+  leadId: string,
+  reviewTaskId: string,
+  taskDesc: string,
+): void {
+  const target = findReviewTarget(ctx, leadId, taskDesc);
+  if (target) {
+    ctx.taskDAG.addDependency(leadId, reviewTaskId, target.id);
+    logger.info('delegation', `Auto-linked review "${reviewTaskId}" → depends on "${target.id}"`);
+  }
+}
+
+function findReviewTarget(ctx: CommandHandlerContext, leadId: string, taskDesc: string): DagTask | null {
+  // Look for agent ID references (e.g., "review commit by 0b85de78")
+  const agentIdMatch = taskDesc.match(/\b([0-9a-f]{8})\b/);
+  if (agentIdMatch) {
+    const tasks = ctx.taskDAG.getTasks(leadId);
+    return tasks.find(t => t.assignedAgentId?.startsWith(agentIdMatch[1]) && t.dagStatus === 'running') || null;
+  }
+  // Look for task ID references (e.g., "review p0-2-autolink" or "review auto-developer-fix-1a2b")
+  const taskIdMatch = taskDesc.match(/\b(p\d+-\d+[-\w]*|auto-\w+[-\w]*)\b/i);
+  if (taskIdMatch) {
+    return ctx.taskDAG.getTask(leadId, taskIdMatch[1]) || null;
   }
   return null;
 }

@@ -456,6 +456,45 @@ export class TaskDAG extends EventEmitter {
     return result.tasks[0];
   }
 
+  /** Add a dependency between two tasks. Returns false if task not found or would create a cycle. */
+  addDependency(leadId: string, taskId: string, dependsOnId: string): boolean {
+    const task = this.getTask(leadId, taskId);
+    const dep = this.getTask(leadId, dependsOnId);
+    if (!task || !dep) return false;
+    if (task.dependsOn.includes(dependsOnId)) return true; // already exists
+    if (this.wouldCreateCycle(leadId, taskId, dependsOnId)) return false;
+    const deps = [...task.dependsOn, dependsOnId];
+    this.db.drizzle.update(dagTasks)
+      .set({ dependsOn: JSON.stringify(deps) })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    // If the dependency isn't done/skipped yet, block this task
+    if (dep.dagStatus !== 'done' && dep.dagStatus !== 'skipped') {
+      this.db.drizzle.update(dagTasks)
+        .set({ dagStatus: 'blocked' })
+        .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+        .run();
+    }
+    this.emit('dag:updated', { leadId });
+    return true;
+  }
+
+  /** Check if adding dependsOnId as a dependency of taskId would create a cycle */
+  private wouldCreateCycle(leadId: string, taskId: string, dependsOnId: string): boolean {
+    // If dependsOnId transitively depends on taskId, adding this edge creates a cycle
+    const visited = new Set<string>();
+    const queue = [dependsOnId];
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      if (current === taskId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const t = this.getTask(leadId, current);
+      if (t) queue.push(...t.dependsOn);
+    }
+    return false;
+  }
+
   /** Get a single task */
   getTask(leadId: string, taskId: string): DagTask | null {
     const row = this.db.drizzle
