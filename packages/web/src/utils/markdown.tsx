@@ -1,4 +1,6 @@
 import React from 'react';
+import { AgentMentionTooltip, type MentionAgent } from '../components/AgentMentionTooltip';
+export type { MentionAgent } from '../components/AgentMentionTooltip';
 
 /** Generate a consistent HSL color from a string (agent ID) */
 export function idColor(id: string): string {
@@ -23,10 +25,10 @@ export function AgentIdBadge({ id, className = '' }: { id: string; className?: s
   );
 }
 
-/** Render text with @mentions as clickable agent badges */
+/** Render text with @mentions as clickable agent badges with detail tooltips */
 export function MentionText({ text, agents, onClickAgent }: {
   text: string;
-  agents: Array<{ id: string; role: { name: string } }>;
+  agents: Array<MentionAgent>;
   onClickAgent?: (agentId: string) => void;
 }) {
   const MENTION_RE = /@([a-f0-9]{4,8})\b/g;
@@ -42,15 +44,15 @@ export function MentionText({ text, agents, onClickAgent }: {
         parts.push(<span key={`t-${lastIdx}`}>{text.slice(lastIdx, match.index)}</span>);
       }
       parts.push(
-        <span
-          key={`m-${match.index}`}
-          className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
-          style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
-          title={`${agent.role.name} (${agent.id.slice(0, 8)})`}
-          onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
-        >
-          @{agent.role.name.toLowerCase()}-{shortId.slice(0, 6)}
-        </span>,
+        <AgentMentionTooltip key={`m-${match.index}`} agent={agent}>
+          <span
+            className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
+            style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
+            onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
+          >
+            @{agent.role.name.toLowerCase()}-{shortId.slice(0, 6)}
+          </span>
+        </AgentMentionTooltip>,
       );
       lastIdx = match.index + match[0].length;
     }
@@ -66,7 +68,7 @@ export function MentionText({ text, agents, onClickAgent }: {
 /** Mention-aware inline markdown: handles **bold**, *italic*, `code`, and @mentions */
 function InlineMarkdownWithMentions({ text, mentionAgents, onMentionClick }: {
   text: string;
-  mentionAgents?: Array<{ id: string; role: { name: string } }>;
+  mentionAgents?: Array<MentionAgent>;
   onMentionClick?: (agentId: string) => void;
 }) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
@@ -164,7 +166,7 @@ function MarkdownTable({ raw }: { raw: string }) {
 /** Render text with markdown tables detected and inline markdown, with optional @mention support */
 export function MarkdownContent({ text, mentionAgents, onMentionClick }: {
   text: string;
-  mentionAgents?: Array<{ id: string; role: { name: string } }>;
+  mentionAgents?: Array<MentionAgent>;
   onMentionClick?: (agentId: string) => void;
 }) {
   const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
