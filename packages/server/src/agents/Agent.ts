@@ -1,4 +1,5 @@
 import { v4 as uuid } from 'uuid';
+import { createHash } from 'crypto';
 import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { AcpConnection } from '../acp/AcpConnection.js';
@@ -31,6 +32,7 @@ export interface AgentJSON {
   status: AgentStatus;
   autopilot: boolean;
   task?: string;
+  dagTaskId?: string;
   parentId?: string;
   childIds: string[];
   createdAt: string;
@@ -86,6 +88,8 @@ export class Agent {
   public contextWindowSize = 0;
   public contextWindowUsed = 0;
   private terminated = false;
+  /** Hash of the last CREW_UPDATE sent — used to skip duplicate updates */
+  private lastUpdateHash: string = '';
   /** When true, message delivery is halted — messages stay queued */
   public systemPaused = false;
 
@@ -105,6 +109,7 @@ export class Agent {
   private permissionRequestListeners: Array<(request: any) => void> = [];
   private sessionReadyListeners: Array<(sessionId: string) => void> = [];
   private contextCompactedListeners: Array<(info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void> = [];
+  private usageListeners: Array<(info: { agentId: string; inputTokens: number; outputTokens: number; dagTaskId?: string }) => void> = [];
   private static readonly MAX_MESSAGES = 500;
   private static readonly MAX_TOOL_CALLS = 200;
   private peers: AgentContextInfo[];
@@ -245,6 +250,10 @@ export class Agent {
     conn.on('usage', (usage: { inputTokens: number; outputTokens: number }) => {
       this.inputTokens = usage.inputTokens;
       this.outputTokens = usage.outputTokens;
+      // Notify external cost tracking listeners
+      for (const listener of this.usageListeners) {
+        listener({ agentId: this.id, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, dagTaskId: this.dagTaskId });
+      }
     });
 
     // Track context window from usage_update events and detect compaction
@@ -441,7 +450,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 [/CREW CONTEXT]`;
   }
 
-  injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[], healthHeader?: string): void {
+  injectContextUpdate(peers: AgentContextInfo[], recentActivity: string[], healthHeader?: string): boolean {
     const isLead = this.role.id === 'lead';
     const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
     const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
@@ -480,11 +489,19 @@ ${healthHeader ? healthHeader + '\n' : ''}${crewStatus}${budgetLine}
 ${activityLines}
 CREW_UPDATE ]]]`;
 
+    // Content hashing: skip sending if update is identical to the last one
+    const hash = createHash('md5').update(update).digest('hex');
+    if (hash === this.lastUpdateHash) {
+      return false;
+    }
+    this.lastUpdateHash = hash;
+
     if (this.acpConnection?.isConnected) {
       this.acpConnection.prompt(update).catch((err) => {
         logger.warn('agent', `Context update failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message}`);
       });
     }
+    return true;
   }
 
   write(data: string): void {
@@ -629,6 +646,7 @@ CREW_UPDATE ]]]`;
     this.pendingMessages.length = 0;
     this.messages.length = 0;
     this.toolCalls.length = 0;
+    this.lastUpdateHash = '';
   }
 
   onData(listener: (data: string) => void): void {
@@ -695,6 +713,11 @@ CREW_UPDATE ]]]`;
     this.contextCompactedListeners.push(listener);
   }
 
+  /** Register a listener for token usage updates (for cost tracking). */
+  onUsage(listener: (info: { agentId: string; inputTokens: number; outputTokens: number; dagTaskId?: string }) => void): void {
+    this.usageListeners.push(listener);
+  }
+
   onThinking(listener: (text: string) => void): void {
     this.thinkingListeners.push(listener);
   }
@@ -719,6 +742,7 @@ CREW_UPDATE ]]]`;
       status: this.status,
       autopilot: this.autopilot,
       task: this.task,
+      dagTaskId: this.dagTaskId,
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),

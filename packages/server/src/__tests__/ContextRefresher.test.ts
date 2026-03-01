@@ -384,4 +384,57 @@ describe('ContextRefresher', () => {
       expect(healthHeader).toBeUndefined();
     });
   });
+
+  describe('buildPeerList reflects latest task after re-delegation', () => {
+    it('shows updated task text when agent.task is changed', () => {
+      const agent = makeAgent({ id: 'a1', task: 'Original task from CREATE_AGENT' });
+      mocks.agentManager.getAll.mockReturnValue([agent]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+
+      // Initial buildPeerList shows original task
+      let peers = refresher.buildPeerList();
+      expect(peers[0]!.task).toBe('Original task from CREATE_AGENT');
+
+      // Simulate DELEGATE updating the task (child.task = req.task)
+      agent.task = 'New task after re-delegation';
+      peers = refresher.buildPeerList();
+      expect(peers[0]!.task).toBe('New task after re-delegation');
+    });
+
+    it('CREW_UPDATE sent to other agents shows re-delegated task', () => {
+      const lead = makeAgent({
+        id: 'lead-1',
+        role: { id: 'lead', name: 'Project Lead' },
+        status: 'running',
+        task: 'Coordinate project',
+      });
+      const dev = makeAgent({
+        id: 'dev-1',
+        status: 'running',
+        task: 'Original dev task',
+        parentId: 'lead-1',
+      });
+      mocks.agentManager.getAll.mockReturnValue([lead, dev]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+
+      refresher.refreshAll();
+
+      // Lead's CREW_UPDATE shows dev with original task
+      const leadCall1 = lead.injectContextUpdate.mock.calls[0];
+      const devPeer1 = leadCall1[0].find((p: any) => p.id === 'dev-1');
+      expect(devPeer1.task).toBe('Original dev task');
+
+      // Simulate re-delegation
+      dev.task = 'Re-delegated task';
+      lead.injectContextUpdate.mockClear();
+
+      refresher.refreshAll();
+
+      // Lead's CREW_UPDATE now shows dev with new task
+      const leadCall2 = lead.injectContextUpdate.mock.calls[0];
+      const devPeer2 = leadCall2[0].find((p: any) => p.id === 'dev-1');
+      expect(devPeer2.task).toBe('Re-delegated task');
+    });
+  });
 });
