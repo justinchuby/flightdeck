@@ -1,14 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const backendPort = process.env.VITE_API_PORT || process.env.PORT || '3001';
+const backendUrl = `http://localhost:${backendPort}`;
+const backendWs = `ws://localhost:${backendPort}`;
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api': backendUrl,
+      '/mcp': backendUrl,
       '/ws': {
-        target: 'ws://localhost:3001',
+        target: backendWs,
         ws: true,
         // Suppress ECONNRESET / EPIPE errors when backend restarts or drops connections
         configure: (proxy) => {
