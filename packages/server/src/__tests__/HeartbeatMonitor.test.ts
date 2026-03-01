@@ -40,11 +40,12 @@ function makeDagSummary(overrides: Partial<DagSummary> = {}): DagSummary {
   };
 }
 
-function createMockContext(): HeartbeatContext & { getAllAgents: ReturnType<typeof vi.fn>; getDelegationsMap: ReturnType<typeof vi.fn>; getDagSummary: ReturnType<typeof vi.fn>; emit: ReturnType<typeof vi.fn> } {
+function createMockContext(): HeartbeatContext & { getAllAgents: ReturnType<typeof vi.fn>; getDelegationsMap: ReturnType<typeof vi.fn>; getDagSummary: ReturnType<typeof vi.fn>; getTaskByAgent: ReturnType<typeof vi.fn>; emit: ReturnType<typeof vi.fn> } {
   return {
     getAllAgents: vi.fn().mockReturnValue([]),
     getDelegationsMap: vi.fn().mockReturnValue(new Map()),
     getDagSummary: vi.fn().mockReturnValue(null),
+    getTaskByAgent: vi.fn().mockReturnValue(null),
     emit: vi.fn() as any,
   };
 }

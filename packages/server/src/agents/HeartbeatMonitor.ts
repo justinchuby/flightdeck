@@ -12,6 +12,7 @@ export interface HeartbeatContext {
   getAllAgents(): Agent[];
   getDelegationsMap(): Map<string, Delegation>;
   getDagSummary(leadId: string): DagSummary | null;
+  getTaskByAgent(leadId: string, agentId: string): unknown | null;
   emit(event: string, ...args: any[]): void;
 }
 
@@ -118,6 +119,12 @@ export class HeartbeatMonitor {
       parts.push(`${idleChildren.length} agents idle, ${completedChildren.length} completed/failed.`);
       if (activeDelegations.length > 0) {
         parts.push(`${activeDelegations.length} active delegations still pending.`);
+        const untrackedCount = activeDelegations.filter(
+          d => !this.ctx.getTaskByAgent(lead.id, d.toAgentId)
+        ).length;
+        if (untrackedCount > 0) {
+          parts.push(`⚠️ ${untrackedCount} active delegation(s) are not tracked in your task DAG. Use ADD_TASK to track them.`);
+        }
       }
       if (remainingDagTasks > 0 && dagSummary) {
         const dagDetails: string[] = [];
