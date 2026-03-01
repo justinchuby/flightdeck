@@ -1325,4 +1325,30 @@ describe('CommandDispatcher', () => {
       );
     });
   });
+
+  // ── Buffer size cap ──────────────────────────────────────────────────
+
+  describe('buffer size cap', () => {
+    it('truncates buffer exceeding 100KB after scanBuffer', () => {
+      const agent = makeAgent({ id: 'agent-1' });
+      // Stuff 150KB of text with an opening bracket near the start
+      const filler = 'x'.repeat(150_000);
+      dispatcher.appendToBuffer(agent.id, '⟦⟦ ' + filler);
+      dispatcher.scanBuffer(agent);
+
+      const buf = (dispatcher as any).textBuffers.get('agent-1') as string;
+      expect(buf.length).toBeLessThanOrEqual(100_000);
+    });
+
+    it('preserves recent content when truncating', () => {
+      const agent = makeAgent({ id: 'agent-1' });
+      const filler = 'x'.repeat(120_000);
+      dispatcher.appendToBuffer(agent.id, filler + '⟦⟦ SENTINEL');
+      dispatcher.scanBuffer(agent);
+
+      const buf = (dispatcher as any).textBuffers.get('agent-1') as string;
+      expect(buf).toContain('SENTINEL');
+      expect(buf.length).toBeLessThanOrEqual(100_000);
+    });
+  });
 });
