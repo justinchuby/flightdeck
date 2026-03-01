@@ -114,6 +114,8 @@ export class ContextRefresher {
       roleName: agent.role.name,
       status: agent.status,
       task: agent.task,
+      parentId: agent.parentId,
+      model: agent.model || agent.role.model,
       lockedFiles: allLocks
         .filter((lock) => lock.agentId === agent.id)
         .map((lock) => lock.filePath),
