@@ -23,6 +23,7 @@ import type { DecisionRecordStore } from './coordination/DecisionRecords.js';
 import type { ModelSelector } from './agents/ModelSelector.js';
 import type { TokenBudgetOptimizer } from './agents/TokenBudgetOptimizer.js';
 import { ReportGenerator } from './coordination/ReportGenerator.js';
+import { extractCommFromActivity } from './coordination/CommEventExtractor.js';
 import { logger } from './utils/logger.js';
 import { ParallelAnalyzer } from './tasks/ParallelAnalyzer.js';
 import { writeAgentFiles } from './agents/agentFiles.js';
@@ -104,15 +105,15 @@ export function apiRouter(
   });
 
   router.post('/agents', spawnLimiter, validateBody(spawnAgentSchema), (req, res) => {
-    const { roleId, task, mode, autopilot, model } = req.body;
+    const { roleId, task, mode, autopilot, model, sessionId } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) {
       logger.warn('api', `POST /agents — unknown role: ${roleId}`);
       return res.status(400).json({ error: `Unknown role: ${roleId}` });
     }
     try {
-      const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model);
-      logger.info('api', `POST /agents — spawned ${role.name} (${agent.id.slice(0, 8)})`, { model: model || role.model });
+      const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined);
+      logger.info('api', `POST /agents — ${sessionId ? 'resumed' : 'spawned'} ${role.name} (${agent.id.slice(0, 8)})`, { model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error('api', `POST /agents — ${err.message}`);
@@ -575,6 +576,12 @@ export function apiRouter(
         teamAgentIds.add(entry.agentId);
       }
       writeSSE('activity', { entry });
+
+      // Emit dedicated comm:update for communication-related events
+      const comm = extractCommFromActivity(entry);
+      if (comm) {
+        writeSSE('comm:update', { comm });
+      }
     };
 
     const onLockAcquired = (data: any) => {
@@ -814,6 +821,26 @@ export function apiRouter(
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
     const status = agentManager.getTaskDAG().getStatus(agent.id);
     res.json(status);
+  });
+
+  // --- Cost tracking ---
+  router.get('/costs/by-agent', (_req, res) => {
+    const tracker = agentManager.getCostTracker();
+    if (!tracker) return res.json([]);
+    res.json(tracker.getAgentCosts());
+  });
+
+  router.get('/costs/by-task', (req, res) => {
+    const tracker = agentManager.getCostTracker();
+    if (!tracker) return res.json([]);
+    const leadId = typeof req.query.leadId === 'string' ? req.query.leadId : undefined;
+    res.json(tracker.getTaskCosts(leadId));
+  });
+
+  router.get('/costs/agent/:agentId', (req, res) => {
+    const tracker = agentManager.getCostTracker();
+    if (!tracker) return res.json([]);
+    res.json(tracker.getAgentTaskCosts(req.params.agentId));
   });
 
   router.get('/lead/:id/progress', (req, res) => {
@@ -1265,6 +1292,64 @@ export function apiRouter(
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
     logger.info('project', `Deleted project ${(req.params.id as string).slice(0, 8)}`);
     res.json({ ok: true });
+  });
+
+  // --- Session Resume ---
+
+  // List sessions that can be resumed (have a Copilot sessionId and are no longer active)
+  router.get('/sessions/resumable', (_req, res) => {
+    if (!projectRegistry) return res.json([]);
+    const sessions = projectRegistry.getResumableSessions();
+    res.json(sessions);
+  });
+
+  // Resume a specific session by its row ID
+  router.post('/sessions/:id/resume', spawnLimiter, (req, res) => {
+    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+
+    const sessionRowId = Number(req.params.id);
+    if (isNaN(sessionRowId)) return res.status(400).json({ error: 'Invalid session ID' });
+
+    const session = projectRegistry.getSessionById(sessionRowId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session.sessionId) return res.status(400).json({ error: 'Session has no Copilot session ID — cannot resume' });
+    if (session.status === 'active') return res.status(409).json({ error: 'Session is still active' });
+
+    const project = projectRegistry.get(session.projectId);
+    if (!project) return res.status(404).json({ error: 'Associated project not found' });
+
+    const role = roleRegistry.get('lead');
+    if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
+
+    const { task: overrideTask, model } = req.body ?? {};
+    const task = overrideTask || session.task || undefined;
+
+    try {
+      const agent = agentManager.spawn(
+        role, task, undefined, true, model,
+        project.cwd ?? undefined,
+        session.sessionId,
+        undefined,
+        { projectName: project.name, projectId: project.id },
+      );
+
+      projectRegistry.startSession(project.id, agent.id, task);
+
+      // Send briefing from previous sessions
+      const briefing = projectRegistry.buildBriefing(project.id);
+      if (briefing && briefing.sessions.length > 1) {
+        const briefingText = projectRegistry.formatBriefing(briefing);
+        setTimeout(() => {
+          agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nYou are resuming a previous session. Continue from where you left off.`);
+        }, 3000);
+      }
+
+      logger.info('session', `Resumed session ${sessionRowId} for project "${project.name}" (${agent.id.slice(0, 8)})`);
+      res.status(201).json(agent.toJSON());
+    } catch (err: any) {
+      logger.error('session', `Failed to resume session: ${err.message}`);
+      res.status(429).json({ error: err.message });
+    }
   });
 
   // --- Database Browser ---

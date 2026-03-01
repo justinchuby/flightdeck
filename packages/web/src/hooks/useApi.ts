@@ -63,6 +63,19 @@ export function useApi() {
     return apiFetch(`/agents/${id}/restart`, { method: 'POST' });
   }, []);
 
+  const resumeAgent = useCallback(async (id: string, sessionId: string) => {
+    const agent = useAppStore.getState().agents.find((a) => a.id === id);
+    return apiFetch('/agents', {
+      method: 'POST',
+      body: JSON.stringify({
+        roleId: agent?.role.id ?? 'lead',
+        task: agent?.task,
+        model: agent?.model,
+        sessionId,
+      }),
+    });
+  }, []);
+
   const updateConfig = useCallback(
     async (patch: Partial<ServerConfig>) => {
       const config = await apiFetch<ServerConfig>('/config', {
@@ -133,6 +146,7 @@ export function useApi() {
     terminateAgent,
     interruptAgent,
     restartAgent,
+    resumeAgent,
     updateAgent,
     updateConfig,
     createRole,
