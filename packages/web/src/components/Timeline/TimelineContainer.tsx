@@ -503,7 +503,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     switch (e.key) {
       case 'ArrowLeft':
         e.preventDefault();
-        onLiveModeChange?.(false);
+        setLiveMode(false);
         setVisibleRange(prev => {
           const span = prev.end.getTime() - prev.start.getTime();
           const shift = span * 0.1;
@@ -593,7 +593,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         setShowShortcutHelp(prev => !prev);
         break;
     }
-  }, [focusedLaneIdx, sortedAgents, toggleExpand, zoomBy, fullRange, onLiveModeChange]);
+  }, [focusedLaneIdx, sortedAgents, toggleExpand, zoomBy, fullRange, setLiveMode]);
 
   if (data.agents.length === 0) {
     return (
@@ -617,7 +617,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-700/50'
                 : 'text-th-text-muted bg-th-bg-alt hover:bg-th-bg-muted'
             }`}
-            onClick={() => onLiveModeChange?.(!liveMode)}
+            onClick={() => setLiveMode(!liveMode)}
             aria-label={liveMode ? 'Disable live mode' : 'Enable live mode'}
           >
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse motion-reduce:animate-none' : 'bg-zinc-600'}`} />
@@ -650,7 +650,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
       <BrushTimeSelector
         fullRange={fullRange}
         visibleRange={visibleRange}
-        onRangeChange={(range) => { onLiveModeChange?.(false); setVisibleRange(range); }}
+        onRangeChange={(range) => { setLiveMode(false); setVisibleRange(range); }}
         agents={sortedAgents}
         width={containerWidth}
         leftOffset={LABEL_WIDTH}
