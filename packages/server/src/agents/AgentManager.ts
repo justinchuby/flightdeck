@@ -18,6 +18,7 @@ import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
 import type { WorktreeManager } from '../coordination/WorktreeManager.js';
+import type { CostTracker } from './CostTracker.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -99,6 +100,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private heartbeat: HeartbeatMonitor;
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
   private worktreeManager?: WorktreeManager;
+  private costTracker?: CostTracker;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -112,7 +114,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker } = {},
   ) {
     super();
     this.config = config;
@@ -128,6 +130,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.timerRegistry = timerRegistry ?? (null as any);
     this.capabilityInjector = capabilityInjector;
     this.worktreeManager = worktreeManager;
+    this.costTracker = costTracker;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -354,6 +357,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       logger.info('agent', `Context compacted for ${agent.role.name} (${agent.id.slice(0, 8)}): ${info.percentDrop}% reduction`);
       this.emit('agent:context_compacted', { agentId: agent.id, ...info });
     });
+
+    // Wire cost tracking: attribute token usage to the agent's current dagTaskId
+    if (this.costTracker) {
+      const tracker = this.costTracker;
+      agent.onUsage(({ agentId, inputTokens, outputTokens, dagTaskId }) => {
+        if (dagTaskId && agent.parentId) {
+          tracker.recordUsage(agentId, dagTaskId, agent.parentId, inputTokens, outputTokens);
+        }
+      });
+    }
 
     agent.onStatus((status) => {
       this.emit('agent:status', { agentId: agent.id, status });
@@ -762,6 +775,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   getTaskDAG(): TaskDAG {
     return this.taskDAG;
+  }
+
+  getCostTracker(): CostTracker | undefined {
+    return this.costTracker;
   }
 
   /** Persist a human message to the agent's conversation history */
