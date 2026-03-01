@@ -7,6 +7,7 @@ import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '
 import { useAppStore } from '../../stores/appStore';
 import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
+import { classifyHighlight } from '../../utils/isUserDirectedMessage';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
@@ -1412,17 +1413,14 @@ export function LeadDashboard({ api, ws }: Props) {
                 const isFirstInRun = !prevMsg || prevMsg.sender !== 'agent' || prevMsg.queued;
                 const agentTs = isFirstInRun ? ts : '';
 
-                // Highlight agent messages that are responses to user input
-                const isReplyToUser = (prevMsg?.sender === 'user' && isFirstInRun)
-                  || msg.text.includes('[USER MESSAGE');
+                // Highlight detection using shared utility
+                const prevSenderIsUser = (prevMsg?.sender === 'user' && isFirstInRun);
+                const highlight = classifyHighlight(msg.text, { prevSenderIsUser });
+                const isUserDir = highlight === 'user-directed';
 
-                // Detect @user-directed messages (lead addressing the human)
-                const isUserDirected = /(?:^|\n)@user\s*\n/m.test(msg.text);
-
-                // @user highlight takes priority over reply highlight
-                const msgHighlight = isUserDirected
+                const msgHighlight = highlight === 'user-directed'
                   ? 'bg-accent/[0.08] border-l-2 border-l-accent/40 pl-2 rounded-md'
-                  : isReplyToUser
+                  : highlight === 'reply-to-user'
                     ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md'
                     : '';
 
@@ -1441,7 +1439,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 return (
                   <div key={i} className={`py-0.5 ${msgHighlight}`}>
                     <div className="flex items-start gap-2">
-                      <div className={`flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 ${isUserDirected ? 'text-th-text' : 'text-th-text-alt'}`}>
+                      <div className={`flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 ${isUserDir ? 'text-th-text' : 'text-th-text-alt'}`}>
                         <AgentTextBlock text={msg.text} />
                       </div>
                       {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}

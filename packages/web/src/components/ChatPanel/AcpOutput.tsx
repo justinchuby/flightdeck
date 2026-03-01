@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X } from 'lucide-react';
+import { classifyHighlight } from '../../utils/isUserDirectedMessage';
 
 interface Props {
   agentId: string;
@@ -307,14 +308,22 @@ export function AcpOutput({ agentId }: Props) {
             }
 
             // Rich content (image, audio, resource)
-            // Agent messages — check if reply to user for blue highlight
+            // Agent messages — use shared highlight detection
             const prevItem = i > 0 ? timeline[i - 1] : null;
-            const isReplyToUser = prevItem?.kind === 'message' && (prevItem.msg.sender ?? 'agent') === 'user';
-            const replyClass = isReplyToUser ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md' : '';
+            const prevSenderIsUser = prevItem?.kind === 'message' && (prevItem.msg.sender ?? 'agent') === 'user';
+            const highlight = classifyHighlight(
+              typeof msg.text === 'string' ? msg.text : '',
+              { prevSenderIsUser },
+            );
+            const highlightClass = highlight === 'user-directed'
+              ? 'bg-accent/[0.08] border-l-2 border-l-accent/40 pl-2 rounded-md'
+              : highlight === 'reply-to-user'
+                ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md'
+                : '';
 
             if (msg.contentType && msg.contentType !== 'text') {
               return (
-                <div key={`msg-${item.index}`} className={`py-1 ${replyClass}`}>
+                <div key={`msg-${item.index}`} className={`py-1 ${highlightClass}`}>
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       {msg.contentType === 'image' && msg.data && (
@@ -350,12 +359,12 @@ export function AcpOutput({ agentId }: Props) {
 
             // Agent messages — flowing text, no bubble
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
-            const isUserDirected = /(?:^|\n)@user\s*\n/m.test(text);
+            const isUserDir = highlight === 'user-directed';
             return (
-              <div key={`msg-${item.index}`} className={`py-1 ${replyClass}`}>
+              <div key={`msg-${item.index}`} className={`py-1 ${highlightClass}`}>
                 <div className="flex items-start gap-2">
                   <div className={`flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 ${
-                    isUserDirected
+                    isUserDir
                       ? 'text-th-text bg-accent/[0.08] border-l-2 border-l-accent/40 pl-2 rounded-md py-1'
                       : 'text-th-text-alt'
                   }`}>
