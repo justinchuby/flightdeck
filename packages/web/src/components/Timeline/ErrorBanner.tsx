@@ -41,16 +41,15 @@ export function ErrorBanner({
     previousErrorCount.current = errors.length;
   }, [errors.length]);
 
-  // Auto-dismiss: observe when banner's scroll sentinel becomes visible
-  // This means user has scrolled past the error
+  // Auto-dismiss: observe the actual error elements in the timeline.
+  // When the first error scrolls into the viewport, dismiss the banner.
   useEffect(() => {
     if (errors.length === 0 || isDismissed) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (!entry.isIntersecting) {
-            // The banner sentinel is no longer visible — user scrolled past errors
+          if (entry.isIntersecting) {
             setIsDismissed(true);
             onDismiss?.();
           }
@@ -59,11 +58,18 @@ export function ErrorBanner({
       { threshold: 0 },
     );
 
-    const el = bannerRef.current;
-    if (el) observer.observe(el);
+    // Observe each error's element in the timeline by convention ID
+    const observedElements: Element[] = [];
+    for (const error of errors) {
+      const el = document.getElementById(`timeline-event-${error.id}`);
+      if (el) {
+        observer.observe(el);
+        observedElements.push(el);
+      }
+    }
 
     return () => observer.disconnect();
-  }, [errors.length, isDismissed, onDismiss]);
+  }, [errors, isDismissed, onDismiss]);
 
   const handleDismiss = useCallback(() => {
     setIsDismissed(true);

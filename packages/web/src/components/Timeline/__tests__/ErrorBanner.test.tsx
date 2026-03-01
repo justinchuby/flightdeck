@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ErrorBanner } from '../ErrorBanner';
 import type { ErrorEntry } from '../ErrorBanner';
 
 // ── Mock IntersectionObserver (not available in jsdom) ────────────────
 
+let intersectionCallback: IntersectionObserverCallback;
+let observedElements: Element[];
+
 beforeEach(() => {
+  observedElements = [];
   vi.stubGlobal('IntersectionObserver', class {
-    observe = vi.fn();
+    observe = vi.fn((el: Element) => { observedElements.push(el); });
     unobserve = vi.fn();
     disconnect = vi.fn();
-    constructor() {}
+    constructor(cb: IntersectionObserverCallback) {
+      intersectionCallback = cb;
+    }
   });
 });
 
@@ -155,5 +161,37 @@ describe('ErrorBanner', () => {
       name: /Scroll to error: Developer 1/,
     });
     expect(errorBtn).toBeInTheDocument();
+  });
+
+  it('observes error elements and auto-dismisses when they become visible', () => {
+    // Create DOM elements that the component will look up by ID
+    const sentinel = document.createElement('div');
+    sentinel.id = 'timeline-event-error-1';
+    document.body.appendChild(sentinel);
+
+    const onDismiss = vi.fn();
+    render(
+      <ErrorBanner
+        errors={makeErrors(1)}
+        onScrollToError={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    // Observer should have observed the error's DOM element
+    expect(observedElements).toContain(sentinel);
+
+    // Simulate the error element scrolling into view (isIntersecting: true)
+    act(() => {
+      intersectionCallback(
+        [{ isIntersecting: true, target: sentinel } as unknown as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(onDismiss).toHaveBeenCalled();
+    expect(screen.queryByTestId('error-banner')).not.toBeInTheDocument();
+
+    document.body.removeChild(sentinel);
   });
 });

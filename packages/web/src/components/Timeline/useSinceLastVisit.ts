@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -45,9 +45,10 @@ export function useSinceLastVisit(
   });
 
   // Compute marker position — graceful fallback if ID references pruned event
-  const lastSeenMarkerPosition = lastSeenEventId
-    ? eventIds.indexOf(lastSeenEventId)
-    : -1;
+  const lastSeenMarkerPosition = useMemo(
+    () => (lastSeenEventId ? eventIds.indexOf(lastSeenEventId) : -1),
+    [eventIds, lastSeenEventId],
+  );
 
   // If the stored ID is not found in current events, treat as first visit (fallback)
   const effectiveMarkerPosition =
