@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from 'helmet';
 import { createServer } from 'http';
 import cors from 'cors';
 import path from 'path';
@@ -59,14 +60,8 @@ app.use(cors({
   credentials: true,
 }));
 
-// Security headers
-app.use((_req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('X-XSS-Protection', '0'); // modern browsers use CSP instead
-  next();
-});
+// Security headers (helmet sets X-Frame-Options, CSP, HSTS, etc.)
+app.use(helmet());
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -371,3 +366,7 @@ function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('unhandledRejection', (reason: unknown) => {
+  console.error('Unhandled promise rejection:', reason);
+  gracefulShutdown('unhandledRejection');
+});
