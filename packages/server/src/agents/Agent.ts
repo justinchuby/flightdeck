@@ -219,26 +219,26 @@ All team members have access to this directory. Create your subdirectory before 
 == COORDINATION RULES ==
 1. DO NOT modify files that another agent has locked (listed above).
 2. ALWAYS acquire a file lock BEFORE editing any file:
-\`⟦ LOCK_FILE {"filePath": "path/to/file", "reason": "why"} ⟧\`
+\`⟦⟦ LOCK_FILE {"filePath": "path/to/file", "reason": "why"} ⟧⟧\`
 3. When you finish editing a file, release the lock:
-\`⟦ UNLOCK_FILE {"filePath": "path/to/file"} ⟧\`
+\`⟦⟦ UNLOCK_FILE {"filePath": "path/to/file"} ⟧⟧\`
 4. To communicate with another agent, use:
-\`⟦ AGENT_MESSAGE {"to": "agent-id", "content": "message"} ⟧\`
+\`⟦⟦ AGENT_MESSAGE {"to": "agent-id", "content": "message"} ⟧⟧\`
 5. To broadcast a message to ALL team members, use:
-\`⟦ BROADCAST {"content": "message"} ⟧\`
+\`⟦⟦ BROADCAST {"content": "message"} ⟧⟧\`
 6. To send a message to a group you belong to:
-\`⟦ GROUP_MESSAGE {"group": "group-name", "content": "message"} ⟧\`
+\`⟦⟦ GROUP_MESSAGE {"group": "group-name", "content": "message"} ⟧⟧\`
 7. To create a chat group with other agents for coordination:
-\`⟦ CREATE_GROUP {"name": "group-name", "members": ["agent-id-1", "agent-id-2"]} ⟧\`
-8. To list your groups: \`⟦ LIST_GROUPS ⟧\`
+\`⟦⟦ CREATE_GROUP {"name": "group-name", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧\`
+8. To list your groups: \`⟦⟦ LIST_GROUPS ⟧⟧\`
 9. To get an updated roster of all agents and their IDs, use:
-\`⟦ QUERY_CREW ⟧\`
+\`⟦⟦ QUERY_CREW ⟧⟧\`
 10. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
 11. Log important decisions by outputting:
-\`⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧\`
+\`⟦⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧⟧\`
 12. To defer a non-blocking issue for later:
-\`⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧\`
-\`⟦ QUERY_DEFERRED {} ⟧\`
+\`⟦⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧⟧\`
+\`⟦⟦ QUERY_DEFERRED {} ⟧⟧\`
 
 == SKILLS (reusable knowledge for future work) ==
 Skills are reusable instructions that Copilot CLI loads automatically when relevant. Use them to capture REUSABLE KNOWLEDGE — patterns, techniques, and approaches that will benefit future work sessions.
@@ -338,11 +338,11 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       ? `\n== AGENT BUDGET ==\nRunning: ${this.budget.runningCount} / ${this.budget.maxConcurrent} | Available slots: ${Math.max(0, this.budget.maxConcurrent - this.budget.runningCount)}${this.budget.runningCount >= this.budget.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}`
       : '';
 
-    const update = `⟦ CREW_UPDATE
+    const update = `⟦⟦ CREW_UPDATE
 ${healthHeader ? healthHeader + '\n' : ''}${crewStatus}${budgetLine}
 == RECENT ACTIVITY ==
 ${activityLines}
-CREW_UPDATE ⟧`;
+CREW_UPDATE ⟧⟧`;
 
     // Hash only stable parts (crew status, budget, health) — not activity timestamps
     const stableContent = `${healthHeader || ''}${crewStatus}${budgetLine}`;
