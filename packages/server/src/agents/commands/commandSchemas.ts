@@ -121,7 +121,10 @@ export const commitSchema = z.object({
 
 export const progressSchema = z.object({
   summary: z.string().max(MAX_CONTENT_LENGTH, `"summary" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
-  percent: z.number().min(0).max(100).optional(),
+  percent: z.union([z.number(), z.string()]).transform((val) => {
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    return num;
+  }).pipe(z.number().min(0, 'Percent must be at least 0').max(100, 'Percent must be at most 100')).optional(),
   status: z.string().max(MAX_NAME_LENGTH).optional(),
 }).passthrough();
 

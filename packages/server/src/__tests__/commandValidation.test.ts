@@ -821,6 +821,29 @@ describe('PROGRESS validation', () => {
       expect.stringContaining('PROGRESS validation error'),
     );
   });
+
+  it('coerces percent from string to number', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {"percent": "50", "summary": "halfway"} ⟧');
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS validation error'),
+    );
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS error'),
+    );
+  });
+
+  it('rejects non-numeric percent string', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {"percent": "abc"} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS validation error'),
+    );
+  });
 });
 
 // ── RELEASE_CAPABILITY validation ────────────────────────────────────
