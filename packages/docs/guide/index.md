@@ -1,27 +1,26 @@
 # Introduction
 
-AI Crew is a web-based orchestration framework that coordinates multiple [GitHub Copilot CLI](https://docs.github.com/en/copilot) agents. A **Project Lead** agent manages a team of specialists — developers, architects, reviewers, designers — that collaborate on software engineering tasks.
+AI Crew is a web-based orchestration framework that coordinates multiple [GitHub Copilot CLI](https://docs.github.com/en/copilot) agents. Give it a task, and it assembles a team of specialists — developers, architects, reviewers, and more — that collaborate like a real engineering team, working in parallel and checking each other's work.
 
 > [!WARNING]
-> This is purely AI-generated code. Use the project with this understanding in mind.
+> This is AI-generated code. Use the project with this understanding in mind.
 
 ## How It Works
 
-1. You create a **project** with a task description
+1. You describe a **goal** in plain language — that's your only job
 2. A **Project Lead** agent analyzes the task and assembles a team
 3. The lead **delegates** subtasks to specialist agents
-4. Agents work autonomously, **communicate** with each other, and report progress
-5. You stay in the loop via the **real-time dashboard**
+4. Agents work in parallel, **communicate** with each other, and report progress
+5. You watch it all happen via the **real-time dashboard** — and can jump in at any time
 
 ## Key Capabilities
 
-- **9 specialist roles** with different AI models (Claude, GPT, Gemini)
-- **Typed event bus** with 27 strongly-typed events for real-time updates
-- **File locking** to prevent edit conflicts between agents
-- **Task DAG** visualization of dependencies
-- **Decision log** with async user confirmation
-- **Context re-injection** after agent compaction events
-- **Batched writes** for high-throughput activity logging
+- **12 specialist roles** — developers, architects, reviewers, designers, and more — each with a different AI model for diverse perspectives
+- **Parallel execution** — multiple agents coding, reviewing, and testing simultaneously
+- **File locking** — agents claim files before editing, so no one overwrites anyone else
+- **Task DAG** — a dependency graph that tracks what's done, what's next, and what's blocked
+- **Built-in code review** — every change is automatically reviewed before it ships
+- **Real-time dashboard** — see who's doing what, message any agent, or pause everything
 
 ## Project Structure
 

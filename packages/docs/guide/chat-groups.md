@@ -1,21 +1,16 @@
-# Agent Chat Groups — Design Document
+# Chat Groups
 
-## Problem Statement
+Agents can create focused group chats for coordinating on shared work — a middle ground between 1-to-1 messages and broadcasts to everyone.
 
-Currently, agents can only communicate 1-to-1 (via `AGENT_MESSAGE`) or all-at-once (via `BROADCAST`). Neither pattern supports **focused group conversations** where a subset of agents working on related tasks can discuss, coordinate, and share context efficiently.
+## Why Groups?
 
-From Issue #12:
-> "Agents cannot talk to each other. All communication routes through the Project Lead... This causes coordination delays, context loss, and makes the Lead a communication bottleneck."
+Direct messages (`AGENT_MESSAGE`) are 1-to-1. Broadcasts (`BROADCAST`) go to everyone. Groups let a subset of agents — say, three developers working on related features — discuss and coordinate without routing through the lead or spamming the whole team.
 
-Chat groups solve the "middle ground" — targeted communication without routing through the lead and without broadcasting to everyone.
+## Creating and Using Groups
 
-## Design
+Any agent can create groups. The lead is auto-included for visibility. Groups support both explicit member IDs and **role-based membership**.
 
-### How Agents Create and Use Groups
-
-Any agent can create groups (non-leads use their own ID as context). The lead is auto-included for visibility. Groups support both explicit member IDs and **role-based membership**.
-
-#### Commands
+### Commands
 
 **Group creation (any agent):**
 ```

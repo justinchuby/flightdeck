@@ -9,7 +9,7 @@
 ## Installation
 
 ```bash
-git clone https://github.com/justinc/ai-crew.git
+git clone https://github.com/justinchuby/ai-crew.git
 cd ai-crew
 npm install
 ```
@@ -53,6 +53,9 @@ npm run dev:web      # http://localhost:5173
 4. Provide a name, task description, and optionally a working directory
 5. Select a model for the Project Lead (defaults to Claude Opus 4.6)
 6. The lead will analyze the task, create agents, and start delegating
+
+> [!TIP] What to expect
+> Within a minute or two, you'll see the lead creating agents (developers, reviewers, etc.) and assigning them work. The dashboard updates in real-time — you can watch agents coding, messaging each other, and reviewing code simultaneously. You don't need to do anything — just watch. Or jump in and message any agent at any time.
 
 ## Interacting with Agents
 

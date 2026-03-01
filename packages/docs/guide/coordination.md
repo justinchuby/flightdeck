@@ -2,6 +2,9 @@
 
 How agents avoid stepping on each other's work.
 
+> [!TIP] TL;DR
+> Multiple agents share one codebase safely through **file locking** (only one agent edits a file at a time), **scoped commits** (agents only commit files they've locked), and **context refresh** (agents get updated on what their teammates are doing). Think of it like a shared Google Doc where each person locks the section they're editing.
+
 ## Problem
 
 Multiple AI agents working on the same codebase can:

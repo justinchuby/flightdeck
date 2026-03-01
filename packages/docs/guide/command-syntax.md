@@ -1,23 +1,22 @@
-# Emoji Command Fence Analysis: Replacing `[[[ ]]]`
+# Command Syntax
 
-## The Problem
+## The `⟦ ⟧` Fence
 
-The `[[[ COMMAND {json} ]]]` syntax has caused repeated issues:
-1. **Parser confusion**: `[[[` inside JSON payloads/task text triggers false command matches (#26, fix-bracket-parsing)
-2. **UI rendering**: `[[[` in displayed content collapsed as command blocks
-3. **Prompt injection**: Leads embedding `[[[ COMMIT ]]]` examples in task descriptions
-4. **Nesting ambiguity**: `isInsideCommandBlock` needed 30+ lines of JSON-string-aware tracking
+Agents communicate via structured commands embedded in their output. Commands use mathematical bracket syntax:
 
-Root cause: `[` is an extremely common character in code, markdown, JSON, and natural language. Any fence built from common ASCII chars will collide.
+```
+⟦ COMMAND_NAME {"key": "value"} ⟧
+```
 
-## Recommendation: `⟦ COMMAND {json} ⟧`
+> [!NOTE]
+> The characters `⟦` (U+27E6) and `⟧` (U+27E7) are mathematical white square brackets. They were chosen because they never appear in code, JSON, or natural language — eliminating false matches.
 
-**Characters:** Mathematical Left/Right White Square Bracket — `⟦` (U+27E6) and `⟧` (U+27E7)
+## Why Not `[[[ ]]]`?
 
-### Why this pair wins
-
-| Criterion | `⟦ ⟧` | `🔧 🔧` | `⌘{ }⌘` | `>>><<<` |
-|-----------|--------|---------|---------|----------|
+The original `[[[ COMMAND {json} ]]]` syntax caused issues:
+1. **Parser confusion**: `[[[` inside JSON payloads triggered false command matches
+2. **UI rendering**: `[[[` in displayed content was misidentified as commands
+3. **Nesting ambiguity**: Required complex tracking to distinguish real commands from text
 | Never appears in code/JSON/markdown | ✅ | ✅ | ❌ (>>> in Python, git conflicts) | ❌ |
 | Single char each (clean regex) | ✅ (1 char) | ✅ (1 char) | ❌ (multi-char) | ❌ |
 | Visually distinct from `[` | ✅ (thick double bracket) | ✅ | ✅ | ❌ |
