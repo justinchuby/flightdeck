@@ -25,6 +25,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
@@ -192,6 +193,7 @@ export function App() {
             </div>
           </header>
 
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<LeadDashboard api={api} ws={ws} />} />
             <Route path="/lead" element={<Navigate to="/" replace />} />
@@ -206,6 +208,7 @@ export function App() {
             <Route path="/mission-control" element={<MissionControlPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ErrorBoundary>
         </div>
 
         {selectedAgentId && (
