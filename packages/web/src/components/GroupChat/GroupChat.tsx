@@ -361,12 +361,12 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
   return (
     <div className="flex flex-col h-full bg-th-bg text-th-text-alt">
-      {/* ---- Project tabs ---- */}
-      {leads.length > 1 && (
+      {/* ---- Project tabs (first level) ---- */}
+      {leads.length > 0 && (
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-th-border/50 shrink-0 overflow-x-auto bg-th-bg/50">
           {leads.map((lead) => {
             const isActive = selectedProjectLeadId === lead.id;
-            const projectGroups = groups.filter((g) => g.leadId === lead.id);
+            const projectGroups = groups.filter((g) => (g.projectId ?? g.leadId) === lead.id);
             return (
               <button
                 key={lead.id}
