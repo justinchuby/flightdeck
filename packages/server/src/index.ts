@@ -1,5 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
+import net from 'net';
 import cors from 'cors';
 import { getConfig, updateConfig } from './config.js';
 import { WebSocketServer } from './comms/WebSocketServer.js';
@@ -328,21 +329,57 @@ if (fs.existsSync(webDistPath)) {
   });
 }
 
-httpServer.listen(config.port, config.host, () => {
-  const url = `http://${config.host}:${config.port}`;
-  console.log(`🚀 AI Crew server running on ${url}`);
-  if (authToken) {
-    console.log(`🔑 Auth token: ${authToken}`);
-    console.log(`   (set SERVER_SECRET env var to use a fixed token, or AUTH=none to disable)`);
-  } else {
-    console.log(`⚠️  Auth disabled (AUTH=none)`);
+const MAX_PORT_RETRIES = 10;
+
+/** Check if a port is available by briefly attempting to listen on it. */
+function isPortAvailable(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const tester = net.createServer()
+      .once('error', () => resolve(false))
+      .once('listening', () => { tester.close(() => resolve(true)); })
+      .listen(port, host);
+  });
+}
+
+async function startServer(requestedPort: number): Promise<void> {
+  let port = requestedPort;
+  for (let attempt = 0; attempt < MAX_PORT_RETRIES; attempt++) {
+    if (await isPortAvailable(port, config.host)) break;
+    console.warn(`⚠️  Port ${port} is in use, trying ${port + 1}...`);
+    port++;
+    if (attempt === MAX_PORT_RETRIES - 1) {
+      console.error(`❌ Could not find an available port after ${MAX_PORT_RETRIES} attempts (tried ${requestedPort}–${port}).`);
+      process.exit(1);
+    }
   }
-  if (config.host === '0.0.0.0') {
-    console.warn('⚠️  WARNING: Server is binding to all interfaces (0.0.0.0). Set HOST=127.0.0.1 for local-only access.');
+
+  if (port !== requestedPort) {
+    config.port = port;
   }
-  contextRefresher.start();
-  escalationManager.start();
-});
+
+  httpServer.listen(port, config.host, () => {
+    const url = `http://${config.host}:${port}`;
+    console.log(`🚀 AI Crew server running on ${url}`);
+    if (authToken) {
+      console.log(`🔑 Auth token: ${authToken}`);
+      console.log(`   (set SERVER_SECRET env var to use a fixed token, or AUTH=none to disable)`);
+    } else {
+      console.log(`⚠️  Auth disabled (AUTH=none)`);
+    }
+    if (config.host === '0.0.0.0') {
+      console.warn('⚠️  WARNING: Server is binding to all interfaces (0.0.0.0). Set HOST=127.0.0.1 for local-only access.');
+    }
+    contextRefresher.start();
+    escalationManager.start();
+  });
+
+  httpServer.on('error', (err: NodeJS.ErrnoException) => {
+    console.error(`❌ Server error: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+startServer(config.port);
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
