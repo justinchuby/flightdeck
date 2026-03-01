@@ -83,6 +83,12 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
           dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" done. Newly ready tasks: ${readyNames}. Use DELEGATE or CREATE_AGENT to assign them.`);
         }
       }
+    } else {
+      // Task not in DAG — nudge the lead to track it
+      const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
+      if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
+        parent.sendMessage(`[System] ⚠ This task was NOT in the DAG. Use COMPLETE_TASK or ADD_TASK (with status "done") to keep the DAG current.`);
+      }
     }
   }
 }
@@ -155,6 +161,12 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
         if (dagParent) {
           dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (exit ${exitCode}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
         }
+      }
+    } else {
+      // Task not in DAG — nudge the lead to track it
+      const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
+      if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
+        parent.sendMessage(`[System] ⚠ This task was NOT in the DAG. Use COMPLETE_TASK or ADD_TASK (with status "done") to keep the DAG current.`);
       }
     }
   }
