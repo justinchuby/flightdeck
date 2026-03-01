@@ -344,7 +344,15 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     });
   }, [fullRange, setLiveMode]);
 
-  const fitToView = useCallback(() => { setVisibleRange(fullRange); }, [fullRange]);
+  const fitToView = useCallback(() => { setVisibleRange(fullRange); setLiveMode(true); }, [fullRange, setLiveMode]);
+
+  // Zoom percentage: how much of the full range is currently visible
+  const zoomPct = useMemo(() => {
+    const fullMs = fullRange.end.getTime() - fullRange.start.getTime();
+    if (fullMs <= 0) return 100;
+    const visMs = visibleRange.end.getTime() - visibleRange.start.getTime();
+    return Math.round((visMs / fullMs) * 100);
+  }, [fullRange, visibleRange]);
 
   // Sort agents: lead first, then by role hierarchy, then by spawn time
   const sortedAgents = useMemo(() => {
@@ -623,18 +631,30 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${liveMode ? 'bg-emerald-400 animate-pulse motion-reduce:animate-none' : 'bg-zinc-600'}`} />
             Live
           </button>
+          <div className="flex items-center border border-th-border/50 rounded overflow-hidden" role="group" aria-label="Zoom controls">
+            <button
+              className="px-2 py-0.5 text-xs text-th-text-muted hover:bg-th-bg-muted hover:text-th-text transition-colors"
+              onClick={() => zoomBy(ZOOM_FACTOR_IN)}
+              aria-label="Zoom in"
+            >+</button>
+            {zoomPct < 100 && (
+              <span className="px-1.5 py-0.5 text-[10px] text-cyan-400 bg-cyan-900/20 font-mono min-w-[3.5ch] text-center" aria-label={`Showing ${zoomPct}% of timeline`}>
+                {zoomPct}%
+              </span>
+            )}
+            <button
+              className="px-2 py-0.5 text-xs text-th-text-muted hover:bg-th-bg-muted hover:text-th-text transition-colors"
+              onClick={() => zoomBy(ZOOM_FACTOR_OUT)}
+              disabled={zoomPct >= 100}
+              aria-label="Zoom out"
+            >−</button>
+          </div>
           <button
-            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
-            onClick={() => zoomBy(ZOOM_FACTOR_IN)}
-            aria-label="Zoom in"
-          >+</button>
-          <button
-            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
-            onClick={() => zoomBy(ZOOM_FACTOR_OUT)}
-            aria-label="Zoom out"
-          >−</button>
-          <button
-            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+            className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              zoomPct < 100
+                ? 'text-cyan-400 bg-cyan-900/20 hover:bg-cyan-900/40'
+                : 'text-th-text-muted bg-th-bg-alt hover:bg-th-bg-muted'
+            }`}
             onClick={fitToView}
             aria-label="Fit timeline to view"
           >Fit</button>

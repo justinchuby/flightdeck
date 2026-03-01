@@ -596,6 +596,49 @@ describe('Toolbar Controls', () => {
     fireEvent.click(screen.getByLabelText('Fit timeline to view'));
     expect(container).toBeTruthy();
   });
+
+  it('zoom in shows zoom percentage indicator', () => {
+    const data = makeStandardTestData();
+    render(<TimelineContainer data={data} />);
+
+    // Before zoom: no percentage shown (100% = full range)
+    expect(screen.queryByText(/%$/)).toBeNull();
+
+    // Zoom in: should show percentage < 100
+    fireEvent.click(screen.getByLabelText('Zoom in'));
+    const pctLabel = screen.getByLabelText(/Showing \d+% of timeline/);
+    expect(pctLabel).toBeInTheDocument();
+    const pct = parseInt(pctLabel.textContent!);
+    expect(pct).toBeLessThan(100);
+    expect(pct).toBeGreaterThan(0);
+  });
+
+  it('fit-to-view resets zoom percentage to 100%', () => {
+    const data = makeStandardTestData();
+    render(<TimelineContainer data={data} />);
+
+    // Zoom in
+    fireEvent.click(screen.getByLabelText('Zoom in'));
+    expect(screen.getByLabelText(/Showing \d+% of timeline/)).toBeInTheDocument();
+
+    // Fit to view — percentage indicator should disappear (100%)
+    fireEvent.click(screen.getByLabelText('Fit timeline to view'));
+    expect(screen.queryByLabelText(/Showing \d+% of timeline/)).toBeNull();
+  });
+
+  it('zoom disables live mode and re-enables on fit-to-view', () => {
+    const onLiveModeChange = vi.fn();
+    const data = makeStandardTestData();
+    render(<TimelineContainer data={data} liveMode={true} onLiveModeChange={onLiveModeChange} />);
+
+    // Zoom in should disable live mode
+    fireEvent.click(screen.getByLabelText('Zoom in'));
+    expect(onLiveModeChange).toHaveBeenCalledWith(false);
+
+    // Fit-to-view should re-enable live mode
+    fireEvent.click(screen.getByLabelText('Fit timeline to view'));
+    expect(onLiveModeChange).toHaveBeenCalledWith(true);
+  });
 });
 
 describe('Multi-Agent Simulation', () => {
