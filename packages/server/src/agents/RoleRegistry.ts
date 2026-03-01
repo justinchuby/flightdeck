@@ -369,6 +369,9 @@ Add/remove members from a group:
 Terminate an agent to free a slot (WARNING: the agent's context is permanently lost — avoid unless necessary when limit is reached):
 \`⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "need slot for different role"} ⟧\`
 
+Cancel an active delegation:
+\`⟦ CANCEL_DELEGATION {"id": "delegation-id"} ⟧\`
+
 Interrupt an agent to stop their current work and redirect (use sparingly — cancels in-progress LLM turn):
 \`⟦ INTERRUPT {"to": "agent-id", "content": "Drop current task and do X instead"} ⟧\`
 
@@ -394,11 +397,14 @@ The system will:
 - Show status with: \`⟦ TASK_STATUS ⟧\`
 
 Management commands:
+- \`⟦ COMPLETE_TASK {"id": "task-id"} ⟧\` — mark a task as done (also auto-triggers when agent reports completion)
 - \`⟦ PAUSE_TASK {"id": "task-id"} ⟧\` — hold a pending/ready task
 - \`⟦ RETRY_TASK {"id": "task-id"} ⟧\` — retry a failed task
 - \`⟦ SKIP_TASK {"id": "task-id"} ⟧\` — skip and unblock dependents
 - \`⟦ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing-task"]} ⟧\` — add to DAG
 - \`⟦ CANCEL_TASK {"id": "task-id"} ⟧\` — remove from DAG
+- \`⟦ ADD_DEPENDENCY {"taskId": "task-b", "depends_on": ["task-a"]} ⟧\` — add a dependency between tasks
+- \`⟦ RESET_DAG ⟧\` — clear all tasks and start over
 - \`⟦ HALT_HEARTBEAT ⟧\` — pause heartbeat nudges (e.g. when waiting for user input). Resumes automatically when you start running again.
 - \`⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
 
@@ -408,6 +414,15 @@ When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG tas
 - Review roles (code-reviewer, critical-reviewer) auto-detect their review targets from the task text
 - If no explicit dependencies are found, the Secretary agent is asked to analyze the DAG and suggest dependencies via ADD_DEPENDENCY commands
 - Include \`dagTaskId\` in CREATE_AGENT/DELEGATE to explicitly link to an existing DAG task. If omitted, the system fuzzy-matches by role and description.
+
+== ADDITIONAL COMMANDS ==
+Export a session summary (lead and secretary only):
+\`⟦ EXPORT_SESSION ⟧\`
+
+Defer non-blocking issues for later follow-up:
+\`⟦ DEFER_ISSUE {"title": "Fix flaky test", "severity": "low", "context": "TestX intermittently fails"} ⟧\`
+\`⟦ QUERY_DEFERRED {} ⟧\` — list all deferred issues
+\`⟦ RESOLVE_DEFERRED {"id": "issue-id"} ⟧\` — mark a deferred issue as resolved
 
 == SPECIALIST ROLES (with recommended default models) ==
 {{ROLE_LIST}}
@@ -495,10 +510,24 @@ You can set reminders using timers:
 \`⟦ CANCEL_TIMER {"name": "check-build"} ⟧\`
 \`⟦ LIST_TIMERS {} ⟧\`
 
+== Task Completion ==
+When you finish a task that's tracked in the DAG, signal completion:
+\`⟦ COMPLETE_TASK {"summary": "what you accomplished"} ⟧\`
+\`⟦ COMPLETE_TASK {"id": "task-id", "summary": "what you accomplished"} ⟧\`
+This notifies the lead and updates the DAG automatically. If your task has a DAG ID, it's used automatically; otherwise specify "id".
+
+You can also check the task DAG status:
+\`⟦ TASK_STATUS ⟧\`
+\`⟦ QUERY_TASKS ⟧\`
+
+Add a dependency between tasks:
+\`⟦ ADD_DEPENDENCY {"taskId": "my-task", "depends_on": ["other-task"]} ⟧\`
+
 == Capability System ==
 You can acquire additional capabilities beyond your role:
   \`⟦ ACQUIRE_CAPABILITY {"capability": "code-review", "reason": "found bug during development"} ⟧\`
   \`⟦ LIST_CAPABILITIES ⟧\`
+  \`⟦ RELEASE_CAPABILITY {"capability": "code-review"} ⟧\`
 Available: code-review, architecture, delegation, testing, devops
 
 == Direct Messaging ==

@@ -236,6 +236,9 @@ All team members have access to this directory. Create your subdirectory before 
 10. Stay within your role's scope. Defer to the appropriate specialist for work outside your expertise.
 11. Log important decisions by outputting:
 \`⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧\`
+12. To defer a non-blocking issue for later:
+\`⟦ DEFER_ISSUE {"title": "issue title", "severity": "low", "context": "details"} ⟧\`
+\`⟦ QUERY_DEFERRED {} ⟧\`
 
 == SKILLS (reusable knowledge for future work) ==
 Skills are reusable instructions that Copilot CLI loads automatically when relevant. Use them to capture REUSABLE KNOWLEDGE — patterns, techniques, and approaches that will benefit future work sessions.
