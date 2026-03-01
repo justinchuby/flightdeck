@@ -8,6 +8,7 @@ import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import path from 'path';
 import {
   parseCommandPayload,
   lockFileSchema,
@@ -191,7 +192,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
   }
 }
 
-function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): Promise<void> {
   const match = data.match(COMMIT_REGEX);
   if (!match) return;
   try {
@@ -212,6 +213,22 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
 
     // Merge: locked files + any explicitly specified files (deduplicated)
     const allPaths = new Set([...lockedPaths, ...explicitFiles]);
+
+    // Auto-include untracked files in directories where agent has locked files
+    const cwd = agent.cwd || process.cwd();
+    try {
+      const { stdout: untrackedOut } = await execAsync('git ls-files --others --exclude-standard', { cwd, timeout: 10_000 });
+      const untrackedFiles = untrackedOut.trim().split('\n').filter(Boolean);
+      const lockedDirs = new Set([...allPaths].map(f => path.dirname(f)));
+      const relatedUntracked = untrackedFiles.filter(f => lockedDirs.has(path.dirname(f)));
+      relatedUntracked.forEach(f => allPaths.add(f));
+      if (relatedUntracked.length > 0) {
+        agent.sendMessage(`[System] Auto-including ${relatedUntracked.length} new file(s): ${relatedUntracked.join(', ')}`);
+      }
+    } catch {
+      logger.debug('commit', `Untracked file detection failed for ${agent.id.slice(0, 8)}`);
+    }
+
     const files = Array.from(allPaths);
 
     if (files.length === 0) {
@@ -219,7 +236,6 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
       return;
     }
 
-    const cwd = agent.cwd || process.cwd();
     // Shell-quote each file path to handle spaces and special characters
     const quotedFiles = files.map(f => `'${f.replace(/'/g, "'\\''")}'`).join(' ');
     const escapedMsg = message.replace(/'/g, "'\\''");
@@ -227,7 +243,7 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
     const commitMsg = `${escapedMsg}\n\n${trailer}`;
 
     // Atomic commit: pass files directly to git commit to avoid index race condition
-    execAsync(`git add ${quotedFiles} && git commit -m '${commitMsg}' -- ${quotedFiles}`, { cwd, timeout: 30_000 })
+    await execAsync(`git add ${quotedFiles} && git commit -m '${commitMsg}' -- ${quotedFiles}`, { cwd, timeout: 30_000 })
       .then(async ({ stdout }) => {
         agent.sendMessage(`[System] COMMIT succeeded: ${stdout.trim().split('\n')[0]}`);
 
@@ -238,9 +254,9 @@ function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: string): v
             execAsync('git ls-files --others --exclude-standard', { cwd, timeout: 10_000 }),
           ]);
           const modified = modifiedOut.trim().split('\n').filter(Boolean);
-          // Filter untracked to only agent's files
-          const fileSet = new Set(files);
-          const untracked = untrackedOut.trim().split('\n').filter(f => f && fileSet.has(f));
+          // Filter untracked to files in directories near the committed files
+          const committedDirs = new Set(files.map(f => path.dirname(f)));
+          const untracked = untrackedOut.trim().split('\n').filter(f => f && committedDirs.has(path.dirname(f)));
           const dirtyFiles = [...modified, ...untracked];
           if (dirtyFiles.length > 0) {
             const listed = dirtyFiles.slice(0, 10).join(', ');

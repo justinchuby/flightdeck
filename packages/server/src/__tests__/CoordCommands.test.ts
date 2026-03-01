@@ -41,14 +41,19 @@ function getCommitHandler(ctx: CommandHandlerContext) {
   return commit;
 }
 
+// Helper: find the git add/commit exec call (skips pre-commit untracked detection)
+function getGitAddCall(): string | undefined {
+  return mockExec.mock.calls.find((args: any[]) => (args[0] as string).includes('git add'))?.[0];
+}
+
 // Helper: make mockExec resolve successfully (commit + post-commit dirty-tree check)
-function mockExecSuccess(stdout = 'abc1234 feat: stuff\n 1 file changed', dirtyFiles?: string[]) {
+function mockExecSuccess(stdout = 'abc1234 feat: stuff\n 1 file changed', dirtyFiles?: string[], untrackedFiles?: string[]) {
   mockExec.mockImplementation((cmd: string, _opts: any, cb: Function) => {
     if (cmd.startsWith('git diff --name-only')) {
       // Post-commit dirty-tree check (scoped to agent's files)
       cb(null, { stdout: (dirtyFiles ?? []).join('\n') + '\n', stderr: '' });
     } else if (cmd.startsWith('git ls-files --others')) {
-      cb(null, { stdout: '\n', stderr: '' });
+      cb(null, { stdout: (untrackedFiles ?? []).join('\n') + '\n', stderr: '' });
     } else {
       cb(null, { stdout, stderr: '' });
     }
@@ -99,13 +104,12 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "Add auth module"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "Add auth module"} ⟧⟧');
 
     expect(ctx.lockRegistry.getByAgent).toHaveBeenCalledWith('agent-dev-abc123');
-    // Wait for async exec
-    await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-    const cmd = mockExec.mock.calls[0][0] as string;
-    expect(cmd).toContain("git add 'src/auth.ts' 'src/utils.ts'");
+    const cmd = getGitAddCall()!;
+    expect(cmd).toContain("'src/auth.ts'");
+    expect(cmd).toContain("'src/utils.ts'");
     expect(cmd).toContain('git commit');
     expect(cmd).toContain('Add auth module');
   });
@@ -123,27 +127,28 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "Update docs"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "Update docs"} ⟧⟧');
 
-    await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-    const cmd = mockExec.mock.calls[0][0] as string;
+    const cmd = getGitAddCall()!;
     expect(cmd).toContain("'src/my component/App.tsx'");
     // Single quotes in paths should be escaped
     expect(cmd).toContain("docs/note");
   });
 
-  it('warns and returns when agent has no locks', () => {
+  it('warns and returns when agent has no locks', async () => {
+    mockExecSuccess();
     const ctx = makeCtx();
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('No file locks held'),
     );
     expect(ctx.activityLedger.log).not.toHaveBeenCalled();
-    expect(mockExec).not.toHaveBeenCalled();
+    // Pre-commit untracked detection runs, but no git add/commit
+    expect(getGitAddCall()).toBeUndefined();
   });
 
   it('includes Co-authored-by trailer in commit command', async () => {
@@ -156,10 +161,9 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
 
-    await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-    const cmd = mockExec.mock.calls[0][0] as string;
+    const cmd = getGitAddCall()!;
     expect(cmd).toContain('Co-authored-by: Copilot');
   });
 
@@ -173,10 +177,9 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {} ⟧⟧');
 
-    await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-    const cmd = mockExec.mock.calls[0][0] as string;
+    const cmd = getGitAddCall()!;
     expect(cmd).toContain('Changes by Developer (agent-d');
   });
 
@@ -193,10 +196,10 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "ship it"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "ship it"} ⟧⟧');
 
     // Activity ledger log now happens after async commit + verification
-    await vi.waitFor(() => expect(ctx.activityLedger.log).toHaveBeenCalledWith(
+    expect(ctx.activityLedger.log).toHaveBeenCalledWith(
       'agent-dev-abc123',
       'developer',
       'file_edit',
@@ -206,7 +209,7 @@ describe('CoordCommands — COMMIT handler', () => {
         files: ['a.ts', 'b.ts'],
         message: 'ship it',
       }),
-    ));
+    );
   });
 
   it('sends success message after git commit succeeds', async () => {
@@ -219,11 +222,11 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "ship it"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "ship it"} ⟧⟧');
 
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
-    ));
+    );
   });
 
   it('sends failure message when git commit fails', async () => {
@@ -236,11 +239,11 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT failed'),
-    ));
+    );
   });
 
   it('executes in agent cwd (worktree path)', async () => {
@@ -253,31 +256,32 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent({ cwd: '/my/worktree/path' });
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
-    await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-    const opts = mockExec.mock.calls[0][1];
-    expect(opts.cwd).toBe('/my/worktree/path');
+    // All exec calls should use agent's cwd
+    for (const call of mockExec.mock.calls) {
+      expect(call[1].cwd).toBe('/my/worktree/path');
+    }
   });
 
-  it('sends error on malformed JSON', () => {
+  it('sends error on malformed JSON', async () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {not valid json} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {not valid json} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT error'),
     );
   });
 
-  it('ignores non-matching input', () => {
+  it('ignores non-matching input', async () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, 'just some regular text');
+    await commit.handler(agent, 'just some regular text');
 
     expect(agent.sendMessage).not.toHaveBeenCalled();
   });
@@ -297,11 +301,11 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "verified commit"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "verified commit"} ⟧⟧');
 
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
-    ));
+    );
     // Should NOT have a warning about dirty files
     const warnings = agent.sendMessage.mock.calls.filter(
       (c: any[]) => (c[0] as string).includes('Post-commit warning'),
@@ -322,12 +326,12 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "partial commit"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "partial commit"} ⟧⟧');
 
     // Should get success message but NOT a warning
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
-    ));
+    );
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('Post-commit warning'),
     );
@@ -347,11 +351,11 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "empty commit"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "empty commit"} ⟧⟧');
 
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
-    ));
+    );
     expect(agent.sendMessage).not.toHaveBeenCalledWith(
       expect.stringContaining('Post-commit warning'),
     );
@@ -367,19 +371,19 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
     // Commit success message should still arrive
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT succeeded'),
-    ));
+    );
     // No crash — dirty-tree check failure is swallowed
     const warnings = agent.sendMessage.mock.calls.filter(
       (c: any[]) => (c[0] as string).includes('Post-commit warning'),
     );
     expect(warnings).toHaveLength(0);
     // Activity ledger still logs (dirty-tree check is best-effort)
-    await vi.waitFor(() => expect(ctx.activityLedger.log).toHaveBeenCalled());
+    expect(ctx.activityLedger.log).toHaveBeenCalled();
   });
 
   it('does not log to activity ledger on commit failure', async () => {
@@ -392,11 +396,11 @@ describe('CoordCommands — COMMIT handler', () => {
     const agent = makeAgent();
     const commit = getCommitHandler(ctx);
 
-    commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "test"} ⟧⟧');
 
-    await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+    expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('COMMIT failed'),
-    ));
+    );
     // Activity ledger should NOT be called on failure
     expect(ctx.activityLedger.log).not.toHaveBeenCalled();
   });
@@ -417,10 +421,9 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "scoped commit"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "scoped commit"} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       // Must contain exactly these two files
       expect(cmd).toContain("'src/TaskDAG.ts'");
       expect(cmd).toContain("'src/__tests__/TaskDAG.test.ts'");
@@ -443,14 +446,13 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "single file"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "single file"} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       expect(cmd).toContain("git add 'README.md'");
-      // Should only have one quoted path
-      const quotedPaths = cmd.match(/'[^']*'/g) ?? [];
-      // 1 file path + 1 commit message = 2 quoted strings minimum
+      // Should only have one quoted path in the add section
+      const addPart = cmd.split('&&')[0];
+      const quotedPaths = addPart.match(/'[^']*'/g) ?? [];
       expect(quotedPaths[0]).toBe("'README.md'");
     });
   });
@@ -488,10 +490,9 @@ describe('CoordCommands — COMMIT handler', () => {
       const agentA = makeAgent({ id: 'agent-aaa' });
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agentA, '⟦⟦ COMMIT {"message": "A only"} ⟧⟧');
+      await commit.handler(agentA, '⟦⟦ COMMIT {"message": "A only"} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       // Agent A's file is staged
       expect(cmd).toContain("'a-file.ts'");
       // Agent B's files are NOT staged
@@ -513,16 +514,18 @@ describe('CoordCommands — COMMIT handler', () => {
       const agentY = makeAgent({ id: 'agent-y' });
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agentX, '⟦⟦ COMMIT {"message": "X work"} ⟧⟧');
-      commit.handler(agentY, '⟦⟦ COMMIT {"message": "Y work"} ⟧⟧');
+      await commit.handler(agentX, '⟦⟦ COMMIT {"message": "X work"} ⟧⟧');
+      await commit.handler(agentY, '⟦⟦ COMMIT {"message": "Y work"} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalledTimes(2));
-      const cmdX = mockExec.mock.calls[0][0] as string;
-      const cmdY = mockExec.mock.calls[1][0] as string;
-      expect(cmdX).toContain("'x.ts'");
-      expect(cmdX).not.toContain("'y.ts'");
-      expect(cmdY).toContain("'y.ts'");
-      expect(cmdY).not.toContain("'x.ts'");
+      // Find git add calls (skip git ls-files calls)
+      const addCalls = mockExec.mock.calls
+        .map((args: any[]) => args[0] as string)
+        .filter((cmd: string) => cmd.includes('git add'));
+      expect(addCalls).toHaveLength(2);
+      expect(addCalls[0]).toContain("'x.ts'");
+      expect(addCalls[0]).not.toContain("'y.ts'");
+      expect(addCalls[1]).toContain("'y.ts'");
+      expect(addCalls[1]).not.toContain("'x.ts'");
     });
   });
 
@@ -543,10 +546,9 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "all files"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "all files"} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       for (const lock of lockedFiles) {
         expect(cmd).toContain(`'${lock.filePath}'`);
       }
@@ -554,7 +556,8 @@ describe('CoordCommands — COMMIT handler', () => {
   });
 
   describe('safety: no locks means no commit', () => {
-    it('refuses to commit and does not invoke git at all', () => {
+    it('refuses to commit and does not invoke git at all', async () => {
+      mockExecSuccess();
       const ctx = makeCtx({
         lockRegistry: {
           getByAgent: vi.fn().mockReturnValue([]),
@@ -563,9 +566,10 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "no locks"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "no locks"} ⟧⟧');
 
-      expect(mockExec).not.toHaveBeenCalled();
+      // Pre-commit untracked detection runs, but no git add/commit
+      expect(getGitAddCall()).toBeUndefined();
       expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('No file locks held'),
       );
@@ -584,14 +588,17 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "verify me"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "verify me"} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalledTimes(3));
-      // First call: git add + commit -- files
-      expect(mockExec.mock.calls[0][0]).toContain('git add');
-      expect(mockExec.mock.calls[0][0]).toContain("-- 'src/file.ts'");
-      // Second + third calls: scoped git diff and git ls-files (dirty-tree check)
-      const postCommitCmds = [mockExec.mock.calls[1][0], mockExec.mock.calls[2][0]];
+      // Pre-commit untracked detection + git add/commit + 2 post-commit checks = 4 calls
+      expect(mockExec).toHaveBeenCalledTimes(4);
+      // First call: pre-commit untracked detection
+      expect(mockExec.mock.calls[0][0]).toContain('git ls-files --others');
+      // Second call: git add + commit
+      expect(mockExec.mock.calls[1][0]).toContain('git add');
+      expect(mockExec.mock.calls[1][0]).toContain("-- 'src/file.ts'");
+      // Third + fourth calls: scoped git diff and git ls-files (dirty-tree check)
+      const postCommitCmds = [mockExec.mock.calls[2][0], mockExec.mock.calls[3][0]];
       expect(postCommitCmds.some((c: string) => c.includes('git diff --name-only --'))).toBe(true);
       expect(postCommitCmds.some((c: string) => c.includes('git ls-files --others'))).toBe(true);
     });
@@ -609,14 +616,14 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "partial modify"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "partial modify"} ⟧⟧');
 
-      await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('COMMIT succeeded'),
-      ));
-      await vi.waitFor(() => expect(agent.sendMessage).toHaveBeenCalledWith(
+      );
+      expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('Post-commit warning'),
-      ));
+      );
     });
   });
 
@@ -633,10 +640,9 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "merge test", "files": ["src/extra.ts"]} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "merge test", "files": ["src/extra.ts"]} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       expect(cmd).toContain("'src/locked.ts'");
       expect(cmd).toContain("'src/extra.ts'");
     });
@@ -651,7 +657,7 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "test", "files": ["src/unlocked.ts"]} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "test", "files": ["src/unlocked.ts"]} ⟧⟧');
 
       expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining("don't hold locks for"),
@@ -668,10 +674,9 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "manual files", "files": ["src/a.ts"]} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "manual files", "files": ["src/a.ts"]} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       expect(cmd).toContain("'src/a.ts'");
     });
 
@@ -685,14 +690,94 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      commit.handler(agent, '⟦⟦ COMMIT {"message": "dedup", "files": ["src/shared.ts"]} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "dedup", "files": ["src/shared.ts"]} ⟧⟧');
 
-      await vi.waitFor(() => expect(mockExec).toHaveBeenCalled());
-      const cmd = mockExec.mock.calls[0][0] as string;
+      const cmd = getGitAddCall()!;
       // git add has the file once, and git commit -- has it once (2 total in cmd)
       const addPart = cmd.split('&&')[0];
       const addCount = (addPart.match(/src\/shared\.ts/g) ?? []).length;
       expect(addCount).toBe(1);
+    });
+  });
+
+  // ── Untracked file auto-inclusion ──────────────────────────────────────
+
+  describe('untracked file auto-inclusion', () => {
+    it('auto-includes untracked files in same directory as locked files', async () => {
+      mockExecSuccess(undefined, [], ['src/foo.test.ts']);
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/foo.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "with untracked"} ⟧⟧');
+
+      const cmd = getGitAddCall()!;
+      expect(cmd).toContain("'src/foo.ts'");
+      expect(cmd).toContain("'src/foo.test.ts'");
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Auto-including 1 new file(s)'),
+      );
+    });
+
+    it('does NOT include untracked files in unrelated directories', async () => {
+      mockExecSuccess(undefined, [], ['lib/unrelated.ts']);
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/foo.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "scoped only"} ⟧⟧');
+
+      const cmd = getGitAddCall()!;
+      expect(cmd).toContain("'src/foo.ts'");
+      expect(cmd).not.toContain('lib/unrelated.ts');
+    });
+
+    it('gracefully handles untracked detection failure', async () => {
+      // mockExecCommitOkVerifyFail fails git ls-files but succeeds on commit
+      mockExecCommitOkVerifyFail();
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "safe"} ⟧⟧');
+
+      // Should still commit successfully even if untracked detection fails
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('COMMIT succeeded'),
+      );
+    });
+
+    it('sends auto-include message with correct file count', async () => {
+      mockExecSuccess(undefined, [], ['src/a.test.ts', 'src/b.test.ts', 'src/c.test.ts']);
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/main.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "multi untracked"} ⟧⟧');
+
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Auto-including 3 new file(s)'),
+      );
+      const cmd = getGitAddCall()!;
+      expect(cmd).toContain("'src/a.test.ts'");
+      expect(cmd).toContain("'src/b.test.ts'");
+      expect(cmd).toContain("'src/c.test.ts'");
     });
   });
 
