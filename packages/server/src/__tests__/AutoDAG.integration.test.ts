@@ -169,7 +169,7 @@ describe('Auto-DAG integration', () => {
     if (opts.dagTaskId) payload.dagTaskId = opts.dagTaskId;
     if (opts.depends_on) payload.depends_on = opts.depends_on;
 
-    dispatch(dispatcher, lead, `⟦ CREATE_AGENT ${JSON.stringify(payload)} ⟧`);
+    dispatch(dispatcher, lead, `⟦⟦ CREATE_AGENT ${JSON.stringify(payload)} ⟧⟧`);
     return child;
   }
 
@@ -188,7 +188,7 @@ describe('Auto-DAG integration', () => {
     if (opts.dagTaskId) payload.dagTaskId = opts.dagTaskId;
     if (opts.depends_on) payload.depends_on = opts.depends_on;
 
-    dispatch(dispatcher, lead, `⟦ DELEGATE ${JSON.stringify(payload)} ⟧`);
+    dispatch(dispatcher, lead, `⟦⟦ DELEGATE ${JSON.stringify(payload)} ⟧⟧`);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -912,7 +912,7 @@ describe('Auto-DAG integration', () => {
       // Include secretary so requestSecretaryDependencyAnalysis can find it
       (ctx.getAllAgents as any).mockReturnValue([lead, child, secretary]);
 
-      dispatch(dispatcher, lead, `⟦ CREATE_AGENT ${JSON.stringify({ role, task: 'Implement the API endpoint for users' })} ⟧`);
+      dispatch(dispatcher, lead, `⟦⟦ CREATE_AGENT ${JSON.stringify({ role, task: 'Implement the API endpoint for users' })} ⟧⟧`);
 
       // Secretary should have received a dependency analysis request
       expect(secretary.sendMessage).toHaveBeenCalledWith(
