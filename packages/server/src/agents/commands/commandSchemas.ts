@@ -119,6 +119,12 @@ export const commitSchema = z.object({
   files: z.array(z.string()).max(MAX_ARRAY_LENGTH, `"files" too many (max ${MAX_ARRAY_LENGTH})`).optional(),
 });
 
+export const progressSchema = z.object({
+  summary: z.string().max(MAX_CONTENT_LENGTH, `"summary" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
+  percent: z.number().min(0).max(100).optional(),
+  status: z.string().max(MAX_NAME_LENGTH).optional(),
+}).passthrough();
+
 // ── System Commands ──────────────────────────────────────────────────
 
 export const requestLimitChangeSchema = z.object({
@@ -163,11 +169,19 @@ export const resolveDeferredSchema = z.object({
   dismiss: z.boolean().optional(),
 });
 
+export const queryDeferredSchema = z.object({
+  status: z.enum(['open', 'resolved', 'dismissed'], { message: '"status" must be one of: open, resolved, dismissed' }).optional(),
+});
+
 // ── Capability Commands ──────────────────────────────────────────────
 
 export const acquireCapabilitySchema = z.object({
   capability: z.string({ message: 'Missing required field "capability"' }).min(1, 'Missing required field "capability"').max(MAX_NAME_LENGTH, `"capability" too long (max ${MAX_NAME_LENGTH})`),
   reason: z.string().max(MAX_CONTENT_LENGTH).optional(),
+});
+
+export const releaseCapabilitySchema = z.object({
+  capability: z.string({ message: 'Missing required field "capability"' }).min(1, 'Missing required field "capability"').max(MAX_NAME_LENGTH, `"capability" too long (max ${MAX_NAME_LENGTH})`),
 });
 
 // ── Direct Message Commands ──────────────────────────────────────────

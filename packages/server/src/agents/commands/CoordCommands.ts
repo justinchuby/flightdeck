@@ -15,6 +15,7 @@ import {
   activitySchema,
   decisionSchema,
   commitSchema,
+  progressSchema,
 } from './commandSchemas.js';
 
 const execAsync = promisify(exec);
@@ -148,13 +149,8 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
   if (!match) return;
 
   try {
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(match[1]);
-    } catch {
-      agent.sendMessage('[System] PROGRESS error: invalid JSON payload.');
-      return;
-    }
+    const parsed = parseCommandPayload(agent, match[1], progressSchema, 'PROGRESS');
+    if (!parsed) return;
     const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
 
     let progress: Record<string, unknown> = { ...parsed };

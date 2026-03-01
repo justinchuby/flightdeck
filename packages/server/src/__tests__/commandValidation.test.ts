@@ -719,3 +719,150 @@ describe('TaskCommands validation', () => {
     );
   });
 });
+
+// ── QUERY_DEFERRED validation ────────────────────────────────────────
+
+describe('QUERY_DEFERRED validation', () => {
+  it('accepts valid status filter', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
+    cmd.handler(agent, '⟦ QUERY_DEFERRED {"status": "open"} ⟧');
+    // Should not get a validation error (may get "no deferred issues" which is fine)
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('QUERY_DEFERRED validation error'),
+    );
+  });
+
+  it('accepts no payload', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
+    cmd.handler(agent, '⟦ QUERY_DEFERRED ⟧');
+    // Should not get a validation error
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('QUERY_DEFERRED validation error'),
+    );
+  });
+
+  it('rejects invalid status value', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
+    cmd.handler(agent, '⟦ QUERY_DEFERRED {"status": "invalid"} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('QUERY_DEFERRED validation error'),
+    );
+  });
+
+  it('rejects invalid JSON payload', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
+    cmd.handler(agent, '⟦ QUERY_DEFERRED {bad json} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('QUERY_DEFERRED error: invalid JSON'),
+    );
+  });
+});
+
+// ── PROGRESS validation ──────────────────────────────────────────────
+
+describe('PROGRESS validation', () => {
+  it('accepts valid progress payload', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {"summary": "50% done", "percent": 50} ⟧');
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS validation error'),
+    );
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS error'),
+    );
+  });
+
+  it('rejects invalid JSON payload', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {not valid json} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS error: invalid JSON'),
+    );
+  });
+
+  it('rejects percent above 100', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {"percent": 150} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS validation error'),
+    );
+  });
+
+  it('rejects percent below 0', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {"percent": -10} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS validation error'),
+    );
+  });
+
+  it('allows extra fields via passthrough', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCoordCommands(ctx), 'PROGRESS');
+    cmd.handler(agent, '⟦ PROGRESS {"custom_field": "value", "summary": "working"} ⟧');
+    expect(agent.sendMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('PROGRESS validation error'),
+    );
+  });
+});
+
+// ── RELEASE_CAPABILITY validation ────────────────────────────────────
+
+describe('RELEASE_CAPABILITY validation', () => {
+  it('accepts valid payload', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
+    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {"capability": "code-review"} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Capabilities are retained'),
+    );
+  });
+
+  it('rejects missing "capability"', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
+    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('RELEASE_CAPABILITY validation error'),
+    );
+  });
+
+  it('rejects invalid JSON', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
+    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {bad} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('RELEASE_CAPABILITY error: invalid JSON'),
+    );
+  });
+
+  it('rejects empty "capability"', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent();
+    const cmd = findHandler(getCapabilityCommands(ctx), 'RELEASE_CAPABILITY');
+    cmd.handler(agent, '⟦ RELEASE_CAPABILITY {"capability": ""} ⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('RELEASE_CAPABILITY validation error'),
+    );
+  });
+});

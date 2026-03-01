@@ -5,6 +5,7 @@ import {
   parseCommandPayload,
   deferIssueSchema,
   resolveDeferredSchema,
+  queryDeferredSchema,
 } from './commandSchemas.js';
 
 // ── Regex patterns ──────────────────────────────────────────────────
@@ -61,12 +62,9 @@ function handleQueryDeferred(ctx: CommandHandlerContext, agent: Agent, data: str
   let statusFilter: 'open' | 'resolved' | 'dismissed' | undefined;
   const match = data.match(QUERY_DEFERRED_REGEX);
   if (match?.[1]) {
-    try {
-      const req = JSON.parse(match[1]);
-      if (req.status && ['open', 'resolved', 'dismissed'].includes(req.status)) {
-        statusFilter = req.status;
-      }
-    } catch { /* no filter, show all */ }
+    const req = parseCommandPayload(agent, match[1], queryDeferredSchema, 'QUERY_DEFERRED');
+    if (!req) return;
+    statusFilter = req.status;
   }
   const issues = ctx.deferredIssueRegistry.list(leadId, statusFilter);
   if (issues.length === 0) {
