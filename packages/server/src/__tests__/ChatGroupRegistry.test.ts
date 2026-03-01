@@ -270,6 +270,39 @@ describe('ChatGroupRegistry', () => {
       expect(registry.exists('team', 'lead-2')).toBe(false);
     });
   });
+
+  describe('role-based groups', () => {
+    it('create persists roles criteria', () => {
+      registry.create('lead-1', 'dev-team', ['agent-1'], undefined, ['developer', 'designer']);
+      const groups = registry.getGroupsWithRoles('lead-1');
+      expect(groups).toHaveLength(1);
+      expect(groups[0].name).toBe('dev-team');
+      expect(groups[0].roles).toEqual(['developer', 'designer']);
+    });
+
+    it('getGroupsWithRoles excludes groups without roles', () => {
+      registry.create('lead-1', 'manual-team', ['agent-1']);
+      registry.create('lead-1', 'role-team', ['agent-1'], undefined, ['developer']);
+      const groups = registry.getGroupsWithRoles('lead-1');
+      expect(groups).toHaveLength(1);
+      expect(groups[0].name).toBe('role-team');
+    });
+
+    it('getGroupsWithRoles excludes archived groups', () => {
+      registry.create('lead-1', 'old-team', ['agent-1'], undefined, ['developer']);
+      registry.archiveGroup('old-team', 'lead-1');
+      const groups = registry.getGroupsWithRoles('lead-1');
+      expect(groups).toHaveLength(0);
+    });
+
+    it('getGroupsWithRoles scopes to lead', () => {
+      registry.create('lead-1', 'team-a', ['agent-1'], undefined, ['developer']);
+      registry.create('lead-2', 'team-b', ['agent-2'], undefined, ['developer']);
+      const groups = registry.getGroupsWithRoles('lead-1');
+      expect(groups).toHaveLength(1);
+      expect(groups[0].name).toBe('team-a');
+    });
+  });
 });
 
 describe('AgentManager group command regexes', () => {

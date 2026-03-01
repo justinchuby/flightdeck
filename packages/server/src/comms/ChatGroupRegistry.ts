@@ -30,13 +30,13 @@ export class ChatGroupRegistry extends EventEmitter {
     this.db = db;
   }
 
-  create(leadId: string, name: string, memberIds: string[], projectId?: string): ChatGroup {
+  create(leadId: string, name: string, memberIds: string[], projectId?: string, roles?: string[]): ChatGroup {
     // Ensure lead is always a member
     const allMembers = new Set([leadId, ...memberIds]);
 
     this.db.drizzle
       .insert(chatGroups)
-      .values({ name, leadId, projectId: projectId || null })
+      .values({ name, leadId, projectId: projectId || null, roles: roles?.length ? JSON.stringify(roles) : null })
       .onConflictDoNothing()
       .run();
 
@@ -265,5 +265,17 @@ export class ChatGroupRegistry extends EventEmitter {
       .from(chatGroups)
       .where(and(eq(chatGroups.name, name), eq(chatGroups.leadId, leadId)))
       .get();
+  }
+
+  /** Get active groups that have role-based membership criteria. */
+  getGroupsWithRoles(leadId: string): Array<{ name: string; leadId: string; roles: string[] }> {
+    const rows = this.db.drizzle
+      .select({ name: chatGroups.name, leadId: chatGroups.leadId, roles: chatGroups.roles })
+      .from(chatGroups)
+      .where(and(eq(chatGroups.leadId, leadId), eq(chatGroups.archived, 0)))
+      .all();
+    return rows
+      .filter((r) => r.roles)
+      .map((r) => ({ name: r.name, leadId: r.leadId, roles: JSON.parse(r.roles!) as string[] }));
   }
 }

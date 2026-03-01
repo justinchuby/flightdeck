@@ -469,7 +469,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       ? recentActivity.join('\n')
       : '(no recent activity)';
 
-    const budgetLine = isLead && this.budget
+    const budgetLine = this.budget
       ? `\n== AGENT BUDGET ==\nRunning: ${this.budget.runningCount} / ${this.budget.maxConcurrent} | Available slots: ${Math.max(0, this.budget.maxConcurrent - this.budget.runningCount)}${this.budget.runningCount >= this.budget.maxConcurrent ? ' | ⚠ AT CAPACITY' : ''}`
       : '';
 

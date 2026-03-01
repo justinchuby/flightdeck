@@ -113,6 +113,7 @@ export const chatGroups = sqliteTable('chat_groups', {
   name: text('name').notNull(),
   leadId: text('lead_id').notNull(),
   projectId: text('project_id'),
+  roles: text('roles'),
   archived: integer('archived').default(0),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
 }, (table) => [

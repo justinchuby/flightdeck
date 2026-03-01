@@ -236,7 +236,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
     if (!resolvedIds.includes(agent.id)) {
       resolvedIds.push(agent.id);
     }
-    const group = ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds, agent.projectId);
+    const group = ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds, agent.projectId, req.roles);
     const memberNames = group.memberIds.map((id) => {
       const a = ctx.getAgent(id);
       return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
