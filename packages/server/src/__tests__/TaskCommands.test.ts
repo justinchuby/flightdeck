@@ -604,3 +604,135 @@ describe('ADD_DEPENDENCY command', () => {
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('cannot determine lead'));
   });
 });
+
+// ── REASSIGN_TASK tests ──────────────────────────────────────────────
+
+function getReassignHandler(ctx: CommandHandlerContext) {
+  const cmds = getTaskCommands(ctx);
+  const cmd = cmds.find(c => c.name === 'REASSIGN_TASK');
+  if (!cmd) throw new Error('REASSIGN_TASK command not found');
+  return cmd;
+}
+
+describe('REASSIGN_TASK', () => {
+  it('reassigns a running task to a new agent', () => {
+    const oldAgent = makeChildAgent('lead-001', { id: 'old-agent-001' });
+    const newAgent = makeChildAgent('lead-001', { id: 'new-agent-001' });
+    const ctx = makeCtx({
+      taskDAG: {
+        reassignTask: vi.fn().mockReturnValue({ oldAgentId: 'old-agent-001' }),
+        getTask: vi.fn().mockReturnValue({ id: 'task-1', description: 'Fix the bug', dagStatus: 'running', assignedAgentId: 'new-agent-001' }),
+      },
+      getAgent: vi.fn().mockImplementation((id: string) => id === 'old-agent-001' ? oldAgent : undefined),
+      getAllAgents: vi.fn().mockReturnValue([oldAgent, newAgent]),
+      lockRegistry: { releaseAll: vi.fn() },
+      delegations: new Map(),
+    });
+    const agent = makeLeadAgent();
+    const handler = getReassignHandler(ctx);
+
+    handler.handler(agent, '⟦⟦ REASSIGN_TASK {"taskId": "task-1", "agentId": "new-agent-001"} ⟧⟧');
+
+    expect(ctx.taskDAG.reassignTask).toHaveBeenCalledWith('lead-001', 'task-1', 'new-agent-001');
+    expect(oldAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('reassigned'));
+    expect(newAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Fix the bug'));
+    expect(newAgent.dagTaskId).toBe('task-1');
+    expect(ctx.lockRegistry.releaseAll).toHaveBeenCalledWith('old-agent-001');
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('reassigned'));
+  });
+
+  it('rejects non-lead agents', () => {
+    const ctx = makeCtx();
+    const agent = makeLeadAgent({ role: { id: 'developer', name: 'Developer' } });
+    const handler = getReassignHandler(ctx);
+
+    handler.handler(agent, '⟦⟦ REASSIGN_TASK {"taskId": "task-1", "agentId": "agent-2"} ⟧⟧');
+
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Only the Project Lead'));
+  });
+
+  it('rejects when new agent not found', () => {
+    const ctx = makeCtx({
+      getAllAgents: vi.fn().mockReturnValue([]),
+    });
+    const agent = makeLeadAgent();
+    const handler = getReassignHandler(ctx);
+
+    handler.handler(agent, '⟦⟦ REASSIGN_TASK {"taskId": "task-1", "agentId": "nonexistent"} ⟧⟧');
+
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Agent not found'));
+  });
+
+  it('rejects when task is not running', () => {
+    const newAgent = makeChildAgent('lead-001', { id: 'new-agent-001' });
+    const ctx = makeCtx({
+      taskDAG: {
+        reassignTask: vi.fn().mockReturnValue(null),
+        getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'pending' }),
+      },
+      getAllAgents: vi.fn().mockReturnValue([newAgent]),
+    });
+    const agent = makeLeadAgent();
+    const handler = getReassignHandler(ctx);
+
+    handler.handler(agent, '⟦⟦ REASSIGN_TASK {"taskId": "task-1", "agentId": "new-agent-001"} ⟧⟧');
+
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Cannot reassign'));
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('pending'));
+  });
+
+  it('cancels old delegation when reassigning', () => {
+    const oldAgent = makeChildAgent('lead-001', { id: 'old-agent-001' });
+    const newAgent = makeChildAgent('lead-001', { id: 'new-agent-001' });
+    const oldDelegation = {
+      id: 'del-1',
+      fromAgentId: 'lead-001',
+      toAgentId: 'old-agent-001',
+      toRole: 'developer',
+      task: 'Fix the bug',
+      status: 'active' as const,
+      createdAt: new Date().toISOString(),
+    };
+    const delegations = new Map([['del-1', oldDelegation]]);
+    const ctx = makeCtx({
+      taskDAG: {
+        reassignTask: vi.fn().mockReturnValue({ oldAgentId: 'old-agent-001' }),
+        getTask: vi.fn().mockReturnValue({ id: 'task-1', description: 'Fix the bug', dagStatus: 'running' }),
+      },
+      getAgent: vi.fn().mockImplementation((id: string) => id === 'old-agent-001' ? oldAgent : undefined),
+      getAllAgents: vi.fn().mockReturnValue([oldAgent, newAgent]),
+      lockRegistry: { releaseAll: vi.fn() },
+      delegations,
+    });
+    const agent = makeLeadAgent();
+    const handler = getReassignHandler(ctx);
+
+    handler.handler(agent, '⟦⟦ REASSIGN_TASK {"taskId": "task-1", "agentId": "new-agent-001"} ⟧⟧');
+
+    expect(oldDelegation.status).toBe('cancelled');
+    expect(oldDelegation.completedAt).toBeDefined();
+    // New delegation should be created
+    expect(delegations.size).toBe(2);
+  });
+
+  it('supports short agent ID prefix matching', () => {
+    const newAgent = makeChildAgent('lead-001', { id: 'new-agent-full-uuid' });
+    const ctx = makeCtx({
+      taskDAG: {
+        reassignTask: vi.fn().mockReturnValue({ oldAgentId: 'old-agent-001' }),
+        getTask: vi.fn().mockReturnValue({ id: 'task-1', description: 'Fix bug', dagStatus: 'running' }),
+      },
+      getAgent: vi.fn().mockReturnValue(undefined),
+      getAllAgents: vi.fn().mockReturnValue([newAgent]),
+      lockRegistry: { releaseAll: vi.fn() },
+      delegations: new Map(),
+    });
+    const agent = makeLeadAgent();
+    const handler = getReassignHandler(ctx);
+
+    handler.handler(agent, '⟦⟦ REASSIGN_TASK {"taskId": "task-1", "agentId": "new-agent"} ⟧⟧');
+
+    // Should resolve short ID to full agent
+    expect(ctx.taskDAG.reassignTask).toHaveBeenCalledWith('lead-001', 'task-1', 'new-agent-full-uuid');
+  });
+});
