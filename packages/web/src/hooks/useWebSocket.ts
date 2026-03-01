@@ -227,7 +227,11 @@ export function useWebSocket() {
           const gs = useGroupStore.getState();
           if (msg.messageId && msg.emoji && msg.agentId) {
             const key = groupKey(msg.leadId, msg.groupName);
-            gs.addReaction(key, msg.messageId, msg.emoji, msg.agentId);
+            if (msg.action === 'remove') {
+              gs.removeReaction(key, msg.messageId, msg.emoji, msg.agentId);
+            } else {
+              gs.addReaction(key, msg.messageId, msg.emoji, msg.agentId);
+            }
           }
           break;
         }
