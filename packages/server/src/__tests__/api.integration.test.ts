@@ -622,3 +622,66 @@ describe('Decisions', () => {
     expect(body.error).toMatch(/message required/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Filesystem Browse — Security Tests
+// ---------------------------------------------------------------------------
+
+describe('GET /api/browse — security', () => {
+  it('returns folders for cwd (default)', async () => {
+    const res = await fetch(`${baseUrl}/api/browse`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.current).toBeTruthy();
+    expect(Array.isArray(body.folders)).toBe(true);
+  });
+
+  it('rejects null byte injection', async () => {
+    const res = await fetch(`${baseUrl}/api/browse?path=/tmp%00/etc`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid path/i);
+  });
+
+  it('rejects access to /etc (system directory)', async () => {
+    const res = await fetch(`${baseUrl}/api/browse?path=/etc`);
+    // Either 403 (blocked) or 403 (outside allowed roots)
+    expect([400, 403]).toContain(res.status);
+  });
+
+  it('rejects access to /proc (system directory)', async () => {
+    const res = await fetch(`${baseUrl}/api/browse?path=/proc`);
+    expect([400, 403]).toContain(res.status);
+  });
+
+  it('rejects path traversal with ../', async () => {
+    // Try to escape to root via path traversal
+    const res = await fetch(`${baseUrl}/api/browse?path=${encodeURIComponent('/../../../etc')}`);
+    expect([400, 403]).toContain(res.status);
+  });
+
+  it('rejects path outside allowed roots', async () => {
+    const res = await fetch(`${baseUrl}/api/browse?path=/var/log`);
+    expect([400, 403]).toContain(res.status);
+  });
+
+  it('returns 400 for non-existent path', async () => {
+    const res = await fetch(`${baseUrl}/api/browse?path=/nonexistent_abc_xyz_123`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/does not exist/i);
+  });
+
+  it('does not return parent outside allowed roots', async () => {
+    // Browse cwd — parent should be null or within allowed roots
+    const res = await fetch(`${baseUrl}/api/browse?path=${encodeURIComponent(process.cwd())}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // parent is either null (at root boundary) or a valid path
+    if (body.parent !== null) {
+      // parent should not be a blocked system path
+      expect(body.parent).not.toBe('/etc');
+      expect(body.parent).not.toBe('/proc');
+    }
+  });
+});
