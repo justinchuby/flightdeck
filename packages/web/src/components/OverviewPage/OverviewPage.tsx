@@ -506,6 +506,13 @@ export function OverviewPage({ api, ws }: Props) {
     return Array.from(names);
   })();
 
+  // Reset filter if the selected project no longer has decisions
+  useEffect(() => {
+    if (timelineProjectFilter && !timelineProjectNames.includes(timelineProjectFilter)) {
+      setTimelineProjectFilter(null);
+    }
+  }, [timelineProjectFilter, timelineProjectNames]);
+
   // Filter decisions for the selected project tab
   const filteredTimelineDecisions = timelineProjectFilter
     ? timelineDecisions.filter((d) => resolveProjectName(d) === timelineProjectFilter)
