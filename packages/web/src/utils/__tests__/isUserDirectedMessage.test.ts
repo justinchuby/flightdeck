@@ -30,21 +30,21 @@ describe('classifyMessage — @user tag', () => {
 // Definite negative: crew commands
 // ══════════════════════════════════════════════════════════════════════
 describe('classifyMessage — crew commands', () => {
-  it('pure crew command (triple bracket) is internal', () => {
-    expect(classifyMessage('[[[ DELEGATE {"to": "developer"} ]]]')).toBe('internal');
+  it('pure crew command (doubled unicode fence) is internal', () => {
+    expect(classifyMessage('⟦⟦ DELEGATE {"to": "developer"} ⟧⟧')).toBe('internal');
   });
 
   it('pure crew command (unicode fence) is internal', () => {
-    expect(classifyMessage('⟦ AGENT_MESSAGE {"to": "173808e0", "content": "status"} ⟧')).toBe('internal');
+    expect(classifyMessage('⟦⟦ AGENT_MESSAGE {"to": "173808e0", "content": "status"} ⟧⟧')).toBe('internal');
   });
 
   it('multiple crew commands are internal', () => {
-    const text = '[[[ LOCK_FILE {"filePath": "foo.ts"} ]]]\n[[[ COMMIT {"message": "fix"} ]]]';
+    const text = '⟦⟦ LOCK_FILE {"filePath": "foo.ts"} ⟧⟧\n⟦⟦ COMMIT {"message": "fix"} ⟧⟧';
     expect(classifyMessage(text)).toBe('internal');
   });
 
   it('crew command mixed with user text is internal (commands dominate)', () => {
-    const text = 'Let me handle that.\n[[[ DELEGATE {"to": "dev"} ]]]';
+    const text = 'Let me handle that.\n⟦⟦ DELEGATE {"to": "dev"} ⟧⟧';
     expect(classifyMessage(text)).toBe('internal');
   });
 });
@@ -185,7 +185,7 @@ describe('classifyMessage — edge cases mentioning "user"', () => {
   });
 
   it('crew command with "user" parameter is internal', () => {
-    expect(classifyMessage('[[[ AGENT_MESSAGE {"to": "173808e0", "content": "user wants zoom fix"} ]]]')).toBe('internal');
+    expect(classifyMessage('⟦⟦ AGENT_MESSAGE {"to": "173808e0", "content": "user wants zoom fix"} ⟧⟧')).toBe('internal');
   });
 
   it('"tell the user" in a delegation message is internal', () => {
@@ -207,7 +207,7 @@ describe('classifyMessage — context (prevSenderIsUser)', () => {
 
   it('crew command after user message is still internal', () => {
     expect(classifyMessage(
-      '[[[ DELEGATE {"to": "developer", "task": "fix zoom"} ]]]',
+      '⟦⟦ DELEGATE {"to": "developer", "task": "fix zoom"} ⟧⟧',
       { prevSenderIsUser: true },
     )).toBe('internal');
   });
@@ -245,7 +245,7 @@ describe('isUserDirected — boolean helper', () => {
   });
 
   it('returns false for internal messages', () => {
-    expect(isUserDirected('[[[ DELEGATE {"to": "dev"} ]]]')).toBe(false);
+    expect(isUserDirected('⟦⟦ DELEGATE {"to": "dev"} ⟧⟧')).toBe(false);
   });
 
   it('returns false for system messages', () => {
@@ -268,7 +268,7 @@ describe('classifyMessage — realistic messages', () => {
   });
 
   it('lead delegating work is internal', () => {
-    const text = '⟦ DELEGATE {"to": "developer", "task": "Fix the zoom controls"} ⟧';
+    const text = '⟦⟦ DELEGATE {"to": "developer", "task": "Fix the zoom controls"} ⟧⟧';
     expect(classifyMessage(text)).toBe('internal');
   });
 
@@ -294,7 +294,7 @@ describe('classifyMessage — realistic messages', () => {
   });
 
   it('multi-line with @user tag and commands is user-directed (@user wins)', () => {
-    const text = '@user\nThe fix is deployed.\n\n[[[ COMPLETE_TASK {"dagTaskId": "p2-8"} ]]]';
+    const text = '@user\nThe fix is deployed.\n\n⟦⟦ COMPLETE_TASK {"dagTaskId": "p2-8"} ⟧⟧';
     expect(classifyMessage(text)).toBe('user-directed');
   });
 });
