@@ -2,7 +2,8 @@
  * Task DAG command handlers.
  *
  * Commands: DECLARE_TASKS, COMPLETE_TASK, TASK_STATUS, QUERY_TASKS, PAUSE_TASK,
- *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG, FORCE_READY, ASSIGN_TASK
+ *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG, FORCE_READY,
+ *           ASSIGN_TASK, REASSIGN_TASK
  */
 import type { Agent } from '../Agent.js';
 import type { DagTaskInput } from '../../tasks/TaskDAG.js';
