@@ -188,6 +188,16 @@ export function CommunicationLinks({
         }
       }
 
+      // Broadcasts: fan-out to all visible agents except sender
+      if (!comm.toAgentId && comm.type === 'broadcast') {
+        for (const [agentId, agentY] of agentPositions.entries()) {
+          if (agentId === comm.fromAgentId) continue;
+          result.push({ comm, idx: i, x, y1, y2: agentY + laneHeight / 2, style: getStyle(comm.type) });
+          if (result.length >= MAX_VISIBLE_LINKS) break;
+        }
+        continue;
+      }
+
       result.push({ comm, idx: i, x, y1, y2, style: getStyle(comm.type) });
 
       // Hard cap for performance
@@ -201,7 +211,7 @@ export function CommunicationLinks({
       <g className="communication-links" style={{ pointerEvents: 'none' }} role="list" aria-label="Communication links between agents">
         <MarkerDefs />
 
-        {links.map(({ comm, idx, x, y1, y2, style }) => {
+        {links.map(({ comm, idx, x, y1, y2, style }, linkIndex) => {
           const isHovered = hoveredIdx === idx;
           const isMissing = y2 === null;
           const path = isMissing ? buildStub(x, y1) : buildCurve(x, y1, y2);
@@ -210,7 +220,7 @@ export function CommunicationLinks({
             : undefined;
 
           return (
-            <g key={idx} role="listitem" aria-label={`${style.label} from ${comm.fromAgentId.slice(0, 8)}${comm.toAgentId ? ` to ${comm.toAgentId.slice(0, 8)}` : comm.groupName ? ` to group ${comm.groupName}` : ''}`}>
+            <g key={linkIndex} role="listitem" aria-label={`${style.label} from ${comm.fromAgentId.slice(0, 8)}${comm.toAgentId ? ` to ${comm.toAgentId.slice(0, 8)}` : comm.groupName ? ` to group ${comm.groupName}` : ''}`}>
               {/* Invisible wider hit area for hover */}
               <path
                 d={path}
