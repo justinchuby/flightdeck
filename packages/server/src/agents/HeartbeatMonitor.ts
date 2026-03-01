@@ -12,7 +12,7 @@ export interface HeartbeatContext {
   getAllAgents(): Agent[];
   getDelegationsMap(): Map<string, Delegation>;
   getDagSummary(leadId: string): DagSummary | null;
-  getTaskByAgent(leadId: string, agentId: string): unknown | null;
+  getTaskByAgent(leadId: string, agentId: string): { id: string; dagStatus: string } | null;
   emit(event: string, ...args: any[]): void;
 }
 

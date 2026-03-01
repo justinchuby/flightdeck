@@ -95,6 +95,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     taskDAG: {
       declareTaskBatch: vi.fn().mockReturnValue({ tasks: [], conflicts: [] }),
       getStatus: vi.fn().mockReturnValue({ tasks: [], fileLockMap: {}, summary: {} }),
+      hasAnyTasks: vi.fn().mockReturnValue(false),
       getTaskByAgent: vi.fn().mockReturnValue(null),
       getTask: vi.fn().mockReturnValue(null),
       findReadyTaskByRole: vi.fn().mockReturnValue(null),
