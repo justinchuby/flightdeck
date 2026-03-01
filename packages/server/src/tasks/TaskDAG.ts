@@ -78,10 +78,20 @@ const STOP_WORDS = new Set([
 
 /** Extract meaningful words from text for similarity comparison */
 function extractWords(text: string): Set<string> {
-  return new Set(
-    text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-      .filter(w => w.length > 2 && !STOP_WORDS.has(w))
-  );
+  // Preserve hyphenated tokens (e.g. "p2-7", "auto-link") as single words
+  const tokens = text.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')   // keep hyphens
+    .split(/\s+/)
+    .flatMap(token => {
+      // Keep hyphenated tokens AND their parts for better matching
+      if (token.includes('-') && token.length > 2) {
+        const parts = token.split('-').filter(p => p.length > 0);
+        return [token, ...parts];
+      }
+      return [token];
+    })
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+  return new Set(tokens);
 }
 
 /**
@@ -615,8 +625,9 @@ export class TaskDAG extends EventEmitter {
       }
     }
 
-    // Fallback: first by priority/createdAt (original behavior)
-    return candidates[0];
+    // Multiple candidates but no clear description match — return null to force explicit dagTaskId
+    // (returning candidates[0] was the bug: it silently linked to the wrong task)
+    return null;
   }
 
   /** Get a transition validation error (for use by CommandDispatcher error messages) */

@@ -692,6 +692,28 @@ describe('TaskDAG', () => {
       );
       expect(score).toBeGreaterThan(0.4);
     });
+
+    it('preserves hyphenated identifiers like P2-7 for matching', () => {
+      // "P2-7" should match "p2-7" in the DAG task
+      const score = descriptionSimilarity(
+        'Implement P2-7: Comm Heatmap Real-time',
+        'P2-7 heatmap real-time SSE updates',
+      );
+      expect(score).toBeGreaterThan(0.4);
+    });
+
+    it('distinguishes P2-7 from P2-8 via hyphenated IDs', () => {
+      const scoreCorrect = descriptionSimilarity(
+        'Implement P2-7 heatmap',
+        'P2-7 heatmap updates',
+      );
+      const scoreWrong = descriptionSimilarity(
+        'Implement P2-7 heatmap',
+        'P2-8 DAG visualization',
+      );
+      expect(scoreCorrect).toBeGreaterThan(scoreWrong);
+      expect(scoreCorrect).toBeGreaterThan(0.3);
+    });
   });
 
   describe('findReadyTask', () => {
@@ -754,7 +776,7 @@ describe('TaskDAG', () => {
       expect(uiTask!.id).toBe('task-ui');
     });
 
-    it('falls back to priority order when description has no meaningful match', () => {
+    it('returns null when description has no meaningful match and multiple candidates', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'low', role: 'developer', description: 'Task A', priority: 1 },
         { id: 'high', role: 'developer', description: 'Task B', priority: 10 },
@@ -763,11 +785,11 @@ describe('TaskDAG', () => {
         role: 'developer',
         taskDescription: 'something completely unrelated xyz',
       });
-      expect(task).not.toBeNull();
-      expect(task!.id).toBe('high');
+      // Should NOT guess — return null to force explicit dagTaskId
+      expect(task).toBeNull();
     });
 
-    it('falls back to priority order when no description provided', () => {
+    it('returns null when no description provided and multiple candidates', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'low', role: 'developer', priority: 1 },
         { id: 'high', role: 'developer', priority: 10 },
@@ -775,8 +797,7 @@ describe('TaskDAG', () => {
       const task = dag.findReadyTask('lead-1', {
         role: 'developer',
       });
-      expect(task).not.toBeNull();
-      expect(task!.id).toBe('high');
+      expect(task).toBeNull();
     });
 
     it('returns single candidate without needing description match', () => {
@@ -842,7 +863,7 @@ describe('TaskDAG', () => {
       expect(task!.id).toBe('task-auth');
     });
 
-    it('preserves priority order when descriptions score equally', () => {
+    it('returns null when descriptions score equally (ambiguous)', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'low-pri', role: 'developer', description: 'Build feature XYZ', priority: 1 },
         { id: 'high-pri', role: 'developer', description: 'Build feature XYZ', priority: 10 },
@@ -851,24 +872,46 @@ describe('TaskDAG', () => {
         role: 'developer',
         taskDescription: 'Build feature XYZ for the platform',
       });
-      expect(task).not.toBeNull();
-      expect(task!.id).toBe('high-pri');
+      // Identical descriptions = zero gap = ambiguous, returns null
+      expect(task).toBeNull();
     });
 
-    it('falls back to priority order when top scores are ambiguously close', () => {
+    it('returns null when top scores are ambiguously close (no false positive)', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'task-a', role: 'developer', description: 'Implement authentication system', priority: 1 },
         { id: 'task-b', role: 'developer', description: 'Implement authorization system', priority: 10 },
       ]);
-      // Both descriptions share "Implement" + "system" with the query,
-      // so scores will be close together — should fall back to priority
+      // Both descriptions share "system" with the query (implement is stop word),
+      // scores are close together — should return null, not guess
       const task = dag.findReadyTask('lead-1', {
         role: 'developer',
         taskDescription: 'Implement notification system',
       });
-      expect(task).not.toBeNull();
-      // Falls back to priority order since scores are ambiguous
-      expect(task!.id).toBe('task-b');
+      expect(task).toBeNull();
+    });
+
+    it('returns null when multiple candidates and no description provided', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'task-x', role: 'developer', description: 'Build API endpoints', priority: 1 },
+        { id: 'task-y', role: 'developer', description: 'Build UI components', priority: 10 },
+      ]);
+      const task = dag.findReadyTask('lead-1', {
+        role: 'developer',
+      });
+      expect(task).toBeNull();
+    });
+
+    it('returns null when description matching falls below threshold', () => {
+      dag.declareTaskBatch('lead-1', [
+        { id: 'p0-2', role: 'developer', description: 'Fix fragile role-based task auto-linking' },
+        { id: 'p0-3', role: 'developer', description: 'Allow agents to signal task completion' },
+      ]);
+      // Re-delegation text doesn't match either task well
+      const task = dag.findReadyTask('lead-1', {
+        role: 'developer',
+        taskDescription: 'Fix security issue in COMPLETE_TASK handler',
+      });
+      expect(task).toBeNull();
     });
   });
 
