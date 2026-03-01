@@ -31,7 +31,7 @@ Always consider: Will this architecture be easy for AI agents to navigate, under
     color: '#f0883e',
     icon: '🏗️',
     builtIn: true,
-    model: 'gpt-5.3-codex',
+    model: 'claude-opus-4.6',
   },
   {
     id: 'code-reviewer',
@@ -112,7 +112,7 @@ Break complex work into clear, user-focused tasks with acceptance criteria that 
     color: '#d29922',
     icon: '🎯',
     builtIn: true,
-    model: 'gpt-5.2-codex',
+    model: 'gpt-5.3-codex',
   },
   {
     id: 'tech-writer',
