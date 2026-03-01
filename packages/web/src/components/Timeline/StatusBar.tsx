@@ -151,8 +151,7 @@ function ConnectionIndicator({ health }: { health: ConnectionHealth }) {
   return (
     <div
       className="flex items-center gap-1"
-      role={isOffline ? undefined : undefined}
-      aria-live={isOffline ? 'assertive' : undefined}
+      aria-live={isOffline ? 'assertive' : 'polite'}
       aria-label={`Connection: ${config.label}`}
     >
       <Icon size={14} className={config.className} />
