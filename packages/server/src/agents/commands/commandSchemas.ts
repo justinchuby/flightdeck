@@ -59,6 +59,7 @@ export const createAgentSchema = z.object({
   model: z.string().max(MAX_NAME_LENGTH).optional(),
   context: z.string().max(MAX_CONTENT_LENGTH, `"context" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
   dagTaskId: z.string().max(MAX_ID_LENGTH).optional(),
+  depends_on: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional(),
   name: z.string().max(MAX_NAME_LENGTH).optional(),
   sessionId: z.string().max(MAX_ID_LENGTH).optional(),
 });
@@ -68,6 +69,7 @@ export const delegateSchema = z.object({
   task: z.string({ message: 'Missing required field "task"' }).min(1, 'Missing required field "task"').max(MAX_TASK_TEXT_LENGTH, `"task" too long (max ${MAX_TASK_TEXT_LENGTH})`),
   context: z.string().max(MAX_CONTENT_LENGTH, `"context" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
   dagTaskId: z.string().max(MAX_ID_LENGTH).optional(),
+  depends_on: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional(),
 });
 
 export const terminateAgentSchema = z.object({

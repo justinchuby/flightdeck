@@ -395,9 +395,9 @@ Management commands:
 - \`⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
 
 == AUTO-DAG FROM DELEGATIONS ==
-When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG task and links it. Express dependencies naturally in your delegations:
-- "Review developer X's implementation" → creates a review task depending on X's task
-- "After the architect reports back, implement the API" → creates a task depending on the architect's task
+When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG task and links it. Express dependencies in three ways:
+- Explicit: \`"depends_on": ["task-id-1", "task-id-2"]\` in CREATE_AGENT/DELEGATE payload (most reliable)
+- Natural language: "Review developer X's implementation" or "After the architect reports back, implement the API" → auto-detected from task text
 - Include \`dagTaskId\` in CREATE_AGENT/DELEGATE to explicitly link to an existing DAG task. If omitted, the system fuzzy-matches by role and description.
 
 == SPECIALIST ROLES (with recommended default models) ==

@@ -116,9 +116,10 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
           dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
         } else {
           // Auto-create DAG task for untracked delegation
-          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id);
+          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id, req.depends_on);
           if (autoResult.created) {
             dagNote = ` [DAG: auto-created "${autoResult.taskId}" → running]`;
+            if (autoResult.depNotes.length) dagNote += `\n  ${autoResult.depNotes.join('\n  ')}`;
             child.dagTaskId = autoResult.taskId;
             logger.info('delegation', `DAG auto-created: task "${autoResult.taskId}" → agent ${child.id.slice(0, 8)}`);
           } else if (autoResult.duplicate) {
@@ -257,9 +258,10 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
         dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
       } else {
         // Auto-create DAG task for untracked delegation
-        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id);
+        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id, req.depends_on);
         if (autoResult.created) {
           dagNote = ` [DAG: auto-created "${autoResult.taskId}" → running]`;
+          if (autoResult.depNotes.length) dagNote += `\n  ${autoResult.depNotes.join('\n  ')}`;
           child.dagTaskId = autoResult.taskId;
           logger.info('delegation', `DAG auto-created: task "${autoResult.taskId}" → agent ${child.id.slice(0, 8)}`);
         } else if (autoResult.duplicate) {
@@ -509,11 +511,15 @@ interface AutoCreateResult {
   created: boolean;
   taskId: string;
   duplicate?: string;
+  depNotes: string[];
 }
 
 /**
  * Auto-create a DAG task for an untracked delegation.
- * Returns the created task ID, or flags a near-duplicate if one exists.
+ * Applies 3-tier dependency inference:
+ *   Tier 1: Explicit depends_on from payload
+ *   Tier 2: Review role inference (code-reviewer, critical-reviewer)
+ *   Tier 3: Natural language parsing ("after X finishes", "once Y reports")
  */
 function autoCreateDagTask(
   ctx: CommandHandlerContext,
@@ -521,14 +527,17 @@ function autoCreateDagTask(
   role: string,
   taskText: string,
   agentId: string,
+  explicitDeps?: string[],
 ): AutoCreateResult {
+  const depNotes: string[] = [];
+
   // Check for near-duplicate before auto-creating
   const existingTasks = ctx.taskDAG.getTasks(leadId);
   const nearDuplicate = existingTasks.find(
     t => descriptionSimilarity(taskText, t.description, t.title) > NEAR_DUPLICATE_THRESHOLD
   );
   if (nearDuplicate) {
-    return { created: false, taskId: '', duplicate: nearDuplicate.id };
+    return { created: false, taskId: '', duplicate: nearDuplicate.id, depNotes };
   }
 
   const autoId = generateAutoTaskId(role, taskText);
@@ -541,15 +550,32 @@ function autoCreateDagTask(
 
   const started = ctx.taskDAG.startTask(leadId, autoTask.id, agentId);
   if (!started) {
-    return { created: false, taskId: autoId };
+    return { created: false, taskId: autoId, depNotes };
   }
 
-  // Auto-link review dependencies
-  if (isReviewRole(role)) {
-    autoLinkReviewDependency(ctx, leadId, autoTask.id, taskText);
+  // ── 3-tier dependency inference ──
+  // Tier 1: Explicit depends_on from payload
+  const tier1 = explicitDeps || [];
+
+  // Tier 2: Review role inference
+  const tier2 = isReviewRole(role) ? inferReviewDependencies(ctx, leadId, taskText) : [];
+
+  // Tier 3: Natural language dependency parsing
+  const tier3 = inferSequentialDependencies(ctx, leadId, taskText);
+
+  // Merge and deduplicate (explicit wins, then review, then NL)
+  const allDeps = [...new Set([...tier1, ...tier2, ...tier3])];
+
+  for (const depId of allDeps) {
+    const added = ctx.taskDAG.addDependency(leadId, autoTask.id, depId);
+    if (added) {
+      const source = tier1.includes(depId) ? 'explicit' : tier2.includes(depId) ? 'review' : 'inferred';
+      depNotes.push(`→ depends on "${depId}" (${source})`);
+      logger.info('delegation', `Auto-linked "${autoId}" → depends on "${depId}" (${source})`);
+    }
   }
 
-  return { created: true, taskId: autoId };
+  return { created: true, taskId: autoId, depNotes };
 }
 
 /** Generate a readable auto-task ID from role and task description */
@@ -568,31 +594,105 @@ function isReviewRole(role: string): boolean {
   return ['code-reviewer', 'critical-reviewer'].includes(role);
 }
 
-/** Try to auto-link a review task as dependent on the task being reviewed */
-function autoLinkReviewDependency(
+// ── Tier 2: Review dependency inference ───────────────────────────────
+
+/**
+ * Infer dependencies for review tasks by detecting what's being reviewed.
+ * Strategies: agent ID reference, task ID reference, role reference.
+ */
+function inferReviewDependencies(
   ctx: CommandHandlerContext,
   leadId: string,
-  reviewTaskId: string,
   taskDesc: string,
-): void {
-  const target = findReviewTarget(ctx, leadId, taskDesc);
-  if (target) {
-    ctx.taskDAG.addDependency(leadId, reviewTaskId, target.id);
-    logger.info('delegation', `Auto-linked review "${reviewTaskId}" → depends on "${target.id}"`);
+): string[] {
+  const deps: string[] = [];
+  const allTasks = ctx.taskDAG.getTasks(leadId);
+
+  // Strategy 1: Agent ID reference (e.g., "review commit by 0b85de78")
+  for (const m of taskDesc.matchAll(/\b([0-9a-f]{8,})\b/g)) {
+    const refId = m[1];
+    const task = allTasks.find(t =>
+      t.assignedAgentId?.startsWith(refId) &&
+      ['running', 'done'].includes(t.dagStatus)
+    );
+    if (task && !deps.includes(task.id)) deps.push(task.id);
   }
+
+  // Strategy 2: DAG task ID reference (e.g., "review p0-2-autolink")
+  for (const m of taskDesc.matchAll(/\b(p\d+-\d+[-\w]*|auto-[-\w]+)\b/gi)) {
+    const task = allTasks.find(t =>
+      t.id.toLowerCase() === m[1].toLowerCase() ||
+      t.id.toLowerCase().startsWith(m[1].toLowerCase())
+    );
+    if (task && !deps.includes(task.id)) deps.push(task.id);
+  }
+
+  // Strategy 3: Role reference (e.g., "review the developer's work")
+  if (deps.length === 0) {
+    const roleMatch = taskDesc.match(/(?:by|from)\s+(?:the\s+)?(\w+)/i);
+    if (roleMatch) {
+      const refRole = roleMatch[1].toLowerCase();
+      const task = allTasks
+        .filter(t => t.role === refRole && ['running', 'done'].includes(t.dagStatus))
+        .sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''))
+        [0];
+      if (task) deps.push(task.id);
+    }
+  }
+
+  return deps;
 }
 
-function findReviewTarget(ctx: CommandHandlerContext, leadId: string, taskDesc: string): DagTask | null {
-  // Look for agent ID references (e.g., "review commit by 0b85de78")
-  const agentIdMatch = taskDesc.match(/\b([0-9a-f]{8})\b/);
-  if (agentIdMatch) {
-    const tasks = ctx.taskDAG.getTasks(leadId);
-    return tasks.find(t => t.assignedAgentId?.startsWith(agentIdMatch[1]) && t.dagStatus === 'running') || null;
+// ── Tier 3: Natural language dependency parsing ───────────────────────
+
+/** Patterns that indicate a dependency on another agent/task completing */
+const NL_DEP_PATTERNS = [
+  /(?:after|once|when)\s+(?:agent\s+)?([0-9a-f]{8,})\s+(?:finishes|completes|reports|is done)/gi,
+  /(?:after|once|when)\s+(?:the\s+)?(\w+)\s+(?:finishes|completes|reports|is done)/gi,
+  /(?:depends on|blocked by|requires|needs)\s+(?:task\s+)?["']?([\w-]+)["']?/gi,
+  /(?:after|once)\s+["']?([\w-]+)["']?\s+(?:is\s+)?(?:done|complete|finished)/gi,
+];
+
+/**
+ * Parse natural language to detect sequential dependencies.
+ * Handles patterns like "after agent X finishes", "once architect reports",
+ * "depends on task-id", "blocked by p0-2-autolink".
+ */
+export function inferSequentialDependencies(
+  ctx: CommandHandlerContext,
+  leadId: string,
+  taskDesc: string,
+): string[] {
+  const deps: string[] = [];
+  const allTasks = ctx.taskDAG.getTasks(leadId);
+
+  for (const pattern of NL_DEP_PATTERNS) {
+    // Reset regex lastIndex for each call since they're global
+    pattern.lastIndex = 0;
+    for (const match of taskDesc.matchAll(pattern)) {
+      const ref = match[1];
+
+      // Try as agent ID (hex string)
+      if (/^[0-9a-f]{8,}$/.test(ref)) {
+        const byAgent = allTasks.find(t =>
+          t.assignedAgentId?.startsWith(ref) &&
+          ['running', 'done', 'ready'].includes(t.dagStatus)
+        );
+        if (byAgent && !deps.includes(byAgent.id)) { deps.push(byAgent.id); continue; }
+      }
+
+      // Try as task ID (exact match)
+      const byTaskId = allTasks.find(t => t.id.toLowerCase() === ref.toLowerCase());
+      if (byTaskId && !deps.includes(byTaskId.id)) { deps.push(byTaskId.id); continue; }
+
+      // Try as role name
+      const byRole = allTasks
+        .filter(t => t.role === ref.toLowerCase() && ['running', 'done'].includes(t.dagStatus))
+        .sort((a, b) => (b.startedAt || '').localeCompare(a.startedAt || ''))
+        [0];
+      if (byRole && !deps.includes(byRole.id)) deps.push(byRole.id);
+    }
   }
-  // Look for task ID references (e.g., "review p0-2-autolink" or "review auto-developer-fix-1a2b")
-  const taskIdMatch = taskDesc.match(/\b(p\d+-\d+[-\w]*|auto-\w+[-\w]*)\b/i);
-  if (taskIdMatch) {
-    return ctx.taskDAG.getTask(leadId, taskIdMatch[1]) || null;
-  }
-  return null;
+
+  return deps;
 }

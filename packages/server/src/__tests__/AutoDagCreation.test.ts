@@ -2,10 +2,11 @@
  * Tests for auto-DAG creation from CREATE_AGENT and DELEGATE commands.
  * When a lead delegates without a pre-declared DAG task, the system
  * auto-creates a DAG task entry and links the agent to it.
+ * Covers 3-tier dependency inference: explicit, review, and NL parsing.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getLifecycleCommands } from '../agents/commands/AgentLifecycle.js';
-import { generateAutoTaskId } from '../agents/commands/AgentLifecycle.js';
+import { generateAutoTaskId, inferSequentialDependencies } from '../agents/commands/AgentLifecycle.js';
 import type { CommandHandlerContext } from '../agents/commands/types.js';
 
 function makeLeadAgent(overrides: Record<string, any> = {}) {
@@ -288,12 +289,10 @@ describe('Auto-DAG review dependency linking', () => {
         getAll: vi.fn().mockReturnValue([]),
       },
     });
-    (ctx.taskDAG.getTask as any).mockImplementation((_leadId: string, taskId: string) => {
-      if (taskId === 'p0-2-autolink') {
-        return { id: 'p0-2-autolink', dagStatus: 'running', description: 'Fix auto-linking', dependsOn: [], files: [] };
-      }
-      return null;
-    });
+    // inferReviewDependencies uses getTasks to scan for matching task IDs
+    (ctx.taskDAG.getTasks as any).mockReturnValue([
+      { id: 'p0-2-autolink', dagStatus: 'running', description: 'Fix auto-linking', dependsOn: [], files: [] },
+    ]);
 
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
@@ -347,5 +346,201 @@ describe('generateAutoTaskId', () => {
     // They share the same prefix but may differ in suffix
     expect(id1.startsWith('auto-developer-fix-bug-')).toBe(true);
     expect(id2.startsWith('auto-developer-fix-bug-')).toBe(true);
+  });
+});
+
+describe('Tier 1: Explicit depends_on from payload', () => {
+  it('wires explicit depends_on when auto-creating via CREATE_AGENT', () => {
+    const ctx = makeCtx();
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task", "design-task"]} ⟧');
+
+    expect(ctx.taskDAG.addTask).toHaveBeenCalled();
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'api-task');
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'design-task');
+  });
+
+  it('wires explicit depends_on when auto-creating via DELEGATE', () => {
+    const child = makeChildAgent('lead-001');
+    const ctx = makeCtx({
+      getAllAgents: vi.fn().mockReturnValue([child]),
+    });
+    const agent = makeLeadAgent();
+    const cmd = getDelegateHandler(ctx);
+
+    cmd.handler(agent, '⟦ DELEGATE {"to": "child-001", "task": "Write tests", "depends_on": ["impl-task"]} ⟧');
+
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'impl-task');
+  });
+
+  it('shows dependency notes in ack message', () => {
+    const ctx = makeCtx();
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task"]} ⟧');
+
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('depends on'));
+  });
+
+  it('does not add depends_on when matching existing task (no auto-create)', () => {
+    const existingTask = { id: 'pre-declared', dagStatus: 'ready' };
+    const ctx = makeCtx();
+    (ctx.taskDAG.findReadyTask as any).mockReturnValue(existingTask);
+    (ctx.taskDAG.startTask as any).mockReturnValue(existingTask);
+
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Build", "depends_on": ["x"]} ⟧');
+
+    // No auto-create, so no addDependency
+    expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
+  });
+});
+
+describe('Tier 3: NL dependency parsing', () => {
+  function makeNLCtx(tasks: any[] = []): CommandHandlerContext {
+    return makeCtx({
+      taskDAG: {
+        ...makeCtx().taskDAG,
+        getTasks: vi.fn().mockReturnValue(tasks),
+        findReadyTask: vi.fn().mockReturnValue(null),
+        addTask: vi.fn().mockImplementation((_: string, t: any) => ({
+          id: t.id, role: t.role, title: t.title, description: t.description || '',
+          dagStatus: 'ready', dependsOn: [], files: [], priority: 0,
+        })),
+        startTask: vi.fn().mockReturnValue({ id: 'started', dagStatus: 'running' }),
+        addDependency: vi.fn().mockReturnValue(true),
+        getTask: vi.fn().mockReturnValue(null),
+        getStatus: vi.fn().mockReturnValue({ tasks: [], fileLockMap: {}, summary: { pending: 0, ready: 0, running: 0 } }),
+        hasActiveTasks: vi.fn().mockReturnValue(false),
+        hasAnyTasks: vi.fn().mockReturnValue(false),
+        completeTask: vi.fn().mockReturnValue([]),
+      },
+    });
+  }
+
+  it('parses "after agent X finishes" as dependency', () => {
+    const tasks = [{
+      id: 'impl-task', role: 'developer', assignedAgentId: '0b85de78-full',
+      dagStatus: 'running', description: 'Implement feature', dependsOn: [], files: [], startedAt: '2026-01-01',
+    }];
+    const ctx = makeNLCtx(tasks);
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "After agent 0b85de78 finishes, write integration tests"} ⟧');
+
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'impl-task');
+  });
+
+  it('parses "once architect reports" as dependency', () => {
+    const tasks = [{
+      id: 'design-task', role: 'architect', assignedAgentId: 'arch-full-id',
+      dagStatus: 'running', description: 'Design the system', dependsOn: [], files: [], startedAt: '2026-01-01',
+    }];
+    const ctx = makeNLCtx(tasks);
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Once architect reports, implement the design"} ⟧');
+
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'design-task');
+  });
+
+  it('parses "depends on task-id" as dependency', () => {
+    const tasks = [{
+      id: 'p0-2-autolink', role: 'developer', dagStatus: 'running',
+      description: 'Fix auto-linking', dependsOn: [], files: [],
+    }];
+    const ctx = makeNLCtx(tasks);
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Depends on p0-2-autolink being done first"} ⟧');
+
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'p0-2-autolink');
+  });
+
+  it('parses "blocked by task-id" as dependency', () => {
+    const tasks = [{
+      id: 'setup-task', role: 'developer', dagStatus: 'running',
+      description: 'Setup infrastructure', dependsOn: [], files: [],
+    }];
+    const ctx = makeNLCtx(tasks);
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "Blocked by setup-task, implement the feature"} ⟧');
+
+    expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'setup-task');
+  });
+
+  it('deduplicates dependencies across tiers', () => {
+    const tasks = [{
+      id: 'impl-task', role: 'developer', assignedAgentId: '0b85de78-full',
+      dagStatus: 'running', description: 'Implement feature', dependsOn: [], files: [], startedAt: '2026-01-01',
+    }];
+    const ctx = makeNLCtx(tasks);
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    // Explicit + NL both reference the same task
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "After agent 0b85de78 finishes, do cleanup", "depends_on": ["impl-task"]} ⟧');
+
+    // Should only call addDependency once for impl-task (deduped)
+    const depCalls = (ctx.taskDAG.addDependency as any).mock.calls
+      .filter((c: any[]) => c[2] === 'impl-task');
+    expect(depCalls.length).toBe(1);
+  });
+
+  it('does not add NL deps when no matching tasks exist', () => {
+    const ctx = makeNLCtx([]); // no tasks in DAG
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦ CREATE_AGENT {"role": "developer", "task": "After architect finishes, implement"} ⟧');
+
+    expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
+  });
+});
+
+describe('inferSequentialDependencies (unit)', () => {
+  function makeMinimalCtx(tasks: any[]): CommandHandlerContext {
+    return {
+      taskDAG: { getTasks: vi.fn().mockReturnValue(tasks) },
+    } as any;
+  }
+
+  it('returns empty array for text with no dependency patterns', () => {
+    const ctx = makeMinimalCtx([{ id: 'a', role: 'developer', dagStatus: 'running' }]);
+    const result = inferSequentialDependencies(ctx, 'lead-1', 'Just build the feature');
+    expect(result).toEqual([]);
+  });
+
+  it('matches "after agent <id> finishes"', () => {
+    const ctx = makeMinimalCtx([{
+      id: 'task-1', role: 'developer', assignedAgentId: 'abcdef12-full',
+      dagStatus: 'running',
+    }]);
+    const result = inferSequentialDependencies(ctx, 'lead-1', 'After agent abcdef12 finishes, deploy');
+    expect(result).toEqual(['task-1']);
+  });
+
+  it('matches "depends on <task-id>"', () => {
+    const ctx = makeMinimalCtx([{ id: 'setup', role: 'developer', dagStatus: 'running' }]);
+    const result = inferSequentialDependencies(ctx, 'lead-1', 'Depends on setup before starting');
+    expect(result).toEqual(['setup']);
+  });
+
+  it('matches role-based "once architect is done"', () => {
+    const ctx = makeMinimalCtx([{
+      id: 'arch-task', role: 'architect', dagStatus: 'running', startedAt: '2026-01-01',
+    }]);
+    const result = inferSequentialDependencies(ctx, 'lead-1', 'Once architect is done, implement');
+    expect(result).toEqual(['arch-task']);
   });
 });
