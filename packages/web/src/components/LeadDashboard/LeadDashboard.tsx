@@ -711,7 +711,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const groups = currentProject?.groups ?? [];
   const groupMessages = currentProject?.groupMessages ?? {};
   const dagStatus = currentProject?.dagStatus ?? null;
-  const teamAgents = agents.filter((a) => a.parentId === selectedLeadId);
+  const teamAgents = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
 
   return (
     <div className="flex-1 flex overflow-hidden">
