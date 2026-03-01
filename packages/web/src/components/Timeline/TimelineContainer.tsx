@@ -527,6 +527,11 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             onClick={fitToView}
             aria-label="Fit timeline to view"
           >Fit</button>
+          <button
+            className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
+            onClick={() => setSortDirection(d => d === 'oldest-first' ? 'newest-first' : 'oldest-first')}
+            aria-label={`Sort: ${sortDirection}. Click to toggle.`}
+          >{sortDirection === 'oldest-first' ? '↑' : '↓'}</button>
         </div>
       </div>
 
