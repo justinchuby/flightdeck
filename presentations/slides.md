@@ -1119,43 +1119,37 @@ system doesn't just build software — it builds a better version of itself.
 
 # Bottlenecks we've hit (and how we're solving them)
 
-<div class="grid grid-cols-2 gap-3 mt-2 text-sm">
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+<div class="grid grid-cols-2 gap-2 mt-1 text-xs">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### ✅ Context window limits
-Each agent has finite context. Long tasks degrade quality.
+Each agent has finite context — long tasks degrade quality.
 
 **Solved:** Content-hashed status updates (40-60% token savings), session checkpointing, smart context pruning.
 
 </div>
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### ✅ Git conflicts with parallel work
-Multiple agents editing the same codebase causes merge conflicts — and worse, **cross-contamination**.
+Multiple agents editing the same codebase → merge conflicts and cross-contamination.
 
-<div class="bg-gray-900 rounded p-2 mt-1 text-xs font-mono">
-<span class="text-gray-500"># Agent A:</span> git add file1.ts<br/>
-<span class="text-gray-500"># Agent B (same ms!):</span> git add file2.ts<br/>
-<span class="text-gray-500"># Agent A:</span> git commit → <span class="text-red-400">includes B's file!</span>
-</div>
-
-**Solved:** File locking + `git commit -- file1 file2` bypasses shared index. Zero conflicts.
+**Solved:** File locking + scoped `git commit -- file1 file2` bypasses shared index. Zero conflicts.
 
 </div>
-<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### ✅ Stuck or hallucinating agents
 Agents can get stuck in loops or produce incorrect work.
 
-**Solved:** Heartbeat monitoring, mandatory code reviews, INTERRUPT command to redirect agents mid-task.
+**Solved:** Heartbeat monitoring, mandatory code reviews, INTERRUPT command to redirect mid-task.
 
 </div>
-<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+<div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
 
 ### ⚠️ Agent context loss on termination
 When you terminate an agent, their accumulated context is gone.
 
-**Partial:** Session resume implemented — agents can checkpoint and resume. Full persistent memory is future work.
+**Partial:** Session resume implemented — agents checkpoint and resume. Full persistent memory is future work.
 
 </div>
 </div>
