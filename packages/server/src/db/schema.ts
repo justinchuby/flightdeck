@@ -147,6 +147,7 @@ export const dagTasks = sqliteTable('dag_tasks', {
   id: text('id').notNull(),
   leadId: text('lead_id').notNull(),
   role: text('role').notNull(),
+  title: text('title'),
   description: text('description').notNull().default(''),
   files: text('files').default('[]'),
   dependsOn: text('depends_on').default('[]'),

@@ -2,6 +2,7 @@ export interface DagTask {
   id: string;
   leadId: string;
   role: string;
+  title?: string;
   description: string;
   files: string[];
   dependsOn: string[];

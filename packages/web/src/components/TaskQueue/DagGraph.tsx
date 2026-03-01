@@ -111,7 +111,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
             textOverflow: 'ellipsis',
           }}
         >
-          {truncate(task.id, 16)}
+          {truncate(task.title || task.id, 16)}
         </span>
       </div>
 
@@ -278,7 +278,12 @@ function DagNodeTooltip({
       {/* Header */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <span style={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {task.title && (
+            <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#e5e7eb' }}>
+              {task.title}
+            </span>
+          )}
+          <span style={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.title ? '#9ca3af' : undefined }}>
             {task.id}
           </span>
           <span

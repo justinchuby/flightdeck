@@ -59,9 +59,12 @@ function TaskCard({ task }: { task: DagTask }) {
     <div className={`px-2 py-1.5 border-b border-th-border/50 hover:bg-th-bg-alt/30 ${cfg.strikethrough ? 'opacity-50' : ''}`}>
       <div className="flex items-center gap-1.5">
         <StatusBadge status={task.dagStatus} />
-        <span className={`text-xs font-mono text-th-text-alt truncate ${cfg.strikethrough ? 'line-through' : ''}`}>
-          {task.id}
+        <span className={`text-xs text-th-text-alt truncate ${cfg.strikethrough ? 'line-through' : ''}`}>
+          {task.title || task.id}
         </span>
+        {task.title && (
+          <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-alt/50 px-1 rounded shrink-0">{task.id}</span>
+        )}
         <span className="text-[10px] text-th-text-muted ml-auto shrink-0">({task.role})</span>
       </div>
       {task.description && (
