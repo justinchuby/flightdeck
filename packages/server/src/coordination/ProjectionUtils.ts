@@ -111,11 +111,15 @@ export class OrphanManager {
     const promoted: CausalEvent[] = [];
 
     // Promote TTL-expired orphans
+    const expiredIds: string[] = [];
     for (const [id, entry] of this.orphans) {
       if (now - entry.firstSeenAt >= this.ttlMs) {
         promoted.push(entry.event);
-        this.orphans.delete(id);
+        expiredIds.push(id);
       }
+    }
+    for (const id of expiredIds) {
+      this.orphans.delete(id);
     }
 
     // Enforce cap: promote oldest orphans beyond limit
