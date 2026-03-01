@@ -19,3 +19,5 @@ export { useTimelineSSE } from './useTimelineSSE';
 export type { UseTimelineSSEResult } from './useTimelineSSE';
 export { useSinceLastVisit } from './useSinceLastVisit';
 export type { SinceLastVisitResult } from './useSinceLastVisit';
+export { getAgentColor, AGENT_COLORS } from './getAgentColor';
+export { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
