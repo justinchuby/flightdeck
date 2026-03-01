@@ -68,6 +68,7 @@ export function MentionText({ text, agents, onClickAgent }: {
           <span
             className="inline-flex items-center gap-0.5 font-mono text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-300 cursor-pointer hover:bg-blue-500/30 transition-colors"
             style={{ borderBottom: `1px solid ${idColor(agent.id)}` }}
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
           >
             @{agent.role.name.toLowerCase()}-{agent.id.slice(0, 6)}
