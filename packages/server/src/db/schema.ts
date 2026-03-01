@@ -280,3 +280,22 @@ export const sessionRetros = sqliteTable('session_retros', {
 }, (table) => [
   index('idx_session_retros_lead').on(table.leadId),
 ]);
+
+// ── Timers ──────────────────────────────────────────────────────────
+
+export const timers = sqliteTable('timers', {
+  id: text('id').primaryKey(),
+  agentId: text('agent_id').notNull(),
+  agentRole: text('agent_role').notNull(),
+  leadId: text('lead_id'),
+  label: text('label').notNull(),
+  message: text('message').notNull(),
+  delaySeconds: integer('delay_seconds').notNull(),
+  fireAt: text('fire_at').notNull(),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  status: text('status').notNull().default('pending'),   // pending | fired | cancelled
+  repeat: integer('repeat').default(0),
+}, (table) => [
+  index('idx_timers_agent').on(table.agentId),
+  index('idx_timers_status').on(table.status),
+]);
