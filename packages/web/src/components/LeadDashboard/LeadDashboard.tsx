@@ -1361,13 +1361,21 @@ export function LeadDashboard({ api, ws }: Props) {
                 // Highlight agent messages that are responses to user input
                 const isReplyToUser = (prevMsg?.sender === 'user' && isFirstInRun)
                   || msg.text.includes('[USER MESSAGE');
-                const replyHighlight = isReplyToUser
-                  ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md'
-                  : '';
+
+                // Detect @user-directed messages (lead addressing the human)
+                const isUserDirected = /(?:^|\n)@user\s*\n/m.test(msg.text);
+                const displayText = isUserDirected ? msg.text.replace(/(?:^|\n)@user\s*\n/gm, '\n').trimStart() : msg.text;
+
+                // @user highlight takes priority over reply highlight
+                const msgHighlight = isUserDirected
+                  ? 'bg-accent/[0.08] border-l-2 border-l-accent/40 pl-2 rounded-md'
+                  : isReplyToUser
+                    ? 'bg-blue-500/[0.06] border-l-2 border-l-blue-400/30 pl-2 rounded-md'
+                    : '';
 
                 if (msg.contentType && msg.contentType !== 'text') {
                   return (
-                    <div key={i} className={`py-1 ${replyHighlight}`}>
+                    <div key={i} className={`py-1 ${msgHighlight}`}>
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <RichContentBlock msg={msg} />
@@ -1378,10 +1386,10 @@ export function LeadDashboard({ api, ws }: Props) {
                   );
                 }
                 return (
-                  <div key={i} className={`py-0.5 ${replyHighlight}`}>
+                  <div key={i} className={`py-0.5 ${msgHighlight}`}>
                     <div className="flex items-start gap-2">
-                      <div className="flex-1 font-mono text-sm text-th-text-alt whitespace-pre-wrap min-w-0">
-                        <AgentTextBlock text={msg.text} />
+                      <div className={`flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 ${isUserDirected ? 'text-th-text' : 'text-th-text-alt'}`}>
+                        <AgentTextBlock text={displayText} />
                       </div>
                       {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
                     </div>
