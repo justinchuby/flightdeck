@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CommandDispatcher, type CommandContext } from '../agents/CommandDispatcher.js';
 import { Database } from '../db/database.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
-import { generateAutoTaskId, requestSecretaryDependencyAnalysis } from '../agents/commands/AgentLifecycle.js';
+import { generateAutoTaskId, requestSecretaryDependencyAnalysis, inferReviewDependencies } from '../agents/commands/AgentLifecycle.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
 
@@ -1248,6 +1248,167 @@ describe('Auto-DAG integration', () => {
     it('strips special characters', () => {
       const id = generateAutoTaskId('developer', 'Fix bugs!!! @#$ in API');
       expect(id).not.toMatch(/[!@#$]/);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // Bonus: inferReviewDependencies unit tests
+  // ════════════════════════════════════════════════════════════════════
+
+  describe('inferReviewDependencies', () => {
+    it('agent ID hex prefix matching has agent- prefix limitation', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'impl-auth', role: 'developer', description: 'Implement auth' },
+      ]);
+      // assignedAgentId has 'agent-' prefix, regex extracts raw hex
+      // startsWith('0b85de78') on 'agent-0b85de78' fails — known limitation
+      dag.startTask(lead.id, 'impl-auth', 'agent-0b85de78');
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review changes by 0b85de78',
+      );
+      expect(deps).toHaveLength(0);
+    });
+
+    it('matches agent ID when assignedAgentId lacks prefix', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'impl-auth', role: 'developer', description: 'Implement auth' },
+      ]);
+      dag.startTask(lead.id, 'impl-auth', '0b85de78');
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review changes by 0b85de78',
+      );
+      expect(deps).toContain('impl-auth');
+    });
+
+    it('matches DAG task ID pattern (p0-2-autolink)', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'p0-2-autolink', role: 'developer', description: 'Fix autolink' },
+      ]);
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review the p0-2-autolink implementation',
+      );
+      expect(deps).toContain('p0-2-autolink');
+    });
+
+    it('matches auto-prefixed task IDs', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'auto-dev-fix-bugs-abc1', role: 'developer', description: 'Fix bugs' },
+      ]);
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review auto-dev-fix-bugs-abc1 changes',
+      );
+      expect(deps).toContain('auto-dev-fix-bugs-abc1');
+    });
+
+    it('falls back to role reference when no ID matches', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'impl-task', role: 'developer', description: 'Implement feature' },
+      ]);
+      dag.startTask(lead.id, 'impl-task', 'agent-xyz');
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review work from the developer',
+      );
+      expect(deps).toContain('impl-task');
+    });
+
+    it('returns empty for no matching references', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'task-a', role: 'developer', description: 'Build feature' },
+      ]);
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review general code quality',
+      );
+      expect(deps).toHaveLength(0);
+    });
+
+    it('deduplicates when both agent ID and task ID match same task', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'p0-2-autolink', role: 'developer', description: 'Fix autolink' },
+      ]);
+      dag.startTask(lead.id, 'p0-2-autolink', '0b85de78');
+
+      const deps = inferReviewDependencies(
+        { taskDAG: dag } as any,
+        lead.id,
+        'Review p0-2-autolink by 0b85de78',
+      );
+      expect(deps.filter(d => d === 'p0-2-autolink').length).toBe(1);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // Bonus: wouldCreateCycle unit tests
+  // ════════════════════════════════════════════════════════════════════
+
+  describe('wouldCreateCycle', () => {
+    it('detects direct cycle (A→B→A)', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'a', role: 'dev', description: 'A' },
+        { id: 'b', role: 'dev', description: 'B' },
+      ]);
+      dag.addDependency(lead.id, 'a', 'b');
+      expect(dag.wouldCreateCycle(lead.id, 'b', 'a')).toBe(true);
+    });
+
+    it('detects transitive cycle (A→B→C→A)', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'a', role: 'dev', description: 'A' },
+        { id: 'b', role: 'dev', description: 'B' },
+        { id: 'c', role: 'dev', description: 'C' },
+      ]);
+      dag.addDependency(lead.id, 'a', 'b');
+      dag.addDependency(lead.id, 'b', 'c');
+      expect(dag.wouldCreateCycle(lead.id, 'c', 'a')).toBe(true);
+    });
+
+    it('returns false for valid edge', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'a', role: 'dev', description: 'A' },
+        { id: 'b', role: 'dev', description: 'B' },
+      ]);
+      expect(dag.wouldCreateCycle(lead.id, 'a', 'b')).toBe(false);
+    });
+
+    it('detects self-cycle', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'a', role: 'dev', description: 'A' },
+      ]);
+      expect(dag.wouldCreateCycle(lead.id, 'a', 'a')).toBe(true);
+    });
+
+    it('handles diamond shape without false positive', () => {
+      dag.declareTaskBatch(lead.id, [
+        { id: 'a', role: 'dev', description: 'A' },
+        { id: 'b', role: 'dev', description: 'B' },
+        { id: 'c', role: 'dev', description: 'C' },
+        { id: 'd', role: 'dev', description: 'D' },
+      ]);
+      dag.addDependency(lead.id, 'a', 'b');
+      dag.addDependency(lead.id, 'a', 'c');
+      dag.addDependency(lead.id, 'b', 'd');
+      dag.addDependency(lead.id, 'c', 'd');
+      // D→A would create cycle
+      expect(dag.wouldCreateCycle(lead.id, 'd', 'a')).toBe(true);
+      // B→D already exists but wouldn't create new cycle
+      expect(dag.wouldCreateCycle(lead.id, 'b', 'd')).toBe(false);
     });
   });
 });
