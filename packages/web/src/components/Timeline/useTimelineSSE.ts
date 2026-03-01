@@ -66,6 +66,9 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
 
     const url = new URL('/api/coordination/timeline/stream', window.location.origin);
     url.searchParams.set('leadId', leadId);
+    if (lastEventId.current) {
+      url.searchParams.set('lastEventId', lastEventId.current);
+    }
 
     const eventSource = new EventSource(url.toString());
     eventSourceRef.current = eventSource;

@@ -539,8 +539,9 @@ export function apiRouter(
       }
     }
 
-    // Handle reconnection: if Last-Event-ID is present, send missed events first
-    const lastEventId = req.headers['last-event-id'] as string | undefined;
+    // Handle reconnection: check header (auto-reconnect) or query param (manual reconnect)
+    const lastEventId = (req.headers['last-event-id'] as string | undefined)
+      || (req.query.lastEventId as string | undefined);
     if (lastEventId) {
       // Extract timestamp from ID format: "<base36-timestamp>-<sequence>"
       const dashIndex = lastEventId.indexOf('-');
