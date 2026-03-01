@@ -473,27 +473,12 @@ function resolveAgentId(ctx: CommandHandlerContext, lead: Agent, idOrPrefix: str
 }
 
 function findSimilarActiveDelegation(ctx: CommandHandlerContext, task: string, excludeAgentId?: string): { agentId: string; role: string; task: string } | null {
-  const STOP_WORDS = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'to', 'of', 'in', 'for', 'on', 'and', 'or', 'with', 'that', 'this', 'it', 'from', 'by', 'as', 'at', 'be', 'do', 'not', 'all', 'if', 'no', 'so']);
-  const extractWords = (text: string): Set<string> => {
-    return new Set(
-      text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-        .filter(w => w.length > 2 && !STOP_WORDS.has(w))
-    );
-  };
-
-  const taskWords = extractWords(task);
-  if (taskWords.size === 0) return null;
-
   for (const [, del] of ctx.delegations) {
     if (del.status !== 'active') continue;
     if (excludeAgentId && del.toAgentId === excludeAgentId) continue;
 
-    const delWords = extractWords(del.task);
-    if (delWords.size === 0) continue;
-
-    const shared = [...taskWords].filter(w => delWords.has(w)).length;
-    const similarity = shared / Math.min(taskWords.size, delWords.size);
-    if (similarity > 0.5) {
+    const similarity = descriptionSimilarity(task, del.task);
+    if (similarity > 0.6) {
       const agent = ctx.getAgent(del.toAgentId);
       return {
         agentId: del.toAgentId,
