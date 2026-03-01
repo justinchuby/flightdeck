@@ -1,13 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { RefreshCw, Filter } from 'lucide-react';
 import { useTimelineData } from './useTimelineData';
 import type { TimelineData, CommType, TimelineStatus } from './useTimelineData';
 import { TimelineContainer } from './TimelineContainer';
+import { useAppStore } from '../../stores/appStore';
 
 interface Props {
   api: any;
   ws: any;
-  agents?: Array<{ id: string; role: string; parentId?: string }>;
 }
 
 // ── Filter config ────────────────────────────────────────────────────
@@ -87,10 +87,17 @@ function applyFilters(
 }
 
 /** Timeline visualization page — shows agent activity over time using visx. */
-export function TimelinePage({ api, ws, agents = [] }: Props) {
+export function TimelinePage({ api, ws }: Props) {
+  const storeAgents = useAppStore((s) => s.agents);
   // Lead selection
-  const leads = agents.filter(a => !a.parentId || a.role === 'lead');
-  const [selectedLead, setSelectedLead] = useState<string | null>(leads[0]?.id ?? null);
+  const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
+  const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  // Auto-select first lead when agents arrive
+  useEffect(() => {
+    if (!selectedLead && leads.length > 0) {
+      setSelectedLead(leads[0].id);
+    }
+  }, [leads, selectedLead]);
   const { data, loading, error, refetch } = useTimelineData(selectedLead);
   const [liveMode, setLiveMode] = useState(true);
 
@@ -148,6 +155,25 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
         </div>
       </div>
 
+      {/* Lead / project selector */}
+      {leads.length > 1 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          {leads.map(lead => (
+            <button
+              key={lead.id}
+              onClick={() => setSelectedLead(lead.id)}
+              className={`px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
+                selectedLead === lead.id
+                  ? 'bg-accent/20 text-accent font-medium'
+                  : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
+              }`}
+            >
+              {lead.projectName || lead.role?.name || lead.id.slice(0, 8)}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Filter toolbar */}
       {showFilters && (
         <div className="bg-th-bg rounded-lg border border-th-border-muted px-4 py-3 flex flex-wrap gap-6 items-start">
@@ -190,7 +216,13 @@ export function TimelinePage({ api, ws, agents = [] }: Props) {
         </div>
       )}
 
-      {loading && !data && (
+      {!selectedLead && !loading && (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center">
+          <p className="text-sm text-th-text-muted font-mono">No active projects. Start a project to see the timeline.</p>
+        </div>
+      )}
+
+      {loading && !data && selectedLead && (
         <div className="bg-th-bg rounded-lg border border-th-border-muted p-8 min-h-[400px] flex items-center justify-center">
           <RefreshCw size={24} className="animate-spin text-th-text-muted" />
         </div>
