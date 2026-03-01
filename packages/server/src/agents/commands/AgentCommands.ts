@@ -263,6 +263,8 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
             dagNote = ` [DAG: "${dagTask.id}" → running]`;
             logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
           }
+        } else if (ctx.taskDAG.getStatus(agent.id).tasks.length > 0) {
+          dagNote = `\n⚠️ This delegation is not tracked in your task DAG. Use ADD_TASK to add it first, or include dagTaskId to link to an existing task.`;
         }
       }
 
@@ -388,6 +390,8 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
           dagNote = ` [DAG: "${dagTask.id}" → running]`;
           logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${child.id.slice(0, 8)}`);
         }
+      } else if (ctx.taskDAG.getStatus(agent.id).tasks.length > 0) {
+        dagNote = `\n⚠️ This delegation is not tracked in your task DAG. Use ADD_TASK to add it first, or include dagTaskId to link to an existing task.`;
       }
     }
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));

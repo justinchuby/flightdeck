@@ -169,6 +169,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           return null;
         }
       },
+      getTaskByAgent: (leadId: string, agentId: string) => {
+        try {
+          return this.taskDAG.getTaskByAgent(leadId, agentId);
+        } catch {
+          return null;
+        }
+      },
       emit: (event: string, ...args: any[]) => this.emit(event as any, args[0]),
     });
     this.heartbeat.start();
