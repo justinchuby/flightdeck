@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useRef, useCallback, useEffect } from 'react';
 import { Brush } from '@visx/brush';
 import type BaseBrush from '@visx/brush/lib/BaseBrush';
 import { scaleTime, scaleLinear } from '@visx/scale';
@@ -75,20 +75,24 @@ export function BrushTimeSelector({
 
   const handleBrushEnd = useCallback((bounds: Bounds | null) => {
     if (!bounds) return;
-    const newStart = xScale.invert(bounds.x0);
-    const newEnd = xScale.invert(bounds.x1);
+    // bounds.x0/x1 are already domain values (timestamps) — @visx/brush
+    // calls convertRangeToDomain internally before invoking onBrushEnd
+    const newStart = new Date(bounds.x0);
+    const newEnd = new Date(bounds.x1);
     // Prevent degenerate ranges
     if (newEnd.getTime() - newStart.getTime() < 1000) return;
     onRangeChange({ start: newStart, end: newEnd });
-  }, [onRangeChange, xScale]);
+  }, [onRangeChange]);
 
   // Update brush position when visibleRange changes externally (e.g., from zoom buttons)
   const prevRangeRef = useRef(visibleRange);
-  if (
-    brushRef.current &&
-    (prevRangeRef.current.start.getTime() !== visibleRange.start.getTime() ||
-     prevRangeRef.current.end.getTime() !== visibleRange.end.getTime())
-  ) {
+  useEffect(() => {
+    if (
+      prevRangeRef.current.start.getTime() === visibleRange.start.getTime() &&
+      prevRangeRef.current.end.getTime() === visibleRange.end.getTime()
+    ) return;
+    prevRangeRef.current = visibleRange;
+    if (!brushRef.current) return;
     const x0 = xScale(visibleRange.start);
     const x1 = xScale(visibleRange.end);
     brushRef.current.updateBrush((prev) => ({
@@ -97,14 +101,13 @@ export function BrushTimeSelector({
       end: { ...prev.end, x: x1 },
       extent: { ...prev.extent, x0, x1, y0: 0, y1: innerHeight },
     }));
-    prevRangeRef.current = visibleRange;
-  }
+  }, [visibleRange, xScale, innerHeight]);
 
   if (innerWidth <= 0) return null;
 
   return (
-    <div className="border-b border-th-border-muted bg-th-bg/50" style={{ height: BRUSH_HEIGHT }}>
-      <svg width={width} height={BRUSH_HEIGHT}>
+    <div className="border-b border-th-border-muted bg-th-bg/50" style={{ height: BRUSH_HEIGHT }} role="region" aria-label="Timeline range selector: drag handles to adjust visible time range" aria-roledescription="minimap">
+      <svg width={width} height={BRUSH_HEIGHT} aria-hidden="true">
         <Group top={PADDING.top} left={PADDING.left}>
           {/* Mini agent lanes background */}
           {agents.map((agent, i) => {

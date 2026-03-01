@@ -198,7 +198,7 @@ export function CommunicationLinks({
 
   return (
     <>
-      <g className="communication-links" style={{ pointerEvents: 'none' }}>
+      <g className="communication-links" style={{ pointerEvents: 'none' }} role="list" aria-label="Communication links between agents">
         <MarkerDefs />
 
         {links.map(({ comm, idx, x, y1, y2, style }) => {
@@ -210,7 +210,7 @@ export function CommunicationLinks({
             : undefined;
 
           return (
-            <g key={idx}>
+            <g key={idx} role="listitem" aria-label={`${style.label} from ${comm.fromAgentId.slice(0, 8)}${comm.toAgentId ? ` to ${comm.toAgentId.slice(0, 8)}` : comm.groupName ? ` to group ${comm.groupName}` : ''}`}>
               {/* Invisible wider hit area for hover */}
               <path
                 d={path}
@@ -232,13 +232,13 @@ export function CommunicationLinks({
                 markerEnd={isMissing ? undefined : `url(#${style.markerId})`}
                 style={{ filter: glowFilter, pointerEvents: 'none' }}
               />
-              {/* '?' label for missing toAgentId */}
+              {/* Label for group messages or missing toAgentId */}
               {isMissing && (
                 <text
                   x={x + 28} y={y1 + 4}
                   fontSize={10} fill="#9ca3af"
                   style={{ pointerEvents: 'none' }}
-                >?</text>
+                >{comm.groupName ? `👥 ${comm.groupName}` : '?'}</text>
               )}
             </g>
           );

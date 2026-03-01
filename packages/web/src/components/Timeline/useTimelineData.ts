@@ -26,6 +26,7 @@ export interface TimelineComm {
   type: CommType;
   fromAgentId: string;
   toAgentId?: string;
+  groupName?: string;
   summary: string;
   timestamp: string;
 }
