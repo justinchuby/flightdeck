@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef, useCallback } from 'react';
-import { RefreshCw, Filter } from 'lucide-react';
+import { RefreshCw, Filter, Trash2 } from 'lucide-react';
 import { useTimelineData } from './useTimelineData';
 import type { TimelineData, CommType, TimelineStatus } from './useTimelineData';
 import { TimelineContainer } from './TimelineContainer';
@@ -118,6 +118,7 @@ export function TimelinePage({ api, ws }: Props) {
   const setHiddenStatuses = useTimelineStore((s) => s.setHiddenStatuses);
   const setCachedData = useTimelineStore((s) => s.setCachedData);
   const getCachedData = useTimelineStore((s) => s.getCachedData);
+  const clearCachedData = useTimelineStore((s) => s.clearCachedData);
 
   // Lead selection
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
@@ -138,6 +139,14 @@ export function TimelinePage({ api, ws }: Props) {
 
   // Use live data if available, fall back to cached data from store
   const data = liveData ?? (selectedLead ? getCachedData(selectedLead) : null);
+
+  // Clear cached data and refetch fresh from SSE
+  const handleClearTimeline = useCallback(() => {
+    if (selectedLead) {
+      clearCachedData(selectedLead);
+    }
+    refetch();
+  }, [selectedLead, clearCachedData, refetch]);
 
   // Announce errors via assertive live region
   useEffect(() => {
@@ -248,6 +257,27 @@ export function TimelinePage({ api, ws }: Props) {
         onErrorClick={handleStatusBarErrorClick}
       />
 
+      {/* Project tabs — always visible as top-level navigation */}
+      {leads.length > 0 && (
+        <nav className="flex items-center gap-1 px-6 pt-2 overflow-x-auto border-b border-th-border-muted timeline-lead-selector" role="tablist" aria-label="Project selection">
+          {leads.map(lead => (
+            <button
+              key={lead.id}
+              onClick={() => setSelectedLead(lead.id)}
+              role="tab"
+              aria-selected={selectedLead === lead.id}
+              className={`px-4 py-2 text-xs whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                selectedLead === lead.id
+                  ? 'border-accent text-accent font-medium bg-th-bg'
+                  : 'border-transparent text-th-text-muted hover:text-th-text hover:border-th-border'
+              }`}
+            >
+              {lead.projectName || lead.role?.name || lead.id.slice(0, 8)}
+            </button>
+          ))}
+        </nav>
+      )}
+
       <div className="p-6 space-y-4 flex-1 flex flex-col min-h-0">
 
       <div className="flex items-center justify-between">
@@ -288,29 +318,17 @@ export function TimelinePage({ api, ws }: Props) {
             <RefreshCw size={14} className={loading ? 'animate-spin motion-reduce:animate-none' : ''} aria-hidden="true" />
             Refresh
           </button>
+          <button
+            onClick={handleClearTimeline}
+            disabled={loading}
+            aria-label="Clear cached timeline data and reload"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-th-bg-alt text-th-text-alt hover:bg-th-bg-muted hover:text-th-text transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={14} aria-hidden="true" />
+            Clear
+          </button>
         </div>
       </div>
-
-      {/* Lead / project selector */}
-      {leads.length > 1 && (
-        <nav className="flex items-center gap-1.5 overflow-x-auto timeline-lead-selector" role="tablist" aria-label="Project selection">
-          {leads.map(lead => (
-            <button
-              key={lead.id}
-              onClick={() => setSelectedLead(lead.id)}
-              role="tab"
-              aria-selected={selectedLead === lead.id}
-              className={`px-3 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
-                selectedLead === lead.id
-                  ? 'bg-accent/20 text-accent font-medium'
-                  : 'text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50'
-              }`}
-            >
-              {lead.projectName || lead.role?.name || lead.id.slice(0, 8)}
-            </button>
-          ))}
-        </nav>
-      )}
 
       {/* Filter toolbar */}
       {showFilters && (
