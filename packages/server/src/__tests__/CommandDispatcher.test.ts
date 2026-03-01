@@ -288,6 +288,7 @@ describe('CommandDispatcher', () => {
         true,
         undefined, // model
         leadAgent.cwd,
+        undefined, // options (non-lead, no projectName)
       );
     });
 
@@ -696,6 +697,7 @@ describe('CommandDispatcher', () => {
         true,
         'claude-opus-4',
         leadAgent.cwd,
+        undefined, // options (non-lead, no projectName)
       );
       // Memory stores model
       expect(ctx.agentMemory.store).toHaveBeenCalledWith(
@@ -904,7 +906,7 @@ describe('CommandDispatcher', () => {
   // ── Feature: Sub-lead projectName (Issue #22.1) ──────────────────────
 
   describe('CREATE_AGENT sets projectName for sub-leads', () => {
-    it('sets projectName from task when creating a sub-lead', () => {
+    it('passes projectName from task when creating a sub-lead', () => {
       const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
       (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
       const subLead = makeAgent({
@@ -918,10 +920,14 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "lead", "task": "Handle deployment"} ]]]');
 
-      expect(subLead.projectName).toBe('Handle deployment');
+      // projectName is now passed through spawn options, not set after
+      expect(ctx.spawnAgent).toHaveBeenCalledWith(
+        leadRole, 'Handle deployment', leadAgent.id, true, undefined, leadAgent.cwd,
+        { projectName: 'Handle deployment' },
+      );
     });
 
-    it('sets projectName from explicit name when provided', () => {
+    it('passes projectName from explicit name when provided', () => {
       const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
       (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
       const subLead = makeAgent({
@@ -935,7 +941,10 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "lead", "task": "Handle deployment", "name": "Deploy v2"} ]]]');
 
-      expect(subLead.projectName).toBe('Deploy v2');
+      expect(ctx.spawnAgent).toHaveBeenCalledWith(
+        leadRole, 'Handle deployment', leadAgent.id, true, undefined, leadAgent.cwd,
+        { projectName: 'Deploy v2' },
+      );
     });
 
     it('does NOT set projectName for non-lead roles', () => {
@@ -946,7 +955,41 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, leadAgent, '[[[ CREATE_AGENT {"role": "developer", "task": "Fix bug"} ]]]');
 
-      expect(child.projectName).toBeUndefined();
+      // Non-lead roles should NOT get projectName in options
+      expect(ctx.spawnAgent).toHaveBeenCalledWith(
+        devRole, 'Fix bug', leadAgent.id, true, undefined, leadAgent.cwd,
+        undefined,
+      );
+    });
+
+    it('propagates projectId from parent to all children', () => {
+      const leadWithProject = makeAgent({ projectId: 'proj-abc-123' });
+      const devRole = makeRole();
+      (ctx.roleRegistry.get as any).mockReturnValue(devRole);
+      const child = makeChildAgent(leadWithProject.id, { id: 'agent-dev-proj-child' });
+      (ctx.spawnAgent as any).mockReturnValue(child);
+
+      dispatch(dispatcher, leadWithProject, '[[[ CREATE_AGENT {"role": "developer", "task": "Build API"} ]]]');
+
+      expect(ctx.spawnAgent).toHaveBeenCalledWith(
+        devRole, 'Build API', leadWithProject.id, true, undefined, leadWithProject.cwd,
+        { projectId: 'proj-abc-123' },
+      );
+    });
+
+    it('propagates projectId + projectName for sub-leads', () => {
+      const leadWithProject = makeAgent({ projectId: 'proj-abc-123' });
+      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
+      (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
+      const subLead = makeAgent({ id: 'agent-sublead-proj', role: leadRole, parentId: leadWithProject.id, hierarchyLevel: 0 });
+      (ctx.spawnAgent as any).mockReturnValue(subLead);
+
+      dispatch(dispatcher, leadWithProject, '[[[ CREATE_AGENT {"role": "lead", "task": "Deploy v2"} ]]]');
+
+      expect(ctx.spawnAgent).toHaveBeenCalledWith(
+        leadRole, 'Deploy v2', leadWithProject.id, true, undefined, leadWithProject.cwd,
+        { projectName: 'Deploy v2', projectId: 'proj-abc-123' },
+      );
     });
   });
 

@@ -134,7 +134,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),
       getRunningCount: () => this.getRunningCount(),
-      spawnAgent: (role, task, parentId, autopilot, model, cwd) => this.spawn(role, task, parentId, autopilot, model, cwd),
+      spawnAgent: (role, task, parentId, autopilot, model, cwd, options) => this.spawn(role, task, parentId, autopilot, model, cwd, undefined, undefined, options),
       terminateAgent: (id) => this.terminate(id),
       emit: (event: string, ...args: any[]) => this.emit(event as any, args[0]),
       roleRegistry: this.roleRegistry,
@@ -207,7 +207,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.dispatcher.setSessionExporter(exporter);
   }
 
-  spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string): Agent {
+  spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
       throw new Error(
@@ -237,6 +237,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (model) agent.model = model;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
+    if (options?.projectName) agent.projectName = options.projectName;
+    if (options?.projectId) agent.projectId = options.projectId;
     if (role.id === 'lead') {
       agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
     }
@@ -434,7 +436,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
                   return;
                 }
               }
-              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined);
+              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined, undefined, { projectName: agent.projectName, projectId: agent.projectId });
               this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
             } catch (err) {
               logger.error('agent', `Auto-restart failed for ${agent.role.name}: ${(err as Error).message}`);
@@ -569,11 +571,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   restart(id: string): Agent | null {
     const agent = this.agents.get(id);
     if (!agent) return null;
-    const { role, task, sessionId, parentId, model, cwd } = agent;
+    const { role, task, sessionId, parentId, model, cwd, projectName, projectId } = agent;
     agent.terminate();
     this.agents.delete(id);
     // Re-spawn with same ID and resume the session if available
-    const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id);
+    const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id, { projectName, projectId });
     this.emit('agent:restarted', { oldId: id, newAgent: newAgent.toJSON() });
     return newAgent;
   }
