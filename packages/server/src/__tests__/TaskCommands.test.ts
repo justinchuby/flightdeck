@@ -694,6 +694,7 @@ describe('REASSIGN_TASK', () => {
       task: 'Fix the bug',
       status: 'active' as const,
       createdAt: new Date().toISOString(),
+      completedAt: undefined as string | undefined,
     };
     const delegations = new Map([['del-1', oldDelegation]]);
     const ctx = makeCtx({
