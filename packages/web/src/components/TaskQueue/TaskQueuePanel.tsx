@@ -368,7 +368,7 @@ export function TaskQueuePanel({ api }: Props) {
               // Map DagTask → GanttTask for the Gantt view.
               const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
                 id:          t.id,
-                title:       t.description || t.id,
+                title:       t.title || t.description || t.id,
                 status:      (['pending','running','done','failed','blocked','skipped'] as const)
                                .includes(t.dagStatus as any)
                                ? t.dagStatus as GanttTask['status']

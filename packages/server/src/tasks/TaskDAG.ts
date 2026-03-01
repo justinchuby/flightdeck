@@ -28,6 +28,7 @@ export interface DagTask {
   id: string;
   leadId: string;
   role: string;
+  title?: string;
   description: string;
   files: string[];
   dependsOn: string[];
@@ -42,6 +43,7 @@ export interface DagTask {
 export interface DagTaskInput {
   id: string;
   role: string;
+  title?: string;
   description?: string;
   files?: string[];
   depends_on?: string[];
@@ -59,6 +61,7 @@ function rowToTask(row: typeof dagTasks.$inferSelect): DagTask {
     id: row.id,
     leadId: row.leadId,
     role: row.role,
+    title: row.title || undefined,
     description: row.description,
     files: JSON.parse(row.files || '[]'),
     dependsOn: JSON.parse(row.dependsOn || '[]'),
@@ -113,6 +116,7 @@ export class TaskDAG extends EventEmitter {
         id: task.id,
         leadId,
         role: task.role,
+        title: task.title || null,
         description: task.description || '',
         files: JSON.stringify(task.files || []),
         dependsOn: JSON.stringify(task.depends_on || []),
