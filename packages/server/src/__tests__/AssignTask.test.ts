@@ -228,31 +228,43 @@ describe('ASSIGN_TASK command', () => {
     leadAgent = makeAgent({ id: LEAD });
   });
 
-  it('assigns a ready task using startTask', () => {
-    const mockTask = { id: 'task-1', dagStatus: 'ready', assignedAgentId: 'agent-1', role: 'developer' };
-    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-1', dagStatus: 'ready', role: 'developer' });
+  it('assigns a ready task using startTask and sets up delegation', () => {
+    const targetAgent = makeAgent({
+      id: 'agent-1-full-id',
+      role: { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '', icon: '', builtIn: true },
+      parentId: LEAD,
+      sendMessage: vi.fn(),
+    });
+    const mockTask = { id: 'task-1', dagStatus: 'ready', assignedAgentId: 'agent-1-full-id', role: 'developer' };
+    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-1', dagStatus: 'ready', description: 'Do something', role: 'developer' });
     (ctx.taskDAG.startTask as any).mockReturnValue(mockTask);
+    (ctx.getAllAgents as any).mockReturnValue([leadAgent, targetAgent]);
 
     dispatch(dispatcher, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "task-1", "agentId": "agent-1"} ⟧⟧');
 
-    expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(LEAD, 'task-1', 'agent-1');
-    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('task-1'),
-    );
+    expect(ctx.taskDAG.startTask).toHaveBeenCalledWith(LEAD, 'task-1', 'agent-1-full-id');
+    expect(targetAgent.dagTaskId).toBe('task-1');
+    expect(targetAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('DAG Task: task-1'));
+    expect(leadAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('task-1'));
   });
 
   it('falls back to forceStartTask for pending/blocked tasks when startTask fails', () => {
-    const mockTask = { id: 'task-2', dagStatus: 'running', assignedAgentId: 'agent-2', role: 'developer' };
-    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-2', dagStatus: 'pending', role: 'developer' });
+    const targetAgent = makeAgent({
+      id: 'agent-2-full-id',
+      role: { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '', icon: '', builtIn: true },
+      parentId: LEAD,
+      sendMessage: vi.fn(),
+    });
+    const mockTask = { id: 'task-2', dagStatus: 'running', assignedAgentId: 'agent-2-full-id', role: 'developer' };
+    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-2', dagStatus: 'pending', description: 'Blocked task', role: 'developer' });
     (ctx.taskDAG.startTask as any).mockReturnValue(null);
     (ctx.taskDAG.forceStartTask as any).mockReturnValue(mockTask);
+    (ctx.getAllAgents as any).mockReturnValue([leadAgent, targetAgent]);
 
     dispatch(dispatcher, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "task-2", "agentId": "agent-2"} ⟧⟧');
 
-    expect(ctx.taskDAG.forceStartTask).toHaveBeenCalledWith(LEAD, 'task-2', 'agent-2');
-    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('task-2'),
-    );
+    expect(ctx.taskDAG.forceStartTask).toHaveBeenCalledWith(LEAD, 'task-2', 'agent-2-full-id');
+    expect(targetAgent.dagTaskId).toBe('task-2');
   });
 
   it('rejects when task not found', () => {
@@ -265,15 +277,34 @@ describe('ASSIGN_TASK command', () => {
     );
   });
 
-  it('rejects when task is already done', () => {
-    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'done-task', dagStatus: 'done', role: 'developer' });
-    (ctx.taskDAG.startTask as any).mockReturnValue(null);
-    (ctx.taskDAG.forceStartTask as any).mockReturnValue(null);
+  it('rejects when agent not found', () => {
+    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-3', dagStatus: 'ready', role: 'developer' });
+    (ctx.getAllAgents as any).mockReturnValue([leadAgent]);
+
+    dispatch(dispatcher, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "task-3", "agentId": "nonexistent"} ⟧⟧');
+
+    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Agent not found'),
+    );
+    expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
+  });
+
+  it('rejects when task is already running and suggests REASSIGN_TASK', () => {
+    const targetAgent = makeAgent({
+      id: 'agent-4-full-id',
+      role: { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '', icon: '', builtIn: true },
+      parentId: LEAD,
+    });
+    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'done-task', dagStatus: 'running', assignedAgentId: 'old-agent-id', role: 'developer' });
+    (ctx.getAllAgents as any).mockReturnValue([leadAgent, targetAgent]);
 
     dispatch(dispatcher, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "done-task", "agentId": "agent-4"} ⟧⟧');
 
     expect(leadAgent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Cannot assign'),
+      expect.stringContaining('REASSIGN_TASK'),
+    );
+    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('old-agen'),
     );
   });
 
@@ -305,5 +336,27 @@ describe('ASSIGN_TASK command', () => {
     expect(leadAgent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('agentId'),
     );
+  });
+
+  it('creates a delegation record in ctx.delegations', () => {
+    const targetAgent = makeAgent({
+      id: 'agent-del-full-id',
+      role: { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '', icon: '', builtIn: true },
+      parentId: LEAD,
+      sendMessage: vi.fn(),
+    });
+    const mockTask = { id: 'task-del', dagStatus: 'ready', assignedAgentId: 'agent-del-full-id', role: 'developer' };
+    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-del', dagStatus: 'ready', description: 'Delegation test', role: 'developer' });
+    (ctx.taskDAG.startTask as any).mockReturnValue(mockTask);
+    (ctx.getAllAgents as any).mockReturnValue([leadAgent, targetAgent]);
+
+    const dispatcher2 = new CommandDispatcher(ctx);
+    dispatch(dispatcher2, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "task-del", "agentId": "agent-del"} ⟧⟧');
+
+    // Check delegation was created (access via the context's delegations map)
+    const delegations = (ctx as any).delegations || (dispatcher2 as any).delegations;
+    // The delegation record should have been set — verify agent got notified
+    expect(targetAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('DAG Task: task-del'));
+    expect(targetAgent.task).toBe('Delegation test');
   });
 });

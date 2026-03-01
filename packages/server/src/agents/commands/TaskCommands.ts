@@ -380,14 +380,26 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
     const req = parseCommandPayload(agent, match[1], assignTaskSchema, 'REASSIGN_TASK');
     if (!req) return;
 
-    // Resolve the new agent (supports short ID prefix matching)
-    const newAgent = ctx.getAllAgents().find(a =>
+    // Resolve the new agent (supports short ID prefix matching, rejects ambiguous)
+    const agentMatches = ctx.getAllAgents().filter(a =>
       (a.id === req.agentId || a.id.startsWith(req.agentId)) &&
       a.parentId === agent.id &&
       a.id !== agent.id
     );
-    if (!newAgent) {
+    if (agentMatches.length === 0) {
       agent.sendMessage(`[System] Agent not found: "${req.agentId}". Use QUERY_CREW to see available agents.`);
+      return;
+    }
+    if (agentMatches.length > 1) {
+      agent.sendMessage(`[System] Ambiguous agent ID "${req.agentId}" matches ${agentMatches.length} agents. Use a longer prefix.`);
+      return;
+    }
+    const newAgent = agentMatches[0];
+
+    // Prevent self-reassignment
+    const currentTask = ctx.taskDAG.getTask(agent.id, req.taskId);
+    if (currentTask?.assignedAgentId === newAgent.id) {
+      agent.sendMessage(`[System] Task "${req.taskId}" is already assigned to @${newAgent.id.slice(0, 8)}.`);
       return;
     }
 
@@ -406,10 +418,14 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       oldAgent.dagTaskId = undefined;
     }
     ctx.lockRegistry.releaseAll(result.oldAgentId);
+    // Cancel only the delegation for this specific task (not all of old agent's delegations)
+    const taskDesc = ctx.taskDAG.getTask(agent.id, req.taskId)?.description;
     for (const [, del] of ctx.delegations) {
-      if (del.toAgentId === result.oldAgentId && del.status === 'active') {
+      if (del.toAgentId === result.oldAgentId && del.status === 'active' &&
+          (del.task === taskDesc || del.task === req.taskId)) {
         del.status = 'cancelled';
         del.completedAt = new Date().toISOString();
+        break; // Only cancel the matching delegation
       }
     }
 
@@ -449,17 +465,51 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
       return;
     }
 
+    // Resolve agent with prefix matching (same pattern as REASSIGN_TASK)
+    const targetAgent = ctx.getAllAgents().find(a =>
+      (a.id === req.agentId || a.id.startsWith(req.agentId)) &&
+      a.parentId === agent.id &&
+      a.id !== agent.id
+    );
+    if (!targetAgent) {
+      agent.sendMessage(`[System] Agent not found: "${req.agentId}". Use QUERY_CREW to see available agents.`);
+      return;
+    }
+
+    // Better error for already-running tasks
+    if (existing.dagStatus === 'running') {
+      const currentOwner = existing.assignedAgentId ? existing.assignedAgentId.slice(0, 8) : 'unknown';
+      agent.sendMessage(`[System] Cannot assign task "${req.taskId}": already running, assigned to ${currentOwner}. Use REASSIGN_TASK to change.`);
+      return;
+    }
+
     // Try normal start first (works for ready tasks), then fall back to forceStart
-    let task = ctx.taskDAG.startTask(agent.id, req.taskId, req.agentId);
+    let task = ctx.taskDAG.startTask(agent.id, req.taskId, targetAgent.id);
     if (!task) {
-      task = ctx.taskDAG.forceStartTask(agent.id, req.taskId, req.agentId);
+      task = ctx.taskDAG.forceStartTask(agent.id, req.taskId, targetAgent.id);
     }
 
     if (task) {
-      agent.sendMessage(`[System] Task "${req.taskId}" assigned to agent ${req.agentId.slice(0, 8)} and moved to running.`);
+      // Set dagTaskId on agent, create delegation record, notify agent
+      targetAgent.dagTaskId = req.taskId;
+      const taskText = existing.description || req.taskId;
+      targetAgent.task = taskText;
+      const delegation: import('./types.js').Delegation = {
+        id: `del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fromAgentId: agent.id,
+        toAgentId: targetAgent.id,
+        toRole: targetAgent.role.id,
+        task: taskText,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      };
+      ctx.delegations.set(delegation.id, delegation);
+      targetAgent.sendMessage(`[DAG Task: ${req.taskId}]\n${taskText}`);
+
+      agent.sendMessage(`[System] Task "${req.taskId}" assigned to @${targetAgent.id.slice(0, 8)} and moved to running.`);
       ctx.emit('dag:updated', { leadId: agent.id });
     } else {
-      agent.sendMessage(`[System] Cannot assign task "${req.taskId}": current status is "${existing.dagStatus}". Task may already be running or completed.`);
+      agent.sendMessage(`[System] Cannot assign task "${req.taskId}": current status is "${existing.dagStatus}". Task may already be completed or skipped.`);
     }
   } catch (err: any) { agent.sendMessage(`[System] ASSIGN_TASK error: ${err.message}`); }
 }
