@@ -89,6 +89,7 @@ export class AlertEngine extends EventEmitter {
 
   /** 1. Agent in 'running' status with no activity for 10+ minutes */
   private checkStuckAgents(): void {
+    return; // Disabled: too noisy for long-running sessions
     const now = Date.now();
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;

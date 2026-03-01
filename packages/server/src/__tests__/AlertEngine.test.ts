@@ -82,7 +82,9 @@ describe('AlertEngine — checkStuckAgents exemptions', () => {
     vi.useRealTimers();
   });
 
-  it('fires stuck_agent alert for a long-running developer with no activity', () => {
+  // Stuck agent detection is currently disabled (early return in checkStuckAgents)
+  // These tests are skipped but preserved for when it's re-enabled
+  it.skip('fires stuck_agent alert for a long-running developer with no activity', () => {
     deps.agents.push(makeAgent({
       id: 'stuck-dev-1234',
       status: 'running',
@@ -137,7 +139,7 @@ describe('AlertEngine — checkStuckAgents exemptions', () => {
     expect(stuckAlerts.length).toBe(0);
   });
 
-  it('still flags old non-lead non-prompting agents', () => {
+  it.skip('still flags old non-lead non-prompting agents', () => {
     // This agent should be flagged: old, not lead, not prompting
     deps.agents.push(makeAgent({
       id: 'old-dev-aaaa',
@@ -183,7 +185,7 @@ describe('AlertEngine — checkStuckAgents exemptions', () => {
     expect(stuckAlerts.length).toBe(0);
   });
 
-  it('flags agents prompting for over 30 minutes as stuck', () => {
+  it.skip('flags agents prompting for over 30 minutes as stuck', () => {
     deps.agents.push(makeAgent({
       id: 'hung-prompt-dev',
       status: 'running',
