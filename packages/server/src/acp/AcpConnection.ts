@@ -75,7 +75,7 @@ export class AcpConnection extends EventEmitter {
 
     // Build the mcpServers array for the ACP newSession call
     const mcpServers = (opts.mcpServers || []).map((s) => ({
-      type: s.type as 'sse',
+      type: s.type,
       name: s.name,
       url: s.url,
       headers: (s.headers || []).map((h) => ({ name: h.name, value: h.value })),
