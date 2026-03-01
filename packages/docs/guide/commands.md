@@ -1,21 +1,19 @@
-# Agent Commands
+# MCP Crew Tools
 
-Agents communicate via structured commands embedded in their output. Commands use triple-bracket syntax with JSON payloads, detected by the `CommandDispatcher`.
+Agents communicate via **MCP (Model Context Protocol) tool calls** prefixed with `crew_`. Each agent discovers available tools automatically through the MCP server connected during session initialization — no text parsing or special syntax required.
 
-## Command Format
+## How It Works
 
-```
-[[[ COMMAND_NAME {"key": "value", ...} ]]]
-```
+When an agent is spawned, it connects to a per-agent MCP endpoint (`POST /mcp/:agentId`). The MCP server exposes 42 crew tools with validated schemas. Agents call these tools natively through the MCP protocol, and receive structured JSON results.
 
-## Available Commands
+## Team Management
 
-### CREATE_AGENT
+### crew_create_agent
 
-Creates a new agent with a specific role. Only the **lead** can use this.
+Creates a new agent with a specific role. Only the **lead** and **architect** can use this.
 
-```
-[[[ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Implement auth module", "context": "Use JWT tokens"} ]]]
+```json
+{ "role": "developer", "model": "claude-opus-4.6", "task": "Implement auth module", "context": "Use JWT tokens" }
 ```
 
 | Field | Required | Description |
@@ -24,13 +22,14 @@ Creates a new agent with a specific role. Only the **lead** can use this.
 | `model` | ❌ | Model override (defaults to role's default) |
 | `task` | ❌ | Initial task description |
 | `context` | ❌ | Additional context for the agent |
+| `name` | ❌ | Name for sub-project leads |
 
-### TERMINATE_AGENT
+### crew_terminate_agent
 
-Terminates an agent. Only the **lead** can use this, and only on agents in its own hierarchy (direct children or sub-lead children). This is an **absolute last resort** — it destroys the agent's accumulated context.
+Terminates an agent. Only the **lead** can use this, and only on agents in its own hierarchy. This is an **absolute last resort** — it destroys the agent's accumulated context.
 
-```
-[[[ TERMINATE_AGENT {"id": "a1b2c3", "reason": "need slot for different role"} ]]]
+```json
+{ "id": "a1b2c3", "reason": "need slot for different role" }
 ```
 
 | Field | Required | Description |
@@ -38,12 +37,12 @@ Terminates an agent. Only the **lead** can use this, and only on agents in its o
 | `id` | ✅ | Target agent ID (short ID prefix) |
 | `reason` | ❌ | Reason for termination |
 
-### DELEGATE
+### crew_delegate
 
-Assigns a task to an existing agent. Only the **lead** can use this.
+Assigns a task to an existing agent. Only the **lead** and **architect** can use this.
 
-```
-[[[ DELEGATE {"to": "a1b2c3", "task": "Write unit tests for auth", "context": "Focus on edge cases"} ]]]
+```json
+{ "to": "a1b2c3", "task": "Write unit tests for auth", "context": "Focus on edge cases" }
 ```
 
 | Field | Required | Description |
@@ -52,87 +51,150 @@ Assigns a task to an existing agent. Only the **lead** can use this.
 | `task` | ✅ | Task description |
 | `context` | ❌ | Additional context |
 
-### AGENT_MESSAGE
+### crew_cancel_delegation
+
+Cancel active delegations to an agent.
+
+```json
+{ "agentId": "a1b2c3" }
+```
+
+## Communication
+
+### crew_agent_message
 
 Send a direct message to another agent.
 
-```
-[[[ AGENT_MESSAGE {"to": "a1b2c3", "content": "Can you review my approach?"} ]]]
+```json
+{ "to": "a1b2c3", "content": "Can you review my approach?" }
 ```
 
-### BROADCAST
+### crew_broadcast
 
 Send a message to all agents in the crew.
 
-```
-[[[ BROADCAST {"content": "Switching to approach B for the API layer"} ]]]
+```json
+{ "content": "Switching to approach B for the API layer" }
 ```
 
-### CREATE_GROUP
+### crew_create_group
 
 Create a group chat for focused discussion.
 
-```
-[[[ CREATE_GROUP {"name": "api-design", "members": ["a1b2c3", "d4e5f6"]} ]]]
+```json
+{ "name": "api-design", "members": ["a1b2c3", "d4e5f6"] }
 ```
 
-### DECISION
+### crew_group_message / crew_add_to_group / crew_remove_from_group
+
+Manage group chat membership and messaging.
+
+### crew_query_groups
+
+List all groups the agent belongs to. No parameters.
+
+### crew_direct_message / crew_query_peers
+
+Peer-to-peer messaging and peer discovery.
+
+## Task & Progress
+
+### crew_decision
 
 Record an architectural decision.
 
-```
-[[[ DECISION {"title": "Use JWT for auth", "rationale": "Stateless, scalable", "alternatives": ["Session cookies", "OAuth only"], "impact": "high", "needsConfirmation": true} ]]]
+```json
+{ "title": "Use JWT for auth", "rationale": "Stateless, scalable", "needsConfirmation": true }
 ```
 
 Decisions with `needsConfirmation: true` appear in the dashboard for user review.
 
-### PROGRESS
+### crew_progress
 
 Report task progress.
 
-```
-[[[ PROGRESS {"summary": "Auth module 60% complete", "completed": ["Login endpoint", "Token refresh"], "in_progress": ["Logout"], "blocked": []} ]]]
+```json
+{ "summary": "Auth module 60% complete", "completed": ["Login endpoint", "Token refresh"], "in_progress": ["Logout"], "blocked": [] }
 ```
 
-### COMPLETE_TASK
+### crew_complete_task
 
 Signal that the current delegation is done.
 
-```
-[[[ COMPLETE_TASK {"summary": "Auth module implemented with full test coverage"} ]]]
+```json
+{ "summary": "Auth module implemented with full test coverage" }
 ```
 
-### DECLARE_TASKS
+### crew_declare_tasks
 
 Declare a batch of tasks in the DAG (directed acyclic graph).
 
-```
-[[[ DECLARE_TASKS {"tasks": [{"id": "auth", "title": "Build auth", "depends_on": []}, {"id": "api", "title": "Build API", "depends_on": ["auth"]}]} ]]]
+```json
+{ "tasks": [{"id": "auth", "title": "Build auth", "depends_on": []}, {"id": "api", "title": "Build API", "depends_on": ["auth"]}] }
 ```
 
-### LOCK_FILE / UNLOCK_FILE
+### crew_query_tasks / crew_add_task / crew_cancel_task / crew_pause_task / crew_retry_task / crew_skip_task / crew_reset_dag
+
+Query and manage individual tasks in the DAG.
+
+## Coordination
+
+### crew_lock_file / crew_unlock_file
 
 Acquire or release a file lock to prevent concurrent edits.
 
-```
-[[[ LOCK_FILE {"filePath": "src/auth.ts", "reason": "implementing auth"} ]]]
-[[[ UNLOCK_FILE {"filePath": "src/auth.ts"} ]]]
-```
-
-### ACTIVITY
-
-Log an activity entry to the crew activity ledger.
-
-```
-[[[ ACTIVITY {"actionType": "file_edit", "summary": "Updated auth module"} ]]]
+```json
+{ "filePath": "src/auth.ts", "reason": "implementing auth" }
 ```
 
-### QUERY_CREW
+### crew_commit
 
-Request the current crew manifest (team roster, delegations, locks).
+Scoped git commit — stages only files the agent has locked.
 
+```json
+{ "message": "feat: implement JWT authentication" }
 ```
-[[[ QUERY_CREW ]]]
+
+### crew_query_crew
+
+Request the current crew manifest (team roster, delegations, locks). No parameters.
+
+### crew_defer_issue / crew_query_deferred / crew_resolve_deferred
+
+Flag, query, and resolve deferred quality issues.
+
+## Timers
+
+### crew_set_timer / crew_cancel_timer / crew_list_timers
+
+Set countdown reminders, cancel them, or list active timers.
+
+## System
+
+### crew_halt_heartbeat
+
+Pause heartbeat stall detection. Lead only.
+
+### crew_request_limit_change
+
+Request a change to the agent concurrency limit.
+
+```json
+{ "limit": 30, "reason": "Need more agents for parallel work" }
 ```
 
-The system responds with a formatted crew status message injected into the agent's context.
+### crew_export_session
+
+Export the current session data for archival.
+
+## Capabilities
+
+### crew_acquire_capability / crew_list_capabilities / crew_release_capability
+
+Agents can acquire additional capabilities beyond their core role (e.g., a developer acquiring "code-review" capability).
+
+## Templates
+
+### crew_list_templates / crew_apply_template / crew_decompose_task
+
+List available workflow templates, apply them to create task DAGs, or decompose a task into sub-tasks.

@@ -15,7 +15,8 @@ AI Crew is a web-based orchestration framework that coordinates multiple [GitHub
 
 ## Key Capabilities
 
-- **9 specialist roles** with different AI models (Claude, GPT, Gemini)
+- **12 specialist roles** with different AI models (Claude, GPT, Gemini)
+- **MCP crew tools** — 42 structured tool calls for team coordination
 - **Typed event bus** with 27 strongly-typed events for real-time updates
 - **File locking** to prevent edit conflicts between agents
 - **Task DAG** visualization of dependencies
@@ -43,5 +44,5 @@ ai-crew/
 | Backend | Node.js, Express, ws, node-pty |
 | Database | SQLite (WAL mode, Drizzle ORM) |
 | Validation | Zod schemas on all API routes |
-| Agent Protocol | ACP (Agent Communication Protocol) |
+| Agent Protocol | ACP (Agent Client Protocol) + MCP (Model Context Protocol) |
 | Events | TypedEmitter with 27 typed events |

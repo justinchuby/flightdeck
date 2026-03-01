@@ -17,7 +17,8 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3001` | Server port |
+| `PORT` | `3001` | Server port. The server auto-retries the next port if in use (up to 10 attempts). |
+| `VITE_API_PORT` | `3001` | Backend port for the Vite dev proxy (frontend only). Falls back to `PORT`. |
 | `HOST` | `localhost` | Server host |
 | `DB_PATH` | `./ai-crew.db` | SQLite database path |
 | `SERVER_SECRET` | *(auto-generated)* | Auth token for API access. If not set, a random token is generated at startup and printed to the console. |

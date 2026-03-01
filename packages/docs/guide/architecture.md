@@ -3,13 +3,14 @@
 ## System Overview
 
 ```
-React UI ←→ WebSocket ←→ Node.js Server ←→ ACP/PTY ←→ Copilot CLI ×N
-                              │
-                         AgentManager (TypedEmitter)
+React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
+                              │                         ↕
+                         AgentManager          MCP SSE (crew_* tools)
                         ┌─────┴──────┐
                    MessageBus    ActivityLedger (batched)
                    DecisionLog   FileLockRegistry
                    Scheduler     ContextRefresher
+                   CrewMcpServer (42 tools)
 ```
 
 ## Core Components
@@ -20,7 +21,7 @@ The central orchestrator. Extends `TypedEmitter<AgentManagerEvents>` with 27 typ
 
 **Responsibilities:**
 - Spawns and manages agent lifecycle (creating → running → idle → completed)
-- Detects structured commands in agent output streams
+- Manages MCP server endpoints for crew tool dispatch
 - Routes inter-agent messages via MessageBus
 - Manages delegations (parent → child task assignment)
 - Persists agent plans to SQLite
@@ -28,7 +29,7 @@ The central orchestrator. Extends `TypedEmitter<AgentManagerEvents>` with 27 typ
 
 ### Agent
 
-Wraps a single Copilot CLI process using ACP (Agent Communication Protocol) or PTY mode.
+Wraps a single Copilot CLI process using ACP (Agent Client Protocol). Connects to a per-agent MCP server for crew coordination tools.
 
 **Lifecycle:** `creating` → `running` → `idle` → `completed` / `failed`
 
@@ -38,9 +39,9 @@ Each agent has:
 - A `.agent.md` file that persists role instructions across context compaction
 - Optional **parent** relationship for delegation tracking
 
-### CommandDispatcher
+### CrewMcpServer
 
-Parses structured commands from agent output text. Commands are HTML comments (`<!-- COMMAND {...} -->`) detected via regex in the buffered output stream.
+Exposes 42 crew coordination tools as MCP tools with Zod-validated schemas. Each agent connects via Streamable HTTP transport to a per-agent MCP endpoint. Tool calls are dispatched to the same command handler modules used previously.
 
 ### MessageBus
 

@@ -8,7 +8,7 @@ Agents acquire locks on files before editing them. This prevents two agents from
 
 - Locks are tracked in the `file_locks` SQLite table
 - The **Scheduler** cleans up expired locks every minute
-- Agents see locked files in the crew manifest via `QUERY_CREW`
+- Agents see locked files in the crew manifest via `crew_query_crew`
 - The lead avoids delegating conflicting file edits
 
 ## Activity Ledger
@@ -56,7 +56,7 @@ Each task node tracks:
 Agents can create focused discussion groups:
 
 ```
-<!-- CREATE_GROUP {"name": "api-design", "members": ["a1b2c3", "d4e5f6"]} -->
+crew_create_group({ "name": "api-design", "members": ["a1b2c3", "d4e5f6"] })
 ```
 
 Group messages are visible to all members and displayed in the Groups tab of the sidebar.
