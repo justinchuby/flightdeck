@@ -62,6 +62,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
       hasActiveTasks: vi.fn().mockReturnValue(false),
       hasAnyTasks: vi.fn().mockReturnValue(false),
       addDependency: vi.fn().mockReturnValue(true),
+      forceStartTask: vi.fn().mockReturnValue(null),
     },
     getAgent: vi.fn().mockReturnValue(undefined),
     getAllAgents: vi.fn().mockReturnValue([child]),
@@ -159,6 +160,87 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Similar DAG task exists'));
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('existing-fix-login'));
+  });
+
+  it('links to existing ready declared task instead of creating duplicate', () => {
+    const child = makeChildAgent('lead-001');
+    const ctx = makeCtx({ spawnAgent: vi.fn().mockReturnValue(child) });
+    // Existing ready task that matches the delegation
+    (ctx.taskDAG.getTasks as any).mockReturnValue([{
+      id: 'declared-fix-login',
+      role: 'developer',
+      title: 'Fix the login bug',
+      description: 'Fix the login bug in the auth module',
+      dagStatus: 'ready',
+      dependsOn: [],
+      files: [],
+    }]);
+    (ctx.taskDAG.startTask as any).mockReturnValue({ id: 'declared-fix-login', dagStatus: 'running' });
+
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug in auth"} ⟧⟧');
+
+    // Should link to existing, not auto-create
+    expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
+    expect(ctx.taskDAG.startTask).toHaveBeenCalledWith('lead-001', 'declared-fix-login', expect.any(String));
+    expect(child.dagTaskId).toBe('declared-fix-login');
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('linked to'));
+  });
+
+  it('force-links to pending declared task instead of creating duplicate', () => {
+    const child = makeChildAgent('lead-001');
+    const ctx = makeCtx({ spawnAgent: vi.fn().mockReturnValue(child) });
+    // Existing pending task (deps not met) that matches the delegation
+    (ctx.taskDAG.getTasks as any).mockReturnValue([{
+      id: 'declared-pending-task',
+      role: 'developer',
+      title: 'Fix the login bug',
+      description: 'Fix the login bug in the auth module',
+      dagStatus: 'pending',
+      dependsOn: ['other-task'],
+      files: [],
+    }]);
+    // startTask fails for pending (not ready), forceStartTask succeeds
+    (ctx.taskDAG.startTask as any).mockReturnValue(null);
+    (ctx.taskDAG.forceStartTask as any).mockReturnValue({ id: 'declared-pending-task', dagStatus: 'running' });
+
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug in auth"} ⟧⟧');
+
+    // Should force-link to existing pending task
+    expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
+    expect(ctx.taskDAG.forceStartTask).toHaveBeenCalledWith('lead-001', 'declared-pending-task', expect.any(String));
+    expect(child.dagTaskId).toBe('declared-pending-task');
+    expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('linked to'));
+  });
+
+  it('force-links to blocked declared task instead of creating duplicate', () => {
+    const child = makeChildAgent('lead-001');
+    const ctx = makeCtx({ spawnAgent: vi.fn().mockReturnValue(child) });
+    (ctx.taskDAG.getTasks as any).mockReturnValue([{
+      id: 'declared-blocked-task',
+      role: 'developer',
+      title: 'Fix the login bug',
+      description: 'Fix the login bug in the auth module',
+      dagStatus: 'blocked',
+      dependsOn: ['other-task'],
+      files: [],
+    }]);
+    (ctx.taskDAG.startTask as any).mockReturnValue(null);
+    (ctx.taskDAG.forceStartTask as any).mockReturnValue({ id: 'declared-blocked-task', dagStatus: 'running' });
+
+    const agent = makeLeadAgent();
+    const cmd = getCreateAgentHandler(ctx);
+
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Fix the login bug in auth"} ⟧⟧');
+
+    expect(ctx.taskDAG.addTask).not.toHaveBeenCalled();
+    expect(ctx.taskDAG.forceStartTask).toHaveBeenCalledWith('lead-001', 'declared-blocked-task', expect.any(String));
+    expect(child.dagTaskId).toBe('declared-blocked-task');
   });
 
   it('sets child.dagTaskId on auto-created task', () => {

@@ -308,6 +308,25 @@ export class TaskDAG extends EventEmitter {
     return this.getTask(leadId, taskId);
   }
 
+  /**
+   * Force-start a task from any non-terminal, non-running state.
+   * Used when the lead explicitly delegates work that matches a declared DAG task
+   * which isn't yet 'ready' (e.g., pending or blocked).
+   */
+  forceStartTask(leadId: string, taskId: string, agentId: string): DagTask | null {
+    const task = this.getTask(leadId, taskId);
+    if (!task) return null;
+    const terminalOrRunning: DagTaskStatus[] = ['done', 'skipped', 'running'];
+    if (terminalOrRunning.includes(task.dagStatus)) return null;
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ dagStatus: 'running', assignedAgentId: agentId, startedAt: sql`datetime('now')` })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return this.getTask(leadId, taskId);
+  }
+
   /** Mark a task as complete. Returns newly ready tasks, or null if transition is invalid. */
   completeTask(leadId: string, taskId: string): DagTask[] | null {
     const error = this.validateTransition(leadId, taskId, 'complete');
