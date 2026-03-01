@@ -100,6 +100,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
   private worktreeManager?: WorktreeManager;
   private _systemPaused = false;
+  private _shuttingDown = false;
 
   constructor(
     config: ServerConfig,
@@ -483,6 +484,21 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     });
 
+    // Helper: post-start actions (emit events after cwd is set)
+    const postSpawn = () => {
+      logger.info('agent', `Spawned ${role.name} (${agent.id.slice(0, 8)})`, {
+        autopilot: agent.autopilot,
+        parentId: parentId?.slice(0, 8),
+        task,
+      });
+      this.emit('agent:spawned', agent.toJSON());
+      this.updateLeadBudgets();
+      // Auto-add to groups with matching role criteria (B4: group auto-add)
+      if (parentId) {
+        this.autoAddToRoleGroups(agent);
+      }
+    };
+
     // Create isolated worktree if manager is available (async — delays agent.start)
     if (this.worktreeManager && !cwd) {
       this.worktreeManager.create(agent.id)
@@ -495,21 +511,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         })
         .finally(() => {
           agent.start();
+          postSpawn();
         });
     } else {
       agent.start();
-    }
-    logger.info('agent', `Spawned ${role.name} (${agent.id.slice(0, 8)})`, {
-      autopilot: agent.autopilot,
-      parentId: parentId?.slice(0, 8),
-      task,
-    });
-    this.emit('agent:spawned', agent.toJSON());
-    this.updateLeadBudgets();
-
-    // Auto-add to groups with matching role criteria (B4: group auto-add)
-    if (parentId) {
-      this.autoAddToRoleGroups(agent);
+      postSpawn();
     }
 
     return agent;
@@ -576,7 +582,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (this.capabilityInjector) this.capabilityInjector.clearAgent(id);
 
     // Merge worktree back and clean up (async, fire-and-forget)
-    if (this.worktreeManager?.getWorktree(id)) {
+    // Skip during shutdown — cleanupAll() handles bulk cleanup without merging
+    if (this.worktreeManager?.getWorktree(id) && !this._shuttingDown) {
       this.worktreeManager.merge(id)
         .then(result => {
           if (!result.ok) {
@@ -718,6 +725,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   }
 
   shutdownAll(): void {
+    this._shuttingDown = true;
     this.heartbeat.stop();
     for (const agent of this.agents.values()) {
       if (!isTerminalStatus(agent.status)) {
@@ -725,6 +733,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
     // Clean up all worktrees (async, best-effort)
+    // Individual terminate() calls skip merge when _shuttingDown is true
     this.worktreeManager?.cleanupAll().catch(err => {
       logger.warn('worktree', `Shutdown worktree cleanup failed: ${err.message}`);
     });
