@@ -46,6 +46,12 @@ export default defineConfig({
             { text: 'Architecture', link: '/guide/timeline-architecture' },
           ],
         },
+        {
+          text: 'Chat',
+          items: [
+            { text: 'Architecture', link: '/guide/chat-architecture' },
+          ],
+        },
       ],
       '/reference/': [
         {
