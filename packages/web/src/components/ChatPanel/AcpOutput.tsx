@@ -351,7 +351,6 @@ export function AcpOutput({ agentId }: Props) {
             // Agent messages — flowing text, no bubble
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text, null, 2);
             const isUserDirected = /(?:^|\n)@user\s*\n/m.test(text);
-            const displayText = isUserDirected ? text.replace(/(?:^|\n)@user\s*\n/gm, '\n').trimStart() : text;
             return (
               <div key={`msg-${item.index}`} className={`py-1 ${replyClass}`}>
                 <div className="flex items-start gap-2">
@@ -360,7 +359,7 @@ export function AcpOutput({ agentId }: Props) {
                       ? 'text-th-text bg-accent/[0.08] border-l-2 border-l-accent/40 pl-2 rounded-md py-1'
                       : 'text-th-text-alt'
                   }`}>
-                    <AgentTextBlockSimple text={displayText} />
+                    <AgentTextBlockSimple text={text} />
                   </div>
                   <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{ts}</span>
                 </div>

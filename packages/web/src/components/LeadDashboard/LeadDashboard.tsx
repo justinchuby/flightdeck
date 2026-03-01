@@ -1364,7 +1364,6 @@ export function LeadDashboard({ api, ws }: Props) {
 
                 // Detect @user-directed messages (lead addressing the human)
                 const isUserDirected = /(?:^|\n)@user\s*\n/m.test(msg.text);
-                const displayText = isUserDirected ? msg.text.replace(/(?:^|\n)@user\s*\n/gm, '\n').trimStart() : msg.text;
 
                 // @user highlight takes priority over reply highlight
                 const msgHighlight = isUserDirected
@@ -1389,7 +1388,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div key={i} className={`py-0.5 ${msgHighlight}`}>
                     <div className="flex items-start gap-2">
                       <div className={`flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 ${isUserDirected ? 'text-th-text' : 'text-th-text-alt'}`}>
-                        <AgentTextBlock text={displayText} />
+                        <AgentTextBlock text={msg.text} />
                       </div>
                       {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
                     </div>
