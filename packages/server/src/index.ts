@@ -169,7 +169,7 @@ const capabilityInjector = new CapabilityInjector();
 
 // Git worktree isolation — each agent gets its own working copy
 import { WorktreeManager } from './coordination/WorktreeManager.js';
-const worktreeManager = new WorktreeManager(process.cwd());
+const worktreeManager = new WorktreeManager(process.cwd(), lockRegistry);
 worktreeManager.cleanupOrphans().catch(err => {
   console.warn(`[worktree] Orphan cleanup failed on startup: ${err.message}`);
 });
