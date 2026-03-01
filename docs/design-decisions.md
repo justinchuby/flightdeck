@@ -45,19 +45,21 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 **Decision:** Agents are assigned roles with system prompts that constrain their behavior.
 
-**Built-in roles (10):**
+**Built-in roles (12):**
 | Role | Focus | Default Model |
 |------|-------|---------------|
+| Project Lead | Orchestration, delegation, team coordination | Claude Opus 4.6 |
 | Developer | Code writing and modification | Claude Opus 4.6 |
 | Architect | System design, architecture decisions | Claude Opus 4.6 |
 | Code Reviewer | Readability, maintainability, patterns | Gemini 3 Pro |
-| Critical Reviewer | Security, performance, edge cases | Claude Sonnet 4.6 |
-| Product Manager | User needs, product quality, UX | GPT-5.2 Codex |
+| Critical Reviewer | Security, performance, edge cases | Gemini 3 Pro |
+| Product Manager | User needs, product quality, UX | GPT-5.3 Codex |
 | Technical Writer | Docs, API design review | GPT-5.2 |
 | Designer | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
 | Generalist | Cross-disciplinary problem solving | Claude Opus 4.6 |
-| Radical Thinker | Challenge assumptions, unconventional ideas | GPT-5.3 Codex |
-| Project Lead | Orchestration, delegation, team coordination | Claude Opus 4.6 |
+| Radical Thinker | Challenge assumptions, unconventional ideas | Gemini 3 Pro |
+| Secretary | Plan tracking, status reports, session summaries | GPT-4.1 |
+| QA Tester | Test strategy, quality assurance, coverage analysis | Claude Sonnet 4.6 |
 
 **Rationale:** Specialization improves output quality — an agent told "you are a code reviewer" catches more bugs than a general-purpose agent. Roles also enable smart task routing (assign review tasks to reviewers, not developers).
 
@@ -116,7 +118,7 @@ PTY is retained for backward compatibility and for scenarios where full terminal
 
 ## 8. Configurable Concurrency at Runtime
 
-**Decision:** Max concurrent agents is adjustable via UI slider (1–20) without restart.
+**Decision:** Max concurrent agents is adjustable via UI slider (1–50) without restart.
 
 **Rationale:** The right number of agents depends on the task, machine resources, and API rate limits. Users need to tune this dynamically — start with 2 agents, scale to 10 when tackling a large feature, back down when reviewing.
 
@@ -405,7 +407,7 @@ ai-crew/
 
 ## 29. Mission Control — Single-Screen Overview
 
-**Decision:** Add a dedicated `/mission-control` page with 6 data panels (HealthSummary, AgentFleet, TokenEconomics, AlertsPanel, ActivityFeed, DagMinimap) that answers "how's the project?" in 3 seconds.
+**Decision:** Add a dedicated `/mission-control` page with 8 configurable panels (HealthSummary, AgentFleet, TokenEconomics, AlertsPanel, ActivityFeed, DagMinimap, CommHeatmap, Performance) that answers "how's the project?" in 3 seconds.
 
 **Rationale:**
 - The Lead Dashboard is optimized for the lead agent's workflow (chat + decisions); humans need a passive monitoring view
@@ -463,3 +465,105 @@ ai-crew/
 - Refresh interval matches the existing `CREW_UPDATE` cadence
 
 **Trade-off:** Additional token cost for periodic context updates. Justified because the secretary's core value depends on having current information.
+
+## 34. Theme Persistence via Shared Zustand Store
+
+**Decision:** Move theme state from component-local `useState` in `SettingsPanel` to a shared `settingsStore` (Zustand) that persists to `localStorage`.
+
+**Rationale:**
+- Theme was previously local state in the Settings panel — changes were lost on navigation and couldn't be accessed by other components
+- The Command Palette also needs to toggle theme — a shared store gives both components the same source of truth
+- `settingsStore` already existed for sound preferences, so theme state is a natural addition
+- Three modes: `'light' | 'dark' | 'system'` where system uses `prefers-color-scheme` media query listener
+- The `applyTheme()` helper applies the appropriate class to `<html>` and is called both from the store and the media query listener
+
+**Trade-off:** Adds a zustand store dependency where `useState` would have sufficed for a single component. Justified because theme is genuinely shared state accessed from multiple UI locations.
+
+## 35. Draggable Dashboard Panel Layout
+
+**Decision:** Replace up/down arrow buttons with HTML5 drag-and-drop for Mission Control panel reordering.
+
+**Rationale:**
+- Arrow buttons required multiple clicks to move a panel across 8 positions
+- Drag-and-drop is the standard UX pattern for list reordering in dashboards
+- HTML5 DnD API works without additional dependencies (no `react-beautiful-dnd`)
+- Panel config persists to `localStorage` via `useDashboardLayout` hook
+- New panels added in code auto-merge into existing user layouts without losing their customizations
+
+**Trade-off:** HTML5 DnD has limited mobile support (no native touch events). Acceptable because AI Crew is primarily a desktop tool.
+
+## 36. Zustand Selector Discipline
+
+**Decision:** Adopt strict rules for zustand store selectors: never return derived objects/arrays from selectors; use module-level empty constants for fallbacks.
+
+**Rationale:**
+- Multiple infinite re-render bugs traced to zustand selectors returning new references on every call:
+  - `Object.keys(s.projects)` → always new array → `useSyncExternalStore` sees changed state → re-render → repeat
+  - `s.foo ?? []` → new `[]` when `foo` is undefined → same infinite loop
+  - `useStore()` without selector → subscribes to entire store → any `set()` causes re-render
+- These bugs are latent — they only manifest when the subscribed store is updated frequently (e.g., during WebSocket streaming)
+- Fix: select stable references from the store, derive keys/filters outside the selector, use `useShallow` for multi-field selections
+- Module-level constants (`const EMPTY: T[] = []`) provide stable fallback references
+
+**Trade-off:** Slightly more verbose selector code. Justified because the alternative is invisible infinite-loop bugs that only appear under load.
+
+## 37. App-Level Startup Data Loading
+
+**Decision:** Load active leads and persisted projects into `leadStore` from an `App.tsx` `useEffect` on mount, rather than relying on individual page components.
+
+**Rationale:**
+- Previously, `leadStore.projects` was only populated when the user visited the Lead Dashboard
+- Mission Control and other pages that depend on lead data showed nothing on first visit
+- After server/frontend restart, chat history was lost because no component loaded it
+- The App.tsx effect runs regardless of which page the user navigates to first
+- Loads active leads from `/api/lead`, pre-fetches message history from `/api/agents/:id/messages`, and loads persisted projects from `/api/projects`
+
+**Trade-off:** Additional API calls on every app mount, even if the user doesn't visit lead-related pages. Acceptable because the calls are lightweight and the data is almost always needed.
+
+## 38. Model Selection Strategy
+
+**Decision:** Use different default models for different roles, with automatic model selection based on task complexity.
+
+**Current defaults (12 built-in roles):**
+| Role | Model | Rationale |
+|------|-------|-----------|
+| Project Lead | Claude Opus 4.6 | Complex orchestration needs premium reasoning |
+| Developer | Claude Opus 4.6 | Code generation benefits from large context + reasoning |
+| Architect | Claude Opus 4.6 | System design requires deep analysis |
+| Code Reviewer | Gemini 3 Pro | Fast, good at pattern recognition |
+| Critical Reviewer | Gemini 3 Pro | Security analysis benefits from broad training data |
+| Product Manager | GPT-5.3 Codex | Creative thinking + structured output |
+| Technical Writer | GPT-5.2 | Documentation generation |
+| Designer | Claude Opus 4.6 | Visual reasoning |
+| Radical Thinker | Gemini 3 Pro | Novel perspective generation |
+| Secretary | GPT-4.1 | Status tracking, low complexity |
+| QA Tester | Claude Sonnet 4.6 | Test reasoning, balanced cost |
+| Generalist | Claude Opus 4.6 | Needs broad capabilities |
+
+The `ModelSelector` component can override defaults at task assignment time, considering task complexity, agent role, and token budget constraints.
+
+**Trade-off:** Model diversity increases system complexity and makes behavior less predictable. Justified because different models genuinely excel at different tasks, and the cost savings from using cheaper models for simpler tasks are significant.
+
+## 39. Performance Scorecard Metrics
+
+**Decision:** Track 5 agent performance metrics: throughput (tasks/hour), first-pass rate (% accepted without revision), velocity (lines/hour), cost efficiency (tasks/token), and review score (average review rating).
+
+**Rationale:**
+- Multi-agent teams need objective measures to identify top performers and bottlenecks
+- Metrics drive the smart agent matching system (`AgentMatcher`) — agents with higher scores get assigned similar future tasks
+- The leaderboard API (`/coordination/leaderboard`) provides ranked views for the UI
+- Metrics are computed from existing activity ledger data — no additional instrumentation needed
+
+**Trade-off:** Metrics can be gamed or misleading (e.g., high throughput ≠ high quality). Mitigated by using multiple metrics and weighting review scores highly.
+
+## 40. Concurrency Limit Increase (20 → 50)
+
+**Decision:** Increase the UI slider maximum for concurrent agents from 20 to 50, matching the server's existing capacity.
+
+**Rationale:**
+- The server already supported up to 50 concurrent agents, but the UI artificially limited to 20
+- Complex projects with multiple parallel work streams benefit from more agents
+- The actual limit depends on the user's API rate limits and machine resources, not a UI cap
+- Users can still set lower limits — the slider is just an upper bound
+
+**Trade-off:** More concurrent agents means more API calls, more WebSocket traffic, and more context to track. Users should increase gradually based on their infrastructure capacity.

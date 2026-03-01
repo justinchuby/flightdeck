@@ -182,7 +182,7 @@ The sidebar navigation shows unread indicators for group chats:
 
 The Mission Control page (`/mission-control`) provides a single-screen project overview — answering "how's the project?" in 3 seconds.
 
-### 6 Panels
+### 8 Configurable Panels
 
 | Panel | Content |
 |-------|---------|
@@ -192,6 +192,23 @@ The Mission Control page (`/mission-control`) provides a single-screen project o
 | **AlertsPanel** | Proactive alerts derived from store data: context overflow, stuck agents, pending decisions >3min, failures, idle+ready mismatch, blocked tasks. Zero height when no alerts. Color-coded by severity. |
 | **ActivityFeed** | Merged activity + comms feed, last 30 events, live via WebSocket |
 | **DagMinimap** | Stacked horizontal status bar (done=green, running=blue, pending=gray, failed=red), recent completions, running tasks |
+| **CommHeatmap** | Communication frequency heatmap showing inter-agent message volume |
+| **Performance** | Agent performance scorecards: throughput, first-pass rate, velocity, cost efficiency |
+
+### Panel Customization
+
+Panels are configurable via the Settings → Dashboard Customizer:
+- **Toggle visibility** — Show/hide individual panels
+- **Drag-and-drop reorder** — HTML5 DnD API to rearrange panel order
+- **Layout persistence** — Panel config stored in `localStorage` via `useDashboardLayout` hook
+- **New panel auto-merge** — When new panels are added in code, they automatically appear in existing users' layouts
+
+### Auto-Discovery
+
+Mission Control automatically discovers lead agents from the app store and registers them in the lead store. This means:
+- No manual navigation to the Lead Dashboard is needed first
+- On app startup, both active leads (from `/api/lead`) and persisted projects (from `/api/projects`) are loaded into the store
+- Chat history for active leads is pre-fetched from `/api/agents/:id/messages`
 
 ### Data Sources
 
@@ -224,3 +241,96 @@ In the agent chat view (`AcpOutput.tsx`), agent responses to user messages recei
 - When the previous timeline item is a user message, the agent's reply gets `bg-blue-500/[0.06]` background + `border-l-2 border-l-blue-400/30` left border
 - Creates a visual connection between user input and agent response
 - Applied to both rich content (images, code) and text messages
+
+## Theme System
+
+The theme system supports three modes: **Light**, **Dark**, and **Follow System**.
+
+### Implementation
+
+- **CSS custom properties** — 10 semantic tokens (`--th-bg`, `--th-text`, `--th-border`, etc.) defined on `:root, .light` and `.dark` selectors
+- **Tailwind `th.*` namespace** — Semantic color tokens referencing CSS variables with `<alpha-value>` opacity support
+- **Zustand `settingsStore`** — Theme state persists to `localStorage` via shared store (not component-local state)
+- **Follow System mode** — Listens to `prefers-color-scheme` media query changes via `matchMedia` and auto-applies the corresponding theme
+- **No FOWT** — An inline `<head>` script reads `localStorage` and sets the `dark` class before React renders, avoiding flash-of-wrong-theme
+- **Accent color contrast** — `dark:` variants used for accent colors (e.g., `text-yellow-600 dark:text-yellow-300`) to ensure WCAG contrast in both themes
+
+### Theme Toggle Locations
+
+- **Settings panel** — Three radio buttons (Light / Dark / System)
+- **Command palette** — Toggle Dark Mode action (Cmd+K → type "theme")
+
+## Command Palette
+
+A global command palette accessible via **Cmd+K** (or Ctrl+K on Windows/Linux).
+
+- **12 navigation/action commands** — Navigate to any page, toggle theme, create project, search
+- **Fuzzy matching** — Type to filter commands
+- **Keyboard navigation** — Arrow keys to select, Enter to execute, Escape to dismiss
+- **Extensible** — Commands registered as a simple array of `{label, action, shortcut?}` objects
+
+## Settings
+
+The Settings panel (`/settings`) provides configuration for:
+
+| Setting | Description |
+|---------|-------------|
+| **Max Concurrent Agents** | Slider from 1–50 (server default is 50) |
+| **Theme** | Light / Dark / Follow System with persistence |
+| **Sound** | Toggle notification sounds |
+| **Dashboard Panels** | Drag-and-drop reorder, toggle visibility of Mission Control panels |
+| **Custom Roles** | Create roles with custom system prompts, colors, icons, and default models |
+
+## Onboarding Wizard
+
+An 8-step guided tour for new users, rendered as a modal overlay:
+
+1. Welcome — Overview of AI Crew
+2. Create Project — How to start a project
+3. Lead Dashboard — Understanding the chat + sidebar layout
+4. Team Management — Agent roles and models
+5. Communication — Messaging, groups, broadcasts
+6. Task DAG — Understanding dependency graphs
+7. Mission Control — Monitoring dashboard overview
+8. Settings — Customization options
+
+## Search Dialog
+
+A global search dialog that searches across:
+- **Messages** — Agent and user messages
+- **Tasks** — DAG tasks and delegations
+- **Decisions** — Architectural decisions
+- **Activity** — Activity log entries
+
+Powered by the server-side `SearchEngine` which provides full-text search with relevance scoring.
+
+## Zustand Store Patterns
+
+Critical patterns for zustand v5 stores used throughout the frontend:
+
+### Anti-Patterns (cause infinite re-renders)
+
+| Pattern | Problem | Fix |
+|---------|---------|-----|
+| `useStore()` without selector | Subscribes to entire state; any `set()` triggers re-render | Use `useShallow` or specific field selectors |
+| `useStore((s) => Object.keys(s.x))` | `Object.keys()` returns new array every call | Select `s.x` directly, derive keys outside |
+| `useStore((s) => s.foo ?? [])` | `[]` is a new reference when `foo` is undefined | Use module-level constant: `const EMPTY: T[] = []` |
+| `useStore((s) => s.items.filter(...))` | `.filter()` / `.map()` always returns new array | Use `useShallow` or memoize outside selector |
+
+### Correct Patterns
+
+```tsx
+// Good: specific field selector
+const projects = useLeadStore((s) => s.projects);
+const projectIds = Object.keys(projects);
+
+// Good: useShallow for multiple fields
+const { messages, decisions } = useLeadStore(useShallow((s) => ({
+  messages: s.projects[id]?.messages,
+  decisions: s.projects[id]?.decisions,
+})));
+
+// Good: module-level empty constant
+const EMPTY_ACTIVITIES: Activity[] = [];
+const activities = useLeadStore((s) => s.projects[id]?.activities ?? EMPTY_ACTIVITIES);
+```
