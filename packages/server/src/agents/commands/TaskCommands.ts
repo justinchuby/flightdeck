@@ -465,12 +465,17 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
       return;
     }
 
-    // Resolve agent with prefix matching (same pattern as REASSIGN_TASK)
-    const targetAgent = ctx.getAllAgents().find(a =>
+    // Resolve agent with prefix matching + ambiguity detection
+    const matches = ctx.getAllAgents().filter(a =>
       (a.id === req.agentId || a.id.startsWith(req.agentId)) &&
       a.parentId === agent.id &&
       a.id !== agent.id
     );
+    if (matches.length > 1) {
+      agent.sendMessage(`[System] Ambiguous agent ID "${req.agentId}" matches ${matches.length} agents. Use a longer prefix.`);
+      return;
+    }
+    const targetAgent = matches[0];
     if (!targetAgent) {
       agent.sendMessage(`[System] Agent not found: "${req.agentId}". Use QUERY_CREW to see available agents.`);
       return;

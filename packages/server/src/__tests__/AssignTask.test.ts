@@ -289,6 +289,20 @@ describe('ASSIGN_TASK command', () => {
     expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
   });
 
+  it('rejects ambiguous agent ID prefix matching multiple agents', () => {
+    const agentA = makeAgent({ id: 'agent-abc-111', role: { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '', icon: '', builtIn: true }, parentId: LEAD });
+    const agentB = makeAgent({ id: 'agent-abc-222', role: { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '', icon: '', builtIn: true }, parentId: LEAD });
+    (ctx.taskDAG.getTask as any).mockReturnValue({ id: 'task-amb', dagStatus: 'ready', role: 'developer' });
+    (ctx.getAllAgents as any).mockReturnValue([leadAgent, agentA, agentB]);
+
+    dispatch(dispatcher, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "task-amb", "agentId": "agent-abc"} ⟧⟧');
+
+    expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Ambiguous'),
+    );
+    expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
+  });
+
   it('rejects when task is already running and suggests REASSIGN_TASK', () => {
     const targetAgent = makeAgent({
       id: 'agent-4-full-id',
