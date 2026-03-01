@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useMemo, useEffect, useRef, useCallback } from 'react';
 import { RefreshCw, Filter } from 'lucide-react';
 import { useTimelineData } from './useTimelineData';
 import type { TimelineData, CommType, TimelineStatus } from './useTimelineData';
@@ -11,6 +11,7 @@ import { useSinceLastVisit } from './useSinceLastVisit';
 import { AccessibilityAnnouncer } from './AccessibilityAnnouncer';
 import { useAccessibilityAnnouncements } from './useAccessibilityAnnouncements';
 import { useAppStore } from '../../stores/appStore';
+import { useTimelineStore } from '../../stores/timelineStore';
 import './timeline-a11y.css';
 
 interface Props {
@@ -102,17 +103,41 @@ export function TimelinePage({ api, ws }: Props) {
   const prevErrorRef = useRef<string | null>(null);
   const prevCommCountRef = useRef<number>(0);
 
+  // Persisted state from Zustand store (survives unmount)
+  const selectedLead = useTimelineStore((s) => s.selectedLeadId);
+  const setSelectedLead = useTimelineStore((s) => s.setSelectedLeadId);
+  const liveMode = useTimelineStore((s) => s.liveMode);
+  const setLiveMode = useTimelineStore((s) => s.setLiveMode);
+  const showFilters = useTimelineStore((s) => s.showFilters);
+  const setShowFilters = useTimelineStore((s) => s.setShowFilters);
+  const roleFilter = useTimelineStore((s) => s.roleFilter);
+  const setRoleFilter = useTimelineStore((s) => s.setRoleFilter);
+  const commFilter = useTimelineStore((s) => s.commFilter);
+  const setCommFilter = useTimelineStore((s) => s.setCommFilter);
+  const hiddenStatuses = useTimelineStore((s) => s.hiddenStatuses);
+  const setHiddenStatuses = useTimelineStore((s) => s.setHiddenStatuses);
+  const setCachedData = useTimelineStore((s) => s.setCachedData);
+  const getCachedData = useTimelineStore((s) => s.getCachedData);
+
   // Lead selection
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
-  const [selectedLead, setSelectedLead] = useState<string | null>(null);
   // Auto-select first lead when agents arrive
   useEffect(() => {
     if (!selectedLead && leads.length > 0) {
       setSelectedLead(leads[0].id);
     }
-  }, [leads, selectedLead]);
-  const { data, loading, error, refetch } = useTimelineData(selectedLead);
-  const [liveMode, setLiveMode] = useState(true);
+  }, [leads, selectedLead, setSelectedLead]);
+  const { data: liveData, loading, error, refetch } = useTimelineData(selectedLead);
+
+  // Cache data in store for persistence across tab switches
+  useEffect(() => {
+    if (liveData && selectedLead) {
+      setCachedData(selectedLead, liveData);
+    }
+  }, [liveData, selectedLead, setCachedData]);
+
+  // Use live data if available, fall back to cached data from store
+  const data = liveData ?? (selectedLead ? getCachedData(selectedLead) : null);
 
   // Announce errors via assertive live region
   useEffect(() => {
@@ -133,12 +158,6 @@ export function TimelinePage({ api, ws }: Props) {
     }
     prevCommCountRef.current = count;
   }, [data, announcements]);
-
-  // Filter state
-  const [showFilters, setShowFilters] = useState(false);
-  const [roleFilter, setRoleFilter] = useState<Set<string>>(() => new Set(ALL_ROLES));
-  const [commFilter, setCommFilter] = useState<Set<CommType>>(() => new Set(ALL_COMM_TYPES));
-  const [hiddenStatuses, setHiddenStatuses] = useState<Set<TimelineStatus>>(() => new Set());
 
   const filteredData = useMemo(() => {
     if (!data) return null;
@@ -235,7 +254,7 @@ export function TimelinePage({ api, ws }: Props) {
         <h1 className="text-2xl font-bold text-th-text">Team Collaboration Timeline</h1>
         <div className="flex items-center gap-2 timeline-toolbar" role="toolbar" aria-label="Timeline page controls">
           <button
-            onClick={() => setShowFilters(f => !f)}
+            onClick={() => setShowFilters(!showFilters)}
             aria-label={`${showFilters ? 'Hide' : 'Show'} filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
             aria-expanded={showFilters}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
@@ -248,7 +267,7 @@ export function TimelinePage({ api, ws }: Props) {
             Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </button>
           <button
-            onClick={() => setLiveMode(prev => !prev)}
+            onClick={() => setLiveMode(!liveMode)}
             aria-label={liveMode ? 'Disable live updates' : 'Enable live updates'}
             aria-pressed={liveMode}
             className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-colors ${

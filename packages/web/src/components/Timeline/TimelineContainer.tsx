@@ -9,6 +9,8 @@ import { BrushTimeSelector } from './BrushTimeSelector';
 import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import { formatTimestamp } from './formatTimestamp';
 import type { TimeRange } from './formatTimestamp';
+import { useTimelineStore } from '../../stores/timelineStore';
+import type { SortDirection } from '../../stores/timelineStore';
 import type {
   TimelineAgent,
   TimelineSegment,
@@ -205,8 +207,6 @@ function TimelineLegend() {
 
 // ── Main component ───────────────────────────────────────────────────
 
-type SortDirection = 'newest-first' | 'oldest-first';
-
 interface TimelineContainerProps {
   data: TimelineData;
   liveMode?: boolean;
@@ -215,9 +215,14 @@ interface TimelineContainerProps {
 }
 
 function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange, lastSeenTimestamp }: TimelineContainerProps & { width: number }) {
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
+  // Persisted view state from Zustand store
+  const selectedLeadId = useTimelineStore((s) => s.selectedLeadId);
+  const expandedAgents = useTimelineStore((s) => s.getExpandedAgents(selectedLeadId ?? ''));
+  const toggleExpandedAgent = useTimelineStore((s) => s.toggleExpandedAgent);
+  const sortDirection = useTimelineStore((s) => s.sortDirection);
+  const setSortDirection = useTimelineStore((s) => s.setSortDirection);
+
   const [focusedLaneIdx, setFocusedLaneIdx] = useState(-1);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('oldest-first');
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const userCollapsedRef = useRef<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -381,37 +386,29 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
   }, [laneLayout]);
 
   const toggleExpand = useCallback((id: string) => {
-    setExpandedAgents(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-        userCollapsedRef.current.add(id);
-      } else {
-        next.add(id);
-        userCollapsedRef.current.delete(id);
-      }
-      return next;
-    });
-  }, []);
+    const leadId = selectedLeadId ?? '';
+    if (expandedAgents.has(id)) {
+      userCollapsedRef.current.add(id);
+    } else {
+      userCollapsedRef.current.delete(id);
+    }
+    toggleExpandedAgent(leadId, id);
+  }, [selectedLeadId, expandedAgents, toggleExpandedAgent]);
 
   // Auto-expand agents with failed segments so errors are visible
   // Skip agents the user has explicitly collapsed
   useEffect(() => {
+    const leadId = selectedLeadId ?? '';
     const failedIds = data.agents
       .filter(a => a.segments.some(s => s.status === 'failed'))
       .map(a => a.id)
       .filter(id => !userCollapsedRef.current.has(id));
-    if (failedIds.length > 0) {
-      setExpandedAgents(prev => {
-        const next = new Set(prev);
-        let changed = false;
-        for (const id of failedIds) {
-          if (!next.has(id)) { next.add(id); changed = true; }
-        }
-        return changed ? next : prev;
-      });
+    for (const id of failedIds) {
+      if (!expandedAgents.has(id)) {
+        toggleExpandedAgent(leadId, id);
+      }
     }
-  }, [data.agents]);
+  }, [data.agents, selectedLeadId, expandedAgents, toggleExpandedAgent]);
 
   // Synced vertical scrolling between labels and timeline
   const syncScroll = useCallback((source: 'label' | 'timeline') => {
@@ -640,7 +637,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           >Fit</button>
           <button
             className="px-2 py-0.5 text-xs text-th-text-muted bg-th-bg-alt rounded hover:bg-th-bg-muted"
-            onClick={() => setSortDirection(d => d === 'oldest-first' ? 'newest-first' : 'oldest-first')}
+            onClick={() => setSortDirection(sortDirection === 'oldest-first' ? 'newest-first' : 'oldest-first')}
             aria-label={`Sort: ${sortDirection}. Click to toggle.`}
           >{sortDirection === 'oldest-first' ? '↑' : '↓'}</button>
         </div>
