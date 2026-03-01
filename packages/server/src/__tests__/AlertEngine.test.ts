@@ -50,6 +50,7 @@ function createMockDeps() {
 
   const activityLedger = {
     on: vi.fn(),
+    off: vi.fn(),
   } as unknown as ActivityLedger;
 
   const taskDAG = {

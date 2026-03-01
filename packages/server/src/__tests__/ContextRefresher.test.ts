@@ -110,15 +110,6 @@ describe('ContextRefresher', () => {
     it('formats activity entries as readable strings', () => {
       const entries = [
         {
-          id: 1,
-          agentId: 'abcdefgh-1234-5678-9012-abcdefghijkl',
-          agentRole: 'Developer',
-          actionType: 'file_edit' as const,
-          summary: 'Edited src/index.ts',
-          details: {},
-          timestamp: '2024-01-01T00:00:00Z',
-        },
-        {
           id: 2,
           agentId: '12345678-abcd-efgh-ijkl-123456789012',
           agentRole: 'QA',
@@ -127,19 +118,30 @@ describe('ContextRefresher', () => {
           details: {},
           timestamp: '2024-01-01T00:01:00Z',
         },
+        {
+          id: 1,
+          agentId: 'abcdefgh-1234-5678-9012-abcdefghijkl',
+          agentRole: 'Developer',
+          actionType: 'file_edit' as const,
+          summary: 'Edited src/index.ts',
+          details: {},
+          timestamp: '2024-01-01T00:00:00Z',
+        },
       ];
       mocks.activityLedger.getRecent.mockReturnValue(entries);
 
       const result = refresher.buildRecentActivity();
 
       expect(result).toHaveLength(2);
+      // SmartActivityFilter sorts by id desc (newest first)
       expect(result[0]).toBe(
-        '[2024-01-01T00:00:00Z] Agent abcdefgh (Developer): file_edit — Edited src/index.ts',
-      );
-      expect(result[1]).toBe(
         '[2024-01-01T00:01:00Z] Agent 12345678 (QA): test_run — Ran tests',
       );
-      expect(mocks.activityLedger.getRecent).toHaveBeenCalledWith(20);
+      expect(result[1]).toBe(
+        '[2024-01-01T00:00:00Z] Agent abcdefgh (Developer): file_edit — Edited src/index.ts',
+      );
+      // Fetches 5x the limit to ensure smart filter has enough entries
+      expect(mocks.activityLedger.getRecent).toHaveBeenCalledWith(100);
     });
   });
 
