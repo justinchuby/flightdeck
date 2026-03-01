@@ -4,6 +4,7 @@ import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X } from 'lucide-react';
 import { classifyHighlight } from '../../utils/isUserDirectedMessage';
+import { useAutoScroll } from '../../hooks/useAutoScroll';
 
 interface Props {
   agentId: string;
@@ -142,14 +143,7 @@ export function AcpOutput({ agentId }: Props) {
     return tA - tB;
   });
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-    if (isNearBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+  useAutoScroll(containerRef, messagesEndRef, [messages], { resetKey: agentId });
 
   // Promote queued messages when agent responds (new agent message after queued user messages)
   useEffect(() => {
