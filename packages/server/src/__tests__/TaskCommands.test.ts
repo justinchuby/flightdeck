@@ -457,7 +457,7 @@ describe('COMPLETE_TASK security', () => {
     const handler = getCompleteHandler(ctx);
     handler.handler(agent, `[[[ COMPLETE_TASK {"summary": "${longText}"} ]]]`);
 
-    const parentAgent = ctx.getAgent('lead-001');
+    const parentAgent = ctx.getAgent('lead-001') as any;
     const parentMsg = parentAgent.sendMessage.mock.calls[0][0];
     // Summary in the message should be truncated to 10K
     expect(parentMsg.length).toBeLessThan(15_000);
