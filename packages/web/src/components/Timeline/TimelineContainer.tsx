@@ -3,7 +3,7 @@ import { ParentSize } from '@visx/responsive';
 import { scaleTime } from '@visx/scale';
 import { AxisTop } from '@visx/axis';
 import { Group } from '@visx/group';
-import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
+import { useTooltip, defaultStyles } from '@visx/tooltip';
 import { CommunicationLinks } from './CommunicationLinks';
 import { BrushTimeSelector } from './BrushTimeSelector';
 import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
@@ -104,11 +104,12 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick }: {
   );
 }
 
-function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, onSegmentLeave }: {
+function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, onSegmentMove, onSegmentLeave }: {
   agent: TimelineAgent; y: number; height: number;
   timeScale: (d: Date) => number; width: number;
   locks: TimelineLock[];
-  onSegmentHover?: (seg: TimelineSegment, event: React.MouseEvent) => void;
+  onSegmentHover?: (seg: TimelineSegment, event: React.MouseEvent, laneY: number) => void;
+  onSegmentMove?: (event: React.MouseEvent) => void;
   onSegmentLeave?: () => void;
 }) {
   const agentLocks = locks.filter(l => l.agentId === agent.id);
@@ -129,7 +130,8 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
         const isFailed = seg.status === 'failed';
         return (
           <g key={i}
-            onMouseEnter={(e) => onSegmentHover?.(seg, e)}
+            onMouseEnter={(e) => onSegmentHover?.(seg, e, y)}
+            onMouseMove={onSegmentMove}
             onMouseLeave={onSegmentLeave}
           >
             <rect
@@ -225,16 +227,51 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
     showTooltip, hideTooltip,
   } = useTooltip<TimelineSegment>();
 
-  const handleSegmentHover = useCallback((seg: TimelineSegment, event: React.MouseEvent) => {
-    const svgEl = event.currentTarget.closest('svg');
-    if (!svgEl) return;
-    const rect = svgEl.getBoundingClientRect();
+  // Refs for cursor-following tooltip (direct DOM manipulation avoids re-renders on mousemove)
+  const tooltipElRef = useRef<HTMLDivElement>(null);
+  const tooltipLaneY = useRef(0);
+  const rafIdRef = useRef(0);
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(rafIdRef.current);
+  }, []);
+
+  const updateTooltipPosition = useCallback((clientX: number) => {
+    const containerEl = timelineRef.current;
+    const tooltipEl = tooltipElRef.current;
+    if (!containerEl || !tooltipEl) return;
+    const rect = containerEl.getBoundingClientRect();
+    const cursorX = clientX - rect.left + containerEl.scrollLeft;
+    const cursorXInView = clientX - rect.left;
+    const tooltipWidth = tooltipEl.offsetWidth;
+    const tooltipHeight = tooltipEl.offsetHeight;
+    // Flip to left side of cursor if tooltip would overflow right edge
+    const left = (cursorXInView + tooltipWidth + 16 > rect.width)
+      ? cursorX - tooltipWidth - 8
+      : cursorX + 12;
+    const top = AXIS_HEIGHT + tooltipLaneY.current - tooltipHeight - 4;
+    tooltipEl.style.transform = `translate(${left}px, ${top}px)`;
+  }, []);
+
+  const handleSegmentHover = useCallback((seg: TimelineSegment, event: React.MouseEvent, laneY: number) => {
+    tooltipLaneY.current = laneY;
+    const containerEl = timelineRef.current;
+    if (!containerEl) return;
+    const rect = containerEl.getBoundingClientRect();
+    const cursorX = event.clientX - rect.left + containerEl.scrollLeft;
     showTooltip({
       tooltipData: seg,
-      tooltipLeft: event.clientX - rect.left,
-      tooltipTop: event.clientY - rect.top - 10,
+      tooltipLeft: cursorX + 12,
+      tooltipTop: AXIS_HEIGHT + laneY - 64,
     });
-  }, [showTooltip]);
+    requestAnimationFrame(() => updateTooltipPosition(event.clientX));
+  }, [showTooltip, updateTooltipPosition]);
+
+  const handleSegmentMove = useCallback((event: React.MouseEvent) => {
+    cancelAnimationFrame(rafIdRef.current);
+    const clientX = event.clientX;
+    rafIdRef.current = requestAnimationFrame(() => updateTooltipPosition(clientX));
+  }, [updateTooltipPosition]);
 
   const fullRange = useMemo(() => ({
     start: new Date(data.timeRange.start),
@@ -580,7 +617,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           ref={timelineRef}
           className="flex-1 overflow-auto"
           style={{ position: 'relative' }}
-          onScroll={() => syncScroll('timeline')}
+          onScroll={() => { syncScroll('timeline'); hideTooltip(); }}
         >
           <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`} style={{ position: 'relative' }}>
             {/* Idle hatch pattern */}
@@ -622,6 +659,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                   width={chartWidth}
                   locks={data.locks}
                   onSegmentHover={handleSegmentHover}
+                  onSegmentMove={handleSegmentMove}
                   onSegmentLeave={hideTooltip}
                 />
               ))}
@@ -651,12 +689,21 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
             </Group>
           </svg>
 
-          {/* Segment tooltip */}
+          {/* Segment tooltip — positioned via ref for smooth cursor-following */}
           {tooltipOpen && tooltipData && (
-            <TooltipWithBounds
-              left={tooltipLeft}
-              top={tooltipTop}
-              style={segmentTooltipStyles}
+            <div
+              ref={tooltipElRef}
+              role="tooltip"
+              style={{
+                ...segmentTooltipStyles,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                pointerEvents: 'none',
+                zIndex: 10,
+                willChange: 'transform',
+                transform: `translate(${tooltipLeft ?? 0}px, ${tooltipTop ?? 0}px)`,
+              }}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span
@@ -678,7 +725,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                   new Date(tooltipData.startAt).getTime()
                 )}
               </div>
-            </TooltipWithBounds>
+            </div>
           )}
         </div>
       </div>
