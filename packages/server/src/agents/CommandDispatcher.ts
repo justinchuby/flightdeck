@@ -25,7 +25,6 @@ import { getCoordCommands } from './commands/CoordCommands.js';
 import { getDeferredCommands } from './commands/DeferredCommands.js';
 import { getSystemCommands } from './commands/SystemCommands.js';
 import { getTimerCommands } from './commands/TimerCommands.js';
-import { getExportCommands } from './commands/ExportCommands.js';
 import { getCapabilityCommands } from './commands/CapabilityCommands.js';
 import { getDirectMessageCommands } from './commands/DirectMessageCommands.js';
 import { getTemplateCommands } from './commands/TemplateCommands.js';
@@ -67,7 +66,6 @@ export class CommandDispatcher {
       ...getDeferredCommands(this.handlerCtx),
       ...getSystemCommands(this.handlerCtx),
       ...getTimerCommands(this.handlerCtx),
-      ...getExportCommands(this.handlerCtx),
       ...getCapabilityCommands(this.handlerCtx),
       ...getDirectMessageCommands(this.handlerCtx),
       // Template commands — only registered when services are provided

@@ -8,8 +8,6 @@ import type { Agent } from '../Agent.js';
 import type { MemoryEntry } from '../AgentMemory.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
@@ -17,7 +15,6 @@ import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.
 const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
 const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*⟧⟧/s;
 const REQUEST_LIMIT_CHANGE_REGEX = /⟦⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*⟧⟧/s;
-const EXPORT_SESSION_REGEX = /⟦⟦\s*EXPORT_SESSION\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -157,28 +154,6 @@ function handleRequestLimitChange(ctx: CommandHandlerContext, agent: Agent, data
   }
 }
 
-// ── EXPORT_SESSION handler ─────────────────────────────────────────────
-
-function handleExportSession(ctx: CommandHandlerContext, agent: Agent): void {
-  if (!ctx.sessionExporter) {
-    agent.sendMessage('[System] EXPORT_SESSION error: session exporter not available.');
-    return;
-  }
-  const leadId = agent.parentId || agent.id;
-  try {
-    const outputDir = join(tmpdir(), 'ai-crew-exports');
-    const result = ctx.sessionExporter.export(leadId, outputDir);
-    agent.sendMessage(
-      `[System] Session exported to: ${result.outputDir}\n` +
-      `Files: ${result.files.length} (${result.agentCount} agents, ${result.eventCount} events)\n` +
-      `Contents: ${result.files.join(', ')}`,
-    );
-    ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent' as any, `Exported session to ${result.outputDir}`, { outputDir: result.outputDir, fileCount: result.files.length });
-  } catch (err: any) {
-    agent.sendMessage(`[System] EXPORT_SESSION error: ${err.message}`);
-  }
-}
-
 // ── Module export ─────────────────────────────────────────────────────
 
 export function getSystemCommands(ctx: CommandHandlerContext): CommandEntry[] {
@@ -186,6 +161,5 @@ export function getSystemCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a) },
     { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a) },
     { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d) },
-    { regex: EXPORT_SESSION_REGEX, name: 'EXPORT_SESSION', handler: (a, _d) => handleExportSession(ctx, a) },
   ];
 }

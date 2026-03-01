@@ -417,9 +417,6 @@ When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG tas
 - Include \`dagTaskId\` in CREATE_AGENT/DELEGATE to explicitly link to an existing DAG task. If omitted, the system fuzzy-matches by role and description.
 
 == ADDITIONAL COMMANDS ==
-Export a session summary (lead and secretary only):
-\`⟦⟦ EXPORT_SESSION ⟧⟧\`
-
 Defer non-blocking issues for later follow-up:
 \`⟦⟦ DEFER_ISSUE {"description": "Fix flaky test in TestX", "severity": "low"} ⟧⟧\`
 \`⟦⟦ QUERY_DEFERRED {} ⟧⟧\` — list all deferred issues
