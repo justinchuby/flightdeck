@@ -579,6 +579,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
         <div
           ref={timelineRef}
           className="flex-1 overflow-auto"
+          style={{ position: 'relative' }}
           onScroll={() => syncScroll('timeline')}
         >
           <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`} style={{ position: 'relative' }}>
@@ -631,6 +632,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
                 agentPositions={agentPositions}
                 xScale={timeScale}
                 laneHeight={LANE_HEIGHT}
+                tooltipContainer={timelineRef.current}
               />
 
               {/* 'You left off here' marker */}

@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
 import type { ScaleTime } from '@visx/vendor/d3-scale';
 
@@ -21,6 +22,8 @@ export interface CommunicationLinksProps {
   laneHeight: number;
   /** Optional visible time range for performance culling */
   visibleTimeRange?: [Date, Date];
+  /** Container element for portaling the tooltip outside SVG */
+  tooltipContainer?: HTMLElement | null;
 }
 
 // ── Style config per comm type ───────────────────────────────────────────
@@ -128,7 +131,24 @@ export function CommunicationLinks({
   xScale,
   laneHeight,
   visibleTimeRange,
+  tooltipContainer,
 }: CommunicationLinksProps) {
+  // Fallback portal target for tooltip (must be outside SVG)
+  const fallbackRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!tooltipContainer) {
+      const el = document.createElement('div');
+      el.style.position = 'absolute';
+      el.style.top = '0';
+      el.style.left = '0';
+      document.body.appendChild(el);
+      fallbackRef.current = el;
+      return () => { document.body.removeChild(el); };
+    }
+  }, [tooltipContainer]);
+
+  const portalTarget = tooltipContainer ?? fallbackRef.current;
+
   const {
     showTooltip,
     hideTooltip,
@@ -256,7 +276,7 @@ export function CommunicationLinks({
       </g>
 
       {/* Tooltip rendered outside SVG via portal */}
-      {tooltipOpen && tooltipData && (
+      {tooltipOpen && tooltipData && portalTarget && createPortal(
         <TooltipWithBounds
           left={tooltipLeft}
           top={tooltipTop}
@@ -290,7 +310,8 @@ export function CommunicationLinks({
               </p>
             )}
           </div>
-        </TooltipWithBounds>
+        </TooltipWithBounds>,
+        portalTarget,
       )}
     </>
   );
