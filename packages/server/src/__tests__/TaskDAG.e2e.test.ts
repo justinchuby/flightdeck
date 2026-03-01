@@ -303,11 +303,14 @@ describe('TaskDAG E2E', () => {
       expect(statusMap(dag, LEAD).c).toBe('ready'); // unblocked
     });
 
-    it('can skip a running task', () => {
+    it('can skip a running task and returns agent info', () => {
       batch(dag, LEAD, [{ id: 'a', role: 'Dev' }]);
       dag.startTask(LEAD, 'a', 'agent-1');
-      expect(dag.skipTask(LEAD, 'a')).toBe(true);
+      const result = dag.skipTask(LEAD, 'a');
+      expect(result).toBeTruthy();
+      expect(result).toEqual({ skippedAgentId: 'agent-1' });
       expect(dag.getTask(LEAD, 'a')!.dagStatus).toBe('skipped');
+      expect(dag.getTask(LEAD, 'a')!.assignedAgentId).toBeUndefined();
     });
   });
 
