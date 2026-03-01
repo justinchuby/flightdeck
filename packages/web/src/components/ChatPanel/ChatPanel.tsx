@@ -2,6 +2,7 @@ import { useRef, useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
+import { useToastStore } from '../Toast';
 import { X, Send, Maximize2, Minimize2, Megaphone } from 'lucide-react';
 import { AcpOutput } from './AcpOutput';
 import { AgentIdBadge } from '../../utils/markdown';
@@ -72,8 +73,8 @@ export function ChatPanel({ agentId, ws, api }: Props) {
     apiFetch(`/agents/${targetId}/message`, {
       method: 'POST',
       body: JSON.stringify({ text, mode }),
-    }).catch(() => {
-      // Silently ignore — message may still have been queued server-side
+    }).catch((err: Error) => {
+      useToastStore.getState().add('error', `Failed to send: ${err.message}`);
     });
   };
 

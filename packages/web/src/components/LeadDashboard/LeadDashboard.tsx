@@ -15,6 +15,8 @@ import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
 import { agentStatusText } from '../../utils/statusColors';
+import { apiFetch } from '../../hooks/useApi';
+import { useToastStore } from '../Toast';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
@@ -2163,6 +2165,8 @@ function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: a
 function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[]; onOpenChat?: (agentId: string) => void }) {
   const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
+  const [agentMsg, setAgentMsg] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
 
   const selectedDelegation = selectedAgent ? [...delegations].reverse().find((d: any) => d.toAgentId === selectedAgent.id) : null;
   const agentComms = selectedAgent ? (comms ?? []).filter((c) => c.fromId === selectedAgent.id || c.toId === selectedAgent.id) : [];
@@ -2181,7 +2185,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               <div
                 key={agent.id}
                 className="bg-th-bg-alt border border-th-border rounded p-1.5 cursor-pointer hover:border-th-border-hover transition-colors"
-                onClick={() => setSelectedAgent(agent)}
+                onClick={() => { setSelectedAgent(agent); setAgentMsg(''); setSendingMsg(false); }}
               >
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm leading-none">{agent.role.icon}</span>
@@ -2190,10 +2194,10 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   {onOpenChat && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onOpenChat(agent.id); }}
-                      className="text-xs leading-none text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 shrink-0 px-0.5"
+                      className="flex items-center gap-0.5 text-[10px] font-mono leading-none px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors shrink-0"
                       title="Open agent chat panel"
                     >
-                      💬
+                      <MessageSquare size={10} /> Chat
                     </button>
                   )}
                   <span className="text-[10px] font-mono text-th-text-muted shrink-0">{agent.id.slice(0, 8)}</span>
@@ -2415,6 +2419,61 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                 </div>
               )}
             </div>
+
+            {/* Message Input */}
+            <div className="px-4 py-3 border-t border-th-border">
+              <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1.5">Send Message</h4>
+              <div className="flex gap-2">
+                <textarea
+                  value={agentMsg}
+                  onChange={(e) => setAgentMsg(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (agentMsg.trim() && !sendingMsg) {
+                        setSendingMsg(true);
+                        apiFetch(`/agents/${selectedAgent.id}/message`, {
+                          method: 'POST',
+                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'queue' }),
+                        }).then(() => {
+                          setAgentMsg('');
+                          useToastStore.getState().add('success', `Message sent to ${selectedAgent.role.name}`);
+                        }).catch((err: Error) => {
+                          useToastStore.getState().add('error', `Failed to send: ${err.message}`);
+                        }).finally(() => setSendingMsg(false));
+                      }
+                    }
+                  }}
+                  placeholder={`Message ${selectedAgent.role.name}...`}
+                  className="flex-1 bg-th-bg border border-th-border rounded px-2.5 py-1.5 text-xs font-mono text-th-text resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                  rows={2}
+                  disabled={sendingMsg}
+                />
+                <button
+                  onClick={() => {
+                    if (agentMsg.trim() && !sendingMsg) {
+                      setSendingMsg(true);
+                      apiFetch(`/agents/${selectedAgent.id}/message`, {
+                        method: 'POST',
+                        body: JSON.stringify({ text: agentMsg.trim(), mode: 'queue' }),
+                      }).then(() => {
+                        setAgentMsg('');
+                        useToastStore.getState().add('success', `Message sent to ${selectedAgent.role.name}`);
+                      }).catch((err: Error) => {
+                        useToastStore.getState().add('error', `Failed to send: ${err.message}`);
+                      }).finally(() => setSendingMsg(false));
+                    }
+                  }}
+                  disabled={!agentMsg.trim() || sendingMsg}
+                  className="self-end px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
+                  title="Send message (Enter)"
+                >
+                  <Send size={12} /> {sendingMsg ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+              <p className="text-[10px] text-th-text-muted mt-1">Enter to send · Shift+Enter for newline · Message is queued for the agent</p>
+            </div>
+
           </div>
         </div>
       )}
