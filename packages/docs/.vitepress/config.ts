@@ -27,6 +27,7 @@ export default defineConfig({
             { text: 'Architecture', link: '/guide/architecture' },
             { text: 'Roles & Agents', link: '/guide/roles' },
             { text: 'Agent Commands', link: '/guide/commands' },
+            { text: 'Command Syntax', link: '/guide/command-syntax' },
             { text: 'Coordination', link: '/guide/coordination' },
             { text: 'TIDE Protocol', link: '/guide/tide-protocol' },
           ],
