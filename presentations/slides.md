@@ -1203,15 +1203,15 @@ session resume works but isn't seamless yet.
 -->
 ---
 
-# Open challenges
+# Remaining challenges
 
 <div class="grid grid-cols-2 gap-3 mt-2 text-sm">
-<div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
+<div class="bg-gray-800 rounded-lg p-3 border border-green-500">
 
-### ⚠️ Sequential lead bottleneck
-The lead processes one message at a time. If multiple agents report simultaneously, there's a queue.
+### ✅ Sequential lead bottleneck
+The lead processes one message at a time. If many agents report simultaneously, there's a queue.
 
-**Proposal:** Hierarchical leads — sub-leads for independent workstreams. Or parallel message processing.
+**Solved:** Hierarchical delegation — the lead can `CREATE_AGENT` with role `"lead"` to spawn **sub-leads** who manage their own workstreams independently.
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-yellow-500">
@@ -1227,7 +1227,7 @@ Opus for architecture, Sonnet for code, Haiku for simple tasks. Choosing the rig
 ### ⚠️ Coordination overhead
 More agents = more communication = more tokens on coordination vs actual work.
 
-**Partial:** DAG-based auto-scheduling reduces manual coordination. Chat groups reduce broadcast noise. But the ratio isn't optimized yet.
+**Partial:** DAG-based auto-scheduling and sub-leads reduce manual coordination. Chat groups reduce broadcast noise. Optimization is ongoing.
 
 </div>
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
