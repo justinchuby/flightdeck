@@ -546,10 +546,13 @@ export function apiRouter(
       const dashIndex = lastEventId.indexOf('-');
       if (dashIndex > 0) {
         const timestampBase36 = lastEventId.slice(0, dashIndex);
-        const reconnectTimestamp = new Date(parseInt(timestampBase36, 36)).toISOString();
-        const missedData = buildTimelineData(leadId, reconnectTimestamp);
-        const { teamAgentIds: _ignored, ...payload } = missedData;
-        writeSSE('reconnect', payload);
+        const ts = parseInt(timestampBase36, 36);
+        if (!isNaN(ts)) {
+          const reconnectTimestamp = new Date(ts).toISOString();
+          const missedData = buildTimelineData(leadId, reconnectTimestamp);
+          const { teamAgentIds: _ignored, ...payload } = missedData;
+          writeSSE('reconnect', payload);
+        }
       }
     }
 

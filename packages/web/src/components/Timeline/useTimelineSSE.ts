@@ -260,7 +260,7 @@ function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
     end: entry.timestamp > prev.timeRange.end ? entry.timestamp : prev.timeRange.end,
   };
 
-  return { agents, communications, locks, timeRange };
+  return { ...prev, agents, communications, locks, timeRange };
 }
 
 /** Merge an incremental lock event into existing timeline data */
