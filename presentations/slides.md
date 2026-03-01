@@ -555,7 +555,7 @@ Here's the incident that created it.
 </div>
 ---
 
-# Story 2: The Commit Catastrophe
+# The Commit Catastrophe
 
 <div class="bg-gray-800 rounded-lg p-3 border border-yellow-500 mt-2 text-sm">
 
@@ -589,6 +589,17 @@ the system. They built file locking — each developer claims files like
 checking out a library book. Multiple developers, 15+ files, zero conflicts.
 -->
 
+---
+layout: center
+---
+
+<div class="text-center text-xl text-gray-400">
+
+That's what happens when things go wrong.
+
+Now let's see how the lead **keeps it from happening again**.
+
+</div>
 
 ---
 layout: center
@@ -701,7 +712,7 @@ Here's what it looks like when a **real vulnerability** hits.
 </div>
 ---
 
-# Story 1: The Security Bug
+# The Security Bug
 
 <div class="bg-gray-800 rounded-lg p-4 border border-red-500 mt-2">
 
@@ -740,6 +751,17 @@ off on anyone else's work. The developer fixed it in minutes. This is why
 you want specialists — a generalist might have missed this.
 -->
 
+---
+layout: center
+---
+
+<div class="text-center text-xl text-gray-400">
+
+That bug was caught because agents **talk to each other**.
+
+Here's how.
+
+</div>
 
 ---
 
@@ -1502,10 +1524,10 @@ Describe Monday's sprint on Friday evening. **Monday morning: done.** Reviewed, 
 </div>
 <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-green-500">
 
-### 🤝 Your AI Engineering Crew
+### 🌐 Cross-Repo Coordination
 <div class="text-sm">
 
-Your own AI engineering crew. You make the creative calls — architecture, design, priorities. **They handle the rest at machine speed.**
+Agents working across multiple repositories simultaneously — frontend, backend, infrastructure, docs — all coordinated through the same DAG.
 
 </div>
 </div>
