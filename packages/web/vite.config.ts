@@ -10,11 +10,17 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true,
-        // Suppress EPIPE errors when backend restarts
+        // Suppress ECONNRESET / EPIPE errors when backend restarts or drops connections
         configure: (proxy) => {
           proxy.on('error', () => {});
           proxy.on('proxyReqWs', (_proxyReq, _req, socket) => {
             socket.on('error', () => {});
+          });
+          proxy.on('open', (socket) => {
+            socket.on('error', () => {});
+          });
+          proxy.on('close', (_res, socket) => {
+            socket?.on?.('error', () => {});
           });
         },
       },
