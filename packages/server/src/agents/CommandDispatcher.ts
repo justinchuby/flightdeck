@@ -99,9 +99,6 @@ export class CommandDispatcher {
     let buf = this.textBuffers.get(agent.id) || '';
     if (!buf) return;
 
-    // Normalize legacy triple-bracket delimiters to doubled Unicode brackets
-    buf = buf.replace(/\[\[\[/g, '⟦⟦').replace(/\]\]\]/g, '⟧⟧');
-
     let found = true;
     while (found) {
       found = false;

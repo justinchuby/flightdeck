@@ -18,17 +18,17 @@ import {
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const DECLARE_TASKS_REGEX = /⟦\s*DECLARE_TASKS\s*(\{.*?\})\s*⟧/s;
-const TASK_STATUS_REGEX = /⟦\s*TASK_STATUS\s*⟧/s;
-const QUERY_TASKS_REGEX = /⟦\s*QUERY_TASKS\s*⟧/s;
-const PAUSE_TASK_REGEX = /⟦\s*PAUSE_TASK\s*(\{.*?\})\s*⟧/s;
-const RETRY_TASK_REGEX = /⟦\s*RETRY_TASK\s*(\{.*?\})\s*⟧/s;
-const SKIP_TASK_REGEX = /⟦\s*SKIP_TASK\s*(\{.*?\})\s*⟧/s;
-const ADD_TASK_REGEX = /⟦\s*ADD_TASK\s*(\{.*?\})\s*⟧/s;
-const CANCEL_TASK_REGEX = /⟦\s*CANCEL_TASK\s*(\{.*?\})\s*⟧/s;
-const COMPLETE_TASK_REGEX = /⟦\s*COMPLETE_TASK\s*(\{.*?\})\s*⟧/s;
-const RESET_DAG_REGEX = /⟦\s*RESET_DAG\s*⟧/s;
-const ADD_DEPENDENCY_REGEX = /⟦\s*ADD_DEPENDENCY\s*(\{.*?\})\s*⟧/s;
+const DECLARE_TASKS_REGEX = /⟦⟦\s*DECLARE_TASKS\s*(\{.*?\})\s*⟧⟧/s;
+const TASK_STATUS_REGEX = /⟦⟦\s*TASK_STATUS\s*⟧⟧/s;
+const QUERY_TASKS_REGEX = /⟦⟦\s*QUERY_TASKS\s*⟧⟧/s;
+const PAUSE_TASK_REGEX = /⟦⟦\s*PAUSE_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const RETRY_TASK_REGEX = /⟦⟦\s*RETRY_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const SKIP_TASK_REGEX = /⟦⟦\s*SKIP_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const ADD_TASK_REGEX = /⟦⟦\s*ADD_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const CANCEL_TASK_REGEX = /⟦⟦\s*CANCEL_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const COMPLETE_TASK_REGEX = /⟦⟦\s*COMPLETE_TASK\s*(\{.*?\})\s*⟧⟧/s;
+const RESET_DAG_REGEX = /⟦⟦\s*RESET_DAG\s*⟧⟧/s;
+const ADD_DEPENDENCY_REGEX = /⟦⟦\s*ADD_DEPENDENCY\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 

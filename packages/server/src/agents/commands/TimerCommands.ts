@@ -14,9 +14,9 @@ import {
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const SET_TIMER_REGEX = /⟦\s*SET_TIMER\s*(\{.*?\})\s*⟧/s;
-const CANCEL_TIMER_REGEX = /⟦\s*CANCEL_TIMER\s*(\{.*?\})\s*⟧/s;
-const LIST_TIMERS_REGEX = /⟦\s*LIST_TIMERS\s*(?:\{.*?\})?\s*⟧/s;
+const SET_TIMER_REGEX = /⟦⟦\s*SET_TIMER\s*(\{.*?\})\s*⟧⟧/s;
+const CANCEL_TIMER_REGEX = /⟦⟦\s*CANCEL_TIMER\s*(\{.*?\})\s*⟧⟧/s;
+const LIST_TIMERS_REGEX = /⟦⟦\s*LIST_TIMERS\s*(?:\{.*?\})?\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 

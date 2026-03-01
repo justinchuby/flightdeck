@@ -14,10 +14,10 @@ import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const QUERY_CREW_REGEX = /⟦\s*QUERY_CREW\s*⟧/s;
-const HALT_HEARTBEAT_REGEX = /⟦\s*HALT_HEARTBEAT\s*⟧/s;
-const REQUEST_LIMIT_CHANGE_REGEX = /⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*⟧/s;
-const EXPORT_SESSION_REGEX = /⟦\s*EXPORT_SESSION\s*⟧/s;
+const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
+const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*⟧⟧/s;
+const REQUEST_LIMIT_CHANGE_REGEX = /⟦⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*⟧⟧/s;
+const EXPORT_SESSION_REGEX = /⟦⟦\s*EXPORT_SESSION\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -99,18 +99,18 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
     humanMsgIndicator = `\n⚠️ UNREAD HUMAN MESSAGE (${agoStr}): "${agent.lastHumanMessageText}"\nRespond to this FIRST before continuing other work.\n`;
   }
 
-  const response = `⟦ CREW_ROSTER${humanMsgIndicator}
+  const response = `⟦⟦ CREW_ROSTER${humanMsgIndicator}
 == YOUR CREW (you can DELEGATE to these) ==
 ${rosterLines}
 ${budgetLine}${siblingSection}${memorySection}
 ⚠️ You can only DELEGATE to agents you created (your crew). Agents from other projects will return "Agent not found".
 To assign a task to an agent, use their ID:
-\`⟦ DELEGATE {"to": "agent-id", "task": "your task"} ⟧\`
+\`⟦⟦ DELEGATE {"to": "agent-id", "task": "your task"} ⟧⟧\`
 To create a new agent:
-\`⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} ⟧\`
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} ⟧⟧\`
 To terminate an agent and free a slot:
-\`⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "no longer needed"} ⟧\`
-CREW_ROSTER ⟧`;
+\`⟦⟦ TERMINATE_AGENT {"id": "agent-id", "reason": "no longer needed"} ⟧⟧\`
+CREW_ROSTER ⟧⟧`;
 
   logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${roster.length} agents`);
   agent.sendMessage(response);

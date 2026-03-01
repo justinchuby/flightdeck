@@ -32,7 +32,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   }
 
   const rawOutput = agent.getRecentOutput(16000);
-  const cleanPreview = rawOutput.replace(/⟦[\s\S]*?⟧/g, '').replace(/⟦[\s\S]*$/g, '').trim().slice(-12000);
+  const cleanPreview = rawOutput.replace(/⟦⟦[\s\S]*?⟧⟧/g, '').replace(/⟦⟦[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
   const dagLabel = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
@@ -104,7 +104,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
 
   const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
   const rawOutput2 = agent.getRecentOutput(16000);
-  const cleanPreview2 = rawOutput2.replace(/⟦[\s\S]*?⟧/g, '').replace(/⟦[\s\S]*$/g, '').trim().slice(-12000);
+  const cleanPreview2 = rawOutput2.replace(/⟦⟦[\s\S]*?⟧⟧/g, '').replace(/⟦⟦[\s\S]*$/g, '').trim().slice(-12000);
   const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief2 = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
   const dagLabel2 = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';

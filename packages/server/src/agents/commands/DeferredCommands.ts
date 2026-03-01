@@ -10,9 +10,9 @@ import {
 
 // ── Regex patterns ──────────────────────────────────────────────────
 
-const DEFER_ISSUE_REGEX = /⟦\s*DEFER_ISSUE\s*(\{.*?\})\s*⟧/s;
-const QUERY_DEFERRED_REGEX = /⟦\s*QUERY_DEFERRED\s*(\{.*?\})?\s*⟧/s;
-const RESOLVE_DEFERRED_REGEX = /⟦\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*⟧/s;
+const DEFER_ISSUE_REGEX = /⟦⟦\s*DEFER_ISSUE\s*(\{.*?\})\s*⟧⟧/s;
+const QUERY_DEFERRED_REGEX = /⟦⟦\s*QUERY_DEFERRED\s*(\{.*?\})?\s*⟧⟧/s;
+const RESOLVE_DEFERRED_REGEX = /⟦⟦\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Exported: command entry list ─────────────────────────────────────
 

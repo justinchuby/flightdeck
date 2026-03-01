@@ -10,7 +10,7 @@ import { logger } from '../../utils/logger.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const EXPORT_SESSION_REGEX = /⟦\s*EXPORT_SESSION\s*(?:\{.*?\})?\s*⟧/s;
+const EXPORT_SESSION_REGEX = /⟦⟦\s*EXPORT_SESSION\s*(?:\{.*?\})?\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 

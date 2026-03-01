@@ -22,12 +22,12 @@ const execAsync = promisify(exec);
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const LOCK_REQUEST_REGEX = /⟦\s*LOCK_FILE\s*(\{.*?\})\s*⟧/s;
-const LOCK_RELEASE_REGEX = /⟦\s*UNLOCK_FILE\s*(\{.*?\})\s*⟧/s;
-const ACTIVITY_REGEX = /⟦\s*ACTIVITY\s*(\{.*?\})\s*⟧/s;
-const DECISION_REGEX = /⟦\s*DECISION\s*(\{.*?\})\s*⟧/s;
-const PROGRESS_REGEX = /⟦\s*PROGRESS\s*(\{.*?\})\s*⟧/s;
-const COMMIT_REGEX = /⟦\s*COMMIT\s*(\{.*?\})\s*⟧/s;
+const LOCK_REQUEST_REGEX = /⟦⟦\s*LOCK_FILE\s*(\{.*?\})\s*⟧⟧/s;
+const LOCK_RELEASE_REGEX = /⟦⟦\s*UNLOCK_FILE\s*(\{.*?\})\s*⟧⟧/s;
+const ACTIVITY_REGEX = /⟦⟦\s*ACTIVITY\s*(\{.*?\})\s*⟧⟧/s;
+const DECISION_REGEX = /⟦⟦\s*DECISION\s*(\{.*?\})\s*⟧⟧/s;
+const PROGRESS_REGEX = /⟦⟦\s*PROGRESS\s*(\{.*?\})\s*⟧⟧/s;
+const COMMIT_REGEX = /⟦⟦\s*COMMIT\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
         filePath: request.filePath,
         reason: request.reason,
       });
-      agent.sendMessage(`[System] Lock acquired on \`${request.filePath}\`. You may proceed with edits. Remember to release it when done with ⟦ UNLOCK_FILE {"filePath": "${request.filePath}"} ⟧`);
+      agent.sendMessage(`[System] Lock acquired on \`${request.filePath}\`. You may proceed with edits. Remember to release it when done with ⟦⟦ UNLOCK_FILE {"filePath": "${request.filePath}"} ⟧⟧`);
     } else {
       const holderShort = result.holder?.slice(0, 8) ?? 'unknown';
       agent.sendMessage(`[System] Lock DENIED on \`${request.filePath}\` — currently held by agent ${holderShort}. Wait for them to release it, or coordinate via AGENT_MESSAGE.`);

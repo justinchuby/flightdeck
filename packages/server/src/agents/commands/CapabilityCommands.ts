@@ -11,9 +11,9 @@ import { parseCommandPayload, acquireCapabilitySchema, releaseCapabilitySchema }
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const ACQUIRE_REGEX = /⟦\s*ACQUIRE_CAPABILITY\s*(\{.*?\})\s*⟧/s;
-const LIST_REGEX = /⟦\s*LIST_CAPABILITIES\s*⟧/s;
-const RELEASE_REGEX = /⟦\s*RELEASE_CAPABILITY\s*(\{.*?\})\s*⟧/s;
+const ACQUIRE_REGEX = /⟦⟦\s*ACQUIRE_CAPABILITY\s*(\{.*?\})\s*⟧⟧/s;
+const LIST_REGEX = /⟦⟦\s*LIST_CAPABILITIES\s*⟧⟧/s;
+const RELEASE_REGEX = /⟦⟦\s*RELEASE_CAPABILITY\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 

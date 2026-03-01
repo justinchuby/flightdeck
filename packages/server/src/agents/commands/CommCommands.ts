@@ -15,15 +15,15 @@ import {
 
 // ── Regex patterns ──────────────────────────────────────────────────
 
-const AGENT_MESSAGE_REGEX = /⟦\s*AGENT_MESSAGE\s*(\{.*?\})\s*⟧/s;
-const BROADCAST_REGEX = /⟦\s*BROADCAST\s*(\{.*?\})\s*⟧/s;
-const CREATE_GROUP_REGEX = /⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧/s;
-const ADD_TO_GROUP_REGEX = /⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧/s;
-const REMOVE_FROM_GROUP_REGEX = /⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧/s;
-const GROUP_MESSAGE_REGEX = /⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧/s;
-const LIST_GROUPS_REGEX = /⟦\s*LIST_GROUPS\s*⟧/s;
-const QUERY_GROUPS_REGEX = /⟦\s*QUERY_GROUPS\s*⟧/s;
-const INTERRUPT_REGEX = /⟦\s*INTERRUPT\s*(\{.*?\})\s*⟧/s;
+const AGENT_MESSAGE_REGEX = /⟦⟦\s*AGENT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
+const BROADCAST_REGEX = /⟦⟦\s*BROADCAST\s*(\{.*?\})\s*⟧⟧/s;
+const CREATE_GROUP_REGEX = /⟦⟦\s*CREATE_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+const ADD_TO_GROUP_REGEX = /⟦⟦\s*ADD_TO_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+const REMOVE_FROM_GROUP_REGEX = /⟦⟦\s*REMOVE_FROM_GROUP\s*(\{.*?\})\s*⟧⟧/s;
+const GROUP_MESSAGE_REGEX = /⟦⟦\s*GROUP_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
+const LIST_GROUPS_REGEX = /⟦⟦\s*LIST_GROUPS\s*⟧⟧/s;
+const QUERY_GROUPS_REGEX = /⟦⟦\s*QUERY_GROUPS\s*⟧⟧/s;
+const INTERRUPT_REGEX = /⟦⟦\s*INTERRUPT\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Exported: command entry list ─────────────────────────────────────
 
@@ -256,7 +256,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
       if (memberId === agent.id) continue;
       const member = ctx.getAgent(memberId);
       if (member && (member.status === 'running' || member.status === 'idle')) {
-        member.sendMessage(`[System] You've been added to group "${req.name}". Members: ${memberNames}.\nSend messages: ⟦ GROUP_MESSAGE {"group": "${req.name}", "content": "your message"} ⟧`);
+        member.sendMessage(`[System] You've been added to group "${req.name}". Members: ${memberNames}.\nSend messages: ⟦⟦ GROUP_MESSAGE {"group": "${req.name}", "content": "your message"} ⟧⟧`);
       }
     }
 
@@ -306,7 +306,7 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
           if (history.length > 0) {
             historyText = '\nRecent messages:\n' + history.map((m) => `  [${m.fromRole} (${m.fromAgentId.slice(0, 8)})]: ${m.content}`).join('\n');
           }
-          member.sendMessage(`[System] You've been added to group "${req.group}". Members: ${memberNames}.${historyText}\nSend messages: ⟦ GROUP_MESSAGE {"group": "${req.group}", "content": "..."} ⟧`);
+          member.sendMessage(`[System] You've been added to group "${req.group}". Members: ${memberNames}.${historyText}\nSend messages: ⟦⟦ GROUP_MESSAGE {"group": "${req.group}", "content": "..."} ⟧⟧`);
         }
       }
       const names = added.map((id) => ctx.getAgent(id)?.role.name || id.slice(0, 8)).join(', ');
@@ -394,7 +394,7 @@ function handleListGroups(ctx: CommandHandlerContext, agent: Agent): void {
       : 'no messages yet';
     return `- "${g.name}" — ${g.memberIds.length} members: ${memberNames}\n  ${msgInfo}`;
   });
-  agent.sendMessage(`[System] Your groups (${groups.length}):\n${lines.join('\n')}\nSend messages: ⟦ GROUP_MESSAGE {"group": "name", "content": "..."} ⟧`);
+  agent.sendMessage(`[System] Your groups (${groups.length}):\n${lines.join('\n')}\nSend messages: ⟦⟦ GROUP_MESSAGE {"group": "name", "content": "..."} ⟧⟧`);
 }
 
 // ── INTERRUPT handler ───────────────────────────────────────────────
