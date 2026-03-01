@@ -96,6 +96,8 @@ export class Agent {
   private exitListeners: Array<(code: number) => void> = [];
   private hungListeners: Array<(elapsedMs: number) => void> = [];
   private statusListeners: Array<(status: AgentStatus) => void> = [];
+  private _idleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly IDLE_DEBOUNCE_MS = 500;
   private pendingMessages: string[] = [];
   private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
   private planListeners: Array<(entries: PlanEntry[]) => void> = [];
@@ -279,9 +281,7 @@ export class Agent {
           return;
         }
         this.status = 'idle';
-        for (const listener of this.statusListeners) {
-          listener(this.status);
-        }
+        this.notifyStatus(this.status);
         for (const listener of this.hungListeners) {
           listener(0);
         }
@@ -293,9 +293,7 @@ export class Agent {
       if (this.terminated) return;
       if (active && this.status !== 'running') {
         this.status = 'running';
-        for (const listener of this.statusListeners) {
-          listener(this.status);
-        }
+        this.notifyStatus(this.status);
       }
     });
   }
@@ -492,17 +490,13 @@ CREW_UPDATE ]]]`;
     if (this.terminated) return;
     if (this.acpConnection?.isConnected) {
       this.status = 'running';
-      for (const listener of this.statusListeners) {
-        listener(this.status);
-      }
+      this.notifyStatus(this.status);
       this.acpConnection.prompt(data).catch((err) => {
         logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
         // Reset status so agent doesn't get stuck as 'running'
         if (this.status === 'running') {
           this.status = 'idle';
-          for (const listener of this.statusListeners) {
-            listener(this.status);
-          }
+          this.notifyStatus(this.status);
         }
       });
     }
@@ -608,9 +602,7 @@ CREW_UPDATE ]]]`;
     if (this.terminated) return;
     this.terminated = true;
     this.status = 'terminated';
-    for (const listener of this.statusListeners) {
-      listener(this.status);
-    }
+    this.notifyStatus(this.status);
     if (this.acpConnection) {
       this.acpConnection.terminate();
       this.acpConnection = null;
@@ -623,6 +615,10 @@ CREW_UPDATE ]]]`;
     this.exitListeners.length = 0;
     this.hungListeners.length = 0;
     this.statusListeners.length = 0;
+    if (this._idleDebounceTimer) {
+      clearTimeout(this._idleDebounceTimer);
+      this._idleDebounceTimer = null;
+    }
     this.sessionReadyListeners.length = 0;
     this.toolCallListeners.length = 0;
     this.planListeners.length = 0;
@@ -652,6 +648,30 @@ CREW_UPDATE ]]]`;
 
   onStatus(listener: (status: AgentStatus) => void): void {
     this.statusListeners.push(listener);
+  }
+
+  /**
+   * Debounced status notification. Idle transitions are delayed by IDLE_DEBOUNCE_MS
+   * to avoid rapid running→idle→running churn in the activity log.
+   * Non-idle transitions fire immediately and cancel any pending idle.
+   */
+  private notifyStatus(status: AgentStatus): void {
+    if (this._idleDebounceTimer) {
+      clearTimeout(this._idleDebounceTimer);
+      this._idleDebounceTimer = null;
+    }
+    if (status === 'idle') {
+      this._idleDebounceTimer = setTimeout(() => {
+        this._idleDebounceTimer = null;
+        for (const listener of this.statusListeners) {
+          listener(status);
+        }
+      }, Agent.IDLE_DEBOUNCE_MS);
+    } else {
+      for (const listener of this.statusListeners) {
+        listener(status);
+      }
+    }
   }
 
   onToolCall(listener: (info: ToolCallInfo) => void): void {
