@@ -852,42 +852,107 @@ with an architect splitting it up? That's Tuesday.
 -->
 
 ---
+layout: center
+---
 
-# Where this is going
+# Imagine where this goes next
 
-<div class="space-y-3 mt-2">
+<div class="text-xl text-gray-400 mt-2">Seven ideas that keep us up at night</div>
 
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
+<!--
+We've shown you what's possible today. Now let's talk about where this is
+going. These aren't just roadmap items — they're paradigm shifts in how
+software gets built. Each one of these is within reach.
+-->
 
-### 🔜 Next
-Each agent gets its own git branch — no more file locking needed. Plus persistent memory across sessions — agents remember what they learned.
+---
+
+# Future Vision
+
+<div class="grid grid-cols-2 gap-3 mt-1">
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-blue-500">
+
+### 🧠 Institutional Memory
+Agents get **smarter across sessions**. "Last time we refactored api.ts, splitting by route worked best." Knowledge compounds.
 
 </div>
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-yellow-500">
 
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-
-### 🔮 Soon
-Agents that span multiple repos. Automatic CI/CD verification. Cost optimization — the system picks the right model for each task.
-
-</div>
-
-<div class="bg-gray-800 rounded-lg p-3 border border-gray-700">
-
-### 🚀 Eventually
-Self-improving teams. Agents that learn from experience and teach each other. Multiple AI Crews coordinating across an organization.
+### ⚡ Smart Model Routing
+GPT-5 for architecture decisions. Haiku for formatting fixes. **10x cost reduction** — the system picks the right brain for each task.
 
 </div>
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-purple-500">
+
+### 🌙 Overnight Autonomy
+Push a backlog before bed. Wake up to PRs, test results, and a summary. Self-healing teams that **restart failed agents** and route around problems.
+
+</div>
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-3 border border-green-500">
+
+### 🤝 Human-AI Mixed Teams
+AI handles 80% of implementation. Humans review, make judgment calls, and ship. **Your team becomes 10x larger overnight.**
+
+</div>
+</div>
+
+<!--
+Institutional memory means agents learn from past sessions — "last time
+we split api.ts by route and it worked great, let's do that again." Smart
+model routing matches the right model to each task — why use the most
+expensive model for a formatting fix? Overnight autonomy means you push a
+backlog, go home, and wake up to pull requests. Human-AI mixed teams means
+your 5-person team operates like a 50-person team — AI does the bulk work,
+humans make the decisions.
+-->
+
+---
+
+# Future Vision
+
+<div class="grid grid-cols-3 gap-3 mt-2">
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-cyan-500">
+
+### 🔮 Predictive Planning
+
+*"This feature will take 3 agents, ~45 minutes, and cost $2.40"*
+
+Accurate estimates **before writing a single line of code.**
+
+</div>
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-orange-500">
+
+### 🧬 Emergent Specialization
+
+Agents that worked well together get **paired again**. Teams evolve their own working relationships — like a real company.
+
+</div>
+<div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-pink-500">
+
+### 🌐 Cross-Project Intelligence
+
+Knowledge flows between projects. A pattern discovered in Project A **automatically improves** Project B. Organizational learning at machine speed.
+
+</div>
+</div>
+
+<br/>
+
+<div class="text-center">
+
+<div class="text-2xl text-gray-300">The question isn't whether AI teams will build software.</div>
+<div class="text-2xl text-blue-400 font-bold mt-1">It's whether you'll be the one directing them.</div>
 
 </div>
 
 <!--
-Where is this going? Near term: git worktree isolation means each agent
-gets its own branch — no more file locking contention at all. Plus
-persistent memory — agents remember patterns from previous sessions. Soon:
-multi-repo support, CI integration, automatic cost optimization. Long term:
-self-improving teams where agents learn skills from experience, teach each
-other, and multiple crews coordinate across an org. We're building toward
-a world where you describe what you want and a team makes it happen.
+Predictive planning uses historical data to estimate cost, time, and
+complexity before you start. Emergent specialization means agents that
+collaborate well get paired together again — the system builds its own
+dream teams. And cross-project intelligence means knowledge flows between
+projects automatically. A pattern one team discovers improves every other
+team. This is organizational learning at machine speed. The question isn't
+if this is coming. It's whether you'll be leading it or following.
 -->
 
 ---
