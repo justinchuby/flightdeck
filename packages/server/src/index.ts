@@ -167,7 +167,14 @@ timerRegistry.start();
 import { CapabilityInjector } from './agents/capabilities/CapabilityInjector.js';
 const capabilityInjector = new CapabilityInjector();
 
-const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer });
+// Git worktree isolation — each agent gets its own working copy
+import { WorktreeManager } from './coordination/WorktreeManager.js';
+const worktreeManager = new WorktreeManager(process.cwd());
+worktreeManager.cleanupOrphans().catch(err => {
+  console.warn(`[worktree] Orphan cleanup failed on startup: ${err.message}`);
+});
+
+const agentManager = new AgentManager(config, roleRegistry, lockRegistry, activityLedger, messageBus, decisionLog, agentMemory, chatGroupRegistry, taskDAG, { db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager });
 agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);

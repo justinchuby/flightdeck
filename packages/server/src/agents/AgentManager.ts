@@ -17,6 +17,7 @@ import type { SessionExporter } from '../coordination/SessionExporter.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
+import type { WorktreeManager } from '../coordination/WorktreeManager.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
@@ -97,6 +98,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private dispatcher: CommandDispatcher;
   private heartbeat: HeartbeatMonitor;
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
+  private worktreeManager?: WorktreeManager;
   private _systemPaused = false;
 
   constructor(
@@ -109,7 +111,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager } = {},
   ) {
     super();
     this.config = config;
@@ -124,6 +126,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.deferredIssueRegistry = deferredIssueRegistry ?? (null as any);
     this.timerRegistry = timerRegistry ?? (null as any);
     this.capabilityInjector = capabilityInjector;
+    this.worktreeManager = worktreeManager;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -480,7 +483,22 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     });
 
-    agent.start();
+    // Create isolated worktree if manager is available (async — delays agent.start)
+    if (this.worktreeManager && !cwd) {
+      this.worktreeManager.create(agent.id)
+        .then(worktreePath => {
+          agent.cwd = worktreePath;
+          logger.info('worktree', `Agent ${agent.id.slice(0, 8)} using worktree at ${worktreePath}`);
+        })
+        .catch(err => {
+          logger.warn('worktree', `Worktree creation failed for ${agent.id.slice(0, 8)}, using shared cwd: ${err.message}`);
+        })
+        .finally(() => {
+          agent.start();
+        });
+    } else {
+      agent.start();
+    }
     logger.info('agent', `Spawned ${role.name} (${agent.id.slice(0, 8)})`, {
       autopilot: agent.autopilot,
       parentId: parentId?.slice(0, 8),
@@ -488,6 +506,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
     this.emit('agent:spawned', agent.toJSON());
     this.updateLeadBudgets();
+
+    // Auto-add to groups with matching role criteria (B4: group auto-add)
+    if (parentId) {
+      this.autoAddToRoleGroups(agent);
+    }
+
     return agent;
   }
 
@@ -550,6 +574,21 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     // Clean up acquired capabilities
     if (this.capabilityInjector) this.capabilityInjector.clearAgent(id);
+
+    // Merge worktree back and clean up (async, fire-and-forget)
+    if (this.worktreeManager?.getWorktree(id)) {
+      this.worktreeManager.merge(id)
+        .then(result => {
+          if (!result.ok) {
+            logger.warn('worktree', `Merge failed for ${id.slice(0, 8)}: ${result.conflicts?.join(', ')}`);
+          }
+        })
+        .finally(() => {
+          this.worktreeManager!.cleanup(id).catch(err => {
+            logger.warn('worktree', `Cleanup failed for ${id.slice(0, 8)}: ${err.message}`);
+          });
+        });
+    }
 
     // Auto-archive groups where all members are now in terminal status
     this.archiveOrphanedGroups(id);
@@ -685,6 +724,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         agent.terminate();
       }
     }
+    // Clean up all worktrees (async, best-effort)
+    this.worktreeManager?.cleanupAll().catch(err => {
+      logger.warn('worktree', `Shutdown worktree cleanup failed: ${err.message}`);
+    });
   }
 
   getDelegations(parentId?: string): import('./CommandDispatcher.js').Delegation[] {
