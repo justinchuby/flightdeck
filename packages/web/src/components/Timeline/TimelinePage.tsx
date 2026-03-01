@@ -138,6 +138,7 @@ export function TimelinePage({ api, ws }: Props) {
     hiddenStatuses.size;
 
   // ── Since-last-visit tracking ────────────────────────────────────────
+  // Synthetic IDs (comm-/seg- prefix) — will migrate to server ULIDs when available
   const eventIds = useMemo(() => {
     if (!data) return [];
     const events: { id: string; time: string }[] = [];
@@ -160,7 +161,6 @@ export function TimelinePage({ api, ws }: Props) {
 
   // Mark events as seen when user interacts with the timeline
   useEffect(() => {
-    if (data && !liveMode) return; // only auto-mark in live mode
     if (data && liveMode) markAsSeen();
   }, [data, liveMode, markAsSeen]);
 
@@ -182,12 +182,13 @@ export function TimelinePage({ api, ws }: Props) {
   const timelineMainRef = useRef<HTMLDivElement>(null);
 
   const handleScrollToError = useCallback((errorId: string) => {
-    // Scroll the timeline container to bring the error agent into view
-    const el = timelineMainRef.current?.querySelector(`[data-agent-id="${errorId}"]`);
+    // Target HTML scroll anchor first, fall back to SVG g element
+    // (scrollIntoView on SVG <g> is inconsistent in Safari/Firefox)
+    const anchor = timelineMainRef.current?.querySelector(`[data-agent-scroll-anchor="${errorId}"]`);
+    const el = anchor ?? timelineMainRef.current?.querySelector(`[data-agent-id="${errorId}"]`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      // Fallback: scroll to top of timeline
       timelineMainRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, []);
