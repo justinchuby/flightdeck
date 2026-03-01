@@ -57,11 +57,13 @@ A floating banner that appears when the user returns after a period of inactivit
 
 #### Thinking/Reasoning Text
 
-When an agent emits `agent_thought_chunk` ACP events (thinking/reasoning text), these are:
-- Streamed and accumulated like regular text chunks
-- Displayed in the chat panel as **italic text in lighter gray** (`text-gray-400 italic`)
-- Visually distinct from the agent's actual output, making it easy to distinguish reasoning from responses
-- Rendered inline in the agent's message bubble as it streams
+When an agent emits `agent_thought_chunk` ACP events (thinking/reasoning text), these are displayed as **collapsible reasoning blocks** in both agent chats and the main lead chat:
+
+- **Collapsed by default** — Shows a 💡 icon with a preview of the first ~80 characters
+- **Click to expand** — Reveals the full reasoning text
+- **Paragraph breaks** — A `pendingNewline` flag in the store ensures proper paragraph separation after reasoning blocks, preventing content from being misidentified as user-directed
+- **Empty text guard** — `CollapsibleReasoningBlock` returns `null` for empty/whitespace-only reasoning to avoid rendering empty blocks
+- **Consistent across views** — Same collapsed/expandable pattern in both agent detail chats and the main lead dashboard chat
 
 ## Compact Team Cards
 
@@ -148,12 +150,23 @@ The Timeline view (`/timeline`) provides a swim-lane visualization of agent acti
 
 | Feature | Control | Description |
 |---------|---------|-------------|
-| **Brush time selector** | Click-drag on mini-timeline | Select a time range to zoom into. The mini-timeline at the bottom shows the full session; the main view shows the selected range. |
+| **Brush time selector** | Click-drag on mini-timeline | Select a time range to zoom into. The mini-timeline at the bottom shows the full session; the main view shows the selected range. Brush area is aligned with the chart via `leftOffset` to account for the label column width. |
 | **Keyboard navigation** | ←/→ arrows | Pan the view left/right through time |
-| **Zoom** | +/- keys | Zoom in/out on the time axis |
+| **Zoom** | +/- keys | Zoom in/out on the time axis. Uses a `liveModeRef` to prevent race conditions between zoom gestures and SSE data updates. |
 | **Filtering** | Dropdown menus | Filter by agent role, communication type (direct/broadcast/group), or agent status |
 | **Live mode** | Toggle button | Auto-scrolls to follow the latest activity as it happens |
 | **Hover tooltips** | Mouse over segment | Shows status badge, task label, time span (start → end), and duration. Uses `@visx/tooltip` with `TooltipWithBounds` for smart positioning. |
+| **Project tabs** | Tab bar | Always-visible project tab bar for switching between active projects. Each tab preserves its own state (zoom, filters, expanded lanes). |
+| **Clear Timeline** | Button | Resets cached timeline data for the current project, triggering a fresh SSE reconnection. |
+| **Adaptive date display** | Automatic | Shows time-only (HH:MM:SS) for sessions <24 hours, date+time (MMM DD HH:MM) for multi-day sessions. Powered by the shared `formatTimestamp()` utility. |
+
+### State Persistence
+
+Timeline state is managed by a Zustand store (`timelineStore.ts`) that survives React Router unmounts:
+
+- **Per-lead state** — Each project/lead has its own cached data, expanded agents, and view settings
+- **LRU eviction** — Cached data is capped at 10 entries; oldest entries are evicted by insertion order when the limit is exceeded
+- **Stable selectors** — `getExpandedAgents()` returns a shared `EMPTY_SET` constant for leads with no expanded agents, avoiding unnecessary re-renders
 
 ### Design Choices
 

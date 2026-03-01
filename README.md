@@ -27,9 +27,11 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 ### 📈 Visualization & Monitoring
 - **Mission Control** — Single-screen project overview with 8 configurable panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards. Drag-and-drop panel reordering in Settings.
-- **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, idle hatch patterns, and hover tooltips showing task details and duration
+- **Timeline** — Swim-lane visualization of agent activity with filtering (role, status, comm type), interactive brush time selector, keyboard navigation, live auto-scroll mode, idle hatch patterns, hover tooltips showing task details and duration, **project tabs** for multi-project sessions, **Zustand store persistence** (state survives tab switches), **adaptive date display** (time-only for <24h sessions, date+time for multi-day), and **Clear Timeline** button for resetting cached data
+- **Org Chart** — Team hierarchy visualization with **project tabs** for switching between active projects
+- **DAG / Gantt Chart** — Scrollable and zoomable task Gantt chart with local timezone display
 - **Token Economics** — Per-agent token breakdown with context pressure bars (80% yellow, 90% red warning thresholds)
-- **Proactive Alerts** — Automatic detection of stuck agents (10min), context pressure (>85%), duplicate file edits, idle agents with ready tasks, and stale decisions (>10min)
+- **Proactive Alerts** — Automatic detection of context pressure (>85%), duplicate file edits, idle agents with ready tasks, and stale decisions (>10min). _Note: Stuck agent detection is currently disabled to reduce noise in long-running sessions._
 - **Real-Time Dashboard** — Live activity feed, team status, user-message highlighting (blue tint), agent reply highlighting via WebSocket
 - **User-Directed Message Highlighting** — Lead marks messages intended for the user with `@user`; these render with accent border + background to stand out from system reactions
 - **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed) with filter toggles

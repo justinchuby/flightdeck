@@ -117,7 +117,9 @@ GET /api/coordination/summary    — aggregate stats
 
 ### Layer 3: Context Refresh
 
-Context updates are pushed to all running agents on significant events (not on a periodic timer, to avoid wasting tokens on idle heartbeats):
+Context updates are pushed to all running agents on significant events (not on a periodic timer, to avoid wasting tokens on idle heartbeats).
+
+The peer list is built by `buildPeerList()` in `ContextRefresher.ts`, which maps each agent to an `AgentContextInfo` object including `id`, `role`, `roleName`, `status`, `task`, `parentId`, `model`, and `lockedFiles`. The `parentId` and `model` fields are essential for the YOUR AGENTS / OTHER CREW classification in the lead's context — without them, Agent.ts cannot determine parent-child relationships.
 
 For the **Project Lead**, the update includes a **health header** followed by the agent roster:
 ```
@@ -256,13 +258,15 @@ The `EventPipeline` (`packages/server/src/coordination/EventPipeline.ts`) provid
 
 The `AlertEngine` (`packages/server/src/coordination/AlertEngine.ts`) runs on a 60-second interval and detects conditions that need attention:
 
-| Alert Type | Threshold | Severity |
-|------------|-----------|----------|
-| `stuck_agent` | Running 10+ minutes with no activity | warning |
-| `context_pressure` | Context usage >85% | warning (85–95%), critical (>95%) |
-| `duplicate_file_edit` | Multiple agents locking same file | warning |
-| `idle_agents_ready_tasks` | Idle agents while DAG has ready tasks | info |
-| `stale_decision` | Pending decisions >10 minutes old | warning |
+| Alert Type | Threshold | Severity | Status |
+|------------|-----------|----------|--------|
+| `stuck_agent` | Running 10+ minutes with no activity | warning | **Disabled** — early return in `checkStuckAgents()`. Too noisy for long-running sessions. Code preserved for re-enabling. |
+| `context_pressure` | Context usage >85% | warning (85–95%), critical (>95%) | Active |
+| `duplicate_file_edit` | Multiple agents locking same file | warning | Active |
+| `idle_agents_ready_tasks` | Idle agents while DAG has ready tasks | info | Active |
+| `stale_decision` | Pending decisions >10 minutes old | warning | Active |
+
+**Prompting timeout:** When stuck detection is re-enabled, agents with active LLM calls (`isPrompting`) are skipped — but only if the call started less than 30 minutes ago. The `promptingStartedAt` timestamp (tracked in `AcpConnection`, exposed via `Agent.ts`) prevents hung LLM calls from masking genuinely stuck agents.
 
 **API:** `GET /api/coordination/alerts` — Returns current alert array
 
