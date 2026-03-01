@@ -56,7 +56,7 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
       className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[70vh]">
+      <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-lg flex flex-col h-[70vh]">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-th-border">
           <FolderOpen className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
           <span className="text-sm font-semibold text-th-text">Select Directory</span>
