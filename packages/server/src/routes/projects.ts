@@ -108,6 +108,10 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
 
       logger.info('project', `Resumed project "${project.name}" with new lead (${agent.id.slice(0, 8)})`);
+
+      // Auto-spawn Secretary for DAG tracking (skips if one exists)
+      agentManager.autoSpawnSecretary(agent);
+
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error('project', `Failed to resume project: ${err.message}`);

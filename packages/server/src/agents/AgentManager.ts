@@ -240,6 +240,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       lockedFiles: [],
       model: a.model,
       parentId: a.parentId,
+      isSystemAgent: a.isSystemAgent || undefined,
     }));
 
     // For lead agents, inject dynamic role list (including custom roles) before creating
@@ -632,6 +633,43 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   getAll(): Agent[] {
     return Array.from(this.agents.values());
+  }
+
+  /** Auto-spawn a Secretary agent as a child of the given lead. Returns the secretary or null. */
+  autoSpawnSecretary(leadAgent: Agent): Agent | null {
+    // Only for root leads (sub-leads don't get auto-secretary)
+    if (leadAgent.parentId) return null;
+
+    // Skip if lead already has a secretary
+    const existing = this.getAll().find(a =>
+      a.parentId === leadAgent.id &&
+      a.role.id === 'secretary' &&
+      a.status !== 'terminated' && a.status !== 'failed' && a.status !== 'completed'
+    );
+    if (existing) return existing;
+
+    const secretaryRole = this.roleRegistry.get('secretary');
+    if (!secretaryRole) return null;
+
+    try {
+      const secretary = this.spawn(
+        secretaryRole,
+        'You are the auto-created project secretary. Track DAG progress, provide status reports when asked, and assist with dependency inference for auto-DAG tasks.',
+        leadAgent.id,
+        true,
+        'gpt-4.1',
+        leadAgent.cwd,
+        undefined,
+        undefined,
+        { projectName: leadAgent.projectName, projectId: leadAgent.projectId },
+      );
+      secretary.isSystemAgent = true;
+      logger.info('agent', `Auto-spawned secretary (${secretary.id.slice(0, 8)}) for lead (${leadAgent.id.slice(0, 8)})`);
+      return secretary;
+    } catch (err: any) {
+      logger.warn('agent', `Failed to auto-spawn secretary: ${err.message}`);
+      return null;
+    }
   }
 
   /** Count agents that are alive (running, idle, or creating) — used for concurrency limit */

@@ -122,6 +122,7 @@ const mockAgentManager = {
   markHumanInterrupt: vi.fn(),
   persistHumanMessage: vi.fn(),
   consumePendingSystemAction: vi.fn().mockReturnValue(undefined),
+  autoSpawnSecretary: vi.fn().mockReturnValue(null),
 };
 
 const mockRole = { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '#888', icon: '🤖', model: 'claude-sonnet-4.5' };
@@ -215,6 +216,7 @@ beforeEach(() => {
   mockAgentManager.getChatGroupRegistry.mockReturnValue(mockChatGroupRegistry);
   mockAgentManager.getDelegations.mockReturnValue([]);
   mockAgentManager.getTaskDAG.mockReturnValue(mockTaskDAG);
+  mockAgentManager.autoSpawnSecretary.mockReturnValue(null);
 
   mockRoleRegistry.get.mockReturnValue(mockRole);
   mockRoleRegistry.getAll.mockReturnValue([mockRole]);
@@ -695,56 +697,37 @@ describe('GET /api/browse — security', () => {
         id: 'secretary-001',
         role: { id: 'secretary', name: 'Secretary', model: 'gpt-4.1' },
         parentId: 'lead-001',
+        isSystemAgent: true,
       });
 
-      let spawnCallCount = 0;
-      mockAgentManager.spawn.mockImplementation(() => {
-        spawnCallCount++;
-        return spawnCallCount === 1 ? leadAgent : secretaryAgent;
-      });
+      mockAgentManager.spawn.mockReturnValue(leadAgent);
+      mockAgentManager.autoSpawnSecretary.mockReturnValue(secretaryAgent);
 
-      // roleRegistry.get must return both lead and secretary roles
       const leadRole = { id: 'lead', name: 'Project Lead', model: 'claude-sonnet-4.5' };
-      const secretaryRole = { id: 'secretary', name: 'Secretary', model: 'gpt-4.1' };
       mockRoleRegistry.get.mockImplementation((id: string) => {
         if (id === 'lead') return leadRole;
-        if (id === 'secretary') return secretaryRole;
         return mockRole;
       });
 
       const res = await post('/api/lead/start', { task: 'Build something' });
       expect(res.status).toBe(201);
 
-      // Should have been called twice: once for Lead, once for Secretary
-      expect(mockAgentManager.spawn).toHaveBeenCalledTimes(2);
-
-      // Second call should be the secretary
-      const secondCall = mockAgentManager.spawn.mock.calls[1];
-      expect(secondCall[0]).toEqual(secretaryRole);         // role
-      expect(secondCall[2]).toBe('lead-001');                // parentId = lead
-      expect(secondCall[4]).toBe('gpt-4.1');                 // model
+      // Should call autoSpawnSecretary with the lead agent
+      expect(mockAgentManager.autoSpawnSecretary).toHaveBeenCalledWith(leadAgent);
     });
 
-    it('succeeds even if Secretary spawn fails', async () => {
+    it('succeeds even if autoSpawnSecretary returns null', async () => {
       const leadAgent = createLeadAgent({ projectName: 'Test Project' });
-
-      let spawnCallCount = 0;
-      mockAgentManager.spawn.mockImplementation(() => {
-        spawnCallCount++;
-        if (spawnCallCount === 1) return leadAgent;
-        throw new Error('Concurrency limit reached');
-      });
+      mockAgentManager.spawn.mockReturnValue(leadAgent);
+      mockAgentManager.autoSpawnSecretary.mockReturnValue(null);
 
       const leadRole = { id: 'lead', name: 'Project Lead', model: 'claude-sonnet-4.5' };
-      const secretaryRole = { id: 'secretary', name: 'Secretary', model: 'gpt-4.1' };
       mockRoleRegistry.get.mockImplementation((id: string) => {
         if (id === 'lead') return leadRole;
-        if (id === 'secretary') return secretaryRole;
         return mockRole;
       });
 
       const res = await post('/api/lead/start', { task: 'Build something' });
-      // Lead creation still succeeds
       expect(res.status).toBe(201);
     });
   });

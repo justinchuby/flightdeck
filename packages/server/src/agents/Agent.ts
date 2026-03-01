@@ -23,6 +23,7 @@ export interface AgentContextInfo {
   lockedFiles: string[];
   model?: string;
   parentId?: string;
+  isSystemAgent?: boolean;
 }
 
 export interface AgentJSON {
@@ -50,6 +51,7 @@ export interface AgentJSON {
   pendingMessages: number;
   isSubLead: boolean;
   hierarchyLevel: number;
+  isSystemAgent?: boolean;
 }
 
 export class Agent {
@@ -80,6 +82,8 @@ export class Agent {
   public budget?: { maxConcurrent: number; runningCount: number };
   /** Hierarchy depth: 0 = root lead, 1 = sub-lead, 2 = sub-sub-lead, etc. */
   public hierarchyLevel: number = 0;
+  /** Whether this agent was auto-created by the system (e.g., auto-secretary) */
+  public isSystemAgent: boolean = false;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
@@ -165,7 +169,8 @@ export class Agent {
       .map((p) => {
         const pShort = p.id.slice(0, 8);
         const modelStr = p.model ? ` [${p.model}]` : '';
-        return `- ${pShort} — ${p.roleName}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
+        const systemStr = p.isSystemAgent ? ' (system)' : '';
+        return `- ${pShort} — ${p.roleName}${systemStr}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
       })
       .join('\n');
 
@@ -173,7 +178,8 @@ export class Agent {
       .map((p) => {
         const pShort = p.id.slice(0, 8);
         const files = p.lockedFiles.length > 0 ? p.lockedFiles.join(', ') : 'none';
-        return `- Agent ${pShort} (${p.roleName}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
+        const systemStr = p.isSystemAgent ? ' (system)' : '';
+        return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
       })
       .join('\n');
 
@@ -303,7 +309,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       .map((p) => {
         const pShort = p.id.slice(0, 8);
         const modelStr = p.model ? ` [${p.model}]` : '';
-        return `- ${pShort} — ${p.roleName}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
+        const systemStr = p.isSystemAgent ? ' (system)' : '';
+        return `- ${pShort} — ${p.roleName}${systemStr}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
       })
       .join('\n');
 
@@ -311,7 +318,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       .map((p) => {
         const pShort = p.id.slice(0, 8);
         const files = p.lockedFiles.length > 0 ? p.lockedFiles.join(', ') : 'none';
-        return `- Agent ${pShort} (${p.roleName}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
+        const systemStr = p.isSystemAgent ? ' (system)' : '';
+        return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
       })
       .join('\n');
 
@@ -534,6 +542,7 @@ CREW_UPDATE ⟧`;
       pendingMessages: this.pendingMessageCount,
       isSubLead: this.role.id === 'lead' && !!this.parentId,
       hierarchyLevel: this.hierarchyLevel,
+      isSystemAgent: this.isSystemAgent || undefined,
     };
   }
 }
