@@ -156,6 +156,19 @@ describe('timelineStore', () => {
     expect(useTimelineStore.getState().getCachedData('lead-1')).not.toBeNull();
   });
 
+  it('evicts oldest cached entries when exceeding 10 leads', () => {
+    for (let i = 1; i <= 12; i++) {
+      useTimelineStore.getState().setCachedData(`lead-${i}`, makeTimelineData());
+    }
+    const s = useTimelineStore.getState();
+    // First 2 should be evicted, last 10 should remain
+    expect(s.getCachedData('lead-1')).toBeNull();
+    expect(s.getCachedData('lead-2')).toBeNull();
+    expect(s.getCachedData('lead-3')).not.toBeNull();
+    expect(s.getCachedData('lead-12')).not.toBeNull();
+    expect(Object.keys(s.cachedData).length).toBe(10);
+  });
+
   // ── Reset ────────────────────────────────────────────────────────
 
   it('reset clears all state to defaults', () => {

@@ -8,6 +8,11 @@ export type SortDirection = 'newest-first' | 'oldest-first';
 const ALL_ROLES = ['lead', 'architect', 'developer', 'code-reviewer', 'critical-reviewer', 'designer', 'secretary', 'qa-tester'];
 const ALL_COMM_TYPES: CommType[] = ['delegation', 'message', 'group_message', 'broadcast'];
 
+// Stable empty set — avoids new Set() on every selector call (CR-10)
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+
+const MAX_CACHED_LEADS = 10;
+
 // ── State interface ──────────────────────────────────────────────────
 
 interface TimelineState {
@@ -36,7 +41,9 @@ interface TimelineState {
   setCommFilter: (filter: Set<CommType>) => void;
   setHiddenStatuses: (statuses: Set<TimelineStatus>) => void;
   toggleExpandedAgent: (leadId: string, agentId: string) => void;
-  getExpandedAgents: (leadId: string) => Set<string>;
+  expandMultipleAgents: (leadId: string, agentIds: string[]) => void;
+  setExpandedAgents: (leadId: string, agentIds: Set<string>) => void;
+  getExpandedAgents: (leadId: string) => ReadonlySet<string>;
   setSortDirection: (dir: SortDirection) => void;
   setCachedData: (leadId: string, data: TimelineData) => void;
   getCachedData: (leadId: string) => TimelineData | null;
@@ -76,12 +83,37 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
       return { expandedAgents: { ...s.expandedAgents, [leadId]: next } };
     }),
 
-  getExpandedAgents: (leadId) => get().expandedAgents[leadId] ?? new Set<string>(),
+  expandMultipleAgents: (leadId, agentIds) =>
+    set((s) => {
+      if (agentIds.length === 0) return s;
+      const current = s.expandedAgents[leadId] ?? new Set<string>();
+      const next = new Set(current);
+      let changed = false;
+      for (const id of agentIds) {
+        if (!next.has(id)) { next.add(id); changed = true; }
+      }
+      if (!changed) return s;
+      return { expandedAgents: { ...s.expandedAgents, [leadId]: next } };
+    }),
+
+  getExpandedAgents: (leadId) => get().expandedAgents[leadId] ?? EMPTY_SET,
+
+  setExpandedAgents: (leadId, agentIds) =>
+    set((s) => ({ expandedAgents: { ...s.expandedAgents, [leadId]: agentIds } })),
 
   setSortDirection: (dir) => set({ sortDirection: dir }),
 
   setCachedData: (leadId, data) =>
-    set((s) => ({ cachedData: { ...s.cachedData, [leadId]: data } })),
+    set((s) => {
+      const next = { ...s.cachedData, [leadId]: data };
+      const keys = Object.keys(next);
+      if (keys.length > MAX_CACHED_LEADS) {
+        // Evict oldest entries (by insertion order) to stay within limit
+        const toRemove = keys.slice(0, keys.length - MAX_CACHED_LEADS);
+        for (const key of toRemove) delete next[key];
+      }
+      return { cachedData: next };
+    }),
 
   getCachedData: (leadId) => get().cachedData[leadId] ?? null,
 
