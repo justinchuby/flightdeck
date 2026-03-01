@@ -342,4 +342,119 @@ describe('useTimelineSSE', () => {
     expect(newAgent!.segments).toHaveLength(1);
     expect(newAgent!.segments[0].status).toBe('running');
   });
+
+  // ── Tab visibility (P2-2) ───────────────────────────────────────────
+
+  it('does not count background errors against failure budget', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+
+    // Go to background
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    // Simulate 3 errors while hidden
+    for (let i = 0; i < 3; i++) {
+      const es = MockEventSource.instances[MockEventSource.instances.length - 1];
+      act(() => { es.simulateError(); });
+      act(() => { vi.advanceTimersByTime(30_000); });
+    }
+
+    // Should NOT have fallen back to polling
+    expect(result.current.sseUnavailable).toBe(false);
+
+    // Restore visibility
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  });
+
+  it('resets error budget and reconnects on tab return', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const initialEs = MockEventSource.instances[0];
+
+    // Accumulate 2 errors (one short of max)
+    act(() => { initialEs.simulateError(); });
+    act(() => { vi.advanceTimersByTime(30_000); });
+    act(() => {
+      MockEventSource.instances[MockEventSource.instances.length - 1].simulateError();
+    });
+    act(() => { vi.advanceTimersByTime(30_000); });
+
+    const instanceCountBefore = MockEventSource.instances.length;
+
+    // Go to background then return
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    // Close the current EventSource to simulate background disconnect
+    const currentEs = MockEventSource.instances[MockEventSource.instances.length - 1];
+    currentEs.readyState = MockEventSource.CLOSED;
+
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    // Should have created a new EventSource (reconnected)
+    expect(MockEventSource.instances.length).toBeGreaterThan(instanceCountBefore);
+    // Should NOT be in offline state
+    expect(result.current.sseUnavailable).toBe(false);
+  });
+
+  it('pauses reconnect timer when tab goes to background', () => {
+    const { result } = renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    // Trigger error to schedule a reconnect timer
+    act(() => { es.simulateError(); });
+
+    const instanceCountAfterError = MockEventSource.instances.length;
+
+    // Go to background — should clear the pending reconnect timer
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    // Advance past the reconnect delay — timer should have been cleared
+    act(() => { vi.advanceTimersByTime(60_000); });
+
+    // No new EventSource should have been created by the paused timer
+    expect(MockEventSource.instances.length).toBe(instanceCountAfterError);
+
+    // Return to foreground — should reconnect
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(MockEventSource.instances.length).toBeGreaterThan(instanceCountAfterError);
+    expect(result.current.sseUnavailable).toBe(false);
+  });
+
+  // ── Stale timer cleanup (P1-1) ─────────────────────────────────────
+
+  it('clears stale reconnect timer before scheduling new one', () => {
+    renderHook(() => useTimelineSSE('lead-1'));
+    const es = MockEventSource.instances[0];
+
+    // First error schedules a reconnect timer
+    act(() => { es.simulateError(); });
+
+    // Before the timer fires, trigger another error on same EventSource
+    // (e.g., browser fires multiple error events)
+    act(() => { es.simulateError(); });
+
+    // Advance timers — should only see one reconnect attempt, not two
+    const instancesBefore = MockEventSource.instances.length;
+    act(() => { vi.advanceTimersByTime(30_000); });
+
+    // At most 1 new EventSource from the single surviving timer
+    expect(MockEventSource.instances.length - instancesBefore).toBeLessThanOrEqual(1);
+  });
 });

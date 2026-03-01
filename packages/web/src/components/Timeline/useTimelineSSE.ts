@@ -34,6 +34,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEventId = useRef<string | null>(null);
   const hasDataRef = useRef(false);
+  const isHiddenRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (eventSourceRef.current) {
@@ -151,6 +152,9 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     };
 
     eventSource.onerror = () => {
+      // P2-2: Don't count background failures against error budget
+      if (isHiddenRef.current) return;
+
       consecutiveFailures.current++;
 
       if (consecutiveFailures.current >= MAX_CONSECUTIVE_FAILURES) {
@@ -166,6 +170,11 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
       // EventSource auto-reconnects, but we track the state
       // If EventSource is CLOSED (not just errored), schedule manual reconnect
       if (eventSource.readyState === EventSource.CLOSED) {
+        // P1-1: Clear stale reconnect timer before scheduling new one
+        if (reconnectTimer.current) {
+          clearTimeout(reconnectTimer.current);
+          reconnectTimer.current = null;
+        }
         const delay = reconnectDelay.current;
         reconnectDelay.current = Math.min(delay * 2, MAX_RECONNECT_DELAY_MS);
         reconnectTimer.current = setTimeout(connect, delay);
@@ -188,7 +197,31 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     setConnectionHealth('connecting');
     connect();
 
-    return cleanup;
+    // P2-2: Pause SSE in background, reconnect on tab return
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        isHiddenRef.current = true;
+        // Pause reconnect attempts while hidden
+        if (reconnectTimer.current) {
+          clearTimeout(reconnectTimer.current);
+          reconnectTimer.current = null;
+        }
+      } else {
+        isHiddenRef.current = false;
+        // Reset error budget and reconnect if needed
+        consecutiveFailures.current = 0;
+        reconnectDelay.current = INITIAL_RECONNECT_DELAY_MS;
+        if (!eventSourceRef.current || eventSourceRef.current.readyState === EventSource.CLOSED) {
+          connect();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cleanup();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [leadId, connect, cleanup, sseUnavailable]);
 
   return { data, loading, error, connectionHealth, sseUnavailable };
