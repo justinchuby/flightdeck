@@ -5,8 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/justinchuby/ai-crew.git"
+    "url": "https://github.com/justinchuby/flightdeck.git"
   },
+  "bugs": {
+    "url": "https://github.com/justinchuby/flightdeck/issues"
+  },
+  "homepage": "https://github.com/justinchuby/flightdeck#readme",
   "type": "module",
   "bin": {
     "flightdeck": "./bin/flightdeck.mjs"
