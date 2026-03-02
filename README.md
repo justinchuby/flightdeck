@@ -172,6 +172,7 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 | **Radical Thinker** | 🚀 | Challenge assumptions, propose bold alternatives | Gemini 3 Pro |
 | **Secretary** | 📋 | Plan tracking, status reports, session summaries | GPT-4.1 |
 | **QA Tester** | 🧪 | Test strategy, quality assurance, coverage analysis | Claude Sonnet 4.6 |
+| **Agent** | ⚙️ | Neutral general-purpose agent, no role-specific instructions | CLI default |
 
 Custom roles can be created via the Settings UI with your own system prompts, colors, and icons.
 
@@ -184,6 +185,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | Command | Description |
 |---------|-------------|
 | `CREATE_AGENT {"role": "developer", "task": "..."}` | Spawn a new agent with a specific role. Optionally assign a task and model. |
+| `SPAWN_AGENT {"role": "developer", "task": "..."}` | Alias for `CREATE_AGENT`. Available to non-lead agents (delegates to parent). |
 | `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Leads and architects can delegate. |
 | `TERMINATE_AGENT {"id": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
 | `INTERRUPT {"to": "agent-id", "content": "..."}` | Send a priority interrupt to a child agent, immediately stopping their current work. *(Parent agents only)* |
