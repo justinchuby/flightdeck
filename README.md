@@ -7,8 +7,6 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 
 **Why Flightdeck?** Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents in parallel — each focused on what they do best. A developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster, higher-quality work with built-in checks and balances.
 
-> **Status**: Active development on [branch `team-work-3`](https://github.com/justinchuby/ai-crew/tree/team-work-3).
-
 ## Features
 
 ### 🎯 Team Orchestration
