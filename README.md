@@ -12,7 +12,7 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 ### 🎯 Team Orchestration
 - **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
 - **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
-- **12 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
+- **13 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
 - **Task DAG** — Declarative task scheduling with dependencies; `PROGRESS` auto-reads DAG state when one exists. DAG auto-links to agents via `DELEGATE`/`CREATE_AGENT` — no manual tracking needed.
 - **Human-in-the-Loop** — Message any agent directly; queued messages show with blue bubbles and a spinner. Remove or reorder queued messages before delivery.
 - **System Pause/Resume** — Halt all message delivery system-wide; agents are notified to hold position. Queued messages stay in place until resumed.
@@ -60,12 +60,20 @@ A real-time web UI that orchestrates teams of [Copilot CLI](https://docs.github.
 ## Quick Start
 
 ```bash
+npx @flightdeck-ai/flightdeck
+```
+
+That's it — this downloads and runs Flightdeck, then opens the web UI in your browser.
+
+**Options:** `--port=4000`, `--host=0.0.0.0`, `--no-browser`, `-v` / `--version`, `-h` / `--help`
+
+### Local Development
+
+```bash
 npm install
 npm run build
 npm start
 ```
-
-This starts the server and opens the web UI. Options: `--port=4000`, `--no-browser`.
 
 For development with hot reload:
 
@@ -112,8 +120,8 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | Component | Responsibility |
 |-----------|---------------|
 | **AgentManager** | Spawns agents, routes messages, manages delegations. Cascade termination with visited-set guard. |
-| **CommandDispatcher** | Thin router (~193 lines) that delegates to 7 command modules. Parses triple-bracket commands from agent output. |
-| **Command Modules** | `AgentCommands`, `CommCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands` — domain-grouped command handlers |
+| **CommandDispatcher** | Thin router that delegates to 10 command modules. Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output. |
+| **Command Modules** | `AgentCommands`, `CommCommands`, `DirectMessageCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands`, `CapabilityCommands`, `TemplateCommands` — domain-grouped command handlers |
 | **Agent** | Wraps a Copilot CLI process (ACP) with lifecycle management, message buffering, and memory bounds |
 | **RoleRegistry** | Role definitions with system prompts, icons, colors, default models. `receivesStatusUpdates` flag for secretary auto-refresh. |
 | **MessageBus** | Routes inter-agent messages and group chats |
@@ -169,7 +177,7 @@ Custom roles can be created via the Settings UI with your own system prompts, co
 
 ## ACP Command Reference
 
-Agents communicate via structured triple-bracket commands detected in their output stream. Commands are parsed by the `CommandDispatcher` and routed to the appropriate subsystem.
+Agents communicate via structured commands wrapped in doubled Unicode brackets (`⟦⟦ COMMAND {...} ⟧⟧`, U+27E6/U+27E7) detected in their output stream. Commands are parsed by the `CommandDispatcher` and routed to the appropriate subsystem.
 
 ### Team Management (Lead + Architect)
 
@@ -178,6 +186,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | `CREATE_AGENT {"role": "developer", "task": "..."}` | Spawn a new agent with a specific role. Optionally assign a task and model. |
 | `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Leads and architects can delegate. |
 | `TERMINATE_AGENT {"id": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
+| `INTERRUPT {"to": "agent-id", "content": "..."}` | Send a priority interrupt to a child agent, immediately stopping their current work. *(Parent agents only)* |
 
 ### Communication (All agents)
 
@@ -192,6 +201,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | `REMOVE_FROM_GROUP {"group": "...", "members": ["id"]}` | Remove agents from a group. The lead cannot be removed. |
 | `QUERY_GROUPS` | List all groups the agent belongs to, with member counts and last message preview. |
 | `QUERY_PEERS` | Discover other active agents for direct messaging. |
+| `REACT {"group": "...", "emoji": "👍"}` | Add an emoji reaction to the latest (or specified) message in a group. |
 
 ### Task & Progress (Lead-only unless noted)
 
@@ -210,6 +220,10 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | `DECISION {"title": "...", "rationale": "..."}` | Log a decision. Users can accept/reject with a reason comment from the dashboard. |
 | `QUERY_TASKS` | Query current task DAG status (alias for TASK_STATUS). |
 | `CANCEL_DELEGATION {"delegationId": "...", "reason": "..."}` | Cancel an active delegation. |
+| `ASSIGN_TASK {"taskId": "...", "agentId": "..."}` | Assign a ready DAG task to an agent and move it to running state. *(Lead-only)* |
+| `REASSIGN_TASK {"taskId": "...", "agentId": "..."}` | Reassign a running task from one agent to another. *(Lead-only)* |
+| `ADD_DEPENDENCY {"taskId": "...", "depends_on": ["dep-id"]}` | Add dependency edges to tasks in the DAG. Prevents circular dependencies. |
+| `FORCE_READY {"id": "task-id"}` | Force a pending/blocked task to ready state, overriding dependency checks. *(Lead-only)* |
 
 ### Coordination (All agents)
 
@@ -222,6 +236,8 @@ Agents communicate via structured triple-bracket commands detected in their outp
 | `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
 | `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
 | `RESOLVE_DEFERRED {"id": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
+| `HALT_HEARTBEAT` | Pause automatic heartbeat nudges from the system. *(Lead-only)* |
+| `REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "..."}` | Request to increase max concurrent agents. Requires user approval. *(Lead-only)* |
 
 ### Capabilities & Timers (All agents)
 
@@ -256,7 +272,7 @@ Agents communicate via structured triple-bracket commands detected in their outp
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
 - **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
-- **Testing**: Vitest with v8 coverage, Codecov integration (1,200+ tests including 30 Task DAG E2E + 40 Timeline E2E)
+- **Testing**: Vitest with v8 coverage, Codecov integration
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
 
 ## Documentation
