@@ -1520,8 +1520,9 @@ picture themselves in each scenario.
 <div class="bg-gray-800 rounded-lg p-3 border border-gray-700 mt-3">
 
 ```bash
-# Try it now:
-npx @flightdeck-ai/flightdeck
+# Install and run:
+npm install -g @flightdeck-ai/flightdeck
+flightdeck
 
 # Or from source:
 git clone https://github.com/justinchuby/flightdeck.git
@@ -1562,7 +1563,8 @@ layout: center
 <div class="text-sm text-gray-400">
 
 ```bash
-npx @flightdeck-ai/flightdeck
+npm install -g @flightdeck-ai/flightdeck
+flightdeck
 # Requires: Node.js 20+, GitHub Copilot CLI
 
 # Or from source:
