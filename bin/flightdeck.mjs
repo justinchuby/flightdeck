@@ -41,6 +41,21 @@ const hostArg = args.find(a => a.startsWith('--host='));
 const host = hostArg ? hostArg.split('=')[1] : process.env.HOST || '127.0.0.1';
 const noBrowser = args.includes('--no-browser');
 
+if (!host) {
+  console.error('❌ --host requires a value (e.g., --host=127.0.0.1)');
+  process.exit(1);
+}
+if (!port) {
+  console.error('❌ --port requires a value (e.g., --port=3001)');
+  process.exit(1);
+}
+
+// Format host for use in URLs (IPv6 needs brackets, wildcard addresses use localhost)
+function formatHost(h) {
+  if (h === '0.0.0.0' || h === '::') return 'localhost';
+  return h.includes(':') ? `[${h}]` : h;
+}
+
 // Check if builds exist, build if needed
 if (!existsSync(serverDist) || !existsSync(webDist)) {
   console.log('📦 Building flightdeck (first run)...');
@@ -56,7 +71,7 @@ if (!existsSync(serverDist) || !existsSync(webDist)) {
 process.env.PORT = port;
 
 // Start the server
-console.log(`\n🚀 Starting Flightdeck on http://${host}:${port}\n`);
+console.log(`\n🚀 Starting Flightdeck on http://${formatHost(host)}:${port}\n`);
 
 const server = spawn('node', [serverDist], {
   cwd: root,
@@ -67,13 +82,13 @@ const server = spawn('node', [serverDist], {
 // Open browser after a short delay (unless --no-browser)
 if (!noBrowser) {
   setTimeout(() => {
-    const browserHost = (host === '0.0.0.0' || host === '::') ? 'localhost' : host;
+    const browserHost = formatHost(host);
     const url = `http://${browserHost}:${port}`;
     const platform = process.platform;
     try {
-      if (platform === 'darwin') execSync(`open "${url}"`);
-      else if (platform === 'win32') execSync(`start "${url}"`);
-      else execSync(`xdg-open "${url}"`);
+      if (platform === 'darwin') spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
+      else if (platform === 'win32') spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true }).unref();
+      else spawn('xdg-open', [url], { stdio: 'ignore', detached: true }).unref();
     } catch {
       console.log(`🌐 Open ${url} in your browser`);
     }
