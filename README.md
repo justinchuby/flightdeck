@@ -238,6 +238,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
 | `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
 | `RESOLVE_DEFERRED {"id": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
+| `ACTIVITY {"action": "...", "summary": "..."}` | Log a structured activity entry to the activity ledger for auditing and tracking. |
 | `HALT_HEARTBEAT` | Pause automatic heartbeat nudges from the system. *(Lead-only)* |
 | `REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "..."}` | Request to increase max concurrent agents. Requires user approval. *(Lead-only)* |
 
@@ -251,6 +252,8 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `SET_TIMER {"label": "name", "delay": 300, "message": "...", "repeat": false}` | Set a reminder that fires after a delay (in seconds). Optionally repeats. |
 | `CANCEL_TIMER {"name": "name"}` | Cancel an active timer. |
 | `LIST_TIMERS` | List all active timers. |
+| `LIST_TEMPLATES` | List all available workflow task templates with IDs, descriptions, and task sequences. |
+| `APPLY_TEMPLATE {"template": "template-id"}` | Instantiate a workflow template, creating tasks in the DAG. Supports `overrides` for customization. *(Lead-only)* |
 
 ### UI Views
 
