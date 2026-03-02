@@ -185,7 +185,6 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | Command | Description |
 |---------|-------------|
 | `CREATE_AGENT {"role": "developer", "task": "..."}` | Spawn a new agent with a specific role. Optionally assign a task and model. |
-| `SPAWN_AGENT {"role": "developer", "task": "..."}` | Alias for `CREATE_AGENT`. Available to non-lead agents (delegates to parent). |
 | `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Leads and architects can delegate. |
 | `TERMINATE_AGENT {"id": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
 | `INTERRUPT {"to": "agent-id", "content": "..."}` | Send a priority interrupt to a child agent, immediately stopping their current work. *(Parent agents only)* |
@@ -252,8 +251,14 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `SET_TIMER {"label": "name", "delay": 300, "message": "...", "repeat": false}` | Set a reminder that fires after a delay (in seconds). Optionally repeats. |
 | `CANCEL_TIMER {"name": "name"}` | Cancel an active timer. |
 | `LIST_TIMERS` | List all active timers. |
+
+### Templates (Lead + All agents)
+
+| Command | Description |
+|---------|-------------|
 | `LIST_TEMPLATES` | List all available workflow task templates with IDs, descriptions, and task sequences. |
 | `APPLY_TEMPLATE {"template": "template-id"}` | Instantiate a workflow template, creating tasks in the DAG. Supports `overrides` for customization. *(Lead-only)* |
+| `DECOMPOSE_TASK {"task": "..."}` | Break a task description into suggested sub-tasks with roles and dependencies. |
 
 ### UI Views
 
