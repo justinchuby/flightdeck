@@ -10,12 +10,17 @@
  */
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { posix } from 'path';
-import { existsSync, rmSync } from 'fs';
+import path from 'path';
+import { existsSync, rmSync, symlinkSync } from 'fs';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 
 const execAsync = promisify(exec);
+
+/** Convert native path to forward slashes for storage/comparison */
+function toForwardSlash(p: string): string {
+  return p.replace(/\\/g, '/');
+}
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -48,7 +53,7 @@ export class WorktreeManager extends EventEmitter {
 
   constructor(repoRoot: string, lockChecker?: LockChecker) {
     super();
-    this.repoRoot = repoRoot.replace(/\\/g, '/');
+    this.repoRoot = toForwardSlash(repoRoot);
     this.lockChecker = lockChecker ?? null;
   }
 
@@ -56,7 +61,7 @@ export class WorktreeManager extends EventEmitter {
   async create(agentId: string): Promise<string> {
     const shortId = agentId.slice(0, 8);
     const branch = `agent-wt-${shortId}`;
-    const worktreePath = posix.join(this.repoRoot, '.worktrees', shortId);
+    const worktreePath = toForwardSlash(path.join(this.repoRoot, '.worktrees', shortId));
 
     // Clean up stale worktree if one already exists at this path
     if (existsSync(worktreePath)) {
@@ -70,10 +75,10 @@ export class WorktreeManager extends EventEmitter {
       );
 
       // Symlink shared workspace so agents can communicate via .ai-crew/
-      const sharedDir = posix.join(this.repoRoot, '.ai-crew');
-      const targetShared = posix.join(worktreePath, '.ai-crew');
+      const sharedDir = path.join(this.repoRoot, '.ai-crew');
+      const targetShared = path.join(worktreePath, '.ai-crew');
       if (existsSync(sharedDir) && !existsSync(targetShared)) {
-        await execAsync(`ln -s "${sharedDir}" "${targetShared}"`, { timeout: 5_000 });
+        symlinkSync(sharedDir, targetShared, 'junction');
       }
 
       const info: WorktreeInfo = { agentId, branch, path: worktreePath, createdAt: Date.now() };
@@ -96,7 +101,7 @@ export class WorktreeManager extends EventEmitter {
       // Commit any uncommitted work in the worktree
       await execAsync(
         'git add -A && git diff --cached --quiet || git commit -m "WIP: agent work"',
-        { cwd: info.path, timeout: 10_000, shell: '/bin/bash' },
+        { cwd: info.path, timeout: 10_000, shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash' },
       ).catch(() => {}); // Ignore if nothing to commit
 
       // A4: Validate merge only includes files the agent had locked
@@ -137,7 +142,7 @@ export class WorktreeManager extends EventEmitter {
     const info = this.worktrees.get(agentId);
     const shortId = agentId.slice(0, 8);
     const branch = info?.branch ?? `agent-wt-${shortId}`;
-    const worktreePath = info?.path ?? posix.join(this.repoRoot, '.worktrees', shortId);
+    const worktreePath = info?.path ?? toForwardSlash(path.join(this.repoRoot, '.worktrees', shortId));
 
     try {
       if (existsSync(worktreePath)) {
@@ -171,7 +176,7 @@ export class WorktreeManager extends EventEmitter {
 
   /** Remove orphaned worktrees left by previous crashes. */
   async cleanupOrphans(): Promise<number> {
-    const worktreeDir = posix.join(this.repoRoot, '.worktrees');
+    const worktreeDir = toForwardSlash(path.join(this.repoRoot, '.worktrees'));
     if (!existsSync(worktreeDir)) return 0;
 
     const { stdout } = await execAsync('git worktree list --porcelain', { cwd: this.repoRoot });

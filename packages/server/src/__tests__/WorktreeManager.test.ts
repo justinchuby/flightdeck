@@ -30,13 +30,14 @@ vi.mock('child_process', () => {
   return { exec: execFn };
 });
 
-// Mock fs.existsSync / rmSync — default: nothing exists
+// Mock fs.existsSync / rmSync / symlinkSync — default: nothing exists
 const existsSyncMock = vi.hoisted(() => vi.fn((_path: string) => false));
 const rmSyncMock = vi.hoisted(() => vi.fn());
+const symlinkSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
-  return { ...actual, existsSync: existsSyncMock, rmSync: rmSyncMock };
+  return { ...actual, existsSync: existsSyncMock, rmSync: rmSyncMock, symlinkSync: symlinkSyncMock };
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ describe('WorktreeManager', () => {
     execCalls = [];
     existsSyncMock.mockReturnValue(false);
     rmSyncMock.mockReset();
+    symlinkSyncMock.mockReset();
     setDefaultExec();
     mgr = new WorktreeManager(REPO);
   });
@@ -100,9 +102,11 @@ describe('WorktreeManager', () => {
 
     await mgr.create(AGENT_ID);
 
-    const lnCmd = execCalls.find(c => c.cmd.includes('ln -s'));
-    expect(lnCmd).toBeDefined();
-    expect(lnCmd!.cmd).toContain('.ai-crew');
+    expect(symlinkSyncMock).toHaveBeenCalledWith(
+      expect.stringContaining('.ai-crew'),
+      expect.stringContaining('.ai-crew'),
+      'junction',
+    );
   });
 
   it('emits worktree:created event', async () => {
