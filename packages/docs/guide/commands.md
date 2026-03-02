@@ -337,6 +337,39 @@ Interrupt another agent's current work by injecting a priority message.
 | `to` | ✅ | Target agent ID (short ID prefix) |
 | `content` | ✅ | Priority message to inject |
 
+### LIST_TEMPLATES
+
+List all available workflow templates. Any agent can use this.
+
+```
+⟦⟦ LIST_TEMPLATES ⟧⟧
+```
+
+### APPLY_TEMPLATE
+
+Instantiate a workflow template into the current DAG. Lead-only.
+
+```
+⟦⟦ APPLY_TEMPLATE {"template": "feature", "overrides": {"task-ref": {"title": "Custom title", "role": "developer"}}} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `template` | ✅ | Template ID to instantiate |
+| `overrides` | ❌ | Map of task refs to override fields (`title`, `role`) |
+
+### DECOMPOSE_TASK
+
+Decompose a task description into suggested sub-tasks using NL analysis.
+
+```
+⟦⟦ DECOMPOSE_TASK {"task": "Build a REST API with authentication and rate limiting"} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `task` | ✅ | Task description to decompose |
+
 ### Task DAG Management (Lead-only)
 
 Additional commands for managing the task DAG:

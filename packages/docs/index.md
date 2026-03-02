@@ -20,7 +20,7 @@ features:
     details: An AI coordinator that breaks down tasks, assembles a team, delegates work, and synthesizes results.
   - icon: 👥
     title: Specialized Roles
-    details: 12 purpose-built agent roles — developers, architects, reviewers, designers — each with a different AI model.
+    details: 13 purpose-built agent roles — developers, architects, reviewers, designers — each with a different AI model.
   - icon: 💬
     title: Inter-Agent Communication
     details: Direct messages, broadcasts, and group chats. Agents debate approaches and challenge ideas collaboratively.
