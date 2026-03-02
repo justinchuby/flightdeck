@@ -265,6 +265,78 @@ Add dependencies between DAG tasks. Any agent can use this:
 
 Validates that both tasks exist and the new dependency doesn't create a cycle. See [Auto-DAG](./auto-dag.md) for details.
 
+### FORCE_READY
+
+Force a task to "ready" state, overriding dependency checks. Lead-only.
+
+```
+⟦⟦ FORCE_READY {"id": "task-id"} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | ✅ | DAG task ID to force into ready state |
+
+### ASSIGN_TASK
+
+Assign an existing DAG task to a specific agent. Lead-only.
+
+```
+⟦⟦ ASSIGN_TASK {"id": "task-id", "agentId": "agent-id-prefix"} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | ✅ | DAG task ID |
+| `agentId` | ✅ | Target agent ID (short ID prefix) |
+
+### REASSIGN_TASK
+
+Reassign a running task from one agent to another. Lead-only.
+
+```
+⟦⟦ REASSIGN_TASK {"id": "task-id", "agentId": "new-agent-id"} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | ✅ | DAG task ID to reassign |
+| `agentId` | ✅ | New target agent ID (short ID prefix) |
+
+### HALT_HEARTBEAT
+
+Stop the heartbeat monitor from nudging the lead. Useful when the lead is performing a long operation.
+
+```
+⟦⟦ HALT_HEARTBEAT ⟧⟧
+```
+
+### REQUEST_LIMIT_CHANGE
+
+Agent requests a change to the concurrency limit. Requires user approval via the dashboard.
+
+```
+⟦⟦ REQUEST_LIMIT_CHANGE {"newLimit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `newLimit` | ✅ | Requested new agent concurrency limit |
+| `reason` | ❌ | Explanation for the change request |
+
+### INTERRUPT
+
+Interrupt another agent's current work by injecting a priority message.
+
+```
+⟦⟦ INTERRUPT {"agentId": "agent-id-prefix", "message": "Stop — requirements changed"} ⟧⟧
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `agentId` | ✅ | Target agent ID (short ID prefix) |
+| `message` | ✅ | Priority message to inject |
+
 ### Task DAG Management (Lead-only)
 
 Additional commands for managing the task DAG:

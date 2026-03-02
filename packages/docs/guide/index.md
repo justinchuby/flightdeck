@@ -25,7 +25,7 @@ Flightdeck is a web-based orchestration framework that coordinates multiple [Git
 ## Project Structure
 
 ```
-flightdeck/
+ai-crew/
 ├── packages/
 │   ├── server/      # Node.js backend (Express, WebSocket, ACP)
 │   ├── web/         # React frontend (Vite, Tailwind, Zustand)
