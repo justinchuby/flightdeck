@@ -37,27 +37,3 @@ features:
     title: Persistent Projects
     details: Projects survive restarts. Resume where you left off with full context — tasks, decisions, and agent memories all preserved.
 ---
-
-<style>
-.install-command {
-  max-width: 480px;
-  margin: 0 auto 2rem;
-  text-align: center;
-}
-.install-command code {
-  font-size: 1.2rem;
-  padding: 0.75rem 1.5rem;
-  background: var(--vp-code-bg);
-  border-radius: 8px;
-  display: inline-block;
-}
-</style>
-
-<div class="install-command">
-
-  ```sh
-  npm install -g @flightdeck-ai/flightdeck
-  flightdeck
-  ```
-
-</div>
