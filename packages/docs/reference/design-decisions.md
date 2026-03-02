@@ -157,6 +157,7 @@ Key architectural choices and their rationale.
 **Structure:**
 ```
 flightdeck/
+├── packages/server/    # Express + ws + ACP
 ├── packages/web/       # React + Vite + Tailwind + xterm.js
 ├── docs/               # Architecture documentation
 ├── tsconfig.base.json  # Shared TS config
