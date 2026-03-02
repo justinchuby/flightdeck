@@ -67,7 +67,8 @@ const server = spawn('node', [serverDist], {
 // Open browser after a short delay (unless --no-browser)
 if (!noBrowser) {
   setTimeout(() => {
-    const url = `http://127.0.0.1:${port}`;
+    const browserHost = (host === '0.0.0.0' || host === '::') ? 'localhost' : host;
+    const url = `http://${browserHost}:${port}`;
     const platform = process.platform;
     try {
       if (platform === 'darwin') execSync(`open "${url}"`);
