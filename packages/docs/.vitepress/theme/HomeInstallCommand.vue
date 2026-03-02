@@ -13,8 +13,9 @@
   border-radius: 12px;
   overflow: hidden;
   background: var(--vp-code-bg);
-  max-width: 320px;
+  max-width: 400px;
   margin: 0 auto;
+  user-select: text;
 }
 .hero-install-header {
   padding: 8px 20px;
@@ -37,5 +38,14 @@
   padding: 0;
   display: block;
   white-space: nowrap;
+  user-select: all;
+  cursor: text;
+}
+
+@media (max-width: 959px) {
+  .hero-install {
+    margin-top: 2rem;
+    max-width: 100%;
+  }
 }
 </style>
