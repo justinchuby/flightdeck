@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Agent } from '../agents/Agent.js';
 import type { CommandHandlerContext } from '../agents/commands/types.js';
 
-// Mock child_process.exec so checkDirtyLockedFiles can be tested
-const mockExec = vi.fn();
-vi.mock('child_process', () => ({ exec: (...args: any[]) => mockExec(...args) }));
+// Mock child_process.execFile so checkDirtyLockedFiles can be tested
+const mockExecFile = vi.fn();
+vi.mock('child_process', () => ({ execFile: (...args: any[]) => mockExecFile(...args) }));
 
 // Import AFTER mocking child_process
 const { notifyParentOfCompletion } = await import('../agents/commands/CompletionTracking.js');
@@ -83,7 +83,7 @@ describe('checkDirtyLockedFiles (via notifyParentOfCompletion)', () => {
       { filePath: 'src/utils.ts' },
     ]);
 
-    mockExec.mockImplementation((cmd: string, _opts: any, cb: Function) => {
+    mockExecFile.mockImplementation((_file: string, _args: string[], _opts: any, cb: Function) => {
       cb(null, { stdout: 'src/main.ts\nsrc/utils.ts\n', stderr: '' });
     });
 
@@ -108,7 +108,7 @@ describe('checkDirtyLockedFiles (via notifyParentOfCompletion)', () => {
       { filePath: 'src/clean.ts' },
     ]);
 
-    mockExec.mockImplementation((cmd: string, _opts: any, cb: Function) => {
+    mockExecFile.mockImplementation((_file: string, _args: string[], _opts: any, cb: Function) => {
       cb(null, { stdout: '\n', stderr: '' });
     });
 
@@ -129,8 +129,8 @@ describe('checkDirtyLockedFiles (via notifyParentOfCompletion)', () => {
     notifyParentOfCompletion(ctx, child, 0);
     await new Promise(r => setTimeout(r, 10));
 
-    // exec should not be called at all — no locks to check
-    expect(mockExec).not.toHaveBeenCalled();
+    // execFile should not be called at all — no locks to check
+    expect(mockExecFile).not.toHaveBeenCalled();
 
     const warningCalls = (parent.sendMessage as any).mock.calls.filter(
       (c: any[]) => c[0].includes('uncommitted changes'),
@@ -143,7 +143,7 @@ describe('checkDirtyLockedFiles (via notifyParentOfCompletion)', () => {
       { filePath: 'src/broken.ts' },
     ]);
 
-    mockExec.mockImplementation((cmd: string, _opts: any, cb: Function) => {
+    mockExecFile.mockImplementation((_file: string, _args: string[], _opts: any, cb: Function) => {
       cb(new Error('git not found'), { stdout: '', stderr: 'git not found' });
     });
 
@@ -162,7 +162,7 @@ describe('checkDirtyLockedFiles (via notifyParentOfCompletion)', () => {
     (ctx.lockRegistry.getByAgent as any).mockReturnValue(manyFiles);
 
     const dirtyOutput = manyFiles.map(f => f.filePath).join('\n') + '\n';
-    mockExec.mockImplementation((cmd: string, _opts: any, cb: Function) => {
+    mockExecFile.mockImplementation((_file: string, _args: string[], _opts: any, cb: Function) => {
       cb(null, { stdout: dirtyOutput, stderr: '' });
     });
 

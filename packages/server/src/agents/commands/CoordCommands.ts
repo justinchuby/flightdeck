@@ -6,7 +6,7 @@
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import {
@@ -19,7 +19,7 @@ import {
   progressSchema,
 } from './commandSchemas.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ function handleLockRelease(ctx: CommandHandlerContext, agent: Agent, data: strin
 
     // Pre-release lock audit — if file is dirty, warn and block release
     const cwd = agent.cwd || process.cwd();
-    execAsync(`git diff --name-only -- '${request.filePath.replace(/'/g, "'\\''")}'`, { cwd, timeout: 10_000 })
+    execFileAsync('git', ['diff', '--name-only', '--', request.filePath], { cwd, timeout: 10_000 })
       .then(({ stdout }) => {
         const dirtyFiles = stdout.trim().split('\n').filter(Boolean);
         if (dirtyFiles.length > 0) {
@@ -217,7 +217,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
     // Auto-include untracked files in directories where agent has locked files
     const cwd = agent.cwd || process.cwd();
     try {
-      const { stdout: untrackedOut } = await execAsync('git ls-files --others --exclude-standard', { cwd, timeout: 10_000 });
+      const { stdout: untrackedOut } = await execFileAsync('git', ['ls-files', '--others', '--exclude-standard'], { cwd, timeout: 10_000 });
       const untrackedFiles = untrackedOut.trim().split('\n').filter(Boolean);
       const lockedDirs = new Set([...allPaths].map(f => path.dirname(f)));
       const relatedUntracked = untrackedFiles.filter(f => lockedDirs.has(path.dirname(f)));
@@ -236,22 +236,20 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
       return;
     }
 
-    // Shell-quote each file path to handle spaces and special characters
-    const quotedFiles = files.map(f => `'${f.replace(/'/g, "'\\''")}'`).join(' ');
-    const escapedMsg = message.replace(/'/g, "'\\''");
     const trailer = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>';
-    const commitMsg = `${escapedMsg}\n\n${trailer}`;
+    const commitMsg = `${message}\n\n${trailer}`;
 
-    // Atomic commit: pass files directly to git commit to avoid index race condition
-    await execAsync(`git add ${quotedFiles} && git commit -m '${commitMsg}' -- ${quotedFiles}`, { cwd, timeout: 30_000 })
+    // Cross-platform: use execFile with args arrays (no shell quoting needed)
+    await execFileAsync('git', ['add', ...files], { cwd, timeout: 30_000 })
+      .then(() => execFileAsync('git', ['commit', '-m', commitMsg, '--', ...files], { cwd, timeout: 30_000 }))
       .then(async ({ stdout }) => {
         agent.sendMessage(`[System] COMMIT succeeded: ${stdout.trim().split('\n')[0]}`);
 
         // Post-commit dirty-tree warning — scoped to agent's files only
         try {
           const [{ stdout: modifiedOut }, { stdout: untrackedOut }] = await Promise.all([
-            execAsync(`git diff --name-only -- ${quotedFiles}`, { cwd, timeout: 10_000 }),
-            execAsync('git ls-files --others --exclude-standard', { cwd, timeout: 10_000 }),
+            execFileAsync('git', ['diff', '--name-only', '--', ...files], { cwd, timeout: 10_000 }),
+            execFileAsync('git', ['ls-files', '--others', '--exclude-standard'], { cwd, timeout: 10_000 }),
           ]);
           const modified = modifiedOut.trim().split('\n').filter(Boolean);
           // Filter untracked to files in directories near the committed files

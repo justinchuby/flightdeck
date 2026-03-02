@@ -311,8 +311,8 @@ export class SessionExporter {
   private getGitCommits(): GitCommit[] {
     try {
       const raw = execSync(
-        'git log --format="%H|%h|%an|%aI|%s" -100 2>/dev/null',
-        { encoding: 'utf-8', timeout: 5_000 },
+        'git log --format="%H|%h|%an|%aI|%s" -100',
+        { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'ignore'] },
       ).trim();
       if (!raw) return [];
       return raw.split('\n').map(line => {

@@ -64,8 +64,8 @@ export const messageLimiter = rateLimit({ windowMs: 10_000, max: 50, message: 'T
 export function getRecentCommits(limit = 20): Array<{ hash: string; message: string }> {
   try {
     const raw = execSync(
-      `git log --format="%H|%s" -${limit} 2>/dev/null`,
-      { encoding: 'utf-8', timeout: 5_000 },
+      'git log --format="%H|%s" -' + limit,
+      { encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'ignore'] },
     ).trim();
     if (!raw) return [];
     return raw.split('\n').map(line => {

@@ -7,10 +7,10 @@
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, Delegation } from './types.js';
 import { logger } from '../../utils/logger.js';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ── Public API (called by CommandDispatcher thin wrappers) ────────────
 
@@ -198,9 +198,9 @@ function checkDirtyLockedFiles(ctx: CommandHandlerContext, agent: Agent, parent:
   if (locks.length === 0) return;
 
   const cwd = agent.cwd || process.cwd();
-  const filePaths = locks.map(l => `'${l.filePath.replace(/'/g, "'\\''")}'`).join(' ');
+  const filePaths = locks.map(l => l.filePath);
 
-  execAsync(`git diff --name-only -- ${filePaths}`, { cwd, timeout: 10_000 })
+  execFileAsync('git', ['diff', '--name-only', '--', ...filePaths], { cwd, timeout: 10_000 })
     .then(({ stdout }) => {
       const dirtyFiles = stdout.trim().split('\n').filter(Boolean);
       if (dirtyFiles.length > 0) {
