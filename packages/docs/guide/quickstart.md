@@ -9,8 +9,8 @@
 ## Installation
 
 ```bash
-git clone https://github.com/justinchuby/flightdeck.git
-cd flightdeck
+git clone https://github.com/justinchuby/ai-crew.git
+cd ai-crew
 npm install
 ```
 
@@ -21,12 +21,15 @@ npm install
 The `flightdeck` command builds the project and starts the server with the web UI:
 
 ```bash
-npx flightdeck
+npx @flightdeck-ai/flightdeck
 ```
 
 Options:
 - `--port=4000` — Custom port (default: 3001, or `PORT` env var)
+- `--host=0.0.0.0` — Bind address (default: 127.0.0.1, or `HOST` env var)
 - `--no-browser` — Don't auto-open the browser
+- `-v` / `--version` — Print version and exit
+- `-h` / `--help` — Print help and exit
 
 The server prints an **auth token** to the console on startup. This token is automatically injected into the web UI — no manual configuration needed.
 
@@ -85,7 +88,7 @@ Projects persist across sessions. If a lead agent exits, the project remembers i
 
 ```bash
 npm run build
-npx flightdeck
+npx @flightdeck-ai/flightdeck
 ```
 
 Or manually:

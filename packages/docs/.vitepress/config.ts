@@ -10,7 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/' },
       { text: 'Reference', link: '/reference/api' },
-      { text: 'GitHub', link: 'https://github.com/justinchuby/flightdeck' },
+      { text: 'GitHub', link: 'https://github.com/justinchuby/ai-crew' },
     ],
     sidebar: {
       '/guide/': [
@@ -75,7 +75,7 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/justinchuby/flightdeck' },
+      { icon: 'github', link: 'https://github.com/justinchuby/ai-crew' },
     ],
     search: { provider: 'local' },
     footer: {

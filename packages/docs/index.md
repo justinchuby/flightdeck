@@ -7,11 +7,14 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /guide/
+      link: /guide/quickstart
     - theme: alt
       text: API Reference
       link: /reference/api
 features:
+  - icon: 🚀
+    title: One-Command Install
+    details: "Run npx @flightdeck-ai/flightdeck and you're up. No configuration needed — opens a real-time dashboard instantly."
   - icon: 🎯
     title: Project Lead
     details: An AI coordinator that breaks down tasks, assembles a team, delegates work, and synthesizes results.

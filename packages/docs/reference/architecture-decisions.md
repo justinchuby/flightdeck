@@ -41,12 +41,12 @@ Key architecture decisions made during Flightdeck development (Waves 1–20).
 ## ADR-003: SQLite over PostgreSQL
 
 **Status**: Accepted
-**Context**: Flightdeck needs to persist agent conversations, decisions, activity logs, and DAG tasks. The server runs locally as a CLI tool (`npx flightdeck`), not on a cloud host.
+**Context**: Flightdeck needs to persist agent conversations, decisions, activity logs, and DAG tasks. The server runs locally as a CLI tool (`npx @flightdeck-ai/flightdeck`), not on a cloud host.
 
 **Decision**: Use SQLite with WAL mode via Drizzle ORM, tuned with pragmas: `busy_timeout=5000`, `foreign_keys=ON`, `journal_mode=WAL`, `synchronous=NORMAL`.
 
 **Rationale**:
-- **Zero-infrastructure install**: A user running `npx flightdeck` should not need to have PostgreSQL running. SQLite is embedded in the process — no separate server, no connection strings, no Docker.
+- **Zero-infrastructure install**: A user running `npx @flightdeck-ai/flightdeck` should not need to have PostgreSQL running. SQLite is embedded in the process — no separate server, no connection strings, no Docker.
 - **WAL mode provides concurrency**: Write-Ahead Logging allows concurrent reads alongside a single writer, which matches the access pattern (many agents reading, one process writing batched activity).
 - **Sufficient scale**: A local project session generates thousands of rows, not millions. SQLite handles this comfortably. The `busy_timeout` pragma prevents write-contention errors under the batched-write pattern.
 - **Drizzle ORM portability**: If a team deployment scenario ever requires PostgreSQL, Drizzle's dialect system allows migrating with minimal schema changes — the SQL is largely compatible.
@@ -78,7 +78,7 @@ Key architecture decisions made during Flightdeck development (Waves 1–20).
 **Status**: Accepted
 **Context**: The `CommandDispatcher` originally handled all ACP commands in a single large file. As commands grew to 30+, the file exceeded 800 lines and was difficult to navigate and test.
 
-**Decision**: Split command handling into seven domain-grouped modules: `AgentCommands`, `CommCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands`. The `CommandDispatcher` becomes a thin router (~193 lines) that parses triple-bracket syntax and delegates.
+**Decision**: Split command handling into domain-grouped modules: `AgentCommands`, `AgentLifecycle`, `CommCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands`, `CapabilityCommands`, and others. The `CommandDispatcher` becomes a thin router that parses Unicode bracket syntax and delegates.
 
 **Rationale**:
 - **Cognitive load**: Developers working on agent coordination don't need to read messaging code. Module boundaries match mental models.

@@ -22,6 +22,8 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 | `DB_PATH` | `./flightdeck.db` | SQLite database path |
 | `SERVER_SECRET` | *(auto-generated)* | Auth token for API access. If not set, a random token is generated at startup and printed to the console. |
 | `AUTH` | `token` | Auth mode. Set to `none` to disable authentication (not recommended). |
+| `COPILOT_CLI_PATH` | `copilot` | Path to the Copilot CLI binary. Override if your Copilot CLI is installed in a non-standard location. |
+| `MAX_AGENTS` | `50` | Hard maximum number of agents that can be spawned regardless of `maxConcurrent` setting. |
 
 ## Security
 
@@ -77,4 +79,7 @@ The `flightdeck` CLI (`bin/flightdeck.mjs`) supports:
 | Flag | Description |
 |------|-------------|
 | `--port=XXXX` | Override the server port |
+| `--host=ADDR` | Bind address (default: `127.0.0.1`, or `HOST` env var) |
 | `--no-browser` | Don't auto-open the browser on startup |
+| `-v` / `--version` | Print version and exit |
+| `-h` / `--help` | Print help and exit |
