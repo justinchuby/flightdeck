@@ -79,7 +79,7 @@ export default defineConfig({
     ],
     search: { provider: 'local' },
     footer: {
-      message: 'AI-generated orchestration framework',
+      message: 'Documentation generated with AI assistance',
     },
   },
 })
