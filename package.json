@@ -1,10 +1,10 @@
 {
-  "name": "ai-crew",
+  "name": "flightdeck",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "ai-crew": "./bin/ai-crew.mjs"
+    "flightdeck": "./bin/flightdeck.mjs"
   },
   "workspaces": [
     "packages/server",
@@ -12,7 +12,7 @@
     "packages/docs"
   ],
   "scripts": {
-    "start": "node bin/ai-crew.mjs",
+    "start": "node bin/flightdeck.mjs",
     "dev": "concurrently \"npm run dev --workspace=packages/server\" \"npm run dev --workspace=packages/web\"",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",

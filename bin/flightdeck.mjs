@@ -18,7 +18,7 @@ const noBrowser = args.includes('--no-browser');
 
 // Check if builds exist, build if needed
 if (!existsSync(serverDist) || !existsSync(webDist)) {
-  console.log('📦 Building ai-crew (first run)...');
+  console.log('📦 Building flightdeck (first run)...');
   try {
     execSync('npm run build', { cwd: root, stdio: 'inherit' });
   } catch (err) {
@@ -31,7 +31,7 @@ if (!existsSync(serverDist) || !existsSync(webDist)) {
 process.env.PORT = port;
 
 // Start the server
-console.log(`\n🚀 Starting AI Crew on http://127.0.0.1:${port}\n`);
+console.log(`\n🚀 Starting Flightdeck on http://127.0.0.1:${port}\n`);
 
 const server = spawn('node', [serverDist], {
   cwd: root,
