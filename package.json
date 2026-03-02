@@ -1,7 +1,12 @@
 {
   "name": "@flightdeck-ai/flightdeck",
   "version": "0.1.0",
+  "description": "Flightdeck - AI crew management platform",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/justinchuby/ai-crew.git"
+  },
   "type": "module",
   "bin": {
     "flightdeck": "./bin/flightdeck.mjs"
