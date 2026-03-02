@@ -17,7 +17,9 @@ export function ensureSharedWorkspace(agent: Agent): void {
   const newBase = join(baseDir, '.flightdeck');
   const legacyBase = join(baseDir, '.ai-crew');
 
-  // Backward-compat: migrate .ai-crew/ → .flightdeck/ if legacy exists
+  // Backward-compat: migrate .ai-crew/ → .flightdeck/ if legacy exists.
+  // Note: existing worktree symlinks pointing to .ai-crew/ will dangle until
+  // their worktree is cleaned up (next session start or cleanupOrphans).
   if (!existsSync(newBase) && existsSync(legacyBase)) {
     try {
       renameSync(legacyBase, newBase);
