@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: AI Crew
+  name: Flightdeck
   text: Multi-Agent Copilot CLI Orchestrator
   tagline: Coordinate teams of AI agents with specialized roles to collaborate on software engineering tasks.
   actions:

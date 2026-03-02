@@ -4,7 +4,7 @@ SQLite database layer using Drizzle ORM, with WAL mode and tuned pragmas for mul
 
 ## Drizzle ORM Setup
 
-AI Crew uses [Drizzle ORM](https://orm.drizzle.team/) over `better-sqlite3` for type-safe database access.
+Flightdeck uses [Drizzle ORM](https://orm.drizzle.team/) over `better-sqlite3` for type-safe database access.
 
 ### Why Drizzle
 

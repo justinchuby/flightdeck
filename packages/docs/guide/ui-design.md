@@ -1,6 +1,6 @@
 # UI Design
 
-Layout patterns and interaction modes for the AI Crew frontend (React + Vite + Tailwind).
+Layout patterns and interaction modes for the Flightdeck frontend (React + Vite + Tailwind).
 
 ## Lead Dashboard Layout
 
@@ -314,7 +314,7 @@ The Settings panel (`/settings`) provides configuration for:
 
 An 8-step guided tour for new users, rendered as a modal overlay:
 
-1. Welcome — Overview of AI Crew
+1. Welcome — Overview of Flightdeck
 2. Create Project — How to start a project
 3. Lead Dashboard — Understanding the chat + sidebar layout
 4. Team Management — Agent roles and models

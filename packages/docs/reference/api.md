@@ -1,4 +1,4 @@
-# AI Crew — REST API Reference
+# Flightdeck — REST API Reference
 
 > **Base URL**: `http://localhost:3001/api`  
 > **Authentication**: Bearer token (auto-generated on server start, required on all routes)  
@@ -884,7 +884,7 @@
 
 ### `GET /export/:leadId`
 
-**Description**: Exports the full session for a lead to disk (`.ai-crew/exports/`) and returns the export manifest.
+**Description**: Exports the full session for a lead to disk (`.flightdeck/exports/`) and returns the export manifest.
 
 **Parameters**:
 | Name | In | Type | Required | Description |

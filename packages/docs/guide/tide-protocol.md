@@ -565,4 +565,4 @@ Define a formal emergency protocol for catastrophic failures (tidal bore events)
 
 ---
 
-*This document is part of the AI Crew architecture documentation. For related protocols, see [Agent Coordination](./coordination.md) and [Agent Communication](./agent-communication.md).*
+*This document is part of the Flightdeck architecture documentation. For related protocols, see [Agent Coordination](./coordination.md) and [Agent Communication](./agent-communication.md).*

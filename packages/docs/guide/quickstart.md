@@ -9,8 +9,8 @@
 ## Installation
 
 ```bash
-git clone https://github.com/justinchuby/ai-crew.git
-cd ai-crew
+git clone https://github.com/justinchuby/flightdeck.git
+cd flightdeck
 npm install
 ```
 
@@ -18,10 +18,10 @@ npm install
 
 ### Production (recommended)
 
-The `ai-crew` command builds the project and starts the server with the web UI:
+The `flightdeck` command builds the project and starts the server with the web UI:
 
 ```bash
-npx ai-crew
+npx flightdeck
 ```
 
 Options:
@@ -85,7 +85,7 @@ Projects persist across sessions. If a lead agent exits, the project remembers i
 
 ```bash
 npm run build
-npx ai-crew
+npx flightdeck
 ```
 
 Or manually:

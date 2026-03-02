@@ -19,7 +19,7 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
 | `HOST` | `localhost` | Server host |
-| `DB_PATH` | `./ai-crew.db` | SQLite database path |
+| `DB_PATH` | `./flightdeck.db` | SQLite database path |
 | `SERVER_SECRET` | *(auto-generated)* | Auth token for API access. If not set, a random token is generated at startup and printed to the console. |
 | `AUTH` | `token` | Auth mode. Set to `none` to disable authentication (not recommended). |
 
@@ -27,7 +27,7 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 
 ### Authentication
 
-The server uses bearer token authentication. On startup, if no `SERVER_SECRET` is set, a random base64url token is auto-generated and printed to the console. The token is also injected into the served web UI via `window.__AI_CREW_TOKEN__`, so users don't need to configure anything.
+The server uses bearer token authentication. On startup, if no `SERVER_SECRET` is set, a random base64url token is auto-generated and printed to the console. The token is also injected into the served web UI via `window.__FLIGHTDECK_TOKEN__`, so users don't need to configure anything.
 
 ### CORS
 
@@ -72,7 +72,7 @@ Models can be configured at three levels (highest priority first):
 
 ## CLI Options
 
-The `ai-crew` CLI (`bin/ai-crew.mjs`) supports:
+The `flightdeck` CLI (`bin/flightdeck.mjs`) supports:
 
 | Flag | Description |
 |------|-------------|

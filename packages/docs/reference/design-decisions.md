@@ -61,7 +61,7 @@ Key architectural choices and their rationale.
 
 **Custom roles:** Users can create custom roles with their own system prompts, colors, and icons via the Settings UI. Built-in roles cannot be deleted.
 
-**Persistent role instructions:** Each role generates an `.agent.md` file in `~/.copilot/agents/ai-crew-<role-id>.agent.md`. These files are loaded by Copilot CLI via the `--agent` flag, ensuring role instructions survive context compression. The system prompt is also included in the initial message as a belt-and-suspenders approach.
+**Persistent role instructions:** Each role generates an `.agent.md` file in `~/.copilot/agents/flightdeck-<role-id>.agent.md`. These files are loaded by Copilot CLI via the `--agent` flag, ensuring role instructions survive context compression. The system prompt is also included in the initial message as a belt-and-suspenders approach.
 
 **Skills format:** Agents record reusable knowledge in `.github/skills/<skill-name>/SKILL.md` with YAML frontmatter (name, description) and Markdown body. Skills are auto-loaded by Copilot CLI when relevant.
 
@@ -156,8 +156,7 @@ Key architectural choices and their rationale.
 
 **Structure:**
 ```
-ai-crew/
-├── packages/server/    # Express + ws + ACP
+flightdeck/
 ├── packages/web/       # React + Vite + Tailwind + xterm.js
 ├── docs/               # Architecture documentation
 ├── tsconfig.base.json  # Shared TS config
@@ -257,7 +256,7 @@ ai-crew/
 - **Autopilot OFF:** After 60 seconds without user response, the tool call is **auto-denied** (cancelled).
 
 **Rationale:**
-- AI Crew distinguishes between supervised and autonomous operation modes
+- Flightdeck distinguishes between supervised and autonomous operation modes
 - Lead-spawned agents run in autopilot by default — they are part of a managed workflow and should proceed without blocking
 - Manually spawned agents without autopilot are in supervised mode — the user is expected to be actively watching
 - Auto-deny prevents non-autopilot agents from silently modifying files or running commands when the user is away
@@ -474,7 +473,7 @@ ai-crew/
 - Panel config persists to `localStorage` via `useDashboardLayout` hook
 - New panels added in code auto-merge into existing user layouts without losing their customizations
 
-**Trade-off:** HTML5 DnD has limited mobile support (no native touch events). Acceptable because AI Crew is primarily a desktop tool.
+**Trade-off:** HTML5 DnD has limited mobile support (no native touch events). Acceptable because Flightdeck is primarily a desktop tool.
 
 ## 36. Zustand Selector Discipline
 

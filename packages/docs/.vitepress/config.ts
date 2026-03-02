@@ -1,16 +1,16 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  title: 'AI Crew',
+  title: 'Flightdeck',
   description: 'Multi-Agent Copilot CLI Orchestrator',
-  base: '/ai-crew/',
-  head: [['link', { rel: 'icon', href: '/ai-crew/favicon.ico' }]],
+  base: '/flightdeck/',
+  head: [['link', { rel: 'icon', href: '/flightdeck/favicon.ico' }]],
   themeConfig: {
     logo: '/logo.svg',
     nav: [
       { text: 'Guide', link: '/guide/' },
       { text: 'Reference', link: '/reference/api' },
-      { text: 'GitHub', link: 'https://github.com/justinchuby/ai-crew' },
+      { text: 'GitHub', link: 'https://github.com/justinchuby/flightdeck' },
     ],
     sidebar: {
       '/guide/': [
@@ -75,7 +75,7 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/justinchuby/ai-crew' },
+      { icon: 'github', link: 'https://github.com/justinchuby/flightdeck' },
     ],
     search: { provider: 'local' },
     footer: {

@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Key architecture decisions made during AI Crew development (Waves 1–20).
+Key architecture decisions made during Flightdeck development (Waves 1–20).
 
 ---
 
@@ -41,16 +41,16 @@ Key architecture decisions made during AI Crew development (Waves 1–20).
 ## ADR-003: SQLite over PostgreSQL
 
 **Status**: Accepted
-**Context**: AI Crew needs to persist agent conversations, decisions, activity logs, and DAG tasks. The server runs locally as a CLI tool (`npx ai-crew`), not on a cloud host.
+**Context**: Flightdeck needs to persist agent conversations, decisions, activity logs, and DAG tasks. The server runs locally as a CLI tool (`npx flightdeck`), not on a cloud host.
 
 **Decision**: Use SQLite with WAL mode via Drizzle ORM, tuned with pragmas: `busy_timeout=5000`, `foreign_keys=ON`, `journal_mode=WAL`, `synchronous=NORMAL`.
 
 **Rationale**:
-- **Zero-infrastructure install**: A user running `npx ai-crew` should not need to have PostgreSQL running. SQLite is embedded in the process — no separate server, no connection strings, no Docker.
+- **Zero-infrastructure install**: A user running `npx flightdeck` should not need to have PostgreSQL running. SQLite is embedded in the process — no separate server, no connection strings, no Docker.
 - **WAL mode provides concurrency**: Write-Ahead Logging allows concurrent reads alongside a single writer, which matches the access pattern (many agents reading, one process writing batched activity).
 - **Sufficient scale**: A local project session generates thousands of rows, not millions. SQLite handles this comfortably. The `busy_timeout` pragma prevents write-contention errors under the batched-write pattern.
 - **Drizzle ORM portability**: If a team deployment scenario ever requires PostgreSQL, Drizzle's dialect system allows migrating with minimal schema changes — the SQL is largely compatible.
-- **Simplicity of deployment**: The database is a single file at `~/.ai-crew/crew.db`, trivially copyable, inspectable with any SQLite browser, and deletable to reset state.
+- **Simplicity of deployment**: The database is a single file at `~/.flightdeck/crew.db`, trivially copyable, inspectable with any SQLite browser, and deletable to reset state.
 
 **Alternatives considered**: PostgreSQL (requires external server), PGlite (browser-only), LevelDB (no SQL, harder to query), in-memory only (no persistence).
 
@@ -128,7 +128,7 @@ Key architecture decisions made during AI Crew development (Waves 1–20).
 ## ADR-008: Webhook Manager with HMAC signatures
 
 **Status**: Accepted  
-**Context**: External systems (CI/CD, Slack, custom dashboards) need to react to AI Crew events without polling.
+**Context**: External systems (CI/CD, Slack, custom dashboards) need to react to Flightdeck events without polling.
 
 **Decision**: Implement `WebhookManager` with configurable URL endpoints, event filters, HMAC-SHA256 signature verification, and retry with exponential backoff.
 
@@ -179,7 +179,7 @@ Key architecture decisions made during AI Crew development (Waves 1–20).
 ## ADR-011: Report Generator (HTML + Markdown)
 
 **Status**: Accepted  
-**Context**: Users need to share session results with stakeholders who don't have access to the AI Crew UI.
+**Context**: Users need to share session results with stakeholders who don't have access to the Flightdeck UI.
 
 **Decision**: Implement `ReportGenerator` that produces both HTML and Markdown session reports with summary statistics, task completion details, decision log, and token usage breakdown.
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-AI Crew uses the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging with Copilot CLI agents.
+Flightdeck uses the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging with Copilot CLI agents.
 
 ## ACP Mode (Default)
 
@@ -11,7 +11,7 @@ Each agent spawns a Copilot CLI process with `copilot --acp --stdio`. Communicat
 ### Connection Lifecycle
 
 ```
-Client (AI Crew)              Agent (Copilot CLI)
+Client (Flightdeck)              Agent (Copilot CLI)
      │                              │
      │── spawn copilot --acp ──────>│
      │                              │
