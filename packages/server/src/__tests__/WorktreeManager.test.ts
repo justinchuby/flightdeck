@@ -107,7 +107,7 @@ describe('WorktreeManager', () => {
     expect(mgr.count).toBe(1);
   });
 
-  it('symlinks .ai-crew when shared dir exists', async () => {
+  it('symlinks .flightdeck when shared dir exists', async () => {
     existsSyncMock
       .mockReturnValueOnce(false)  // worktreePath doesn't exist
       .mockReturnValueOnce(true)   // sharedDir exists
@@ -116,8 +116,8 @@ describe('WorktreeManager', () => {
     await mgr.create(AGENT_ID);
 
     expect(symlinkSyncMock).toHaveBeenCalledWith(
-      expect.stringContaining('.ai-crew'),
-      expect.stringContaining('.ai-crew'),
+      expect.stringContaining('.flightdeck'),
+      expect.stringContaining('.flightdeck'),
       'junction',
     );
   });

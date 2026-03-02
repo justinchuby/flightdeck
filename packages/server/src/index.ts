@@ -324,7 +324,7 @@ if (fs.existsSync(webDistPath)) {
     const secret = getAuthSecret();
     if (secret) {
       // Deliver token via HttpOnly cookie — never embed secrets in HTML
-      res.cookie('ai-crew-token', secret, {
+      res.cookie('flightdeck-token', secret, {
         httpOnly: true,
         sameSite: 'strict',
         path: '/',
@@ -336,7 +336,7 @@ if (fs.existsSync(webDistPath)) {
 
 httpServer.listen(config.port, config.host, () => {
   const url = `http://${config.host}:${config.port}`;
-  console.log(`🚀 AI Crew server running on ${url}`);
+  console.log(`🚀 Flightdeck server running on ${url}`);
   if (authToken) {
     console.log(`🔑 Auth token: ${authToken}`);
     console.log(`   (set SERVER_SECRET env var to use a fixed token, or AUTH=none to disable)`);

@@ -63,8 +63,8 @@ export class WebhookManager {
       try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          'X-AiCrew-Event': event,
-          'X-AiCrew-Webhook-Id': webhook.id,
+          'X-Flightdeck-Event': event,
+          'X-Flightdeck-Webhook-Id': webhook.id,
         };
 
         if (webhook.secret) {
@@ -72,7 +72,7 @@ export class WebhookManager {
           const crypto = await import('crypto');
           const body = JSON.stringify({ event, payload, timestamp: Date.now() });
           const signature = crypto.createHmac('sha256', webhook.secret).update(body).digest('hex');
-          headers['X-AiCrew-Signature'] = signature;
+          headers['X-Flightdeck-Signature'] = signature;
         }
 
         const response = await fetch(webhook.url, {

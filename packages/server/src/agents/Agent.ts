@@ -212,10 +212,10 @@ ${crewSection}
 ${budgetSection}
 
 == SHARED WORKSPACE ==
-Path: .ai-crew/shared/ (inside your working directory)
+Path: .flightdeck/shared/ (inside your working directory)
 Use this directory for documents, reports, or artifacts that other agents need to read.
-Convention: .ai-crew/shared/<your-role>-<short-id>/<filename>
-Example: .ai-crew/shared/architect-a1b2c3d4/design-doc.md
+Convention: .flightdeck/shared/<your-role>-<short-id>/<filename>
+Example: .flightdeck/shared/architect-a1b2c3d4/design-doc.md
 All team members have access to this directory. Create your subdirectory before writing files.
 
 == COORDINATION RULES ==

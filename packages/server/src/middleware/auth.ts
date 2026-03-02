@@ -59,7 +59,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   // Check HttpOnly cookie (set by server on page load)
-  const cookieToken = parseCookie(req.headers.cookie, 'ai-crew-token');
+  const cookieToken = parseCookie(req.headers.cookie, 'flightdeck-token');
   if (cookieToken === secret) {
     next();
     return;

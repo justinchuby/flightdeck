@@ -123,14 +123,14 @@ describe('WebhookManager', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('sends correct headers including X-AiCrew-Event', async () => {
+  it('sends correct headers including X-Flightdeck-Event', async () => {
     const wh = manager.register({ url: 'https://example.com/hook', events: ['error'], enabled: true });
     await manager.fire('error', {});
 
     const [, init] = fetchSpy.mock.calls[0];
     expect(init.headers['Content-Type']).toBe('application/json');
-    expect(init.headers['X-AiCrew-Event']).toBe('error');
-    expect(init.headers['X-AiCrew-Webhook-Id']).toBe(wh.id);
+    expect(init.headers['X-Flightdeck-Event']).toBe('error');
+    expect(init.headers['X-Flightdeck-Webhook-Id']).toBe(wh.id);
   });
 
   it('sends HMAC signature header when secret is set', async () => {
@@ -138,9 +138,9 @@ describe('WebhookManager', () => {
     await manager.fire('error', {});
 
     const [, init] = fetchSpy.mock.calls[0];
-    expect(init.headers['X-AiCrew-Signature']).toBeDefined();
-    expect(typeof init.headers['X-AiCrew-Signature']).toBe('string');
-    expect(init.headers['X-AiCrew-Signature']).toHaveLength(64); // SHA-256 hex = 64 chars
+    expect(init.headers['X-Flightdeck-Signature']).toBeDefined();
+    expect(typeof init.headers['X-Flightdeck-Signature']).toBe('string');
+    expect(init.headers['X-Flightdeck-Signature']).toHaveLength(64); // SHA-256 hex = 64 chars
   });
 
   // ── Error handling ──────────────────────────────────────────────

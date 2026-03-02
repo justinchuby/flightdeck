@@ -13,7 +13,7 @@ import type { Agent } from './Agent.js';
 
 /** Ensure the shared workspace directory exists for inter-agent artifact sharing. */
 export function ensureSharedWorkspace(agent: Agent): void {
-  const sharedDir = join(agent.cwd || process.cwd(), '.ai-crew', 'shared');
+  const sharedDir = join(agent.cwd || process.cwd(), '.flightdeck', 'shared');
   if (!existsSync(sharedDir)) {
     try { mkdirSync(sharedDir, { recursive: true }); } catch (err) { logger.debug('agent', 'Shared dir already exists or cannot be created'); }
   }

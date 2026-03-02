@@ -1,5 +1,5 @@
 /**
- * Simple structured logger for AI Crew server.
+ * Simple structured logger for Flightdeck server.
  * Outputs timestamped, categorized messages to stdout/stderr.
  */
 

@@ -48,13 +48,13 @@ function makeRole(overrides: Partial<Role> = {}): Role {
 
 describe('agentFlagForRole', () => {
   it('returns correct prefix for a role id', () => {
-    expect(agentFlagForRole('developer')).toBe('ai-crew-developer');
+    expect(agentFlagForRole('developer')).toBe('flightdeck-developer');
   });
 
   it('works for various role IDs', () => {
-    expect(agentFlagForRole('lead')).toBe('ai-crew-lead');
-    expect(agentFlagForRole('code-reviewer')).toBe('ai-crew-code-reviewer');
-    expect(agentFlagForRole('architect')).toBe('ai-crew-architect');
+    expect(agentFlagForRole('lead')).toBe('flightdeck-lead');
+    expect(agentFlagForRole('code-reviewer')).toBe('flightdeck-code-reviewer');
+    expect(agentFlagForRole('architect')).toBe('flightdeck-architect');
   });
 });
 
@@ -92,12 +92,12 @@ describe('writeAgentFiles', () => {
     expect(mockWriteFileSync).toHaveBeenCalledOnce();
 
     const [filePath, content, encoding] = mockWriteFileSync.mock.calls[0];
-    expect(filePath).toContain('ai-crew-developer.agent.md');
+    expect(filePath).toContain('flightdeck-developer.agent.md');
     expect(encoding).toBe('utf-8');
 
     // Frontmatter
-    expect(content).toContain('name: ai-crew-developer');
-    expect(content).toContain('description: "AI Crew Developer: Writes production code"');
+    expect(content).toContain('name: flightdeck-developer');
+    expect(content).toContain('description: "Flightdeck Developer: Writes production code"');
 
     // Tools
     expect(content).toContain('  - read');
@@ -106,7 +106,7 @@ describe('writeAgentFiles', () => {
     expect(content).toContain('  - shell');
 
     // Body
-    expect(content).toContain('# Developer — AI Crew Agent');
+    expect(content).toContain('# Developer — Flightdeck Agent');
     expect(content).toContain('You are a skilled Developer.');
   });
 
@@ -124,9 +124,9 @@ describe('writeAgentFiles', () => {
     expect(mockWriteFileSync).toHaveBeenCalledTimes(3);
 
     const writtenPaths = mockWriteFileSync.mock.calls.map((c: any[]) => c[0]);
-    expect(writtenPaths[0]).toContain('ai-crew-lead.agent.md');
-    expect(writtenPaths[1]).toContain('ai-crew-developer.agent.md');
-    expect(writtenPaths[2]).toContain('ai-crew-reviewer.agent.md');
+    expect(writtenPaths[0]).toContain('flightdeck-lead.agent.md');
+    expect(writtenPaths[1]).toContain('flightdeck-developer.agent.md');
+    expect(writtenPaths[2]).toContain('flightdeck-reviewer.agent.md');
   });
 
   it('catches errors gracefully without propagating', () => {

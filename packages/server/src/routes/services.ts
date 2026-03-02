@@ -119,7 +119,7 @@ export function servicesRoutes(ctx: AppContext): Router {
       return;
     }
     try {
-      const outputDir = join(process.cwd(), '.ai-crew', 'exports');
+      const outputDir = join(process.cwd(), '.flightdeck', 'exports');
       const result = sessionExporter.export(req.params.leadId, outputDir);
       res.json(result);
     } catch (err: any) {
@@ -444,7 +444,7 @@ export function servicesRoutes(ctx: AppContext): Router {
     // Recent git commits
     const commits = getRecentCommits();
 
-    const projectName = lead?.projectName ?? lead?.task?.slice(0, 60) ?? 'AI Crew Session';
+    const projectName = lead?.projectName ?? lead?.task?.slice(0, 60) ?? 'Flightdeck Session';
 
     const data = {
       projectName,

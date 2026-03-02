@@ -38,7 +38,7 @@ export class WebSocketServer {
         const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
         const url = new URL(req.url || '', `http://${req.headers.host}`);
         const token = url.searchParams.get('token');
-        const cookieToken = this.parseCookie(req.headers.cookie, 'ai-crew-token');
+        const cookieToken = this.parseCookie(req.headers.cookie, 'flightdeck-token');
         if (!isLocalhost && token !== secret && cookieToken !== secret) {
           ws.close(4401, 'Authentication required');
           return;

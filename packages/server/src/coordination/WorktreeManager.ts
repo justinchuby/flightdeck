@@ -75,9 +75,9 @@ export class WorktreeManager extends EventEmitter {
         { cwd: this.repoRoot, timeout: 10_000 },
       );
 
-      // Symlink shared workspace so agents can communicate via .ai-crew/
-      const sharedDir = path.join(this.repoRoot, '.ai-crew');
-      const targetShared = path.join(worktreePath, '.ai-crew');
+      // Symlink shared workspace so agents can communicate via .flightdeck/
+      const sharedDir = path.join(this.repoRoot, '.flightdeck');
+      const targetShared = path.join(worktreePath, '.flightdeck');
       if (existsSync(sharedDir) && !existsSync(targetShared)) {
         symlinkSync(sharedDir, targetShared, 'junction');
       }

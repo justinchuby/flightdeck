@@ -5,7 +5,7 @@ import type { Role } from './RoleRegistry.js';
 import { logger } from '../utils/logger.js';
 
 const AGENTS_DIR = join(homedir(), '.copilot', 'agents');
-const PREFIX = 'ai-crew-';
+const PREFIX = 'flightdeck-';
 
 /**
  * Build the .agent.md content for a role.
@@ -16,7 +16,7 @@ function buildAgentFile(role: Role): string {
   const lines = [
     '---',
     `name: ${PREFIX}${role.id}`,
-    `description: "AI Crew ${role.name}: ${role.description}"`,
+    `description: "Flightdeck ${role.name}: ${role.description}"`,
     'tools:',
     '  - read',
     '  - edit',
@@ -24,7 +24,7 @@ function buildAgentFile(role: Role): string {
     '  - shell',
     '---',
     '',
-    `# ${role.name} — AI Crew Agent`,
+    `# ${role.name} — Flightdeck Agent`,
     '',
     role.systemPrompt,
     '',
