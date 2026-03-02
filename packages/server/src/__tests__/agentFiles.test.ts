@@ -5,16 +5,20 @@ import { sep } from 'path';
 // Mocks — vi.hoisted ensures these are available inside the hoisted vi.mock factories
 // ---------------------------------------------------------------------------
 
-const { mockMkdirSync, mockWriteFileSync, mockExistsSync } = vi.hoisted(() => ({
+const { mockMkdirSync, mockWriteFileSync, mockExistsSync, mockReaddirSync, mockUnlinkSync } = vi.hoisted(() => ({
   mockMkdirSync: vi.fn(),
   mockWriteFileSync: vi.fn(),
   mockExistsSync: vi.fn(),
+  mockReaddirSync: vi.fn((): string[] => []),
+  mockUnlinkSync: vi.fn(),
 }));
 
 vi.mock('fs', () => ({
   mkdirSync: mockMkdirSync,
   writeFileSync: mockWriteFileSync,
   existsSync: mockExistsSync,
+  readdirSync: mockReaddirSync,
+  unlinkSync: mockUnlinkSync,
 }));
 
 vi.mock('../utils/logger.js', () => ({
@@ -137,5 +141,37 @@ describe('writeAgentFiles', () => {
 
     // Should not throw
     expect(() => writeAgentFiles([makeRole()])).not.toThrow();
+  });
+
+  it('removes legacy ai-crew-*.agent.md files when writing new ones', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReaddirSync.mockReturnValue([
+      'ai-crew-developer.agent.md',
+      'ai-crew-lead.agent.md',
+      'flightdeck-architect.agent.md',
+      'unrelated-file.txt',
+    ]);
+
+    writeAgentFiles([makeRole()]);
+
+    // Should only delete legacy ai-crew- prefixed agent files
+    expect(mockUnlinkSync).toHaveBeenCalledTimes(2);
+    expect(mockUnlinkSync).toHaveBeenCalledWith(
+      expect.stringContaining('ai-crew-developer.agent.md'),
+    );
+    expect(mockUnlinkSync).toHaveBeenCalledWith(
+      expect.stringContaining('ai-crew-lead.agent.md'),
+    );
+  });
+
+  it('does not fail if cleanup of legacy files errors', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReaddirSync.mockImplementation(() => {
+      throw new Error('permission denied');
+    });
+
+    // Should not throw — cleanup is best-effort
+    expect(() => writeAgentFiles([makeRole()])).not.toThrow();
+    expect(mockWriteFileSync).toHaveBeenCalled();
   });
 });

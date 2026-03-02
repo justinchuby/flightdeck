@@ -2,7 +2,7 @@
  * ACP connection management for Agent — extracted from Agent.ts to reduce file size.
  * Handles startAcp(), wireAcpEvents(), and ensureSharedWorkspace().
  */
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, renameSync } from 'fs';
 import { join } from 'path';
 import { AcpConnection } from '../acp/AcpConnection.js';
 import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
@@ -13,7 +13,21 @@ import type { Agent } from './Agent.js';
 
 /** Ensure the shared workspace directory exists for inter-agent artifact sharing. */
 export function ensureSharedWorkspace(agent: Agent): void {
-  const sharedDir = join(agent.cwd || process.cwd(), '.flightdeck', 'shared');
+  const baseDir = agent.cwd || process.cwd();
+  const newBase = join(baseDir, '.flightdeck');
+  const legacyBase = join(baseDir, '.ai-crew');
+
+  // Backward-compat: migrate .ai-crew/ → .flightdeck/ if legacy exists
+  if (!existsSync(newBase) && existsSync(legacyBase)) {
+    try {
+      renameSync(legacyBase, newBase);
+      logger.info('agent', `📦 Migrated workspace: .ai-crew/ → .flightdeck/`);
+    } catch {
+      logger.debug('agent', 'Could not migrate .ai-crew/ dir, creating fresh .flightdeck/');
+    }
+  }
+
+  const sharedDir = join(newBase, 'shared');
   if (!existsSync(sharedDir)) {
     try { mkdirSync(sharedDir, { recursive: true }); } catch (err) { logger.debug('agent', 'Shared dir already exists or cannot be created'); }
   }
