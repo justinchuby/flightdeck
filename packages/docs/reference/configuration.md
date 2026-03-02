@@ -23,7 +23,7 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 | `SERVER_SECRET` | *(auto-generated)* | Auth token for API access. If not set, a random token is generated at startup and printed to the console. |
 | `AUTH` | `token` | Auth mode. Set to `none` to disable authentication (not recommended). |
 | `COPILOT_CLI_PATH` | `copilot` | Path to the Copilot CLI binary. Override if your Copilot CLI is installed in a non-standard location. |
-| `MAX_AGENTS` | `50` | Hard maximum number of agents that can be spawned regardless of `maxConcurrent` setting. |
+| `MAX_AGENTS` | `50` | Initial default for maximum concurrent agents at startup. Seeds the `maxConcurrent` setting in the database; not a hard upper bound (can be overridden via the Settings page or API). |
 
 ## Security
 
@@ -92,11 +92,15 @@ The `flightdeck` CLI (`bin/flightdeck.mjs`) supports:
 flightdeck --port=4000
 ```
 
-### Expose to your local network
+### Remote access via SSH tunneling
+
+Flightdeck binds to `127.0.0.1` by default — all access is local. For remote access, use SSH tunneling to securely forward the port:
 
 ```bash
-flightdeck --host=0.0.0.0
+ssh -L 3001:localhost:3001 user@remote-host
 ```
+
+Then open `http://localhost:3001` on your local machine. The connection is encrypted by SSH — no need to expose Flightdeck to the network.
 
 ### Run headless (no browser)
 
