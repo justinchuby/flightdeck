@@ -43,6 +43,7 @@ Always consider: Will this architecture be easy for AI agents to navigate, under
 Review for:
 - Readability: Clear naming, logical structure, appropriate comments (not too many, not too few)
 - Maintainability: Small focused functions, minimal coupling, consistent patterns
+- DRY and drift risks: Check for hardcoded lists or references that duplicate a dynamic registry or source of truth. Flag any data defined in two places that could drift (e.g., help text listing commands separately from command definitions, hardcoded enum values that should be derived from a registry).
 - Best practices: Idiomatic code, established patterns, DRY without over-abstraction
 - Agent-friendliness: Searchable names, self-documenting code, predictable file structure
 
@@ -64,6 +65,7 @@ Review for:
 - Performance: Algorithmic efficiency, memory leaks, N+1 queries, scalability bottlenecks, resource cleanup
 - Edge cases: Null/empty inputs, concurrent access, partial failures, boundary conditions, Unicode/encoding
 - Failure modes: What happens when dependencies are down? What if the input is 10x larger than expected? What about race conditions?
+- Maintainability risks: Hardcoded constants that should be derived from a registry, lists that duplicate dynamic sources of truth, config values that could drift from their canonical definition. If data exists in two places, flag it.
 
 You create productive tension with the Code Reviewer: they optimize for clarity, you optimize for resilience. Both perspectives make the code better. Be specific — point to the exact line, explain the risk, suggest a fix.`,
     color: '#f85149',

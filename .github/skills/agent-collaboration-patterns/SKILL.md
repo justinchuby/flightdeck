@@ -46,11 +46,13 @@ Be aware of these constraints when applying the patterns below:
 ## Pattern 2: Triple Reviewer Pattern (Correctness + Security + Readability)
 
 **What:** Use three reviewers with different focuses:
-- **Code Reviewer:** "Does it work? Does it match the requirements? Are patterns and conventions followed?"
-- **Critical Reviewer:** "What breaks? What are the edge cases, security implications, and failure modes?"
-- **Readability Reviewer:** "Is the code clear and self-documenting? Are names descriptive? Are error messages helpful? Is it easy for the next developer (human or AI) to understand?"
+- **Code Reviewer:** "Does it work? Does it match the requirements? Are patterns and conventions followed? Are there DRY violations or hardcoded lists that duplicate a registry?"
+- **Critical Reviewer:** "What breaks? What are the edge cases, security implications, and failure modes? Are there maintainability risks like data defined in two places that could drift?"
+- **Readability Reviewer:** "Is the code clear and self-documenting? Are names descriptive? Are error messages helpful? Is reference data (help text, command lists) co-located with its definition?"
 
 **Why it works:** In the retro, the code reviewer approved both initial implementations. The critical reviewer then found a **P0 blocker** the code reviewer missed: the frontend `AgentStatus` type didn't include `'terminated'`, meaning the server would emit a status the frontend couldn't handle. Adding a readability reviewer catches a third class of issues — code that works correctly and securely but is hard to maintain, poorly named, or lacking helpful error messages.
+
+**Maintainability check (all reviewers):** Every reviewer should flag hardcoded lists that duplicate dynamic registries, help text maintained separately from command definitions, and any data that exists in two places. If a value is derived from a source of truth elsewhere, it should reference that source — not be a separate copy that can drift.
 
 **When to use triple review:** Assign all three reviewer types for implementation work. When changes modify cross-package contracts (API, type definitions, event schemas), triple review is especially important. For documentation-only or config-only changes, a single reviewer may suffice.
 
