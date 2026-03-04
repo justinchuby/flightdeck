@@ -55,6 +55,7 @@ export function MentionText({ text, agents, onClickAgent }: {
   agents: Array<MentionAgent>;
   onClickAgent?: (agentId: string) => void;
 }) {
+  if (!text) return null;
   // Match @hexId or @role-name (hyphenated words like "code-reviewer")
   const MENTION_RE = /@([a-f0-9]{4,8}|[a-zA-Z][\w-]*)\b/g;
   const parts: React.ReactNode[] = [];

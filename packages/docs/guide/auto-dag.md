@@ -111,7 +111,7 @@ When an agent completes its work (reports idle, sends a completion message, or e
 No manual `COMPLETE_TASK` call is needed from the lead. Agents can also explicitly complete their own task:
 
 ```
-⟦⟦ COMPLETE_TASK {"summary": "Implemented the feature", "dagTaskId": "my-task-id"} ⟧⟧
+⟦⟦ COMPLETE_TASK {"summary": "Implemented the feature", "taskId": "my-task-id"} ⟧⟧
 ```
 
 ## The ADD_DEPENDENCY Command
@@ -135,9 +135,9 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 
 ```
 ⟦⟦ DECLARE_TASKS {"tasks": [
-  {"id": "design-api", "role": "architect", "title": "Design REST API"},
-  {"id": "impl-api", "role": "developer", "title": "Implement API", "dependsOn": ["design-api"]},
-  {"id": "review-api", "role": "code-reviewer", "title": "Review API", "dependsOn": ["impl-api"]}
+  {"taskId": "design-api", "role": "architect", "title": "Design REST API"},
+  {"taskId": "impl-api", "role": "developer", "title": "Implement API", "dependsOn": ["design-api"]},
+  {"taskId": "review-api", "role": "code-reviewer", "title": "Review API", "dependsOn": ["impl-api"]}
 ]} ⟧⟧
 
 ⟦⟦ CREATE_AGENT {"role": "architect", "task": "Design the REST API", "dagTaskId": "design-api"} ⟧⟧
@@ -158,8 +158,8 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 
 ```
 ⟦⟦ DECLARE_TASKS {"tasks": [
-  {"id": "auth", "role": "developer", "title": "Build auth module"},
-  {"id": "api", "role": "developer", "title": "Build API", "dependsOn": ["auth"]}
+  {"taskId": "auth", "role": "developer", "title": "Build auth module"},
+  {"taskId": "api", "role": "developer", "title": "Build API", "dependsOn": ["auth"]}
 ]} ⟧⟧
 
 // These link to declared tasks:

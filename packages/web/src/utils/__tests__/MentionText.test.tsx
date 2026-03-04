@@ -67,4 +67,21 @@ describe('MentionText', () => {
     expect(agentMention).not.toBeNull();
     expect(agentMention!.textContent).toContain('@developer');
   });
+
+  it('returns null for null/undefined text without crashing', () => {
+    const { container: c1 } = render(
+      <MentionText text={null as unknown as string} agents={agents} />,
+    );
+    expect(c1.innerHTML).toBe('');
+
+    const { container: c2 } = render(
+      <MentionText text={undefined as unknown as string} agents={agents} />,
+    );
+    expect(c2.innerHTML).toBe('');
+
+    const { container: c3 } = render(
+      <MentionText text="" agents={agents} />,
+    );
+    expect(c3.innerHTML).toBe('');
+  });
 });

@@ -168,10 +168,15 @@ export class Agent {
     const shortId = this.id.slice(0, 8);
     const taskLine = this.task ? this.task : 'Awaiting assignment';
 
-    // For leads: show "YOUR AGENTS" (children) separately from other peers
+    // For leads: show "YOUR AGENTS" (children) separately from sibling leads
     const isLead = this.role.id === 'lead';
     const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
-    const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
+    // Sibling peers: same-project agents that aren't this lead's children (and not self)
+    const siblingPeers = isLead
+      ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id)
+      : [];
+    // Non-leads see all peers (pre-filtered to same project by the caller)
+    const otherPeers = isLead ? [] : peers;
 
     const childLines = myChildren
       .map((p) => {
@@ -179,6 +184,14 @@ export class Agent {
         const modelStr = p.model ? ` [${p.model}]` : '';
         const systemStr = p.isSystemAgent ? ' (system)' : '';
         return `- ${pShort} — ${p.roleName}${systemStr}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
+      })
+      .join('\n');
+
+    const siblingLines = siblingPeers
+      .map((p) => {
+        const pShort = p.id.slice(0, 8);
+        const systemStr = p.isSystemAgent ? ' (system)' : '';
+        return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task ? p.task.slice(0, 80) : 'idle'}`;
       })
       .join('\n');
 
@@ -190,6 +203,10 @@ export class Agent {
         return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
       })
       .join('\n');
+
+    const siblingSection = isLead && siblingLines
+      ? `\n== OTHER TEAM MEMBERS ==\n${siblingLines}`
+      : '';
 
     const budgetSection = isLead && budget
       ? `\n== AGENT BUDGET ==
@@ -203,7 +220,7 @@ ${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — reuse idle 
       ? `== YOUR AGENTS ==
 ${childLines || '(no agents created yet — use CREATE_AGENT to create specialists)'}
 Use agent IDs above with DELEGATE to assign tasks, or AGENT_MESSAGE to communicate.
-${otherPeers.length > 0 ? `\n== OTHER CREW MEMBERS ==\n${peerLines}` : ''}${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${this.parentId.slice(0, 8)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}`
+${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${this.parentId.slice(0, 8)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}${siblingSection}`
       : `== ACTIVE CREW MEMBERS ==
 ${peerLines || '(no other agents)'}`;
 

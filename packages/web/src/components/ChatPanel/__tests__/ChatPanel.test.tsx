@@ -92,15 +92,16 @@ describe('ChatPanel', () => {
   it('calls interruptAgent on Ctrl+Enter with no text', () => {
     seedAgent('running');
     const ws = makeWs();
-    const api = makeApi();
     render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
 
-    // No text → should NOT send message, should interrupt
-    expect(mockApiFetch).not.toHaveBeenCalled();
-    expect(api.interruptAgent).toHaveBeenCalledWith(AGENT_ID);
+    // No text → should call interrupt endpoint, not send message
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      `/agents/${AGENT_ID}/interrupt`,
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 
   it('marks message as queued when agent is busy and mode is queue', () => {

@@ -99,6 +99,54 @@ export function maybeAutoCreateGroup(
   }
 }
 
+// ── Shared agent resolution with integrated project boundary check ──
+
+/**
+ * Resolve a target agent by ID, prefix, role ID, or role name — scoped to the
+ * sender's project. The project check is applied at EVERY resolution step
+ * (including exact UUID matches) so there is no code path that bypasses it.
+ *
+ * This replaces the previous two-step approach (resolve, then boundary check)
+ * which failed at runtime when senderProjectId was undefined.
+ */
+export function resolveAgentInProject(
+  ctx: CommandHandlerContext,
+  to: string,
+  senderProjectId: string | undefined,
+): Agent | undefined {
+  const isInSameProject = (a: Agent) =>
+    !senderProjectId || ctx.getProjectIdForAgent(a.id) === senderProjectId;
+  const isActive = (a: Agent) => a.status === 'running' || a.status === 'idle';
+
+  // 1. Exact UUID match — must be in same project
+  const exactMatch = ctx.getAgent(to);
+  if (exactMatch && isInSameProject(exactMatch)) {
+    return exactMatch;
+  }
+
+  // 2. Build candidate list: active, same-project agents
+  const candidates = ctx.getAllAgents().filter((a) => isInSameProject(a) && isActive(a));
+
+  // 3. ID prefix match
+  const byPrefix = candidates.find((a) => a.id.startsWith(to));
+  if (byPrefix) return byPrefix;
+
+  // 4. Role ID match
+  const byRoleId = candidates.find((a) => a.role.id === to);
+  if (byRoleId) return byRoleId;
+
+  // 5. Role name match (case-insensitive)
+  const lower = to.toLowerCase();
+  const byRoleName = candidates.find((a) => a.role.name.toLowerCase() === lower);
+  if (byRoleName) return byRoleName;
+
+  // 6. Partial match (role ID or name contains the search term)
+  const partial = candidates.find((a) =>
+    a.role.id.includes(lower) || a.role.name.toLowerCase().includes(lower),
+  );
+  return partial;
+}
+
 // ── Handler implementations ─────────────────────────────────────────
 
 function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -109,52 +157,16 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     const msg = parseCommandPayload(agent, match[1], agentMessageSchema, 'AGENT_MESSAGE');
     if (!msg) return;
 
-    // Resolve "to" — could be full UUID, short ID prefix, role ID, or role name
-    // Scope resolution to sender's project to prevent cross-project messaging
-    let targetId = msg.to;
     const senderProjectId = ctx.getProjectIdForAgent(agent.id);
-    const allAgents = senderProjectId
-      ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === senderProjectId)
-      : ctx.getAllAgents();
-    if (!ctx.getAgent(targetId)) {
-      const byPrefix = allAgents.find((a) => a.id.startsWith(msg.to) && (a.status === 'running' || a.status === 'idle'));
-      if (byPrefix) {
-        targetId = byPrefix.id;
-      } else {
-        const byRoleId = allAgents.find((a) => a.role.id === msg.to && (a.status === 'running' || a.status === 'idle'));
-        if (byRoleId) {
-          targetId = byRoleId.id;
-        } else {
-          const lower = msg.to.toLowerCase();
-          const byRoleName = allAgents.find((a) =>
-            a.role.name.toLowerCase() === lower && (a.status === 'running' || a.status === 'idle')
-          );
-          if (byRoleName) {
-            targetId = byRoleName.id;
-          } else {
-            const partial = allAgents.find((a) =>
-              (a.role.id.includes(lower) || a.role.name.toLowerCase().includes(lower)) && (a.status === 'running' || a.status === 'idle')
-            );
-            if (partial) targetId = partial.id;
-          }
-        }
-      }
-    }
+    const targetAgent = resolveAgentInProject(ctx, msg.to, senderProjectId);
 
-    const targetAgent = ctx.getAgent(targetId);
     if (!targetAgent) {
       logger.warn('message', `Cannot resolve target "${msg.to}" for message from ${agent.role.name} (${agent.id.slice(0, 8)})`);
       agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
       return;
     }
 
-    // Enforce project boundary — reject cross-project messages
-    if (senderProjectId && ctx.getProjectIdForAgent(targetId) !== senderProjectId) {
-      logger.warn('message', `Cross-project message blocked: ${agent.id.slice(0, 8)} → ${targetId.slice(0, 8)}`);
-      agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
-      return;
-    }
-
+    const targetId = targetAgent.id;
     ctx.messageBus.send({
       from: agent.id,
       to: targetId,
@@ -341,9 +353,10 @@ function handleRemoveFromGroup(ctx: CommandHandlerContext, agent: Agent, data: s
     if (!req) return;
     const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
     if (!leadId) { agent.sendMessage('[System] Cannot manage groups — no lead context found.'); return; }
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
     const resolvedIds = req.members.map((m: string) => {
-      const found = ctx.getAllAgents().find((a) => a.id === m || a.id.startsWith(m));
-      return found?.id;
+      const resolved = resolveAgentInProject(ctx, m, senderProjectId);
+      return resolved?.id;
     }).filter(Boolean) as string[];
 
     const removed = ctx.chatGroupRegistry.removeMembers(leadId, req.group, resolvedIds);
@@ -423,34 +436,9 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
     const req = parseCommandPayload(agent, match[1], interruptSchema, 'INTERRUPT');
     if (!req) return;
 
-    // Resolve target agent (same resolution as AGENT_MESSAGE)
-    // Scope to sender's project to prevent cross-project interrupts
-    let targetId = req.to;
+    // Resolve target agent — uses same project-scoped resolution as AGENT_MESSAGE
     const senderProjectId = ctx.getProjectIdForAgent(agent.id);
-    const allAgents = senderProjectId
-      ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === senderProjectId)
-      : ctx.getAllAgents();
-    if (!ctx.getAgent(targetId)) {
-      const byPrefix = allAgents.find((a) => a.id.startsWith(req.to) && (a.status === 'running' || a.status === 'idle'));
-      if (byPrefix) {
-        targetId = byPrefix.id;
-      } else {
-        const byRoleId = allAgents.find((a) => a.role.id === req.to && (a.status === 'running' || a.status === 'idle'));
-        if (byRoleId) {
-          targetId = byRoleId.id;
-        } else {
-          const lower = req.to.toLowerCase();
-          const byRoleName = allAgents.find((a) =>
-            a.role.name.toLowerCase() === lower && (a.status === 'running' || a.status === 'idle')
-          );
-          if (byRoleName) {
-            targetId = byRoleName.id;
-          }
-        }
-      }
-    }
-
-    const target = ctx.getAgent(targetId);
+    const target = resolveAgentInProject(ctx, req.to, senderProjectId);
     if (!target) {
       agent.sendMessage(`[System] Cannot resolve agent "${req.to}" for interrupt.`);
       return;

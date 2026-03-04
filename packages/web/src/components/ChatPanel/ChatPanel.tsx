@@ -198,7 +198,11 @@ export function ChatPanel({ agentId, ws }: Props) {
                 handleSend();
               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                if (inputText.trim()) handleSend('interrupt');
+                if (inputText.trim()) {
+                  handleSend('interrupt');
+                } else {
+                  interruptAgent(agentId);
+                }
               }
             }}
             onInput={(e) => {

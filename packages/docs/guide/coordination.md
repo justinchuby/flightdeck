@@ -270,9 +270,9 @@ On termination:
 The `DeferredIssueRegistry` provides a lightweight issue tracker scoped to each project lead. Agents flag quality issues, configuration problems, or blockers that can't be addressed immediately.
 
 **Commands:**
-- `DEFER_ISSUE {"description": "...", "severity": "P2", "sourceFile": "..."}` — Flag an issue with optional severity (P1/P2/P3) and source file
+- `DEFER_ISSUE {"description": "...", "severity": "P2", "filePath": "..."}` — Flag an issue with optional severity (P1/P2/P3) and source file
 - `QUERY_DEFERRED {"status": "open"}` — List issues with optional status filter (open/resolved/dismissed)
-- `RESOLVE_DEFERRED {"id": 42}` — Mark as resolved, or `{"id": 42, "dismiss": true}` to dismiss
+- `RESOLVE_DEFERRED {"issueId": 42}` — Mark as resolved, or `{"issueId": 42, "dismiss": true}` to dismiss
 
 **Key design:**
 - Lead-scoped — agents only see issues within their lead's project

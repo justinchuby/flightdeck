@@ -35,6 +35,9 @@ export interface ProjectBriefing {
 }
 
 export class ProjectRegistry {
+  /** In-memory cache: projectId → merged model config. Invalidated on setModelConfig(). */
+  private modelConfigCache = new Map<string, { config: ProjectModelConfig; defaults: ProjectModelConfig }>();
+
   constructor(private db: Database) {}
 
   /** Create a new project, return its ID */
@@ -291,8 +294,12 @@ export class ProjectRegistry {
   /**
    * Get the model config for a project.
    * Returns the stored config merged over defaults — stored values take precedence.
+   * Results are cached in-memory; cache is invalidated on setModelConfig().
    */
   getModelConfig(projectId: string): { config: ProjectModelConfig; defaults: ProjectModelConfig } {
+    const cached = this.modelConfigCache.get(projectId);
+    if (cached) return cached;
+
     const row = this.db.drizzle.select({ modelConfig: projects.modelConfig })
       .from(projects)
       .where(eq(projects.id, projectId))
@@ -303,12 +310,15 @@ export class ProjectRegistry {
     }
     // Merge: stored overrides defaults per-role
     const merged: ProjectModelConfig = { ...DEFAULT_MODEL_CONFIG, ...stored };
-    return { config: merged, defaults: DEFAULT_MODEL_CONFIG };
+    const result = { config: merged, defaults: DEFAULT_MODEL_CONFIG };
+    this.modelConfigCache.set(projectId, result);
+    return result;
   }
 
   /**
    * Set the model config for a project.
    * Only stores the roles that differ from defaults (sparse storage).
+   * Invalidates the in-memory cache for this project.
    */
   setModelConfig(projectId: string, config: ProjectModelConfig): void {
     const json = JSON.stringify(config);
@@ -316,6 +326,12 @@ export class ProjectRegistry {
       modelConfig: json,
       updatedAt: new Date().toISOString(),
     }).where(eq(projects.id, projectId)).run();
+    this.modelConfigCache.delete(projectId);
+  }
+
+  /** Clear the entire model config cache (useful for testing). */
+  clearModelConfigCache(): void {
+    this.modelConfigCache.clear();
   }
 
   /** Delete a project and all associated sessions */

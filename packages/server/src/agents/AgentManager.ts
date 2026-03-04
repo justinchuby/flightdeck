@@ -226,6 +226,45 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.projectRegistry = registry;
   }
 
+  /**
+   * Resolve the effective model for a role based on project model config.
+   *
+   * Priority:
+   *   1. If the requested model is in the allowed list → use it
+   *   2. If the requested model is NOT in the allowed list → fall back to role default, log warning
+   *   3. If no model requested → use the first allowed model from project config (role default)
+   *   4. If no project config or no restrictions for role → return requestedModel unchanged
+   */
+  resolveModelForRole(roleId: string, requestedModel: string | undefined, projectId: string | undefined): { model: string | undefined; overridden: boolean; reason?: string } {
+    if (!projectId || !this.projectRegistry) {
+      return { model: requestedModel, overridden: false };
+    }
+
+    const { config } = this.projectRegistry.getModelConfig(projectId);
+    const allowedModels = config[roleId];
+
+    if (!allowedModels || allowedModels.length === 0) {
+      return { model: requestedModel, overridden: false };
+    }
+
+    const roleDefault = allowedModels[0];
+
+    if (!requestedModel) {
+      return { model: roleDefault, overridden: false, reason: `Using project default model for role "${roleId}"` };
+    }
+
+    if (allowedModels.includes(requestedModel)) {
+      return { model: requestedModel, overridden: false };
+    }
+
+    // Requested model is not in the allowed list — enforce config
+    return {
+      model: roleDefault,
+      overridden: true,
+      reason: `Model "${requestedModel}" is not in the allowed list for role "${roleId}". Using "${roleDefault}" instead. Allowed: [${allowedModels.join(', ')}]`,
+    };
+  }
+
   spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
@@ -234,7 +273,27 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       );
     }
 
-    const peers: AgentContextInfo[] = this.getAll().map((a) => ({
+    // Determine the project scope for this agent:
+    // - explicit projectId from options
+    // - inherited from parent
+    // - undefined (no project scope)
+    const effectiveProjectId = options?.projectId
+      ?? (parentId ? this.getProjectIdForAgent(parentId) : undefined);
+
+    // Enforce project model config: resolve the effective model for this role
+    const modelResolution = this.resolveModelForRole(role.id, model, effectiveProjectId);
+    const effectiveModel = modelResolution.model;
+    if (modelResolution.overridden && modelResolution.reason) {
+      logger.warn('model-config', modelResolution.reason);
+    } else if (modelResolution.reason) {
+      logger.info('model-config', modelResolution.reason);
+    }
+
+    // Filter initial peer list to same project to prevent cross-project visibility
+    const allAgents = effectiveProjectId
+      ? this.getByProject(effectiveProjectId)
+      : this.getAll();
+    const peers: AgentContextInfo[] = allAgents.map((a) => ({
       id: a.id,
       role: a.role.id,
       roleName: a.role.name,
@@ -254,7 +313,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     const agent = new Agent(effectiveRole, this.config, task, parentId, peers, autopilot, id);
-    if (model) agent.model = model;
+    if (effectiveModel) agent.model = effectiveModel;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
     if (options?.projectName) agent.projectName = options.projectName;

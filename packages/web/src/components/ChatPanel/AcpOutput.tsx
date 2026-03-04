@@ -4,7 +4,7 @@ import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X } from 'lucide-react';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
-import { InlineMarkdownWithMentions } from '../../utils/markdown';
+import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
 import { PromptNav, hasUserMention } from '../PromptNav';
 
 interface Props {
@@ -267,7 +267,7 @@ export function AcpOutput({ agentId }: Props) {
                 <div key={`msg-${item.index}`} data-user-prompt={item.index} className="flex justify-end items-start gap-2 py-1">
                   <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                   <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
-                    {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
+                    <MentionText text={typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                   </div>
                 </div>
               );
@@ -297,7 +297,7 @@ export function AcpOutput({ agentId }: Props) {
               return (
                 <div key={`msg-${item.index}`} className="flex justify-center py-1">
                   <div className="max-w-[85%] rounded-lg px-3 py-1.5 bg-th-bg-alt/60 border border-th-border/50 text-xs text-th-text-muted whitespace-pre-wrap">
-                    {text}
+                    <MentionText text={text} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                   </div>
                 </div>
               );

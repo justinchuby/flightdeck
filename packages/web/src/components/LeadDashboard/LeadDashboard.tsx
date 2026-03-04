@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter, Download } from 'lucide-react';
+import { Crown, Send, Users, CheckCircle, AlertCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Hand, Square, Filter, Download, Settings, Eye, EyeOff } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
@@ -46,7 +46,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
-  const [showModelConfig, setShowModelConfig] = useState(false);
+  const [showModelConfig, setShowModelConfig] = useState(true);
   const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -56,16 +56,40 @@ export function LeadDashboard({ api, ws }: Props) {
   const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
+    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
     try {
       const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length >= 4) return parsed.filter((id: string) => id !== 'activity');
+        if (Array.isArray(parsed) && parsed.length >= 4) {
+          let tabs = parsed.filter((id: string) => id !== 'activity');
+          // Migrate: ensure all supported tabs are present
+          let changed = false;
+          for (const tab of allSupportedTabs) {
+            if (!tabs.includes(tab)) {
+              tabs.push(tab);
+              changed = true;
+            }
+          }
+          if (changed) localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(tabs));
+          return tabs;
+        }
       }
     } catch {}
-    return ['team', 'comms', 'groups', 'dag'];
+    return allSupportedTabs;
   });
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
+  const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('flightdeck-hidden-tabs');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch {}
+    return new Set();
+  });
+  const [showTabConfig, setShowTabConfig] = useState(false);
   const [showProgressDetail, setShowProgressDetail] = useState(false);
   const [expandedReport, setExpandedReport] = useState<AgentReport | null>(null);
   const [reportsExpanded, setReportsExpanded] = useState(true);
@@ -640,6 +664,29 @@ export function LeadDashboard({ api, ws }: Props) {
     setDragOverTab(null);
   }, []);
 
+  const toggleTabVisibility = useCallback((tabId: string) => {
+    setHiddenTabs((prev) => {
+      const next = new Set(prev);
+      if (next.has(tabId)) {
+        next.delete(tabId);
+      } else {
+        next.add(tabId);
+      }
+      localStorage.setItem('flightdeck-hidden-tabs', JSON.stringify([...next]));
+      // If hiding the active tab, switch to first visible tab
+      if (next.has(tabId)) {
+        setSidebarTab((current) => {
+          if (current === tabId) {
+            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
+            return allSupportedTabs.find((id) => !next.has(id)) ?? 'team';
+          }
+          return current;
+        });
+      }
+      return next;
+    });
+  }, []);
+
   const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string, initialTeam?: string[]) => {
     setStarting(true);
     try {
@@ -1151,12 +1198,11 @@ export function LeadDashboard({ api, ws }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowModelConfig(!showModelConfig)}
-                  className="flex items-center gap-1 text-xs text-th-text-muted hover:text-th-text-alt font-medium transition-colors"
+                  className="flex items-center gap-1 text-xs text-th-text-alt hover:text-th-text font-medium transition-colors"
                 >
                   {showModelConfig ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                   <Wrench className="w-3 h-3" />
                   Model Configuration
-                  <span className="text-[10px] text-th-text-muted">(optional)</span>
                 </button>
                 {showModelConfig && (
                   <div className="mt-2 border border-th-border rounded-md p-2 bg-th-bg">
@@ -1404,7 +1450,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     <div key={i} data-user-prompt={i} className="flex justify-end items-start gap-2 py-1">
                       <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                       <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
-                        {msg.text}
+                        <MentionText text={msg.text} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                       </div>
                     </div>
                   );
@@ -1430,7 +1476,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     <div key={i} className="flex justify-center py-1">
                       <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-th-bg-alt/60 border border-th-border/50 text-xs font-mono text-th-text-muted">
                         <RefreshCw className="w-3 h-3 text-th-text-muted" />
-                        {msg.text}
+                        <MentionText text={msg.text} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                         {ts && <span className="text-[10px] text-th-text-muted ml-1">{ts}</span>}
                       </div>
                     </div>
@@ -1562,7 +1608,11 @@ export function LeadDashboard({ api, ws }: Props) {
                       sendMessage('queue');
                     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
-                      if (input.trim()) sendMessage('interrupt');
+                      if (input.trim()) {
+                        sendMessage('interrupt');
+                      } else if (selectedLeadId) {
+                        apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
+                      }
                     }
                   }}
                   placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt)' : 'Project Lead is not active'}
@@ -1664,7 +1714,7 @@ export function LeadDashboard({ api, ws }: Props) {
 
                 {/* Tabbed bottom panels */}
                 <div className="flex-1 min-h-0 border-t border-th-border flex flex-col relative">
-                  <div className="flex border-b border-th-border shrink-0 overflow-x-auto">
+                  <div className="flex flex-wrap border-b border-th-border shrink-0 items-center">
                     {(() => {
                       const allTabs: Record<string, { icon: React.ReactNode; label: string; badge?: number }> = {
                         team: { icon: <Bot className="w-3 h-3" />, label: 'Team', badge: teamAgents.length },
@@ -1676,10 +1726,10 @@ export function LeadDashboard({ api, ws }: Props) {
                         costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Costs' },
                         timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
                       };
-                      const orderedIds = tabOrder.filter((id) => id in allTabs);
-                      // Append any missing tabs (safety net)
+                      const orderedIds = tabOrder.filter((id) => id in allTabs && !hiddenTabs.has(id));
+                      // Append any missing visible tabs (safety net)
                       for (const id of Object.keys(allTabs)) {
-                        if (!orderedIds.includes(id)) orderedIds.push(id);
+                        if (!orderedIds.includes(id) && !hiddenTabs.has(id)) orderedIds.push(id);
                       }
                       return orderedIds.map((tabId) => {
                         const tab = allTabs[tabId];
@@ -1710,6 +1760,36 @@ export function LeadDashboard({ api, ws }: Props) {
                         );
                       });
                     })()}
+                    {/* Tab visibility settings */}
+                    <div className="relative ml-auto">
+                      <button
+                        onClick={() => setShowTabConfig((v) => !v)}
+                        className="flex items-center px-1.5 py-1.5 text-th-text-muted hover:text-th-text-alt transition-colors"
+                        title="Configure visible tabs"
+                      >
+                        <Settings className="w-3 h-3" />
+                      </button>
+                      {showTabConfig && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowTabConfig(false)} />
+                          <div className="absolute right-0 top-full mt-1 z-50 bg-th-bg-panel border border-th-border rounded-md shadow-lg py-1 min-w-[140px]">
+                            {(['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'] as const).map((tabId) => (
+                              <button
+                                key={tabId}
+                                onClick={() => toggleTabVisibility(tabId)}
+                                className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] hover:bg-th-bg-muted transition-colors"
+                              >
+                                {hiddenTabs.has(tabId)
+                                  ? <EyeOff className="w-3 h-3 text-th-text-muted" />
+                                  : <Eye className="w-3 h-3 text-blue-500" />
+                                }
+                                <span className={hiddenTabs.has(tabId) ? 'text-th-text-muted' : ''}>{tabId.charAt(0).toUpperCase() + tabId.slice(1)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
                     {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
@@ -2414,7 +2494,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                             <span className="text-th-text-muted ml-auto">{time}</span>
                           </div>
                           <p className="text-th-text-alt mt-0.5 break-words whitespace-pre-wrap">
-                            {c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content}
+                            <MentionText text={c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </p>
                         </div>
                       );
@@ -2465,7 +2545,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   value={agentMsg}
                   onChange={(e) => setAgentMsg(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                       e.preventDefault();
                       if (agentMsg.trim() && !sendingMsg) {
                         setSendingMsg(true);
@@ -2479,6 +2559,26 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                           useToastStore.getState().add('error', `Failed to send: ${err.message}`);
                         }).finally(() => setSendingMsg(false));
                       }
+                    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      if (agentMsg.trim() && !sendingMsg) {
+                        setSendingMsg(true);
+                        apiFetch(`/agents/${selectedAgent.id}/message`, {
+                          method: 'POST',
+                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'interrupt' }),
+                        }).then(() => {
+                          setAgentMsg('');
+                          useToastStore.getState().add('success', `Interrupt sent to ${selectedAgent.role.name}`);
+                        }).catch((err: Error) => {
+                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+                        }).finally(() => setSendingMsg(false));
+                      } else {
+                        apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' }).then(() => {
+                          useToastStore.getState().add('success', `Interrupted ${selectedAgent.role.name}`);
+                        }).catch((err: Error) => {
+                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+                        });
+                      }
                     }
                   }}
                   placeholder={`Message ${selectedAgent.role.name}...`}
@@ -2486,29 +2586,58 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                   rows={2}
                   disabled={sendingMsg}
                 />
-                <button
-                  onClick={() => {
-                    if (agentMsg.trim() && !sendingMsg) {
-                      setSendingMsg(true);
-                      apiFetch(`/agents/${selectedAgent.id}/message`, {
-                        method: 'POST',
-                        body: JSON.stringify({ text: agentMsg.trim(), mode: 'queue' }),
-                      }).then(() => {
-                        setAgentMsg('');
-                        useToastStore.getState().add('success', `Message sent to ${selectedAgent.role.name}`);
-                      }).catch((err: Error) => {
-                        useToastStore.getState().add('error', `Failed to send: ${err.message}`);
-                      }).finally(() => setSendingMsg(false));
-                    }
-                  }}
-                  disabled={!agentMsg.trim() || sendingMsg}
-                  className="self-end px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
-                  title="Send message (Enter)"
-                >
-                  <Send size={12} /> {sendingMsg ? 'Sending…' : 'Send'}
-                </button>
+                <div className="flex flex-col gap-1 self-end shrink-0">
+                  <button
+                    onClick={() => {
+                      if (agentMsg.trim() && !sendingMsg) {
+                        setSendingMsg(true);
+                        apiFetch(`/agents/${selectedAgent.id}/message`, {
+                          method: 'POST',
+                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'queue' }),
+                        }).then(() => {
+                          setAgentMsg('');
+                          useToastStore.getState().add('success', `Message sent to ${selectedAgent.role.name}`);
+                        }).catch((err: Error) => {
+                          useToastStore.getState().add('error', `Failed to send: ${err.message}`);
+                        }).finally(() => setSendingMsg(false));
+                      }
+                    }}
+                    disabled={!agentMsg.trim() || sendingMsg}
+                    className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
+                    title="Send message (Enter)"
+                  >
+                    <Send size={12} /> {sendingMsg ? 'Sending…' : 'Send'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (agentMsg.trim() && !sendingMsg) {
+                        setSendingMsg(true);
+                        apiFetch(`/agents/${selectedAgent.id}/message`, {
+                          method: 'POST',
+                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'interrupt' }),
+                        }).then(() => {
+                          setAgentMsg('');
+                          useToastStore.getState().add('success', `Interrupt sent to ${selectedAgent.role.name}`);
+                        }).catch((err: Error) => {
+                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+                        }).finally(() => setSendingMsg(false));
+                      } else {
+                        apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' }).then(() => {
+                          useToastStore.getState().add('success', `Interrupted ${selectedAgent.role.name}`);
+                        }).catch((err: Error) => {
+                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+                        });
+                      }
+                    }}
+                    disabled={sendingMsg}
+                    className="px-3 py-1.5 rounded bg-orange-600/80 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
+                    title="Interrupt agent (Ctrl+Enter)"
+                  >
+                    <AlertCircle size={12} /> Interrupt
+                  </button>
+                </div>
               </div>
-              <p className="text-[10px] text-th-text-muted mt-1">Enter to send · Shift+Enter for newline · Message is queued for the agent</p>
+              <p className="text-[10px] text-th-text-muted mt-1">Enter to send · Shift+Enter for newline · Ctrl+Enter to interrupt</p>
             </div>
 
           </div>

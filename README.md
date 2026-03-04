@@ -217,15 +217,15 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 | Command | Description |
 |---------|-------------|
-| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `role`, `dependsOn`, and optional `description`. |
+| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `taskId`, `role`, `dependsOn`, and optional `description`. |
 | `PROGRESS {"summary": "..."}` | Report progress. Auto-reads DAG state when a DAG exists — no need to query separately. |
-| `COMPLETE_TASK {"taskId": "task-id", "summary": "...", "output": "..."}` | Mark a DAG task as done. Non-lead agents relay to parent's DAG with auth validation. Supports `id`, `summary`, `status`, `output` fields. *(Any agent)* |
+| `COMPLETE_TASK {"taskId": "task-id", "summary": "...", "output": "..."}` | Mark a DAG task as done. Non-lead agents relay to parent's DAG with auth validation. Supports `taskId`, `summary`, `status`, `output` fields. *(Any agent)* |
 | `TASK_STATUS` | Query current task DAG status. |
-| `PAUSE_TASK {"id": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
-| `RETRY_TASK {"id": "..."}` | Retry a failed task. *(Lead-only)* |
-| `SKIP_TASK {"id": "..."}` | Skip a task and unblock dependents. *(Lead-only)* |
-| `ADD_TASK {"id": "...", "role": "...", "description": "...", "dependsOn": [...]}` | Add a new task to an existing DAG. *(Lead-only)* |
-| `CANCEL_TASK {"id": "..."}` | Cancel a task. *(Lead-only)* |
+| `PAUSE_TASK {"taskId": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
+| `RETRY_TASK {"taskId": "..."}` | Retry a failed task. *(Lead-only)* |
+| `SKIP_TASK {"taskId": "..."}` | Skip a task and unblock dependents. *(Lead-only)* |
+| `ADD_TASK {"taskId": "...", "role": "...", "description": "...", "dependsOn": [...]}` | Add a new task to an existing DAG. *(Lead-only)* |
+| `CANCEL_TASK {"taskId": "..."}` | Cancel a task. *(Lead-only)* |
 | `RESET_DAG` | Reset the entire DAG (clear all tasks). *(Lead-only)* |
 | `DECISION {"title": "...", "rationale": "..."}` | Log a decision. Users can accept/reject with a reason comment from the dashboard. |
 | `QUERY_TASKS` | Query current task DAG status (alias for TASK_STATUS). |
@@ -233,7 +233,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `ASSIGN_TASK {"taskId": "...", "agentId": "..."}` | Assign a ready DAG task to an agent and move it to running state. *(Lead-only)* |
 | `REASSIGN_TASK {"taskId": "...", "agentId": "..."}` | Reassign a running task from one agent to another. *(Lead-only)* |
 | `ADD_DEPENDENCY {"taskId": "...", "dependsOn": ["dep-id"]}` | Add dependency edges to tasks in the DAG. Prevents circular dependencies. |
-| `FORCE_READY {"id": "task-id"}` | Force a pending/blocked task to ready state, overriding dependency checks. *(Lead-only)* |
+| `FORCE_READY {"taskId": "task-id"}` | Force a pending/blocked task to ready state, overriding dependency checks. *(Lead-only)* |
 
 ### Coordination (All agents)
 
@@ -245,7 +245,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `QUERY_CREW` | Get the current roster of agents with IDs, roles, models, and status. |
 | `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
 | `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
-| `RESOLVE_DEFERRED {"id": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
+| `RESOLVE_DEFERRED {"issueId": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
 | `ACTIVITY {"action": "...", "summary": "..."}` | Log a structured activity entry to the activity ledger for auditing and tracking. |
 | `HALT_HEARTBEAT` | Pause automatic heartbeat nudges from the system. *(Lead-only)* |
 | `REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "..."}` | Request to increase max concurrent agents. Requires user approval. *(Lead-only)* |

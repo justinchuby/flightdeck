@@ -12,6 +12,7 @@ import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { isTerminalStatus } from '../Agent.js';
 import { parseCommandPayload, directMessageSchema } from './commandSchemas.js';
 import { deriveArgs } from './CommandHelp.js';
+import { resolveAgentInProject } from './CommCommands.js';
 
 const DM_REGEX = /⟦⟦\s*DIRECT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
 const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*⟧⟧/s;
@@ -25,16 +26,9 @@ function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: str
     if (!payload) return;
     const { to, content } = payload;
 
-    // Resolve target: exact ID first, then short prefix match
-    // Scope to sender's project to prevent cross-project messaging
+    // Resolve target using shared project-scoped resolution
     const senderProjectId = ctx.getProjectIdForAgent(agent.id);
-    const isInSameProject = (a: Agent) =>
-      !senderProjectId || ctx.getProjectIdForAgent(a.id) === senderProjectId;
-
-    const exactMatch = ctx.getAgent(to);
-    const target = (exactMatch && isInSameProject(exactMatch))
-      ? exactMatch
-      : ctx.getAllAgents().find((a) => a.id.startsWith(to) && isInSameProject(a));
+    const target = resolveAgentInProject(ctx, to, senderProjectId);
 
     if (!target) {
       agent.sendMessage(`[System] Agent "${to}" not found. Use QUERY_PEERS to see available agents.`);
