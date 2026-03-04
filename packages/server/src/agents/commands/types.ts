@@ -72,6 +72,16 @@ export interface CommandHandlerContext extends CommandContext {
   pendingSystemActions: Map<string, { type: string; value: number; agentId: string }>;
 }
 
+// ── CommandArg — structured argument metadata for help generation ─────
+
+export interface CommandArg {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+  default?: string;
+}
+
 // ── CommandEntry — uniform return type from all modules ──────────────
 
 export interface CommandEntry {
@@ -83,5 +93,6 @@ export interface CommandEntry {
     description: string;
     example: string;
     category: string;
+    args?: CommandArg[];
   };
 }

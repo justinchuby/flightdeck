@@ -289,11 +289,31 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
 export function getCoordCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => handleLockRequest(ctx, a, d), help: { description: 'Acquire a file lock', example: 'LOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination' } },
-    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination' } },
-    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"type": "milestone", "summary": "phase 1 complete"}', category: 'Coordination' } },
-    { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => handleDecision(ctx, a, d), help: { description: 'Record an architectural decision', example: 'DECISION {"title": "Use React", "rationale": "team expertise"}', category: 'Coordination' } },
-    { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => handleProgress(ctx, a, d), help: { description: 'Report progress on current work', example: 'PROGRESS {"summary": "50% complete"}', category: 'Coordination' } },
-    { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => handleCommit(ctx, a, d), help: { description: 'Commit locked files', example: 'COMMIT {"message": "feat: add new feature"}', category: 'Coordination' } },
+    { regex: LOCK_REQUEST_REGEX, name: 'LOCK', handler: (a, d) => handleLockRequest(ctx, a, d), help: { description: 'Acquire a file lock', example: 'LOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
+      { name: 'filePath', type: 'string', required: true, description: 'Path to lock' },
+      { name: 'reason', type: 'string', required: false, description: 'Why you need this lock' },
+    ] } },
+    { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
+      { name: 'filePath', type: 'string', required: true, description: 'Path to unlock' },
+    ] } },
+    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"type": "milestone", "summary": "phase 1 complete"}', category: 'Coordination', args: [
+      { name: 'actionType', type: 'string', required: false, description: 'Activity type' },
+      { name: 'summary', type: 'string', required: false, description: 'Activity summary' },
+      { name: 'details', type: 'object', required: false, description: 'Additional details' },
+    ] } },
+    { regex: DECISION_REGEX, name: 'DECISION', handler: (a, d) => handleDecision(ctx, a, d), help: { description: 'Record an architectural decision', example: 'DECISION {"title": "Use React", "rationale": "team expertise"}', category: 'Coordination', args: [
+      { name: 'title', type: 'string', required: true, description: 'Decision title' },
+      { name: 'rationale', type: 'string', required: false, description: 'Why this decision was made' },
+      { name: 'needsConfirmation', type: 'boolean', required: false, description: 'Requires user approval' },
+    ] } },
+    { regex: PROGRESS_REGEX, name: 'PROGRESS', handler: (a, d) => handleProgress(ctx, a, d), help: { description: 'Report progress on current work', example: 'PROGRESS {"summary": "50% complete"}', category: 'Coordination', args: [
+      { name: 'summary', type: 'string', required: false, description: 'Progress description' },
+      { name: 'percent', type: 'number', required: false, description: 'Completion percentage (0-100)' },
+      { name: 'status', type: 'string', required: false, description: 'Current status' },
+    ] } },
+    { regex: COMMIT_REGEX, name: 'COMMIT', handler: (a, d) => handleCommit(ctx, a, d), help: { description: 'Commit locked files', example: 'COMMIT {"message": "feat: add new feature"}', category: 'Coordination', args: [
+      { name: 'message', type: 'string', required: false, description: 'Commit message' },
+      { name: 'files', type: 'string[]', required: false, description: 'Extra files to include beyond locked files' },
+    ] } },
   ];
 }

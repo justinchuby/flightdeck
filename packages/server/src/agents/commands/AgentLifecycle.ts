@@ -31,10 +31,31 @@ const CANCEL_DELEGATION_REGEX = /⟦⟦\s*CANCEL_DELEGATION\s*(\{.*?\})\s*⟧⟧
 export function getLifecycleCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: SPAWN_REQUEST_REGEX, name: 'SPAWN', handler: (a, d) => handleSpawnRequest(ctx, a, d) },
-    { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => handleCreateAgent(ctx, a, d), help: { description: 'Spawn a new agent with a role and task', example: 'CREATE_AGENT {"role": "developer", "task": "implement feature X"}', category: 'Agent Lifecycle' } },
-    { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => handleDelegate(ctx, a, d), help: { description: 'Delegate a task to an existing agent', example: 'DELEGATE {"to": "agent-id", "task": "do something"}', category: 'Agent Lifecycle' } },
-    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"id": "agent-id"}', category: 'Agent Lifecycle' } },
-    { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d), help: { description: 'Cancel an active delegation', example: 'CANCEL_DELEGATION {"delegationId": "del-id"}', category: 'Agent Lifecycle' } },
+    { regex: CREATE_AGENT_REGEX, name: 'CREATE_AGENT', handler: (a, d) => handleCreateAgent(ctx, a, d), help: { description: 'Spawn a new agent with a role and task', example: 'CREATE_AGENT {"role": "developer", "task": "implement feature X"}', category: 'Agent Lifecycle', args: [
+      { name: 'role', type: 'string', required: true, description: 'Agent role (developer, architect, etc.)' },
+      { name: 'task', type: 'string', required: false, description: 'Task description for the agent' },
+      { name: 'model', type: 'string', required: false, description: 'Model override (e.g. claude-opus-4.6)' },
+      { name: 'context', type: 'string', required: false, description: 'Additional context to include' },
+      { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
+      { name: 'depends_on', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
+      { name: 'name', type: 'string', required: false, description: 'Display name for the agent' },
+      { name: 'sessionId', type: 'string', required: false, description: 'Reuse an existing session' },
+    ] } },
+    { regex: DELEGATE_REGEX, name: 'DELEGATE', handler: (a, d) => handleDelegate(ctx, a, d), help: { description: 'Delegate a task to an existing agent', example: 'DELEGATE {"to": "agent-id", "task": "do something"}', category: 'Agent Lifecycle', args: [
+      { name: 'to', type: 'string', required: true, description: 'Target agent ID' },
+      { name: 'task', type: 'string', required: true, description: 'Task description' },
+      { name: 'context', type: 'string', required: false, description: 'Additional context' },
+      { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
+      { name: 'depends_on', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
+    ] } },
+    { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"id": "agent-id"}', category: 'Agent Lifecycle', args: [
+      { name: 'id', type: 'string', required: true, description: 'Agent ID to terminate' },
+      { name: 'reason', type: 'string', required: false, description: 'Reason for termination' },
+    ] } },
+    { regex: CANCEL_DELEGATION_REGEX, name: 'CANCEL_DELEGATION', handler: (a, d) => handleCancelDelegation(ctx, a, d), help: { description: 'Cancel an active delegation', example: 'CANCEL_DELEGATION {"delegationId": "del-id"}', category: 'Agent Lifecycle', args: [
+      { name: 'agentId', type: 'string', required: false, description: 'Agent ID (either agentId or delegationId required)' },
+      { name: 'delegationId', type: 'string', required: false, description: 'Delegation ID' },
+    ] } },
   ];
 }
 

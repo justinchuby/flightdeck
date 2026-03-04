@@ -107,8 +107,16 @@ function handleListTimers(ctx: CommandHandlerContext, agent: Agent, _data: strin
 export function getTimerCommands(ctx: CommandHandlerContext): CommandEntry[] {
   if (!ctx.timerRegistry) return [];
   return [
-    { regex: SET_TIMER_REGEX, name: 'SET_TIMER', handler: (a, d) => handleSetTimer(ctx, a, d), help: { description: 'Set a reminder timer', example: 'SET_TIMER {"label": "check-build", "delay": 300, "message": "Check build status"}', category: 'Timers' } },
-    { regex: CANCEL_TIMER_REGEX, name: 'CANCEL_TIMER', handler: (a, d) => handleCancelTimer(ctx, a, d), help: { description: 'Cancel a timer', example: 'CANCEL_TIMER {"name": "check-build"}', category: 'Timers' } },
+    { regex: SET_TIMER_REGEX, name: 'SET_TIMER', handler: (a, d) => handleSetTimer(ctx, a, d), help: { description: 'Set a reminder timer', example: 'SET_TIMER {"label": "check-build", "delay": 300, "message": "Check build status"}', category: 'Timers', args: [
+      { name: 'label', type: 'string', required: true, description: 'Timer name' },
+      { name: 'delay', type: 'number|string', required: true, description: 'Seconds or duration (e.g. "5m", "2h")' },
+      { name: 'message', type: 'string', required: true, description: 'Message delivered when timer fires' },
+      { name: 'repeat', type: 'boolean', required: false, description: 'Repeat after each delay', default: 'false' },
+    ] } },
+    { regex: CANCEL_TIMER_REGEX, name: 'CANCEL_TIMER', handler: (a, d) => handleCancelTimer(ctx, a, d), help: { description: 'Cancel a timer', example: 'CANCEL_TIMER {"name": "check-build"}', category: 'Timers', args: [
+      { name: 'id', type: 'string', required: false, description: 'Timer ID' },
+      { name: 'name', type: 'string', required: false, description: 'Timer label (either id or name required)' },
+    ] } },
     { regex: LIST_TIMERS_REGEX, name: 'LIST_TIMERS', handler: (a, d) => handleListTimers(ctx, a, d), help: { description: 'List active timers', example: 'LIST_TIMERS {}', category: 'Timers' } },
   ];
 }

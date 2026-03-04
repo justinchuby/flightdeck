@@ -99,7 +99,10 @@ function handleQueryPeers(ctx: CommandHandlerContext, agent: Agent): void {
 
 export function getDirectMessageCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: DM_REGEX, name: 'DIRECT_MESSAGE', handler: (a, d) => handleDirectMessage(ctx, a, d), help: { description: 'Queue a message for an agent (non-interrupting)', example: 'DIRECT_MESSAGE {"to": "agent-id", "content": "your message"}', category: 'Communication' } },
+    { regex: DM_REGEX, name: 'DIRECT_MESSAGE', handler: (a, d) => handleDirectMessage(ctx, a, d), help: { description: 'Queue a message for an agent (non-interrupting)', example: 'DIRECT_MESSAGE {"to": "agent-id", "content": "your message"}', category: 'Communication', args: [
+      { name: 'to', type: 'string', required: true, description: 'Target agent ID' },
+      { name: 'content', type: 'string', required: true, description: 'Message content' },
+    ] } },
     { regex: QUERY_PEERS_REGEX, name: 'QUERY_PEERS', handler: (a) => handleQueryPeers(ctx, a), help: { description: 'List peer agents for direct messaging', example: 'QUERY_PEERS {}', category: 'System' } },
   ];
 }

@@ -25,6 +25,7 @@ beforeAll(async () => {
     chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
     taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
     deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
+    timerRegistry: { create: vi.fn(), cancel: vi.fn(), getAgentTimers: vi.fn().mockReturnValue([]), getAllTimers: vi.fn().mockReturnValue([]) },
     maxConcurrent: 10,
     markHumanInterrupt: vi.fn(),
   } as any;
@@ -60,6 +61,28 @@ describe('CommandHelp', () => {
       expect(help).toContain('All commands use the format: COMMAND_NAME {json_payload}');
     });
 
+    it('renders args line for commands with arg metadata', () => {
+      const help = buildCommandHelp();
+      // SET_TIMER has args: label(req), delay(req), message(req), repeat(opt, default: false)
+      expect(help).toContain('Args: <label: string> <delay: number|string> <message: string> [repeat: boolean = false]');
+    });
+
+    it('renders required args with angle brackets and optional with square brackets', () => {
+      const help = buildCommandHelp();
+      // DELEGATE has required args (to, task) and optional (context, dagTaskId, depends_on)
+      expect(help).toContain('<to: string>');
+      expect(help).toContain('[context: string]');
+    });
+
+    it('does not render Args line for commands without arg metadata', () => {
+      const help = buildCommandHelp();
+      // QUERY_CREW and HALT_HEARTBEAT have no args
+      const lines = help.split('\n');
+      const queryCrew = lines.findIndex(l => l.includes('QUERY_CREW — '));
+      // Next line should be the example, not Args
+      expect(lines[queryCrew + 1]).toContain('QUERY_CREW {}');
+    });
+
     it('includes escaping guidance section', () => {
       const help = buildCommandHelp();
       expect(help).toContain('== Escaping ==');
@@ -74,12 +97,19 @@ describe('CommandHelp', () => {
     it('builds help dynamically from setRegisteredPatterns', () => {
       // Save current state, set custom patterns, verify, restore
       const customPatterns: CommandEntry[] = [
-        { regex: /test/, name: 'CUSTOM_CMD', handler: () => {}, help: { description: 'A custom command', example: 'CUSTOM_CMD {"key": "val"}', category: 'Custom' } },
+        { regex: /test/, name: 'CUSTOM_CMD', handler: () => {}, help: {
+          description: 'A custom command', example: 'CUSTOM_CMD {"key": "val"}', category: 'Custom',
+          args: [
+            { name: 'key', type: 'string', required: true, description: 'A key' },
+            { name: 'opt', type: 'number', required: false, description: 'Optional num', default: '42' },
+          ],
+        } },
       ];
       setRegisteredPatterns(customPatterns);
       const help = buildCommandHelp();
       expect(help).toContain('== Custom ==');
       expect(help).toContain('CUSTOM_CMD — A custom command');
+      expect(help).toContain('Args: <key: string> [opt: number = 42]');
       // Won't contain old commands since we replaced the patterns
       expect(help).not.toContain('DELEGATE');
     });
@@ -103,6 +133,7 @@ describe('CommandHelp', () => {
         chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
         taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
         deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
+        timerRegistry: { create: vi.fn(), cancel: vi.fn(), getAgentTimers: vi.fn().mockReturnValue([]), getAllTimers: vi.fn().mockReturnValue([]) },
         maxConcurrent: 10, markHumanInterrupt: vi.fn(),
       } as any;
       new CommandDispatcher(mockCtx);

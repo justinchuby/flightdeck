@@ -6,12 +6,13 @@
  * new command automatically includes it in the help menu.
  */
 
-import type { CommandEntry } from './types.js';
+import type { CommandEntry, CommandArg } from './types.js';
 
 export interface CommandRef {
   name: string;
   description: string;
   example: string;
+  args?: CommandArg[];
 }
 
 /** Category display order — unlisted categories appear at the end. */
@@ -56,6 +57,7 @@ function buildReferenceFromPatterns(patterns: CommandEntry[]): Record<string, Co
       name: entry.name,
       description: entry.help.description,
       example: entry.help.example,
+      args: entry.help.args,
     });
   }
 
@@ -73,6 +75,17 @@ function buildReferenceFromPatterns(patterns: CommandEntry[]): Record<string, Co
   return ordered;
 }
 
+/** Format argument list: `<name: type>` for required, `[name: type = default]` for optional. */
+function formatArgs(args: CommandArg[]): string {
+  return args.map(a => {
+    if (a.required) {
+      return `<${a.name}: ${a.type}>`;
+    }
+    const def = a.default !== undefined ? ` = ${a.default}` : '';
+    return `[${a.name}: ${a.type}${def}]`;
+  }).join(' ');
+}
+
 /** Build a formatted help text listing all available commands. */
 export function buildCommandHelp(): string {
   const ref = buildReferenceFromPatterns(registeredPatterns);
@@ -82,6 +95,9 @@ export function buildCommandHelp(): string {
     lines.push(`== ${category} ==`);
     for (const cmd of commands) {
       lines.push(`  ${cmd.name} — ${cmd.description}`);
+      if (cmd.args && cmd.args.length > 0) {
+        lines.push(`    Args: ${formatArgs(cmd.args)}`);
+      }
       lines.push(`    ${cmd.example}`);
     }
     lines.push('');
