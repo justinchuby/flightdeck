@@ -73,13 +73,16 @@ export class ContextRefresher {
     const peers = this.buildPeerList();
     const lockSection = this.buildFileLockSection();
     const alerts = this.buildAlerts(peers);
+    const lockActivity = this.buildLockActivity();
 
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
       if (!agent.role.receivesStatusUpdates) continue;
       const otherPeers = peers.filter((p) => p.id !== agent.id);
+      const isSecretary = agent.role.id === 'secretary';
+      const extra = isSecretary && lockActivity ? `\n${lockActivity}` : '';
       const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
-      agent.injectContextUpdate(otherPeers, [], `${healthHeader}\n${lockSection}`, alerts);
+      agent.injectContextUpdate(otherPeers, [], `${healthHeader}\n${lockSection}${extra}`, alerts);
     }
   }
 
@@ -106,10 +109,14 @@ export class ContextRefresher {
     const peers = this.buildPeerList();
     const lockSection = this.buildFileLockSection();
     const alerts = this.buildAlerts(peers);
+    // Build lock activity once — only appended for secretaries
+    const lockActivity = this.buildLockActivity();
 
     for (const agent of statusAgents) {
       const otherPeers = peers.filter((p) => p.id !== agent.id);
-      const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${lockSection}`;
+      const isSecretary = agent.role.id === 'secretary';
+      const extra = isSecretary && lockActivity ? `\n${lockActivity}` : '';
+      const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${lockSection}${extra}`;
       agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
     }
   }
@@ -263,6 +270,20 @@ export class ContextRefresher {
     }
 
     return alerts;
+  }
+
+  /** Build recent lock event activity for the secretary's CREW_UPDATE. */
+  private buildLockActivity(): string {
+    const LOCK_ACTIONS = new Set(['lock_acquired', 'lock_denied', 'lock_released']);
+    const entries = this.activityLedger.getRecent(50)
+      .filter(e => LOCK_ACTIONS.has(e.actionType));
+    if (entries.length === 0) return '';
+
+    const lines = entries.slice(0, 10).map(e => {
+      const shortId = e.agentId.slice(0, 8);
+      return `[${e.timestamp}] ${shortId} (${e.agentRole}): ${e.actionType} — ${e.summary}`;
+    });
+    return `== RECENT LOCK ACTIVITY ==\n${lines.join('\n')}`;
   }
 
   /**

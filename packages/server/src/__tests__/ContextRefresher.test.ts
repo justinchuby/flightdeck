@@ -717,4 +717,100 @@ describe('ContextRefresher', () => {
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('lock activity routing', () => {
+    it('secretary receives RECENT LOCK ACTIVITY section', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary, subLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([
+        {
+          id: 1,
+          agentId: 'dev-123456',
+          agentRole: 'developer',
+          actionType: 'lock_acquired',
+          summary: 'Locked src/index.ts',
+          timestamp: '2026-01-01T00:00:00Z',
+          details: {},
+          projectId: '',
+        },
+        {
+          id: 2,
+          agentId: 'dev-789012',
+          agentRole: 'developer',
+          actionType: 'lock_denied',
+          summary: 'Denied access to src/index.ts',
+          timestamp: '2026-01-01T00:01:00Z',
+          details: {},
+          projectId: '',
+        },
+      ]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = secretary.injectContextUpdate.mock.calls[0][2] as string;
+      expect(healthHeader).toContain('RECENT LOCK ACTIVITY');
+      expect(healthHeader).toContain('lock_acquired');
+      expect(healthHeader).toContain('lock_denied');
+    });
+
+    it('lead does NOT receive lock activity section', () => {
+      const lead = makeAgent({
+        id: 'lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
+      });
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([lead, subLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([
+        {
+          id: 1,
+          agentId: 'dev-123456',
+          agentRole: 'developer',
+          actionType: 'lock_acquired',
+          summary: 'Locked src/index.ts',
+          timestamp: '2026-01-01T00:00:00Z',
+          details: {},
+          projectId: '',
+        },
+      ]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(lead.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = lead.injectContextUpdate.mock.calls[0][2] as string;
+      expect(healthHeader).not.toContain('RECENT LOCK ACTIVITY');
+    });
+  });
 });
