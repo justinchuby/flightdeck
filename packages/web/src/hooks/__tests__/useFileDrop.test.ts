@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFileExtension, buildInsertText, type DroppedFile } from '../useFileDrop';
+import { classifyFileExtension, buildInsertText, MAX_IMAGE_SIZE, type DroppedFile } from '../useFileDrop';
 
 describe('classifyFileExtension', () => {
   it('classifies common image extensions', () => {
@@ -87,5 +87,16 @@ describe('buildInsertText', () => {
   it('uses name when path is empty', () => {
     const result = buildInsertText(makeFile({ kind: 'code', name: 'app.js', path: '' }));
     expect(result).toBe('@app.js');
+  });
+});
+
+describe('MAX_IMAGE_SIZE', () => {
+  it('is set to 5 MB', () => {
+    expect(MAX_IMAGE_SIZE).toBe(5 * 1024 * 1024);
+  });
+
+  it('is exported so consumers can reference the limit', () => {
+    expect(typeof MAX_IMAGE_SIZE).toBe('number');
+    expect(MAX_IMAGE_SIZE).toBeGreaterThan(0);
   });
 });

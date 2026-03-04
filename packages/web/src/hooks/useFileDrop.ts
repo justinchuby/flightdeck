@@ -151,12 +151,23 @@ export function useFileDrop({ onInsertText, enabled = true }: UseFileDropOptions
 
 // ── File processing ─────────────────────────────────────────────────────
 
+/** Max image file size for inline base64 embedding (5 MB) */
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
 function processDroppedFiles(files: File[], onInsertText: (text: string) => void): void {
   const insertions: Promise<string>[] = files.map((file) => {
     const kind = classifyFileExtension(file.name);
+    // file.path is an Electron extension; in standard browsers it's undefined,
+    // so we fall back to file.name (filename only, no directory info).
     const path = (file as any).path || file.name;
 
     if (kind === 'image') {
+      if (file.size > MAX_IMAGE_SIZE) {
+        // Too large for inline base64 — insert as a file mention instead
+        return Promise.resolve(
+          buildInsertText({ kind: 'code', name: file.name, path, file }),
+        );
+      }
       return readFileAsDataUrl(file)
         .then((dataUrl) =>
           buildInsertText({ kind, name: file.name, path, dataUrl, file }),
