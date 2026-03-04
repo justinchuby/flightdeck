@@ -116,6 +116,11 @@ export class CommandDispatcher {
         // Skip commands whose ⟦⟦ is nested inside another ⟦⟦ ⟧⟧ block
         if (CommandDispatcher.isInsideCommandBlock(buf, best.index)) {
           logger.debug('agent', `Skipped nested command: ${best.name} from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+          agent.sendMessage(
+            `[System] Nested ${best.name} was stripped — it appeared inside another command's payload. ` +
+            `To show command examples in text, refer to commands by name (e.g. "use the ${best.name} command") ` +
+            `instead of including literal bracket delimiters.`,
+          );
           buf = buf.slice(0, best.index) + buf.slice(best.end);
           found = true;
         } else {

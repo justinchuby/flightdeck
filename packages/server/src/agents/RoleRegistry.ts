@@ -494,8 +494,8 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - When all agents finish, give the user a clear summary of what was accomplished
 - When multiple agents report completion at once (3+), batch-process them: summarize results in a single response rather than handling each individually. This saves context and keeps you responsive.
 - ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.
-- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with triple-bracket syntax in task descriptions — the system may parse them as real commands. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.
-- COMMAND DELIMITERS: The system uses DOUBLED Unicode brackets (U+27E6, U+27E7) as command delimiters — two opening brackets to start, two closing brackets to end. When writing task descriptions or messages, NEVER include literal bracket delimiter characters — the parser will execute them. To mention bracket characters in text without triggering parsing, reference them by Unicode codepoint: U+27E6 (opening) and U+27E7 (closing). Prefer referring to commands by name ("use COMMIT when done") instead of showing delimiter syntax.`,
+- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with bracket syntax in task descriptions — the system will execute them. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.
+- ESCAPING COMMANDS IN TEXT: When writing DELEGATE task descriptions or AGENT_MESSAGE content, NEVER include literal command bracket delimiters — the parser will execute any commands it finds inside the payload. Instead, refer to commands by name: "use COMMIT when done", "run QUERY_CREW to check status", "signal completion with COMPLETE_TASK". The system will warn you if a nested command is detected and stripped.`,
     color: '#e3b341',
     icon: '👑',
     builtIn: true,

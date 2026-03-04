@@ -32,6 +32,12 @@ describe('CommandHelp', () => {
       expect(help).toContain('All commands use the format: COMMAND_NAME {json_payload}');
     });
 
+    it('includes escaping guidance section', () => {
+      const help = buildCommandHelp();
+      expect(help).toContain('== Escaping ==');
+      expect(help).toContain('Refer to commands by name');
+    });
+
     it('starts with [System] prefix', () => {
       const help = buildCommandHelp();
       expect(help).toMatch(/^\[System\]/);
@@ -159,6 +165,53 @@ describe('CommandDispatcher error handling', () => {
     expect(errorCall![0]).toContain('database connection lost');
     expect(errorCall![0]).toContain('Correct format:');
   });
+
+  it('sends escaping hint when a known command is nested inside another', async () => {
+    const { CommandDispatcher } = await import('../agents/CommandDispatcher.js');
+
+    const sendMessage = vi.fn();
+    const agent = {
+      id: 'test-agent-id-1234',
+      role: { id: 'lead', name: 'Project Lead' },
+      sendMessage,
+      humanMessageResponded: false,
+    } as any;
+
+    const mockCtx = {
+      getAgent: vi.fn(),
+      getAllAgents: vi.fn().mockReturnValue([]),
+      getProjectIdForAgent: vi.fn(),
+      getRunningCount: vi.fn().mockReturnValue(0),
+      spawnAgent: vi.fn(),
+      terminateAgent: vi.fn(),
+      emit: vi.fn(),
+      roleRegistry: { getRole: vi.fn(), getAllRoles: vi.fn().mockReturnValue([]) },
+      config: { modelId: 'test', maxConcurrent: 10, agentCwd: '/tmp' },
+      lockRegistry: { acquire: vi.fn(), release: vi.fn(), getAll: vi.fn().mockReturnValue([]), getByAgent: vi.fn().mockReturnValue([]) },
+      activityLedger: { log: vi.fn(), getRecent: vi.fn().mockReturnValue([]) },
+      messageBus: { send: vi.fn(), getQueuedCount: vi.fn().mockReturnValue(0) },
+      decisionLog: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]), getByLeadId: vi.fn().mockReturnValue([]) },
+      agentMemory: { get: vi.fn(), set: vi.fn() },
+      chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
+      taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
+      deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
+      maxConcurrent: 10,
+      markHumanInterrupt: vi.fn(),
+    } as any;
+
+    const dispatcher = new CommandDispatcher(mockCtx);
+
+    // Simulate: DELEGATE with a nested COMMIT inside the JSON payload
+    dispatcher.appendToBuffer(agent.id, '⟦⟦ DELEGATE {"to": "dev-1", "task": "do X then ⟦⟦ COMMIT {\\"message\\": \\"done\\"} ⟧⟧"} ⟧⟧');
+    dispatcher.scanBuffer(agent);
+
+    const nestedHint = sendMessage.mock.calls.find(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes('Nested'),
+    );
+    expect(nestedHint).toBeDefined();
+    expect(nestedHint![0]).toContain('Nested COMMIT was stripped');
+    expect(nestedHint![0]).toContain('refer to commands by name');
+  });
 });
 
 describe('Lead role system prompt policies', () => {
@@ -180,5 +233,14 @@ describe('Lead role system prompt policies', () => {
     expect(lead!.systemPrompt).toContain('Heartbeat reminder');
     expect(lead!.systemPrompt).toContain('Cannot be paused');
     expect(lead!.systemPrompt).toContain('Paused by HALT_HEARTBEAT');
+  });
+
+  it('contains escaping guidance for command delimiters in task descriptions', async () => {
+    const { RoleRegistry } = await import('../agents/RoleRegistry.js');
+    const registry = new RoleRegistry();
+    const lead = registry.get('lead');
+    expect(lead).toBeDefined();
+    expect(lead!.systemPrompt).toContain('ESCAPING COMMANDS IN TEXT');
+    expect(lead!.systemPrompt).toContain('refer to commands by name');
   });
 });

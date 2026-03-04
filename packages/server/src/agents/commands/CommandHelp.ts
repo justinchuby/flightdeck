@@ -90,6 +90,10 @@ export function buildCommandHelp(): string {
   }
 
   lines.push('All commands use the format: COMMAND_NAME {json_payload}');
+  lines.push('');
+  lines.push('== Escaping ==');
+  lines.push('Do NOT include literal command brackets in messages or task descriptions.');
+  lines.push('Refer to commands by name: "use COMMIT when done" or "run QUERY_CREW".');
   return lines.join('\n');
 }
 
