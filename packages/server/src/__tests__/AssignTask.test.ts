@@ -42,6 +42,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
   return {
     getAgent: vi.fn(),
     getAllAgents: vi.fn().mockReturnValue([]),
+    getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
     getRunningCount: vi.fn().mockReturnValue(1),
     spawnAgent: vi.fn(),
     terminateAgent: vi.fn().mockReturnValue(true),
