@@ -503,7 +503,7 @@ When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG tas
 Defer non-blocking issues for later follow-up:
 \`⟦⟦ DEFER_ISSUE {"description": "Fix flaky test in TestX", "severity": "low"} ⟧⟧\`
 \`⟦⟦ QUERY_DEFERRED {} ⟧⟧\` — list all deferred issues
-\`⟦⟦ RESOLVE_DEFERRED {"id": 1} ⟧⟧\` — mark a deferred issue as resolved (id is a number)
+\`⟦⟦ RESOLVE_DEFERRED {"issueId": 1} ⟧⟧\` — mark a deferred issue as resolved (issueId is a number)
 
 == SPECIALIST ROLES (with recommended default models) ==
 {{ROLE_LIST}}

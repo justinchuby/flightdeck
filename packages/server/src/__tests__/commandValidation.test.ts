@@ -486,7 +486,7 @@ describe('TimerCommands validation', () => {
     );
   });
 
-  it('CANCEL_TIMER rejects empty payload (no id or label)', () => {
+  it('CANCEL_TIMER rejects empty payload (no timerId or label)', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getTimerCommands(ctx), 'CANCEL_TIMER');
@@ -510,7 +510,7 @@ describe('DeferredCommands validation', () => {
     );
   });
 
-  it('RESOLVE_DEFERRED rejects missing "id"', () => {
+  it('RESOLVE_DEFERRED rejects missing "issueId"', () => {
     const ctx = makeCtx();
     const agent = makeAgent();
     const cmd = findHandler(getDeferredCommands(ctx), 'RESOLVE_DEFERRED');

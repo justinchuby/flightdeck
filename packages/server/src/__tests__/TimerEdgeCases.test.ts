@@ -102,8 +102,8 @@ describe('SET_TIMER delay validation', () => {
 // ── CANCEL_TIMER validation ─────────────────────────────────────────
 
 describe('CANCEL_TIMER validation', () => {
-  it('accepts id field', () => {
-    const result = cancelTimerSchema.safeParse({ id: 'tmr-123' });
+  it('accepts timerId field', () => {
+    const result = cancelTimerSchema.safeParse({ timerId: 'tmr-123' });
     expect(result.success).toBe(true);
   });
 
@@ -112,13 +112,13 @@ describe('CANCEL_TIMER validation', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects when both id and label missing', () => {
+  it('rejects when both timerId and label missing', () => {
     const result = cancelTimerSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 
-  it('accepts both id and label (id takes precedence in handler)', () => {
-    const result = cancelTimerSchema.safeParse({ id: 'tmr-123', label: 'backup' });
+  it('accepts both timerId and label (timerId takes precedence in handler)', () => {
+    const result = cancelTimerSchema.safeParse({ timerId: 'tmr-123', label: 'backup' });
     expect(result.success).toBe(true);
   });
 });
