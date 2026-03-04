@@ -686,7 +686,7 @@ export function requestSecretaryDependencyAnalysis(
   if (!secretary) return;
 
   const activeTasks = ctx.taskDAG.getTasks(leadId)
-    .filter(t => ['running', 'ready', 'pending'].includes(t.dagStatus) && t.id !== newTaskId)
+    .filter(t => ['ready', 'pending'].includes(t.dagStatus) && t.id !== newTaskId)
     .map(t => `  - ${t.id}: ${t.description?.slice(0, 100) || t.role}`)
     .join('\n');
 

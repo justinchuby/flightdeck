@@ -638,7 +638,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
       status: 'running', sendMessage: vi.fn(),
     };
     const tasks = [{
-      id: 'impl-task', role: 'developer', dagStatus: 'running',
+      id: 'impl-task', role: 'developer', dagStatus: 'ready',
       description: 'Implement feature', dependsOn: [], files: [],
     }];
     const ctx = makeSecretaryCtx(tasks, secretaryAgent);
@@ -732,7 +732,7 @@ describe('requestSecretaryDependencyAnalysis (unit)', () => {
       getAllAgents: vi.fn().mockReturnValue([secretary]),
       taskDAG: {
         getTasks: vi.fn().mockReturnValue([
-          { id: 'task-a', dagStatus: 'running', description: 'Build API', role: 'developer' },
+          { id: 'task-a', dagStatus: 'ready', description: 'Build API', role: 'developer' },
           { id: 'task-b', dagStatus: 'ready', description: 'Write tests', role: 'tester' },
         ]),
       },
@@ -788,8 +788,8 @@ describe('requestSecretaryDependencyAnalysis (unit)', () => {
       getAllAgents: vi.fn().mockReturnValue([secretary]),
       taskDAG: {
         getTasks: vi.fn().mockReturnValue([
-          { id: 'new-task', dagStatus: 'running', description: 'Deploy API' },
-          { id: 'other-task', dagStatus: 'running', description: 'Build API' },
+          { id: 'new-task', dagStatus: 'ready', description: 'Deploy API' },
+          { id: 'other-task', dagStatus: 'pending', description: 'Build API' },
         ]),
       },
     } as any;

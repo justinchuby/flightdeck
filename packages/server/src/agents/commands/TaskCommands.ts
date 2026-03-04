@@ -48,8 +48,14 @@ function handleDeclareTasks(ctx: CommandHandlerContext, agent: Agent, data: stri
   try {
     const req = parseCommandPayload(agent, match[1], declareTasksSchema, 'DECLARE_TASKS');
     if (!req) return;
-    const { tasks, conflicts } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
+    const { tasks, conflicts, linkedAutoTasks } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
     let msg = `[System] Task DAG declared: ${tasks.length} tasks added.`;
+    if (linkedAutoTasks.length > 0) {
+      msg += `\n🔗 Linked ${linkedAutoTasks.length} declared task(s) to existing auto-created tasks:`;
+      for (const link of linkedAutoTasks) {
+        msg += `\n  - "${link.declaredId}" → existing "${link.autoId}"`;
+      }
+    }
     const readyCount = tasks.filter(t => t.dagStatus === 'ready').length;
     const pendingCount = tasks.filter(t => t.dagStatus === 'pending').length;
     msg += `\n  Ready: ${readyCount}, Pending (waiting on deps): ${pendingCount}`;

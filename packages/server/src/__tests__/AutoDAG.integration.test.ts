@@ -268,6 +268,7 @@ describe('Auto-DAG integration', () => {
         { taskId: 'task-1', role: 'developer', description: 'First task' },
         { taskId: 'task-2', role: 'tester', description: 'Second task' },
       ]);
+      dag.startTask(lead.id, 'task-1', 'agent-x');
       dag.completeTask(lead.id, 'task-1');
 
       createAgent({ task: 'Completely unrelated new work' });
@@ -480,7 +481,7 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dependsOn).toContain('task-3');
       });
 
-      it('dependsOn blocks auto-task when dependency is not done', () => {
+      it('dependsOn records dependency on running auto-task without blocking', () => {
         dag.declareTaskBatch(lead.id, [
           { taskId: 'blocker', role: 'developer' },
         ]);
@@ -491,13 +492,16 @@ describe('Auto-DAG integration', () => {
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
         expect(autoTask).toBeDefined();
-        expect(autoTask!.dagStatus).toBe('blocked');
+        // Auto-task stays running since addDependency no longer regresses running→blocked
+        expect(autoTask!.dagStatus).toBe('running');
+        expect(autoTask!.dependsOn).toContain('blocker');
       });
 
       it('dependsOn on completed task keeps auto-task running', () => {
         dag.declareTaskBatch(lead.id, [
           { taskId: 'done-task', role: 'developer' },
         ]);
+        dag.startTask(lead.id, 'done-task', 'agent-x');
         dag.completeTask(lead.id, 'done-task');
 
         createAgent({ task: 'After done task', dependsOn: ['done-task'] });
@@ -539,7 +543,7 @@ describe('Auto-DAG integration', () => {
         expect(depCount).toBe(1);
       });
 
-      it('completing dependency unblocks auto-task via completeTask', () => {
+      it('completing dependency does not affect running auto-task', () => {
         dag.declareTaskBatch(lead.id, [
           { taskId: 'prereq', role: 'tester' },
         ]);
@@ -548,18 +552,15 @@ describe('Auto-DAG integration', () => {
         createAgent({ task: 'Depends on prereq finishing', dependsOn: ['prereq'] });
 
         const autoTaskBefore = dag.getTasks(lead.id).find(t => t.id.startsWith('auto-'));
-        expect(autoTaskBefore!.dagStatus).toBe('blocked');
+        // Auto-task stays running (addDependency no longer regresses running→blocked)
+        expect(autoTaskBefore!.dagStatus).toBe('running');
 
-        // Complete the prereq — resolveReady only processes 'pending', not 'blocked'
-        // So addDependency-blocked tasks stay blocked until explicitly managed
+        // Complete the prereq
         dag.completeTask(lead.id, 'prereq');
 
-        // Check: blocked tasks set by addDependency stay blocked after completeTask
-        // (resolveReady only promotes 'pending' → 'ready')
+        // Auto-task still running (was never blocked)
         const autoTaskAfter = dag.getTasks(lead.id).find(t => t.id.startsWith('auto-'));
-        // The task was auto-started as 'running' then blocked by addDependency
-        // After dep completes, skipTask resolves blocked→ready, but completeTask doesn't
-        expect(['blocked', 'ready']).toContain(autoTaskAfter!.dagStatus);
+        expect(autoTaskAfter!.dagStatus).toBe('running');
       });
     });
   });
@@ -943,7 +944,9 @@ describe('Auto-DAG integration', () => {
         { taskId: 'a', role: 'developer' },
         { taskId: 'b', role: 'developer' },
       ]);
+      dag.startTask(lead.id, 'a', 'agent-x');
       dag.completeTask(lead.id, 'a');
+      dag.startTask(lead.id, 'b', 'agent-y');
       dag.completeTask(lead.id, 'b');
 
       createAgent({ task: 'New work after everything done' });
@@ -1156,6 +1159,7 @@ describe('Auto-DAG integration', () => {
         { taskId: 'd2', role: 'tester' },
         { taskId: 'd3', role: 'designer' },
       ]);
+      dag.startTask(lead.id, 'd1', 'agent-d1');
       dag.completeTask(lead.id, 'd1');
       dag.startTask(lead.id, 'd2', 'agent-x');
       dag.startTask(lead.id, 'd3', 'agent-y');
@@ -1188,7 +1192,9 @@ describe('Auto-DAG integration', () => {
       });
       const taskB = dag.getTasks(lead.id).find(t => t.role === 'code-reviewer')!;
       expect(taskB).toBeDefined();
-      expect(taskB.dagStatus).toBe('blocked'); // A is running
+      // Auto-task stays running — addDependency no longer regresses running→blocked
+      expect(taskB.dagStatus).toBe('running');
+      expect(taskB.dependsOn).toContain(taskA.id);
 
       // Task C: fix issues (depends on B, different role to avoid matching)
       createAgent({
@@ -1198,29 +1204,19 @@ describe('Auto-DAG integration', () => {
       });
       const taskC = dag.getTasks(lead.id).find(t => t.role === 'tester')!;
       expect(taskC).toBeDefined();
-      expect(taskC.dagStatus).toBe('blocked'); // B is blocked
+      // Auto-task stays running — addDependency no longer regresses running→blocked
+      expect(taskC.dagStatus).toBe('running');
+      expect(taskC.dependsOn).toContain(taskB.id);
 
-      // Complete A → B should be promoted from blocked to ready
+      // Complete A
       (ctx.getAgent as any).mockImplementation((id: string) =>
         id === lead.id ? lead : id === childA.id ? childA : undefined,
       );
       dispatcher.notifyParentOfIdle(childA);
       expect(dag.getTask(lead.id, taskA.id)!.dagStatus).toBe('done');
-      expect(dag.getTask(lead.id, taskB.id)!.dagStatus).toBe('ready');
-      expect(dag.getTask(lead.id, taskC.id)!.dagStatus).toBe('blocked'); // still blocked on B
-
-      // Complete B → C should be promoted from blocked to ready
-      const childB = makeChild(lead.id, { taskId: 'agent-childB',
-        role: makeRole({ id: 'code-reviewer', name: 'Code Reviewer' }),
-        status: 'idle',
-      });
-      dag.startTask(lead.id, taskB.id, childB.id);
-      (ctx.getAgent as any).mockImplementation((id: string) =>
-        id === lead.id ? lead : id === childB.id ? childB : undefined,
-      );
-      dispatcher.notifyParentOfIdle(childB);
-      expect(dag.getTask(lead.id, taskB.id)!.dagStatus).toBe('done');
-      expect(dag.getTask(lead.id, taskC.id)!.dagStatus).toBe('ready');
+      // B and C remain running
+      expect(dag.getTask(lead.id, taskB.id)!.dagStatus).toBe('running');
+      expect(dag.getTask(lead.id, taskC.id)!.dagStatus).toBe('running');
     });
   });
 

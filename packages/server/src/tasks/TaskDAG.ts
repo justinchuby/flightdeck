@@ -8,7 +8,7 @@ export type DagTaskStatus = 'pending' | 'ready' | 'running' | 'done' | 'failed' 
 /** Valid source states for each state transition method */
 export const VALID_TRANSITIONS: Record<string, DagTaskStatus[]> = {
   start:    ['ready'],
-  complete: ['running', 'ready'],
+  complete: ['running'],
   fail:     ['running'],
   pause:    ['pending', 'ready'],
   resume:   ['paused'],
@@ -140,7 +140,7 @@ export class TaskDAG extends EventEmitter {
   }
 
   /** Declare a batch of tasks for a lead. Validates deps and detects file conflicts. */
-  declareTaskBatch(leadId: string, tasks: DagTaskInput[]): { tasks: DagTask[]; conflicts: FileConflict[] } {
+  declareTaskBatch(leadId: string, tasks: DagTaskInput[]): { tasks: DagTask[]; conflicts: FileConflict[]; linkedAutoTasks: Array<{ declaredId: string; autoId: string }> } {
     // Validate: all dependsOn reference tasks in this batch or already existing
     const taskIds = new Set(tasks.map(t => t.taskId));
     const existingRows = this.db.drizzle
@@ -151,12 +151,22 @@ export class TaskDAG extends EventEmitter {
     const existingIds = new Set(existingRows.map(r => r.id));
     const allIds = new Set([...taskIds, ...existingIds]);
 
+    // Build a list of existing auto-created tasks for dedup matching
+    const existingAutoTasks = this.getTasks(leadId).filter(t =>
+      t.id.startsWith('auto-') && !['done', 'skipped'].includes(t.dagStatus)
+    );
+    // Track which auto-tasks have already been linked to avoid double-linking
+    const linkedAutoIds = new Set<string>();
+    // Map from declared task ID → auto task ID for dedup results
+    const linkedAutoTasks: Array<{ declaredId: string; autoId: string }> = [];
+
     for (const task of tasks) {
       for (const dep of task.dependsOn || []) {
         if (!allIds.has(dep)) {
           throw new Error(`Task "${task.taskId}" depends on unknown task "${dep}"`);
         }
       }
+      // Skip duplicate check for tasks that will be deduped against auto-created tasks
       if (existingIds.has(task.taskId)) {
         throw new Error(`Task "${task.taskId}" already exists for this lead`);
       }
@@ -165,27 +175,54 @@ export class TaskDAG extends EventEmitter {
     // Detect file conflicts (tasks that share files without explicit dependency)
     const conflicts = this.detectFileConflicts(tasks);
 
-    // Insert tasks
+    // Insert tasks (with auto-DAG dedup)
     const inserted: DagTask[] = [];
     for (const task of tasks) {
-      const dagStatus = (task.dependsOn && task.dependsOn.length > 0) ? 'pending' : 'ready';
-      this.db.drizzle.insert(dagTasks).values({
-        id: task.taskId,
-        leadId,
-        role: task.role,
-        title: task.title || null,
-        description: task.description || '',
-        files: JSON.stringify(task.files || []),
-        dependsOn: JSON.stringify(task.dependsOn || []),
-        priority: task.priority || 0,
-        model: task.model || null,
-        dagStatus,
-      }).run();
-      inserted.push(this.getTask(leadId, task.taskId)!);
+      // Check for matching auto-created task (same role + similar description)
+      const autoMatch = existingAutoTasks.find(auto =>
+        !linkedAutoIds.has(auto.id)
+        && auto.role === task.role
+        && descriptionSimilarity(task.description || '', auto.description, auto.title) > 0.5
+      );
+
+      if (autoMatch) {
+        // Reuse existing auto-created task: update its metadata to match the declared task
+        linkedAutoIds.add(autoMatch.id);
+        this.db.drizzle.update(dagTasks)
+          .set({
+            title: task.title || autoMatch.title || null,
+            description: task.description || autoMatch.description,
+            files: JSON.stringify(task.files || []),
+            dependsOn: JSON.stringify(task.dependsOn || []),
+            priority: task.priority || autoMatch.priority,
+            model: task.model || autoMatch.model || null,
+          })
+          .where(and(eq(dagTasks.id, autoMatch.id), eq(dagTasks.leadId, leadId)))
+          .run();
+        // Add the declared ID as an alias so dependsOn references resolve
+        allIds.add(autoMatch.id);
+        linkedAutoTasks.push({ declaredId: task.taskId, autoId: autoMatch.id });
+        inserted.push(this.getTask(leadId, autoMatch.id)!);
+      } else {
+        const dagStatus = (task.dependsOn && task.dependsOn.length > 0) ? 'pending' : 'ready';
+        this.db.drizzle.insert(dagTasks).values({
+          id: task.taskId,
+          leadId,
+          role: task.role,
+          title: task.title || null,
+          description: task.description || '',
+          files: JSON.stringify(task.files || []),
+          dependsOn: JSON.stringify(task.dependsOn || []),
+          priority: task.priority || 0,
+          model: task.model || null,
+          dagStatus,
+        }).run();
+        inserted.push(this.getTask(leadId, task.taskId)!);
+      }
     }
 
     this.emit('dag:updated', { leadId });
-    return { tasks: inserted, conflicts };
+    return { tasks: inserted, conflicts, linkedAutoTasks };
   }
 
   /** Detect file conflicts: tasks that overlap files without dependency relationship */
@@ -524,8 +561,10 @@ export class TaskDAG extends EventEmitter {
       .set({ dependsOn: JSON.stringify(deps) })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
-    // If the dependency isn't done/skipped yet, block this task
-    if (dep.dagStatus !== 'done' && dep.dagStatus !== 'skipped') {
+    // If the dependency isn't done/skipped yet, block this task —
+    // but only if the task isn't already running or done (don't regress active/completed work)
+    if (dep.dagStatus !== 'done' && dep.dagStatus !== 'skipped'
+        && task.dagStatus !== 'running' && task.dagStatus !== 'done') {
       this.db.drizzle.update(dagTasks)
         .set({ dagStatus: 'blocked' })
         .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
