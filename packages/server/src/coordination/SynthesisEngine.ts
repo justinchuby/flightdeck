@@ -106,12 +106,15 @@ export class SynthesisEngine {
   ) {}
 
   /** Classify recent activity and return a structured health snapshot for a lead */
-  synthesizeProjectHealth(leadId: string): ProjectHealthSnapshot {
+  synthesizeProjectHealth(leadId: string, projectId?: string): ProjectHealthSnapshot {
     const fifteenMinAgo = new Date(Date.now() - 15 * 60_000).toISOString();
-    const recentEvents = this.activityLedger.getSince(fifteenMinAgo);
+    const recentEvents = this.activityLedger.getSince(fifteenMinAgo, projectId);
 
     // Filter to events from this lead's agents
-    const myAgents = this.agentManager.getAll().filter(a => a.parentId === leadId || a.id === leadId);
+    const projectAgents = projectId
+      ? this.agentManager.getByProject(projectId)
+      : this.agentManager.getAll();
+    const myAgents = projectAgents.filter(a => a.parentId === leadId || a.id === leadId);
     const myAgentIds = new Set(myAgents.map(a => a.id));
     const myEvents = recentEvents.filter(e => myAgentIds.has(e.agentId));
 
@@ -157,8 +160,8 @@ export class SynthesisEngine {
   }
 
   /** Format critical events as a string section for CREW_UPDATE */
-  formatCriticalSection(leadId: string): string | null {
-    const health = this.synthesizeProjectHealth(leadId);
+  formatCriticalSection(leadId: string, projectId?: string): string | null {
+    const health = this.synthesizeProjectHealth(leadId, projectId);
     const lines: string[] = [];
 
     if (health.criticalEvents.length > 0) {

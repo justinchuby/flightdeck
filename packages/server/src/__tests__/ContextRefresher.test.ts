@@ -827,4 +827,188 @@ describe('ContextRefresher', () => {
       expect(healthHeader).not.toContain('RECENT LOCK DENIALS');
     });
   });
+
+  describe('project isolation', () => {
+    it('buildPeerList with projectId only returns agents from that project', () => {
+      const projAAgent = makeAgent({ id: 'a1', role: { id: 'dev', name: 'Dev' }, status: 'running', task: 'task-a' });
+      const projBAgent = makeAgent({ id: 'b1', role: { id: 'dev', name: 'Dev' }, status: 'running', task: 'task-b' });
+
+      mocks.agentManager.getAll.mockReturnValue([projAAgent, projBAgent]);
+      mocks.agentManager.getByProject.mockImplementation((pid: string) => {
+        if (pid === 'proj-a') return [projAAgent];
+        if (pid === 'proj-b') return [projBAgent];
+        return [];
+      });
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+
+      const peersA = refresher.buildPeerList('proj-a');
+      expect(peersA).toHaveLength(1);
+      expect(peersA[0].id).toBe('a1');
+
+      const peersB = refresher.buildPeerList('proj-b');
+      expect(peersB).toHaveLength(1);
+      expect(peersB[0].id).toBe('b1');
+
+      // Without projectId, returns all
+      const peersAll = refresher.buildPeerList();
+      expect(peersAll).toHaveLength(2);
+    });
+
+    it('refreshAll only shows same-project peers to each agent', () => {
+      const projALead = makeAgent({
+        id: 'lead-a',
+        status: 'running',
+        role: { id: 'lead', name: 'Lead A', receivesStatusUpdates: true },
+        task: 'proj-a task',
+      });
+      const projADev = makeAgent({
+        id: 'dev-a',
+        status: 'running',
+        role: { id: 'dev', name: 'Dev A' },
+        parentId: 'lead-a',
+        task: 'dev-a task',
+      });
+      const projBLead = makeAgent({
+        id: 'lead-b',
+        status: 'running',
+        role: { id: 'lead', name: 'Lead B', receivesStatusUpdates: true },
+        task: 'proj-b task',
+      });
+      const projBDev = makeAgent({
+        id: 'dev-b',
+        status: 'running',
+        role: { id: 'dev', name: 'Dev B' },
+        parentId: 'lead-b',
+        task: 'dev-b task',
+      });
+
+      mocks.agentManager.getAll.mockReturnValue([projALead, projADev, projBLead, projBDev]);
+      mocks.agentManager.getProjectIdForAgent.mockImplementation((id: string) => {
+        if (id === 'lead-a' || id === 'dev-a') return 'proj-a';
+        if (id === 'lead-b' || id === 'dev-b') return 'proj-b';
+        return undefined;
+      });
+      mocks.agentManager.getByProject.mockImplementation((pid: string) => {
+        if (pid === 'proj-a') return [projALead, projADev];
+        if (pid === 'proj-b') return [projBLead, projBDev];
+        return [];
+      });
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      // Lead A should only get peers from project A (dev-a), NOT lead-b or dev-b
+      expect(projALead.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const peersA = projALead.injectContextUpdate.mock.calls[0][0];
+      expect(peersA.map((p: any) => p.id)).toEqual(['dev-a']);
+      expect(peersA.map((p: any) => p.id)).not.toContain('lead-b');
+      expect(peersA.map((p: any) => p.id)).not.toContain('dev-b');
+
+      // Lead B should only get peers from project B (dev-b), NOT lead-a or dev-a
+      expect(projBLead.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const peersB = projBLead.injectContextUpdate.mock.calls[0][0];
+      expect(peersB.map((p: any) => p.id)).toEqual(['dev-b']);
+      expect(peersB.map((p: any) => p.id)).not.toContain('lead-a');
+      expect(peersB.map((p: any) => p.id)).not.toContain('dev-a');
+    });
+
+    it('terminated agents from other projects do not appear in CREW_UPDATE', () => {
+      const projASecretary = makeAgent({
+        id: 'sec-a',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary A', receivesStatusUpdates: true },
+        task: 'monitoring',
+      });
+      const projBTerminated = makeAgent({
+        id: 'dev-b',
+        status: 'terminated',
+        role: { id: 'dev', name: 'Dev B' },
+        task: 'terminated task',
+      });
+
+      mocks.agentManager.getAll.mockReturnValue([projASecretary, projBTerminated]);
+      mocks.agentManager.getProjectIdForAgent.mockImplementation((id: string) => {
+        if (id === 'sec-a') return 'proj-a';
+        if (id === 'dev-b') return 'proj-b';
+        return undefined;
+      });
+      mocks.agentManager.getByProject.mockImplementation((pid: string) => {
+        if (pid === 'proj-a') return [projASecretary];
+        if (pid === 'proj-b') return [projBTerminated];
+        return [];
+      });
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(projASecretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const peers = projASecretary.injectContextUpdate.mock.calls[0][0];
+      // The terminated agent from project B should NOT be visible
+      expect(peers.map((p: any) => p.id)).not.toContain('dev-b');
+    });
+
+    it('file locks from other projects are not shown in CREW_UPDATE', () => {
+      const projALead = makeAgent({
+        id: 'lead-a',
+        status: 'running',
+        role: { id: 'lead', name: 'Lead A', receivesStatusUpdates: true },
+      });
+
+      mocks.agentManager.getAll.mockReturnValue([projALead]);
+      mocks.agentManager.getProjectIdForAgent.mockImplementation((id: string) => {
+        if (id === 'lead-a') return 'proj-a';
+        if (id === 'dev-b') return 'proj-b';
+        return undefined;
+      });
+      mocks.agentManager.getByProject.mockImplementation((pid: string) => {
+        if (pid === 'proj-a') return [projALead];
+        return [];
+      });
+      mocks.agentManager.get.mockImplementation((id: string) => {
+        if (id === 'lead-a') return projALead;
+        return { role: { name: 'Dev B' } };
+      });
+      mocks.lockRegistry.getAll.mockReturnValue([
+        makeLock('lead-a', 'src/index.ts'),
+        makeLock('dev-b', 'src/other.ts'),
+      ]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.refreshAll();
+
+      expect(projALead.injectContextUpdate).toHaveBeenCalledTimes(1);
+      const healthHeader = projALead.injectContextUpdate.mock.calls[0][2] as string;
+      // Lead A should see their own lock but NOT dev-b's lock
+      expect(healthHeader).toContain('src/index.ts');
+      expect(healthHeader).not.toContain('src/other.ts');
+    });
+
+    it('buildRecentActivity passes projectId to activity ledger', () => {
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+
+      refresher.buildRecentActivity(20, 'proj-a');
+
+      expect(mocks.activityLedger.getRecent).toHaveBeenCalledWith(100, 'proj-a');
+    });
+  });
 });

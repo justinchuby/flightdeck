@@ -171,7 +171,8 @@ export class Agent {
     // For leads: show "YOUR AGENTS" (children) separately from other peers
     const isLead = this.role.id === 'lead';
     const myChildren = isLead ? peers.filter((p) => p.parentId === this.id) : [];
-    const otherPeers = isLead ? peers.filter((p) => p.parentId !== this.id && p.id !== this.id) : peers;
+    // Non-leads see all peers (pre-filtered to same project by the caller)
+    const otherPeers = isLead ? [] : peers;
 
     const childLines = myChildren
       .map((p) => {
@@ -203,7 +204,7 @@ ${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — reuse idle 
       ? `== YOUR AGENTS ==
 ${childLines || '(no agents created yet — use CREATE_AGENT to create specialists)'}
 Use agent IDs above with DELEGATE to assign tasks, or AGENT_MESSAGE to communicate.
-${otherPeers.length > 0 ? `\n== OTHER CREW MEMBERS ==\n${peerLines}` : ''}${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${this.parentId.slice(0, 8)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}`
+${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${this.parentId.slice(0, 8)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}`
       : `== ACTIVE CREW MEMBERS ==
 ${peerLines || '(no other agents)'}`;
 

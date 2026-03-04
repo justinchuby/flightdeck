@@ -70,18 +70,19 @@ export class ContextRefresher {
   }
 
   refreshAll(): void {
-    const peers = this.buildPeerList();
-    const lockSection = this.buildFileLockSection();
-    const alerts = this.buildAlerts(peers);
-    const lockActivity = this.buildLockActivity();
-
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
       if (!agent.role.receivesStatusUpdates) continue;
+
+      const projectId = this.agentManager.getProjectIdForAgent(agent.id);
+      const peers = this.buildPeerList(projectId);
       const otherPeers = peers.filter((p) => p.id !== agent.id);
+      const lockSection = this.buildFileLockSection(projectId);
+      const alerts = this.buildAlerts(otherPeers);
       const isSecretary = agent.role.id === 'secretary';
+      const lockActivity = isSecretary ? this.buildLockActivity(projectId) : '';
       const extra = isSecretary && lockActivity ? `\n${lockActivity}` : '';
-      const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead');
+      const healthHeader = this.buildHealthHeader(agent.id, agent.role.id !== 'lead', projectId);
       agent.injectContextUpdate(otherPeers, [], `${healthHeader}\n${lockSection}${extra}`, alerts);
     }
   }
@@ -90,11 +91,12 @@ export class ContextRefresher {
     const agent = this.agentManager.get(agentId);
     if (!agent || agent.status !== 'running') return;
 
-    const peers = this.buildPeerList();
+    const projectId = this.agentManager.getProjectIdForAgent(agentId);
+    const peers = this.buildPeerList(projectId);
     const otherPeers = peers.filter((p) => p.id !== agentId);
-    const alerts = this.buildAlerts(peers);
+    const alerts = this.buildAlerts(otherPeers);
     const healthHeader = agent.role.receivesStatusUpdates
-      ? `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${this.buildFileLockSection()}`
+      ? `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead', projectId)}\n${this.buildFileLockSection(projectId)}`
       : undefined;
     agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
   }
@@ -106,23 +108,24 @@ export class ContextRefresher {
     );
     if (statusAgents.length === 0) return;
 
-    const peers = this.buildPeerList();
-    const lockSection = this.buildFileLockSection();
-    const alerts = this.buildAlerts(peers);
-    // Build lock activity once — only appended for secretaries
-    const lockActivity = this.buildLockActivity();
-
     for (const agent of statusAgents) {
+      const projectId = this.agentManager.getProjectIdForAgent(agent.id);
+      const peers = this.buildPeerList(projectId);
       const otherPeers = peers.filter((p) => p.id !== agent.id);
+      const lockSection = this.buildFileLockSection(projectId);
+      const alerts = this.buildAlerts(otherPeers);
       const isSecretary = agent.role.id === 'secretary';
+      const lockActivity = isSecretary ? this.buildLockActivity(projectId) : '';
       const extra = isSecretary && lockActivity ? `\n${lockActivity}` : '';
-      const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead')}\n${lockSection}${extra}`;
+      const healthHeader = `${this.buildHealthHeader(agent.id, agent.role.id !== 'lead', projectId)}\n${lockSection}${extra}`;
       agent.injectContextUpdate(otherPeers, [], healthHeader, alerts);
     }
   }
 
-  buildPeerList(): AgentContextInfo[] {
-    const agents = this.agentManager.getAll();
+  buildPeerList(projectId?: string): AgentContextInfo[] {
+    const agents = projectId
+      ? this.agentManager.getByProject(projectId)
+      : this.agentManager.getAll();
     const allLocks = this.lockRegistry.getAll();
 
     return agents.map((agent) => ({
@@ -144,15 +147,15 @@ export class ContextRefresher {
     }));
   }
 
-  buildRecentActivity(limit: number = 20): string[] {
+  buildRecentActivity(limit: number = 20, projectId?: string): string[] {
     // Fetch extra entries so the smart filter has enough high/medium priority events.
     // If the first pass is exhausted by low-value churn, widen the window adaptively.
     const initialFetch = limit * 5;
-    let rawEntries = this.activityLedger.getRecent(initialFetch);
+    let rawEntries = this.activityLedger.getRecent(initialFetch, projectId);
     let filtered = this.activityFilter.filter(rawEntries, limit);
 
     if (filtered.length < limit && rawEntries.length >= initialFetch) {
-      rawEntries = this.activityLedger.getRecent(initialFetch * 3);
+      rawEntries = this.activityLedger.getRecent(initialFetch * 3, projectId);
       filtered = this.activityFilter.filter(rawEntries, limit);
     }
 
@@ -166,9 +169,12 @@ export class ContextRefresher {
    * Compute a 2-3 line health summary for CREW_UPDATE.
    * @param agentId - The agent receiving the header
    * @param projectWide - If true, shows all agents (for secretary); if false, shows only children (for lead)
+   * @param projectId - Scope to this project (prevents cross-project data leakage)
    */
-  private buildHealthHeader(agentId: string, projectWide: boolean = false): string {
-    const allAgents = this.agentManager.getAll();
+  private buildHealthHeader(agentId: string, projectWide: boolean = false, projectId?: string): string {
+    const allAgents = projectId
+      ? this.agentManager.getByProject(projectId)
+      : this.agentManager.getAll();
     const myAgents = projectWide
       ? allAgents.filter(a => a.id !== agentId)
       : allAgents.filter(a => a.parentId === agentId);
@@ -225,19 +231,23 @@ export class ContextRefresher {
 
     // Append critical events from SynthesisEngine (for leads only)
     if (!projectWide) {
-      const criticalSection = this.synthesisEngine.formatCriticalSection(agentId);
+      const criticalSection = this.synthesisEngine.formatCriticalSection(agentId, projectId);
       if (criticalSection) return `${healthLine}\n${criticalSection}`;
     }
 
     return healthLine;
   }
 
-  /** Build a summary of currently held file locks */
-  private buildFileLockSection(): string {
+  /** Build a summary of currently held file locks, scoped to a project */
+  private buildFileLockSection(projectId?: string): string {
     const locks = this.lockRegistry.getAll();
-    if (locks.length === 0) return '== ACTIVE FILE LOCKS ==\nNone';
+    // Filter locks to only include agents from the same project
+    const scopedLocks = projectId
+      ? locks.filter(lock => this.agentManager.getProjectIdForAgent(lock.agentId) === projectId)
+      : locks;
+    if (scopedLocks.length === 0) return '== ACTIVE FILE LOCKS ==\nNone';
 
-    const lines = locks.map(lock => {
+    const lines = scopedLocks.map(lock => {
       const agent = this.agentManager.get(lock.agentId);
       const roleName = agent?.role.name ?? 'Unknown';
       return `- ${lock.filePath} \u2192 ${lock.agentId.slice(0, 8)} (${roleName})`;
@@ -262,9 +272,9 @@ export class ContextRefresher {
     return alerts;
   }
 
-  /** Build recent lock_denied activity for the secretary's CREW_UPDATE. */
-  private buildLockActivity(): string {
-    const entries = this.activityLedger.getRecent(50)
+  /** Build recent lock_denied activity for the secretary's CREW_UPDATE, scoped to a project. */
+  private buildLockActivity(projectId?: string): string {
+    const entries = this.activityLedger.getRecent(50, projectId)
       .filter(e => e.actionType === 'lock_denied');
     if (entries.length === 0) return '';
 

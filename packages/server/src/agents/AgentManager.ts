@@ -234,7 +234,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       );
     }
 
-    const peers: AgentContextInfo[] = this.getAll().map((a) => ({
+    // Determine the project scope for this agent:
+    // - explicit projectId from options
+    // - inherited from parent
+    // - undefined (no project scope)
+    const effectiveProjectId = options?.projectId
+      ?? (parentId ? this.getProjectIdForAgent(parentId) : undefined);
+
+    // Filter initial peer list to same project to prevent cross-project visibility
+    const allAgents = effectiveProjectId
+      ? this.getByProject(effectiveProjectId)
+      : this.getAll();
+    const peers: AgentContextInfo[] = allAgents.map((a) => ({
       id: a.id,
       role: a.role.id,
       roleName: a.role.name,
