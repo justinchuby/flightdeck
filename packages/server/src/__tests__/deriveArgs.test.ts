@@ -3,17 +3,38 @@ import { z } from 'zod';
 import { deriveArgs, deriveHelp } from '../agents/commands/CommandHelp.js';
 import {
   agentMessageSchema,
+  interruptSchema,
+  broadcastSchema,
+  createGroupSchema,
+  addToGroupSchema,
+  removeFromGroupSchema,
+  groupMessageSchema,
+  createAgentSchema,
+  delegateSchema,
+  terminateAgentSchema,
+  cancelDelegationSchema,
+  lockFileSchema,
+  unlockFileSchema,
+  activitySchema,
+  decisionSchema,
+  commitSchema,
+  progressSchema,
+  requestLimitChangeSchema,
   setTimerSchema,
   cancelTimerSchema,
-  progressSchema,
-  createAgentSchema,
-  createGroupSchema,
-  cancelDelegationSchema,
+  deferIssueSchema,
   resolveDeferredSchema,
   queryDeferredSchema,
-  activitySchema,
-  requestLimitChangeSchema,
+  acquireCapabilitySchema,
+  releaseCapabilitySchema,
+  directMessageSchema,
+  reactSchema,
+  applyTemplateSchema,
+  decomposeTaskSchema,
   declareTasksSchema,
+  addTaskSchema,
+  taskIdSchema,
+  completeTaskSchema,
   addDependencySchema,
   assignTaskSchema,
 } from '../agents/commands/commandSchemas.js';
@@ -106,6 +127,29 @@ describe('deriveArgs', () => {
     const args = deriveArgs(schema);
     expect(args[0].description).toBe('foo');
   });
+
+  it('handles ZodDefault wrapper — extracts type and default value', () => {
+    const schema = z.object({
+      enabled: z.boolean().default(false).describe('Enable feature'),
+    });
+    const args = deriveArgs(schema);
+    expect(args).toHaveLength(1);
+    expect(args[0].name).toBe('enabled');
+    expect(args[0].type).toBe('boolean');
+    expect(args[0].required).toBe(false);
+    expect(args[0].default).toBe('false');
+    expect(args[0].description).toBe('Enable feature');
+  });
+
+  it('handles ZodDefault with string value', () => {
+    const schema = z.object({
+      mode: z.string().default('auto').describe('Processing mode'),
+    });
+    const args = deriveArgs(schema);
+    expect(args[0].type).toBe('string');
+    expect(args[0].default).toBe('auto');
+    expect(args[0].required).toBe(false);
+  });
 });
 
 // ── deriveHelp tests ─────────────────────────────────────────────────
@@ -124,17 +168,38 @@ describe('deriveHelp', () => {
 describe('schema-arg drift detection', () => {
   const schemas = {
     agentMessageSchema,
+    interruptSchema,
+    broadcastSchema,
+    createGroupSchema,
+    addToGroupSchema,
+    removeFromGroupSchema,
+    groupMessageSchema,
+    createAgentSchema,
+    delegateSchema,
+    terminateAgentSchema,
+    cancelDelegationSchema,
+    lockFileSchema,
+    unlockFileSchema,
+    activitySchema,
+    decisionSchema,
+    commitSchema,
+    progressSchema,
+    requestLimitChangeSchema,
     setTimerSchema,
     cancelTimerSchema,
-    progressSchema,
-    createAgentSchema,
-    createGroupSchema,
-    cancelDelegationSchema,
+    deferIssueSchema,
     resolveDeferredSchema,
     queryDeferredSchema,
-    activitySchema,
-    requestLimitChangeSchema,
+    acquireCapabilitySchema,
+    releaseCapabilitySchema,
+    directMessageSchema,
+    reactSchema,
+    applyTemplateSchema,
+    decomposeTaskSchema,
     declareTasksSchema,
+    addTaskSchema,
+    taskIdSchema,
+    completeTaskSchema,
     addDependencySchema,
     assignTaskSchema,
   };
@@ -182,5 +247,14 @@ describe('Zod _def structure (pin test)', () => {
   it('.isOptional() returns true for optional fields', () => {
     expect(z.string().isOptional()).toBe(false);
     expect(z.string().optional().isOptional()).toBe(true);
+  });
+
+  it('default has _def.type = "default" with _def.defaultValue and _def.innerType', () => {
+    const field = z.boolean().default(false);
+    const def = field._def as any;
+    expect(def.type).toBe('default');
+    expect(def.defaultValue).toBe(false);
+    expect(def.innerType._def.type).toBe('boolean');
+    expect(field.isOptional()).toBe(true);
   });
 });

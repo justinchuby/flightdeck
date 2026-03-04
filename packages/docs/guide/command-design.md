@@ -45,8 +45,9 @@ IDs are always prefixed with their entity type:
 | `agentId` | Agent | `CANCEL_DELEGATION {"agentId": "abc123"}` |
 | `timerId` | Timer | `CANCEL_TIMER {"timerId": "check-build"}` |
 | `issueId` | Deferred issue | `RESOLVE_DEFERRED {"issueId": 1}` |
-| `groupId` | Chat group | `GROUP_MESSAGE {"groupId": "config-team", ...}` |
 | `delegationId` | Delegation | `CANCEL_DELEGATION {"delegationId": "del-123"}` |
+
+> **Note:** Groups are referenced by name (the `group` field), not by typed ID, since group names are human-readable identifiers.
 
 ### Help Text Format
 

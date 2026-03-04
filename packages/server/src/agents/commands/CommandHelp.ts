@@ -45,10 +45,10 @@ export function setRegisteredPatterns(patterns: CommandEntry[]): void {
 // Zod internal _def access — these are runtime properties not exposed in types
 type ZodDef = Record<string, any>;
 
-/** Unwrap optional/nullable wrappers to get the inner Zod type. */
+/** Unwrap optional/nullable/default wrappers to get the inner Zod type. */
 function unwrapOptional(field: z.ZodType): z.ZodType {
   const def = field._def as ZodDef;
-  if (def?.type === 'optional' || def?.type === 'nullable') {
+  if (def?.type === 'optional' || def?.type === 'nullable' || def?.type === 'default') {
     return unwrapOptional(def.innerType);
   }
   return field;
@@ -58,8 +58,20 @@ function unwrapOptional(field: z.ZodType): z.ZodType {
 function getDescription(field: z.ZodType): string | undefined {
   if (field.description) return field.description;
   const def = field._def as ZodDef;
-  if (def?.type === 'optional' || def?.type === 'nullable') {
+  if (def?.type === 'optional' || def?.type === 'nullable' || def?.type === 'default') {
     return def.innerType?.description;
+  }
+  return undefined;
+}
+
+/** Extract the default value from a ZodDefault wrapper, if present. */
+function getDefaultValue(field: z.ZodType): string | undefined {
+  const def = field._def as ZodDef;
+  if (def?.type === 'default') {
+    return String(def.defaultValue);
+  }
+  if (def?.type === 'optional' || def?.type === 'nullable') {
+    return getDefaultValue(def.innerType);
   }
   return undefined;
 }
@@ -105,12 +117,15 @@ export function deriveArgs(schema: z.ZodObject<any>): CommandArg[] {
   const args: CommandArg[] = [];
 
   for (const [name, field] of Object.entries(shape)) {
-    args.push({
+    const defaultVal = getDefaultValue(field);
+    const arg: CommandArg = {
       name,
       type: deriveTypeName(field),
       required: !field.isOptional(),
       description: getDescription(field) ?? name,
-    });
+    };
+    if (defaultVal !== undefined) arg.default = defaultVal;
+    args.push(arg);
   }
 
   return args;
