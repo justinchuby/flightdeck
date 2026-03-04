@@ -40,12 +40,13 @@ function makeDagSummary(overrides: Partial<DagSummary> = {}): DagSummary {
   };
 }
 
-function createMockContext(): HeartbeatContext & { getAllAgents: ReturnType<typeof vi.fn>; getDelegationsMap: ReturnType<typeof vi.fn>; getDagSummary: ReturnType<typeof vi.fn>; getTaskByAgent: ReturnType<typeof vi.fn>; emit: ReturnType<typeof vi.fn> } {
+function createMockContext(): HeartbeatContext & { getAllAgents: ReturnType<typeof vi.fn>; getDelegationsMap: ReturnType<typeof vi.fn>; getDagSummary: ReturnType<typeof vi.fn>; getTaskByAgent: ReturnType<typeof vi.fn>; getRemainingTasks: ReturnType<typeof vi.fn>; emit: ReturnType<typeof vi.fn> } {
   return {
     getAllAgents: vi.fn().mockReturnValue([]),
     getDelegationsMap: vi.fn().mockReturnValue(new Map()),
     getDagSummary: vi.fn().mockReturnValue(null),
     getTaskByAgent: vi.fn().mockReturnValue(null),
+    getRemainingTasks: vi.fn().mockReturnValue([]),
     emit: vi.fn() as any,
   };
 }
@@ -257,6 +258,10 @@ describe('HeartbeatMonitor', () => {
     ctx.getAllAgents.mockReturnValue([lead, child]);
     ctx.getDelegationsMap.mockReturnValue(new Map());
     ctx.getDagSummary.mockReturnValue(makeDagSummary({ ready: 3, pending: 1, blocked: 2 }));
+    ctx.getRemainingTasks.mockReturnValue([
+      { id: 'task-1', description: 'Implement feature A', dagStatus: 'ready' },
+      { id: 'task-2', description: 'Fix bug B', dagStatus: 'ready' },
+    ]);
 
     monitor.trackIdle('lead-1');
     vi.advanceTimersByTime(90_000);
@@ -264,7 +269,6 @@ describe('HeartbeatMonitor', () => {
     triggerCheck();
 
     const message = (lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(message).toContain('DAG tasks remaining');
     expect(message).toContain('3 ready');
     expect(message).toContain('1 pending');
     expect(message).toContain('2 blocked');
@@ -314,9 +318,9 @@ describe('HeartbeatMonitor', () => {
     expect(lead.sendMessage).toHaveBeenCalledTimes(2);
   });
 
-  // ── 10. Escalation after 2 nudges ─────────────────────────────────
+  // ── 10. Escalation after 5 nudges ─────────────────────────────────
 
-  it('emits lead:stalled after 2 consecutive nudges', () => {
+  it('emits lead:stalled after 5 consecutive nudges', () => {
     const lead = makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Team Lead' }, status: 'idle' });
     const child = makeAgent({ id: 'child-1', parentId: 'lead-1', status: 'idle' });
     ctx.getAllAgents.mockReturnValue([lead, child]);
@@ -328,15 +332,18 @@ describe('HeartbeatMonitor', () => {
     monitor.trackIdle('lead-1');
     vi.advanceTimersByTime(90_000);
 
-    // First check — no escalation
+    // First 4 checks — no escalation
     triggerCheck();
+    for (let i = 0; i < 3; i++) {
+      vi.advanceTimersByTime(100);
+    }
     expect(ctx.emit).not.toHaveBeenCalledWith('lead:stalled', expect.anything());
 
-    // Second check — should escalate
+    // 5th check — should escalate
     vi.advanceTimersByTime(100);
     expect(ctx.emit).toHaveBeenCalledWith('lead:stalled', expect.objectContaining({
       leadId: 'lead-1',
-      nudgeCount: 2,
+      nudgeCount: 5,
     }));
   });
 
@@ -372,11 +379,17 @@ describe('HeartbeatMonitor', () => {
     // First nudge after reset — count is back to 1, so no escalation
     expect(ctx.emit).not.toHaveBeenCalledWith('lead:stalled', expect.anything());
 
-    // Second nudge after reset — count is 2, should escalate
+    // Nudges 2-4 after reset — still no escalation (threshold is 5)
+    vi.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
+    expect(ctx.emit).not.toHaveBeenCalledWith('lead:stalled', expect.anything());
+
+    // 5th nudge after reset — should escalate
     vi.advanceTimersByTime(100);
     expect(ctx.emit).toHaveBeenCalledWith('lead:stalled', expect.objectContaining({
       leadId: 'lead-1',
-      nudgeCount: 2,
+      nudgeCount: 5,
     }));
   });
 
@@ -448,5 +461,72 @@ describe('HeartbeatMonitor', () => {
     vi.advanceTimersByTime(61_000);
     // No more nudges after removal (idleSince was deleted)
     expect(lead.sendMessage).not.toHaveBeenCalled();
+  });
+
+  // ── New: nudge message format ───────────────────────────────────────
+
+  it('uses soft "[System] Reminder:" prefix instead of "stalled"', () => {
+    const { lead } = setupStalledTeam({
+      delegations: [makeDelegation({ fromAgentId: 'lead-1', status: 'active' })],
+    });
+
+    triggerCheck();
+
+    const message = (lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(message).toContain('[System] Reminder:');
+    expect(message).not.toContain('stalled');
+    expect(message).not.toContain('[System Heartbeat]');
+  });
+
+  it('includes remaining tasks in nudge message', () => {
+    ctx.getRemainingTasks.mockReturnValue([
+      { id: 'qa-test', description: 'QA testing of isolation', dagStatus: 'ready' },
+      { id: 'fix-alerts', description: 'Fix AlertEngine scoping', dagStatus: 'ready' },
+      { id: 'update-docs', description: 'Update documentation', dagStatus: 'blocked' },
+    ]);
+
+    const { lead } = setupStalledTeam({
+      dagSummary: makeDagSummary({ ready: 2, blocked: 1 }),
+    });
+
+    triggerCheck();
+
+    const message = (lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(message).toContain('qa-test: QA testing of isolation (ready)');
+    expect(message).toContain('fix-alerts: Fix AlertEngine scoping (ready)');
+    expect(message).toContain('update-docs: Update documentation (blocked)');
+  });
+
+  it('includes actionable hints in nudge', () => {
+    const { lead } = setupStalledTeam({
+      delegations: [makeDelegation({ fromAgentId: 'lead-1', status: 'active' })],
+    });
+
+    triggerCheck();
+
+    const message = (lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(message).toContain('DELEGATE');
+    expect(message).toContain('QUERY_CREW');
+    expect(message).toContain('HALT_HEARTBEAT');
+  });
+
+  it('truncates task list to 8 entries', () => {
+    const tasks = Array.from({ length: 12 }, (_, i) => ({
+      id: `task-${i}`,
+      description: `Task number ${i}`,
+      dagStatus: 'ready',
+    }));
+    ctx.getRemainingTasks.mockReturnValue(tasks);
+
+    const { lead } = setupStalledTeam({
+      dagSummary: makeDagSummary({ ready: 12 }),
+    });
+
+    triggerCheck();
+
+    const message = (lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(message).toContain('task-7'); // 8th task (0-indexed)
+    expect(message).not.toContain('task-8'); // 9th task should not appear
+    expect(message).toContain('... and 4 more');
   });
 });

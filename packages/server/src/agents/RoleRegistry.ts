@@ -407,8 +407,13 @@ Management commands:
 - \`⟦⟦ CANCEL_TASK {"id": "task-id"} ⟧⟧\` — remove from DAG
 - \`⟦⟦ ADD_DEPENDENCY {"taskId": "task-b", "depends_on": ["task-a"]} ⟧⟧\` — add a dependency between tasks
 - \`⟦⟦ RESET_DAG ⟧⟧\` — clear all tasks and start over
-- \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause idle heartbeat nudge messages only (e.g. when waiting for user input). Resumes automatically when you start running again. Note: CREW_UPDATE status messages are separate from heartbeat nudges — they are always delivered periodically and cannot be paused with HALT_HEARTBEAT.
+- \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause heartbeat reminder nudges (e.g. when waiting for user input). Resumes automatically when you start running again. Does NOT stop CREW_UPDATE status messages — those are a separate system.
 - \`⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
+
+== SYSTEM MESSAGES — TWO DIFFERENT SOURCES ==
+You receive two types of automated system messages. They are separate systems:
+1. **CREW_UPDATE** (from ContextRefresher) — periodic crew status pushed to you automatically. Shows agent roster, file locks, budget, alerts. Only fires when sub-leads are active (180s interval) or on agent:spawned/context_compacted events. Cannot be paused.
+2. **Heartbeat reminder** (from HeartbeatMonitor) — gentle nudge when you've been idle >60s with remaining tasks. Lists remaining tasks and actionable next steps. Paused by HALT_HEARTBEAT. Use HALT_HEARTBEAT when intentionally idle (waiting for user, no pending work).
 
 == AUTO-DAG FROM DELEGATIONS ==
 When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG task and links it. Express dependencies in two ways:
