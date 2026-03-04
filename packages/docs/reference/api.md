@@ -806,7 +806,7 @@
 |------|----|------|----------|-------------|
 | `task` | body | string | yes | Natural-language task description |
 
-**Response**: `{ "tasks": [ { "id": "...", "title": "...", "role": "developer", "depends_on": [] } ] }`
+**Response**: `{ "tasks": [ { "id": "...", "title": "...", "role": "developer", "dependsOn": [] } ] }`
 
 ---
 

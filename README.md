@@ -195,7 +195,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 |---------|-------------|
 | `CREATE_AGENT {"role": "developer", "task": "..."}` | Spawn a new agent with a specific role. Optionally assign a task and model. |
 | `DELEGATE {"to": "agent-id", "task": "...", "context": "..."}` | Assign a task to an existing agent. Leads and architects can delegate. |
-| `TERMINATE_AGENT {"id": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
+| `TERMINATE_AGENT {"agentId": "agent-id", "reason": "..."}` | Terminate an agent and free its slot. Logs session ID for potential resume. |
 | `INTERRUPT {"to": "agent-id", "content": "..."}` | Send a priority interrupt to a child agent, immediately stopping their current work. *(Parent agents only)* |
 
 ### Communication (All agents)
@@ -217,14 +217,14 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 | Command | Description |
 |---------|-------------|
-| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `role`, `depends_on`, and optional `description`. |
+| `DECLARE_TASKS {"tasks": [...]}` | Declare a task DAG with dependencies. Tasks have `id`, `role`, `dependsOn`, and optional `description`. |
 | `PROGRESS {"summary": "..."}` | Report progress. Auto-reads DAG state when a DAG exists — no need to query separately. |
-| `COMPLETE_TASK {"id": "task-id", "summary": "...", "output": "..."}` | Mark a DAG task as done. Non-lead agents relay to parent's DAG with auth validation. Supports `id`, `summary`, `status`, `output` fields. *(Any agent)* |
+| `COMPLETE_TASK {"taskId": "task-id", "summary": "...", "output": "..."}` | Mark a DAG task as done. Non-lead agents relay to parent's DAG with auth validation. Supports `id`, `summary`, `status`, `output` fields. *(Any agent)* |
 | `TASK_STATUS` | Query current task DAG status. |
 | `PAUSE_TASK {"id": "..."}` | Pause a pending/ready task in the DAG. *(Lead-only)* |
 | `RETRY_TASK {"id": "..."}` | Retry a failed task. *(Lead-only)* |
 | `SKIP_TASK {"id": "..."}` | Skip a task and unblock dependents. *(Lead-only)* |
-| `ADD_TASK {"id": "...", "role": "...", "description": "...", "depends_on": [...]}` | Add a new task to an existing DAG. *(Lead-only)* |
+| `ADD_TASK {"id": "...", "role": "...", "description": "...", "dependsOn": [...]}` | Add a new task to an existing DAG. *(Lead-only)* |
 | `CANCEL_TASK {"id": "..."}` | Cancel a task. *(Lead-only)* |
 | `RESET_DAG` | Reset the entire DAG (clear all tasks). *(Lead-only)* |
 | `DECISION {"title": "...", "rationale": "..."}` | Log a decision. Users can accept/reject with a reason comment from the dashboard. |
@@ -232,7 +232,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `CANCEL_DELEGATION {"delegationId": "...", "reason": "..."}` | Cancel an active delegation. |
 | `ASSIGN_TASK {"taskId": "...", "agentId": "..."}` | Assign a ready DAG task to an agent and move it to running state. *(Lead-only)* |
 | `REASSIGN_TASK {"taskId": "...", "agentId": "..."}` | Reassign a running task from one agent to another. *(Lead-only)* |
-| `ADD_DEPENDENCY {"taskId": "...", "depends_on": ["dep-id"]}` | Add dependency edges to tasks in the DAG. Prevents circular dependencies. |
+| `ADD_DEPENDENCY {"taskId": "...", "dependsOn": ["dep-id"]}` | Add dependency edges to tasks in the DAG. Prevents circular dependencies. |
 | `FORCE_READY {"id": "task-id"}` | Force a pending/blocked task to ready state, overriding dependency checks. *(Lead-only)* |
 
 ### Coordination (All agents)
@@ -258,7 +258,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `RELEASE_CAPABILITY {"capability": "code-review"}` | Release a previously acquired capability. |
 | `LIST_CAPABILITIES` | List currently held capabilities. |
 | `SET_TIMER {"label": "name", "delay": 300, "message": "...", "repeat": false}` | Set a reminder that fires after a delay (in seconds). Optionally repeats. |
-| `CANCEL_TIMER {"name": "name"}` | Cancel an active timer. |
+| `CANCEL_TIMER {"label": "name"}` | Cancel an active timer. |
 | `LIST_TIMERS` | List all active timers. |
 
 ### Templates (Lead + All agents)

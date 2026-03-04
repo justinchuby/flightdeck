@@ -54,16 +54,16 @@ This prevents the same work from being tracked twice when re-delegating or rephr
 
 Dependencies are detected through three complementary mechanisms, from most reliable to most flexible:
 
-### Tier 1: Explicit `depends_on` (Recommended)
+### Tier 1: Explicit `dependsOn` (Recommended)
 
-Include a `depends_on` array in the delegation payload:
-
-```
-⟦⟦ DELEGATE {"to": "agent-id", "task": "Review the API changes", "depends_on": ["implement-api"]} ⟧⟧
-```
+Include a `dependsOn` array in the delegation payload:
 
 ```
-⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the frontend", "depends_on": ["design-api", "setup-db"]} ⟧⟧
+⟦⟦ DELEGATE {"to": "agent-id", "task": "Review the API changes", "dependsOn": ["implement-api"]} ⟧⟧
+```
+
+```
+⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build the frontend", "dependsOn": ["design-api", "setup-db"]} ⟧⟧
 ```
 
 This is the most reliable path — no inference needed, dependencies are exact.
@@ -95,7 +95,7 @@ When delegating to a `code-reviewer` or `critical-reviewer`, the system automati
 When Tiers 1 and 2 produce no dependencies and a Secretary agent is active, the system sends the Secretary a dependency analysis request. The Secretary uses LLM reasoning to evaluate whether the new task depends on any active tasks and can respond with:
 
 ```
-⟦⟦ ADD_DEPENDENCY {"taskId": "auto-developer-fix-bugs-1a2b", "depends_on": ["implement-api"]} ⟧⟧
+⟦⟦ ADD_DEPENDENCY {"taskId": "auto-developer-fix-bugs-1a2b", "dependsOn": ["implement-api"]} ⟧⟧
 ```
 
 This is **asynchronous** — the task starts running immediately, and late-added dependencies are informational for DAG visualization and progress tracking.
@@ -119,7 +119,7 @@ No manual `COMPLETE_TASK` call is needed from the lead. Agents can also explicit
 Any agent can add dependencies between tasks using `ADD_DEPENDENCY`:
 
 ```
-⟦⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "depends_on": ["design-api", "setup-db"]} ⟧⟧
+⟦⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "dependsOn": ["design-api", "setup-db"]} ⟧⟧
 ```
 
 The system validates:
@@ -136,8 +136,8 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 ```
 ⟦⟦ DECLARE_TASKS {"tasks": [
   {"id": "design-api", "role": "architect", "title": "Design REST API"},
-  {"id": "impl-api", "role": "developer", "title": "Implement API", "depends_on": ["design-api"]},
-  {"id": "review-api", "role": "code-reviewer", "title": "Review API", "depends_on": ["impl-api"]}
+  {"id": "impl-api", "role": "developer", "title": "Implement API", "dependsOn": ["design-api"]},
+  {"id": "review-api", "role": "code-reviewer", "title": "Review API", "dependsOn": ["impl-api"]}
 ]} ⟧⟧
 
 ⟦⟦ CREATE_AGENT {"role": "architect", "task": "Design the REST API", "dagTaskId": "design-api"} ⟧⟧
@@ -159,7 +159,7 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 ```
 ⟦⟦ DECLARE_TASKS {"tasks": [
   {"id": "auth", "role": "developer", "title": "Build auth module"},
-  {"id": "api", "role": "developer", "title": "Build API", "depends_on": ["auth"]}
+  {"id": "api", "role": "developer", "title": "Build API", "dependsOn": ["auth"]}
 ]} ⟧⟧
 
 // These link to declared tasks:
@@ -167,7 +167,7 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 ⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build API", "dagTaskId": "api"} ⟧⟧
 
 // This ad-hoc task auto-creates since it's not in the DAG:
-⟦⟦ DELEGATE {"to": "dev-id", "task": "Fix the CSS styling issue", "depends_on": ["api"]} ⟧⟧
+⟦⟦ DELEGATE {"to": "dev-id", "task": "Fix the CSS styling issue", "dependsOn": ["api"]} ⟧⟧
 // Auto-creates "auto-developer-fix-css-styling-5z6w" with explicit dependency on "api"
 ```
 
@@ -180,6 +180,6 @@ Non-lead agents resolve the lead through their parent chain, so they can manage 
 | Delegation with no match | Auto-creates a DAG task |
 | Near-duplicate delegation | Warns with existing task ID |
 | Review delegation | Auto-links as dependency of reviewed work (Tier 2) |
-| Delegation with `depends_on` | Explicit dependencies wired (Tier 1) |
+| Delegation with `dependsOn` | Explicit dependencies wired (Tier 1) |
 | Agent completes | Auto-marks matching DAG task as done |
 | All dependencies satisfied | Blocked tasks promoted to ready |

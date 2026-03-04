@@ -25,14 +25,14 @@ Creates a new agent with a specific role. The **lead** and **architect** can use
 | `task` | ❌ | Initial task description |
 | `context` | ❌ | Additional context for the agent |
 | `dagTaskId` | ❌ | Link to a specific DAG task |
-| `depends_on` | ❌ | Array of DAG task IDs this work depends on |
+| `dependsOn` | ❌ | Array of DAG task IDs this work depends on |
 
 ### TERMINATE_AGENT
 
 Terminates an agent. Only the **lead** can use this, and only on agents in its own hierarchy (direct children or sub-lead children). This is an **absolute last resort** — it destroys the agent's accumulated context.
 
 ```
-⟦⟦ TERMINATE_AGENT {"id": "a1b2c3", "reason": "need slot for different role"} ⟧⟧
+⟦⟦ TERMINATE_AGENT {"agentId": "a1b2c3", "reason": "need slot for different role"} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -54,7 +54,7 @@ Assigns a task to an existing agent. Only the **lead** can use this.
 | `task` | ✅ | Task description |
 | `context` | ❌ | Additional context |
 | `dagTaskId` | ❌ | Link to a specific DAG task |
-| `depends_on` | ❌ | Array of DAG task IDs this work depends on |
+| `dependsOn` | ❌ | Array of DAG task IDs this work depends on |
 
 ### AGENT_MESSAGE
 
@@ -103,7 +103,7 @@ Report task progress.
 Mark a DAG task as done. Any agent can use this — non-lead agents relay completion to the parent lead's DAG with authorization validation.
 
 ```
-⟦⟦ COMPLETE_TASK {"id": "task-id", "summary": "Auth module implemented with full test coverage", "output": "..."} ⟧⟧
+⟦⟦ COMPLETE_TASK {"taskId": "task-id", "summary": "Auth module implemented with full test coverage", "output": "..."} ⟧⟧
 ```
 
 | Field | Required | Description |
@@ -120,7 +120,7 @@ Mark a DAG task as done. Any agent can use this — non-lead agents relay comple
 Declare a batch of tasks in the DAG (directed acyclic graph).
 
 ```
-⟦⟦ DECLARE_TASKS {"tasks": [{"id": "auth", "role": "developer", "description": "Build auth module", "depends_on": []}, {"id": "api", "role": "developer", "description": "Build API layer", "depends_on": ["auth"]}]} ⟧⟧
+⟦⟦ DECLARE_TASKS {"tasks": [{"id": "auth", "role": "developer", "description": "Build auth module", "dependsOn": []}, {"id": "api", "role": "developer", "description": "Build API layer", "dependsOn": ["auth"]}]} ⟧⟧
 ```
 
 ### LOCK_FILE / UNLOCK_FILE
@@ -184,7 +184,7 @@ Set reminders that fire after a delay, with optional repeat.
 
 ```
 ⟦⟦ SET_TIMER {"label": "check-build", "delay": 300, "message": "Check if the build passed", "repeat": false} ⟧⟧
-⟦⟦ CANCEL_TIMER {"name": "check-build"} ⟧⟧
+⟦⟦ CANCEL_TIMER {"label": "check-build"} ⟧⟧
 ⟦⟦ LIST_TIMERS ⟧⟧
 ```
 
@@ -260,7 +260,7 @@ List all groups the agent belongs to, with member info and recent messages:
 Add dependencies between DAG tasks. Any agent can use this:
 
 ```
-⟦⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "depends_on": ["design-api", "setup-db"]} ⟧⟧
+⟦⟦ ADD_DEPENDENCY {"taskId": "build-frontend", "dependsOn": ["design-api", "setup-db"]} ⟧⟧
 ```
 
 Validates that both tasks exist and the new dependency doesn't create a cycle. See [Auto-DAG](./auto-dag.md) for details.
@@ -379,8 +379,8 @@ Additional commands for managing the task DAG:
 | Command | Description |
 |---------|-------------|
 | `TASK_STATUS` / `QUERY_TASKS` | View current DAG state and progress summary |
-| `ADD_TASK {"id": "...", "role": "...", "description": "...", "depends_on": [...]}` | Add a single task to an existing DAG |
-| `ADD_DEPENDENCY {"taskId": "...", "depends_on": ["..."]}` | Add dependencies between tasks |
+| `ADD_TASK {"id": "...", "role": "...", "description": "...", "dependsOn": [...]}` | Add a single task to an existing DAG |
+| `ADD_DEPENDENCY {"taskId": "...", "dependsOn": ["..."]}` | Add dependencies between tasks |
 | `CANCEL_TASK {"id": "..."}` | Cancel a task |
 | `SKIP_TASK {"id": "..."}` | Skip a task and unblock dependents |
 | `RETRY_TASK {"id": "..."}` | Retry a failed task |

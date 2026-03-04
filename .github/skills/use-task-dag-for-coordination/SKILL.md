@@ -30,9 +30,9 @@ Instead of manually delegating and tracking:
 ```
 DECLARE_TASKS with tasks:
 - {id: 'design', role: 'architect', description: '...'}
-- {id: 'implement', role: 'developer', depends_on: ['design']}
-- {id: 'review', role: 'code-reviewer', depends_on: ['implement']}
-- {id: 'test', role: 'qa-tester', depends_on: ['review']}
+- {id: 'implement', role: 'developer', dependsOn: ['design']}
+- {id: 'review', role: 'code-reviewer', dependsOn: ['implement']}
+- {id: 'test', role: 'qa-tester', dependsOn: ['review']}
 ```
 
 The system will auto-start each task when its dependencies complete.
