@@ -204,6 +204,7 @@ export const projects = sqliteTable('projects', {
   description: text('description').default(''),
   cwd: text('cwd'),
   status: text('status').default('active'),       // active | archived | completed
+  modelConfig: text('model_config').default('{}'),  // JSON: role → allowed model IDs
   createdAt: text('created_at').default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').default(sql`(datetime('now'))`),
 }, (table) => [

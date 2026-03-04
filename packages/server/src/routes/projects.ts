@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
+import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
 
 export function projectsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
@@ -126,6 +127,42 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
     logger.info('project', `Deleted project ${(req.params.id as string).slice(0, 8)}`);
     res.json({ ok: true });
+  });
+
+  // --- Model Config ---
+
+  // List all known models and default config
+  router.get('/models', (_req, res) => {
+    res.json({
+      models: KNOWN_MODEL_IDS,
+      defaults: DEFAULT_MODEL_CONFIG,
+    });
+  });
+
+  router.get('/projects/:id/model-config', (req, res) => {
+    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    res.json(projectRegistry.getModelConfig(req.params.id));
+  });
+
+  router.put('/projects/:id/model-config', (req, res) => {
+    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const { config } = req.body;
+    const shapeError = validateModelConfigShape(config);
+    if (shapeError) return res.status(400).json({ error: shapeError });
+
+    const unknownIds = validateModelConfig(config);
+    if (unknownIds.length > 0) {
+      return res.status(400).json({ error: `Unknown model IDs: ${unknownIds.join(', ')}` });
+    }
+
+    projectRegistry.setModelConfig(req.params.id, config);
+    logger.info('project', `Updated model config for project "${project.name}" (${project.id.slice(0, 8)})`);
+    res.json(projectRegistry.getModelConfig(req.params.id));
   });
 
   return router;

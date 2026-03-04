@@ -2,6 +2,7 @@ import { eq, desc, and, isNotNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { projects, projectSessions, dagTasks, decisions, agentMemory } from '../db/schema.js';
 import { randomUUID } from 'crypto';
+import { DEFAULT_MODEL_CONFIG, type ProjectModelConfig } from './ModelConfigDefaults.js';
 
 export interface Project {
   id: string;
@@ -285,6 +286,36 @@ export class ProjectRegistry {
       )
       .run();
     return result.changes > 0;
+  }
+
+  /**
+   * Get the model config for a project.
+   * Returns the stored config merged over defaults — stored values take precedence.
+   */
+  getModelConfig(projectId: string): { config: ProjectModelConfig; defaults: ProjectModelConfig } {
+    const row = this.db.drizzle.select({ modelConfig: projects.modelConfig })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .get();
+    let stored: ProjectModelConfig = {};
+    if (row?.modelConfig) {
+      try { stored = JSON.parse(row.modelConfig); } catch { stored = {}; }
+    }
+    // Merge: stored overrides defaults per-role
+    const merged: ProjectModelConfig = { ...DEFAULT_MODEL_CONFIG, ...stored };
+    return { config: merged, defaults: DEFAULT_MODEL_CONFIG };
+  }
+
+  /**
+   * Set the model config for a project.
+   * Only stores the roles that differ from defaults (sparse storage).
+   */
+  setModelConfig(projectId: string, config: ProjectModelConfig): void {
+    const json = JSON.stringify(config);
+    this.db.drizzle.update(projects).set({
+      modelConfig: json,
+      updatedAt: new Date().toISOString(),
+    }).where(eq(projects.id, projectId)).run();
   }
 
   /** Delete a project and all associated sessions */
