@@ -177,7 +177,7 @@ function DagTaskNode({ data }: NodeProps<Node<DagTaskNodeData>>) {
             maxWidth: '100%',
           }}
         >
-          🤖 {truncate(task.assignedAgentId, 14)}
+          🤖 {task.assignedAgentId.slice(0, 8)}
         </div>
       )}
 
@@ -334,7 +334,7 @@ function DagNodeTooltip({
           <span>{task.role}</span>
           {task.model && <span style={{ color: 'var(--graph-text-muted)' }}>· {task.model}</span>}
           {task.assignedAgentId && (
-            <span style={{ color: 'var(--graph-text-accent)', fontSize: 11 }}>🤖 {truncate(task.assignedAgentId, 14)}</span>
+            <span style={{ color: 'var(--graph-text-accent)', fontSize: 11 }}>🤖 {task.assignedAgentId.slice(0, 8)}</span>
           )}
         </div>
       </div>
