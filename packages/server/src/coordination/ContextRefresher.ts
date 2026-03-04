@@ -7,7 +7,7 @@ import { SynthesisEngine } from './SynthesisEngine.js';
 import { SmartActivityFilter } from './SmartActivityFilter.js';
 
 /** Interval for periodic status updates during active work (ms) */
-const ACTIVE_UPDATE_INTERVAL_MS = 90_000;
+const ACTIVE_UPDATE_INTERVAL_MS = 120_000;
 
 /** Interval for periodic status updates during idle periods (ms) */
 const IDLE_UPDATE_INTERVAL_MS = 120_000;

@@ -326,8 +326,8 @@ describe('ContextRefresher', () => {
       });
 
       refresher.start();
-      // Active interval is 90s when agents are running
-      vi.advanceTimersByTime(90000);
+      // Active interval is 120s when agents are running
+      vi.advanceTimersByTime(120000);
 
       // Secretary gets periodic update
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
@@ -469,7 +469,7 @@ describe('ContextRefresher', () => {
       vi.useRealTimers();
     });
 
-    it('uses shorter interval (90s) when agents are active', () => {
+    it('uses 120s interval when agents are active', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
@@ -488,11 +488,11 @@ describe('ContextRefresher', () => {
 
       refresher.start();
 
-      // At 89s — no update yet
-      vi.advanceTimersByTime(89000);
+      // At 119s — no update yet
+      vi.advanceTimersByTime(119000);
       expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
 
-      // At 90s — first update
+      // At 120s — first update
       vi.advanceTimersByTime(1000);
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
     });
