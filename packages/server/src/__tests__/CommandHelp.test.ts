@@ -339,3 +339,50 @@ describe('Lead role system prompt policies', () => {
     expect(lead!.systemPrompt).toContain('refer to commands by name');
   });
 });
+
+describe('Command examples parse against Zod schemas', () => {
+  it('DEFER_ISSUE example parses without title field', async () => {
+    const { deferIssueSchema } = await import('../agents/commands/commandSchemas.js');
+    const example = { description: 'Tech debt: refactor later', severity: 'low' };
+    const result = deferIssueSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it('DEFER_ISSUE rejects example with title instead of description', async () => {
+    const { deferIssueSchema } = await import('../agents/commands/commandSchemas.js');
+    const badExample = { title: 'Tech debt', description: undefined };
+    const result = deferIssueSchema.safeParse(badExample);
+    expect(result.success).toBe(false);
+  });
+
+  it('REQUEST_LIMIT_CHANGE example uses limit (not newLimit)', async () => {
+    const { requestLimitChangeSchema } = await import('../agents/commands/commandSchemas.js');
+    const example = { limit: 10, reason: 'need more agents' };
+    const result = requestLimitChangeSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it('REQUEST_LIMIT_CHANGE rejects newLimit field', async () => {
+    const { requestLimitChangeSchema } = await import('../agents/commands/commandSchemas.js');
+    const badExample = { newLimit: 10, reason: 'need more agents' };
+    const result = requestLimitChangeSchema.safeParse(badExample);
+    expect(result.success).toBe(false);
+  });
+
+  it('ACTIVITY example uses actionType (not type)', async () => {
+    const { activitySchema } = await import('../agents/commands/commandSchemas.js');
+    const example = { actionType: 'milestone', summary: 'phase 1 complete' };
+    const result = activitySchema.safeParse(example);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.actionType).toBe('milestone');
+    }
+  });
+
+  it('DEFER_ISSUE schema accepts file field', async () => {
+    const { deferIssueSchema } = await import('../agents/commands/commandSchemas.js');
+    const example = { description: 'Fix later', file: 'src/utils.ts' };
+    const result = deferIssueSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+});

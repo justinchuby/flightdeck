@@ -18,10 +18,11 @@ const RESOLVE_DEFERRED_REGEX = /⟦⟦\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*⟧⟧/s
 
 export function getDeferredCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d), help: { description: 'Defer an issue for later', example: 'DEFER_ISSUE {"title": "Tech debt", "description": "refactor later"}', category: 'Deferred Issues', args: [
+    { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d), help: { description: 'Defer an issue for later', example: 'DEFER_ISSUE {"description": "Tech debt: refactor later", "severity": "low"}', category: 'Deferred Issues', args: [
       { name: 'description', type: 'string', required: true, description: 'Issue description' },
       { name: 'severity', type: 'string', required: false, description: 'Severity level (e.g. P1, P2)' },
       { name: 'sourceFile', type: 'string', required: false, description: 'Related file path' },
+      { name: 'file', type: 'string', required: false, description: 'Related file path (alias for sourceFile)' },
     ] } },
     { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d), help: { description: 'List deferred issues', example: 'QUERY_DEFERRED {}', category: 'Deferred Issues', args: [
       { name: 'status', type: 'string', required: false, description: 'Filter: "open", "resolved", or "dismissed"' },

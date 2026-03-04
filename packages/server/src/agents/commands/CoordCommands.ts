@@ -296,7 +296,8 @@ export function getCoordCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: LOCK_RELEASE_REGEX, name: 'UNLOCK', handler: (a, d) => handleLockRelease(ctx, a, d), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "src/index.ts"}', category: 'Coordination', args: [
       { name: 'filePath', type: 'string', required: true, description: 'Path to unlock' },
     ] } },
-    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"type": "milestone", "summary": "phase 1 complete"}', category: 'Coordination', args: [
+    { regex: ACTIVITY_REGEX, name: 'ACTIVITY', handler: (a, d) => handleActivity(ctx, a, d), help: { description: 'Log an activity entry', example: 'ACTIVITY {"actionType": "milestone", "summary": "phase 1 complete"}', category: 'Coordination', args: [
+      { name: 'action', type: 'string', required: false, description: 'Activity action (legacy alias)' },
       { name: 'actionType', type: 'string', required: false, description: 'Activity type' },
       { name: 'summary', type: 'string', required: false, description: 'Activity summary' },
       { name: 'details', type: 'object', required: false, description: 'Additional details' },
