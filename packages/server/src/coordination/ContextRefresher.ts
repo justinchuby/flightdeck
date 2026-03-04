@@ -40,6 +40,9 @@ export class ContextRefresher {
     this.boundRefresh = () => this.scheduleRefresh();
     this.boundCompacted = (data) => this.refreshOne(data.agentId);
 
+    // Notify lead when new agents appear (sub-leads can CREATE_AGENT independently)
+    this.agentManager.on('agent:spawned', this.boundRefresh);
+
     // Re-inject crew context immediately after Copilot CLI compacts an agent's context
     this.agentManager.on('agent:context_compacted', this.boundCompacted);
   }
@@ -53,6 +56,7 @@ export class ContextRefresher {
   stop(): void {
     this.running = false;
     // Remove event listeners to prevent leaks
+    this.agentManager.off('agent:spawned', this.boundRefresh);
     this.agentManager.off('agent:context_compacted', this.boundCompacted);
 
     if (this.debounceHandle) {
