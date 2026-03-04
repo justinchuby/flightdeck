@@ -423,10 +423,10 @@ export function AcpOutput({ agentId }: Props) {
   );
 }
 
-/** Collapsed-by-default ⟦ command ⟧ block with click to expand */
+/** Collapsed-by-default ⟦⟦ command ⟧⟧ block with click to expand */
 function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
-  const nameMatch = text.match(/⟦\s*(\w+)/);
+  const nameMatch = text.match(/⟦⟦\s*(\w+)/);
   const label = nameMatch ? nameMatch[1] : 'command';
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   let preview = '';
@@ -457,27 +457,28 @@ function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   );
 }
 
-/** Check if a ⟦ ... ⟧ block looks like a real command (ALL_CAPS name after ⟦) */
+/** Check if a ⟦⟦ ... ⟧⟧ block looks like a real command (ALL_CAPS name after ⟦⟦) */
 function isRealCommandBlock(text: string): boolean {
-  return /^⟦\s*[A-Z][A-Z_]{2,}/.test(text);
+  return /^⟦⟦\s*[A-Z][A-Z_]{2,}/.test(text);
 }
 
-/** Render agent text with ⟦ ⟧ blocks separated and inline markdown + tables */
+/** Render agent text with ⟦⟦ ⟧⟧ blocks separated and inline markdown + tables */
 function AgentTextBlockSimple({ text }: { text: string }) {
-  const segments = text.split(/(⟦[\s\S]*?⟧)/g);
+  const segments = text.split(/(⟦⟦[\s\S]*?⟧⟧)/g);
   return (
     <>
       {segments.map((seg, i) => {
-        if (seg.startsWith('⟦') && seg.endsWith('⟧')) {
+        // Complete ⟦⟦ ⟧⟧ block — only collapse if it looks like a real command
+        if (seg.startsWith('⟦⟦') && seg.endsWith('⟧⟧')) {
           if (isRealCommandBlock(seg)) {
             return <CollapsibleCommandBlockSimple key={i} text={seg} />;
           }
           // Not a real command — render as plain text
           return <BlockMarkdownSimple key={i} text={seg} />;
         }
-        // Unclosed ⟦ block
-        if (seg.includes('⟦') && !seg.includes('⟧')) {
-          const idx = seg.indexOf('⟦');
+        // Unclosed ⟦⟦ block (still streaming or split across messages)
+        if (seg.includes('⟦⟦') && !seg.includes('⟧⟧')) {
+          const idx = seg.indexOf('⟦⟦');
           const before = seg.slice(0, idx);
           const cmdBlock = seg.slice(idx);
           if (isRealCommandBlock(cmdBlock)) {
@@ -490,6 +491,18 @@ function AgentTextBlockSimple({ text }: { text: string }) {
           }
           // Not a real command — render entire segment as text
           return seg.trim() ? <BlockMarkdownSimple key={i} text={seg} /> : null;
+        }
+        // Dangling ⟧⟧ from a block that started in a previous message
+        if (seg.includes('⟧⟧') && !seg.includes('⟦⟦')) {
+          const idx = seg.indexOf('⟧⟧') + 2;
+          const cmdBlock = seg.slice(0, idx);
+          const after = seg.slice(idx);
+          return (
+            <span key={i}>
+              <CollapsibleCommandBlockSimple text={cmdBlock} />
+              {after.trim() ? <BlockMarkdownSimple text={after} /> : null}
+            </span>
+          );
         }
         if (!seg.trim()) return null;
         // Check for tables
