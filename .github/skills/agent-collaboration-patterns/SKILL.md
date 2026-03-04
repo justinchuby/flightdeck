@@ -125,12 +125,19 @@ Be aware of these constraints when applying the patterns below:
 
 **Guideline:** Watch for signs of context pressure: inconsistent references to earlier work, repeated questions about things already discussed, or outputs that contradict the agent's own prior actions. These signal it's time to rotate — spin up a fresh agent with a summary of what's been done so far. When re-delegating to an existing agent, include a brief summary rather than assuming they remember accurately.
 
+## Anti-Pattern 7: Duplicate Task Assignment
+
+**Problem:** The lead delegated overlapping tasks to multiple agents without checking whether a similar task was already assigned. This wasted agent compute and created confusion about ownership.
+
+**Guideline:** Before delegating a task, use `QUERY_TASKS` to check if a similar task is already active. If using a DAG, the task list shows what's assigned. If not, check recent AGENT_MESSAGE history for delegation acknowledgments. When in doubt, ask: "Is anyone already working on [topic]?" via BROADCAST before delegating.
+
 ## Session Planning Checklist
 
 - [ ] Have the architect map relevant code and all issues before delegating to developers.
 - [ ] Map file ownership to identify parallel workstreams and bottleneck files.
 - [ ] Consider a secretary if the lead is tracking 5+ parallel agents.
 - [ ] Create a DAG with `DECLARE_TASKS` and assign someone to keep it updated.
+- [ ] Check `QUERY_TASKS` before delegating to avoid duplicate assignments.
 - [ ] Plan explicit sequencing for shared files (who goes first, second, third).
 - [ ] Assign dual reviewers for changes that cross package boundaries or modify contracts.
 - [ ] Use `DEFER_ISSUE` for findings that won't be addressed this session; batch-file GitHub issues at session end.

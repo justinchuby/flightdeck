@@ -97,6 +97,12 @@ CREATE_GROUP {"name": "commanddispatcher-editors", "members": ["agent-a", "agent
 ```
 Agents use the group to signal when they're done and release locks, so the next agent can start immediately instead of polling.
 
+## Pattern 8: Group Lifecycle — Auto-Archive on Termination
+
+Groups should be archived when all members have terminated. Stale groups clutter `QUERY_GROUPS` output and confuse agents who discover them later. If only some members terminate, the group remains active for the surviving members.
+
+**Guideline:** Don't manually clean up groups during a session — let the system handle it. But if you notice stale groups from a previous phase, ignore them and create fresh ones rather than reviving old groups with new members.
+
 ## Checklist for Leads Setting Up a Multi-Agent Session
 
 - [ ] Create role-based groups at session start when members will clearly need to coordinate.
