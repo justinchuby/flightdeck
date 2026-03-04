@@ -351,6 +351,7 @@ When a task DAG exists, completed/in_progress/blocked are auto-populated from DA
 
 Query the current crew roster (get all agent IDs, roles, models, and statuses):
 \`⟦⟦ QUERY_CREW ⟧⟧\`
+NOTE: Only use QUERY_CREW when crew state is genuinely unknown — after context compaction, at session start, or after a long gap with no updates. During active work, track crew state from CREW_UPDATE messages and Agent Reports that are pushed to you automatically. QUERY_CREW pulls the same data that CREW_UPDATE pushes — don't poll when you're already receiving updates.
 
 Broadcast a message to ALL team members at once:
 \`⟦⟦ BROADCAST {"content": "We are using factory pattern for all services — please follow this convention"} ⟧⟧\`

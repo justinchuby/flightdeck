@@ -160,3 +160,14 @@ describe('CommandDispatcher error handling', () => {
     expect(errorCall![0]).toContain('Correct format:');
   });
 });
+
+describe('Lead role QUERY_CREW policy', () => {
+  it('lead system prompt contains QUERY_CREW usage guidance', async () => {
+    const { RoleRegistry } = await import('../agents/RoleRegistry.js');
+    const registry = new RoleRegistry();
+    const lead = registry.get('lead');
+    expect(lead).toBeDefined();
+    expect(lead!.systemPrompt).toContain('Only use QUERY_CREW when crew state is genuinely unknown');
+    expect(lead!.systemPrompt).toContain('CREW_UPDATE messages and Agent Reports');
+  });
+});
