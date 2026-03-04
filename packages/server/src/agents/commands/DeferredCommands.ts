@@ -1,6 +1,7 @@
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   deferIssueSchema,
@@ -18,18 +19,9 @@ const RESOLVE_DEFERRED_REGEX = /⟦⟦\s*RESOLVE_DEFERRED\s*(\{.*?\})\s*⟧⟧/s
 
 export function getDeferredCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d), help: { description: 'Defer an issue for later', example: 'DEFER_ISSUE {"description": "Tech debt: refactor later", "severity": "low"}', category: 'Deferred Issues', args: [
-      { name: 'description', type: 'string', required: true, description: 'Issue description' },
-      { name: 'severity', type: 'string', required: false, description: 'Severity level (e.g. P1, P2)' },
-      { name: 'filePath', type: 'string', required: false, description: 'Related file path' },
-    ] } },
-    { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d), help: { description: 'List deferred issues', example: 'QUERY_DEFERRED {}', category: 'Deferred Issues', args: [
-      { name: 'status', type: 'string', required: false, description: 'Filter: "open", "resolved", or "dismissed"' },
-    ] } },
-    { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => handleResolveDeferred(ctx, a, d), help: { description: 'Resolve a deferred issue', example: 'RESOLVE_DEFERRED {"id": 42}', category: 'Deferred Issues', args: [
-      { name: 'id', type: 'number', required: true, description: 'Issue ID to resolve' },
-      { name: 'dismiss', type: 'boolean', required: false, description: 'Dismiss instead of resolve' },
-    ] } },
+    { regex: DEFER_ISSUE_REGEX, name: 'DEFER_ISSUE', handler: (a, d) => handleDeferIssue(ctx, a, d), help: { description: 'Defer an issue for later', example: 'DEFER_ISSUE {"description": "Tech debt: refactor later", "severity": "low"}', category: 'Deferred Issues', args: deriveArgs(deferIssueSchema) } },
+    { regex: QUERY_DEFERRED_REGEX, name: 'QUERY_DEFERRED', handler: (a, d) => handleQueryDeferred(ctx, a, d), help: { description: 'List deferred issues', example: 'QUERY_DEFERRED {}', category: 'Deferred Issues', args: deriveArgs(queryDeferredSchema) } },
+    { regex: RESOLVE_DEFERRED_REGEX, name: 'RESOLVE_DEFERRED', handler: (a, d) => handleResolveDeferred(ctx, a, d), help: { description: 'Resolve a deferred issue', example: 'RESOLVE_DEFERRED {"issueId": 42}', category: 'Deferred Issues', args: deriveArgs(resolveDeferredSchema) } },
   ];
 }
 
@@ -106,12 +98,12 @@ function handleResolveDeferred(ctx: CommandHandlerContext, agent: Agent, data: s
     }
     const action = req.dismiss ? 'dismiss' : 'resolve';
     const ok = action === 'dismiss'
-      ? ctx.deferredIssueRegistry.dismiss(leadId, req.id)
-      : ctx.deferredIssueRegistry.resolve(leadId, req.id);
+      ? ctx.deferredIssueRegistry.dismiss(leadId, req.issueId)
+      : ctx.deferredIssueRegistry.resolve(leadId, req.issueId);
     if (ok) {
-      agent.sendMessage(`[System] Deferred issue #${req.id} ${action === 'dismiss' ? 'dismissed' : 'resolved'}.`);
+      agent.sendMessage(`[System] Deferred issue #${req.issueId} ${action === 'dismiss' ? 'dismissed' : 'resolved'}.`);
     } else {
-      agent.sendMessage(`[System] Deferred issue #${req.id} not found or already ${action === 'dismiss' ? 'dismissed' : 'resolved'}.`);
+      agent.sendMessage(`[System] Deferred issue #${req.issueId} not found or already ${action === 'dismiss' ? 'dismissed' : 'resolved'}.`);
     }
   } catch (err: any) {
     agent.sendMessage(`[System] RESOLVE_DEFERRED error: ${err.message}`);

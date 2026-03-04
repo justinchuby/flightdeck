@@ -63,8 +63,8 @@ describe('CommandHelp', () => {
 
     it('renders args line for commands with arg metadata', () => {
       const help = buildCommandHelp();
-      // SET_TIMER has args: label(req), delay(req), message(req), repeat(opt, default: false)
-      expect(help).toContain('Args: <label: string> <delay: number|string> <message: string> [repeat: boolean = false]');
+      // SET_TIMER has args derived from schema: label(req), delay(req), message(req), repeat(opt)
+      expect(help).toContain('Args: <label: string> <delay: number | string> <message: string> [repeat: boolean]');
     });
 
     it('renders required args with angle brackets and optional with square brackets', () => {

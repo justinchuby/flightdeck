@@ -163,11 +163,11 @@ export const setTimerSchema = z.object({
 });
 
 export const cancelTimerSchema = z.object({
-  id: z.string().max(MAX_ID_LENGTH).optional().describe('Timer ID'),
+  timerId: z.string().max(MAX_ID_LENGTH).optional().describe('Timer ID'),
   label: z.string().max(MAX_NAME_LENGTH).optional().describe('Timer label'),
 }).refine(
-  (data) => data.id || data.label,
-  { message: 'Requires either "id" (timer ID) or "label" (timer label)' },
+  (data) => data.timerId || data.label,
+  { message: 'Requires either "timerId" (timer ID) or "label" (timer label)' },
 );
 
 // ── Deferred Commands ────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export const deferIssueSchema = z.object({
 });
 
 export const resolveDeferredSchema = z.object({
-  id: z.number({ message: 'Missing required field "id" (number)' }).describe('Deferred issue ID'),
+  issueId: z.number({ message: 'Missing required field "issueId" (number)' }).describe('Deferred issue ID'),
   dismiss: z.boolean().optional().describe('Dismiss instead of resolve'),
 });
 

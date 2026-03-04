@@ -16,6 +16,7 @@ import {
   applyTemplateSchema,
   decomposeTaskSchema,
 } from './commandSchemas.js';
+import { deriveArgs } from './CommandHelp.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -137,10 +138,7 @@ export function getTemplateCommands(
         description: 'Instantiate a workflow template to create tasks',
         example: 'APPLY_TEMPLATE {"template": "feature"}',
         category: 'Templates',
-        args: [
-          { name: 'template', type: 'string', required: true, description: 'Template ID to apply' },
-          { name: 'overrides', type: 'object', required: false, description: 'Per-task overrides (title, role)' },
-        ],
+        args: deriveArgs(applyTemplateSchema),
       },
     },
     {
@@ -151,9 +149,7 @@ export function getTemplateCommands(
         description: 'Decompose a task description into suggested sub-tasks',
         example: 'DECOMPOSE_TASK {"task": "implement user auth"}',
         category: 'Templates',
-        args: [
-          { name: 'task', type: 'string', required: true, description: 'Task description to decompose' },
-        ],
+        args: deriveArgs(decomposeTaskSchema),
       },
     },
   ];

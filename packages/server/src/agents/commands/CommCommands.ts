@@ -2,6 +2,7 @@ import { isTerminalStatus } from '../Agent.js';
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js';
 import { logger } from '../../utils/logger.js';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   agentMessageSchema,
@@ -31,36 +32,15 @@ const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
 
 export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MESSAGE', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication', args: [
-      { name: 'to', type: 'string', required: true, description: 'Agent ID or role name' },
-      { name: 'content', type: 'string', required: true, description: 'Message content' },
-    ] } },
-    { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d), help: { description: 'Send a message to all agents', example: 'BROADCAST {"content": "attention everyone..."}', category: 'Communication', args: [
-      { name: 'content', type: 'string', required: true, description: 'Message to broadcast' },
-    ] } },
-    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d), help: { description: 'Create a chat group', example: 'CREATE_GROUP {"name": "backend-team", "members": ["id1", "id2"]}', category: 'Groups', args: [
-      { name: 'name', type: 'string', required: true, description: 'Group name' },
-      { name: 'members', type: 'string[]', required: false, description: 'Agent IDs (either members or roles required)' },
-      { name: 'roles', type: 'string[]', required: false, description: 'Role names to include' },
-    ] } },
-    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d), help: { description: 'Add members to a group', example: 'ADD_TO_GROUP {"group": "backend-team", "members": ["id3"]}', category: 'Groups', args: [
-      { name: 'group', type: 'string', required: true, description: 'Group name' },
-      { name: 'members', type: 'string[]', required: true, description: 'Agent IDs to add' },
-    ] } },
-    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d), help: { description: 'Remove members from a group', example: 'REMOVE_FROM_GROUP {"group": "backend-team", "members": ["id2"]}', category: 'Groups', args: [
-      { name: 'group', type: 'string', required: true, description: 'Group name' },
-      { name: 'members', type: 'string[]', required: true, description: 'Agent IDs to remove' },
-    ] } },
-    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MESSAGE', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups', args: [
-      { name: 'group', type: 'string', required: true, description: 'Group name' },
-      { name: 'content', type: 'string', required: true, description: 'Message content' },
-    ] } },
+    { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MESSAGE', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication', args: deriveArgs(agentMessageSchema) } },
+    { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d), help: { description: 'Send a message to all agents', example: 'BROADCAST {"content": "attention everyone..."}', category: 'Communication', args: deriveArgs(broadcastSchema) } },
+    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d), help: { description: 'Create a chat group', example: 'CREATE_GROUP {"name": "backend-team", "members": ["id1", "id2"]}', category: 'Groups', args: deriveArgs(createGroupSchema) } },
+    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d), help: { description: 'Add members to a group', example: 'ADD_TO_GROUP {"group": "backend-team", "members": ["id3"]}', category: 'Groups', args: deriveArgs(addToGroupSchema) } },
+    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d), help: { description: 'Remove members from a group', example: 'REMOVE_FROM_GROUP {"group": "backend-team", "members": ["id2"]}', category: 'Groups', args: deriveArgs(removeFromGroupSchema) } },
+    { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MESSAGE', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups', args: deriveArgs(groupMessageSchema) } },
     { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
     { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a), help: { description: 'List all groups you belong to', example: 'QUERY_GROUPS {}', category: 'Groups' } },
-    { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication', args: [
-      { name: 'to', type: 'string', required: true, description: 'Agent ID or role name' },
-      { name: 'content', type: 'string', required: true, description: 'Urgent message content' },
-    ] } },
+    { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication', args: deriveArgs(interruptSchema) } },
     { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
   ];
 }

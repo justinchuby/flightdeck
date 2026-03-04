@@ -17,6 +17,7 @@ import {
   addDependencySchema,
   assignTaskSchema,
 } from './commandSchemas.js';
+import { deriveArgs } from './CommandHelp.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -523,53 +524,19 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
 
 export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => handleDeclareTasks(ctx, a, d), help: { description: 'Declare a set of tasks with dependencies', example: 'DECLARE_TASKS {"tasks": [{"taskId": "task-1", "role": "developer", "description": "..."}]}', category: 'Task DAG', args: [
-      { name: 'tasks', type: 'array', required: true, description: 'Array of {taskId, role, description?, dependsOn?, files?, status?, priority?}' },
-    ] } },
-    { regex: COMPLETE_TASK_REGEX, name: 'COMPLETE_TASK', handler: (a, d) => handleCompleteTask(ctx, a, d), help: { description: 'Mark a task as done', example: 'COMPLETE_TASK {"summary": "what was accomplished"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: false, description: 'Task ID (auto-detected if omitted)' },
-      { name: 'summary', type: 'string', required: false, description: 'What was accomplished' },
-      { name: 'status', type: 'string', required: false, description: 'Final status' },
-      { name: 'output', type: 'string', required: false, description: 'Output to include' },
-    ] } },
+    { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => handleDeclareTasks(ctx, a, d), help: { description: 'Declare a set of tasks with dependencies', example: 'DECLARE_TASKS {"tasks": [{"taskId": "task-1", "role": "developer", "description": "..."}]}', category: 'Task DAG', args: deriveArgs(declareTasksSchema) } },
+    { regex: COMPLETE_TASK_REGEX, name: 'COMPLETE_TASK', handler: (a, d) => handleCompleteTask(ctx, a, d), help: { description: 'Mark a task as done', example: 'COMPLETE_TASK {"summary": "what was accomplished"}', category: 'Task DAG', args: deriveArgs(completeTaskSchema) } },
     { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => handleTaskStatus(ctx, a, _d), help: { description: 'View the task DAG status', example: 'TASK_STATUS {}', category: 'Task DAG' } },
     { regex: QUERY_TASKS_REGEX, name: 'QUERY_TASKS', handler: (a, _d) => handleTaskStatus(ctx, a, _d) },
-    { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => handlePauseTask(ctx, a, d), help: { description: 'Pause a task', example: 'PAUSE_TASK {"taskId": "task-1"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to pause' },
-    ] } },
-    { regex: RETRY_TASK_REGEX, name: 'RETRY_TASK', handler: (a, d) => handleRetryTask(ctx, a, d), help: { description: 'Retry a failed task', example: 'RETRY_TASK {"taskId": "task-1"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to retry' },
-    ] } },
-    { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => handleSkipTask(ctx, a, d), help: { description: 'Skip a task', example: 'SKIP_TASK {"taskId": "task-1"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to skip' },
-    ] } },
-    { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => handleAddTask(ctx, a, d), help: { description: 'Add a single task to the DAG', example: 'ADD_TASK {"taskId": "task-2", "role": "developer", "description": "..."}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Unique task ID' },
-      { name: 'role', type: 'string', required: true, description: 'Role for this task' },
-      { name: 'description', type: 'string', required: false, description: 'Task description' },
-      { name: 'dependsOn', type: 'string[]', required: false, description: 'Task IDs this depends on' },
-      { name: 'files', type: 'string[]', required: false, description: 'Files involved' },
-      { name: 'status', type: 'string', required: false, description: 'Initial status' },
-      { name: 'priority', type: 'number', required: false, description: 'Priority level' },
-    ] } },
-    { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => handleCancelTask(ctx, a, d), help: { description: 'Cancel a task', example: 'CANCEL_TASK {"taskId": "task-1"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to cancel' },
-    ] } },
+    { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => handlePauseTask(ctx, a, d), help: { description: 'Pause a task', example: 'PAUSE_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
+    { regex: RETRY_TASK_REGEX, name: 'RETRY_TASK', handler: (a, d) => handleRetryTask(ctx, a, d), help: { description: 'Retry a failed task', example: 'RETRY_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
+    { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => handleSkipTask(ctx, a, d), help: { description: 'Skip a task', example: 'SKIP_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
+    { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => handleAddTask(ctx, a, d), help: { description: 'Add a single task to the DAG', example: 'ADD_TASK {"taskId": "task-2", "role": "developer", "description": "..."}', category: 'Task DAG', args: deriveArgs(addTaskSchema) } },
+    { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => handleCancelTask(ctx, a, d), help: { description: 'Cancel a task', example: 'CANCEL_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d), help: { description: 'Reset the entire task DAG', example: 'RESET_DAG {}', category: 'Task DAG' } },
-    { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"taskId": "task-2", "dependsOn": ["task-1"]}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task that needs the dependency' },
-      { name: 'dependsOn', type: 'string[]', required: true, description: 'Task IDs it depends on' },
-    ] } },
-    { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d), help: { description: 'Force a task to ready status', example: 'FORCE_READY {"taskId": "task-1"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to force ready' },
-    ] } },
-    { regex: ASSIGN_TASK_REGEX, name: 'ASSIGN_TASK', handler: (a, d) => handleAssignTask(ctx, a, d), help: { description: 'Assign a task to a specific agent', example: 'ASSIGN_TASK {"taskId": "task-2", "agentId": "agent-id"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to assign' },
-      { name: 'agentId', type: 'string', required: true, description: 'Target agent ID' },
-    ] } },
-    { regex: REASSIGN_TASK_REGEX, name: 'REASSIGN_TASK', handler: (a, d) => handleReassignTask(ctx, a, d), help: { description: 'Reassign a task to a different agent', example: 'REASSIGN_TASK {"taskId": "task-2", "agentId": "new-agent-id"}', category: 'Task DAG', args: [
-      { name: 'taskId', type: 'string', required: true, description: 'Task ID to reassign' },
-      { name: 'agentId', type: 'string', required: true, description: 'New agent ID' },
-    ] } },
+    { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"taskId": "task-2", "dependsOn": ["task-1"]}', category: 'Task DAG', args: deriveArgs(addDependencySchema) } },
+    { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d), help: { description: 'Force a task to ready status', example: 'FORCE_READY {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
+    { regex: ASSIGN_TASK_REGEX, name: 'ASSIGN_TASK', handler: (a, d) => handleAssignTask(ctx, a, d), help: { description: 'Assign a task to a specific agent', example: 'ASSIGN_TASK {"taskId": "task-2", "agentId": "agent-id"}', category: 'Task DAG', args: deriveArgs(assignTaskSchema) } },
+    { regex: REASSIGN_TASK_REGEX, name: 'REASSIGN_TASK', handler: (a, d) => handleReassignTask(ctx, a, d), help: { description: 'Reassign a task to a different agent', example: 'REASSIGN_TASK {"taskId": "task-2", "agentId": "new-agent-id"}', category: 'Task DAG', args: deriveArgs(assignTaskSchema) } },
   ];
 }

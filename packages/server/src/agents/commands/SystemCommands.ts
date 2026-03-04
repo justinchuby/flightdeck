@@ -9,6 +9,7 @@ import type { MemoryEntry } from '../AgentMemory.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.js';
+import { deriveArgs } from './CommandHelp.js';
 import { formatQueryCrew } from '../../coordination/CrewFormatter.js';
 import type { CrewMember } from '../../coordination/CrewFormatter.js';
 
@@ -161,9 +162,6 @@ export function getSystemCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a), help: { description: 'Get current crew status', example: 'QUERY_CREW {}', category: 'System' } },
     { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a), help: { description: 'Stop heartbeat reminder nudges', example: 'HALT_HEARTBEAT {}', category: 'System' } },
-    { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d), help: { description: 'Request a change to concurrency limits', example: 'REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "need more agents"}', category: 'System', args: [
-      { name: 'limit', type: 'number', required: true, description: 'New agent concurrency limit (1-100)' },
-      { name: 'reason', type: 'string', required: false, description: 'Why the increase is needed' },
-    ] } },
+    { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d), help: { description: 'Request a change to concurrency limits', example: 'REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "need more agents"}', category: 'System', args: deriveArgs(requestLimitChangeSchema) } },
   ];
 }

@@ -6,6 +6,7 @@
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
+import { deriveArgs } from './CommandHelp.js';
 import {
   parseCommandPayload,
   setTimerSchema,
@@ -57,7 +58,7 @@ function handleCancelTimer(ctx: CommandHandlerContext, agent: Agent, data: strin
   try {
     const req = parseCommandPayload(agent, match[1], cancelTimerSchema, 'CANCEL_TIMER');
     if (!req) return;
-    const timerId = (req.id || req.label)!;
+    const timerId = (req.timerId || req.label)!;
     // timerId is guaranteed non-empty by the schema's refine check
 
     // Try by ID first, then by label
@@ -107,16 +108,8 @@ function handleListTimers(ctx: CommandHandlerContext, agent: Agent, _data: strin
 export function getTimerCommands(ctx: CommandHandlerContext): CommandEntry[] {
   if (!ctx.timerRegistry) return [];
   return [
-    { regex: SET_TIMER_REGEX, name: 'SET_TIMER', handler: (a, d) => handleSetTimer(ctx, a, d), help: { description: 'Set a reminder timer', example: 'SET_TIMER {"label": "check-build", "delay": 300, "message": "Check build status"}', category: 'Timers', args: [
-      { name: 'label', type: 'string', required: true, description: 'Timer name' },
-      { name: 'delay', type: 'number|string', required: true, description: 'Seconds or duration (e.g. "5m", "2h")' },
-      { name: 'message', type: 'string', required: true, description: 'Message delivered when timer fires' },
-      { name: 'repeat', type: 'boolean', required: false, description: 'Repeat after each delay', default: 'false' },
-    ] } },
-    { regex: CANCEL_TIMER_REGEX, name: 'CANCEL_TIMER', handler: (a, d) => handleCancelTimer(ctx, a, d), help: { description: 'Cancel a timer', example: 'CANCEL_TIMER {"label": "check-build"}', category: 'Timers', args: [
-      { name: 'id', type: 'string', required: false, description: 'Timer ID' },
-      { name: 'label', type: 'string', required: false, description: 'Timer label (either id or label required)' },
-    ] } },
+    { regex: SET_TIMER_REGEX, name: 'SET_TIMER', handler: (a, d) => handleSetTimer(ctx, a, d), help: { description: 'Set a reminder timer', example: 'SET_TIMER {"label": "check-build", "delay": 300, "message": "Check build status"}', category: 'Timers', args: deriveArgs(setTimerSchema) } },
+    { regex: CANCEL_TIMER_REGEX, name: 'CANCEL_TIMER', handler: (a, d) => handleCancelTimer(ctx, a, d), help: { description: 'Cancel a timer', example: 'CANCEL_TIMER {"label": "check-build"}', category: 'Timers', args: deriveArgs(cancelTimerSchema) } },
     { regex: LIST_TIMERS_REGEX, name: 'LIST_TIMERS', handler: (a, d) => handleListTimers(ctx, a, d), help: { description: 'List active timers', example: 'LIST_TIMERS {}', category: 'Timers' } },
   ];
 }

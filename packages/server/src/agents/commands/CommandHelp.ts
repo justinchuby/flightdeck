@@ -7,6 +7,7 @@
  */
 
 import type { CommandEntry, CommandArg } from './types.js';
+import { z } from 'zod';
 
 export interface CommandRef {
   name: string;
@@ -37,6 +38,95 @@ let registeredPatterns: CommandEntry[] = [];
 /** Called by CommandDispatcher to register patterns for help generation. */
 export function setRegisteredPatterns(patterns: CommandEntry[]): void {
   registeredPatterns = patterns;
+}
+
+// ── Zod→CommandArg derivation ────────────────────────────────────────
+
+// Zod internal _def access — these are runtime properties not exposed in types
+type ZodDef = Record<string, any>;
+
+/** Unwrap optional/nullable wrappers to get the inner Zod type. */
+function unwrapOptional(field: z.ZodType): z.ZodType {
+  const def = field._def as ZodDef;
+  if (def?.type === 'optional' || def?.type === 'nullable') {
+    return unwrapOptional(def.innerType);
+  }
+  return field;
+}
+
+/** Get the description from a Zod field, checking outer wrapper and inner type. */
+function getDescription(field: z.ZodType): string | undefined {
+  if (field.description) return field.description;
+  const def = field._def as ZodDef;
+  if (def?.type === 'optional' || def?.type === 'nullable') {
+    return def.innerType?.description;
+  }
+  return undefined;
+}
+
+/** Derive a human-readable type name from a Zod field. */
+function deriveTypeName(field: z.ZodType): string {
+  const inner = unwrapOptional(field);
+  const def = inner._def as ZodDef;
+  const defType = def?.type as string | undefined;
+
+  switch (defType) {
+    case 'string': return 'string';
+    case 'number': return 'number';
+    case 'boolean': return 'boolean';
+    case 'array': return 'array';
+    case 'record': return 'object';
+    case 'enum': return 'string';
+    case 'union': {
+      const options = def.options as z.ZodType[] | undefined;
+      if (options) {
+        const types = options.map((o: z.ZodType) => (o._def as ZodDef)?.type as string).filter(Boolean);
+        const unique = [...new Set(types)];
+        return unique.join(' | ') || 'unknown';
+      }
+      return 'unknown';
+    }
+    case 'pipe': {
+      const input = def.in as z.ZodType | undefined;
+      if (input) return deriveTypeName(input);
+      return 'unknown';
+    }
+    default: return defType || 'unknown';
+  }
+}
+
+/**
+ * Derive CommandArg[] from a Zod object schema.
+ * Walks schema.shape and extracts name, type, required, and description for each field.
+ */
+export function deriveArgs(schema: z.ZodObject<any>): CommandArg[] {
+  // Handle .refine() wrappers — get the underlying object schema
+  const shape = schema.shape as Record<string, z.ZodType>;
+  const args: CommandArg[] = [];
+
+  for (const [name, field] of Object.entries(shape)) {
+    args.push({
+      name,
+      type: deriveTypeName(field),
+      required: !field.isOptional(),
+      description: getDescription(field) ?? name,
+    });
+  }
+
+  return args;
+}
+
+/**
+ * Convenience: derive help metadata from a Zod schema.
+ * Returns { description, args, category } — spread into CommandEntry.help.
+ * Example: `help: { ...deriveHelp(schema, 'Send a message', 'Communication'), example: '...' }`
+ */
+export function deriveHelp(
+  schema: z.ZodObject<any>,
+  description: string,
+  category: string,
+): { description: string; args: CommandArg[]; category: string } {
+  return { description, args: deriveArgs(schema), category };
 }
 
 /** Build grouped reference from registered patterns' help metadata. */
