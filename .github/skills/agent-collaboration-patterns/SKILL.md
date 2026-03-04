@@ -22,19 +22,17 @@ Be aware of these constraints when applying the patterns below:
 
 ## Pattern 1: Architect-First Codebase Mapping
 
-**What:** Before any code is written, have the architect explore the codebase scoped to the assigned issues and produce a targeted map with files, methods, line numbers, and proposed fixes.
+**What:** Before any code is written, have the architect explore the codebase thoroughly — reading all assigned issues, understanding the architecture, identifying key files, and producing a detailed map with files, methods, line numbers, and proposed fixes.
 
-**Scope guidance:** Limit the architect's exploration to packages/directories that the issues reference. For large codebases (100K+ files), do NOT explore the entire repo — focus on the relevant modules. Budget 5 minutes maximum for the mapping phase.
-
-**Why it works:** 5 minutes of architect analysis saved ~30 minutes of cumulative developer exploration (6 developers × 5 minutes each). The map also ensures consistent approaches — e.g., all developers agreed on `'terminated'` as the status string rather than each choosing their own.
+**Why it works:** Thorough architect analysis saved ~30 minutes of cumulative developer exploration time (6 developers × 5 minutes each). Every developer referenced the architect's map before starting work, eliminating the "explore and discover" phase that each would have done independently. The map also ensures consistent approaches — e.g., all developers agreed on `'terminated'` as the status string rather than each choosing their own.
 
 **How to do it:**
-1. Architect reads all issues and explores relevant directories.
+1. Architect reads all issues and explores the codebase to understand the architecture and patterns.
 2. Architect produces a map file at `.flightdeck/shared/architect-<id>/issue-map.md`.
 3. Every developer's delegation prompt includes: "Read the architect map at [path] before starting."
-4. The map should include: file paths, function/method names, approximate line numbers, and the proposed change.
+4. The map should include: file paths, function/method names, line numbers, and the proposed change.
 
-**Important:** The architect's map is a starting point, not a contract. Developers should verify line numbers and proposed approaches against current code (line numbers shift after other agents commit). If a developer finds the map is wrong, they should message the architect and the lead immediately.
+**When the map is wrong:** Line numbers shift after other agents commit, and proposed fixes may not account for everything. Developers should verify against current code. If a developer finds the map is wrong, they should message the architect and the lead immediately so the map can be updated for other developers.
 
 **Example entry from the retro's map:**
 ```
