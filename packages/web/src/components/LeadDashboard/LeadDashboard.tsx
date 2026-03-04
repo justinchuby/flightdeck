@@ -3206,7 +3206,7 @@ function AgentTextBlock({ text }: { text: string }) {
   );
 }
 
-/** Detect markdown tables and render them; pass other text to InlineMarkdown */
+/** Detect markdown tables and code fences, render them; pass other text to InlineMarkdown */
 function MarkdownWithTables({ text }: { text: string }) {
   // Match contiguous lines that look like table rows (start with |)
   const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
@@ -3220,7 +3220,32 @@ function MarkdownWithTables({ text }: { text: string }) {
           return <MarkdownTable key={i} raw={trimmed} />;
         }
         if (!trimmed) return null;
-        return <InlineMarkdown key={i} text={part} />;
+        return <BlockMarkdown key={i} text={part} />;
+      })}
+    </>
+  );
+}
+
+/** Block-level markdown: splits on fenced code blocks, delegates non-code to InlineMarkdown */
+function BlockMarkdown({ text }: { text: string }) {
+  const CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
+  const segments = text.split(CODE_BLOCK_RE);
+  if (segments.length === 1) return <InlineMarkdown text={text} />;
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('```') && seg.endsWith('```')) {
+          const inner = seg.slice(3, -3);
+          const newlineIdx = inner.indexOf('\n');
+          const content = newlineIdx >= 0 ? inner.slice(newlineIdx + 1) : inner;
+          return (
+            <pre key={i} className="bg-th-bg-alt border border-th-border rounded-md px-3 py-2 my-1.5 overflow-x-auto text-xs font-mono text-th-text-alt whitespace-pre">
+              <code>{content}</code>
+            </pre>
+          );
+        }
+        if (!seg.trim()) return null;
+        return <InlineMarkdown key={i} text={seg} />;
       })}
     </>
   );

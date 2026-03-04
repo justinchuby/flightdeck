@@ -450,7 +450,7 @@ function AgentTextBlockSimple({ text }: { text: string }) {
             return <CollapsibleCommandBlockSimple key={i} text={seg} />;
           }
           // Not a real command — render as plain text
-          return <InlineMarkdownSimple key={i} text={seg} />;
+          return <BlockMarkdownSimple key={i} text={seg} />;
         }
         // Unclosed ⟦ block
         if (seg.includes('⟦') && !seg.includes('⟧')) {
@@ -460,13 +460,13 @@ function AgentTextBlockSimple({ text }: { text: string }) {
           if (isRealCommandBlock(cmdBlock)) {
             return (
               <span key={i}>
-                {before.trim() ? <InlineMarkdownSimple text={before} /> : null}
+                {before.trim() ? <BlockMarkdownSimple text={before} /> : null}
                 <CollapsibleCommandBlockSimple text={cmdBlock} />
               </span>
             );
           }
           // Not a real command — render entire segment as text
-          return seg.trim() ? <InlineMarkdownSimple key={i} text={seg} /> : null;
+          return seg.trim() ? <BlockMarkdownSimple key={i} text={seg} /> : null;
         }
         if (!seg.trim()) return null;
         // Check for tables
@@ -480,7 +480,7 @@ function AgentTextBlockSimple({ text }: { text: string }) {
                 return <SimpleTable key={j} raw={trimmed} />;
               }
               if (!trimmed) return null;
-              return <InlineMarkdownSimple key={j} text={part} />;
+              return <BlockMarkdownSimple key={j} text={part} />;
             })}
           </span>
         );
@@ -493,6 +493,32 @@ function AgentTextBlockSimple({ text }: { text: string }) {
 function InlineMarkdownSimple({ text }: { text: string }) {
   const agents = useAppStore((s) => s.agents);
   return <InlineMarkdownWithMentions text={text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />;
+}
+
+/** Block-level markdown: splits on fenced code blocks, delegates non-code to InlineMarkdownSimple */
+function BlockMarkdownSimple({ text }: { text: string }) {
+  const CODE_BLOCK_RE = /(```[\s\S]*?```)/g;
+  const segments = text.split(CODE_BLOCK_RE);
+  if (segments.length === 1) return <InlineMarkdownSimple text={text} />;
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.startsWith('```') && seg.endsWith('```')) {
+          const inner = seg.slice(3, -3);
+          const newlineIdx = inner.indexOf('\n');
+          const lang = newlineIdx >= 0 ? inner.slice(0, newlineIdx).trim() : '';
+          const content = newlineIdx >= 0 ? inner.slice(newlineIdx + 1) : inner;
+          return (
+            <pre key={i} className="bg-th-bg-alt border border-th-border rounded-md px-3 py-2 my-1.5 overflow-x-auto text-xs font-mono text-th-text-alt whitespace-pre" data-lang={lang || undefined}>
+              <code>{content}</code>
+            </pre>
+          );
+        }
+        if (!seg.trim()) return null;
+        return <InlineMarkdownSimple key={i} text={seg} />;
+      })}
+    </>
+  );
 }
 
 /** Simple markdown table renderer */
