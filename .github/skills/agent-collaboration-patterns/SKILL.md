@@ -1,6 +1,6 @@
 ---
 name: agent-collaboration-patterns
-description: Proven collaboration patterns for flightdeck-based multi-agent crews. Covers architect-first mapping, dual review, file lock coordination, context pressure, and DAG management. Use when planning any crew session with 3+ agents.
+description: Proven collaboration patterns for flightdeck-based multi-agent crews. Covers architect-first mapping, triple review, file lock coordination, context pressure, and DAG management. Use when planning any crew session with 3+ agents.
 ---
 
 # Agent Collaboration Patterns
@@ -43,15 +43,16 @@ Be aware of these constraints when applying the patterns below:
 - Fix: Add state guards — throw if task is already in terminal state
 ```
 
-## Pattern 2: Dual Reviewer Pattern (Correctness + Security)
+## Pattern 2: Triple Reviewer Pattern (Correctness + Security + Readability)
 
-**What:** Use two reviewers with different focuses:
-- **Code Reviewer:** "Does it work? Does it match the requirements?"
-- **Critical Reviewer:** "What breaks? What are the edge cases and security implications?"
+**What:** Use three reviewers with different focuses:
+- **Code Reviewer:** "Does it work? Does it match the requirements? Are patterns and conventions followed?"
+- **Critical Reviewer:** "What breaks? What are the edge cases, security implications, and failure modes?"
+- **Readability Reviewer:** "Is the code clear and self-documenting? Are names descriptive? Are error messages helpful? Is it easy for the next developer (human or AI) to understand?"
 
-**Why it works:** In the retro, the code reviewer approved both initial implementations. The critical reviewer then found a **P0 blocker** the code reviewer missed: the frontend `AgentStatus` type didn't include `'terminated'`, meaning the server would emit a status the frontend couldn't handle.
+**Why it works:** In the retro, the code reviewer approved both initial implementations. The critical reviewer then found a **P0 blocker** the code reviewer missed: the frontend `AgentStatus` type didn't include `'terminated'`, meaning the server would emit a status the frontend couldn't handle. Adding a readability reviewer catches a third class of issues — code that works correctly and securely but is hard to maintain, poorly named, or lacking helpful error messages.
 
-**When to use dual review:** Assign both reviewer types when changes modify both client-facing types AND server-side logic, or when a contract (API, type definition, event schema) is modified. For single-file bug fixes within one package, one reviewer suffices.
+**When to use triple review:** Assign all three reviewer types for implementation work. When changes modify cross-package contracts (API, type definitions, event schemas), triple review is especially important. For documentation-only or config-only changes, a single reviewer may suffice.
 
 ## Pattern 3: Broadcast-Then-Refactor for Cross-Cutting Concerns
 
@@ -137,5 +138,5 @@ Be aware of these constraints when applying the patterns below:
 - [ ] Create a DAG with `DECLARE_TASKS` and assign someone to keep it updated.
 - [ ] Check `QUERY_TASKS` before delegating to avoid duplicate assignments.
 - [ ] Plan explicit sequencing for shared files (who goes first, second, third).
-- [ ] Assign dual reviewers for changes that cross package boundaries or modify contracts.
+- [ ] Assign triple reviewers (code, critical, readability) for implementation work.
 - [ ] Use `DEFER_ISSUE` for findings that won't be addressed this session; batch-file GitHub issues at session end.
