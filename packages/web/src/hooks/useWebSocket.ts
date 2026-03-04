@@ -171,16 +171,19 @@ export function useWebSocket() {
         case 'agent:message_sent': {
           // Show incoming messages in the recipient agent's chat panel
           const toId = msg.to;
+          const fromId = msg.from;
+          const isFromSystem = fromId === 'system';
+          const senderLabel = msg.fromRole
+            ? `${msg.fromRole} (${(fromId ?? '').slice(0, 8)})`
+            : fromId?.slice(0, 8) || 'System';
+          const preview = (msg.content ?? '').slice(0, 2000);
+
+          // Show in recipient's panel
           if (toId && toId !== 'system') {
             const state = useAppStore.getState();
             const recipient = state.agents.find((a) => a.id === toId);
             if (recipient) {
               const msgs = [...(recipient.messages ?? [])];
-              const isFromSystem = msg.from === 'system';
-              const senderLabel = msg.fromRole
-                ? `${msg.fromRole} (${(msg.from ?? '').slice(0, 8)})`
-                : msg.from?.slice(0, 8) || 'System';
-              const preview = (msg.content ?? '').slice(0, 2000);
               msgs.push({
                 type: 'text',
                 text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
@@ -188,6 +191,31 @@ export function useWebSocket() {
                 timestamp: Date.now(),
               });
               updateAgent(toId, { messages: msgs });
+            }
+          }
+
+          // Also show in sender's panel so both sides see the DM
+          if (fromId && fromId !== 'system' && toId !== fromId) {
+            const state = useAppStore.getState();
+            const sender = state.agents.find((a) => a.id === fromId);
+            if (sender) {
+              const isBroadcast = toId === 'all';
+              const recipientLabel = isBroadcast
+                ? 'All'
+                : (() => {
+                    const toAgent = state.agents.find((a) => a.id === toId);
+                    return toAgent?.role?.name
+                      ? `${toAgent.role.name} (${(toId ?? '').slice(0, 8)})`
+                      : (toId ?? '').slice(0, 8);
+                  })();
+              const msgs = [...(sender.messages ?? [])];
+              msgs.push({
+                type: 'text',
+                text: `📤 [To ${recipientLabel}] ${preview}`,
+                sender: 'system' as any,
+                timestamp: Date.now(),
+              });
+              updateAgent(fromId, { messages: msgs });
             }
           }
           break;

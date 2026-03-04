@@ -90,6 +90,13 @@ export function ChatPanel({ agentId, ws }: Props) {
     const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
     const isAgentBusy = existing?.status === 'running';
     const msgs = [...(existing?.messages ?? [])];
+    // For interrupts, insert a separator so the post-interrupt response appears as a new bubble
+    if (mode === 'interrupt' && isAgentBusy) {
+      const last = msgs[msgs.length - 1];
+      if (last?.sender === 'agent') {
+        msgs.push({ type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      }
+    }
     msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
     useAppStore.getState().updateAgent(agentId, { messages: msgs });
 

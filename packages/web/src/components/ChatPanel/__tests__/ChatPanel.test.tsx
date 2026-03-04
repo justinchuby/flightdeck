@@ -132,6 +132,69 @@ describe('ChatPanel', () => {
     expect(lastMsg?.queued).toBeFalsy();
   });
 
+  it('inserts a separator before user message when interrupting a busy agent', () => {
+    // Seed agent with an existing agent message so separator is needed
+    useAppStore.getState().setAgents([
+      {
+        id: AGENT_ID,
+        role: { id: 'developer', name: 'Developer', icon: '💻' },
+        status: 'running',
+        messages: [{ type: 'text', text: 'previous response', sender: 'agent', timestamp: 1000 }],
+        childIds: [],
+        inputTokens: 0,
+        outputTokens: 0,
+        contextWindowSize: 0,
+        contextWindowUsed: 0,
+      } as any,
+    ]);
+    const ws = makeWs();
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+    fireEvent.change(textarea, { target: { value: 'urgent fix' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
+
+    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
+    const msgs = agent?.messages ?? [];
+    // Should have: [agent msg, separator, user msg]
+    expect(msgs).toHaveLength(3);
+    expect(msgs[0].sender).toBe('agent');
+    expect(msgs[1].text).toBe('---');
+    expect(msgs[1].sender).toBe('system');
+    expect(msgs[2].sender).toBe('user');
+    expect(msgs[2].text).toBe('urgent fix');
+  });
+
+  it('does NOT insert separator when interrupting if last message is not from agent', () => {
+    // Seed agent with a user message as last
+    useAppStore.getState().setAgents([
+      {
+        id: AGENT_ID,
+        role: { id: 'developer', name: 'Developer', icon: '💻' },
+        status: 'running',
+        messages: [{ type: 'text', text: 'user question', sender: 'user', timestamp: 1000 }],
+        childIds: [],
+        inputTokens: 0,
+        outputTokens: 0,
+        contextWindowSize: 0,
+        contextWindowUsed: 0,
+      } as any,
+    ]);
+    const ws = makeWs();
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+
+    const textarea = screen.getByPlaceholderText(/Type a message/);
+    fireEvent.change(textarea, { target: { value: 'interrupt' } });
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
+
+    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
+    const msgs = agent?.messages ?? [];
+    // Should have: [user msg, user msg] — no separator needed
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0].sender).toBe('user');
+    expect(msgs[1].sender).toBe('user');
+  });
+
   it('sends to @mentioned agents via REST API', () => {
     const OTHER_ID = 'bbbb2222-3333-4444-5555-666677778888';
     useAppStore.getState().setAgents([

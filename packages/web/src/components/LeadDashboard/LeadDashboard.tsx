@@ -487,6 +487,36 @@ export function LeadDashboard({ api, ws }: Props) {
               timestamp: Date.now(),
             });
           }
+
+          // Surface DMs and broadcasts in the lead chat panel
+          const preview = (msg.content ?? '').slice(0, 2000);
+          const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
+          const senderId = (msg.from ?? '').slice(0, 8);
+          if (msg.from === 'system') {
+            store.addMessage(leadId, {
+              type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else if (isBroadcast) {
+            store.addMessage(leadId, {
+              type: 'text', text: `📢 [${senderRole} ${senderId} → All] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else if (msg.to === leadId) {
+            store.addMessage(leadId, {
+              type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else if (msg.from === leadId) {
+            const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
+            const recipientId = (msg.to ?? '').slice(0, 8);
+            store.addMessage(leadId, {
+              type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          } else {
+            const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
+            const recipientId = (msg.to ?? '').slice(0, 8);
+            store.addMessage(leadId, {
+              type: 'text', text: `💬 [${senderRole} ${senderId} → ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
+            });
+          }
         }
       }
 
@@ -510,6 +540,17 @@ export function LeadDashboard({ api, ws }: Props) {
             content: gm.content ?? '',
             timestamp: Date.now(),
             type: 'group_message',
+          });
+          // Surface group messages in the lead chat panel
+          const senderRole = gm.fromRole || 'Agent';
+          const senderId = (gm.fromAgentId ?? '').slice(0, 8);
+          const groupName = msg.groupName || 'Group';
+          const preview = (gm.content ?? '').slice(0, 2000);
+          store.addMessage(selectedLeadId!, {
+            type: 'text',
+            text: `🗣️ [${groupName}: ${senderRole} ${senderId}] ${preview}`,
+            sender: 'system' as any,
+            timestamp: Date.now(),
           });
         }
       }
@@ -736,7 +777,17 @@ export function LeadDashboard({ api, ws }: Props) {
     if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
     setInput('');
-    useLeadStore.getState().addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
+    const store = useLeadStore.getState();
+    // For interrupts, insert a separator so post-interrupt response appears as a new bubble
+    if (mode === 'interrupt') {
+      const proj = store.projects[selectedLeadId];
+      const msgs = proj?.messages ?? [];
+      const last = msgs[msgs.length - 1];
+      if (last?.sender === 'agent') {
+        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      }
+    }
+    store.addMessage(selectedLeadId, { type: 'text', text, sender: 'user', queued: mode === 'queue', timestamp: Date.now() });
     await fetch(`/api/lead/${selectedLeadId}/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
