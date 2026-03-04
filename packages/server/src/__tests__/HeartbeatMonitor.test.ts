@@ -529,4 +529,46 @@ describe('HeartbeatMonitor', () => {
     expect(message).not.toContain('task-8'); // 9th task should not appear
     expect(message).toContain('... and 4 more');
   });
+
+  // ── Backoff logic ────────────────────────────────────────────────────
+
+  describe('shouldSkipNudge backoff', () => {
+    it('fires nudges 1-3 on every cycle', () => {
+      expect(monitor.shouldSkipNudge(1)).toBe(false);
+      expect(monitor.shouldSkipNudge(2)).toBe(false);
+      expect(monitor.shouldSkipNudge(3)).toBe(false);
+    });
+
+    it('fires nudges 4-6 only on even cycles (every 2nd)', () => {
+      expect(monitor.shouldSkipNudge(4)).toBe(false); // even → fire
+      expect(monitor.shouldSkipNudge(5)).toBe(true);  // odd → skip
+      expect(monitor.shouldSkipNudge(6)).toBe(false); // even → fire
+    });
+
+    it('fires nudges 7+ only every 3rd cycle', () => {
+      expect(monitor.shouldSkipNudge(7)).toBe(true);  // 7%3=1 → skip
+      expect(monitor.shouldSkipNudge(8)).toBe(true);  // 8%3=2 → skip
+      expect(monitor.shouldSkipNudge(9)).toBe(false); // 9%3=0 → fire
+      expect(monitor.shouldSkipNudge(10)).toBe(true); // 10%3=1 → skip
+      expect(monitor.shouldSkipNudge(11)).toBe(true); // 11%3=2 → skip
+      expect(monitor.shouldSkipNudge(12)).toBe(false); // 12%3=0 → fire
+    });
+  });
+
+  it('skips nudge delivery on backoff cycles', () => {
+    const delegation = makeDelegation({ fromAgentId: 'lead-1', status: 'active' });
+    const { lead } = setupStalledTeam({
+      delegations: [delegation],
+      dagSummary: makeDagSummary({ ready: 1 }),
+    });
+
+    // Fire 5 consecutive check cycles — nudges 1-3 fire, 4 fires (even), 5 skips (odd)
+    for (let i = 0; i < 5; i++) {
+      triggerCheck();
+      monitor.stop(); // stop interval before next cycle
+    }
+
+    // Nudges 1, 2, 3, 4 fire; nudge 5 is skipped → 4 messages total
+    expect((lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls.length).toBe(4);
+  });
 });

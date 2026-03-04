@@ -69,6 +69,16 @@ export class HeartbeatMonitor {
     this.humanInterrupted.add(agentId);
   }
 
+  /**
+   * Backoff: nudges 1-3 fire every cycle, 4-6 every 2nd cycle, 7+ every 3rd cycle.
+   * Returns true if this cycle should be skipped (no nudge sent).
+   */
+  shouldSkipNudge(nudgeCount: number): boolean {
+    if (nudgeCount <= 3) return false;
+    if (nudgeCount <= 6) return nudgeCount % 2 !== 0;
+    return nudgeCount % 3 !== 0;
+  }
+
   /** Periodic heartbeat check: detect stalled teams and nudge the lead */
   private check(): void {
     const leads = this.ctx.getAllAgents().filter((a) => a.role.id === 'lead' && a.status === 'idle');
@@ -113,6 +123,15 @@ export class HeartbeatMonitor {
       // All children are idle/completed but there is remaining work — nudge the lead
       const nudgeCount = (this.leadNudgeCount.get(lead.id) ?? 0) + 1;
       this.leadNudgeCount.set(lead.id, nudgeCount);
+
+      // Escalate after 5+ consecutive check cycles (fires regardless of backoff)
+      if (nudgeCount >= 5) {
+        logger.warn('lead', `Lead ${lead.id.slice(0, 8)} unresponsive after ${nudgeCount} reminders`);
+        this.ctx.emit('lead:stalled', { leadId: lead.id, nudgeCount, idleDuration });
+      }
+
+      // Backoff: skip nudge message based on count to reduce noise
+      if (this.shouldSkipNudge(nudgeCount)) continue;
 
       // Build actionable nudge message
       const parts: string[] = [];
@@ -163,12 +182,6 @@ export class HeartbeatMonitor {
         toRole: lead.role.name,
         content: nudge,
       });
-
-      // Only escalate after 5+ consecutive nudges (soft threshold)
-      if (nudgeCount >= 5) {
-        logger.warn('lead', `Lead ${lead.id.slice(0, 8)} unresponsive after ${nudgeCount} reminders`);
-        this.ctx.emit('lead:stalled', { leadId: lead.id, nudgeCount, idleDuration });
-      }
     }
   }
 }
