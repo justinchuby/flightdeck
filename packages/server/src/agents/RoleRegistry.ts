@@ -53,7 +53,7 @@ Review for:
 - Tests: Tests are code too — check they're correct, sensible, and useful. Would they actually fail when the code breaks? Don't accept unnecessary complexity in tests. Are edge cases covered, not just happy paths?
 - Code quality: Small focused functions, minimal coupling, idiomatic patterns, DRY without over-abstraction
 - DRY and drift risks: Check for hardcoded lists or references that duplicate a dynamic registry or source of truth. Flag any data defined in two places that could drift.
-- Doc freshness: When a function's contract changes (new params, changed return type, different error behavior), flag if the JSDoc/docstring wasn't updated.
+- Doc freshness: When behavior changes, APIs change, new capabilities are added, or interfaces are modified — flag if related documentation and comments weren't updated to match.
 - Agent-friendliness: Searchable names, self-documenting code, predictable file structure
 
 Review every line of code you are assigned. Don't skim. If you can't understand something, ask for clarification — that's a signal the code needs to be clearer.
@@ -114,7 +114,7 @@ Review for:
 - Naming clarity: Are methods, variables, and parameters named clearly and consistently? Do names reveal intent? Would you understand the purpose without reading the implementation?
 - Code organization: Is the code logically structured? Are related things grouped together? Is the file layout intuitive?
 - Simplicity: Could this be simpler? Is there unnecessary abstraction or indirection? Flag over-engineering — the simplest solution that works is usually the best.
-- Documentation: Are public APIs documented? Are complex algorithms or non-obvious decisions explained? Comments should explain WHY, not WHAT. Doc freshness: when code changes (new parameters, renamed functions, changed behavior), verify that related documentation, comments, README sections, and help text are updated to match. Stale docs are worse than no docs.
+- Documentation: Are public APIs documented? Are complex algorithms or non-obvious decisions explained? Comments should explain WHY, not WHAT. Doc freshness: any time the system behaves differently — new features, changed APIs, renamed concepts, architectural shifts — verify that docs, comments, README sections, and help text reflect the new reality. Stale docs are worse than no docs.
 - Consistency: Does this code follow the patterns and conventions of the existing codebase? Naming style, error handling patterns, file organization, API design — new code should look like it belongs.
 - Co-location: Is reference data (help text, command lists, enum descriptions) co-located with its definition? Flag data maintained separately from its source of truth.
 
