@@ -28,6 +28,8 @@ function createMocks() {
   const agentManager = Object.assign(new EventEmitter(), {
     getAll: vi.fn().mockReturnValue([]),
     get: vi.fn(),
+    getByProject: vi.fn().mockReturnValue([]),
+    getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
   });
   const lockRegistry = Object.assign(new EventEmitter(), {
     getByAgent: vi.fn().mockReturnValue([]),
@@ -145,7 +147,7 @@ describe('ContextRefresher', () => {
         '[2024-01-01T00:00:00Z] Agent abcdefgh (Developer): file_edit — Edited src/index.ts',
       );
       // Fetches 5x the limit to ensure smart filter has enough entries
-      expect(mocks.activityLedger.getRecent).toHaveBeenCalledWith(100);
+      expect(mocks.activityLedger.getRecent).toHaveBeenCalledWith(100, undefined);
     });
   });
 
