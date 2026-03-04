@@ -101,14 +101,29 @@ export function useWebSocket() {
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const msgs = [...(existing?.messages ?? [])];
-          const last = msgs[msgs.length - 1];
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
-          // If the last message has an unclosed ⟦ block, always append to keep commands intact
-          const lastText = last?.text ?? '';
-          const hasUnclosedCommand = lastText.lastIndexOf('⟦') > lastText.lastIndexOf('⟧');
-          if (last && (last.sender ?? 'agent') === 'agent' && (!needsNewline || hasUnclosedCommand)) {
-            msgs[msgs.length - 1] = { ...last, text: lastText + rawText, timestamp: last.timestamp || Date.now() };
+
+          // Find the last agent message, skipping over interleaved DM/group notifications.
+          // This prevents system notifications (📨, 📤, 🗣️) from fragmenting a streaming response.
+          let appendIdx = -1;
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            const m = msgs[i];
+            const sender = m.sender ?? 'agent';
+            if (sender === 'agent') {
+              appendIdx = i;
+              break;
+            }
+            // User messages, separators, and thinking blocks break the append chain
+            if (sender === 'user' || sender === 'thinking' || m.text === '---') break;
+            // System messages that are DM/group notifications are transparent — keep searching
+          }
+
+          const appendTarget = appendIdx >= 0 ? msgs[appendIdx] : null;
+          const appendText = appendTarget?.text ?? '';
+          const hasUnclosedCommand = appendText.lastIndexOf('⟦') > appendText.lastIndexOf('⟧');
+          if (appendTarget && (!needsNewline || hasUnclosedCommand)) {
+            msgs[appendIdx] = { ...appendTarget, text: appendText + rawText, timestamp: appendTarget.timestamp || Date.now() };
           } else {
             msgs.push({ type: 'text', text: rawText, sender: 'agent', timestamp: Date.now() });
           }
