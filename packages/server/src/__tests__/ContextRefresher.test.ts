@@ -719,7 +719,7 @@ describe('ContextRefresher', () => {
   });
 
   describe('lock activity routing', () => {
-    it('secretary receives RECENT LOCK ACTIVITY section', () => {
+    it('secretary receives RECENT LOCK DENIALS section (only lock_denied, not acquire/release)', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
@@ -754,6 +754,16 @@ describe('ContextRefresher', () => {
           details: {},
           projectId: '',
         },
+        {
+          id: 3,
+          agentId: 'dev-123456',
+          agentRole: 'developer',
+          actionType: 'lock_released',
+          summary: 'Released src/index.ts',
+          timestamp: '2026-01-01T00:02:00Z',
+          details: {},
+          projectId: '',
+        },
       ]);
       (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
         getAll: vi.fn().mockReturnValue([]),
@@ -767,12 +777,14 @@ describe('ContextRefresher', () => {
 
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
       const healthHeader = secretary.injectContextUpdate.mock.calls[0][2] as string;
-      expect(healthHeader).toContain('RECENT LOCK ACTIVITY');
-      expect(healthHeader).toContain('lock_acquired');
+      expect(healthHeader).toContain('RECENT LOCK DENIALS');
       expect(healthHeader).toContain('lock_denied');
+      // lock_acquired and lock_released should NOT appear in the lock denials section
+      expect(healthHeader).not.toContain('lock_acquired');
+      expect(healthHeader).not.toContain('lock_released');
     });
 
-    it('lead does NOT receive lock activity section', () => {
+    it('lead does NOT receive lock denials section', () => {
       const lead = makeAgent({
         id: 'lead-1',
         status: 'running',
@@ -791,8 +803,8 @@ describe('ContextRefresher', () => {
           id: 1,
           agentId: 'dev-123456',
           agentRole: 'developer',
-          actionType: 'lock_acquired',
-          summary: 'Locked src/index.ts',
+          actionType: 'lock_denied',
+          summary: 'Denied access to src/index.ts',
           timestamp: '2026-01-01T00:00:00Z',
           details: {},
           projectId: '',
@@ -810,7 +822,7 @@ describe('ContextRefresher', () => {
 
       expect(lead.injectContextUpdate).toHaveBeenCalledTimes(1);
       const healthHeader = lead.injectContextUpdate.mock.calls[0][2] as string;
-      expect(healthHeader).not.toContain('RECENT LOCK ACTIVITY');
+      expect(healthHeader).not.toContain('RECENT LOCK DENIALS');
     });
   });
 });

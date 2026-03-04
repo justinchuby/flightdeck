@@ -272,18 +272,17 @@ export class ContextRefresher {
     return alerts;
   }
 
-  /** Build recent lock event activity for the secretary's CREW_UPDATE. */
+  /** Build recent lock_denied activity for the secretary's CREW_UPDATE. */
   private buildLockActivity(): string {
-    const LOCK_ACTIONS = new Set(['lock_acquired', 'lock_denied', 'lock_released']);
     const entries = this.activityLedger.getRecent(50)
-      .filter(e => LOCK_ACTIONS.has(e.actionType));
+      .filter(e => e.actionType === 'lock_denied');
     if (entries.length === 0) return '';
 
     const lines = entries.slice(0, 10).map(e => {
       const shortId = e.agentId.slice(0, 8);
       return `[${e.timestamp}] ${shortId} (${e.agentRole}): ${e.actionType} — ${e.summary}`;
     });
-    return `== RECENT LOCK ACTIVITY ==\n${lines.join('\n')}`;
+    return `== RECENT LOCK DENIALS ==\n${lines.join('\n')}`;
   }
 
   /**
