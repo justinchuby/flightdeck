@@ -167,13 +167,19 @@ const mockLockRegistry = {
   release: vi.fn().mockReturnValue(true),
 };
 
+const allActivity = [
+  { id: 1, agentId: 'lead-aaa', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:00:00Z', projectId: 'proj-a' },
+  { id: 2, agentId: 'dev-a1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:01:00Z', projectId: 'proj-a' },
+  { id: 3, agentId: 'lead-bbb', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:02:00Z', projectId: 'proj-b' },
+  { id: 4, agentId: 'dev-b1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:03:00Z', projectId: 'proj-b' },
+];
+
+function filterActivity(entries: typeof allActivity, projectId?: string) {
+  return projectId ? entries.filter((e) => e.projectId === projectId) : entries;
+}
+
 const mockActivityLedger = {
-  getRecent: vi.fn().mockReturnValue([
-    { id: 1, agentId: 'lead-aaa', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:00:00Z' },
-    { id: 2, agentId: 'dev-a1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:01:00Z' },
-    { id: 3, agentId: 'lead-bbb', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:02:00Z' },
-    { id: 4, agentId: 'dev-b1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:03:00Z' },
-  ]),
+  getRecent: vi.fn((_limit?: number, projectId?: string) => filterActivity(allActivity, projectId)),
   getByAgent: vi.fn().mockReturnValue([]),
   getByType: vi.fn().mockReturnValue([]),
   getSince: vi.fn().mockReturnValue([]),
@@ -229,12 +235,7 @@ beforeEach(() => {
   mockAgentManager.getProjectIdForAgent.mockImplementation((agentId: string) => getProjectIdForAgent(agentId));
   mockLockRegistry.getAll.mockReturnValue(allLocks);
   mockLockRegistry.getByProject.mockImplementation((projectId: string) => allLocks.filter((l) => l.projectId === projectId));
-  mockActivityLedger.getRecent.mockReturnValue([
-    { id: 1, agentId: 'lead-aaa', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:00:00Z' },
-    { id: 2, agentId: 'dev-a1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:01:00Z' },
-    { id: 3, agentId: 'lead-bbb', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:02:00Z' },
-    { id: 4, agentId: 'dev-b1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:03:00Z' },
-  ]);
+  mockActivityLedger.getRecent.mockImplementation((_limit?: number, projectId?: string) => filterActivity(allActivity, projectId));
   mockDecisionLog.getAll.mockReturnValue([
     { id: 'd1', title: 'Decision A', projectId: 'proj-a', agentId: 'lead-aaa', leadId: 'lead-aaa', agentRole: 'lead', status: 'recorded' },
     { id: 'd2', title: 'Decision B', projectId: 'proj-b', agentId: 'lead-bbb', leadId: 'lead-bbb', agentRole: 'lead', status: 'recorded' },

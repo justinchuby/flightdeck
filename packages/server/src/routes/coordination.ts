@@ -52,21 +52,16 @@ export function coordinationRoutes(ctx: AppContext): Router {
   router.get('/coordination/activity', (req, res) => {
     const { agentId, type, limit, since, projectId } = req.query;
     const limitNum = limit ? Number(limit) : 50;
+    const pid = projectId as string | undefined;
     let activities;
     if (since) {
-      activities = activityLedger.getSince(since as string);
+      activities = activityLedger.getSince(since as string, pid);
     } else if (agentId) {
-      activities = activityLedger.getByAgent(agentId as string, limitNum);
+      activities = activityLedger.getByAgent(agentId as string, limitNum, pid);
     } else if (type) {
-      activities = activityLedger.getByType(type as ActionType, limitNum);
+      activities = activityLedger.getByType(type as ActionType, limitNum, pid);
     } else {
-      activities = activityLedger.getRecent(limitNum);
-    }
-    if (projectId) {
-      const projectAgentIds = new Set(
-        agentManager.getByProject(projectId as string).map(a => a.id),
-      );
-      activities = activities.filter((e: { agentId: string }) => projectAgentIds.has(e.agentId));
+      activities = activityLedger.getRecent(limitNum, pid);
     }
     res.json(activities);
   });
