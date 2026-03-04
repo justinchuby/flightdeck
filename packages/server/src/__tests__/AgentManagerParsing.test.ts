@@ -226,14 +226,14 @@ describe('AgentManager output parsing regexes', () => {
     it('matches a multi-line DECLARE_TASKS with nested task objects', () => {
       const input = `⟦⟦ DECLARE_TASKS {"tasks": [
   {"id": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"]},
-  {"id": "dead-fields", "role": "developer", "depends_on": ["rope-config"]}
+  {"id": "dead-fields", "role": "developer", "dependsOn": ["rope-config"]}
 ]} ⟧⟧`;
       const match = input.match(DECLARE_TASKS_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
       expect(parsed.tasks).toHaveLength(2);
       expect(parsed.tasks[0].files).toEqual(['src/_configs.py']);
-      expect(parsed.tasks[1].depends_on).toEqual(['rope-config']);
+      expect(parsed.tasks[1].dependsOn).toEqual(['rope-config']);
     });
 
     it('does not match without closing ⟧⟧', () => {
@@ -292,13 +292,13 @@ describe('AgentManager output parsing regexes', () => {
 
   describe('ADD_TASK_REGEX', () => {
     it('matches a valid ADD_TASK command', () => {
-      const input = '⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing"]} ⟧⟧';
+      const input = '⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "dependsOn": ["existing"]} ⟧⟧';
       const match = input.match(ADD_TASK_REGEX);
       expect(match).not.toBeNull();
       const parsed = JSON.parse(match![1]);
       expect(parsed.id).toBe('new-task');
       expect(parsed.role).toBe('developer');
-      expect(parsed.depends_on).toEqual(['existing']);
+      expect(parsed.dependsOn).toEqual(['existing']);
     });
   });
 

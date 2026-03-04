@@ -57,7 +57,7 @@ function handleDeclareTasks(ctx: CommandHandlerContext, agent: Agent, data: stri
       for (const c of conflicts) {
         msg += `\n  - ${c.file}: tasks [${c.tasks.join(', ')}]`;
       }
-      msg += '\nConsider adding depends_on between these tasks or confirming parallel execution.';
+      msg += '\nConsider adding dependsOn between these tasks or confirming parallel execution.';
     }
     const readyTasks = tasks.filter(t => t.dagStatus === 'ready');
     if (readyTasks.length > 0) {
@@ -94,7 +94,7 @@ function handleTaskStatus(ctx: CommandHandlerContext, agent: Agent, _data: strin
     msg += `\n  ${statusIcon} [${task.dagStatus.toUpperCase()}] ${task.id} (${task.role})`;
     if (task.description) msg += ` — ${task.description.slice(0, 80)}`;
     if (task.assignedAgentId) msg += ` [agent: ${task.assignedAgentId.slice(0, 8)}]`;
-    if (task.dependsOn.length > 0) msg += `\n      depends_on: [${task.dependsOn.join(', ')}]`;
+    if (task.dependsOn.length > 0) msg += `\n      dependsOn: [${task.dependsOn.join(', ')}]`;
     if (task.files.length > 0) msg += `\n      files: [${task.files.join(', ')}]`;
   }
   if (Object.keys(fileLockMap).length > 0) {
@@ -338,7 +338,7 @@ function handleAddDependency(ctx: CommandHandlerContext, agent: Agent, data: str
     }
 
     const results: string[] = [];
-    for (const depId of req.depends_on) {
+    for (const depId of req.dependsOn) {
       const added = ctx.taskDAG.addDependency(leadId, req.taskId, depId);
       if (added) {
         results.push(`✓ "${req.taskId}" → depends on "${depId}"`);
@@ -524,7 +524,7 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
 export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => handleDeclareTasks(ctx, a, d), help: { description: 'Declare a set of tasks with dependencies', example: 'DECLARE_TASKS {"tasks": [{"id": "task-1", "role": "developer", "description": "..."}]}', category: 'Task DAG', args: [
-      { name: 'tasks', type: 'array', required: true, description: 'Array of {id, role, description?, depends_on?, files?, status?, priority?}' },
+      { name: 'tasks', type: 'array', required: true, description: 'Array of {id, role, description?, dependsOn?, files?, status?, priority?}' },
     ] } },
     { regex: COMPLETE_TASK_REGEX, name: 'COMPLETE_TASK', handler: (a, d) => handleCompleteTask(ctx, a, d), help: { description: 'Mark a task as done', example: 'COMPLETE_TASK {"summary": "what was accomplished"}', category: 'Task DAG', args: [
       { name: 'id', type: 'string', required: false, description: 'Task ID (auto-detected if omitted)' },
@@ -547,7 +547,7 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
       { name: 'id', type: 'string', required: true, description: 'Unique task ID' },
       { name: 'role', type: 'string', required: true, description: 'Role for this task' },
       { name: 'description', type: 'string', required: false, description: 'Task description' },
-      { name: 'depends_on', type: 'string[]', required: false, description: 'Task IDs this depends on' },
+      { name: 'dependsOn', type: 'string[]', required: false, description: 'Task IDs this depends on' },
       { name: 'files', type: 'string[]', required: false, description: 'Files involved' },
       { name: 'status', type: 'string', required: false, description: 'Initial status' },
       { name: 'priority', type: 'number', required: false, description: 'Priority level' },
@@ -556,9 +556,9 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
       { name: 'id', type: 'string', required: true, description: 'Task ID to cancel' },
     ] } },
     { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d), help: { description: 'Reset the entire task DAG', example: 'RESET_DAG {}', category: 'Task DAG' } },
-    { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"taskId": "task-2", "depends_on": ["task-1"]}', category: 'Task DAG', args: [
+    { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"taskId": "task-2", "dependsOn": ["task-1"]}', category: 'Task DAG', args: [
       { name: 'taskId', type: 'string', required: true, description: 'Task that needs the dependency' },
-      { name: 'depends_on', type: 'string[]', required: true, description: 'Task IDs it depends on' },
+      { name: 'dependsOn', type: 'string[]', required: true, description: 'Task IDs it depends on' },
     ] } },
     { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d), help: { description: 'Force a task to ready status', example: 'FORCE_READY {"id": "task-1"}', category: 'Task DAG', args: [
       { name: 'id', type: 'string', required: true, description: 'Task ID to force ready' },

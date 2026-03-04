@@ -164,7 +164,7 @@ describe('dagDeclareSchema', () => {
     const result = dagDeclareSchema.safeParse({
       tasks: [
         { id: 'task-1', role: 'dev' },
-        { id: 'task-2', role: 'tester', description: 'test it', depends_on: ['task-1'] },
+        { id: 'task-2', role: 'tester', description: 'test it', dependsOn: ['task-1'] },
       ],
     });
     expect(result.success).toBe(true);
@@ -177,7 +177,7 @@ describe('dagDeclareSchema', () => {
         role: 'dev',
         description: 'do stuff',
         files: ['src/index.ts'],
-        depends_on: [],
+        dependsOn: [],
         priority: 10,
         model: 'claude-sonnet-4-20250514',
       }],

@@ -464,8 +464,8 @@ Declare tasks with dependencies and the system auto-schedules execution:
 
 \`⟦⟦ DECLARE_TASKS {"tasks": [
   {"id": "rope-config", "role": "developer", "description": "Extract RoPEConfig", "files": ["src/_configs.py"], "priority": 1},
-  {"id": "dead-fields", "role": "developer", "description": "Remove dead fields", "files": ["src/_configs.py"], "depends_on": ["rope-config"]},
-  {"id": "review-rope", "role": "code-reviewer", "description": "Review RoPEConfig", "depends_on": ["rope-config"]},
+  {"id": "dead-fields", "role": "developer", "description": "Remove dead fields", "files": ["src/_configs.py"], "dependsOn": ["rope-config"]},
+  {"id": "review-rope", "role": "code-reviewer", "description": "Review RoPEConfig", "dependsOn": ["rope-config"]},
   {"id": "rewrite-rules", "role": "developer", "description": "Add fusion rules", "files": ["src/rewrite_rules/"]}
 ]} ⟧⟧\`
 
@@ -480,9 +480,9 @@ Management commands:
 - \`⟦⟦ PAUSE_TASK {"id": "task-id"} ⟧⟧\` — hold a pending/ready task
 - \`⟦⟦ RETRY_TASK {"id": "task-id"} ⟧⟧\` — retry a failed task
 - \`⟦⟦ SKIP_TASK {"id": "task-id"} ⟧⟧\` — skip and unblock dependents
-- \`⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "depends_on": ["existing-task"]} ⟧⟧\` — add to DAG
+- \`⟦⟦ ADD_TASK {"id": "new-task", "role": "developer", "dependsOn": ["existing-task"]} ⟧⟧\` — add to DAG
 - \`⟦⟦ CANCEL_TASK {"id": "task-id"} ⟧⟧\` — remove from DAG
-- \`⟦⟦ ADD_DEPENDENCY {"taskId": "task-b", "depends_on": ["task-a"]} ⟧⟧\` — add a dependency between tasks
+- \`⟦⟦ ADD_DEPENDENCY {"taskId": "task-b", "dependsOn": ["task-a"]} ⟧⟧\` — add a dependency between tasks
 - \`⟦⟦ RESET_DAG ⟧⟧\` — clear all tasks and start over
 - \`⟦⟦ HALT_HEARTBEAT ⟧⟧\` — pause heartbeat reminder nudges (e.g. when waiting for user input). Resumes automatically when you start running again. Does NOT stop CREW_UPDATE status messages — those are a separate system.
 - \`⟦⟦ REQUEST_LIMIT_CHANGE {"limit": 15, "reason": "Need more agents for parallel testing"} ⟧⟧\` — request the user to increase the max concurrent agent limit. This creates a decision requiring user approval. The system will apply the change automatically if approved.
@@ -494,7 +494,7 @@ You receive two types of automated system messages. They are separate systems:
 
 == AUTO-DAG FROM DELEGATIONS ==
 When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG task and links it. Express dependencies in two ways:
-- Explicit: \`"depends_on": ["task-id-1", "task-id-2"]\` in CREATE_AGENT/DELEGATE payload (most reliable)
+- Explicit: \`"dependsOn": ["task-id-1", "task-id-2"]\` in CREATE_AGENT/DELEGATE payload (most reliable)
 - Review roles (code-reviewer, critical-reviewer, readability-reviewer) auto-detect their review targets from the task text
 - If no explicit dependencies are found, the Secretary agent is asked to analyze the DAG and suggest dependencies via ADD_DEPENDENCY commands
 - Include \`dagTaskId\` in CREATE_AGENT/DELEGATE to explicitly link to an existing DAG task. If omitted, the system fuzzy-matches by role and description.
@@ -606,7 +606,7 @@ You can also check the task DAG status:
 \`⟦⟦ QUERY_TASKS ⟧⟧\`
 
 Add a dependency between tasks:
-\`⟦⟦ ADD_DEPENDENCY {"taskId": "my-task", "depends_on": ["other-task"]} ⟧⟧\`
+\`⟦⟦ ADD_DEPENDENCY {"taskId": "my-task", "dependsOn": ["other-task"]} ⟧⟧\`
 
 == Capability System ==
 You can acquire additional capabilities beyond your role:

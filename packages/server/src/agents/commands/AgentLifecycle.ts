@@ -37,7 +37,7 @@ export function getLifecycleCommands(ctx: CommandHandlerContext): CommandEntry[]
       { name: 'model', type: 'string', required: false, description: 'Model override (e.g. claude-opus-4.6)' },
       { name: 'context', type: 'string', required: false, description: 'Additional context to include' },
       { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
-      { name: 'depends_on', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
+      { name: 'dependsOn', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
       { name: 'name', type: 'string', required: false, description: 'Display name for the agent' },
       { name: 'sessionId', type: 'string', required: false, description: 'Reuse an existing session' },
     ] } },
@@ -46,7 +46,7 @@ export function getLifecycleCommands(ctx: CommandHandlerContext): CommandEntry[]
       { name: 'task', type: 'string', required: true, description: 'Task description' },
       { name: 'context', type: 'string', required: false, description: 'Additional context' },
       { name: 'dagTaskId', type: 'string', required: false, description: 'DAG task ID to associate' },
-      { name: 'depends_on', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
+      { name: 'dependsOn', type: 'string[]', required: false, description: 'DAG task IDs this depends on' },
     ] } },
     { regex: TERMINATE_AGENT_REGEX, name: 'TERMINATE_AGENT', handler: (a, d) => handleTerminateAgent(ctx, a, d), help: { description: 'Stop an agent', example: 'TERMINATE_AGENT {"id": "agent-id"}', category: 'Agent Lifecycle', args: [
       { name: 'id', type: 'string', required: true, description: 'Agent ID to terminate' },
@@ -137,7 +137,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
           dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
         } else {
           // Auto-create DAG task for untracked delegation
-          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id, req.depends_on);
+          const autoResult = autoCreateDagTask(ctx, agent.id, role.id, req.task, child.id, req.dependsOn);
           if (autoResult.linked) {
             dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]`;
             child.dagTaskId = autoResult.taskId;
@@ -285,7 +285,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
         dagNote = `\n⚠️ DAG task "${req.dagTaskId}" not found or not ready. Check TASK_STATUS.`;
       } else {
         // Auto-create DAG task for untracked delegation
-        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id, req.depends_on);
+        const autoResult = autoCreateDagTask(ctx, agent.id, child.role.id, req.task, child.id, req.dependsOn);
         if (autoResult.linked) {
           dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]`;
           child.dagTaskId = autoResult.taskId;
@@ -535,7 +535,7 @@ interface AutoCreateResult {
 /**
  * Auto-create a DAG task for an untracked delegation.
  * Applies 3-tier dependency inference:
- *   Tier 1: Explicit depends_on from payload
+ *   Tier 1: Explicit dependsOn from payload
  *   Tier 2: Review role inference (code-reviewer, critical-reviewer)
  *   Tier 3: Natural language parsing ("after X finishes", "once Y reports")
  */
@@ -592,7 +592,7 @@ function autoCreateDagTask(
   }
 
   // ── Dependency inference (Tier 1 + Tier 2, synchronous) ──
-  // Tier 1: Explicit depends_on from payload
+  // Tier 1: Explicit dependsOn from payload
   const tier1 = explicitDeps || [];
 
   // Tier 2: Review role inference
@@ -717,7 +717,7 @@ export function requestSecretaryDependencyAnalysis(
     `Description: ${taskDescription.slice(0, 500)}\n\n` +
     `Active tasks:\n${activeTasks}\n\n` +
     `Does "${newTaskId}" depend on any of these tasks? ` +
-    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "depends_on": ["task-id-here"]} ⟧⟧. ` +
+    `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
     `If no dependencies, ignore this message.`
   );
   logger.info('delegation', `Requested Secretary dependency analysis for "${newTaskId}"`);

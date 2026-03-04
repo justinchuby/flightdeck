@@ -135,7 +135,7 @@ describe('TaskDAG assign-related methods', () => {
     it('rejects starting a pending (not ready) task', () => {
       dag.declareTaskBatch(LEAD, [
         { id: 'dep', role: 'developer', description: 'Dependency' },
-        { id: 'task-b', role: 'developer', description: 'Blocked', depends_on: ['dep'] },
+        { id: 'task-b', role: 'developer', description: 'Blocked', dependsOn: ['dep'] },
       ]);
       const result = dag.startTask(LEAD, 'task-b', 'agent-1');
       expect(result).toBeNull();
@@ -151,7 +151,7 @@ describe('TaskDAG assign-related methods', () => {
     it('force-starts a pending task that has unmet dependencies', () => {
       dag.declareTaskBatch(LEAD, [
         { id: 'dep', role: 'developer', description: 'Dependency' },
-        { id: 'task-c', role: 'developer', description: 'Blocked task', depends_on: ['dep'] },
+        { id: 'task-c', role: 'developer', description: 'Blocked task', dependsOn: ['dep'] },
       ]);
       const task = dag.getTask(LEAD, 'task-c');
       expect(task!.dagStatus).toBe('pending');
@@ -165,7 +165,7 @@ describe('TaskDAG assign-related methods', () => {
     it('force-starts a blocked task', () => {
       dag.declareTaskBatch(LEAD, [
         { id: 'dep2', role: 'developer', description: 'Dependency' },
-        { id: 'task-d', role: 'developer', description: 'Will be blocked', depends_on: ['dep2'] },
+        { id: 'task-d', role: 'developer', description: 'Will be blocked', dependsOn: ['dep2'] },
       ]);
       // Fail the dependency to block task-d
       dag.startTask(LEAD, 'dep2', 'agent-x');

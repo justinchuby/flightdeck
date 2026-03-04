@@ -154,7 +154,7 @@ describe('Auto-DAG integration', () => {
     role?: string;
     task: string;
     dagTaskId?: string;
-    depends_on?: string[];
+    dependsOn?: string[];
     childOverrides?: Record<string, any>;
   }): Agent {
     const role = opts.role || 'developer';
@@ -169,7 +169,7 @@ describe('Auto-DAG integration', () => {
 
     const payload: Record<string, any> = { role, task: opts.task };
     if (opts.dagTaskId) payload.dagTaskId = opts.dagTaskId;
-    if (opts.depends_on) payload.depends_on = opts.depends_on;
+    if (opts.dependsOn) payload.dependsOn = opts.dependsOn;
 
     dispatch(dispatcher, lead, `⟦⟦ CREATE_AGENT ${JSON.stringify(payload)} ⟧⟧`);
     return child;
@@ -179,7 +179,7 @@ describe('Auto-DAG integration', () => {
   function delegateToAgent(child: Agent, opts: {
     task: string;
     dagTaskId?: string;
-    depends_on?: string[];
+    dependsOn?: string[];
   }): void {
     (ctx.getAgent as any).mockImplementation((id: string) =>
       id === lead.id ? lead : id === child.id ? child : undefined,
@@ -188,7 +188,7 @@ describe('Auto-DAG integration', () => {
 
     const payload: Record<string, any> = { to: child.id, task: opts.task };
     if (opts.dagTaskId) payload.dagTaskId = opts.dagTaskId;
-    if (opts.depends_on) payload.depends_on = opts.depends_on;
+    if (opts.dependsOn) payload.dependsOn = opts.dependsOn;
 
     dispatch(dispatcher, lead, `⟦⟦ DELEGATE ${JSON.stringify(payload)} ⟧⟧`);
   }
@@ -365,7 +365,7 @@ describe('Auto-DAG integration', () => {
     it('promotes dependents when auto-created task completes', () => {
       const autoTask = dag.getTasks(lead.id)[0];
       // Add a second task that depends on the auto-created one
-      dag.addTask(lead.id, { id: 'next-task', role: 'tester', depends_on: [autoTask.id] });
+      dag.addTask(lead.id, { id: 'next-task', role: 'tester', dependsOn: [autoTask.id] });
       const pendingTask = dag.getTask(lead.id, 'next-task');
       expect(pendingTask!.dagStatus).toBe('pending');
 
@@ -425,7 +425,7 @@ describe('Auto-DAG integration', () => {
   // 3. DEPENDENCY INFERENCE — TIER 1: Explicit (11 tests)
   // ════════════════════════════════════════════════════════════════════
 
-  describe('Tier 1: explicit depends_on', () => {
+  describe('Tier 1: explicit dependsOn', () => {
 
     describe('addDependency (pure DAG logic)', () => {
       it('self-dependency is rejected', () => {
@@ -437,15 +437,15 @@ describe('Auto-DAG integration', () => {
       });
     });
 
-    describe('explicit depends_on in delegation', () => {
+    describe('explicit dependsOn in delegation', () => {
 
-      it('CREATE_AGENT with depends_on creates task with dependency edges', () => {
+      it('CREATE_AGENT with dependsOn creates task with dependency edges', () => {
         dag.declareTaskBatch(lead.id, [
           { id: 'task-1', role: 'developer', description: 'First task' },
         ]);
         dag.startTask(lead.id, 'task-1', 'agent-x');
 
-        createAgent({ task: 'Fix API after task-1', depends_on: ['task-1'] });
+        createAgent({ task: 'Fix API after task-1', dependsOn: ['task-1'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -453,8 +453,8 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dependsOn).toContain('task-1');
       });
 
-      it('depends_on with nonexistent task ID does not add dependency', () => {
-        createAgent({ task: 'Some work', depends_on: ['nonexistent-id'] });
+      it('dependsOn with nonexistent task ID does not add dependency', () => {
+        createAgent({ task: 'Some work', dependsOn: ['nonexistent-id'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -463,14 +463,14 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dependsOn).toHaveLength(0);
       });
 
-      it('depends_on with multiple valid tasks creates all edges', () => {
+      it('dependsOn with multiple valid tasks creates all edges', () => {
         dag.declareTaskBatch(lead.id, [
           { id: 'task-1', role: 'developer' },
           { id: 'task-2', role: 'developer' },
           { id: 'task-3', role: 'tester' },
         ]);
 
-        createAgent({ task: 'Integrate everything', depends_on: ['task-1', 'task-2', 'task-3'] });
+        createAgent({ task: 'Integrate everything', dependsOn: ['task-1', 'task-2', 'task-3'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -480,13 +480,13 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dependsOn).toContain('task-3');
       });
 
-      it('depends_on blocks auto-task when dependency is not done', () => {
+      it('dependsOn blocks auto-task when dependency is not done', () => {
         dag.declareTaskBatch(lead.id, [
           { id: 'blocker', role: 'developer' },
         ]);
         dag.startTask(lead.id, 'blocker', 'agent-x');
 
-        createAgent({ task: 'Depends on blocker', depends_on: ['blocker'] });
+        createAgent({ task: 'Depends on blocker', dependsOn: ['blocker'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -494,13 +494,13 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dagStatus).toBe('blocked');
       });
 
-      it('depends_on on completed task keeps auto-task running', () => {
+      it('dependsOn on completed task keeps auto-task running', () => {
         dag.declareTaskBatch(lead.id, [
           { id: 'done-task', role: 'developer' },
         ]);
         dag.completeTask(lead.id, 'done-task');
 
-        createAgent({ task: 'After done task', depends_on: ['done-task'] });
+        createAgent({ task: 'After done task', dependsOn: ['done-task'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -511,12 +511,12 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dagStatus).toBe('running');
       });
 
-      it('partial depends_on: some valid, some invalid', () => {
+      it('partial dependsOn: some valid, some invalid', () => {
         dag.declareTaskBatch(lead.id, [
           { id: 'real-task', role: 'tester' },
         ]);
 
-        createAgent({ task: 'Mixed deps work', depends_on: ['real-task', 'fake-task'] });
+        createAgent({ task: 'Mixed deps work', dependsOn: ['real-task', 'fake-task'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -525,12 +525,12 @@ describe('Auto-DAG integration', () => {
         expect(autoTask!.dependsOn).not.toContain('fake-task');
       });
 
-      it('duplicate IDs in depends_on are deduplicated', () => {
+      it('duplicate IDs in dependsOn are deduplicated', () => {
         dag.declareTaskBatch(lead.id, [
           { id: 'task-1', role: 'tester' },
         ]);
 
-        createAgent({ task: 'Duped deps work', depends_on: ['task-1', 'task-1'] });
+        createAgent({ task: 'Duped deps work', dependsOn: ['task-1', 'task-1'] });
 
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
@@ -545,7 +545,7 @@ describe('Auto-DAG integration', () => {
         ]);
         dag.startTask(lead.id, 'prereq', 'agent-x');
 
-        createAgent({ task: 'Depends on prereq finishing', depends_on: ['prereq'] });
+        createAgent({ task: 'Depends on prereq finishing', dependsOn: ['prereq'] });
 
         const autoTaskBefore = dag.getTasks(lead.id).find(t => t.id.startsWith('auto-'));
         expect(autoTaskBefore!.dagStatus).toBe('blocked');
@@ -1023,13 +1023,13 @@ describe('Auto-DAG integration', () => {
       expect(tasks.length).toBe(5);
     });
 
-    it('auto-created task with depends_on on auto-created task works', () => {
+    it('auto-created task with dependsOn on auto-created task works', () => {
       // First auto-task (different role to avoid findReadyTask match)
       createAgent({ role: 'architect', task: 'Design feature alpha architecture' });
       const firstTask = dag.getTasks(lead.id)[0];
 
       // Second auto-task depends on first (use very different description)
-      createAgent({ task: 'Build payment gateway integration', depends_on: [firstTask.id] });
+      createAgent({ task: 'Build payment gateway integration', dependsOn: [firstTask.id] });
 
       const tasks = dag.getTasks(lead.id);
       const secondTask = tasks.find(t => t.id !== firstTask.id);
@@ -1072,7 +1072,7 @@ describe('Auto-DAG integration', () => {
       dag.declareTaskBatch(lead.id, [
         { id: 'fix-api', role: 'developer', description: 'Fix API bugs' },
         { id: 'fix-ui', role: 'developer', description: 'Fix UI bugs' },
-        { id: 'review-api', role: 'code-reviewer', description: 'Review API', depends_on: ['fix-api'] },
+        { id: 'review-api', role: 'code-reviewer', description: 'Review API', dependsOn: ['fix-api'] },
       ]);
 
       // 2. Link fix-api to an agent
@@ -1124,11 +1124,11 @@ describe('Auto-DAG integration', () => {
       expect(implTask!.id).toBeTruthy();
       expect(dag.getTask(lead.id, implTask!.id)!.dagStatus).toBe('done');
 
-      // 3. Code review (depends on impl via explicit depends_on)
+      // 3. Code review (depends on impl via explicit dependsOn)
       createAgent({
         role: 'code-reviewer',
         task: 'Review auth implementation for correctness',
-        depends_on: [implTask!.id],
+        dependsOn: [implTask!.id],
       });
 
       const reviewTask = dag.getTasks(lead.id).find(t => t.role === 'code-reviewer');
@@ -1141,7 +1141,7 @@ describe('Auto-DAG integration', () => {
       createAgent({
         role: 'critical-reviewer',
         task: 'Security and performance audit of auth module',
-        depends_on: [implTask!.id],
+        dependsOn: [implTask!.id],
       });
 
       const critTask = dag.getTasks(lead.id).find(t => t.role === 'critical-reviewer');
@@ -1184,7 +1184,7 @@ describe('Auto-DAG integration', () => {
       createAgent({
         role: 'code-reviewer',
         task: 'Review core module changes',
-        depends_on: [taskA.id],
+        dependsOn: [taskA.id],
       });
       const taskB = dag.getTasks(lead.id).find(t => t.role === 'code-reviewer')!;
       expect(taskB).toBeDefined();
@@ -1194,7 +1194,7 @@ describe('Auto-DAG integration', () => {
       createAgent({
         role: 'tester',
         task: 'Verify fixes from code review',
-        depends_on: [taskB.id],
+        dependsOn: [taskB.id],
       });
       const taskC = dag.getTasks(lead.id).find(t => t.role === 'tester')!;
       expect(taskC).toBeDefined();

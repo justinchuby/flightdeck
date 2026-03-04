@@ -145,7 +145,7 @@ export class TaskTemplateRegistry {
         id: refToId[task.ref],
         role: override.role ?? task.role,
         description: override.title ?? task.title,
-        depends_on: (task.dependsOn ?? []).map(depRef => refToId[depRef]),
+        dependsOn: (task.dependsOn ?? []).map(depRef => refToId[depRef]),
       };
     });
 

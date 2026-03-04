@@ -64,7 +64,7 @@ export const createAgentSchema = z.object({
   model: z.string().max(MAX_NAME_LENGTH).optional(),
   context: z.string().max(MAX_CONTENT_LENGTH, `"context" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
   dagTaskId: z.string().max(MAX_ID_LENGTH).optional(),
-  depends_on: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional(),
+  dependsOn: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional(),
   name: z.string().max(MAX_NAME_LENGTH).optional(),
   sessionId: z.string().max(MAX_ID_LENGTH).optional(),
 });
@@ -74,7 +74,7 @@ export const delegateSchema = z.object({
   task: z.string({ message: 'Missing required field "task"' }).min(1, 'Missing required field "task"').max(MAX_TASK_TEXT_LENGTH, `"task" too long (max ${MAX_TASK_TEXT_LENGTH})`),
   context: z.string().max(MAX_CONTENT_LENGTH, `"context" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
   dagTaskId: z.string().max(MAX_ID_LENGTH).optional(),
-  depends_on: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional(),
+  dependsOn: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional(),
 });
 
 export const terminateAgentSchema = z.object({
@@ -235,7 +235,7 @@ const dagTaskInputSchema = z.object({
   id: z.string({ message: 'Missing required field "id"' }).trim().min(1, 'Missing required field "id"').max(100, 'id too long (max 100 chars)'),
   role: z.string({ message: 'Missing required field "role"' }).trim().min(1, 'Missing required field "role"').max(MAX_NAME_LENGTH, `"role" too long (max ${MAX_NAME_LENGTH})`),
   description: z.string().max(MAX_CONTENT_LENGTH, `"description" too long (max ${MAX_CONTENT_LENGTH})`).optional(),
-  depends_on: z.array(z.string()).max(MAX_MEMBERS_LENGTH, `"depends_on" too many (max ${MAX_MEMBERS_LENGTH})`).optional(),
+  dependsOn: z.array(z.string()).max(MAX_MEMBERS_LENGTH, `"dependsOn" too many (max ${MAX_MEMBERS_LENGTH})`).optional(),
   files: z.array(z.string()).max(MAX_ARRAY_LENGTH, `"files" too many (max ${MAX_ARRAY_LENGTH})`).optional(),
   status: z.string().max(MAX_NAME_LENGTH).optional(),
   priority: z.number().optional(),
@@ -260,7 +260,7 @@ export const completeTaskSchema = z.object({
 
 export const addDependencySchema = z.object({
   taskId: z.string({ message: 'Missing required field "taskId"' }).min(1, 'Missing required field "taskId"').max(MAX_ID_LENGTH),
-  depends_on: z.array(z.string().max(MAX_ID_LENGTH)).min(1, '"depends_on" must have at least one task ID').max(20, '"depends_on" max 20 entries'),
+  dependsOn: z.array(z.string().max(MAX_ID_LENGTH)).min(1, '"dependsOn" must have at least one task ID').max(20, '"dependsOn" max 20 entries'),
 });
 
 export const assignTaskSchema = z.object({

@@ -22,7 +22,7 @@ describe('TaskDAG', () => {
     it('inserts tasks and returns them', () => {
       const tasks: DagTaskInput[] = [
         { id: 'task-1', role: 'Developer', description: 'Build API' },
-        { id: 'task-2', role: 'Developer', description: 'Build UI', depends_on: ['task-1'] },
+        { id: 'task-2', role: 'Developer', description: 'Build UI', dependsOn: ['task-1'] },
       ];
       const result = dag.declareTaskBatch('lead-1', tasks);
       expect(result.tasks).toHaveLength(2);
@@ -44,7 +44,7 @@ describe('TaskDAG', () => {
     it('sets pending status for tasks with dependencies', () => {
       const result = dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       expect(result.tasks[1].dagStatus).toBe('pending');
     });
@@ -52,7 +52,7 @@ describe('TaskDAG', () => {
     it('throws on unknown dependency', () => {
       expect(() => {
         dag.declareTaskBatch('lead-1', [
-          { id: 'a', role: 'Dev', depends_on: ['nonexistent'] },
+          { id: 'a', role: 'Dev', dependsOn: ['nonexistent'] },
         ]);
       }).toThrow('Task "a" depends on unknown task "nonexistent"');
     });
@@ -73,7 +73,7 @@ describe('TaskDAG', () => {
     it('allows cross-batch dependency references', () => {
       dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
       const result = dag.declareTaskBatch('lead-1', [
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       expect(result.tasks[0].dependsOn).toEqual(['a']);
     });
@@ -115,7 +115,7 @@ describe('TaskDAG', () => {
     it('does not flag conflicts when tasks have dependency relationship', () => {
       const result = dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev', files: ['src/index.ts'] },
-        { id: 'b', role: 'Dev', files: ['src/index.ts'], depends_on: ['a'] },
+        { id: 'b', role: 'Dev', files: ['src/index.ts'], dependsOn: ['a'] },
       ]);
       expect(result.conflicts).toHaveLength(0);
     });
@@ -141,8 +141,8 @@ describe('TaskDAG', () => {
     it('finds tasks with all deps done', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
       // a is ready, b and c are pending.
       // Complete a => b should become ready
@@ -170,7 +170,7 @@ describe('TaskDAG', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev', files: ['src/shared.ts'] },
         { id: 'b', role: 'Dev', files: ['src/other.ts'] },
-        { id: 'c', role: 'Dev', files: ['src/shared.ts'], depends_on: ['b'] },
+        { id: 'c', role: 'Dev', files: ['src/shared.ts'], dependsOn: ['b'] },
       ]);
 
       // Start 'a' (holds src/shared.ts)
@@ -190,7 +190,7 @@ describe('TaskDAG', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev', files: ['src/components'] },
         { id: 'b', role: 'Dev' },
-        { id: 'c', role: 'Dev', files: ['src/components/Button.tsx'], depends_on: ['b'] },
+        { id: 'c', role: 'Dev', files: ['src/components/Button.tsx'], dependsOn: ['b'] },
       ]);
 
       dag.startTask('lead-1', 'a', 'agent-1');
@@ -205,7 +205,7 @@ describe('TaskDAG', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev', files: ['src/a.ts'] },
         { id: 'b', role: 'Dev' },
-        { id: 'c', role: 'Dev', files: ['src/c.ts'], depends_on: ['b'] },
+        { id: 'c', role: 'Dev', files: ['src/c.ts'], dependsOn: ['b'] },
       ]);
 
       dag.startTask('lead-1', 'a', 'agent-1');
@@ -224,7 +224,7 @@ describe('TaskDAG', () => {
     it('marks task as done and promotes dependents', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       dag.startTask('lead-1', 'a', 'agent-1');
       const newlyReady = dag.completeTask('lead-1', 'a');
@@ -243,7 +243,7 @@ describe('TaskDAG', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
         { id: 'b', role: 'Dev' },
-        { id: 'c', role: 'Dev', depends_on: ['a', 'b'] },
+        { id: 'c', role: 'Dev', dependsOn: ['a', 'b'] },
       ]);
 
       dag.startTask('lead-1', 'a', 'agent-1');
@@ -275,8 +275,8 @@ describe('TaskDAG', () => {
     it('marks task as failed and blocks dependents', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
 
       dag.startTask('lead-1', 'a', 'agent-1');
@@ -308,7 +308,7 @@ describe('TaskDAG', () => {
     it('pauses a pending task', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       const paused = dag.pauseTask('lead-1', 'b');
       expect(paused).toBe(true);
@@ -340,7 +340,7 @@ describe('TaskDAG', () => {
     it('resumes paused task to pending when deps are not met', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       dag.pauseTask('lead-1', 'b');
       const resumed = dag.resumeTask('lead-1', 'b');
@@ -359,7 +359,7 @@ describe('TaskDAG', () => {
     it('resets failed task to ready and unblocks dependents', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
 
       dag.startTask('lead-1', 'a', 'agent-1');
@@ -392,7 +392,7 @@ describe('TaskDAG', () => {
     it('marks task as skipped and unblocks dependents', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
 
       const skipped = dag.skipTask('lead-1', 'a');
@@ -426,8 +426,8 @@ describe('TaskDAG', () => {
     it('can skip a blocked task to unblock dependents', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
 
       dag.startTask('lead-1', 'a', 'agent-1');
@@ -448,7 +448,7 @@ describe('TaskDAG', () => {
     it('removes a pending task', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       const cancelled = dag.cancelTask('lead-1', 'b');
       expect(cancelled).toBe(true);
@@ -482,8 +482,8 @@ describe('TaskDAG', () => {
     it('unblocks dependents when cancelled task is removed', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
       // a is ready, b and c are pending
       expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('ready');
@@ -505,7 +505,7 @@ describe('TaskDAG', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
         { id: 'b', role: 'Dev' },
-        { id: 'c', role: 'Dev', depends_on: ['a', 'b'] },
+        { id: 'c', role: 'Dev', dependsOn: ['a', 'b'] },
       ]);
       expect(dag.getTask('lead-1', 'c')!.dagStatus).toBe('pending');
 
@@ -522,7 +522,7 @@ describe('TaskDAG', () => {
   describe('addTask', () => {
     it('adds a single task to an existing DAG', () => {
       dag.declareTaskBatch('lead-1', [{ id: 'a', role: 'Dev' }]);
-      const task = dag.addTask('lead-1', { id: 'b', role: 'Dev', depends_on: ['a'] });
+      const task = dag.addTask('lead-1', { id: 'b', role: 'Dev', dependsOn: ['a'] });
       expect(task.id).toBe('b');
       expect(task.dependsOn).toEqual(['a']);
       expect(task.dagStatus).toBe('pending');
@@ -557,7 +557,7 @@ describe('TaskDAG', () => {
     it('returns full DAG state with summary and file lock map', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev', files: ['src/a.ts'] },
-        { id: 'b', role: 'Dev', files: ['src/b.ts'], depends_on: ['a'] },
+        { id: 'b', role: 'Dev', files: ['src/b.ts'], dependsOn: ['a'] },
         { id: 'c', role: 'Dev' },
       ]);
 
@@ -840,7 +840,7 @@ describe('TaskDAG', () => {
     it('ignores non-ready tasks even with matching dagTaskId', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'dep', role: 'developer', description: 'Dependency' },
-        { id: 'blocked', role: 'developer', description: 'Blocked task', depends_on: ['dep'] },
+        { id: 'blocked', role: 'developer', description: 'Blocked task', dependsOn: ['dep'] },
       ]);
       const task = dag.findReadyTask('lead-1', {
         dagTaskId: 'blocked',
@@ -958,9 +958,9 @@ describe('TaskDAG', () => {
     it('schedules a diamond DAG correctly', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['a'] },
-        { id: 'd', role: 'Dev', depends_on: ['b', 'c'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['a'] },
+        { id: 'd', role: 'Dev', dependsOn: ['b', 'c'] },
       ]);
 
       // a is ready, b/c/d are pending
@@ -1002,7 +1002,7 @@ describe('TaskDAG', () => {
     it('startTask returns null for non-ready task', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       // b is pending, not ready
       expect(dag.startTask('lead-1', 'b', 'agent-1')).toBeNull();
@@ -1025,7 +1025,7 @@ describe('TaskDAG', () => {
     it('completeTask returns null for pending task', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       expect(dag.completeTask('lead-1', 'b')).toBeNull();
       expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
@@ -1059,7 +1059,7 @@ describe('TaskDAG', () => {
     it('failTask returns false for pending task', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       expect(dag.failTask('lead-1', 'b')).toBe(false);
       expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('pending');
@@ -1135,7 +1135,7 @@ describe('TaskDAG', () => {
     it('removes all tasks for a lead', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       const count = dag.resetDAG('lead-1');
       expect(count).toBe(2);
@@ -1208,7 +1208,7 @@ describe('TaskDAG', () => {
     it('returns true for duplicate dependency (idempotent)', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       const result = dag.addDependency('lead-1', 'b', 'a');
       expect(result).toBe(true);
@@ -1223,7 +1223,7 @@ describe('TaskDAG', () => {
     it('prevents cycle: A→B→A', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       // b depends on a, so adding a depends on b would create a cycle
       const result = dag.addDependency('lead-1', 'a', 'b');
@@ -1233,8 +1233,8 @@ describe('TaskDAG', () => {
     it('prevents transitive cycle: A→B→C→A', () => {
       dag.declareTaskBatch('lead-1', [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
       // c→b→a, so adding a→c would create A→B→C→A cycle
       const result = dag.addDependency('lead-1', 'a', 'c');

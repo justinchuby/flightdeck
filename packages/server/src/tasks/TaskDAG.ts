@@ -48,7 +48,7 @@ export interface DagTaskInput {
   title?: string;
   description?: string;
   files?: string[];
-  depends_on?: string[];
+  dependsOn?: string[];
   priority?: number;
   model?: string;
 }
@@ -141,7 +141,7 @@ export class TaskDAG extends EventEmitter {
 
   /** Declare a batch of tasks for a lead. Validates deps and detects file conflicts. */
   declareTaskBatch(leadId: string, tasks: DagTaskInput[]): { tasks: DagTask[]; conflicts: FileConflict[] } {
-    // Validate: all depends_on reference tasks in this batch or already existing
+    // Validate: all dependsOn reference tasks in this batch or already existing
     const taskIds = new Set(tasks.map(t => t.id));
     const existingRows = this.db.drizzle
       .select({ id: dagTasks.id })
@@ -152,7 +152,7 @@ export class TaskDAG extends EventEmitter {
     const allIds = new Set([...taskIds, ...existingIds]);
 
     for (const task of tasks) {
-      for (const dep of task.depends_on || []) {
+      for (const dep of task.dependsOn || []) {
         if (!allIds.has(dep)) {
           throw new Error(`Task "${task.id}" depends on unknown task "${dep}"`);
         }
@@ -168,7 +168,7 @@ export class TaskDAG extends EventEmitter {
     // Insert tasks
     const inserted: DagTask[] = [];
     for (const task of tasks) {
-      const dagStatus = (task.depends_on && task.depends_on.length > 0) ? 'pending' : 'ready';
+      const dagStatus = (task.dependsOn && task.dependsOn.length > 0) ? 'pending' : 'ready';
       this.db.drizzle.insert(dagTasks).values({
         id: task.id,
         leadId,
@@ -176,7 +176,7 @@ export class TaskDAG extends EventEmitter {
         title: task.title || null,
         description: task.description || '',
         files: JSON.stringify(task.files || []),
-        dependsOn: JSON.stringify(task.depends_on || []),
+        dependsOn: JSON.stringify(task.dependsOn || []),
         priority: task.priority || 0,
         model: task.model || null,
         dagStatus,
@@ -206,7 +206,7 @@ export class TaskDAG extends EventEmitter {
         const hasDep = (a: string, b: string): boolean => {
           const taskA = tasks.find(t => t.id === a);
           const taskB = tasks.find(t => t.id === b);
-          return (taskA?.depends_on || []).includes(b) || (taskB?.depends_on || []).includes(a);
+          return (taskA?.dependsOn || []).includes(b) || (taskB?.dependsOn || []).includes(a);
         };
 
         let allHaveDeps = true;

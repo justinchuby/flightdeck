@@ -50,9 +50,9 @@ describe('TaskDAG E2E', () => {
       //   setup (no deps) → api (depends on setup) → ui (depends on api) → tests (depends on ui)
       batch(dag, LEAD, [
         { id: 'setup', role: 'Developer', description: 'Project scaffolding', files: ['package.json'] },
-        { id: 'api', role: 'Developer', description: 'Build REST API', files: ['src/api.ts'], depends_on: ['setup'] },
-        { id: 'ui', role: 'Designer', description: 'Build UI components', files: ['src/App.tsx'], depends_on: ['api'] },
-        { id: 'tests', role: 'Developer', description: 'Write integration tests', files: ['src/test.ts'], depends_on: ['ui'] },
+        { id: 'api', role: 'Developer', description: 'Build REST API', files: ['src/api.ts'], dependsOn: ['setup'] },
+        { id: 'ui', role: 'Designer', description: 'Build UI components', files: ['src/App.tsx'], dependsOn: ['api'] },
+        { id: 'tests', role: 'Developer', description: 'Write integration tests', files: ['src/test.ts'], dependsOn: ['ui'] },
       ]);
 
       // Initial state: only setup is ready
@@ -113,8 +113,8 @@ describe('TaskDAG E2E', () => {
         { id: 'fe', role: 'Developer', description: 'Frontend', files: ['src/fe/'] },
         { id: 'be', role: 'Developer', description: 'Backend', files: ['src/be/'] },
         { id: 'docs', role: 'Tech Writer', description: 'Documentation', files: ['docs/'] },
-        { id: 'integration', role: 'Developer', description: 'Integration tests', depends_on: ['fe', 'be'] },
-        { id: 'deploy', role: 'Developer', description: 'Deploy', depends_on: ['integration'] },
+        { id: 'integration', role: 'Developer', description: 'Integration tests', dependsOn: ['fe', 'be'] },
+        { id: 'deploy', role: 'Developer', description: 'Deploy', dependsOn: ['integration'] },
       ]);
 
       // All 3 independent tasks are ready
@@ -160,7 +160,7 @@ describe('TaskDAG E2E', () => {
       batch(dag, LEAD, [
         { id: 'task-a', role: 'Developer', files: ['src/shared.ts'] },
         { id: 'task-b', role: 'Developer' },
-        { id: 'task-c', role: 'Developer', files: ['src/shared.ts'], depends_on: ['task-b'] },
+        { id: 'task-c', role: 'Developer', files: ['src/shared.ts'], dependsOn: ['task-b'] },
       ]);
 
       // Start task-a (holds src/shared.ts)
@@ -191,8 +191,8 @@ describe('TaskDAG E2E', () => {
     it('fails a task, blocks dependents, retries, succeeds, unblocks', () => {
       batch(dag, LEAD, [
         { id: 'build', role: 'Developer', description: 'Build the project' },
-        { id: 'test', role: 'Developer', description: 'Run tests', depends_on: ['build'] },
-        { id: 'deploy', role: 'Developer', description: 'Deploy', depends_on: ['test'] },
+        { id: 'test', role: 'Developer', description: 'Run tests', dependsOn: ['build'] },
+        { id: 'deploy', role: 'Developer', description: 'Deploy', dependsOn: ['test'] },
       ]);
 
       // Build starts and fails
@@ -241,7 +241,7 @@ describe('TaskDAG E2E', () => {
     it('multiple failures and retries maintain consistency', () => {
       batch(dag, LEAD, [
         { id: 'flaky', role: 'Developer' },
-        { id: 'dependent', role: 'Developer', depends_on: ['flaky'] },
+        { id: 'dependent', role: 'Developer', dependsOn: ['flaky'] },
       ]);
 
       // Fail 3 times
@@ -265,7 +265,7 @@ describe('TaskDAG E2E', () => {
     it('skipping a task unblocks its dependents', () => {
       batch(dag, LEAD, [
         { id: 'optional', role: 'Developer', description: 'Nice to have' },
-        { id: 'must-have', role: 'Developer', description: 'Required', depends_on: ['optional'] },
+        { id: 'must-have', role: 'Developer', description: 'Required', dependsOn: ['optional'] },
       ]);
 
       dag.skipTask(LEAD, 'optional');
@@ -276,8 +276,8 @@ describe('TaskDAG E2E', () => {
     it('skipping a blocked task (from upstream failure) unblocks downstream', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
 
       // a fails → b blocked
@@ -295,7 +295,7 @@ describe('TaskDAG E2E', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
         { id: 'b', role: 'Dev' },
-        { id: 'c', role: 'Dev', depends_on: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['a'] },
       ]);
 
       dag.skipTask(LEAD, 'a');
@@ -320,7 +320,7 @@ describe('TaskDAG E2E', () => {
     it('forces a blocked task to ready', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       expect(dag.getTask(LEAD, 'b')!.dagStatus).toBe('pending');
 
@@ -332,7 +332,7 @@ describe('TaskDAG E2E', () => {
     it('forces a pending task to ready', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       // b is pending (a is ready but not done)
       expect(dag.getTask(LEAD, 'b')!.dagStatus).toBe('pending');
@@ -391,7 +391,7 @@ describe('TaskDAG E2E', () => {
     it('can cancel a blocked task', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       dag.startTask(LEAD, 'a', 'agent-1');
       dag.failTask(LEAD, 'a');
@@ -408,7 +408,7 @@ describe('TaskDAG E2E', () => {
     it('returns complete DAG state with summary, tasks, and file lock map', () => {
       batch(dag, LEAD, [
         { id: 'api', role: 'Developer', files: ['src/api.ts', 'src/routes.ts'], priority: 10 },
-        { id: 'ui', role: 'Designer', files: ['src/App.tsx'], depends_on: ['api'], priority: 5 },
+        { id: 'ui', role: 'Designer', files: ['src/App.tsx'], dependsOn: ['api'], priority: 5 },
         { id: 'docs', role: 'Tech Writer', files: ['README.md'] },
       ]);
 
@@ -437,7 +437,7 @@ describe('TaskDAG E2E', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
         { id: 'b', role: 'Dev' },
-        { id: 'c', role: 'Dev', depends_on: ['a', 'b'] },
+        { id: 'c', role: 'Dev', dependsOn: ['a', 'b'] },
       ]);
 
       let s = dag.getStatus(LEAD).summary;
@@ -469,10 +469,10 @@ describe('TaskDAG E2E', () => {
       //          E
       batch(dag, LEAD, [
         { id: 'A', role: 'Dev', description: 'Foundation' },
-        { id: 'B', role: 'Dev', description: 'Core module', depends_on: ['A'] },
-        { id: 'C', role: 'Dev', description: 'Extension', depends_on: ['B'] },
-        { id: 'D', role: 'Dev', description: 'Final integration', depends_on: ['C'] },
-        { id: 'E', role: 'Dev', description: 'Cross-cutting', depends_on: ['B', 'C'] },
+        { id: 'B', role: 'Dev', description: 'Core module', dependsOn: ['A'] },
+        { id: 'C', role: 'Dev', description: 'Extension', dependsOn: ['B'] },
+        { id: 'D', role: 'Dev', description: 'Final integration', dependsOn: ['C'] },
+        { id: 'E', role: 'Dev', description: 'Cross-cutting', dependsOn: ['B', 'C'] },
       ]);
 
       // Only A is ready
@@ -512,9 +512,9 @@ describe('TaskDAG E2E', () => {
     it('failure in diamond blocks convergence point', () => {
       batch(dag, LEAD, [
         { id: 'root', role: 'Dev' },
-        { id: 'left', role: 'Dev', depends_on: ['root'] },
-        { id: 'right', role: 'Dev', depends_on: ['root'] },
-        { id: 'merge', role: 'Dev', depends_on: ['left', 'right'] },
+        { id: 'left', role: 'Dev', dependsOn: ['root'] },
+        { id: 'right', role: 'Dev', dependsOn: ['root'] },
+        { id: 'merge', role: 'Dev', dependsOn: ['left', 'right'] },
       ]);
 
       runTask(dag, LEAD, 'root', 'agent-1');
@@ -542,11 +542,11 @@ describe('TaskDAG E2E', () => {
     it('wide fan-out: one root with 5 independent children', () => {
       batch(dag, LEAD, [
         { id: 'root', role: 'Lead' },
-        { id: 'c1', role: 'Dev', depends_on: ['root'] },
-        { id: 'c2', role: 'Dev', depends_on: ['root'] },
-        { id: 'c3', role: 'Dev', depends_on: ['root'] },
-        { id: 'c4', role: 'Dev', depends_on: ['root'] },
-        { id: 'c5', role: 'Dev', depends_on: ['root'] },
+        { id: 'c1', role: 'Dev', dependsOn: ['root'] },
+        { id: 'c2', role: 'Dev', dependsOn: ['root'] },
+        { id: 'c3', role: 'Dev', dependsOn: ['root'] },
+        { id: 'c4', role: 'Dev', dependsOn: ['root'] },
+        { id: 'c5', role: 'Dev', dependsOn: ['root'] },
       ]);
 
       runTask(dag, LEAD, 'root', 'agent-lead');
@@ -572,8 +572,8 @@ describe('TaskDAG E2E', () => {
     it('full reset after partial completion allows re-declaration', () => {
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
-        { id: 'c', role: 'Dev', depends_on: ['b'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
+        { id: 'c', role: 'Dev', dependsOn: ['b'] },
       ]);
 
       // Partially complete
@@ -589,7 +589,7 @@ describe('TaskDAG E2E', () => {
       // Can re-declare entirely new tasks
       batch(dag, LEAD, [
         { id: 'x', role: 'Dev', description: 'New task' },
-        { id: 'y', role: 'Dev', description: 'Another new task', depends_on: ['x'] },
+        { id: 'y', role: 'Dev', description: 'Another new task', dependsOn: ['x'] },
       ]);
 
       expect(dag.getTasks(LEAD)).toHaveLength(2);
@@ -599,11 +599,11 @@ describe('TaskDAG E2E', () => {
     it('reset one lead does not affect another lead', () => {
       batch(dag, 'lead-A', [
         { id: 'a1', role: 'Dev' },
-        { id: 'a2', role: 'Dev', depends_on: ['a1'] },
+        { id: 'a2', role: 'Dev', dependsOn: ['a1'] },
       ]);
       batch(dag, 'lead-B', [
         { id: 'b1', role: 'Dev' },
-        { id: 'b2', role: 'Dev', depends_on: ['b1'] },
+        { id: 'b2', role: 'Dev', dependsOn: ['b1'] },
       ]);
 
       runTask(dag, 'lead-A', 'a1', 'agent-1');
@@ -633,15 +633,15 @@ describe('TaskDAG E2E', () => {
       batch(dag, LEAD, [
         // Workstream 1: API
         { id: 'api-design', role: 'Architect', description: 'Design API schema', priority: 10 },
-        { id: 'api-impl', role: 'Developer', description: 'Implement API', depends_on: ['api-design'], priority: 8 },
-        { id: 'api-tests', role: 'Developer', description: 'API tests', depends_on: ['api-impl'], priority: 6 },
+        { id: 'api-impl', role: 'Developer', description: 'Implement API', dependsOn: ['api-design'], priority: 8 },
+        { id: 'api-tests', role: 'Developer', description: 'API tests', dependsOn: ['api-impl'], priority: 6 },
         // Workstream 2: UI
         { id: 'ui-design', role: 'Designer', description: 'Design UI mockups', priority: 9 },
-        { id: 'ui-impl', role: 'Developer', description: 'Implement UI', depends_on: ['ui-design', 'api-impl'], priority: 7 },
+        { id: 'ui-impl', role: 'Developer', description: 'Implement UI', dependsOn: ['ui-design', 'api-impl'], priority: 7 },
         // Workstream 3: Docs (independent)
         { id: 'docs', role: 'Tech Writer', description: 'Write documentation', priority: 3 },
         // Integration (depends on everything)
-        { id: 'integration', role: 'Developer', description: 'Full integration', depends_on: ['api-tests', 'ui-impl', 'docs'], priority: 1 },
+        { id: 'integration', role: 'Developer', description: 'Full integration', dependsOn: ['api-tests', 'ui-impl', 'docs'], priority: 1 },
       ]);
 
       // Phase 1: Start independent tasks
@@ -727,7 +727,7 @@ describe('TaskDAG E2E', () => {
 
       batch(dag, LEAD, [
         { id: 'a', role: 'Dev' },
-        { id: 'b', role: 'Dev', depends_on: ['a'] },
+        { id: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       expect(events.length).toBe(1); // declareTaskBatch
 
@@ -783,7 +783,7 @@ describe('TaskDAG E2E', () => {
       ]);
 
       // Dynamically add task that depends on phase1
-      const added = dag.addTask(LEAD, { id: 'phase2', role: 'Dev', depends_on: ['phase1'] });
+      const added = dag.addTask(LEAD, { id: 'phase2', role: 'Dev', dependsOn: ['phase1'] });
       expect(added.dagStatus).toBe('pending');
 
       // Complete phase1 → phase2 promoted
@@ -794,7 +794,7 @@ describe('TaskDAG E2E', () => {
     it('unknown dependency throws on declare', () => {
       expect(() => {
         batch(dag, LEAD, [
-          { id: 'orphan', role: 'Dev', depends_on: ['ghost'] },
+          { id: 'orphan', role: 'Dev', dependsOn: ['ghost'] },
         ]);
       }).toThrow('depends on unknown task "ghost"');
     });

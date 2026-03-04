@@ -89,7 +89,7 @@ export const dagDeclareSchema = z.object({
       role: z.string(),
       description: z.string().optional(),
       files: z.array(z.string()).optional(),
-      depends_on: z.array(z.string()).optional(),
+      dependsOn: z.array(z.string()).optional(),
       priority: z.number().optional(),
       model: z.string().optional(),
     }),

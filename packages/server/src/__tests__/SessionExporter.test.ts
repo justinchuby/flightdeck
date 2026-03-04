@@ -159,8 +159,8 @@ describe('SessionExporter', () => {
     const mgr = createMockAgentManager([lead]);
 
     taskDAG.declareTaskBatch('lead-001', [
-      { id: 'task-1', role: 'developer', description: 'Build API', files: ['api.ts'], depends_on: [] },
-      { id: 'task-2', role: 'developer', description: 'Build UI', files: ['ui.ts'], depends_on: ['task-1'] },
+      { id: 'task-1', role: 'developer', description: 'Build API', files: ['api.ts'], dependsOn: [] },
+      { id: 'task-2', role: 'developer', description: 'Build UI', files: ['ui.ts'], dependsOn: ['task-1'] },
     ]);
 
     const exporter = new SessionExporter(mgr, activityLedger, decisionLog, taskDAG, chatGroupRegistry);
@@ -273,7 +273,7 @@ describe('SessionExporter', () => {
     const mgr = createMockAgentManager([lead]);
 
     taskDAG.declareTaskBatch('lead-001', [
-      { id: 'task-1', role: 'dev', description: 'Build API', files: ['api.ts'], depends_on: [] },
+      { id: 'task-1', role: 'dev', description: 'Build API', files: ['api.ts'], dependsOn: [] },
     ]);
     taskDAG.startTask('lead-001', 'task-1', 'lead-001');
     taskDAG.completeTask('lead-001', 'task-1');

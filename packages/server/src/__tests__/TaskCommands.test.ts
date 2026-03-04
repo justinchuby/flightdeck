@@ -483,7 +483,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('✓'));
@@ -500,7 +500,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeChildAgent('lead-001');
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
   });
@@ -516,7 +516,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeChildAgent('lead-001');
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('denied'));
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
@@ -532,7 +532,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b", "task-c"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b", "task-c"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledTimes(2);
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', 'task-a', 'task-b');
@@ -549,7 +549,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('skipped'));
   });
@@ -564,7 +564,7 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b"]} ⟧⟧');
 
     expect(ctx.emit).toHaveBeenCalledWith('dag:updated', { leadId: 'lead-001' });
   });
@@ -574,17 +574,17 @@ describe('ADD_DEPENDENCY command', () => {
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"dependsOn": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('error'));
   });
 
-  it('rejects invalid payload (empty depends_on)', () => {
+  it('rejects invalid payload (empty dependsOn)', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": []} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": []} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('error'));
   });
@@ -599,7 +599,7 @@ describe('ADD_DEPENDENCY command', () => {
     } as any;
     const handler = getAddDependencyHandler(ctx);
 
-    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "depends_on": ["task-b"]} ⟧⟧');
+    handler.handler(agent, '⟦⟦ ADD_DEPENDENCY {"taskId": "task-a", "dependsOn": ["task-b"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('cannot determine lead'));
   });

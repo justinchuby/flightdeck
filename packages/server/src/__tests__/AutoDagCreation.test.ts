@@ -2,7 +2,7 @@
  * Tests for auto-DAG creation from CREATE_AGENT and DELEGATE commands.
  * When a lead delegates without a pre-declared DAG task, the system
  * auto-creates a DAG task entry and links the agent to it.
- * Covers dependency inference: explicit depends_on, review inference, and Secretary-assisted analysis.
+ * Covers dependency inference: explicit dependsOn, review inference, and Secretary-assisted analysis.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getLifecycleCommands } from '../agents/commands/AgentLifecycle.js';
@@ -432,20 +432,20 @@ describe('generateAutoTaskId', () => {
   });
 });
 
-describe('Tier 1: Explicit depends_on from payload', () => {
-  it('wires explicit depends_on when auto-creating via CREATE_AGENT', () => {
+describe('Tier 1: Explicit dependsOn from payload', () => {
+  it('wires explicit dependsOn when auto-creating via CREATE_AGENT', () => {
     const ctx = makeCtx();
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task", "design-task"]} ⟧⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "dependsOn": ["api-task", "design-task"]} ⟧⟧');
 
     expect(ctx.taskDAG.addTask).toHaveBeenCalled();
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'api-task');
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'design-task');
   });
 
-  it('wires explicit depends_on when auto-creating via DELEGATE', () => {
+  it('wires explicit dependsOn when auto-creating via DELEGATE', () => {
     const child = makeChildAgent('lead-001');
     const ctx = makeCtx({
       getAllAgents: vi.fn().mockReturnValue([child]),
@@ -453,7 +453,7 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getDelegateHandler(ctx);
 
-    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "child-001", "task": "Write tests", "depends_on": ["impl-task"]} ⟧⟧');
+    cmd.handler(agent, '⟦⟦ DELEGATE {"to": "child-001", "task": "Write tests", "dependsOn": ["impl-task"]} ⟧⟧');
 
     expect(ctx.taskDAG.addDependency).toHaveBeenCalledWith('lead-001', expect.stringMatching(/^auto-/), 'impl-task');
   });
@@ -463,12 +463,12 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "depends_on": ["api-task"]} ⟧⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build UI", "dependsOn": ["api-task"]} ⟧⟧');
 
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('depends on'));
   });
 
-  it('does not add depends_on when matching existing task (no auto-create)', () => {
+  it('does not add dependsOn when matching existing task (no auto-create)', () => {
     const existingTask = { id: 'pre-declared', dagStatus: 'ready' };
     const ctx = makeCtx();
     (ctx.taskDAG.findReadyTask as any).mockReturnValue(existingTask);
@@ -477,7 +477,7 @@ describe('Tier 1: Explicit depends_on from payload', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build", "depends_on": ["x"]} ⟧⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build", "dependsOn": ["x"]} ⟧⟧');
 
     // No auto-create, so no addDependency
     expect(ctx.taskDAG.addDependency).not.toHaveBeenCalled();
@@ -715,7 +715,7 @@ describe('Tier 3: Secretary-assisted dependency inference', () => {
     const agent = makeLeadAgent();
     const cmd = getCreateAgentHandler(ctx);
 
-    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build feature", "depends_on": ["setup-task"]} ⟧⟧');
+    cmd.handler(agent, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build feature", "dependsOn": ["setup-task"]} ⟧⟧');
 
     // Has explicit dep — Secretary not needed
     expect(secretaryAgent.sendMessage).not.toHaveBeenCalled();
