@@ -3,10 +3,10 @@ import { EventEmitter } from 'events';
 
 // ── Mock child_process ────────────────────────────────────────────
 const mockSpawn = vi.fn();
-const mockExecFileSync = vi.fn();
+const mockExecSync = vi.fn();
 vi.mock('child_process', () => ({
   spawn: (...args: any[]) => mockSpawn(...args),
-  execFileSync: (...args: any[]) => mockExecFileSync(...args),
+  execSync: (...args: any[]) => mockExecSync(...args),
   ChildProcess: EventEmitter,
 }));
 
@@ -54,7 +54,7 @@ describe('AcpConnection', () => {
 
   describe('validateCliCommand (pre-flight check)', () => {
     it('throws descriptive error when CLI binary is not found in PATH', async () => {
-      mockExecFileSync.mockImplementation(() => {
+      mockExecSync.mockImplementation(() => {
         throw new Error('not found');
       });
 
@@ -66,7 +66,7 @@ describe('AcpConnection', () => {
     });
 
     it('includes COPILOT_CLI_PATH hint in error message', async () => {
-      mockExecFileSync.mockImplementation(() => {
+      mockExecSync.mockImplementation(() => {
         throw new Error('not found');
       });
 
@@ -78,7 +78,7 @@ describe('AcpConnection', () => {
     });
 
     it('proceeds to spawn when CLI binary exists', async () => {
-      mockExecFileSync.mockReturnValue('');
+      mockExecSync.mockReturnValue('');
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
@@ -100,22 +100,18 @@ describe('AcpConnection', () => {
       await expect(startPromise).rejects.toThrow();
     });
 
-    it('uses "command -v" on Unix and "where" on Windows', async () => {
-      const originalPlatform = process.platform;
-
-      // Test Unix path
-      mockExecFileSync.mockReturnValue('/usr/local/bin/copilot');
+    it('uses "which" on Unix and "where" on Windows', async () => {
+      mockExecSync.mockReturnValue('/usr/local/bin/copilot');
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
       const conn = new AcpConnection({ autopilot: true });
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
 
-      // On macOS/Linux, should use 'command' with '-v'
+      // On macOS/Linux, should use 'which'
       if (process.platform !== 'win32') {
-        expect(mockExecFileSync).toHaveBeenCalledWith(
-          'command',
-          ['-v', 'copilot'],
+        expect(mockExecSync).toHaveBeenCalledWith(
+          'which copilot',
           expect.objectContaining({ timeout: 3000 }),
         );
       }
@@ -127,7 +123,7 @@ describe('AcpConnection', () => {
 
   describe('process error handler', () => {
     it('emits exit(1) and logs error when spawn emits error event', async () => {
-      mockExecFileSync.mockReturnValue('');
+      mockExecSync.mockReturnValue('');
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
@@ -155,7 +151,7 @@ describe('AcpConnection', () => {
     });
 
     it('does not crash the process on spawn error', async () => {
-      mockExecFileSync.mockReturnValue('');
+      mockExecSync.mockReturnValue('');
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
@@ -170,7 +166,7 @@ describe('AcpConnection', () => {
     });
 
     it('sets isConnected to false on spawn error', async () => {
-      mockExecFileSync.mockReturnValue('');
+      mockExecSync.mockReturnValue('');
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
@@ -181,6 +177,29 @@ describe('AcpConnection', () => {
 
       await startPromise.catch(() => {});
       expect(conn.isConnected).toBe(false);
+    });
+
+    it('emits exit only once when both error and exit events fire', async () => {
+      mockExecSync.mockReturnValue('');
+      const fakeProc = createFakeProcess();
+      mockSpawn.mockReturnValue(fakeProc);
+
+      const conn = new AcpConnection({ autopilot: true });
+      const exitEvents: (number | null)[] = [];
+      conn.on('exit', (code: number | null) => exitEvents.push(code));
+
+      const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+
+      // Node.js can emit both 'error' then 'exit' on spawn failure
+      const spawnError = Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' });
+      fakeProc.emit('error', spawnError);
+      fakeProc.emit('exit', null);
+
+      await startPromise.catch(() => {});
+
+      // Should only have ONE exit event, not two
+      expect(exitEvents).toHaveLength(1);
+      expect(exitEvents[0]).toBe(1);
     });
   });
 });

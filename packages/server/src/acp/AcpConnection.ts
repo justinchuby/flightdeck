@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { spawn, execFileSync, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import { Readable, Writable } from 'stream';
 import * as acp from '@agentclientprotocol/sdk';
 
@@ -51,6 +51,7 @@ export class AcpConnection extends EventEmitter {
   private connection: acp.ClientSideConnection | null = null;
   private sessionId: string | null = null;
   private _isConnected = false;
+  private _exited = false;
   private _isPrompting = false;
   private _promptingStartedAt: number | null = null;
   private promptQueue: string[] = [];
@@ -92,10 +93,13 @@ export class AcpConnection extends EventEmitter {
    */
   private validateCliCommand(command: string): void {
     try {
-      // Use 'command -v' on Unix (works in sh/bash/zsh); 'where' on Windows
-      const checkCmd = process.platform === 'win32' ? 'where' : 'command';
-      const checkArgs = process.platform === 'win32' ? [command] : ['-v', command];
-      execFileSync(checkCmd, checkArgs, { timeout: 3000, stdio: 'ignore' });
+      // 'which' exists as a standalone binary on all Unix systems (/usr/bin/which).
+      // 'command -v' is a shell builtin (no /usr/bin/command on Linux), so we avoid it.
+      // On Windows, 'where' is the equivalent.
+      const check = process.platform === 'win32'
+        ? `where ${command}`
+        : `which ${command}`;
+      execSync(check, { timeout: 3000, stdio: 'ignore' });
     } catch {
       throw new Error(
         `CLI binary "${command}" not found in PATH. ` +
@@ -117,7 +121,11 @@ export class AcpConnection extends EventEmitter {
       throw new Error('Failed to start ACP process — stdin/stdout not available');
     }
 
+    this._exited = false;
+
     this.process.on('error', (err) => {
+      if (this._exited) return;
+      this._exited = true;
       const errCode = (err as NodeJS.ErrnoException).code;
       logger.error('acp', `Spawn error for "${opts.cliCommand}": ${err.message}`, {
         code: errCode,
@@ -128,6 +136,8 @@ export class AcpConnection extends EventEmitter {
     });
 
     this.process.on('exit', (code) => {
+      if (this._exited) return;
+      this._exited = true;
       this._isConnected = false;
       this.emit('exit', code);
     });
