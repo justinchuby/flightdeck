@@ -16,10 +16,9 @@ interface Props {
     resizeAgent: (id: string, cols: number, rows: number) => void;
     send: (msg: any) => void;
   };
-  api: any;
 }
 
-export function ChatPanel({ agentId, ws, api }: Props) {
+export function ChatPanel({ agentId, ws }: Props) {
   const [inputText, setInputText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [broadcast, setBroadcast] = useState(false);
@@ -69,40 +68,45 @@ export function ChatPanel({ agentId, ws, api }: Props) {
 
   const runningAgents = agents.filter((a) => a.status === 'running');
 
-  const sendToAgent = (targetId: string, text: string) => {
+  const sendToAgent = (targetId: string, text: string, mode: 'queue' | 'interrupt' = 'queue') => {
+    const body: Record<string, string> = { mode };
+    if (text) body.text = text;
     apiFetch(`/agents/${targetId}/message`, {
       method: 'POST',
-      body: JSON.stringify({ text, mode: 'queue' }),
+      body: JSON.stringify(body),
     }).catch((err: Error) => {
       useToastStore.getState().add('error', `Failed to send: ${err.message}`);
     });
   };
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  const handleSend = (mode: 'queue' | 'interrupt' = 'queue') => {
+    const text = inputText.trim();
+    if (!text && mode === 'queue') return;
 
-    // Record user message in store so it appears in chat
-    const state = useAppStore.getState();
-    const existing = state.agents.find((a) => a.id === agentId);
-    const isAgentBusy = existing?.status === 'running';
-    const msgs = [...(existing?.messages ?? [])];
-    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy ? { queued: true } : {}) });
-    useAppStore.getState().updateAgent(agentId, { messages: msgs });
+    if (text) {
+      // Record user message in store so it appears in chat
+      const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
+      const isAgentBusy = existing?.status === 'running';
+      const msgs = [...(existing?.messages ?? [])];
+      msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
+      useAppStore.getState().updateAgent(agentId, { messages: msgs });
+    }
 
     if (broadcast) {
-      const allAgents = useAppStore.getState().agents;
-      const running = allAgents.filter((a) => a.status === 'running');
-      running.forEach((a) => sendToAgent(a.id, inputText));
+      const running = useAppStore.getState().agents.filter((a) => a.status === 'running');
+      running.forEach((a) => sendToAgent(a.id, text, mode));
     } else {
-      sendToAgent(agentId, inputText);
+      sendToAgent(agentId, text, mode);
     }
     // Send to @mentioned agents
-    const mentionPattern = /@([a-f0-9]{4,8})\b/g;
-    let m;
-    while ((m = mentionPattern.exec(inputText)) !== null) {
-      const fullId = useAppStore.getState().agents.find((a) => a.id.startsWith(m![1]))?.id;
-      if (fullId && fullId !== agentId) {
-        sendToAgent(fullId, inputText);
+    if (text) {
+      const mentionPattern = /@([a-f0-9]{4,8})\b/g;
+      let m;
+      while ((m = mentionPattern.exec(text)) !== null) {
+        const fullId = useAppStore.getState().agents.find((a) => a.id.startsWith(m![1]))?.id;
+        if (fullId && fullId !== agentId) {
+          sendToAgent(fullId, text, mode);
+        }
       }
     }
     setInputText('');
@@ -195,10 +199,7 @@ export function ChatPanel({ agentId, ws, api }: Props) {
                 handleSend();
               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                api.interruptAgent(agentId);
-                if (inputText.trim()) {
-                  handleSend();
-                }
+                handleSend('interrupt');
               }
             }}
             onInput={(e) => {
@@ -219,12 +220,7 @@ export function ChatPanel({ agentId, ws, api }: Props) {
             <Megaphone size={14} />
           </button>
           <button
-            onClick={() => {
-              api.interruptAgent(agentId);
-              if (inputText.trim()) {
-                handleSend();
-              }
-            }}
+            onClick={() => handleSend('interrupt')}
             className="p-2 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
             title="Interrupt agent (Ctrl+Enter)"
           >

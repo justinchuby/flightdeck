@@ -27,10 +27,6 @@ function makeWs() {
   };
 }
 
-function makeApi() {
-  return { interruptAgent: vi.fn() };
-}
-
 function seedAgent(status = 'idle') {
   useAppStore.getState().setAgents([
     {
@@ -56,7 +52,7 @@ describe('ChatPanel', () => {
   it('sends message via REST API (not WebSocket)', () => {
     seedAgent();
     const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} api={makeApi()} />);
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'hello agent' } });
@@ -78,7 +74,7 @@ describe('ChatPanel', () => {
   it('uses interrupt mode on Ctrl+Enter with text', () => {
     seedAgent('running');
     const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} api={makeApi()} />);
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'urgent fix' } });
@@ -97,7 +93,7 @@ describe('ChatPanel', () => {
     seedAgent('running');
     const ws = makeWs();
     const api = makeApi();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} api={api} />);
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
@@ -110,7 +106,7 @@ describe('ChatPanel', () => {
   it('marks message as queued when agent is busy and mode is queue', () => {
     seedAgent('running');
     const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} api={makeApi()} />);
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'test' } });
@@ -124,7 +120,7 @@ describe('ChatPanel', () => {
   it('does NOT mark message as queued when agent is busy and mode is interrupt', () => {
     seedAgent('running');
     const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} api={makeApi()} />);
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'urgent' } });
@@ -163,7 +159,7 @@ describe('ChatPanel', () => {
     ]);
 
     const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} api={makeApi()} />);
+    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'hey @bbbb2222 check this' } });

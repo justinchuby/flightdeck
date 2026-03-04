@@ -100,19 +100,26 @@ export function agentsRoutes(ctx: AppContext): Router {
 
     if (agent.role.id === 'lead') {
       agent.lastHumanMessageAt = new Date();
-      agent.lastHumanMessageText = text.slice(0, 200);
+      agent.lastHumanMessageText = (text || '').slice(0, 200);
       agent.humanMessageResponded = false;
     }
 
-    const prefix = `[USER MESSAGE] The human user says:\n`;
-    const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message.`;
-
     if (mode === 'interrupt') {
-      logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
       agentManager.markHumanInterrupt(agent.id);
-      await agent.interruptWithMessage(formatted);
+      if (text) {
+        const prefix = `[USER MESSAGE] The human user says:\n`;
+        const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message.`;
+        logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+        await agent.interruptWithMessage(formatted);
+      } else {
+        logger.info('api', `Interrupt (no message) → ${agent.role.name} (${req.params.id.slice(0, 8)})`);
+        await agent.interrupt();
+      }
       res.json({ ok: true, mode: 'interrupt', status: agent.status });
     } else {
+      if (!text) return res.status(400).json({ error: 'text is required for queue mode' });
+      const prefix = `[USER MESSAGE] The human user says:\n`;
+      const formatted = `${prefix}${text}\n\nPlease acknowledge and respond to this message.`;
       logger.info('api', `Queued message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
       agent.queueMessage(formatted);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount, status: agent.status });

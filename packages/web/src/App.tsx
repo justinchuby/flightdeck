@@ -213,7 +213,7 @@ export function App() {
 
         {selectedAgentId && (
           <div className="w-[500px] border-l border-th-border flex flex-col">
-            <ChatPanel agentId={selectedAgentId} ws={ws} api={api} />
+            <ChatPanel agentId={selectedAgentId} ws={ws} />
           </div>
         )}
       </div>

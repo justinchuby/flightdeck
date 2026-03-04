@@ -61,13 +61,13 @@ export const spawnAgentSchema = z.object({
 
 /** POST /api/agents/:id/message */
 export const sendMessageSchema = z.object({
-  text: z.string().min(1, 'text is required'),
+  text: z.string().min(1).optional(),
   mode: z.enum(['queue', 'interrupt']).optional(),
 });
 
 /** POST /api/lead/:id/message */
 export const leadMessageSchema = z.object({
-  text: z.string().min(1, 'text is required'),
+  text: z.string().min(1).optional(),
   mode: z.enum(['queue', 'interrupt']).optional(),
 });
 

@@ -2300,7 +2300,7 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
               {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
                 <div className="flex items-center gap-1 mr-2">
                   <button
-                    onClick={() => apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
+                    onClick={() => apiFetch(`/agents/${selectedAgent.id}/message`, { method: 'POST', body: JSON.stringify({ mode: 'interrupt' }) })}
                     className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 transition-colors"
                     title="Interrupt — cancel current work"
                   >

@@ -107,22 +107,32 @@ export function leadRoutes(ctx: AppContext): Router {
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
 
     agent.lastHumanMessageAt = new Date();
-    agent.lastHumanMessageText = text.slice(0, 200);
+    agent.lastHumanMessageText = (text || '').slice(0, 200);
     agent.humanMessageResponded = false;
 
-    // Persist human message to conversation history
-    agentManager.persistHumanMessage(agent.id, text);
+    if (text) {
+      // Persist human message to conversation history
+      agentManager.persistHumanMessage(agent.id, text);
+    }
 
-    const formatted = `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`;
+    const formatted = text
+      ? `[USER MESSAGE — PRIORITY] The human user says:\n${text}\n\nPlease acknowledge and respond to this message. The user is waiting for your reply.`
+      : '';
 
     if (mode === 'queue') {
+      if (!text) return res.status(400).json({ error: 'text is required for queue mode' });
       logger.info('lead', `Queued message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
       agent.queueMessage(formatted);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount });
     } else {
-      logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
       agentManager.markHumanInterrupt(agent.id);
-      await agent.interruptWithMessage(formatted);
+      if (text) {
+        logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"`);
+        await agent.interruptWithMessage(formatted);
+      } else {
+        logger.info('lead', `Interrupt (no message) → ${agent.projectName || agent.id.slice(0, 8)}`);
+        await agent.interrupt();
+      }
       res.json({ ok: true, mode: 'interrupt' });
     }
   });
