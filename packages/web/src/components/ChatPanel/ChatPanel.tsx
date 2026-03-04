@@ -199,7 +199,7 @@ export function ChatPanel({ agentId, ws }: Props) {
                 handleSend();
               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                handleSend('interrupt');
+                if (inputText.trim()) handleSend('interrupt');
               }
             }}
             onInput={(e) => {

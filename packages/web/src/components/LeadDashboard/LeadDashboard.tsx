@@ -1567,7 +1567,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       sendMessage('queue');
                     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault();
-                      sendMessage('interrupt');
+                      if (input.trim()) sendMessage('interrupt');
                     }
                   }}
                   placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt)' : 'Project Lead is not active'}
