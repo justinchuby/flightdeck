@@ -25,9 +25,15 @@ function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: str
     const { to, content } = payload;
 
     // Resolve target: exact ID first, then short prefix match
-    const target =
-      ctx.getAgent(to) ??
-      ctx.getAllAgents().find((a) => a.id.startsWith(to));
+    // Scope to sender's project to prevent cross-project messaging
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const isInSameProject = (a: Agent) =>
+      !senderProjectId || ctx.getProjectIdForAgent(a.id) === senderProjectId;
+
+    const exactMatch = ctx.getAgent(to);
+    const target = (exactMatch && isInSameProject(exactMatch))
+      ? exactMatch
+      : ctx.getAllAgents().find((a) => a.id.startsWith(to) && isInSameProject(a));
 
     if (!target) {
       agent.sendMessage(`[System] Agent "${to}" not found. Use QUERY_PEERS to see available agents.`);

@@ -109,8 +109,12 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     if (!msg) return;
 
     // Resolve "to" — could be full UUID, short ID prefix, role ID, or role name
+    // Scope resolution to sender's project to prevent cross-project messaging
     let targetId = msg.to;
-    const allAgents = ctx.getAllAgents();
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const allAgents = senderProjectId
+      ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === senderProjectId)
+      : ctx.getAllAgents();
     if (!ctx.getAgent(targetId)) {
       const byPrefix = allAgents.find((a) => a.id.startsWith(msg.to) && (a.status === 'running' || a.status === 'idle'));
       if (byPrefix) {
@@ -139,6 +143,12 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     const targetAgent = ctx.getAgent(targetId);
     if (!targetAgent) {
       logger.warn('message', `Cannot resolve target "${msg.to}" for message from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+      return;
+    }
+
+    // Enforce project boundary — reject cross-project messages
+    if (senderProjectId && ctx.getProjectIdForAgent(targetId) !== senderProjectId) {
+      logger.warn('message', `Cross-project message blocked: ${agent.id.slice(0, 8)} → ${targetId.slice(0, 8)}`);
       return;
     }
 
@@ -411,8 +421,12 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
     if (!req) return;
 
     // Resolve target agent (same resolution as AGENT_MESSAGE)
+    // Scope to sender's project to prevent cross-project interrupts
     let targetId = req.to;
-    const allAgents = ctx.getAllAgents();
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const allAgents = senderProjectId
+      ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === senderProjectId)
+      : ctx.getAllAgents();
     if (!ctx.getAgent(targetId)) {
       const byPrefix = allAgents.find((a) => a.id.startsWith(req.to) && (a.status === 'running' || a.status === 'idle'));
       if (byPrefix) {

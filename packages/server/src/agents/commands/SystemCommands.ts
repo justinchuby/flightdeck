@@ -19,7 +19,11 @@ const REQUEST_LIMIT_CHANGE_REGEX = /⟦⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*
 // ── Handlers ──────────────────────────────────────────────────────────
 
 function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
-  const allAgents = ctx.getAllAgents();
+  // Scope to the requesting agent's project to prevent cross-project visibility
+  const agentProjectId = ctx.getProjectIdForAgent(agent.id);
+  const allAgents = agentProjectId
+    ? ctx.getAllAgents().filter((a) => ctx.getProjectIdForAgent(a.id) === agentProjectId)
+    : ctx.getAllAgents();
   const roster = allAgents
     .filter((a) => !isTerminalStatus(a.status))
     .map((a) => ({
@@ -55,16 +59,9 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
     }
   } else {
     const ownAgents = roster.filter(r => r.fullParentId === agent.id || r.fullId === agent.id);
-    const otherAgents = roster.filter(r => r.fullParentId !== agent.id && r.fullId !== agent.id);
     rosterLines = ownAgents
       .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) [${r.model}] | Status: ${r.status} | Task: ${r.task || 'idle'}`)
       .join('\n') || '(no agents created yet — use CREATE_AGENT to create specialists)';
-    if (otherAgents.length > 0) {
-      rosterLines += `\n\n== OTHER PROJECTS' AGENTS (read-only — you CANNOT delegate to these) ==\n` +
-        otherAgents
-          .map((r) => `- ${r.id} | ${r.role} (${r.roleId}) | Status: ${r.status} | Parent: ${r.parentId ?? 'none'}`)
-          .join('\n');
-    }
   }
 
   // Include memory entries for the lead

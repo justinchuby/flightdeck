@@ -139,6 +139,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.dispatcher = new CommandDispatcher({
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),
+      getProjectIdForAgent: (agentId) => this.getProjectIdForAgent(agentId),
       getRunningCount: () => this.getRunningCount(),
       spawnAgent: (role, task, parentId, autopilot, model, cwd, options) => this.spawn(role, task, parentId, autopilot, model, cwd, undefined, undefined, options),
       terminateAgent: (id) => this.terminate(id),
@@ -686,6 +687,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   /** Count agents that are alive (running, idle, or creating) — used for concurrency limit */
   getRunningCount(): number {
     return this.getAll().filter((a) => a.status === 'running' || a.status === 'creating' || a.status === 'idle').length;
+  }
+
+  /** Count alive agents belonging to a specific project */
+  getRunningCountByProject(projectId: string): number {
+    return this.getByProject(projectId).filter(
+      (a) => a.status === 'running' || a.status === 'creating' || a.status === 'idle',
+    ).length;
   }
 
   restart(id: string): Agent | null {
