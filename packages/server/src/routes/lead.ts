@@ -273,6 +273,49 @@ export function leadRoutes(ctx: AppContext): Router {
     res.json(timers);
   });
 
+  router.post('/timers', (req, res) => {
+    const registry = agentManager.getTimerRegistry();
+    if (!registry) return res.status(503).json({ error: 'Timer system not available' });
+
+    const { agentId, label, message, delaySeconds, repeat } = req.body;
+    if (!agentId || typeof agentId !== 'string') {
+      return res.status(400).json({ error: 'agentId is required' });
+    }
+    if (!label || typeof label !== 'string') {
+      return res.status(400).json({ error: 'label is required' });
+    }
+    if (typeof delaySeconds !== 'number' || delaySeconds <= 0 || delaySeconds > 86400) {
+      return res.status(400).json({ error: 'delaySeconds must be a number between 1 and 86400' });
+    }
+
+    const agent = agentManager.get(agentId);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+    const timer = registry.create(
+      agentId,
+      { label, message: message || '', delaySeconds, repeat: !!repeat },
+      agent.role.id,
+      agent.parentId ?? null,
+    );
+    if (!timer) {
+      return res.status(429).json({ error: 'Timer limit reached for this agent (max 20)' });
+    }
+
+    res.status(201).json({
+      id: timer.id,
+      agentId: timer.agentId,
+      agentRole: timer.agentRole,
+      label: timer.label,
+      message: timer.message,
+      fireAt: timer.fireAt,
+      createdAt: timer.createdAt,
+      status: timer.status,
+      repeat: timer.repeat,
+      delaySeconds: timer.delaySeconds,
+      remainingMs: Math.max(0, timer.fireAt - Date.now()),
+    });
+  });
+
   router.delete('/timers/:timerId', (req, res) => {
     const registry = agentManager.getTimerRegistry();
     if (!registry) return res.status(404).json({ error: 'Timer system not available' });

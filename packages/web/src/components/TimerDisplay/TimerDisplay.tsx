@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
+import { TimerCreateForm } from './TimerCreateForm';
 import type { TimerInfo } from '../../types';
 
 type TimerFilter = 'active' | 'fired' | 'all';
@@ -98,6 +99,7 @@ export function TimerDisplay() {
   const removeTimer = useTimerStore((s) => s.removeTimer);
   const [filter, setFilter] = useState<TimerFilter>('active');
   const [error, setError] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Initial fetch — WS events keep it updated after this
   useEffect(() => {
@@ -158,9 +160,19 @@ export function TimerDisplay() {
   return (
     <div className="p-3 text-xs">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[11px] font-semibold text-th-text-alt uppercase tracking-wide">
-          Timers
-        </h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[11px] font-semibold text-th-text-alt uppercase tracking-wide">
+            Timers
+          </h3>
+          <button
+            onClick={() => setShowCreateForm((s) => !s)}
+            className="text-[11px] text-blue-400 hover:text-blue-300 px-1 rounded hover:bg-blue-500/10"
+            title={showCreateForm ? 'Close form' : 'Create timer'}
+            data-testid="timer-create-toggle"
+          >
+            {showCreateForm ? '−' : '+'}
+          </button>
+        </div>
         <div className="flex gap-1">
           {(['active', 'fired', 'all'] as TimerFilter[]).map((f) => (
             <button
@@ -197,6 +209,8 @@ export function TimerDisplay() {
           ))}
         </div>
       )}
+
+      {showCreateForm && <TimerCreateForm onClose={() => setShowCreateForm(false)} />}
     </div>
   );
 }

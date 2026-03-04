@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { TimerInfo } from '../types';
+import { apiFetch } from '../hooks/useApi';
 
 /** Tracks removal timeouts for fired timers — cleared on early removal */
 const fireTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -16,6 +17,8 @@ interface TimerState {
   clearRecentlyFired: (timerId: string) => void;
   /** Schedule auto-removal after fired flash. Returns cleanup function. */
   scheduleFireRemoval: (timerId: string, delayMs?: number) => void;
+  /** Create a timer via the REST API and add it to the store */
+  createTimer: (input: { agentId: string; label: string; message: string; delaySeconds: number; repeat: boolean }) => Promise<TimerInfo>;
 }
 
 export const useTimerStore = create<TimerState>((set, get) => ({
@@ -75,6 +78,16 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       get().removeTimer(timerId);
     }, delayMs);
     fireTimeouts.set(timerId, timeout);
+  },
+
+  createTimer: async (input) => {
+    const timer = await apiFetch<TimerInfo>('/timers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    // WebSocket timer:created event will add it to the store
+    return timer;
   },
 }));
 

@@ -187,3 +187,83 @@ describe('Duration parsing in SET_TIMER schema', () => {
     expect(result.success).toBe(false); // 172800 > 86400 max
   });
 });
+
+describe('Timer creation via POST /timers (route handler logic)', () => {
+  let registry: TimerRegistry;
+
+  beforeEach(() => {
+    registry = new TimerRegistry(createTestTimerDb());
+  });
+
+  afterEach(() => {
+    registry.stop();
+  });
+
+  it('creates a timer with valid input', () => {
+    const timer = registry.create('agent-1', {
+      label: 'ui-timer',
+      message: 'Created from UI',
+      delaySeconds: 60,
+      repeat: false,
+    }, 'developer', 'lead-1');
+
+    expect(timer).not.toBeNull();
+    expect(timer!.label).toBe('ui-timer');
+    expect(timer!.message).toBe('Created from UI');
+    expect(timer!.agentRole).toBe('developer');
+    expect(timer!.leadId).toBe('lead-1');
+    expect(timer!.status).toBe('pending');
+    expect(timer!.repeat).toBe(false);
+    expect(timer!.delaySeconds).toBe(60);
+  });
+
+  it('rejects timer with delaySeconds > 86400', () => {
+    const timer = registry.create('agent-1', {
+      label: 'too-long',
+      message: 'Test',
+      delaySeconds: 86401,
+    });
+    expect(timer).toBeNull();
+  });
+
+  it('rejects timer with negative delaySeconds', () => {
+    const timer = registry.create('agent-1', {
+      label: 'negative',
+      message: 'Test',
+      delaySeconds: -1,
+    });
+    expect(timer).toBeNull();
+  });
+
+  it('rejects when agent hits max timer limit (20)', () => {
+    for (let i = 0; i < 20; i++) {
+      const t = registry.create('agent-1', {
+        label: `timer-${i}`,
+        message: 'Test',
+        delaySeconds: 300,
+      });
+      expect(t).not.toBeNull();
+    }
+    // 21st should fail
+    const overflow = registry.create('agent-1', {
+      label: 'overflow',
+      message: 'Should fail',
+      delaySeconds: 300,
+    });
+    expect(overflow).toBeNull();
+  });
+
+  it('emits timer:created event on creation', () => {
+    const events: any[] = [];
+    registry.on('timer:created', (timer) => events.push(timer));
+
+    registry.create('agent-1', {
+      label: 'event-test',
+      message: 'Testing events',
+      delaySeconds: 120,
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0].label).toBe('event-test');
+  });
+});
