@@ -8,12 +8,17 @@ export function decisionsRoutes(ctx: AppContext): Router {
 
   // --- Decisions ---
   router.get('/decisions', (req, res) => {
-    const { needs_confirmation } = req.query;
+    const { needs_confirmation, projectId } = req.query;
+    let decisions;
     if (needs_confirmation === 'true') {
-      res.json(decisionLog.getNeedingConfirmation());
+      decisions = decisionLog.getNeedingConfirmation();
     } else {
-      res.json(decisionLog.getAll());
+      decisions = decisionLog.getAll();
     }
+    if (projectId) {
+      decisions = decisions.filter((d: { projectId?: string | null }) => d.projectId === projectId);
+    }
+    res.json(decisions);
   });
 
   router.post('/decisions/:id/confirm', (req, res) => {

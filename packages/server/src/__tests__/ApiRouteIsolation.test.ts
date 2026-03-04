@@ -86,11 +86,18 @@ const agentMap = new Map(allAgents.map(a => [a.id, a]));
 // ---------------------------------------------------------------------------
 
 const mockDecisionLog = {
-  getAll: vi.fn().mockReturnValue([]),
-  getNeedingConfirmation: vi.fn().mockReturnValue([]),
+  getAll: vi.fn().mockReturnValue([
+    { id: 'd1', title: 'Decision A', projectId: 'proj-a', agentId: 'lead-aaa', leadId: 'lead-aaa', agentRole: 'lead', status: 'recorded' },
+    { id: 'd2', title: 'Decision B', projectId: 'proj-b', agentId: 'lead-bbb', leadId: 'lead-bbb', agentRole: 'lead', status: 'recorded' },
+    { id: 'd3', title: 'Decision A2', projectId: 'proj-a', agentId: 'dev-a1', leadId: 'lead-aaa', agentRole: 'developer', status: 'confirmed' },
+  ]),
+  getNeedingConfirmation: vi.fn().mockReturnValue([
+    { id: 'd1', title: 'Decision A', projectId: 'proj-a', agentId: 'lead-aaa', leadId: 'lead-aaa', agentRole: 'lead', status: 'recorded', needsConfirmation: 1 },
+  ]),
   confirm: vi.fn().mockReturnValue(null),
   reject: vi.fn().mockReturnValue(null),
   getByLeadId: vi.fn().mockReturnValue([]),
+  getById: vi.fn().mockReturnValue(null),
 };
 
 function getProjectIdForAgent(agentId: string): string | undefined {
@@ -227,6 +234,14 @@ beforeEach(() => {
     { id: 3, agentId: 'lead-bbb', agentRole: 'lead', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:02:00Z' },
     { id: 4, agentId: 'dev-b1', agentRole: 'developer', actionType: 'status_change', summary: 'Status: running', timestamp: '2026-03-04T00:03:00Z' },
   ]);
+  mockDecisionLog.getAll.mockReturnValue([
+    { id: 'd1', title: 'Decision A', projectId: 'proj-a', agentId: 'lead-aaa', leadId: 'lead-aaa', agentRole: 'lead', status: 'recorded' },
+    { id: 'd2', title: 'Decision B', projectId: 'proj-b', agentId: 'lead-bbb', leadId: 'lead-bbb', agentRole: 'lead', status: 'recorded' },
+    { id: 'd3', title: 'Decision A2', projectId: 'proj-a', agentId: 'dev-a1', leadId: 'lead-aaa', agentRole: 'developer', status: 'confirmed' },
+  ]);
+  mockDecisionLog.getNeedingConfirmation.mockReturnValue([
+    { id: 'd1', title: 'Decision A', projectId: 'proj-a', agentId: 'lead-aaa', leadId: 'lead-aaa', agentRole: 'lead', status: 'recorded', needsConfirmation: 1 },
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -357,22 +372,67 @@ describe('API Route Isolation (Issue #69 Step 3)', () => {
     });
   });
 
+  describe('GET /api/decisions', () => {
+    it('returns all decisions when no projectId filter', async () => {
+      const res = await fetch(`${baseUrl}/api/decisions`);
+      const data = await res.json();
+      expect(res.status).toBe(200);
+      expect(data).toHaveLength(3);
+    });
+
+    it('returns only project A decisions when projectId=proj-a', async () => {
+      const res = await fetch(`${baseUrl}/api/decisions?projectId=proj-a`);
+      const data = await res.json();
+      expect(res.status).toBe(200);
+      expect(data).toHaveLength(2);
+      for (const d of data) {
+        expect(d.projectId).toBe('proj-a');
+      }
+    });
+
+    it('returns only project B decisions when projectId=proj-b', async () => {
+      const res = await fetch(`${baseUrl}/api/decisions?projectId=proj-b`);
+      const data = await res.json();
+      expect(res.status).toBe(200);
+      expect(data).toHaveLength(1);
+      expect(data[0].projectId).toBe('proj-b');
+    });
+
+    it('filters needs_confirmation AND projectId together', async () => {
+      const res = await fetch(`${baseUrl}/api/decisions?needs_confirmation=true&projectId=proj-a`);
+      const data = await res.json();
+      expect(res.status).toBe(200);
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe('d1');
+    });
+
+    it('needs_confirmation with non-matching projectId returns empty', async () => {
+      const res = await fetch(`${baseUrl}/api/decisions?needs_confirmation=true&projectId=proj-b`);
+      const data = await res.json();
+      expect(res.status).toBe(200);
+      expect(data).toEqual([]);
+    });
+  });
+
   describe('backward compatibility', () => {
     it('all routes work identically when no projectId is provided', async () => {
-      const [agentsRes, statusRes, activityRes] = await Promise.all([
+      const [agentsRes, statusRes, activityRes, decisionsRes] = await Promise.all([
         fetch(`${baseUrl}/api/agents`),
         fetch(`${baseUrl}/api/coordination/status`),
         fetch(`${baseUrl}/api/coordination/activity`),
+        fetch(`${baseUrl}/api/decisions`),
       ]);
 
       const agents = await agentsRes.json();
       const status = await statusRes.json();
       const activity = await activityRes.json();
+      const decisions = await decisionsRes.json();
 
       // All return full unfiltered data
       expect(agents).toHaveLength(4);
       expect(status.agents).toHaveLength(4);
       expect(activity).toHaveLength(4);
+      expect(decisions).toHaveLength(3);
     });
   });
 });
