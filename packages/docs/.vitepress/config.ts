@@ -28,6 +28,7 @@ export default defineConfig({
             { text: 'Roles & Agents', link: '/guide/roles' },
             { text: 'Agent Commands', link: '/guide/commands' },
             { text: 'Command Syntax', link: '/guide/command-syntax' },
+            { text: 'Command Design', link: '/guide/command-design' },
             { text: 'Coordination', link: '/guide/coordination' },
             { text: 'Multiproject Isolation', link: '/guide/multiproject-isolation' },
             { text: 'Crew Status & Heartbeat', link: '/guide/crew-status' },
