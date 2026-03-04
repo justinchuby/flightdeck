@@ -37,7 +37,7 @@ Terminates an agent. Only the **lead** can use this, and only on agents in its o
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | ✅ | Target agent ID (short ID prefix) |
+| `agentId` | ✅ | Target agent ID (short ID prefix) |
 | `reason` | ❌ | Reason for termination |
 
 ### DELEGATE
@@ -108,12 +108,12 @@ Mark a DAG task as done. Any agent can use this — non-lead agents relay comple
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | ❌ | DAG task ID (defaults to agent's assigned `dagTaskId`) |
+| `taskId` | ❌ | DAG task ID (auto-detected if omitted) |
 | `summary` | ❌ | Brief summary of what was accomplished |
 | `status` | ❌ | Completion status (defaults to `"done"`) |
 | `output` | ❌ | Alias for `summary` — either field works |
 
-**Security**: When using an explicit `id`, the system verifies the calling agent is assigned to that task. Agents cannot complete tasks assigned to other agents. Fields are capped at 10K characters.
+**Security**: When using an explicit `taskId`, the system verifies the calling agent is assigned to that task. Agents cannot complete tasks assigned to other agents. Fields are capped at 10K characters.
 
 ### DECLARE_TASKS
 

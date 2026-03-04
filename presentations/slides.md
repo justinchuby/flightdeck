@@ -911,9 +911,9 @@ zero operational overhead.
 ```
 ⟦ DECLARE_TASKS {
   "tasks": [
-    {"id": "api",  "depends_on": []},
-    {"id": "ui",   "depends_on": ["api"]},
-    {"id": "test", "depends_on": ["api","ui"]}
+    {"taskId": "api",  "dependsOn": []},
+    {"taskId": "ui",   "dependsOn": ["api"]},
+    {"taskId": "test", "dependsOn": ["api","ui"]}
   ]
 } ⟧
 ```
@@ -936,8 +936,8 @@ zero operational overhead.
 
 ```
 ⟦ ADD_DEPENDENCY {
-  "task": "deploy",
-  "depends_on": "security-review"} ⟧
+  "taskId": "deploy",
+  "dependsOn": ["security-review"]} ⟧
 
 ⟦ COMPLETE_TASK {
   "taskId": "api",
@@ -971,7 +971,7 @@ When the lead uses `⟦ DELEGATE ⟧` without a DECLARE_TASKS plan, the system *
 <div class="bg-gray-800 rounded-lg p-2 border border-green-500">
 
 ### Tier 1: Explicit
-`depends_on` field in DECLARE_TASKS — you specify the graph directly
+`dependsOn` field in DECLARE_TASKS — you specify the graph directly
 
 </div>
 <div class="bg-gray-800 rounded-lg p-2 border border-yellow-500">
@@ -1672,10 +1672,10 @@ Each agent connects via ACP — the Agent Communication Protocol.
 
 ```ts
 DECLARE_TASKS {"tasks": [
-  {"id": "design",    "role": "architect",   "description": "Design API schema"},
-  {"id": "implement", "role": "developer",   "description": "Build endpoints",   "depends_on": ["design"]},
-  {"id": "test",      "role": "qa-tester",   "description": "Write E2E tests",   "depends_on": ["implement"]},
-  {"id": "review",    "role": "code-review", "description": "Review changes",    "depends_on": ["implement"]}
+  {"taskId": "design",    "role": "architect",   "description": "Design API schema"},
+  {"taskId": "implement", "role": "developer",   "description": "Build endpoints",   "dependsOn": ["design"]},
+  {"taskId": "test",      "role": "qa-tester",   "description": "Write E2E tests",   "dependsOn": ["implement"]},
+  {"taskId": "review",    "role": "code-review", "description": "Review changes",    "dependsOn": ["implement"]}
 ]}
 ```
 

@@ -111,7 +111,7 @@ When an agent completes its work (reports idle, sends a completion message, or e
 No manual `COMPLETE_TASK` call is needed from the lead. Agents can also explicitly complete their own task:
 
 ```
-⟦⟦ COMPLETE_TASK {"summary": "Implemented the feature", "dagTaskId": "my-task-id"} ⟧⟧
+⟦⟦ COMPLETE_TASK {"summary": "Implemented the feature", "taskId": "my-task-id"} ⟧⟧
 ```
 
 ## The ADD_DEPENDENCY Command
