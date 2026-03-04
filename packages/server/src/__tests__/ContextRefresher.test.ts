@@ -326,20 +326,27 @@ describe('ContextRefresher', () => {
         status: 'running',
         role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
       });
+      const subLead = makeAgent({
+        id: 'sub-lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Sub Lead', receivesStatusUpdates: true },
+        parentId: 'lead-1',
+      });
       const dev = makeAgent({ id: 'd1', status: 'running' });
-      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
+      mocks.agentManager.getAll.mockReturnValue([secretary, subLead, dev]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
       (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
         getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
       });
       (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
         getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
       });
 
       refresher.start();
-      // Active interval is 300s when agents are running
-      vi.advanceTimersByTime(300000);
+      // Periodic interval is 180s when sub-leads are active
+      vi.advanceTimersByTime(180000);
 
       // Secretary gets periodic update
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
@@ -472,7 +479,7 @@ describe('ContextRefresher', () => {
     });
   });
 
-  describe('adaptive frequency and idle collapse', () => {
+  describe('periodic timer policy — sub-lead gated', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -481,7 +488,46 @@ describe('ContextRefresher', () => {
       vi.useRealTimers();
     });
 
-    it('uses 300s interval when agents are active', () => {
+    it('sends periodic updates at 180s when sub-leads are active', () => {
+      const secretary = makeAgent({
+        id: 's1',
+        status: 'running',
+        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
+      });
+      const topLead = makeAgent({
+        id: 'lead-1',
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
+      });
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary, topLead, subLead]);
+      mocks.lockRegistry.getAll.mockReturnValue([]);
+      mocks.activityLedger.getRecent.mockReturnValue([]);
+      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
+        getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
+      });
+      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+      });
+
+      refresher.start();
+
+      // At 179s — no update yet
+      vi.advanceTimersByTime(179000);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // At 180s — first update
+      vi.advanceTimersByTime(1000);
+      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips periodic updates when no sub-leads exist', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
@@ -500,48 +546,12 @@ describe('ContextRefresher', () => {
 
       refresher.start();
 
-      // At 119s — no update yet
-      vi.advanceTimersByTime(119000);
-      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
-
-      // At 120s — still no update (active interval is 300s)
-      vi.advanceTimersByTime(1000);
-      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
-
-      // At 300s — first update
-      vi.advanceTimersByTime(180000);
-      expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
-    });
-
-    it('uses longer interval (120s) when all agents are idle', () => {
-      const secretary = makeAgent({
-        id: 's1',
-        status: 'idle',
-        role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
-      });
-      const dev = makeAgent({ id: 'd1', status: 'idle' });
-      mocks.agentManager.getAll.mockReturnValue([secretary, dev]);
-      mocks.lockRegistry.getAll.mockReturnValue([]);
-      mocks.activityLedger.getRecent.mockReturnValue([]);
-      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
-        getAll: vi.fn().mockReturnValue([]),
-      });
-      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
-        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 5, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
-      });
-
-      refresher.start();
-
-      // At 90s — no update (idle interval is 120s)
-      vi.advanceTimersByTime(90000);
-      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
-
-      // At 120s — idle collapse kicks in: all idle + DAG done = skip update
-      vi.advanceTimersByTime(30000);
+      // Even after 5 minutes, no periodic update (no sub-leads)
+      vi.advanceTimersByTime(300000);
       expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('suppresses updates when crew is fully idle and DAG complete', () => {
+    it('no periodic updates when all agents are idle (no sub-leads)', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'idle',
@@ -555,48 +565,57 @@ describe('ContextRefresher', () => {
       mocks.agentManager.getAll.mockReturnValue([lead, secretary]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
-      (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
-        getAll: vi.fn().mockReturnValue([]),
-        getByLeadId: vi.fn().mockReturnValue([]),
-      });
-      (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
-        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 1 } }),
-      });
 
       refresher.start();
 
-      // Even after multiple intervals, no updates sent (idle collapse)
-      vi.advanceTimersByTime(300000);
+      vi.advanceTimersByTime(600000);
       expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
       expect(lead.injectContextUpdate).not.toHaveBeenCalled();
     });
 
-    it('sends updates when DAG has incomplete tasks even if agents idle', () => {
+    it('starts sending updates when a sub-lead appears', () => {
       const secretary = makeAgent({
         id: 's1',
         status: 'running',
         role: { id: 'secretary', name: 'Secretary', receivesStatusUpdates: true },
       });
-      const lead = makeAgent({
+      const topLead = makeAgent({
         id: 'lead-1',
-        status: 'idle',
-        role: { id: 'lead', name: 'Project Lead' },
+        status: 'running',
+        role: { id: 'lead', name: 'Project Lead', receivesStatusUpdates: true },
       });
-      mocks.agentManager.getAll.mockReturnValue([lead, secretary]);
+      // Start without sub-leads
+      mocks.agentManager.getAll.mockReturnValue([secretary, topLead]);
       mocks.lockRegistry.getAll.mockReturnValue([]);
       mocks.activityLedger.getRecent.mockReturnValue([]);
       (mocks.agentManager as any).getDecisionLog = vi.fn().mockReturnValue({
         getAll: vi.fn().mockReturnValue([]),
+        getByLeadId: vi.fn().mockReturnValue([]),
       });
-      // DAG has pending tasks — not fully complete
       (mocks.agentManager as any).getTaskDAG = vi.fn().mockReturnValue({
-        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 2, ready: 1, running: 0, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
+        getStatus: vi.fn().mockReturnValue({ tasks: [], summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } }),
       });
 
       refresher.start();
 
-      // Idle interval (120s) — but DAG incomplete so update should fire
-      vi.advanceTimersByTime(120000);
+      // First 180s — no update (no sub-leads)
+      vi.advanceTimersByTime(180000);
+      expect(secretary.injectContextUpdate).not.toHaveBeenCalled();
+
+      // Add a sub-lead and emit agent:spawned to trigger timer re-evaluation
+      const subLead = makeAgent({
+        id: 'sublead-1',
+        status: 'running',
+        parentId: 'lead-1',
+        role: { id: 'lead', name: 'Sub Lead' },
+      });
+      mocks.agentManager.getAll.mockReturnValue([secretary, topLead, subLead]);
+      mocks.agentManager.emit('agent:spawned', { id: 'sublead-1' });
+
+      // Debounce (2s) + periodic interval (180s) = update fires
+      vi.advanceTimersByTime(2000); // debounce fires refreshAll
+      secretary.injectContextUpdate.mockClear(); // clear the refreshAll call
+      vi.advanceTimersByTime(180000); // periodic timer fires
       expect(secretary.injectContextUpdate).toHaveBeenCalledTimes(1);
     });
   });

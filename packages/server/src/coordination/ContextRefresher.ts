@@ -6,11 +6,11 @@ import type { ActivityLedger } from './ActivityLedger.js';
 import { SynthesisEngine } from './SynthesisEngine.js';
 import { SmartActivityFilter } from './SmartActivityFilter.js';
 
-/** Interval for periodic status updates during active work (ms) */
-const ACTIVE_UPDATE_INTERVAL_MS = 300_000;
-
-/** Interval for periodic status updates during idle periods (ms) */
-const IDLE_UPDATE_INTERVAL_MS = 120_000;
+/**
+ * Periodic update interval when sub-leads are active (ms).
+ * Only used when the project has sub-leads who can CREATE_AGENT autonomously.
+ */
+const SUB_LEAD_UPDATE_INTERVAL_MS = 180_000;
 
 export class ContextRefresher {
   private agentManager: AgentManager;
@@ -22,7 +22,7 @@ export class ContextRefresher {
   private periodicHandle: ReturnType<typeof setTimeout> | null = null;
   private boundRefresh: () => void;
   private boundCompacted: (data: { agentId: string }) => void;
-  private currentIntervalMs: number = ACTIVE_UPDATE_INTERVAL_MS;
+  private currentIntervalMs: number = SUB_LEAD_UPDATE_INTERVAL_MS;
   private running: boolean = false;
 
   constructor(
@@ -265,58 +265,35 @@ export class ContextRefresher {
     return alerts;
   }
 
-  /** Check if crew is fully idle — no worker agents active and DAG complete */
-  private isCrewIdle(): boolean {
-    const agents = this.agentManager.getAll();
-    // Exclude pure status receivers (secretaries) from the "active work" check
-    const hasActiveWorker = agents.some(
-      a => a.status === 'running' && !a.role.receivesStatusUpdates,
+  /**
+   * Check if running sub-leads exist (agents with role 'lead' that have a parentId).
+   * Only when sub-leads are active does the lead need periodic updates,
+   * since sub-leads can CREATE_AGENT autonomously.
+   */
+  private hasActiveSubLeads(): boolean {
+    return this.agentManager.getAll().some(
+      a => a.role.id === 'lead' && !!a.parentId && a.status === 'running',
     );
-    if (hasActiveWorker) return false;
-
-    // Check DAG — if it exists and has incomplete tasks, not idle
-    try {
-      const taskDAG = this.agentManager.getTaskDAG();
-      const leadAgent = agents.find(a => a.role.id === 'lead' && !a.parentId);
-      if (leadAgent) {
-        const status = taskDAG.getStatus(leadAgent.id);
-        const { summary } = status;
-        const incomplete = summary.pending + summary.ready + summary.running + summary.blocked + summary.paused;
-        if (incomplete > 0) return false;
-      }
-    } catch {
-      // No DAG available — that's fine
-    }
-
-    return true;
   }
 
-  /** Determine the appropriate update interval based on crew activity */
-  private getAdaptiveInterval(): number {
-    const agents = this.agentManager.getAll();
-    // Only count non-status-receiver agents as "active work"
-    const activeWorkers = agents.filter(
-      a => a.status === 'running' && !a.role.receivesStatusUpdates,
-    ).length;
-    return activeWorkers > 0 ? ACTIVE_UPDATE_INTERVAL_MS : IDLE_UPDATE_INTERVAL_MS;
-  }
-
-  /** Schedule the next periodic refresh with adaptive timing */
+  /** Schedule the next periodic refresh — only runs when sub-leads are active */
   private schedulePeriodicRefresh(): void {
     if (!this.running) return;
     if (this.periodicHandle) {
       clearTimeout(this.periodicHandle);
+      this.periodicHandle = null;
     }
-    this.currentIntervalMs = this.getAdaptiveInterval();
+
+    // No periodic updates if no sub-leads — the lead gets direct Agent Reports
+    if (!this.hasActiveSubLeads()) return;
+
+    this.currentIntervalMs = SUB_LEAD_UPDATE_INTERVAL_MS;
     this.periodicHandle = setTimeout(() => {
       this.periodicHandle = null;
       if (!this.running) return;
-
-      // Idle collapse: skip update entirely when crew is idle and DAG complete
-      if (!this.isCrewIdle()) {
+      if (this.hasActiveSubLeads()) {
         this.refreshStatusReceivers();
       }
-
       this.schedulePeriodicRefresh();
     }, this.currentIntervalMs);
   }
@@ -328,6 +305,8 @@ export class ContextRefresher {
     this.debounceHandle = setTimeout(() => {
       this.debounceHandle = null;
       this.refreshAll();
+      // Re-evaluate periodic timer (a new sub-lead may have spawned)
+      if (!this.periodicHandle) this.schedulePeriodicRefresh();
     }, 2000);
   }
 }
