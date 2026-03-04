@@ -134,6 +134,11 @@ export function useFileDrop({ onInsertText, enabled = true }: UseFileDropOptions
 
   return {
     isDragOver,
+    /**
+     * Handles both dragOver and dragEnter events. Attach this to the drop zone's
+     * `onDragOver` — do NOT attach a separate `onDragEnter` handler, as this
+     * already tracks enter/leave counts for proper isDragOver state management.
+     */
     handleDragOver: (e: React.DragEvent) => {
       handleDragEnter(e);
       handleDragOver(e);
@@ -152,9 +157,14 @@ function processDroppedFiles(files: File[], onInsertText: (text: string) => void
     const path = (file as any).path || file.name;
 
     if (kind === 'image') {
-      return readFileAsDataUrl(file).then((dataUrl) =>
-        buildInsertText({ kind, name: file.name, path, dataUrl, file }),
-      );
+      return readFileAsDataUrl(file)
+        .then((dataUrl) =>
+          buildInsertText({ kind, name: file.name, path, dataUrl, file }),
+        )
+        .catch(() => {
+          // Fall back to a file mention if the image can't be read
+          return buildInsertText({ kind: 'code', name: file.name, path, file });
+        });
     }
 
     return Promise.resolve(
@@ -163,8 +173,8 @@ function processDroppedFiles(files: File[], onInsertText: (text: string) => void
   });
 
   Promise.all(insertions).then((texts) => {
-    const combined = texts.join(' ');
-    onInsertText(combined);
+    const combined = texts.filter(Boolean).join(' ');
+    if (combined) onInsertText(combined);
   });
 }
 

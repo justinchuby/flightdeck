@@ -18,6 +18,7 @@ import { agentStatusText } from '../../utils/statusColors';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { PromptNav, hasUserMention } from '../PromptNav';
+import { useFileDrop } from '../../hooks/useFileDrop';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
@@ -36,6 +37,12 @@ export function LeadDashboard({ api, ws }: Props) {
   const setInput = useCallback((text: string) => {
     if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
   }, [selectedLeadId]);
+  const handleLeadFileInsert = useCallback((text: string) => {
+    setInput(input ? input + ' ' + text : text);
+  }, [input, setInput]);
+  const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
+    onInsertText: handleLeadFileInsert,
+  });
   const [starting, setStarting] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -1648,7 +1655,17 @@ export function LeadDashboard({ api, ws }: Props) {
 
             {/* Input */}
             <div className="border-t border-th-border p-3">
-              <div className="flex gap-2 items-end">
+              <div
+                className={`flex gap-2 items-end relative rounded transition-all ${leadDropZoneClassName}`}
+                onDragOver={leadDragOver}
+                onDragLeave={leadDragLeave}
+                onDrop={leadDrop}
+              >
+                {isLeadDragOver && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-accent/10 border-2 border-dashed border-accent rounded z-10 pointer-events-none">
+                    <span className="text-xs font-medium text-accent">Drop file to mention or attach</span>
+                  </div>
+                )}
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
