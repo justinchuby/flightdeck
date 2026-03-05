@@ -217,12 +217,11 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                       <button
                         onClick={() => handleSelect(agent.id)}
                         className="font-medium text-th-text-alt text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
-                        title={`${agent.role.name} — click to open chat`}
+                        title={`${agent.role.name} (${agent.id.slice(0, 8)}) — click to open chat`}
                       >
-                        {agent.role.name}
+                        {agent.role.name} <span className="text-th-text-muted font-mono">({agent.id.slice(0, 8)})</span>
                       </button>
                       <div className="text-[10px] text-th-text-muted font-mono flex items-center gap-1 flex-wrap">
-                        {agent.id.slice(0, 8)}
                         {agent.childIds.length > 0 && (
                           <span className="text-[10px] px-1 py-px rounded bg-blue-500/15 text-blue-400 font-sans">
                             {agent.childIds.length} sub-agent{agent.childIds.length > 1 ? 's' : ''}

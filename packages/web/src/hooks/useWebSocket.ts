@@ -6,6 +6,16 @@ import { useToastStore } from '../components/Toast';
 import type { WsMessage } from '../types';
 import { getAuthToken } from './useApi';
 
+// Module-level WS ref for global access (e.g., timer pause from ApprovalSlideOver)
+let globalWs: WebSocket | null = null;
+
+/** Send a WS message from any component (best-effort, no-op if not connected) */
+export function sendWsMessage(msg: Record<string, unknown>): void {
+  if (globalWs?.readyState === WebSocket.OPEN) {
+    globalWs.send(JSON.stringify(msg));
+  }
+}
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -30,6 +40,7 @@ export function useWebSocket() {
       : `${protocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    globalWs = ws;
 
     ws.onopen = () => {
       setConnected(true);
@@ -361,6 +372,7 @@ export function useWebSocket() {
         wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
+        globalWs = null;
       }
     };
   }, [connect]);

@@ -44,8 +44,7 @@ function AgentTreeNode({ agentId, depth }: { agentId: string; depth: number }) {
           <GitBranch size={12} className="text-th-text-muted shrink-0" />
         )}
         <span>{agent.role.icon}</span>
-        <span className="truncate">{agent.role.name}</span>
-        <span className="text-[10px] text-th-text-muted font-mono ml-auto">{agentId.slice(0, 6)}</span>
+        <span className="truncate">{agent.role.name} ({agentId.slice(0, 8)})</span>
       </button>
       {children.map((child) => (
         <AgentTreeNode key={child.id} agentId={child.id} depth={depth + 1} />

@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { X, ListChecks } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
-import { apiFetch } from '../../hooks/useApi';
+import { sendWsMessage } from '../../hooks/useWebSocket';
 import { ApprovalQueue } from './ApprovalQueue';
 
 export function ApprovalSlideOver() {
@@ -21,13 +21,9 @@ export function ApprovalSlideOver() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, close]);
 
-  // Timer pause: send queue_open/queue_closed signal so decisions don't auto-deny while reviewing
+  // Timer pause: send queue_open/queue_closed via WebSocket so decisions don't auto-deny while reviewing
   useEffect(() => {
-    const signal = isOpen ? 'queue_open' : 'queue_closed';
-    apiFetch('/decisions/timer-pause', {
-      method: 'POST',
-      body: JSON.stringify({ signal }),
-    }).catch(() => {}); // Best-effort — endpoint may not exist yet
+    sendWsMessage({ type: isOpen ? 'queue_open' : 'queue_closed' });
   }, [isOpen]);
 
   if (!isOpen) return null;

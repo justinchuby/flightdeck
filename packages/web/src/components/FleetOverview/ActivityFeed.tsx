@@ -36,7 +36,7 @@ export function ActivityFeed({ activity, agents }: Props) {
 
   const getAgentLabel = (agentId: string) => {
     const agent = agents.find((a) => a.id === agentId);
-    if (agent) return `${agent.role.icon} ${agent.role.name}`;
+    if (agent) return `${agent.role.icon} ${agent.role.name} (${agent.id.slice(0, 8)})`;
     return agentId.slice(0, 8);
   };
 

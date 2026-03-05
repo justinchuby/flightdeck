@@ -42,7 +42,7 @@ export function AgentCard({ agent, api }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-lg">{agent.role.icon}</span>
           <div>
-            <h3 className="text-sm font-medium">{agent.role.name}</h3>
+            <h3 className="text-sm font-medium">{agent.role.name} <span className="text-th-text-muted font-mono text-xs">({agent.id.slice(0, 8)})</span></h3>
             <span className={`text-xs ${agentStatusText(agent.status)}`}>
               {agent.status}
             </span>
