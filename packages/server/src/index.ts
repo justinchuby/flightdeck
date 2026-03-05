@@ -339,11 +339,7 @@ if (fs.existsSync(webDistPath)) {
   });
 }
 
-// Port file path — shared with bin/flightdeck.mjs which reads it before opening the browser
-const PORT_FILE = path.resolve(process.cwd(), '.flightdeck', 'port');
-
 async function listenWithRetry(basePort: number, host: string, maxAttempts = 10): Promise<number> {
-  removePortFile(); // clear stale port file from previous run
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const port = basePort + attempt;
     try {
@@ -363,21 +359,10 @@ async function listenWithRetry(basePort: number, host: string, maxAttempts = 10)
   throw new Error(`No available port found in range ${basePort}–${basePort + maxAttempts - 1}`);
 }
 
-function writePortFile(port: number) {
-  const dir = path.dirname(PORT_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(PORT_FILE, String(port), 'utf-8');
-}
-
-function removePortFile() {
-  try { fs.unlinkSync(PORT_FILE); } catch { /* already gone */ }
-}
-
 listenWithRetry(config.port, config.host).then((actualPort) => {
   if (actualPort !== config.port) {
     updateConfig({ port: actualPort });
   }
-  writePortFile(actualPort);
 
   const url = `http://${config.host}:${actualPort}`;
   console.log(`FLIGHTDECK_PORT=${actualPort}`);
@@ -401,7 +386,6 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Shutting down gracefully...`);
-  removePortFile();
   contextRefresher.stop();
   scheduler.stop();
   eagerScheduler.stop();
@@ -424,7 +408,6 @@ function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('exit', () => removePortFile());
 process.on('unhandledRejection', (reason: unknown) => {
   console.error('Unhandled promise rejection:', reason);
   gracefulShutdown('unhandledRejection');
