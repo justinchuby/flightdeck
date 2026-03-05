@@ -249,7 +249,7 @@ export function ChatPanel({ agentId, ws }: Props) {
               el.style.height = Math.min(el.scrollHeight, 150) + 'px';
             }}
             rows={1}
-            placeholder="Type a message... (Enter = send, Shift+Enter = newline, Ctrl+Enter = interrupt, @ to mention)"
+            placeholder="Type a message... (Enter = send, Shift+Enter = newline, Ctrl+Enter = interrupt, @ to mention files, drag & drop images)"
             className={`flex-1 bg-surface border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent resize-none overflow-y-auto ${broadcast ? 'border-accent' : 'border-th-border'}`}
             style={{ maxHeight: 150 }}
           />

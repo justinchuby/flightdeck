@@ -1313,13 +1313,13 @@ describe('TaskDAG', () => {
     });
   });
 
-  describe('completeTask RUNNING-only guard', () => {
-    it('rejects completing a ready task', () => {
+  describe('completeTask from various states', () => {
+    it('allows completing a ready task (unstarted)', () => {
       dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
-      // a is ready but not running
-      const result = dag.completeTask('lead-1', 'a');
-      expect(result).toBeNull();
       expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('ready');
+      const result = dag.completeTask('lead-1', 'a');
+      expect(result).not.toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
     });
 
     it('allows completing a running task', () => {
@@ -1330,12 +1330,21 @@ describe('TaskDAG', () => {
       expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
     });
 
-    it('getTransitionError reports ready as invalid for complete', () => {
+    it('getTransitionError returns null for ready task (ready is valid for complete)', () => {
       dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
       const error = dag.getTransitionError('lead-1', 'a', 'complete');
+      expect(error).toBeNull();
+    });
+
+    it('getTransitionError reports pending as invalid for complete', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      const error = dag.getTransitionError('lead-1', 'b', 'complete');
       expect(error).not.toBeNull();
-      expect(error!.currentStatus).toBe('ready');
-      expect(error!.validStatuses).toEqual(['running', 'paused']);
+      expect(error!.currentStatus).toBe('pending');
+      expect(error!.validStatuses).toEqual(['running', 'paused', 'ready']);
     });
 
     it('allows completing a paused task (work done outside DAG)', () => {
@@ -1353,6 +1362,17 @@ describe('TaskDAG', () => {
         { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
       ]);
       dag.pauseTask('lead-1', 'a');
+      const newlyReady = dag.completeTask('lead-1', 'a');
+      expect(newlyReady).not.toBeNull();
+      expect(newlyReady!.map(t => t.id)).toContain('b');
+      expect(dag.getTask('lead-1', 'b')!.dagStatus).toBe('ready');
+    });
+
+    it('completing ready task promotes dependents', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
       const newlyReady = dag.completeTask('lead-1', 'a');
       expect(newlyReady).not.toBeNull();
       expect(newlyReady!.map(t => t.id)).toContain('b');
@@ -1492,6 +1512,93 @@ describe('TaskDAG', () => {
       expect(task.title).toBe('Auth System Implementation');
       expect(task.files).toContain('src/auth.ts');
       expect(task.priority).toBe(5);
+    });
+  });
+
+  describe('reopenTask', () => {
+    it('reopens a done task to ready when deps satisfied', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
+      const result = dag.reopenTask('lead-1', 'a');
+      expect(result).not.toBeNull();
+      expect(result!.dagStatus).toBe('ready');
+    });
+
+    it('reopens a done task to pending when deps not satisfied', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      dag.startTask('lead-1', 'b', 'agent-2');
+      dag.completeTask('lead-1', 'b');
+      // Reopen a first (goes to ready since no deps)
+      dag.reopenTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('ready');
+      // Reopen b — a is no longer done, so b should go to pending
+      const result = dag.reopenTask('lead-1', 'b');
+      expect(result).not.toBeNull();
+      expect(result!.dagStatus).toBe('pending');
+    });
+
+    it('returns null for non-done task (ready)', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      expect(dag.reopenTask('lead-1', 'a')).toBeNull();
+    });
+
+    it('returns null for nonexistent task', () => {
+      expect(dag.reopenTask('lead-1', 'nope')).toBeNull();
+    });
+
+    it('returns null for failed task (use retryTask instead)', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.failTask('lead-1', 'a');
+      expect(dag.reopenTask('lead-1', 'a')).toBeNull();
+    });
+
+    it('clears completedAt and assignedAgentId', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      expect(dag.getTask('lead-1', 'a')!.completedAt).toBeDefined();
+      expect(dag.getTask('lead-1', 'a')!.assignedAgentId).toBeDefined();
+      const result = dag.reopenTask('lead-1', 'a');
+      expect(result!.completedAt).toBeUndefined();
+      expect(result!.assignedAgentId).toBeUndefined();
+    });
+
+    it('reopens to ready when deps are skipped (skipped counts as satisfied)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.skipTask('lead-1', 'a');
+      dag.startTask('lead-1', 'b', 'agent-1');
+      dag.completeTask('lead-1', 'b');
+      const result = dag.reopenTask('lead-1', 'b');
+      expect(result).not.toBeNull();
+      expect(result!.dagStatus).toBe('ready');
+    });
+
+    it('reopens to ready when a dependency was cancelled (cancelled dep = satisfied)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      // Complete both, then cancel a (removes it), then reopen b
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.completeTask('lead-1', 'a');
+      dag.startTask('lead-1', 'b', 'agent-2');
+      dag.completeTask('lead-1', 'b');
+      dag.cancelTask('lead-1', 'a');
+      // Cancelled deps are treated as satisfied, consistent with resolveReady
+      const result = dag.reopenTask('lead-1', 'b');
+      expect(result).not.toBeNull();
+      expect(result!.dagStatus).toBe('ready');
     });
   });
 });

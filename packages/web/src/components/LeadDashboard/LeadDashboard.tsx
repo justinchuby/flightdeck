@@ -1713,7 +1713,7 @@ export function LeadDashboard({ api, ws }: Props) {
                       }
                     }
                   }}
-                  placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt, @ to mention files)' : 'Project Lead is not active'}
+                  placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt, @ to mention files, drag & drop images)' : 'Project Lead is not active'}
                   disabled={!isActive}
                   rows={1}
                   onInput={(e) => {

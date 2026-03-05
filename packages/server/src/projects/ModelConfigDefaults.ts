@@ -36,11 +36,12 @@ const knownSet = new Set<string>(KNOWN_MODEL_IDS);
 /** Default model config used when a project has no custom config. */
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   developer: ['claude-opus-4.6'],
-  architect: ['claude-sonnet-4.6', 'claude-opus-4.6'],
-  'code-reviewer': ['gemini-3-pro-preview', 'claude-sonnet-4.6', 'claude-sonnet-4.5'],
-  'critical-reviewer': ['gemini-3-pro-preview', 'claude-opus-4.6'],
-  'tech-writer': ['claude-sonnet-4.6'],
-  secretary: ['gpt-4.1'],
+  architect: ['claude-opus-4.6'],
+  'code-reviewer': ['gemini-3-pro-preview', 'claude-opus-4.6'],
+  'critical-reviewer': ['gemini-3-pro-preview'],
+  'readability-reviewer': ['gemini-3-pro-preview'],
+  'tech-writer': ['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6'],
+  secretary: ['gpt-4.1', 'gpt-5.2', 'gpt-5.1'],
 };
 
 /** Validate that all model IDs in a config are known. Returns unknown IDs. */

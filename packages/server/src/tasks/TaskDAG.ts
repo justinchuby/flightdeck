@@ -8,11 +8,12 @@ export type DagTaskStatus = 'pending' | 'ready' | 'running' | 'done' | 'failed' 
 /** Valid source states for each state transition method */
 export const VALID_TRANSITIONS: Record<string, DagTaskStatus[]> = {
   start:    ['ready'],
-  complete: ['running', 'paused'],
+  complete: ['running', 'paused', 'ready'],
   fail:     ['running'],
   pause:    ['pending', 'ready'],
   resume:   ['paused'],
   retry:    ['failed'],
+  reopen:   ['done'],
   skip:     ['pending', 'ready', 'running', 'blocked', 'paused', 'failed'],
   cancel:   ['pending', 'ready', 'blocked', 'paused', 'failed', 'skipped'],
   forceReady: ['pending', 'blocked'],
@@ -447,7 +448,8 @@ export class TaskDAG extends EventEmitter {
     const task = this.getTask(leadId, taskId)!;
     const newStatus = task.dependsOn.every(depId => {
       const dep = this.getTask(leadId, depId);
-      return dep && (dep.dagStatus === 'done' || dep.dagStatus === 'skipped');
+      // null means dep was cancelled (deleted) — treat as satisfied, consistent with resolveReady
+      return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
     }) ? 'ready' : 'pending';
     this.db.drizzle
       .update(dagTasks)
@@ -480,6 +482,26 @@ export class TaskDAG extends EventEmitter {
     }
     this.emit('dag:updated', { leadId });
     return true;
+  }
+
+  /** Reopen a completed task (revert done → ready/pending based on deps) */
+  reopenTask(leadId: string, taskId: string): DagTask | null {
+    const error = this.validateTransition(leadId, taskId, 'reopen');
+    if (error) return null;
+    const task = this.getTask(leadId, taskId)!;
+    const depsOk = task.dependsOn.every(depId => {
+      const dep = this.getTask(leadId, depId);
+      // null means dep was cancelled (deleted) — treat as satisfied, consistent with resolveReady
+      return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
+    });
+    const newStatus = depsOk ? 'ready' : 'pending';
+    this.db.drizzle
+      .update(dagTasks)
+      .set({ dagStatus: newStatus, completedAt: null, assignedAgentId: null })
+      .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
+      .run();
+    this.emit('dag:updated', { leadId });
+    return this.getTask(leadId, taskId)!;
   }
 
   /** Force a pending/blocked task to ready state, bypassing dependency checks */

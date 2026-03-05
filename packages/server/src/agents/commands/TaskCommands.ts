@@ -2,11 +2,12 @@
  * Task DAG command handlers.
  *
  * Commands: DECLARE_TASKS, COMPLETE_TASK, TASK_STATUS, QUERY_TASKS, PAUSE_TASK,
- *           RETRY_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG, FORCE_READY,
- *           ASSIGN_TASK, REASSIGN_TASK
+ *           RETRY_TASK, REOPEN_TASK, SKIP_TASK, ADD_TASK, CANCEL_TASK, RESET_DAG,
+ *           FORCE_READY, ASSIGN_TASK, REASSIGN_TASK
  */
 import type { Agent } from '../Agent.js';
 import type { DagTaskInput } from '../../tasks/TaskDAG.js';
+import { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { CommandEntry, CommandHandlerContext } from './types.js';
 import {
   parseCommandPayload,
@@ -35,6 +36,7 @@ const RESET_DAG_REGEX = /⟦⟦\s*RESET_DAG\s*⟧⟧/s;
 const ADD_DEPENDENCY_REGEX = /⟦⟦\s*ADD_DEPENDENCY\s*(\{.*?\})\s*⟧⟧/s;
 const REASSIGN_TASK_REGEX = /⟦⟦\s*REASSIGN_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const FORCE_READY_REGEX = /⟦⟦\s*FORCE_READY\s*(\{.*?\})\s*⟧⟧/s;
+const REOPEN_TASK_REGEX = /⟦⟦\s*REOPEN_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const ASSIGN_TASK_REGEX = /⟦⟦\s*ASSIGN_TASK\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
@@ -157,6 +159,36 @@ function handleRetryTask(ctx: CommandHandlerContext, agent: Agent, data: string)
       agent.sendMessage(`[System] Cannot retry task "${req.taskId}" (must be failed).`);
     }
   } catch { agent.sendMessage('[System] RETRY_TASK error: invalid payload.'); }
+}
+
+function handleReopenTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can reopen tasks.'); return; }
+  const match = data.match(REOPEN_TASK_REGEX);
+  if (!match) return;
+  try {
+    const req = parseCommandPayload(agent, match[1], taskIdSchema, 'REOPEN_TASK');
+    if (!req) return;
+    const result = ctx.taskDAG.reopenTask(agent.id, req.taskId);
+    if (result) {
+      const allTasks = ctx.taskDAG.getTasks(agent.id);
+      const startedDependents = allTasks.filter(t =>
+        t.dependsOn.includes(req.taskId) && (t.dagStatus === 'running' || t.dagStatus === 'done')
+      );
+      let msg = `[System] Task "${req.taskId}" reopened → ${result.dagStatus}.`;
+      if (startedDependents.length > 0) {
+        const names = startedDependents.map(t => `"${t.id}" (${t.dagStatus})`).join(', ');
+        msg += ` ⚠ Warning: ${startedDependents.length} dependent task(s) already started/completed: ${names}. Consider pausing or cancelling them.`;
+      }
+      agent.sendMessage(msg);
+    } else {
+      const error = ctx.taskDAG.getTransitionError(agent.id, req.taskId, 'reopen');
+      if (error) {
+        agent.sendMessage(`[System] ${TaskDAG.formatTransitionError(error)}`);
+      } else {
+        agent.sendMessage(`[System] Cannot reopen task "${req.taskId}" (must be done).`);
+      }
+    }
+  } catch { agent.sendMessage('[System] REOPEN_TASK error: invalid payload.'); }
 }
 
 function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -322,7 +354,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
     const summary = (req.summary || req.output || '').slice(0, 10_000) || undefined;
     const error = ctx.taskDAG.getTransitionError(agent.id, req.taskId, 'complete');
     if (error) {
-      agent.sendMessage(`[System] Cannot complete task "${req.taskId}": ${error.currentStatus === 'not_found' ? 'task not found.' : `current status is "${error.currentStatus}". Must be running or ready.`}`);
+      agent.sendMessage(`[System] ${TaskDAG.formatTransitionError(error)}`);
       return;
     }
     const newlyReady = ctx.taskDAG.completeTask(agent.id, req.taskId);
@@ -555,6 +587,7 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => handlePauseTask(ctx, a, d), help: { description: 'Pause a task', example: 'PAUSE_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: RESUME_TASK_REGEX, name: 'RESUME_TASK', handler: (a, d) => handleResumeTask(ctx, a, d), help: { description: 'Resume a paused task', example: 'RESUME_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: RETRY_TASK_REGEX, name: 'RETRY_TASK', handler: (a, d) => handleRetryTask(ctx, a, d), help: { description: 'Retry a failed task', example: 'RETRY_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
+    { regex: REOPEN_TASK_REGEX, name: 'REOPEN_TASK', handler: (a, d) => handleReopenTask(ctx, a, d), help: { description: 'Reopen a completed task', example: 'REOPEN_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => handleSkipTask(ctx, a, d), help: { description: 'Skip a task', example: 'SKIP_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => handleAddTask(ctx, a, d), help: { description: 'Add a single task to the DAG', example: 'ADD_TASK {"taskId": "task-2", "role": "developer", "description": "..."}', category: 'Task DAG', args: deriveArgs(addTaskSchema) } },
     { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => handleCancelTask(ctx, a, d), help: { description: 'Cancel a task', example: 'CANCEL_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },

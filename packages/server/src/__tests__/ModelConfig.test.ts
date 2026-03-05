@@ -100,23 +100,27 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has architect defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.architect).toEqual(['claude-sonnet-4.6', 'claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.architect).toEqual(['claude-opus-4.6']);
     });
 
     it('has code-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gemini-3-pro-preview', 'claude-sonnet-4.6', 'claude-sonnet-4.5']);
+      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gemini-3-pro-preview', 'claude-opus-4.6']);
     });
 
     it('has critical-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gemini-3-pro-preview', 'claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gemini-3-pro-preview']);
+    });
+
+    it('has readability-reviewer defaults', () => {
+      expect(DEFAULT_MODEL_CONFIG['readability-reviewer']).toEqual(['gemini-3-pro-preview']);
     });
 
     it('has tech-writer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['claude-sonnet-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6']);
     });
 
     it('has secretary defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-4.1']);
+      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-4.1', 'gpt-5.2', 'gpt-5.1']);
     });
   });
 });
