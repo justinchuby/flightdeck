@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { VersionBadge } from '../VersionBadge';
 
+// Vite replaces __APP_VERSION__ and __GIT_HASH__ via AST substitution at build time.
+// In tests, these globals don't go through Vite, so we simulate them by
+// mutating globalThis before each test and restoring afterwards.
 const originalVersion = globalThis.__APP_VERSION__;
 const originalHash = globalThis.__GIT_HASH__;
 
@@ -55,6 +58,18 @@ describe('VersionBadge', () => {
     setGlobals('1.0.0', 'unknown');
     render(<VersionBadge />);
     expect(screen.getByText('v1.0.0')).toBeDefined();
+  });
+
+  it('shows fallback version when package.json was unreadable', () => {
+    setGlobals('0.0.0', 'abc1234');
+    render(<VersionBadge />);
+    expect(screen.getByText('v0.0.0 (abc1234)')).toBeDefined();
+  });
+
+  it('shows version only when both fallbacks are active', () => {
+    setGlobals('0.0.0', 'unknown');
+    render(<VersionBadge />);
+    expect(screen.getByText('v0.0.0')).toBeDefined();
   });
 
   it('has a title attribute with full version info', () => {
