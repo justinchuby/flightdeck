@@ -277,7 +277,7 @@ export function LeadDashboard({ api, ws }: Props) {
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [currentProject?.agentReports?.length]);
+  }, [currentProject?.agentReports?.length, reportsExpanded]);
 
   // Poll progress for selected lead (skip for project: prefixed IDs — those are persisted projects, not running agents)
   const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:');

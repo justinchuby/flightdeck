@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { spawn, execSync, ChildProcess } from 'child_process';
+import { spawn, execFileSync, ChildProcess } from 'child_process';
 import { Readable, Writable } from 'stream';
 import * as acp from '@agentclientprotocol/sdk';
 
@@ -93,13 +93,11 @@ export class AcpConnection extends EventEmitter {
    */
   private validateCliCommand(command: string): void {
     try {
-      // 'which' exists as a standalone binary on all Unix systems (/usr/bin/which).
-      // 'command -v' is a shell builtin (no /usr/bin/command on Linux), so we avoid it.
-      // On Windows, 'where' is the equivalent.
-      const check = process.platform === 'win32'
-        ? `where ${command}`
-        : `which ${command}`;
-      execSync(check, { timeout: 3000, stdio: 'ignore' });
+      // Use execFileSync (no shell) to avoid shell injection.
+      // 'which' exists as /usr/bin/which on all Unix systems.
+      // 'where' is the Windows equivalent.
+      const checkCmd = process.platform === 'win32' ? 'where' : 'which';
+      execFileSync(checkCmd, [command], { timeout: 3000, stdio: 'ignore' });
     } catch {
       throw new Error(
         `CLI binary "${command}" not found in PATH. ` +
@@ -135,11 +133,15 @@ export class AcpConnection extends EventEmitter {
       this.emit('exit', 1);
     });
 
-    this.process.on('exit', (code) => {
+    this.process.on('exit', (code, signal) => {
       if (this._exited) return;
       this._exited = true;
       this._isConnected = false;
-      this.emit('exit', code);
+      const exitCode = typeof code === 'number' ? code : 1;
+      if (code === null && signal) {
+        logger.warn('acp', `ACP process exited due to signal "${signal}", normalizing exit code to ${exitCode}`);
+      }
+      this.emit('exit', exitCode);
     });
 
     const output = Writable.toWeb(this.process.stdin) as WritableStream<Uint8Array>;
