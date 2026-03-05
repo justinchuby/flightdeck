@@ -206,9 +206,12 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
       return;
     }
 
+    // Exclude the lead — they see broadcasts via WebSocket events in the comms panel.
+    // Injecting into the lead's ACP prompt causes redundant reactions that clutter user chat.
     const recipients = ctx.getAllAgents().filter((a) =>
       a.id !== agent.id &&
-      (a.id === leadId || a.parentId === leadId) &&
+      a.id !== leadId &&
+      a.parentId === leadId &&
       (a.status === 'running' || a.status === 'idle')
     );
 

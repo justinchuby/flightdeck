@@ -93,4 +93,38 @@ describe('Broadcast — empty audience warning', () => {
       expect.stringContaining('Broadcast from'),
     );
   });
+
+  it('excludes the lead from broadcast recipients (lead sees via WebSocket)', () => {
+    const lead = makeAgent({
+      id: 'lead-1',
+      role: { id: 'lead', name: 'Project Lead' },
+      status: 'running',
+    });
+    const dev1 = makeAgent({
+      id: 'dev-1',
+      role: { id: 'developer', name: 'Developer' },
+      status: 'running',
+      parentId: 'lead-1',
+    });
+    const dev2 = makeAgent({
+      id: 'dev-2',
+      role: { id: 'developer', name: 'Developer' },
+      status: 'running',
+      parentId: 'lead-1',
+    });
+    const ctx = createMockContext([lead, dev1, dev2]);
+    const commands = getCommCommands(ctx);
+    const broadcastCmd = commands.find(c => c.name === 'BROADCAST')!;
+
+    const data = '\u27E6\u27E6 BROADCAST {"content": "Hello team!"} \u27E7\u27E7';
+    broadcastCmd.handler(dev1 as unknown as Agent, data);
+
+    // dev2 should receive the broadcast
+    expect(dev2.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Broadcast from'),
+    );
+
+    // Lead should NOT receive via ACP prompt injection
+    expect(lead.sendMessage).not.toHaveBeenCalled();
+  });
 });
