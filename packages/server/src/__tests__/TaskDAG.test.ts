@@ -1567,8 +1567,8 @@ describe('TaskDAG', () => {
       expect(dag.getTask('lead-1', 'a')!.completedAt).toBeDefined();
       expect(dag.getTask('lead-1', 'a')!.assignedAgentId).toBeDefined();
       const result = dag.reopenTask('lead-1', 'a');
-      expect(result!.completedAt).toBeFalsy();
-      expect(result!.assignedAgentId).toBeFalsy();
+      expect(result!.completedAt).toBeUndefined();
+      expect(result!.assignedAgentId).toBeUndefined();
     });
 
     it('reopens to ready when deps are skipped (skipped counts as satisfied)', () => {

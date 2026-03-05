@@ -448,7 +448,8 @@ export class TaskDAG extends EventEmitter {
     const task = this.getTask(leadId, taskId)!;
     const newStatus = task.dependsOn.every(depId => {
       const dep = this.getTask(leadId, depId);
-      return dep && (dep.dagStatus === 'done' || dep.dagStatus === 'skipped');
+      // null means dep was cancelled (deleted) — treat as satisfied, consistent with resolveReady
+      return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
     }) ? 'ready' : 'pending';
     this.db.drizzle
       .update(dagTasks)
