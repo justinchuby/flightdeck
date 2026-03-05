@@ -339,10 +339,12 @@ if (fs.existsSync(webDistPath)) {
   });
 }
 
+// Port file path — shared with bin/flightdeck.mjs which reads it before opening the browser
 const PORT_FILE = path.resolve(process.cwd(), '.flightdeck', 'port');
 
-async function listenWithRetry(basePort: number, host: string, maxRetries = 10): Promise<number> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+async function listenWithRetry(basePort: number, host: string, maxAttempts = 10): Promise<number> {
+  removePortFile(); // clear stale port file from previous run
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const port = basePort + attempt;
     try {
       await new Promise<void>((resolve, reject) => {
@@ -358,7 +360,7 @@ async function listenWithRetry(basePort: number, host: string, maxRetries = 10):
       console.warn(`⚠️  Port ${port} in use, trying ${port + 1}...`);
     }
   }
-  throw new Error(`No available port found in range ${basePort}–${basePort + maxRetries - 1}`);
+  throw new Error(`No available port found in range ${basePort}–${basePort + maxAttempts - 1}`);
 }
 
 function writePortFile(port: number) {
@@ -421,6 +423,7 @@ function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('exit', () => removePortFile());
 process.on('unhandledRejection', (reason: unknown) => {
   console.error('Unhandled promise rejection:', reason);
   gracefulShutdown('unhandledRejection');
