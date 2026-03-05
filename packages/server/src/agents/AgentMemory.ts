@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
-import { agentMemory } from '../db/schema.js';
+import { agentMemory, utcNow } from '../db/schema.js';
 
 export interface MemoryEntry {
   id: number;
@@ -44,7 +44,7 @@ export class AgentMemory {
     if (existing) {
       this.db.drizzle
         .update(agentMemory)
-        .set({ value, createdAt: sql`datetime('now')` })
+        .set({ value, createdAt: utcNow })
         .where(eq(agentMemory.id, existing.id))
         .run();
     } else {

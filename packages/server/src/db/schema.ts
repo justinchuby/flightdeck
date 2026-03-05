@@ -1,13 +1,16 @@
 import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
+/** ISO 8601 UTC timestamp with Z suffix — use instead of datetime('now') to avoid timezone ambiguity */
+export const utcNow = sql`(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))`;
+
 // ── Conversations & Messages ─────────────────────────────────────────
 
 export const conversations = sqliteTable('conversations', {
   id: text('id').primaryKey(),
   agentId: text('agent_id').notNull(),
   taskId: text('task_id'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
 }, (table) => [
   index('idx_conversations_agent').on(table.agentId),
 ]);
@@ -17,7 +20,7 @@ export const messages = sqliteTable('messages', {
   conversationId: text('conversation_id').notNull().references(() => conversations.id),
   sender: text('sender').notNull(),
   content: text('content').notNull(),
-  timestamp: text('timestamp').default(sql`(datetime('now'))`),
+  timestamp: text('timestamp').default(utcNow),
 }, (table) => [
   index('idx_messages_conversation').on(table.conversationId),
 ]);
@@ -49,7 +52,7 @@ export const fileLocks = sqliteTable('file_locks', {
   agentId: text('agent_id').notNull(),
   agentRole: text('agent_role').notNull(),
   reason: text('reason').default(''),
-  acquiredAt: text('acquired_at').default(sql`(datetime('now'))`),
+  acquiredAt: text('acquired_at').default(utcNow),
   expiresAt: text('expires_at').notNull(),
   projectId: text('project_id').default(''),
 }, (table) => [
@@ -66,7 +69,7 @@ export const activityLog = sqliteTable('activity_log', {
   actionType: text('action_type').notNull(),
   summary: text('summary').notNull(),
   details: text('details').default('{}'),
-  timestamp: text('timestamp').default(sql`(datetime('now'))`),
+  timestamp: text('timestamp').default(utcNow),
   projectId: text('project_id').default(''),
 }, (table) => [
   index('idx_activity_agent').on(table.agentId),
@@ -88,7 +91,7 @@ export const decisions = sqliteTable('decisions', {
   status: text('status').default('recorded'),
   autoApproved: integer('auto_approved').default(0),
   confirmedAt: text('confirmed_at'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
 }, (table) => [
   index('idx_decisions_status').on(table.status),
   index('idx_decisions_needs_confirmation').on(table.needsConfirmation),
@@ -104,7 +107,7 @@ export const agentMemory = sqliteTable('agent_memory', {
   agentId: text('agent_id').notNull(),
   key: text('key').notNull(),
   value: text('value').notNull(),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
 }, (table) => [
   index('idx_agent_memory_lead').on(table.leadId),
   index('idx_agent_memory_agent').on(table.agentId),
@@ -119,7 +122,7 @@ export const chatGroups = sqliteTable('chat_groups', {
   projectId: text('project_id'),
   roles: text('roles'),
   archived: integer('archived').default(0),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
 }, (table) => [
   primaryKey({ columns: [table.name, table.leadId] }),
 ]);
@@ -128,7 +131,7 @@ export const chatGroupMembers = sqliteTable('chat_group_members', {
   groupName: text('group_name').notNull(),
   leadId: text('lead_id').notNull(),
   agentId: text('agent_id').notNull(),
-  addedAt: text('added_at').default(sql`(datetime('now'))`),
+  addedAt: text('added_at').default(utcNow),
 }, (table) => [
   primaryKey({ columns: [table.groupName, table.leadId, table.agentId] }),
 ]);
@@ -141,7 +144,7 @@ export const chatGroupMessages = sqliteTable('chat_group_messages', {
   fromRole: text('from_role').notNull(),
   content: text('content').notNull(),
   reactions: text('reactions').default('{}'),
-  timestamp: text('timestamp').default(sql`(datetime('now'))`),
+  timestamp: text('timestamp').default(utcNow),
 }, (table) => [
   index('idx_group_messages_group').on(table.groupName, table.leadId),
 ]);
@@ -160,7 +163,7 @@ export const dagTasks = sqliteTable('dag_tasks', {
   priority: integer('priority').default(0),
   model: text('model'),
   assignedAgentId: text('assigned_agent_id'),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
   startedAt: text('started_at'),
   completedAt: text('completed_at'),
 }, (table) => [
@@ -180,7 +183,7 @@ export const deferredIssues = sqliteTable('deferred_issues', {
   description: text('description').notNull(),
   sourceFile: text('source_file').default(''),
   status: text('status').notNull().default('open'),       // open | resolved | dismissed
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
   resolvedAt: text('resolved_at'),
 }, (table) => [
   index('idx_deferred_issues_lead').on(table.leadId),
@@ -193,7 +196,7 @@ export const agentPlans = sqliteTable('agent_plans', {
   agentId: text('agent_id').primaryKey(),
   leadId: text('lead_id'),
   planJson: text('plan_json').notNull().default('[]'),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').default(utcNow),
 });
 
 // ── Projects (persistent, survive lead sessions) ────────────────────
@@ -205,8 +208,8 @@ export const projects = sqliteTable('projects', {
   cwd: text('cwd'),
   status: text('status').default('active'),       // active | archived | completed
   modelConfig: text('model_config').default('{}'),  // JSON: role → allowed model IDs
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
+  updatedAt: text('updated_at').default(utcNow),
 }, (table) => [
   index('idx_projects_status').on(table.status),
 ]);
@@ -219,7 +222,7 @@ export const projectSessions = sqliteTable('project_sessions', {
   role: text('role').default('lead'),               // role id used for this session
   task: text('task'),
   status: text('status').default('active'),        // active | completed | crashed
-  startedAt: text('started_at').default(sql`(datetime('now'))`),
+  startedAt: text('started_at').default(utcNow),
   endedAt: text('ended_at'),
 }, (table) => [
   index('idx_project_sessions_project').on(table.projectId),
@@ -233,8 +236,8 @@ export const agentFileHistory = sqliteTable('agent_file_history', {
   agentRole: text('agent_role').notNull(),
   leadId: text('lead_id').notNull(),
   filePath: text('file_path').notNull(),
-  firstTouchedAt: text('first_touched_at').default(sql`(datetime('now'))`),
-  lastTouchedAt: text('last_touched_at').default(sql`(datetime('now'))`),
+  firstTouchedAt: text('first_touched_at').default(utcNow),
+  lastTouchedAt: text('last_touched_at').default(utcNow),
   touchCount: integer('touch_count').default(1),
 }, (table) => [
   primaryKey({ columns: [table.agentId, table.leadId, table.filePath] }),
@@ -251,8 +254,8 @@ export const collectiveMemory = sqliteTable('collective_memory', {
   value: text('value').notNull(),
   source: text('source').notNull(),      // agentId who discovered it
   projectId: text('project_id').default(''),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  lastUsedAt: text('last_used_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
+  lastUsedAt: text('last_used_at').default(utcNow),
   useCount: integer('use_count').default(0),
 }, (table) => [
   index('idx_collective_memory_category').on(table.category),
@@ -269,8 +272,8 @@ export const taskCostRecords = sqliteTable('task_cost_records', {
   leadId: text('lead_id').notNull(),
   inputTokens: integer('input_tokens').default(0),
   outputTokens: integer('output_tokens').default(0),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
+  updatedAt: text('updated_at').default(utcNow),
 }, (table) => [
   primaryKey({ columns: [table.agentId, table.dagTaskId, table.leadId] }),
   index('idx_task_cost_agent').on(table.agentId),
@@ -283,7 +286,7 @@ export const sessionRetros = sqliteTable('session_retros', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   leadId: text('lead_id').notNull(),
   data: text('data').notNull(),        // JSON blob with full retro
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
 }, (table) => [
   index('idx_session_retros_lead').on(table.leadId),
 ]);
@@ -299,7 +302,7 @@ export const timers = sqliteTable('timers', {
   message: text('message').notNull(),
   delaySeconds: integer('delay_seconds').notNull(),
   fireAt: text('fire_at').notNull(),
-  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  createdAt: text('created_at').default(utcNow),
   status: text('status').notNull().default('pending'),   // pending | fired | cancelled
   repeat: integer('repeat').default(0),
 }, (table) => [

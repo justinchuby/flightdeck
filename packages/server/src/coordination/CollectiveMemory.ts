@@ -1,6 +1,6 @@
 import { eq, and, desc, like, sql } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
-import { collectiveMemory } from '../db/schema.js';
+import { collectiveMemory, utcNow } from '../db/schema.js';
 
 // Escape LIKE wildcards to prevent pattern injection
 function escapeLike(s: string): string {
@@ -64,7 +64,7 @@ export class CollectiveMemory {
         .set({
           value,
           source: sourceAgentId,
-          lastUsedAt: sql`datetime('now')`,
+          lastUsedAt: utcNow,
           useCount: sql`use_count + 1`,
         })
         .where(eq(collectiveMemory.id, existing.id))
@@ -102,7 +102,7 @@ export class CollectiveMemory {
     if (ids.length > 0) {
       this.db.drizzle
         .update(collectiveMemory)
-        .set({ lastUsedAt: sql`datetime('now')`, useCount: sql`use_count + 1` })
+        .set({ lastUsedAt: utcNow, useCount: sql`use_count + 1` })
         .where(sql`id IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`)
         .run();
     }

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { eq, and, sql } from 'drizzle-orm';
 import { Database } from '../db/database.js';
-import { fileLocks } from '../db/schema.js';
+import { fileLocks, utcNow } from '../db/schema.js';
 
 export interface FileLock {
   filePath: string;
@@ -42,8 +42,8 @@ function pathsConflict(existingPattern: string, requested: string): boolean {
   return false;
 }
 
-const activeFilter = sql`${fileLocks.expiresAt} > datetime('now')`;
-const expiredFilter = sql`${fileLocks.expiresAt} <= datetime('now')`;
+const activeFilter = sql`${fileLocks.expiresAt} > ${utcNow}`;
+const expiredFilter = sql`${fileLocks.expiresAt} <= ${utcNow}`;
 
 export class FileLockRegistry extends EventEmitter {
   private db: Database;

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { eq, and, desc, asc, sql, ne, inArray } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
-import { dagTasks } from '../db/schema.js';
+import { dagTasks, utcNow } from '../db/schema.js';
 
 export type DagTaskStatus = 'pending' | 'ready' | 'running' | 'done' | 'failed' | 'blocked' | 'paused' | 'skipped';
 
@@ -341,7 +341,7 @@ export class TaskDAG extends EventEmitter {
     if (error) return null;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'running', assignedAgentId: agentId, startedAt: sql`datetime('now')` })
+      .set({ dagStatus: 'running', assignedAgentId: agentId, startedAt: utcNow })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     this.emit('dag:updated', { leadId });
@@ -360,7 +360,7 @@ export class TaskDAG extends EventEmitter {
     if (terminalOrRunning.includes(task.dagStatus)) return null;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'running', assignedAgentId: agentId, startedAt: sql`datetime('now')` })
+      .set({ dagStatus: 'running', assignedAgentId: agentId, startedAt: utcNow })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     this.emit('dag:updated', { leadId });
@@ -387,7 +387,7 @@ export class TaskDAG extends EventEmitter {
     if (error) return null;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'done', completedAt: sql`datetime('now')` })
+      .set({ dagStatus: 'done', completedAt: utcNow })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     const newlyReady = this.resolveReady(leadId);
@@ -409,7 +409,7 @@ export class TaskDAG extends EventEmitter {
     if (error) return false;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'failed', completedAt: sql`datetime('now')` })
+      .set({ dagStatus: 'failed', completedAt: utcNow })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     // Block all tasks that depend on this one
@@ -505,7 +505,7 @@ export class TaskDAG extends EventEmitter {
     const previousAgentId = task?.assignedAgentId;
     this.db.drizzle
       .update(dagTasks)
-      .set({ dagStatus: 'skipped', assignedAgentId: null, completedAt: sql`datetime('now')` })
+      .set({ dagStatus: 'skipped', assignedAgentId: null, completedAt: utcNow })
       .where(and(eq(dagTasks.id, taskId), eq(dagTasks.leadId, leadId)))
       .run();
     // Resolve newly ready tasks (skipped counts as "done" for dependency resolution)

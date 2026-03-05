@@ -1,6 +1,6 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { Database } from '../db/database.js';
-import { agentFileHistory } from '../db/schema.js';
+import { agentFileHistory, utcNow } from '../db/schema.js';
 import type { FileLockRegistry } from './FileLockRegistry.js';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export class CapabilityRegistry {
       .onConflictDoUpdate({
         target: [agentFileHistory.agentId, agentFileHistory.leadId, agentFileHistory.filePath],
         set: {
-          lastTouchedAt: sql`datetime('now')`,
+          lastTouchedAt: utcNow,
           touchCount: sql`${agentFileHistory.touchCount} + 1`,
         },
       })

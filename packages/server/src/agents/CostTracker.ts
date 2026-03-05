@@ -1,5 +1,5 @@
 import type { Database } from '../db/database.js';
-import { taskCostRecords } from '../db/schema.js';
+import { taskCostRecords, utcNow } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 
 export interface CostRecord {
@@ -108,7 +108,7 @@ export class CostTracker {
         set: {
           inputTokens: sql`${taskCostRecords.inputTokens} + ${deltaInput}`,
           outputTokens: sql`${taskCostRecords.outputTokens} + ${deltaOutput}`,
-          updatedAt: sql`datetime('now')`,
+          updatedAt: utcNow,
         },
       })
       .run();
