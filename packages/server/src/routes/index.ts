@@ -24,6 +24,8 @@ import { recoveryRoutes } from './recovery.js';
 import { handoffRoutes } from './handoffs.js';
 import { notificationRoutes } from './notifications.js';
 import { nlRoutes } from './nl.js';
+import { predictionRoutes } from './predictions.js';
+import { workflowRoutes } from './workflows.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -50,4 +52,6 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(handoffRoutes(ctx));
   router.use(notificationRoutes(ctx));
   router.use(nlRoutes(ctx));
+  router.use(predictionRoutes(ctx));
+  router.use(workflowRoutes(ctx));
 }
