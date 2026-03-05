@@ -13,7 +13,7 @@ export type AlertSeverity = 'critical' | 'warning' | 'info';
 export interface AlertAction {
   label: string;
   description: string;
-  actionType: 'api_call';
+  actionType: 'api_call' | 'dismiss';
   endpoint: string;
   method: 'POST' | 'DELETE' | 'PATCH';
   body?: Record<string, any>;
@@ -230,7 +230,13 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
   );
 
   const executeAction = useCallback(async (alertId: string, action: AlertAction) => {
-    if (!action.endpoint) return; // Dismiss action
+    // 'dismiss' actions are client-side only — no API call
+    if (action.actionType === 'dismiss' || !action.endpoint) return;
+    // Validate endpoint starts with /api/ or relative path for safety
+    if (!action.endpoint.startsWith('/') && !action.endpoint.startsWith('api/')) {
+      addToast('error', `Invalid action endpoint: ${action.endpoint}`);
+      return;
+    }
     setExecutingAction(`${alertId}-${action.label}`);
     try {
       await apiFetch(action.endpoint, {

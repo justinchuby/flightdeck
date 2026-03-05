@@ -28,6 +28,7 @@ import { OnboardingWizard, useOnboarding } from './components/Onboarding/Onboard
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { VersionBadge } from './components/VersionBadge';
 import { PulseStrip } from './components/Pulse';
+import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
@@ -61,6 +62,19 @@ export function App() {
   // Onboarding wizard — show on first visit
   const { shouldShow } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(shouldShow);
+
+  // Shift+A global shortcut to open approval queue
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'A' && e.shiftKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        useAppStore.getState().setApprovalQueueOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
   useEffect(() => {
@@ -180,6 +194,7 @@ export function App() {
                 {systemPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                 <span>{systemPaused ? 'Resume' : 'Pause'}</span>
               </button>
+              <ApprovalBadge />
               <button
                 onClick={openCmd}
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
@@ -226,6 +241,7 @@ export function App() {
       </div>
       <ToastContainer />
       <PermissionDialog />
+      <ApprovalSlideOver />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}

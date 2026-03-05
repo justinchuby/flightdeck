@@ -193,6 +193,7 @@ export interface Decision {
   status?: 'recorded' | 'confirmed' | 'rejected';
   autoApproved?: boolean;
   confirmedAt?: string | null;
+  category?: string;
   timestamp: string;
 }
 

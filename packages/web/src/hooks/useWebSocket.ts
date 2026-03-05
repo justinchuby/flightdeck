@@ -308,6 +308,39 @@ export function useWebSocket() {
           if (timerId) ts.removeTimer(timerId);
           break;
         }
+        // Track pending decisions globally for the approval queue badge
+        case 'lead:decision': {
+          if (msg.needsConfirmation && msg.id) {
+            useAppStore.getState().addPendingDecision({
+              id: msg.id,
+              agentId: msg.agentId,
+              agentRole: msg.agentRole || 'Unknown',
+              projectId: msg.projectId,
+              title: msg.title || 'Untitled decision',
+              rationale: msg.rationale || '',
+              needsConfirmation: true,
+              status: 'recorded',
+              timestamp: msg.timestamp || new Date().toISOString(),
+            });
+          }
+          break;
+        }
+        case 'decision:confirmed':
+        case 'decision:rejected': {
+          const decisionId = msg.decisionId ?? msg.id;
+          if (decisionId) {
+            useAppStore.getState().removePendingDecision(decisionId);
+          }
+          break;
+        }
+        case 'decisions:batch': {
+          // Batch resolve — remove all resolved decisions
+          const decisions = msg.decisions ?? [];
+          for (const d of decisions) {
+            if (d.id) useAppStore.getState().removePendingDecision(d.id);
+          }
+          break;
+        }
       }
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);

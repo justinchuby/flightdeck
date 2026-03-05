@@ -48,6 +48,8 @@ function pressureDotColor(pct: number): string {
 
 export function PulseStrip() {
   const agents = useAppStore((s) => s.agents);
+  const pendingDecisionCount = useAppStore((s) => s.pendingDecisions.length);
+  const openApprovalQueue = useAppStore((s) => s.setApprovalQueueOpen);
 
   const stats = useMemo(() => {
     let totalInput = 0;
@@ -81,8 +83,9 @@ export function PulseStrip() {
     const cost = estimateCostUsd(totalInput, totalOutput);
     const totalTokens = totalInput + totalOutput;
 
-    // Pending decisions: count agents with pendingPermission
-    const pendingDecisions = agents.filter((a) => a.pendingPermission).length;
+    // Pending decisions: from appStore (tracked via WebSocket events)
+    // Also count agents with pendingPermission as a fallback
+    const permissionCount = agents.filter((a) => a.pendingPermission).length;
 
     // Token pressure: agents with context data, sorted by pressure descending
     const agentsWithContext = agents
@@ -106,12 +109,15 @@ export function PulseStrip() {
       idle,
       failed,
       stuck,
-      pendingDecisions,
+      permissionCount,
       agentsWithContext,
       maxPressure,
       agentCount: agents.length,
     };
   }, [agents]);
+
+  // Combine appStore pending decisions + permission requests for total count
+  const totalPending = pendingDecisionCount + (stats.permissionCount ?? 0);
 
   // Don't render if no agents are active
   if (stats.agentCount === 0) return null;
@@ -156,19 +162,20 @@ export function PulseStrip() {
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />
 
-      {/* Pending Decisions */}
+      {/* Pending Decisions — click opens Approval Queue */}
       <button
+        onClick={() => openApprovalQueue(true)}
         className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${
-          stats.pendingDecisions > 0
+          totalPending > 0
             ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 cursor-pointer'
-            : 'text-th-text-muted cursor-default'
+            : 'text-th-text-muted hover:text-th-text-alt cursor-pointer'
         }`}
-        title={stats.pendingDecisions > 0 ? `${stats.pendingDecisions} decisions awaiting approval` : 'No pending decisions'}
+        title={totalPending > 0 ? `${totalPending} decisions awaiting approval — click to review` : 'No pending decisions — click to open approval queue'}
       >
         <AlertCircle className="w-3.5 h-3.5" />
-        <span className="font-mono font-medium">{stats.pendingDecisions}</span>
+        <span className="font-mono font-medium">{totalPending}</span>
         <span className="hidden sm:inline">pending</span>
-        {stats.pendingDecisions > 0 && (
+        {totalPending > 0 && (
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
         )}
       </button>
