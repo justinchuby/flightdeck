@@ -4,6 +4,7 @@ import type { AgentInfo } from '../../types';
 import { RefreshCw, Square, Terminal, Hand, Check, Play } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { DiffBadge } from '../DiffPreview';
 
 interface Props {
   agent: AgentInfo;
@@ -209,6 +210,9 @@ export function AgentCard({ agent, api }: Props) {
             <span className="text-[10px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400">
               autopilot
             </span>
+          )}
+          {(agent.status === 'running' || agent.status === 'idle') && (
+            <DiffBadge agentId={agent.id} />
           )}
         </div>
         <AgentIdBadge id={agent.id} />

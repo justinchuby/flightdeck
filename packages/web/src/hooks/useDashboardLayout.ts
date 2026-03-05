@@ -22,6 +22,8 @@ export const DEFAULT_PANELS: PanelConfig[] = [
   { id: 'costs',      label: 'Cost Breakdown',   visible: false, order: 7 },
   { id: 'timers',     label: 'Agent Timers',     visible: false, order: 8 },
   { id: 'scorecards', label: 'Performance',      visible: false, order: 9 },
+  { id: 'commflow',   label: 'Comm Flow Graph',  visible: true,  order: 10 },
+  { id: 'diff',       label: 'Live Diffs',        visible: true,  order: 11 },
 ];
 
 const STORAGE_KEY = 'dashboard-layout';

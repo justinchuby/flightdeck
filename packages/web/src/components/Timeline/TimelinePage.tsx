@@ -12,6 +12,7 @@ import { AccessibilityAnnouncer } from './AccessibilityAnnouncer';
 import { useAccessibilityAnnouncements } from './useAccessibilityAnnouncements';
 import { useAppStore } from '../../stores/appStore';
 import { useTimelineStore } from '../../stores/timelineStore';
+import { ReplayScrubber } from '../SessionReplay';
 import './timeline-a11y.css';
 
 interface Props {
@@ -404,6 +405,13 @@ export function TimelinePage({ api, ws }: Props) {
             onScrollToError={handleScrollToError}
           />
           <TimelineContainer data={filteredData} liveMode={liveMode} onLiveModeChange={setLiveMode} />
+        </div>
+      )}
+
+      {/* Session Replay Scrubber — available when a lead is selected */}
+      {selectedLead && !liveMode && (
+        <div className="shrink-0 px-0 pb-2">
+          <ReplayScrubber leadId={selectedLead} />
         </div>
       )}
       </div>

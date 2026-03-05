@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
@@ -11,6 +11,9 @@ import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
 import { AlertsPanel } from './AlertsPanel';
 import { CommHeatmap } from '../FleetOverview/CommHeatmap';
+import { CommFlowGraph } from '../CommFlow';
+import { DiffPreview } from '../DiffPreview';
+import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 import type { PanelConfig } from '../../hooks/useDashboardLayout';
 
@@ -85,9 +88,66 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
         </div>
       );
     }
+    case 'commflow':
+      return (
+        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+          <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">🔀 Communication Flow</h3>
+          <CommFlowGraph leadId={leadId} width={600} height={400} />
+        </div>
+      );
+    case 'diff':
+      return <AgentDiffPanel agents={agents} leadId={leadId} />;
     default:
       return null;
   }
+}
+
+// ── Agent Diff Panel (uses useFocusAgent to show live diffs) ─────────
+
+function AgentDiffPanel({ agents, leadId }: { agents: any[]; leadId: string }) {
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const { data } = useFocusAgent(selectedAgentId);
+
+  const team = agents.filter((a) => a.parentId === leadId || a.id === leadId);
+  const agentsWithActivity = team.filter((a) => a.status === 'running' || a.status === 'idle');
+
+  return (
+    <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
+      <h3 className="text-sm font-semibold text-th-text-alt mb-3 flex items-center gap-2">📝 Live Diffs</h3>
+      {agentsWithActivity.length === 0 ? (
+        <p className="text-xs text-th-text-muted">No active agents with file changes.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {agentsWithActivity.map((a) => {
+              const roleName = typeof a.role === 'object' ? a.role.name : a.role;
+              const icon = typeof a.role === 'object' ? a.role.icon : '🤖';
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setSelectedAgentId(selectedAgentId === a.id ? null : a.id)}
+                  className={`px-2 py-1 text-[11px] rounded border transition-colors ${
+                    selectedAgentId === a.id
+                      ? 'bg-accent/15 border-accent/40 text-accent'
+                      : 'bg-th-bg-alt border-th-border text-th-text-muted hover:text-th-text-alt'
+                  }`}
+                >
+                  {icon} {roleName} ({a.id.slice(0, 8)})
+                </button>
+              );
+            })}
+          </div>
+          {data?.diff ? (
+            <DiffPreview diff={data.diff} />
+          ) : selectedAgentId ? (
+            <p className="text-xs text-th-text-muted">No file changes for this agent.</p>
+          ) : (
+            <p className="text-xs text-th-text-muted">Select an agent to view their diffs.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 // ── MissionControlPage ───────────────────────────────────────────────
