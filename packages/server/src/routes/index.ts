@@ -15,6 +15,8 @@ import { servicesRoutes } from './services.js';
 import { diffRoutes } from './diff.js';
 import { replayRoutes } from './replay.js';
 import { commsRoutes } from './comms.js';
+import { summaryRoutes } from './summary.js';
+import { playbookRoutes } from './playbooks.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -32,4 +34,6 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(diffRoutes(ctx));
   router.use(replayRoutes(ctx));
   router.use(commsRoutes(ctx));
+  router.use(summaryRoutes(ctx));
+  router.use(playbookRoutes(ctx));
 }
