@@ -93,7 +93,17 @@ export function coordinationRoutes(ctx: AppContext): Router {
   });
 
   // ── Helper: build timeline data from activity events ──────────────────────
+  // 5s TTL cache to avoid re-computing on rapid polling
+  let _timelineCache: { key: string; data: any; ts: number } | null = null;
+  const TIMELINE_CACHE_TTL = 5_000;
+
   function buildTimelineData(leadId?: string, since?: string) {
+    const cacheKey = `${leadId ?? ''}:${since ?? ''}`;
+    const now = Date.now();
+    if (_timelineCache && _timelineCache.key === cacheKey && now - _timelineCache.ts < TIMELINE_CACHE_TTL) {
+      return _timelineCache.data;
+    }
+
     let events = since ? activityLedger.getSince(since) : activityLedger.getRecent(10_000);
 
     // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
@@ -235,7 +245,9 @@ export function coordinationRoutes(ctx: AppContext): Router {
     const leadAgent = resolvedLeadId ? agentManager.get(resolvedLeadId) : undefined;
     const project = leadAgent ? { projectId: leadAgent.projectId, projectName: leadAgent.projectName, leadId: leadAgent.id } : undefined;
 
-    return { agents, communications, locks, timeRange, project, teamAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
+    const result = { agents, communications, locks, timeRange, project, teamAgentIds, ledgerVersion: activityLedger.version, dropCount: eventPipeline?.dropCount ?? 0 };
+    _timelineCache = { key: cacheKey, data: result, ts: Date.now() };
+    return result;
   }
 
   router.get('/coordination/timeline', (req, res) => {

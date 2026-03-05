@@ -15,10 +15,11 @@ function makeMsg(overrides: Partial<GroupMessage> & { content: string }): GroupM
   };
 }
 
-function createMockRegistry(messages: GroupMessage[], groups?: ChatGroup[]) {
+function createMockRegistry(messages: GroupMessage[], _groups?: ChatGroup[]) {
   return {
-    getGroups: vi.fn(() => groups ?? [{ name: 'test-group', leadId: 'lead-1', memberIds: [], createdAt: new Date().toISOString() }]),
+    getGroups: vi.fn(() => _groups ?? [{ name: 'test-group', leadId: 'lead-1', memberIds: [], createdAt: new Date().toISOString() }]),
     getMessages: vi.fn(() => messages),
+    getMessagesByLead: vi.fn(() => messages),
   };
 }
 

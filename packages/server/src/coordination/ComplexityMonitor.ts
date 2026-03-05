@@ -45,6 +45,7 @@ export interface ComplexityAlert {
 export class ComplexityMonitor {
   private files: Map<string, FileComplexity> = new Map();
   private projectRoot: string;
+  private static readonly MAX_FILES = 5_000;
 
   // Configurable thresholds (exposed as statics for testability)
   static LINE_WARNING = 300;
@@ -100,6 +101,17 @@ export class ComplexityMonitor {
       };
 
       this.files.set(filePath, result);
+
+      // Evict stalest entry if at capacity
+      if (this.files.size > ComplexityMonitor.MAX_FILES) {
+        let stalestKey: string | null = null;
+        let stalestTime = Infinity;
+        for (const [key, f] of this.files) {
+          if (f.lastChecked < stalestTime) { stalestTime = f.lastChecked; stalestKey = key; }
+        }
+        if (stalestKey) this.files.delete(stalestKey);
+      }
+
       return result;
     } catch {
       return null;

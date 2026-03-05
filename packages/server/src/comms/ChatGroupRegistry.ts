@@ -208,6 +208,27 @@ export class ChatGroupRegistry extends EventEmitter {
     }));
   }
 
+  /** Get all recent messages across all groups for a lead (single query) */
+  getMessagesByLead(leadId: string, limit = 2000): GroupMessage[] {
+    const rows = this.db.drizzle
+      .select()
+      .from(chatGroupMessages)
+      .where(eq(chatGroupMessages.leadId, leadId))
+      .orderBy(asc(chatGroupMessages.timestamp))
+      .limit(limit)
+      .all();
+    return rows.map((r) => ({
+      id: r.id,
+      groupName: r.groupName,
+      leadId: r.leadId,
+      fromAgentId: r.fromAgentId,
+      fromRole: r.fromRole,
+      content: r.content,
+      reactions: JSON.parse(r.reactions || '{}') as Record<string, string[]>,
+      timestamp: r.timestamp!,
+    }));
+  }
+
   // ── Reactions ──────────────────────────────────────────────────────
 
   addReaction(messageId: string, agentId: string, emoji: string): boolean {

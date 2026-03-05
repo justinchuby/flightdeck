@@ -148,7 +148,7 @@ export class ActivityLedger extends EventEmitter {
     return rows.map((row) => this._mapRow(row));
   }
 
-  getSince(timestamp: string, projectId?: string): ActivityEntry[] {
+  getSince(timestamp: string, projectId?: string, limit = 10_000): ActivityEntry[] {
     this.flush();
     const conditions = [gt(activityLog.timestamp, timestamp)];
     if (projectId) conditions.push(eq(activityLog.projectId, projectId));
@@ -157,6 +157,7 @@ export class ActivityLedger extends EventEmitter {
       .from(activityLog)
       .where(and(...conditions))
       .orderBy(asc(activityLog.id))
+      .limit(limit)
       .all();
     return rows.map((row) => this._mapRow(row));
   }

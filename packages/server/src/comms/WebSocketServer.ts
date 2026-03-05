@@ -26,6 +26,10 @@ export class WebSocketServer {
   private statusThrottleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private statusPending = new Map<string, any>();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  // agent:text batching — buffer per agent, flush every 100ms
+  private textBuffer = new Map<string, { texts: string[]; projectId?: string }>();
+  private textFlushTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly TEXT_FLUSH_MS = 100;
 
   constructor(
     server: HttpServer,
@@ -189,12 +193,16 @@ export class WebSocketServer {
     // Do NOT remove the '*' wildcard support — it is intentional for UI monitoring.
     this.track(agentManager, 'agent:text', ({ agentId, text }: { agentId: string; text: string }) => {
       const projectId = this.resolveAgentProjectId(agentId);
-      this.broadcast(
-        { type: 'agent:text', agentId, text },
-        (c) =>
-          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
-          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
-      );
+      // Buffer text and flush in batches per TEXT_FLUSH_MS
+      const buf = this.textBuffer.get(agentId);
+      if (buf) {
+        buf.texts.push(text);
+      } else {
+        this.textBuffer.set(agentId, { texts: [text], projectId });
+      }
+      if (!this.textFlushTimer) {
+        this.textFlushTimer = setInterval(() => this.flushTextBuffer(), WebSocketServer.TEXT_FLUSH_MS);
+      }
     });
 
     this.track(agentManager, 'agent:content', (data: any) => {
@@ -447,6 +455,27 @@ export class WebSocketServer {
     this.broadcastToProject(msg, projectId);
   }
 
+  /** Flush buffered agent:text events — coalesces rapid text chunks into single WS messages */
+  private flushTextBuffer(): void {
+    if (this.textBuffer.size === 0) {
+      if (this.textFlushTimer) {
+        clearInterval(this.textFlushTimer);
+        this.textFlushTimer = null;
+      }
+      return;
+    }
+    for (const [agentId, { texts, projectId }] of this.textBuffer) {
+      const merged = texts.join('');
+      this.broadcast(
+        { type: 'agent:text', agentId, text: merged },
+        (c) =>
+          (!c.subscribedProject || !projectId || c.subscribedProject === projectId) &&
+          (c.subscribedAgents.has(agentId) || c.subscribedAgents.has('*')),
+      );
+    }
+    this.textBuffer.clear();
+  }
+
   /** Remove all event listeners and close the WebSocket server */
   close(): void {
     for (const cleanup of this.eventCleanups) {
@@ -458,6 +487,13 @@ export class WebSocketServer {
     for (const timer of this.statusThrottleTimers.values()) clearTimeout(timer);
     this.statusThrottleTimers.clear();
     this.statusPending.clear();
+
+    // Clean up text buffer
+    if (this.textFlushTimer) {
+      clearInterval(this.textFlushTimer);
+      this.textFlushTimer = null;
+    }
+    this.textBuffer.clear();
 
     // Clean up heartbeat
     if (this.heartbeatTimer) {

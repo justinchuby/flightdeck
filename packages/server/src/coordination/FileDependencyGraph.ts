@@ -20,6 +20,7 @@ export interface ImpactAnalysis {
 export class FileDependencyGraph {
   private graph: Map<string, FileNode> = new Map();
   private projectRoot: string;
+  private static readonly MAX_NODES = 5_000;
 
   constructor(projectRoot: string) {
     this.projectRoot = projectRoot;
@@ -180,6 +181,15 @@ export class FileDependencyGraph {
   private getOrCreate(path: string): FileNode {
     let node = this.graph.get(path);
     if (!node) {
+      // Evict stalest entry if at capacity
+      if (this.graph.size >= FileDependencyGraph.MAX_NODES) {
+        let stalestKey: string | null = null;
+        let stalestTime = Infinity;
+        for (const [key, n] of this.graph) {
+          if (n.lastAnalyzed < stalestTime) { stalestTime = n.lastAnalyzed; stalestKey = key; }
+        }
+        if (stalestKey) this.graph.delete(stalestKey);
+      }
       node = { path, imports: [], importedBy: [], lastAnalyzed: 0 };
       this.graph.set(path, node);
     }

@@ -56,6 +56,7 @@ export class AlertEngine extends EventEmitter {
 
   // Track recent activity per agent to detect "stuck" state
   private lastActivityByAgent = new Map<string, number>();
+  private static readonly MAX_TRACKED_AGENTS = 500;
 
   constructor(
     private agentManager: AgentManager,
@@ -74,6 +75,15 @@ export class AlertEngine extends EventEmitter {
     // Subscribe to activity events to track last-activity timestamps
     this.boundActivityHandler = (entry: { agentId: string }) => {
       this.lastActivityByAgent.set(entry.agentId, Date.now());
+      // Evict oldest entries if map grows unbounded
+      if (this.lastActivityByAgent.size > AlertEngine.MAX_TRACKED_AGENTS) {
+        let oldestKey: string | null = null;
+        let oldestTime = Infinity;
+        for (const [key, time] of this.lastActivityByAgent) {
+          if (time < oldestTime) { oldestTime = time; oldestKey = key; }
+        }
+        if (oldestKey) this.lastActivityByAgent.delete(oldestKey);
+      }
     };
     this.activityLedger.on('activity', this.boundActivityHandler);
 
@@ -92,6 +102,7 @@ export class AlertEngine extends EventEmitter {
       clearInterval(this.checkTimer);
       this.checkTimer = null;
     }
+    this.lastActivityByAgent.clear();
   }
 
   getAlerts(): Alert[] {

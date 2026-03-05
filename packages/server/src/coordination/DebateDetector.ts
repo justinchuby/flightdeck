@@ -71,24 +71,33 @@ export class DebateDetector {
 
   /** Scan group chat messages for debates */
   detectDebates(leadId: string, since?: string): Debate[] {
-    const groups = this.chatGroupRegistry.getGroups(leadId);
+    // Single query for all messages across all groups (eliminates N+1)
+    const allMessages = this.chatGroupRegistry.getMessagesByLead(leadId, 2000);
+
+    // Filter by since timestamp if provided
+    const filtered = since
+      ? allMessages.filter(m => m.timestamp >= since)
+      : allMessages;
+
+    if (filtered.length < 2) return [];
+
+    // Group messages by groupName
+    const byGroup = new Map<string, GroupMessage[]>();
+    for (const msg of filtered) {
+      const list = byGroup.get(msg.groupName);
+      if (list) list.push(msg);
+      else byGroup.set(msg.groupName, [msg]);
+    }
+
     const debates: Debate[] = [];
-
-    for (const group of groups) {
-      const messages = this.chatGroupRegistry.getMessages(group.name, leadId, 500);
-
-      // Filter by since timestamp if provided
-      const filtered = since
-        ? messages.filter(m => m.timestamp >= since)
-        : messages;
-
-      if (filtered.length < 2) continue;
+    for (const [groupName, messages] of byGroup) {
+      if (messages.length < 2) continue;
 
       // Group messages into conversation threads by temporal proximity
-      const threads = this.groupIntoThreads(filtered);
+      const threads = this.groupIntoThreads(messages);
 
       for (const thread of threads) {
-        const debate = this.analyzeThread(thread, group.name);
+        const debate = this.analyzeThread(thread, groupName);
         if (debate && debate.confidence >= MIN_CONFIDENCE) {
           debates.push(debate);
         }
