@@ -42,6 +42,13 @@ export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   'readability-reviewer': ['gemini-3-pro-preview'],
   'tech-writer': ['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6'],
   secretary: ['gpt-4.1', 'gpt-5.2', 'gpt-5.1'],
+  'qa-tester': ['claude-sonnet-4.6'],
+  designer: ['claude-opus-4.6'],
+  'product-manager': ['gpt-5.3-codex'],
+  generalist: ['claude-opus-4.6'],
+  'radical-thinker': ['gemini-3-pro-preview'],
+  agent: ['claude-sonnet-4.6'],
+  lead: ['claude-opus-4.6'],
 };
 
 /** Validate that all model IDs in a config are known. Returns unknown IDs. */

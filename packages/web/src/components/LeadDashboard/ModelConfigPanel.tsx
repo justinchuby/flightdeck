@@ -41,6 +41,7 @@ const ROLE_NAMES: Record<string, string> = {
   architect: 'Architect',
   'code-reviewer': 'Code Reviewer',
   'critical-reviewer': 'Critical Reviewer',
+  'readability-reviewer': 'Readability Reviewer',
   'tech-writer': 'Tech Writer',
   secretary: 'Secretary',
   'qa-tester': 'QA Tester',
@@ -49,6 +50,7 @@ const ROLE_NAMES: Record<string, string> = {
   generalist: 'Generalist',
   'radical-thinker': 'Radical Thinker',
   agent: 'Agent',
+  lead: 'Project Lead',
 };
 
 /** Roles shown in config UI, in display order */
@@ -57,9 +59,16 @@ const CONFIG_ROLES = [
   'architect',
   'code-reviewer',
   'critical-reviewer',
+  'readability-reviewer',
   'tech-writer',
   'secretary',
   'qa-tester',
+  'designer',
+  'product-manager',
+  'generalist',
+  'radical-thinker',
+  'agent',
+  'lead',
 ];
 
 interface Props {
