@@ -39,7 +39,7 @@
   "scripts": {
     "start": "node bin/flightdeck.mjs",
     "prepublishOnly": "npm run build",
-    "dev": "concurrently \"npm run dev --workspace=packages/server\" \"npm run dev --workspace=packages/web\"",
+    "dev": "node scripts/dev.mjs",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
     "build": "npm run build --workspace=packages/server && npm run build --workspace=packages/web",
@@ -63,7 +63,6 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
-    "concurrently": "^9.2.1",
     "eslint": "^10.0.2",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3"

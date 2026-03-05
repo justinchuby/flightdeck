@@ -66,6 +66,26 @@ function edgeColor(status: DagTaskStatus): string {
   return 'var(--st-skipped)';
 }
 
+/** Apply visual highlighting to edges connected to the given node, dimming the rest. */
+function applyEdgeHighlighting(edges: Edge[], highlightedNodeId: string | null): Edge[] {
+  if (!highlightedNodeId) return edges;
+  return edges.map(edge => {
+    const isConnected = edge.source === highlightedNodeId || edge.target === highlightedNodeId;
+    if (isConnected) {
+      return {
+        ...edge,
+        style: { ...edge.style, strokeWidth: 3, opacity: 1 },
+        zIndex: 10,
+      };
+    }
+    return {
+      ...edge,
+      style: { ...edge.style, opacity: 0.15 },
+      zIndex: 0,
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Custom node component
 // ---------------------------------------------------------------------------
@@ -585,6 +605,10 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
   const [pinnedTooltip, setPinnedTooltip] = useState<TooltipState | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Edge highlighting state ────────────────────────────────────────
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const highlightedNodeId = pinnedTooltip?.task.id ?? hoveredNodeId;
+
   const clearHoverTimer = useCallback(() => {
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
@@ -606,6 +630,7 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
 
   const onNodeMouseEnter: NodeMouseHandler<Node<DagTaskNodeData>> = useCallback(
     (_event, node) => {
+      setHoveredNodeId(node.id);
       if (pinnedTooltip) return;
       clearHoverTimer();
       hoverTimerRef.current = setTimeout(() => {
@@ -617,6 +642,7 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
   );
 
   const onNodeMouseLeave: NodeMouseHandler<Node<DagTaskNodeData>> = useCallback(() => {
+    setHoveredNodeId(null);
     clearHoverTimer();
     setHoverTooltip(null);
   }, [clearHoverTimer]);
@@ -646,13 +672,13 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
   // Dismiss hover tooltip on zoom/pan
   const onMoveStart = useCallback(() => {
     setHoverTooltip(null);
+    setHoveredNodeId(null);
     clearHoverTimer();
   }, [clearHoverTimer]);
 
-  // Sync when data changes
+  // Sync nodes when data changes
   useEffect(() => {
     setNodes(initialNodes);
-    setEdges(initialEdges);
 
     const structKey = dagStatus.tasks.map((t) => t.id).sort().join(',');
     const prevStructKey = prevTaskKeyRef.current;
@@ -662,7 +688,12 @@ function DagGraphInner({ dagStatus, containerRef }: { dagStatus: DagStatus; cont
         fitView({ padding: 0.15, duration: 200 });
       });
     }
-  }, [initialNodes, initialEdges, dagStatus.tasks, setNodes, setEdges, fitView]);
+  }, [initialNodes, dagStatus.tasks, setNodes, fitView]);
+
+  // Sync edges with highlighting whenever data or highlighted node changes
+  useEffect(() => {
+    setEdges(applyEdgeHighlighting(initialEdges, highlightedNodeId));
+  }, [initialEdges, highlightedNodeId, setEdges]);
 
   // Update pinned tooltip data when tasks change
   useEffect(() => {

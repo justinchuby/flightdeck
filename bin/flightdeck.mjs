@@ -75,29 +75,44 @@ console.log(`\n🚀 Starting Flightdeck on http://${formatHost(host)}:${port}\n`
 
 const server = spawn('node', [serverDist], {
   cwd: process.cwd(),
-  stdio: 'inherit',
+  stdio: ['inherit', 'pipe', 'inherit'],
   env: { ...process.env, PORT: port, HOST: host },
 });
 
-// Open browser after a short delay (unless --no-browser)
-if (!noBrowser) {
-  setTimeout(() => {
-    const browserHost = formatHost(host);
-    const url = `http://${browserHost}:${port}`;
-    const platform = process.platform;
-    try {
-      let child;
-      if (platform === 'darwin') child = spawn('open', [url], { stdio: 'ignore', detached: true });
-      else if (platform === 'win32') child = spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true });
-      else child = spawn('xdg-open', [url], { stdio: 'ignore', detached: true });
-      child.on('error', () => {
-        console.log(`🌐 Open ${url} in your browser`);
-      });
-      child.unref();
-    } catch {
-      console.log(`🌐 Open ${url} in your browser`);
+// Pipe server stdout to terminal while capturing the actual port
+const PORT_RE = /^FLIGHTDECK_PORT=(\d+)$/m;
+let browserOpened = false;
+
+server.stdout.on('data', (chunk) => {
+  const text = chunk.toString();
+  process.stdout.write(text);
+
+  if (!browserOpened && !noBrowser) {
+    const match = text.match(PORT_RE);
+    if (match) {
+      browserOpened = true;
+      const actualPort = match[1];
+      const browserHost = formatHost(host);
+      const url = `http://${browserHost}:${actualPort}`;
+      openBrowser(url);
     }
-  }, 1500);
+  }
+});
+
+function openBrowser(url) {
+  const platform = process.platform;
+  try {
+    let child;
+    if (platform === 'darwin') child = spawn('open', [url], { stdio: 'ignore', detached: true });
+    else if (platform === 'win32') child = spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true });
+    else child = spawn('xdg-open', [url], { stdio: 'ignore', detached: true });
+    child.on('error', () => {
+      console.log(`🌐 Open ${url} in your browser`);
+    });
+    child.unref();
+  } catch {
+    console.log(`🌐 Open ${url} in your browser`);
+  }
 }
 
 // Forward signals for graceful shutdown

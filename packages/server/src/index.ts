@@ -339,8 +339,33 @@ if (fs.existsSync(webDistPath)) {
   });
 }
 
-httpServer.listen(config.port, config.host, () => {
-  const url = `http://${config.host}:${config.port}`;
+async function listenWithRetry(basePort: number, host: string, maxAttempts = 10): Promise<number> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const port = basePort + attempt;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        httpServer.once('error', reject);
+        httpServer.listen(port, host, () => {
+          httpServer.removeListener('error', reject);
+          resolve();
+        });
+      });
+      return port;
+    } catch (err: any) {
+      if (err.code !== 'EADDRINUSE') throw err;
+      console.warn(`⚠️  Port ${port} in use, trying ${port + 1}...`);
+    }
+  }
+  throw new Error(`No available port found in range ${basePort}–${basePort + maxAttempts - 1}`);
+}
+
+listenWithRetry(config.port, config.host).then((actualPort) => {
+  if (actualPort !== config.port) {
+    updateConfig({ port: actualPort });
+  }
+
+  const url = `http://${config.host}:${actualPort}`;
+  console.log(`FLIGHTDECK_PORT=${actualPort}`);
   console.log(`🚀 Flightdeck server running on ${url}`);
   if (authToken) {
     console.log(`🔑 Auth token: ${authToken}`);
@@ -353,6 +378,9 @@ httpServer.listen(config.port, config.host, () => {
   }
   contextRefresher.start();
   escalationManager.start();
+}).catch((err) => {
+  console.error(`❌ Failed to start server: ${err.message}`);
+  process.exit(1);
 });
 
 // Graceful shutdown

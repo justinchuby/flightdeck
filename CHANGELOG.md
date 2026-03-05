@@ -5,7 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## Unreleased
+
+### Added
+
+- **DAG edge highlighting** — hovering or clicking a task card highlights connected edges and dims unconnected ones; click to pin, Escape to unpin
+- **Dynamic port allocation** — server auto-retries on EADDRINUSE (up to 10 ports), prints `FLIGHTDECK_PORT=NNNN` to stdout for discovery
+- **Sequential dev launcher** (`scripts/dev.mjs`) — `npm run dev` starts Express first, captures the actual port, then starts Vite with the correct proxy target; multiple instances can run simultaneously
+- **Commit sign-off convention** — all agent commits now include agent ID, role, and model name
+
+### Changed
+
+- Vite proxy target is now configurable via `SERVER_PORT` env var instead of hardcoded `:3001`
+
+### Fixed
+
+- **Gantt chart vertical alignment** — fixed SVG viewBox stretching, time axis overlap with first task row, and container height formula for small task counts
+
+### Removed
+
+- Tool call activity cards from agent chat panel (redundant with inline activity messages)
+- `.flightdeck/port` file mechanism replaced with stdout-based port discovery
+
+## [0.2.0] - 2026-03-05
 
 ### Added
 

@@ -571,7 +571,7 @@ Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Ha
 - When all agents finish, give the user a clear summary of what was accomplished
 - When multiple agents report completion at once (3+), batch-process them: summarize results in a single response rather than handling each individually. This saves context and keeps you responsive.
 - ALWAYS prioritize human messages over agent reports. If a human message is waiting, respond to it FIRST.
-- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with bracket syntax in task descriptions — the system will execute them. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes.
+- GIT COMMITS: Agents already know how to use the COMMIT command (it's in their prompt). Do NOT include COMMIT examples with bracket syntax in task descriptions — the system will execute them. Just say "Commit with COMMIT command when done." Do NOT use \`git add -A\` — it picks up other agents' uncommitted changes. The COMMIT command automatically appends a Signed-off-by trailer with the agent's role, ID, and model.
 - ESCAPING COMMANDS IN TEXT: When writing DELEGATE task descriptions or AGENT_MESSAGE content, NEVER include literal command bracket delimiters — the parser will execute any commands it finds inside the payload. Instead, refer to commands by name: "use COMMIT when done", "run QUERY_CREW to check status", "signal completion with COMPLETE_TASK". The system will warn you if a nested command is detected and stripped.`,
     color: '#e3b341',
     icon: '👑',
@@ -590,7 +590,7 @@ When something is unclear or you need information from another agent, send them 
 
 When a discussion involves multiple agents (e.g. coordinating shared interfaces, debating design choices, aligning on conventions), use QUERY_GROUPS to check for existing groups first, then create one with CREATE_GROUP if needed. Groups are auto-created when you delegate the same feature to 3+ agents — check QUERY_GROUPS before creating duplicates. Group chats keep everyone in sync and reduce duplicated conversations.
 
-When committing changes, NEVER use \`git add -A\` — it picks up other agents' uncommitted work. Instead, use \`git add <your-specific-files>\` or use the COMMIT command which auto-scopes to your locked files:
+When committing changes, NEVER use \`git add -A\` — it picks up other agents' uncommitted work. Instead, use \`git add <your-specific-files>\` or use the COMMIT command which auto-scopes to your locked files and appends your sign-off automatically:
 \`⟦⟦ COMMIT {"message": "description of changes"} ⟧⟧\`
 
 You can set reminders using timers:
