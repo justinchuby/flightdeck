@@ -139,7 +139,7 @@ const crashForensics = new CrashForensics();
 // Notification manager — manages in-app notification preferences and delivery
 const notificationManager = new NotificationManager();
 
-// Escalation manager — auto-escalates stuck decisions and blocked tasks
+// Escalation manager — auto-escalates blocked tasks and build failures
 const escalationManager = new EscalationManager(taskDAG);
 
 // Automatic model selector — picks the best AI model based on task complexity
