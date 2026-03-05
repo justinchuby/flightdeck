@@ -29,6 +29,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { VersionBadge } from './components/VersionBadge';
 import { PulseStrip } from './components/Pulse';
 import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
+import { CatchUpBanner } from './components/CatchUp';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
@@ -242,6 +243,7 @@ export function App() {
       <ToastContainer />
       <PermissionDialog />
       <ApprovalSlideOver />
+      <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}

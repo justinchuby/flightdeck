@@ -203,6 +203,21 @@ body {
   animation: pulse-slow 3s ease-in-out infinite;
 }
 
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
 /* ── Liquid Glass Toast (Apple-style glassmorphism) ───────────────────── */
 .glass-toast {
   background: linear-gradient(
