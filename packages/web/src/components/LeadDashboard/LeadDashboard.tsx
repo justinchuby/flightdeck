@@ -3228,7 +3228,7 @@ function CollapsibleSection({
 function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(cwd || '');
-  const { updateAgent } = useAppStore();
+  const updateAgent = useAppStore((s) => s.updateAgent);
 
   useEffect(() => { setValue(cwd || ''); }, [cwd]);
 

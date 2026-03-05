@@ -298,7 +298,7 @@ interface Props {
 }
 
 export function OrgChart({ api, ws }: Props) {
-  const { agents } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
   const projects = useLeadStore((s) => s.projects);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [commView, setCommView] = useState<'list' | 'matrix' | 'heatmap'>('list');

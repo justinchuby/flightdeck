@@ -29,7 +29,8 @@ export function ChatPanel({ agentId, ws }: Props) {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { agents, setSelectedAgent } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const agent = agents.find((a) => a.id === agentId);
 
   const handleFileInsert = useCallback((text: string) => {

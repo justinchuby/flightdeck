@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function SpawnDialog({ api, onClose }: Props) {
-  const { roles } = useAppStore();
+  const roles = useAppStore((s) => s.roles);
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
   const [autopilot, setAutopilot] = useState(false);
   const [loading, setLoading] = useState(false);

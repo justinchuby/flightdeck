@@ -32,7 +32,8 @@ export async function apiFetch<T = any>(path: string, opts?: RequestInit): Promi
 }
 
 export function useApi() {
-  const { setRoles, setConfig } = useAppStore();
+  const setRoles = useAppStore((s) => s.setRoles);
+  const setConfig = useAppStore((s) => s.setConfig);
 
   const loadRoles = useCallback(async () => {
     const roles = await apiFetch<Role[]>('/roles');

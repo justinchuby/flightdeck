@@ -40,7 +40,7 @@ interface Props {
 }
 
 export function FleetOverview({ api, ws }: Props) {
-  const { agents } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
   const [locks, setLocks] = useState<FileLock[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);

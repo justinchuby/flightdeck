@@ -22,8 +22,11 @@ export function useWebSocket() {
   const shouldReconnectRef = useRef(true);
   // Track agents that had a tool call since their last text — next append needs a newline separator
   const pendingNewlineRef = useRef<Set<string>>(new Set());
-  const { setConnected, setAgents, addAgent, updateAgent, removeAgent } =
-    useAppStore();
+  const setConnected = useAppStore((s) => s.setConnected);
+  const setAgents = useAppStore((s) => s.setAgents);
+  const addAgent = useAppStore((s) => s.addAgent);
+  const updateAgent = useAppStore((s) => s.updateAgent);
+  const removeAgent = useAppStore((s) => s.removeAgent);
 
   const connect = useCallback(() => {
     // Close any existing connection first

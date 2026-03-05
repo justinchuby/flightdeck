@@ -14,7 +14,8 @@ interface Props {
 }
 
 export function SettingsPanel({ api }: Props) {
-  const { config, roles } = useAppStore();
+  const config = useAppStore((s) => s.config);
+  const roles = useAppStore((s) => s.roles);
   const { soundEnabled, toggleSound } = useSettingsStore();
   const [maxAgents, setMaxAgents] = useState(config?.maxConcurrentAgents || 10);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);

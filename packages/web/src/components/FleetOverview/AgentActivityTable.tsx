@@ -155,7 +155,7 @@ function TokenHistoryCell({ totalTokens }: { agentId: string; totalTokens: numbe
 }
 
 export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
-  const { setSelectedAgent } = useAppStore();
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [confirmTerminateIds, setConfirmTerminateIds] = useState<Set<string>>(new Set());
 
   const handleSelect = (id: string) => {

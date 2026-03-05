@@ -26,7 +26,8 @@ const AVAILABLE_MODELS = [
 ];
 
 export function AgentCard({ agent, api }: Props) {
-  const { setSelectedAgent, selectedAgentId } = useAppStore();
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const isSelected = selectedAgentId === agent.id;
   const [confirmKill, setConfirmKill] = useState(false);
 

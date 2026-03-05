@@ -2,7 +2,7 @@ import { useAppStore } from '../../stores/appStore';
 import { MessageSquare, GitBranch } from 'lucide-react';
 
 export function AgentTimeline() {
-  const { agents } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
 
   // Build timeline from agent relationships
   const roots = agents.filter((a) => !a.parentId);
@@ -24,7 +24,9 @@ export function AgentTimeline() {
 }
 
 function AgentTreeNode({ agentId, depth }: { agentId: string; depth: number }) {
-  const { agents, setSelectedAgent, selectedAgentId } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const agent = agents.find((a) => a.id === agentId);
   if (!agent) return null;
 

@@ -50,7 +50,10 @@ function RouteSpinner() {
 export function App() {
   const ws = useWebSocket();
   const api = useApi();
-  const { connected, agents, selectedAgentId, systemPaused } = useAppStore();
+  const connected = useAppStore((s) => s.connected);
+  const agents = useAppStore((s) => s.agents);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
+  const systemPaused = useAppStore((s) => s.systemPaused);
   const setSystemPaused = useAppStore((s) => s.setSystemPaused);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const addToast = useToastStore((s) => s.add);

@@ -19,7 +19,8 @@ interface Props {
 }
 
 export function AgentDashboard({ api, ws }: Props) {
-  const { agents, setSelectedAgent } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
+  const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [showSpawn, setShowSpawn] = useState(false);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
   const [locks, setLocks] = useState<FileLock[]>([]);

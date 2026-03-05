@@ -127,7 +127,7 @@ function tabKey(tab: TabItem): string {
 // Main TaskQueuePanel — tabbed by project
 // ---------------------------------------------------------------------------
 export function TaskQueuePanel({ api }: Props) {
-  const { agents } = useAppStore();
+  const agents = useAppStore((s) => s.agents);
   const leadProjects = useLeadStore((s) => s.projects);
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
