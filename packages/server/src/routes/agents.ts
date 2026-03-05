@@ -22,8 +22,11 @@ function buildContentBlocks(text: string, attachments?: Array<{ name: string; mi
   return blocks;
 }
 
+import { DiffService } from '../coordination/DiffService.js';
+
 export function agentsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, db: _db } = ctx;
+  const { agentManager, roleRegistry, db: _db, lockRegistry, decisionLog, activityLedger } = ctx;
+  const diffService = lockRegistry ? new DiffService(lockRegistry, process.cwd()) : null;
   const router = Router();
 
   // --- Agents ---
@@ -179,6 +182,34 @@ export function agentsRoutes(ctx: AppContext): Router {
     const ok = agentManager.resolvePermission(req.params.id, approved);
     if (!ok) return res.status(404).json({ error: 'Agent not found' });
     res.json({ ok: true });
+  });
+
+  // --- Focus Mode: aggregated single-agent view ---
+
+  router.get('/agents/:id/focus', async (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+    const activityLimit = Math.min(Number(req.query.activityLimit) || 50, 200);
+    const outputLimit = Number(req.query.outputLimit) || 8000;
+
+    // Aggregate all agent data in parallel
+    const [fileLocks, decisions, diff] = await Promise.all([
+      Promise.resolve(lockRegistry.getByAgent(agent.id)),
+      Promise.resolve(decisionLog.getByAgent(agent.id)),
+      diffService?.getDiff(agent.id).catch(() => null) ?? Promise.resolve(null),
+    ]);
+
+    const activities = activityLedger.getByAgent(agent.id, activityLimit);
+
+    res.json({
+      agent: agent.toJSON(),
+      recentOutput: agent.getRecentOutput(outputLimit),
+      activities,
+      decisions,
+      fileLocks,
+      diff,
+    });
   });
 
   return router;
