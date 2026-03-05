@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
-import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
+import type { AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare } from 'lucide-react';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
@@ -23,12 +23,6 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
   low: 'bg-gray-500/20 text-th-text-muted',
 };
 
-const TC_STATUS: Record<AcpToolCall['status'], string> = {
-  pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
-  in_progress: 'bg-blue-500/20 text-blue-400',
-  completed: 'bg-purple-500/20 text-purple-400',
-  cancelled: 'bg-gray-500/20 text-th-text-muted',
-};
 
 /** Render inline markdown: **bold**, *italic*, `code` */
 function renderMarkdown(text: string): React.ReactNode[] {
@@ -63,47 +57,6 @@ function renderMarkdown(text: string): React.ReactNode[] {
   return parts.length > 0 ? parts : [text];
 }
 
-/** Render a single content item — handles text, resource, image, audio, or unknown */
-function renderContentItem(c: any): string {
-  if (typeof c === 'string') return c;
-  if (c == null) return '';
-  // Any object with a .text string field — extract it (covers {text: "...", type: "text"} and similar)
-  if (typeof c.text === 'string' && (c.type === 'text' || !c.type || c.type === undefined)) return c.text;
-  if (c.type === 'text' && typeof c.text === 'string') return c.text;
-  if (c.type === 'resource') {
-    const uri = c.resource?.uri ?? '';
-    const text = c.resource?.text ?? '';
-    return uri ? `📎 ${uri}\n${text}` : text;
-  }
-  if (c.type === 'image') return `[🖼️ image: ${c.mimeType ?? 'unknown'}]`;
-  if (c.type === 'audio') return `[🔊 audio: ${c.mimeType ?? 'unknown'}]`;
-  // Fallback: extract common fields
-  if (typeof c.text === 'string') return c.text;
-  if (c.content) return typeof c.content === 'string' ? c.content : JSON.stringify(c.content, null, 2);
-  return JSON.stringify(c, null, 2);
-}
-
-/** Safely render tool call content — handles string, array, or object */
-function stringifyContent(content: any): string {
-  if (typeof content === 'string') {
-    // Try to parse JSON strings that look like content objects
-    if (content.startsWith('{') || content.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(content);
-        return stringifyContent(parsed);
-      } catch { /* not JSON, use as-is */ }
-    }
-    return content.slice(0, 500);
-  }
-  if (Array.isArray(content)) {
-    return content.map(renderContentItem).join('\n').slice(0, 500);
-  }
-  if (content && typeof content === 'object') {
-    return renderContentItem(content).slice(0, 500);
-  }
-  return String(content).slice(0, 500);
-}
-
 export function AcpOutput({ agentId }: Props) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
   const [planOpen, setPlanOpen] = useState(true);
@@ -111,7 +64,6 @@ export function AcpOutput({ agentId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const plan = agent?.plan ?? [];
-  const toolCalls = agent?.toolCalls ?? [];
   const messages = agent?.messages ?? [];
 
   // Fetch message history when agent panel opens and no messages are loaded yet
@@ -235,30 +187,6 @@ export function AcpOutput({ agentId }: Props) {
               ))}
             </ul>
           )}
-        </div>
-      )}
-
-      {/* Tool Calls Section */}
-      {toolCalls.length > 0 && (
-        <div className="space-y-1.5">
-          {toolCalls.map((tc) => (
-            <div key={tc.toolCallId} className="border border-th-border rounded-lg bg-surface-raised p-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-th-text-alt">{typeof tc.title === 'string' ? tc.title : JSON.stringify(tc.title)}</span>
-                  <span className="text-[10px] text-th-text-muted">{typeof tc.kind === 'string' ? tc.kind : JSON.stringify(tc.kind)}</span>
-                </div>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${TC_STATUS[tc.status]}`}>
-                  {tc.status}
-                </span>
-              </div>
-              {tc.content && tc.status === 'completed' && (
-                <pre className="mt-1 text-[11px] text-th-text-muted font-mono overflow-hidden max-h-24 bg-surface/50 rounded p-1">
-                  {stringifyContent(tc.content)}
-                </pre>
-              )}
-            </div>
-          ))}
         </div>
       )}
 
