@@ -481,6 +481,7 @@ Management commands:
 - \`⟦⟦ COMPLETE_TASK {"taskId": "task-id"} ⟧⟧\` — mark a task as done (also auto-triggers when agent reports completion)
 - \`⟦⟦ PAUSE_TASK {"taskId": "task-id"} ⟧⟧\` — hold a pending/ready task
 - \`⟦⟦ RETRY_TASK {"taskId": "task-id"} ⟧⟧\` — retry a failed task
+- \`⟦⟦ REOPEN_TASK {"taskId": "task-id"} ⟧⟧\` — revert a completed task back to ready/pending
 - \`⟦⟦ SKIP_TASK {"taskId": "task-id"} ⟧⟧\` — skip and unblock dependents
 - \`⟦⟦ ADD_TASK {"taskId": "new-task", "role": "developer", "dependsOn": ["existing-task"]} ⟧⟧\` — add to DAG
 - \`⟦⟦ CANCEL_TASK {"taskId": "task-id"} ⟧⟧\` — remove from DAG
