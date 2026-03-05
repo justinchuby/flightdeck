@@ -1,15 +1,13 @@
 /**
- * Displays the app version next to the logo.
- * For dev/pre-release versions, includes the short git commit hash.
+ * Displays the app version and git commit hash next to the logo.
+ * The hash is always shown so developers can identify the exact build.
  */
 export function VersionBadge() {
   const version = __APP_VERSION__;
   const gitHash = __GIT_HASH__;
 
-  const isDevVersion =
-    version.includes('-') || version.includes('alpha') || version.includes('beta');
-
-  const displayText = isDevVersion ? `v${version} (${gitHash})` : `v${version}`;
+  const showHash = gitHash && gitHash !== 'unknown';
+  const displayText = showHash ? `v${version} (${gitHash})` : `v${version}`;
 
   return (
     <span

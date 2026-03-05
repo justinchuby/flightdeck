@@ -20,17 +20,17 @@ afterEach(() => {
 });
 
 describe('VersionBadge', () => {
-  it('renders the version for a stable release', () => {
+  it('renders version with git hash for a stable release', () => {
     setGlobals('1.2.3', 'def5678');
     render(<VersionBadge />);
-    expect(screen.getByText('v1.2.3')).toBeDefined();
+    expect(screen.getByText('v1.2.3 (def5678)')).toBeDefined();
   });
 
-  it('does not show git hash for stable release', () => {
+  it('always shows git hash when available', () => {
     setGlobals('2.0.0', 'aaa1111');
     render(<VersionBadge />);
-    const badge = screen.getByText('v2.0.0');
-    expect(badge.textContent).not.toContain('aaa1111');
+    const badge = screen.getByText('v2.0.0 (aaa1111)');
+    expect(badge).toBeDefined();
   });
 
   it('shows git hash for dev/pre-release version with hyphen', () => {
@@ -51,16 +51,22 @@ describe('VersionBadge', () => {
     expect(screen.getByText('v3.0.0-beta (ccc3333)')).toBeDefined();
   });
 
+  it('hides hash when git hash is "unknown"', () => {
+    setGlobals('1.0.0', 'unknown');
+    render(<VersionBadge />);
+    expect(screen.getByText('v1.0.0')).toBeDefined();
+  });
+
   it('has a title attribute with full version info', () => {
     setGlobals('1.0.0', 'xyz9999');
     render(<VersionBadge />);
-    const badge = screen.getByText('v1.0.0');
+    const badge = screen.getByText('v1.0.0 (xyz9999)');
     expect(badge.getAttribute('title')).toBe('Version 1.0.0 — xyz9999');
   });
 
   it('renders with muted text styling', () => {
     render(<VersionBadge />);
-    const badge = screen.getByText('v1.0.0');
+    const badge = screen.getByText('v1.0.0 (abc1234)');
     expect(badge.className).toContain('text-th-text-muted');
     expect(badge.className).toContain('text-[11px]');
   });
