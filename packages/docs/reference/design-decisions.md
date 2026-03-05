@@ -427,11 +427,11 @@ flightdeck/
 
 ## 32. Proactive Alert Engine
 
-**Decision:** Run an `AlertEngine` on a 60-second interval that detects and broadcasts conditions needing attention (stuck agents, context pressure, idle-ready mismatches, duplicate edits).
+**Decision:** Run an `AlertEngine` on a 60-second interval that detects and broadcasts conditions needing attention (stuck agents, context pressure, stale decisions, idle-ready mismatches, duplicate edits).
 
 **Rationale:**
 - Agents and humans shouldn't have to poll for problems — the system should surface them proactively
-- Four alert types cover the most common multi-agent failure modes
+- Five alert types cover the most common multi-agent failure modes
 - Ring buffer of 100 alerts in memory (no persistence — alerts are ephemeral by nature)
 - WebSocket broadcast (`alert:new`) enables real-time UI updates
 - Dedup logic prevents repeated alerts for the same condition

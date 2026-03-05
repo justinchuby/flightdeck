@@ -139,8 +139,8 @@ const crashForensics = new CrashForensics();
 // Notification manager — manages in-app notification preferences and delivery
 const notificationManager = new NotificationManager();
 
-// Escalation manager — auto-escalates blocked tasks and build failures
-const escalationManager = new EscalationManager(taskDAG);
+// Escalation manager — auto-escalates stuck decisions and blocked tasks
+const escalationManager = new EscalationManager(decisionLog, taskDAG);
 
 // Automatic model selector — picks the best AI model based on task complexity
 const modelSelector = new ModelSelector();
@@ -204,9 +204,9 @@ ciRunner.on('ci:complete', (result: { success: boolean }) => {
   // CI events are global — no project scoping (they apply to the shared repo)
 });
 
-// Proactive alert engine — watches for stuck agents, context pressure, duplicate edits
+// Proactive alert engine — watches for stuck agents, context pressure, stale decisions
 import { AlertEngine } from './coordination/AlertEngine.js';
-const alertEngine = new AlertEngine(agentManager, lockRegistry, activityLedger, taskDAG);
+const alertEngine = new AlertEngine(agentManager, lockRegistry, decisionLog, activityLedger, taskDAG);
 alertEngine.start();
 alertEngine.on('alert:new', (alert) => {
   wsServer.broadcastEvent({ type: 'alert:new', alert }, alert.projectId);

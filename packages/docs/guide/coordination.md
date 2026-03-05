@@ -308,6 +308,7 @@ The `AlertEngine` (`packages/server/src/coordination/AlertEngine.ts`) runs on a 
 | `context_pressure` | Context usage >85% | warning (85–95%), critical (>95%) | Active |
 | `duplicate_file_edit` | Multiple agents locking same file | warning | Active |
 | `idle_agents_ready_tasks` | Idle agents while DAG has ready tasks | info | Active |
+| `stale_decision` | Pending decisions >10 minutes old | warning | Active |
 
 **Prompting timeout:** When stuck detection is re-enabled, agents with active LLM calls (`isPrompting`) are skipped — but only if the call started less than 30 minutes ago. The `promptingStartedAt` timestamp (tracked in `AcpConnection`, exposed via `Agent.ts`) prevents hung LLM calls from masking genuinely stuck agents.
 

@@ -3,6 +3,7 @@ import { AlertEngine } from '../coordination/AlertEngine.js';
 import type { Agent } from '../agents/Agent.js';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
+import type { DecisionLog } from '../coordination/DecisionLog.js';
 import type { ActivityLedger } from '../coordination/ActivityLedger.js';
 import type { TaskDAG } from '../tasks/TaskDAG.js';
 
@@ -43,6 +44,10 @@ function createMockDeps() {
     getAll: vi.fn(() => []),
   } as unknown as FileLockRegistry;
 
+  const decisionLog = {
+    getNeedingConfirmation: vi.fn(() => []),
+  } as unknown as DecisionLog;
+
   const activityLedger = {
     on: vi.fn(),
     off: vi.fn(),
@@ -52,7 +57,7 @@ function createMockDeps() {
     resolveReady: vi.fn(() => []),
   } as unknown as TaskDAG;
 
-  return { agents, agentManager, lockRegistry, activityLedger, taskDAG };
+  return { agents, agentManager, lockRegistry, decisionLog, activityLedger, taskDAG };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -67,6 +72,7 @@ describe('AlertEngine — checkStuckAgents exemptions', () => {
     engine = new AlertEngine(
       deps.agentManager,
       deps.lockRegistry,
+      deps.decisionLog,
       deps.activityLedger,
       deps.taskDAG,
     );

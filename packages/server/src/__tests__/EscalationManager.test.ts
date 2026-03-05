@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EscalationManager } from '../coordination/EscalationManager.js';
 import { Database } from '../db/database.js';
+import { DecisionLog } from '../coordination/DecisionLog.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 
 vi.mock('../utils/logger.js', () => ({
@@ -9,13 +10,15 @@ vi.mock('../utils/logger.js', () => ({
 
 describe('EscalationManager', () => {
   let db: Database;
+  let decisionLog: DecisionLog;
   let taskDAG: TaskDAG;
   let manager: EscalationManager;
 
   beforeEach(() => {
     db = new Database(':memory:');
+    decisionLog = new DecisionLog(db);
     taskDAG = new TaskDAG(db);
-    manager = new EscalationManager(taskDAG);
+    manager = new EscalationManager(decisionLog, taskDAG);
   });
 
   afterEach(() => {
@@ -25,17 +28,18 @@ describe('EscalationManager', () => {
 
   // ── Default rules ────────────────────────────────────────────────
 
-  it('starts with 2 default rules', () => {
+  it('starts with 3 default rules', () => {
     const rules = manager.getRules();
-    expect(rules).toHaveLength(2);
+    expect(rules).toHaveLength(3);
     const ids = rules.map(r => r.id);
+    expect(ids).toContain('stale-decision');
     expect(ids).toContain('blocked-task-15m');
     expect(ids).toContain('build-failure');
   });
 
   it('addRule appends a custom rule', () => {
     manager.addRule({ id: 'custom', name: 'Custom', condition: 'agent_stuck', thresholdMs: 5_000, escalateTo: 'architect' });
-    expect(manager.getRules()).toHaveLength(3);
+    expect(manager.getRules()).toHaveLength(4);
     expect(manager.getRules().find(r => r.id === 'custom')).toBeDefined();
   });
 
@@ -45,6 +49,43 @@ describe('EscalationManager', () => {
     const result = manager.evaluate();
     expect(result).toHaveLength(0);
     expect(manager.getActive()).toHaveLength(0);
+  });
+
+  // ── evaluate — stale decision ─────────────────────────────────────
+
+  it('escalates a decision that needs confirmation and is older than threshold', () => {
+    // Fake a very old timestamp by manipulating the decision
+    const dec = decisionLog.add('agent-1', 'lead', 'Deploy to prod', 'Risky', true);
+
+    // Override threshold to 0ms so any decision qualifies immediately
+    const rules = manager.getRules();
+    const rule = rules.find(r => r.id === 'stale-decision')!;
+    rule.thresholdMs = 0;
+
+    const newEscalations = manager.evaluate();
+    expect(newEscalations).toHaveLength(1);
+    expect(newEscalations[0].subject).toBe(dec.id);
+    expect(newEscalations[0].ruleId).toBe('stale-decision');
+    expect(newEscalations[0].resolved).toBe(false);
+  });
+
+  it('does not double-escalate the same decision', () => {
+    const dec = decisionLog.add('agent-1', 'lead', 'Deploy to prod', 'Risky', true);
+    const rule = manager.getRules().find(r => r.id === 'stale-decision')!;
+    rule.thresholdMs = 0;
+
+    manager.evaluate();
+    manager.evaluate(); // second call should not add another
+    expect(manager.getActive().filter(e => e.subject === dec.id)).toHaveLength(1);
+  });
+
+  it('does not escalate decisions that do not need confirmation', () => {
+    decisionLog.add('agent-1', 'lead', 'Minor refactor', 'Low risk', false); // needsConfirmation=false
+    const rule = manager.getRules().find(r => r.id === 'stale-decision')!;
+    rule.thresholdMs = 0;
+
+    const result = manager.evaluate();
+    expect(result).toHaveLength(0);
   });
 
   // ── evaluate — blocked tasks ──────────────────────────────────────
@@ -149,7 +190,7 @@ describe('EscalationManager', () => {
   // ── start / stop ─────────────────────────────────────────────────
 
   it('start registers an interval and stop clears it', () => {
-    const fresh = new EscalationManager(taskDAG);
+    const fresh = new EscalationManager(decisionLog, taskDAG);
     const setIntervalSpy = vi.spyOn(global, 'setInterval');
     const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
     fresh.start(5_000);
@@ -161,7 +202,7 @@ describe('EscalationManager', () => {
   });
 
   it('start is idempotent — calling twice only registers one interval', () => {
-    const fresh = new EscalationManager(taskDAG);
+    const fresh = new EscalationManager(decisionLog, taskDAG);
     const setIntervalSpy = vi.spyOn(global, 'setInterval');
     fresh.start(5_000);
     fresh.start(5_000); // second call should be a no-op

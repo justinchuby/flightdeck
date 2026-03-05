@@ -667,7 +667,7 @@
 
 ### `GET /coordination/alerts`
 
-**Description**: Returns all active proactive alerts from the AlertEngine (stuck agents, context pressure, duplicate edits, idle+ready mismatch).
+**Description**: Returns all active proactive alerts from the AlertEngine (stuck agents, context pressure, duplicate edits, idle+ready mismatch, stale decisions).
 
 **Parameters**: None
 

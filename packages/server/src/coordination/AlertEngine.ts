@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { FileLockRegistry } from './FileLockRegistry.js';
+import type { DecisionLog } from './DecisionLog.js';
 import type { ActivityLedger } from './ActivityLedger.js';
 import type { TaskDAG } from '../tasks/TaskDAG.js';
 import { logger } from '../utils/logger.js';
@@ -26,6 +27,7 @@ const STUCK_AGENT_MS = 10 * 60 * 1000;       // 10 minutes
 const NEW_AGENT_GRACE_MS = 5 * 60 * 1000;   // 5 minutes grace for newly created agents
 const MAX_PROMPTING_MS = 30 * 60 * 1000;     // 30 minutes max before prompting is considered stuck
 const CONTEXT_PRESSURE_THRESHOLD = 0.85;       // 85%
+const STALE_DECISION_MS = 10 * 60 * 1000;     // 10 minutes
 const CHECK_INTERVAL_MS = 60 * 1000;           // 1 minute
 
 // ── AlertEngine ───────────────────────────────────────────────────
@@ -42,6 +44,7 @@ export class AlertEngine extends EventEmitter {
   constructor(
     private agentManager: AgentManager,
     private lockRegistry: FileLockRegistry,
+    private decisionLog: DecisionLog,
     private activityLedger: ActivityLedger,
     private taskDAG: TaskDAG,
   ) {
@@ -86,6 +89,7 @@ export class AlertEngine extends EventEmitter {
     this.checkContextPressure();
     this.checkDuplicateFileEdits();
     this.checkIdleAgentsWithReadyTasks();
+    this.checkStaleDecisions();
   }
 
   // ── Individual checks ───────────────────────────────────────────
@@ -181,6 +185,23 @@ export class AlertEngine extends EventEmitter {
         severity: 'info',
         message: `${teamIdle.length} idle agent(s) (${agentNames}) but ${readyTasks.length} DAG task(s) ready (${taskNames})`,
       });
+    }
+  }
+
+  /** 5. Decisions pending confirmation for 10+ minutes */
+  private checkStaleDecisions(): void {
+    const pending = this.decisionLog.getNeedingConfirmation();
+    const now = Date.now();
+    for (const decision of pending) {
+      const age = now - new Date(decision.timestamp).getTime();
+      if (age > STALE_DECISION_MS) {
+        this.addAlert({
+          type: 'stale_decision',
+          severity: 'warning',
+          message: `Decision "${decision.title}" pending for ${Math.round(age / 60_000)}min — needs user response`,
+          agentId: decision.agentId,
+        });
+      }
     }
   }
 

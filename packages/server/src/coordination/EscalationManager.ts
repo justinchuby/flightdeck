@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events';
+import type { DecisionLog } from './DecisionLog.js';
 import type { TaskDAG } from '../tasks/TaskDAG.js';
 import { logger } from '../utils/logger.js';
 
-export type EscalationCondition = 'blocked_task' | 'agent_stuck' | 'build_failure';
+export type EscalationCondition = 'stale_decision' | 'blocked_task' | 'agent_stuck' | 'build_failure';
 export type EscalationTarget = 'lead' | 'user' | 'architect';
 
 export interface EscalationRule {
@@ -25,6 +26,13 @@ export interface Escalation {
 
 const DEFAULT_RULES: EscalationRule[] = [
   {
+    id: 'stale-decision',
+    name: 'Stale Decision',
+    condition: 'stale_decision',
+    thresholdMs: 10 * 60_000,
+    escalateTo: 'user',
+  },
+  {
     id: 'blocked-task-15m',
     name: 'Blocked Task >15min',
     condition: 'blocked_task',
@@ -46,6 +54,7 @@ export class EscalationManager extends EventEmitter {
   private checkTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
+    private decisionLog: DecisionLog,
     private taskDAG: TaskDAG,
   ) {
     super();
@@ -71,6 +80,21 @@ export class EscalationManager extends EventEmitter {
     const now = Date.now();
 
     for (const rule of this.rules) {
+      if (rule.condition === 'stale_decision') {
+        // Find decisions that need confirmation and are older than the threshold
+        const pending = this.decisionLog.getNeedingConfirmation();
+        for (const decision of pending) {
+          const age = now - new Date(decision.timestamp).getTime();
+          if (age >= rule.thresholdMs) {
+            const existing = this.escalations.find(e => e.subject === decision.id && e.ruleId === rule.id && !e.resolved);
+            if (!existing) {
+              const esc = this.createEscalation(rule, decision.id, `Decision "${decision.title}" awaiting confirmation for ${Math.round(age / 60_000)}min`);
+              newEscalations.push(esc);
+            }
+          }
+        }
+      }
+
       if (rule.condition === 'blocked_task') {
         const allTasks = this.taskDAG.getAll();
         for (const task of allTasks) {

@@ -80,7 +80,7 @@ npm run dev
 - **Org Chart** — Team hierarchy visualization with project tabs
 - **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
 - **Token Economics** — Per-agent token breakdown with context pressure warnings (80% yellow, 90% red)
-- **Proactive Alerts** — Auto-detects context pressure, duplicate file edits, and idle agents with ready tasks
+- **Proactive Alerts** — Auto-detects context pressure, duplicate file edits, idle agents with ready tasks, and stale decisions
 - **Three-Tier Messages** — Comms feed classifies messages as Critical (red), Notable (blue), or Routine (dimmed)
 - **Catch-Up Summary** — After 60s of inactivity, a banner summarizes what happened while you were away
 
@@ -141,7 +141,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **ChatGroupRegistry** | Group lifecycle — create, archive, role-based membership, auto-creation for parallel work. Auto-adds new agents matching group role criteria. |
 | **ActivityLedger** | Batched activity logging (flushes every 250ms or 64 entries) |
 | **DecisionLog** | Decision tracking with accept/reject/reason workflow |
-| **AlertEngine** | Proactive detection: stuck agents (with exemptions for leads, new agents, prompting agents), context pressure, duplicate edits, idle+ready mismatch |
+| **AlertEngine** | Proactive detection: stuck agents (with exemptions for leads, new agents, prompting agents), context pressure, duplicate edits, idle+ready mismatch, stale decisions |
 | **ContextRefresher** | Re-injects crew context with health header after compaction events. Auto-refreshes secretary roles. |
 | **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
@@ -156,7 +156,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **CoverageTracker** | Test coverage monitoring with regression detection and trend analysis |
 | **ComplexityMonitor** | File complexity analysis with 4-tier scoring and hotspot detection |
 | **NotificationManager** | User notification preferences, quiet hours, priority-based routing |
-| **EscalationManager** | Auto-escalation for blocked tasks |
+| **EscalationManager** | Auto-escalation for stale decisions and blocked tasks |
 | **ModelSelector** | Auto-picks optimal model based on task complexity, agent role, and budget |
 | **TokenBudgetOptimizer** | Priority-weighted token allocation across active agents |
 | **ParallelAnalyzer** | DAG bottleneck detection with critical path analysis |
