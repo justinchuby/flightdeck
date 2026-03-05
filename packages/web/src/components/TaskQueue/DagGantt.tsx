@@ -33,6 +33,7 @@ const ROW_H   = 28; // bar height in px
 const ROW_GAP = 6;  // vertical gap between rows
 const LABEL_W = 176; // fixed label column width
 const VB_W    = 1000; // SVG viewBox virtual width
+const TIME_AXIS_H = 20; // top offset for time axis labels
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -135,16 +136,16 @@ export function DagGantt({ tasks }: DagGanttProps) {
         aria-label="Gantt chart scrollable area"
         tabIndex={0}
       >
-        <div className="flex pb-[30vh] pr-[200px]" style={{ height: totalH + 40, minWidth: '100%' }}>
+        <div className="flex pb-[30vh] pr-[200px]" style={{ minHeight: TIME_AXIS_H + totalH + 40, minWidth: '100%' }}>
           {/* Label column */}
-          <div className="shrink-0 relative sticky left-0 z-10 bg-th-bg" style={{ width: LABEL_W }}>
+          <div className="shrink-0 sticky left-0 z-10 bg-th-bg" style={{ width: LABEL_W }}>
             {tasks.map((task, i) => (
               <div
                 key={task.id}
                 className={`absolute flex items-center gap-1 pr-2 ${
                   criticalPath.has(task.id) ? 'text-orange-300' : 'text-th-text-alt'
                 }`}
-                style={{ top: i * (ROW_H + ROW_GAP), height: ROW_H, width: '100%' }}
+                style={{ top: TIME_AXIS_H + i * (ROW_H + ROW_GAP), height: ROW_H, width: '100%' }}
               >
                 {criticalPath.has(task.id) && (
                   <span className="text-orange-400 text-[9px] shrink-0 leading-none">★</span>
@@ -179,7 +180,7 @@ export function DagGantt({ tasks }: DagGanttProps) {
               <div
                 key={i}
                 className={`absolute w-full pointer-events-none ${i % 2 === 0 ? 'bg-th-bg-alt/10' : ''}`}
-                style={{ top: i * (ROW_H + ROW_GAP), height: ROW_H }}
+                style={{ top: TIME_AXIS_H + i * (ROW_H + ROW_GAP), height: ROW_H }}
               />
             ))}
 
@@ -200,7 +201,7 @@ export function DagGantt({ tasks }: DagGanttProps) {
                     ${onCrit ? 'ring-1 ring-orange-400/80' : ''}
                   `}
                   style={{
-                    top:    i * (ROW_H + ROW_GAP) + 2,
+                    top:    TIME_AXIS_H + i * (ROW_H + ROW_GAP) + 2,
                     left:   `${leftPct}%`,
                     width:  `${widthPct}%`,
                     height: ROW_H - 4,
@@ -220,8 +221,8 @@ export function DagGantt({ tasks }: DagGanttProps) {
 
             {/* SVG dependency arrows — drawn in the same coordinate space as the bars */}
             <svg
-              className="absolute inset-0 pointer-events-none overflow-visible"
-              style={{ width: '100%', height: '100%' }}
+              className="absolute left-0 pointer-events-none overflow-visible"
+              style={{ width: '100%', height: totalH, top: TIME_AXIS_H }}
               viewBox={`0 0 ${VB_W} ${totalH}`}
               preserveAspectRatio="none"
               aria-hidden="true"
