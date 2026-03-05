@@ -37,6 +37,7 @@ const SETTINGS_KEY = 'budget_config';
 export class BudgetEnforcer extends EventEmitter {
   private config: BudgetConfig;
   private pauseTriggered = false;
+  private lastEmittedLevel: 'ok' | 'warn' | 'alert' | 'pause' = 'ok';
 
   constructor(
     private db: Database,
@@ -70,6 +71,7 @@ export class BudgetEnforcer extends EventEmitter {
       Object.assign(this.config.thresholds, updates.thresholds);
     }
     this.pauseTriggered = false; // Reset pause trigger on config change
+    this.lastEmittedLevel = 'ok'; // Reset dedup tracking
     this.saveConfig();
   }
 
@@ -119,15 +121,22 @@ export class BudgetEnforcer extends EventEmitter {
     }
 
     if (utilization >= this.config.thresholds.alert) {
-      this.emit('budget:alert', { currentSpend, limit: this.config.limit, utilization });
+      if (this.lastEmittedLevel !== 'alert') {
+        this.lastEmittedLevel = 'alert';
+        this.emit('budget:alert', { currentSpend, limit: this.config.limit, utilization });
+      }
       return { level: 'alert', utilization };
     }
 
     if (utilization >= this.config.thresholds.warn) {
-      this.emit('budget:warning', { currentSpend, limit: this.config.limit, utilization });
+      if (this.lastEmittedLevel !== 'warn') {
+        this.lastEmittedLevel = 'warn';
+        this.emit('budget:warning', { currentSpend, limit: this.config.limit, utilization });
+      }
       return { level: 'warn', utilization };
     }
 
+    this.lastEmittedLevel = 'ok';
     return { level: 'ok', utilization };
   }
 }

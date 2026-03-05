@@ -52,13 +52,30 @@ const KEYFRAME_TYPES: Record<string, Keyframe['type']> = {
 
 export class SessionReplay {
   private cache = new Map<string, CacheEntry>();
+  private cleanupTimer: ReturnType<typeof setInterval>;
 
   constructor(
     private activityLedger: ActivityLedger,
     private taskDAG: TaskDAG,
     private decisionLog: DecisionLog,
     private lockRegistry: FileLockRegistry,
-  ) {}
+  ) {
+    // Evict expired cache entries every 60s to prevent unbounded growth
+    this.cleanupTimer = setInterval(() => this.evictExpired(), 60_000);
+  }
+
+  /** Stop the cache cleanup timer */
+  destroy(): void {
+    clearInterval(this.cleanupTimer);
+    this.cache.clear();
+  }
+
+  private evictExpired(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache) {
+      if (entry.expiresAt <= now) this.cache.delete(key);
+    }
+  }
 
   /** Reconstruct the world state at a specific point in time */
   getWorldStateAt(leadId: string, timestamp: string): WorldState {

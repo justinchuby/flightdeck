@@ -76,80 +76,85 @@ export function commsRoutes(ctx: AppContext): Router {
 
   // GET /api/comms/:leadId/flows
   router.get('/comms/:leadId/flows', (req, res) => {
-    const { leadId } = req.params;
-    const since = req.query.since as string | undefined;
-    const types = req.query.types
-      ? (req.query.types as string).split(',').map(t => t.trim())
-      : undefined;
+    try {
+      const { leadId } = req.params;
+      const since = req.query.since as string | undefined;
+      const types = req.query.types
+        ? (req.query.types as string).split(',').map(t => t.trim())
+        : undefined;
 
-    const events = getCommEvents(leadId, since, types);
+      const events = getCommEvents(leadId, since, types);
 
-    // Build nodes from team agents
-    const teamIds = getTeamIds(leadId);
-    const nodes: FlowNode[] = [];
-    for (const agent of agentManager.getAll()) {
-      if (teamIds.has(agent.id)) {
-        nodes.push({
-          id: agent.id,
-          role: agent.role?.name ?? agent.role?.id ?? 'unknown',
-          shortId: agent.id.slice(0, 8),
-          status: agent.status,
-        });
-      }
-    }
-
-    // Build edges by aggregating comm events
-    const edgeMap = new Map<string, FlowEdge>();
-    const timeline: FlowTimelineEntry[] = [];
-
-    for (const event of events) {
-      const details = event.details as Record<string, string>;
-      const commType = ACTION_TO_COMM_TYPE[event.actionType];
-      if (!commType) continue;
-
-      const from = event.agentId;
-      const to = details.toAgentId === 'all' ? null : (details.toAgentId ?? null);
-      const groupName = details.groupName ?? undefined;
-
-      // Edge key: from→to→type
-      const edgeKey = `${from}→${to ?? 'all'}→${commType}`;
-      const existing = edgeMap.get(edgeKey);
-      if (existing) {
-        existing.count++;
-        if (event.timestamp > existing.lastTimestamp) {
-          existing.lastTimestamp = event.timestamp;
+      // Build nodes from team agents
+      const teamIds = getTeamIds(leadId);
+      const nodes: FlowNode[] = [];
+      for (const agent of agentManager.getAll()) {
+        if (teamIds.has(agent.id)) {
+          nodes.push({
+            id: agent.id,
+            role: agent.role?.name ?? agent.role?.id ?? 'unknown',
+            shortId: agent.id.slice(0, 8),
+            status: agent.status,
+          });
         }
-      } else {
-        edgeMap.set(edgeKey, {
+      }
+
+      // Build edges by aggregating comm events
+      const edgeMap = new Map<string, FlowEdge>();
+      const timeline: FlowTimelineEntry[] = [];
+
+      for (const event of events) {
+        const details = event.details as Record<string, string>;
+        const commType = ACTION_TO_COMM_TYPE[event.actionType];
+        if (!commType) continue;
+
+        const from = event.agentId;
+        const to = details.toAgentId === 'all' ? null : (details.toAgentId ?? null);
+        const groupName = details.groupName ?? undefined;
+
+        // Edge key: from→to→type
+        const edgeKey = `${from}→${to ?? 'all'}→${commType}`;
+        const existing = edgeMap.get(edgeKey);
+        if (existing) {
+          existing.count++;
+          if (event.timestamp > existing.lastTimestamp) {
+            existing.lastTimestamp = event.timestamp;
+          }
+        } else {
+          edgeMap.set(edgeKey, {
+            from,
+            to,
+            type: commType,
+            count: 1,
+            lastTimestamp: event.timestamp,
+            groupName,
+          });
+        }
+
+        timeline.push({
+          timestamp: event.timestamp,
           from,
           to,
           type: commType,
-          count: 1,
-          lastTimestamp: event.timestamp,
-          groupName,
+          summary: event.summary.slice(0, 120),
         });
       }
 
-      timeline.push({
-        timestamp: event.timestamp,
-        from,
-        to,
-        type: commType,
-        summary: event.summary.slice(0, 120),
+      res.json({
+        nodes,
+        edges: [...edgeMap.values()],
+        timeline,
       });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to build comm flows', detail: (err as Error).message });
     }
-
-    res.json({
-      nodes,
-      edges: [...edgeMap.values()],
-      timeline,
-    });
   });
 
   // GET /api/comms/:leadId/stats
   router.get('/comms/:leadId/stats', (req, res) => {
-    const { leadId } = req.params;
-    const events = getCommEvents(leadId);
+    try {
+      const { leadId } = req.params;
+      const events = getCommEvents(leadId);
 
     const byType: Record<string, number> = {};
     const sentCount = new Map<string, number>();
@@ -186,6 +191,9 @@ export function commsRoutes(ctx: AppContext): Router {
       byType,
       mostActive: mostActive.agentId ? mostActive : null,
     });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to compute comm stats', detail: (err as Error).message });
+    }
   });
 
   return router;
