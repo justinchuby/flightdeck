@@ -142,17 +142,21 @@ export function decisionsRoutes(ctx: AppContext): Router {
   });
 
   router.post('/intents', (req, res) => {
-    const { category, source, description, roleScopes, conditions, priority } = req.body ?? {};
+    const { category, source, description, roleScopes, conditions, priority, action, enabled } = req.body ?? {};
     if (!DECISION_CATEGORIES.includes(category as DecisionCategory)) {
       return res.status(400).json({ error: `category must be one of: ${DECISION_CATEGORIES.join(', ')}` });
     }
     const validSources = ['manual', 'teach_me', 'preset'];
     const ruleSource = validSources.includes(source) ? source : 'manual';
+    const validActions = ['auto-approve', 'queue', 'alert'];
+    const ruleAction = validActions.includes(action) ? action : 'auto-approve';
     const rule = decisionLog.addIntentRule(category as DecisionCategory, ruleSource, {
       description,
       roleScopes,
       conditions,
       priority,
+      action: ruleAction,
+      enabled: enabled ?? true,
     });
     res.status(201).json(rule);
   });
@@ -162,14 +166,25 @@ export function decisionsRoutes(ctx: AppContext): Router {
     const rule = rules.find(r => r.id === req.params.id);
     if (!rule) return res.status(404).json({ error: 'Intent rule not found' });
     // Allow updating mutable fields
-    const { description, roleScopes, conditions, priority } = req.body ?? {};
+    const { description, roleScopes, conditions, priority, enabled, action } = req.body ?? {};
     if (description !== undefined) rule.description = description;
     if (roleScopes !== undefined) rule.roleScopes = roleScopes;
     if (conditions !== undefined) rule.conditions = conditions;
     if (priority !== undefined) rule.priority = priority;
+    if (enabled !== undefined) rule.enabled = enabled;
+    if (action !== undefined && ['auto-approve', 'queue', 'alert'].includes(action)) rule.action = action;
     // Force re-save
     (decisionLog as any).saveIntentRules();
     res.json(rule);
+  });
+
+  router.post('/intents/reorder', (req, res) => {
+    const { ids } = req.body ?? {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array of rule IDs' });
+    }
+    const updated = decisionLog.reorderIntentRules(ids);
+    res.json({ updated });
   });
 
   router.delete('/intents/:id', (req, res) => {

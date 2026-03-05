@@ -1,4 +1,4 @@
-import type { ActivityLedger, ActivityEntry } from './ActivityLedger.js';
+import type { ChatGroupRegistry, GroupMessage } from '../comms/ChatGroupRegistry.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -12,6 +12,7 @@ export interface DebatePosition {
 export interface Debate {
   id: string;
   topic: string;
+  groupName: string;
   participants: string[];
   positions: DebatePosition[];
   status: 'active' | 'resolved';
@@ -66,28 +67,31 @@ const MIN_CONFIDENCE = 40; // Minimum confidence to report as debate
 // ── DebateDetector ────────────────────────────────────────────────
 
 export class DebateDetector {
-  constructor(private activityLedger: ActivityLedger) {}
+  constructor(private chatGroupRegistry: ChatGroupRegistry) {}
 
-  /** Scan recent activity for debates */
+  /** Scan group chat messages for debates */
   detectDebates(leadId: string, since?: string): Debate[] {
-    const events = since
-      ? this.activityLedger.getSince(since, leadId)
-      : this.activityLedger.getRecent(5_000);
-
-    // Filter to message events from the team
-    const messageEvents = events.filter(e =>
-      e.actionType === 'message_sent' || e.actionType === 'group_message',
-    );
-
-    // Group messages into conversation threads by topic proximity
-    const threads = this.groupIntoThreads(messageEvents);
-
-    // Analyze each thread for debate patterns
+    const groups = this.chatGroupRegistry.getGroups(leadId);
     const debates: Debate[] = [];
-    for (const thread of threads) {
-      const debate = this.analyzeThread(thread);
-      if (debate && debate.confidence >= MIN_CONFIDENCE) {
-        debates.push(debate);
+
+    for (const group of groups) {
+      const messages = this.chatGroupRegistry.getMessages(group.name, leadId, 500);
+
+      // Filter by since timestamp if provided
+      const filtered = since
+        ? messages.filter(m => m.timestamp >= since)
+        : messages;
+
+      if (filtered.length < 2) continue;
+
+      // Group messages into conversation threads by temporal proximity
+      const threads = this.groupIntoThreads(filtered);
+
+      for (const thread of threads) {
+        const debate = this.analyzeThread(thread, group.name);
+        if (debate && debate.confidence >= MIN_CONFIDENCE) {
+          debates.push(debate);
+        }
       }
     }
 
@@ -95,15 +99,15 @@ export class DebateDetector {
   }
 
   /** Group sequential messages into threads based on temporal proximity */
-  private groupIntoThreads(events: ActivityEntry[]): ActivityEntry[][] {
-    if (events.length === 0) return [];
+  private groupIntoThreads(messages: GroupMessage[]): GroupMessage[][] {
+    if (messages.length === 0) return [];
 
-    const threads: ActivityEntry[][] = [];
-    let currentThread: ActivityEntry[] = [events[0]];
+    const threads: GroupMessage[][] = [];
+    let currentThread: GroupMessage[] = [messages[0]];
 
-    for (let i = 1; i < events.length; i++) {
-      const prev = events[i - 1];
-      const curr = events[i];
+    for (let i = 1; i < messages.length; i++) {
+      const prev = messages[i - 1];
+      const curr = messages[i];
 
       // Start new thread if gap > 5 min
       const gap = new Date(curr.timestamp).getTime() - new Date(prev.timestamp).getTime();
@@ -121,7 +125,7 @@ export class DebateDetector {
   }
 
   /** Analyze a message thread for debate signals */
-  private analyzeThread(thread: ActivityEntry[]): Debate | null {
+  private analyzeThread(thread: GroupMessage[], groupName: string): Debate | null {
     if (thread.length < 2) return null;
 
     let strongHits = 0;
@@ -131,26 +135,26 @@ export class DebateDetector {
     let resolution: string | undefined;
     const participants = new Set<string>();
 
-    for (const event of thread) {
-      const text = event.summary;
-      participants.add(event.agentId);
+    for (const msg of thread) {
+      const text = msg.content;
+      participants.add(msg.fromAgentId);
 
       // Check for strong disagreement
       for (const pattern of STRONG_PATTERNS) {
         if (pattern.test(text)) {
           strongHits++;
           positions.push({
-            agentId: event.agentId,
-            agentRole: event.agentRole,
+            agentId: msg.fromAgentId,
+            agentRole: msg.fromRole,
             stance: text.slice(0, 200),
-            timestamp: event.timestamp,
+            timestamp: msg.timestamp,
           });
           break; // One hit per message is enough
         }
       }
 
       // Check for moderate disagreement
-      if (strongHits === 0 || positions[positions.length - 1]?.timestamp !== event.timestamp) {
+      if (strongHits === 0 || positions[positions.length - 1]?.timestamp !== msg.timestamp) {
         for (const pattern of MODERATE_PATTERNS) {
           if (pattern.test(text)) {
             moderateHits++;
@@ -181,11 +185,12 @@ export class DebateDetector {
     if (confidence < MIN_CONFIDENCE) return null;
 
     // Extract topic from first message
-    const topic = thread[0].summary.slice(0, 100);
+    const topic = thread[0].content.slice(0, 100);
 
     return {
       id: `debate-${thread[0].timestamp.replace(/[^0-9]/g, '').slice(0, 14)}`,
       topic,
+      groupName,
       participants: [...participants],
       positions: positions.slice(0, 10), // Cap positions
       status: resolved ? 'resolved' : 'active',
