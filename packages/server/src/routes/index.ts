@@ -21,6 +21,8 @@ import { debateRoutes } from './debates.js';
 import { sharedRoutes } from './shared.js';
 import { analyticsRoutes } from './analytics.js';
 import { recoveryRoutes } from './recovery.js';
+import { handoffRoutes } from './handoffs.js';
+import { notificationRoutes } from './notifications.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -44,4 +46,6 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(sharedRoutes(ctx));
   router.use(analyticsRoutes(ctx));
   router.use(recoveryRoutes(ctx));
+  router.use(handoffRoutes(ctx));
+  router.use(notificationRoutes(ctx));
 }
