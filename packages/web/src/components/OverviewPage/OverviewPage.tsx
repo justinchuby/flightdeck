@@ -45,15 +45,31 @@ export function OverviewPage(_props: Props) {
   const [costData, setCostData] = useState<CostPoint[]>([]);
   const [heatmapBuckets, setHeatmapBuckets] = useState<HeatmapBucket[]>([]);
   const [keyframes, setKeyframes] = useState<ReplayKeyframe[]>([]);
+  const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
   const [totalTokens, setTotalTokens] = useState(0);
   const [totalTasks, setTotalTasks] = useState(0);
   const mountedRef = useRef(true);
+
+  // Use live agents if available, otherwise fall back to API-fetched historical agents
+  const displayAgents = agents.length > 0 ? agents : historicalAgents;
 
   // ── Fetch overview data ────────────────────────────────────────
   const fetchData = useCallback(async () => {
     if (!leadId) return;
 
     try {
+      // Fetch agents from REST API when live WebSocket agents are empty
+      if (agents.length === 0) {
+        try {
+          const agentData = await apiFetch<any[]>('/agents');
+          const arr = Array.isArray(agentData) ? agentData : [];
+          if (mountedRef.current) setHistoricalAgents(arr);
+        } catch { /* API may not have agent list endpoint */ }
+      }
+
+      // Use whichever agents are available for token calculations
+      const currentAgents = agents.length > 0 ? agents : historicalAgents;
+
       // Fetch keyframes for milestones
       const kfData = await apiFetch<{ keyframes: ReplayKeyframe[] }>(`/replay/${leadId}/keyframes`);
       const kf: ReplayKeyframe[] = kfData.keyframes ?? [];
@@ -69,9 +85,9 @@ export function OverviewPage(_props: Props) {
           const hBuckets: HeatmapBucket[] = [];
           let taskTotal = 0;
 
-          // Use real token counts from agents (same source as PulseStrip)
-          const totalInput = agents.reduce((s, a) => s + (a.inputTokens ?? 0), 0);
-          const totalOutput = agents.reduce((s, a) => s + (a.outputTokens ?? 0), 0);
+          // Use real token counts from available agents
+          const totalInput = currentAgents.reduce((s: number, a: any) => s + (a.inputTokens ?? 0), 0);
+          const totalOutput = currentAgents.reduce((s: number, a: any) => s + (a.outputTokens ?? 0), 0);
           const realTokens = totalInput + totalOutput;
 
           for (const frame of kf) {
@@ -110,7 +126,7 @@ export function OverviewPage(_props: Props) {
     } catch {
       // API not ready — show empty states
     }
-  }, [leadId]);
+  }, [leadId, agents.length, historicalAgents]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -125,9 +141,9 @@ export function OverviewPage(_props: Props) {
   // ── Session start time ─────────────────────────────────────────
   const sessionStart = useMemo(() => {
     if (keyframes.length > 0) return keyframes[0].timestamp;
-    const lead = agents.find((a) => a.id === leadId);
+    const lead = displayAgents.find((a: any) => a.id === leadId);
     return lead?.createdAt ?? undefined;
-  }, [keyframes, agents, leadId]);
+  }, [keyframes, displayAgents, leadId]);
 
   if (!leadId) {
     return (
@@ -146,11 +162,11 @@ export function OverviewPage(_props: Props) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <TaskBurndown data={burndownData} totalTasks={totalTasks} />
         <CostCurve data={costData} />
-        <KeyStats agents={agents} totalTokens={totalTokens} sessionStart={sessionStart} />
+        <KeyStats agents={displayAgents} totalTokens={totalTokens} sessionStart={sessionStart} />
       </div>
 
       {/* Agent Activity Heatmap */}
-      <AgentHeatmap agents={agents} buckets={heatmapBuckets} />
+      <AgentHeatmap agents={displayAgents} buckets={heatmapBuckets} />
 
       {/* Milestones */}
       <MilestoneTimeline keyframes={keyframes} />
