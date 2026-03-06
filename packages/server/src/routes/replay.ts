@@ -16,6 +16,11 @@ export function replayRoutes(ctx: AppContext): Router {
     return replay;
   }
 
+  // Strip 'project:' prefix from leadId — the client may send it from the project selector
+  function resolveLeadId(raw: string): string {
+    return raw.startsWith('project:') ? raw.slice(8) : raw;
+  }
+
   // GET /api/replay/:leadId/state?at=<ISO-timestamp>
   router.get('/replay/:leadId/state', (req, res) => {
     const r = getReplay();
@@ -25,7 +30,7 @@ export function replayRoutes(ctx: AppContext): Router {
     if (!timestamp) return res.status(400).json({ error: 'Missing required query param: at (ISO timestamp)' });
 
     try {
-      const state = r.getWorldStateAt(req.params.leadId, timestamp);
+      const state = r.getWorldStateAt(resolveLeadId(req.params.leadId), timestamp);
       res.json(state);
     } catch (err) {
       res.status(500).json({ error: 'Failed to reconstruct state', detail: (err as Error).message });
@@ -33,19 +38,36 @@ export function replayRoutes(ctx: AppContext): Router {
   });
 
   // GET /api/replay/:leadId/events?from=<ISO>&to=<ISO>&types=<csv>
+  // Also supports ?limit=N (returns most recent N events)
   router.get('/replay/:leadId/events', (req, res) => {
     const r = getReplay();
     if (!r) return res.status(503).json({ error: 'Replay service not available' });
 
+    const leadId = resolveLeadId(req.params.leadId);
     const from = req.query.from as string;
     const to = req.query.to as string;
-    if (!from || !to) return res.status(400).json({ error: 'Missing required query params: from, to (ISO timestamps)' });
+    const limitStr = req.query.limit as string;
+
+    if (!from && !to && !limitStr) {
+      return res.status(400).json({ error: 'Missing required query params: from & to (ISO timestamps), or limit (number)' });
+    }
 
     const types = req.query.types ? (req.query.types as string).split(',').map(t => t.trim()) : undefined;
 
     try {
-      const events = r.getEventsInRange(req.params.leadId, from, to, types);
-      res.json({ events });
+      if (from && to) {
+        const events = r.getEventsInRange(leadId, from, to, types);
+        res.json({ events });
+      } else {
+        // limit-based: return most recent events
+        const limit = Math.min(parseInt(limitStr, 10) || 50, 500);
+        const now = new Date().toISOString();
+        const activities = r.resolveActivities(leadId, now, limit);
+        const events = types && types.length > 0
+          ? activities.filter(a => types.includes(a.actionType))
+          : activities;
+        res.json({ events: events.slice(-limit) });
+      }
     } catch (err) {
       res.status(500).json({ error: 'Failed to query events', detail: (err as Error).message });
     }
@@ -57,7 +79,7 @@ export function replayRoutes(ctx: AppContext): Router {
     if (!r) return res.status(503).json({ error: 'Replay service not available' });
 
     try {
-      const keyframes = r.getKeyframes(req.params.leadId);
+      const keyframes = r.getKeyframes(resolveLeadId(req.params.leadId));
       res.json({ keyframes });
     } catch (err) {
       res.status(500).json({ error: 'Failed to get keyframes', detail: (err as Error).message });
