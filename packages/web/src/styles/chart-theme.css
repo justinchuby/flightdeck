@@ -107,5 +107,5 @@
 [data-testid*="chart"] text,
 [data-testid*="cost-curve"] text,
 [data-testid*="cost-trend"] text {
-  fill: var(--th-text-muted) !important;
+  fill: #9ca3af !important;
 }
