@@ -64,3 +64,7 @@ Documented preferences from user feedback. Follow these when building new featur
 - No role contribution chart (not a meaningful metric).
 - No session score stars (subjective, not useful).
 - No monetary cost estimates — token counts only.
+
+## Release Process
+
+- **User creates git tags themselves** — do NOT create tags or push tags. Only prepare version bumps and CHANGELOG updates.
