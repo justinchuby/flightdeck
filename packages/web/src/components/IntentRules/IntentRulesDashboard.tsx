@@ -4,21 +4,19 @@ import { apiFetch } from '../../hooks/useApi';
 import { TrustPresetBar } from './TrustPresetBar';
 import { RuleRow } from './RuleRow';
 import { RuleEditor } from './RuleEditor';
-import { type IntentRuleV2, type TrustPreset } from './types';
-import { backendToFrontend, frontendToCreateBody, frontendToPatchBody, type BackendIntentRule } from './adapters';
+import { type IntentRule, type TrustPreset } from './types';
 
 export function IntentRulesDashboard() {
-  const [rules, setRules] = useState<IntentRuleV2[]>([]);
+  const [rules, setRules] = useState<IntentRule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activePreset, setActivePreset] = useState<TrustPreset | null>(null);
+  const [activePreset, setActivePreset] = useState<TrustPreset | null>('autonomous');
   const [creating, setCreating] = useState(false);
 
-  // Fetch rules and transform from backend shape
+  // Fetch rules directly — backend returns the same shape
   const fetchRules = useCallback(async () => {
     try {
-      const data = await apiFetch<BackendIntentRule[]>('/intents');
-      const raw = Array.isArray(data) ? data : [];
-      setRules(raw.map(backendToFrontend));
+      const data = await apiFetch<IntentRule[]>('/intents');
+      setRules(Array.isArray(data) ? data : []);
     } catch { /* rules stay empty */ }
     finally { setLoading(false); }
   }, []);
@@ -48,14 +46,21 @@ export function IntentRulesDashboard() {
   }, [fetchRules]);
 
   // Save rule (create or update)
-  const handleSave = useCallback(async (rule: IntentRuleV2) => {
+  const handleSave = useCallback(async (rule: IntentRule) => {
     const isNew = !rules.find((r) => r.id === rule.id);
     if (isNew) {
       try {
         await apiFetch('/intents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(frontendToCreateBody(rule)),
+          body: JSON.stringify({
+            category: rule.match.categories[0] ?? 'general',
+            name: rule.name,
+            action: rule.action,
+            roles: rule.match.roles,
+            conditions: rule.conditions,
+            priority: rule.priority,
+          }),
         });
         setCreating(false);
         fetchRules();
@@ -65,7 +70,14 @@ export function IntentRulesDashboard() {
         await apiFetch(`/intents/${rule.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(frontendToPatchBody(rule)),
+          body: JSON.stringify({
+            name: rule.name,
+            action: rule.action,
+            roles: rule.match.roles,
+            conditions: rule.conditions,
+            priority: rule.priority,
+            enabled: rule.enabled,
+          }),
         });
         fetchRules();
       } catch { /* optimistic update stays */ }

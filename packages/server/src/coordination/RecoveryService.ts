@@ -332,7 +332,7 @@ export class RecoveryService extends EventEmitter {
     // Get active intent rules for this agent's role context
     const intentRules = this.decisionLog.getIntentRules()
       .filter(r => r.enabled)
-      .map(r => r.description ?? `${r.action} ${r.category}`)
+      .map(r => r.name)
       .slice(0, 5);
 
     // Build narrative

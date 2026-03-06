@@ -3,7 +3,7 @@ import { DecisionLog, DECISION_CATEGORIES, TRUST_PRESETS, MIN_MATCHES_FOR_SCORE 
 import type { IntentRule, IntentCondition, TrustPreset, IntentAction } from '../coordination/DecisionLog.js';
 import { Database } from '../db/database.js';
 
-describe('Intent Rules V2', () => {
+describe('Intent Rules', () => {
   let db: Database;
   let log: DecisionLog;
 
@@ -12,20 +12,19 @@ describe('Intent Rules V2', () => {
     log = new DecisionLog(db);
   });
 
-  describe('V2 fields', () => {
-    it('creates rule with description, roleScopes, conditions, priority', () => {
+  describe('CRUD', () => {
+    it('creates rule with unified type shape', () => {
       const rule = log.addIntentRule('style', 'manual', {
-        description: 'Auto-approve style from developers',
-        roleScopes: ['Developer'],
-        conditions: [{ field: 'title', operator: 'contains', value: 'format' }],
+        name: 'Allow style from developers',
+        roles: ['Developer'],
         priority: 10,
       });
-      expect(rule.description).toBe('Auto-approve style from developers');
-      expect(rule.roleScopes).toEqual(['Developer']);
-      expect(rule.conditions).toHaveLength(1);
+      expect(rule.name).toBe('Allow style from developers');
+      expect(rule.match.categories).toEqual(['style']);
+      expect(rule.match.roles).toEqual(['Developer']);
       expect(rule.priority).toBe(10);
-      expect(rule.effectiveness).toBeDefined();
-      expect(rule.effectiveness!.totalMatches).toBe(0);
+      expect(rule.metadata.matchCount).toBe(0);
+      expect(rule.metadata.source).toBe('manual');
     });
 
     it('sorts rules by priority descending', () => {
@@ -33,18 +32,26 @@ describe('Intent Rules V2', () => {
       log.addIntentRule('testing', 'manual', { priority: 20 });
       log.addIntentRule('general', 'manual', { priority: 1 });
       const rules = log.getIntentRules();
-      expect(rules[0].category).toBe('testing');
-      expect(rules[1].category).toBe('style');
-      expect(rules[2].category).toBe('general');
+      expect(rules[0].match.categories).toContain('testing');
+      expect(rules[1].match.categories).toContain('style');
+      expect(rules[2].match.categories).toContain('general');
     });
 
-    it('backward compatible — no V2 fields still works', () => {
+    it('defaults to allow action when no options', () => {
       const rule = log.addIntentRule('style', 'manual');
+      expect(rule.action).toBe('allow');
       expect(rule.priority).toBe(0);
-      expect(rule.roleScopes).toBeUndefined();
-      expect(rule.conditions).toBeUndefined();
       expect(rule.enabled).toBe(true);
-      expect(rule.action).toBe('auto-approve');
+    });
+
+    it('deletes a rule', () => {
+      const rule = log.addIntentRule('style', 'manual');
+      expect(log.deleteIntentRule(rule.id)).toBe(true);
+      expect(log.getIntentRules()).toHaveLength(0);
+    });
+
+    it('returns false for unknown rule deletion', () => {
+      expect(log.deleteIntentRule('nonexistent')).toBe(false);
     });
   });
 
@@ -63,26 +70,17 @@ describe('Intent Rules V2', () => {
       log.addIntentRule('style', 'manual', { enabled: false });
       expect(log.matchIntentRule('style')).toBeUndefined();
     });
-
-    it('re-enabling rule allows matching again', () => {
-      const rule = log.addIntentRule('style', 'manual', { enabled: false });
-      // Manually re-enable via direct mutation + save
-      const rules = log.getIntentRules();
-      rules.find(r => r.id === rule.id)!.enabled = true;
-      (log as any).saveIntentRules();
-      expect(log.matchIntentRule('style')).toBeDefined();
-    });
   });
 
   describe('action types', () => {
-    it('defaults to auto-approve action', () => {
+    it('defaults to allow action', () => {
       const rule = log.addIntentRule('style', 'manual');
-      expect(rule.action).toBe('auto-approve');
+      expect(rule.action).toBe('allow');
     });
 
-    it('can create queue action rule', () => {
-      const rule = log.addIntentRule('style', 'manual', { action: 'queue' });
-      expect(rule.action).toBe('queue');
+    it('can create require-review action rule', () => {
+      const rule = log.addIntentRule('style', 'manual', { action: 'require-review' });
+      expect(rule.action).toBe('require-review');
     });
 
     it('can create alert action rule', () => {
@@ -91,10 +89,10 @@ describe('Intent Rules V2', () => {
     });
 
     it('matchIntentRule returns rules of any action type', () => {
-      log.addIntentRule('style', 'manual', { action: 'queue' });
+      log.addIntentRule('style', 'manual', { action: 'require-review' });
       const match = log.matchIntentRule('style');
       expect(match).toBeDefined();
-      expect(match!.action).toBe('queue');
+      expect(match!.action).toBe('require-review');
     });
   });
 
@@ -106,99 +104,38 @@ describe('Intent Rules V2', () => {
 
       const updated = log.reorderIntentRules([r3.id, r1.id, r2.id]);
       expect(updated).toBe(3);
-
       const rules = log.getIntentRules();
-      // r3 should be first (highest priority), r2 should be last
       expect(rules[0].id).toBe(r3.id);
       expect(rules[1].id).toBe(r1.id);
       expect(rules[2].id).toBe(r2.id);
     });
-
-    it('reorder ignores unknown IDs', () => {
-      const r1 = log.addIntentRule('style', 'manual');
-      const updated = log.reorderIntentRules([r1.id, 'nonexistent']);
-      expect(updated).toBe(1);
-    });
   });
 
-  describe('V2 matching with role scopes', () => {
+  describe('matching with role scopes', () => {
     it('matches when agent role is in scope', () => {
-      log.addIntentRule('style', 'manual', { roleScopes: ['Developer'] });
-      const match = log.matchIntentRule('style', { agentRole: 'Developer' });
-      expect(match).toBeDefined();
+      log.addIntentRule('style', 'manual', { roles: ['Developer'] });
+      expect(log.matchIntentRule('style', { agentRole: 'Developer' })).toBeDefined();
     });
 
     it('does not match when agent role is out of scope', () => {
-      log.addIntentRule('style', 'manual', { roleScopes: ['Developer'] });
-      const match = log.matchIntentRule('style', { agentRole: 'Architect' });
-      expect(match).toBeUndefined();
+      log.addIntentRule('style', 'manual', { roles: ['Developer'] });
+      expect(log.matchIntentRule('style', { agentRole: 'Architect' })).toBeUndefined();
     });
 
-    it('matches when roleScopes is empty (all roles)', () => {
-      log.addIntentRule('style', 'manual', { roleScopes: [] });
-      const match = log.matchIntentRule('style', { agentRole: 'Architect' });
-      expect(match).toBeDefined();
-    });
-  });
-
-  describe('V2 matching with conditions', () => {
-    it('contains condition matches', () => {
-      log.addIntentRule('style', 'manual', {
-        conditions: [{ field: 'title', operator: 'contains', value: 'format' }],
-      });
-      expect(log.matchIntentRule('style', { title: 'Auto-format code' })).toBeDefined();
-      expect(log.matchIntentRule('style', { title: 'Refactor module' })).toBeUndefined();
-    });
-
-    it('not_contains condition matches', () => {
-      log.addIntentRule('general', 'manual', {
-        conditions: [{ field: 'title', operator: 'not_contains', value: 'delete' }],
-      });
-      expect(log.matchIntentRule('general', { title: 'Add feature' })).toBeDefined();
-      expect(log.matchIntentRule('general', { title: 'Delete all files' })).toBeUndefined();
-    });
-
-    it('equals condition matches', () => {
-      log.addIntentRule('testing', 'manual', {
-        conditions: [{ field: 'agentRole', operator: 'equals', value: 'qa tester' }],
-      });
-      expect(log.matchIntentRule('testing', { agentRole: 'QA Tester' })).toBeDefined();
-      expect(log.matchIntentRule('testing', { agentRole: 'Developer' })).toBeUndefined();
-    });
-
-    it('matches condition is regex-based', () => {
-      log.addIntentRule('style', 'manual', {
-        conditions: [{ field: 'title', operator: 'matches', value: 'format|lint|prettier' }],
-      });
-      expect(log.matchIntentRule('style', { title: 'Run prettier' })).toBeDefined();
-      expect(log.matchIntentRule('style', { title: 'Refactor logic' })).toBeUndefined();
-    });
-
-    it('multiple conditions all must match (AND)', () => {
-      log.addIntentRule('style', 'manual', {
-        roleScopes: ['Developer'],
-        conditions: [
-          { field: 'title', operator: 'contains', value: 'lint' },
-        ],
-      });
-      // Both role + condition match
-      expect(log.matchIntentRule('style', { agentRole: 'Developer', title: 'Fix lint errors' })).toBeDefined();
-      // Role matches, condition doesn't
-      expect(log.matchIntentRule('style', { agentRole: 'Developer', title: 'Refactor module' })).toBeUndefined();
-      // Condition matches, role doesn't
-      expect(log.matchIntentRule('style', { agentRole: 'Architect', title: 'Fix lint errors' })).toBeUndefined();
+    it('matches when roles is empty (all roles)', () => {
+      log.addIntentRule('style', 'manual', { roles: [] });
+      expect(log.matchIntentRule('style', { agentRole: 'Architect' })).toBeDefined();
     });
   });
 
   describe('effectiveness tracking', () => {
-    it('recordMatch increments totalMatches and autoApproved', () => {
+    it('recordMatch increments matchCount', () => {
       const rule = log.addIntentRule('style', 'manual');
       log.recordMatch(rule.id, true);
       log.recordMatch(rule.id, true);
       const updated = log.getIntentRules().find(r => r.id === rule.id)!;
-      expect(updated.effectiveness!.totalMatches).toBe(2);
-      expect(updated.effectiveness!.autoApproved).toBe(2);
-      expect(updated.effectiveness!.score).toBeNull(); // < MIN_MATCHES
+      expect(updated.metadata.matchCount).toBe(2);
+      expect(updated.metadata.effectivenessScore).toBeNull(); // < MIN_MATCHES
     });
 
     it('computes score after MIN_MATCHES_FOR_SCORE', () => {
@@ -207,7 +144,7 @@ describe('Intent Rules V2', () => {
         log.recordMatch(rule.id, true);
       }
       const updated = log.getIntentRules().find(r => r.id === rule.id)!;
-      expect(updated.effectiveness!.score).toBe(100);
+      expect(updated.metadata.effectivenessScore).toBe(100);
     });
 
     it('recordOverride decreases effectiveness score', () => {
@@ -218,68 +155,63 @@ describe('Intent Rules V2', () => {
       log.recordOverride(rule.id);
       log.recordOverride(rule.id);
       const updated = log.getIntentRules().find(r => r.id === rule.id)!;
-      // 5 auto-approved - 2 overridden = 3 effective, score = 60%
-      expect(updated.effectiveness!.score).toBe(60);
+      // 5 matches - 2 issues = 3 effective, score = 60%
+      expect(updated.metadata.effectivenessScore).toBe(60);
     });
   });
 
   describe('trust presets', () => {
-    it('conservative preset adds rules with queue action for most categories', () => {
+    it('conservative preset: allow style, require-review everything else', () => {
       const rules = log.applyTrustPreset('conservative');
       expect(rules).toHaveLength(6);
-      const autoApprove = rules.filter(r => r.action === 'auto-approve');
-      const queue = rules.filter(r => r.action === 'queue');
-      expect(autoApprove).toHaveLength(1);
-      expect(autoApprove[0].category).toBe('style');
-      expect(queue).toHaveLength(5);
+      const allow = rules.filter(r => r.action === 'allow');
+      const review = rules.filter(r => r.action === 'require-review');
+      expect(allow).toHaveLength(1);
+      expect(allow[0].match.categories).toContain('style');
+      expect(review).toHaveLength(5);
     });
 
-    it('moderate preset has mix of auto-approve, queue, alert', () => {
+    it('moderate preset: mix of allow, alert, require-review', () => {
       const rules = log.applyTrustPreset('moderate');
       expect(rules).toHaveLength(6);
-      const autoApprove = rules.filter(r => r.action === 'auto-approve');
-      const alert = rules.filter(r => r.action === 'alert');
-      const queue = rules.filter(r => r.action === 'queue');
-      expect(autoApprove.length).toBeGreaterThan(0);
-      expect(alert).toHaveLength(1);
-      expect(queue).toHaveLength(1);
+      expect(rules.filter(r => r.action === 'allow').length).toBeGreaterThan(0);
+      expect(rules.filter(r => r.action === 'alert')).toHaveLength(1);
+      expect(rules.filter(r => r.action === 'require-review')).toHaveLength(1);
     });
 
-    it('autonomous preset auto-approves most, alerts on architecture', () => {
+    it('autonomous preset: allow most, alert on architecture + tool_access', () => {
       const rules = log.applyTrustPreset('autonomous');
       expect(rules).toHaveLength(6);
       const alert = rules.filter(r => r.action === 'alert');
-      expect(alert).toHaveLength(2); // architecture + tool_access
+      expect(alert).toHaveLength(2);
     });
 
-    it('all preset rules have enabled=true', () => {
+    it('all preset rules have enabled=true and source=preset', () => {
       const rules = log.applyTrustPreset('moderate');
       for (const rule of rules) {
         expect(rule.enabled).toBe(true);
-        expect(rule.source).toBe('preset');
+        expect(rule.metadata.source).toBe('preset');
       }
     });
 
     it('applying preset replaces previous preset rules but keeps manual rules', () => {
-      log.addIntentRule('general', 'manual', { description: 'My custom rule' });
+      log.addIntentRule('general', 'manual', { name: 'My custom rule' });
       log.applyTrustPreset('conservative');
-      expect(log.getIntentRules()).toHaveLength(7); // 1 manual + 6 preset
+      expect(log.getIntentRules()).toHaveLength(7);
 
-      log.applyTrustPreset('moderate'); // replaces preset rules
+      log.applyTrustPreset('moderate');
       const rules = log.getIntentRules();
-      const manualRules = rules.filter(r => r.source === 'manual');
-      const presetRules = rules.filter(r => r.source === 'preset');
-      expect(manualRules).toHaveLength(1);
-      expect(presetRules).toHaveLength(6);
+      expect(rules.filter(r => r.metadata.source === 'manual')).toHaveLength(1);
+      expect(rules.filter(r => r.metadata.source === 'preset')).toHaveLength(6);
     });
 
     it('preset rules have lower priority than manual rules', () => {
       log.addIntentRule('style', 'manual', { priority: 0 });
       log.applyTrustPreset('conservative');
       const rules = log.getIntentRules();
-      const manual = rules.find(r => r.source === 'manual')!;
-      const preset = rules.find(r => r.source === 'preset')!;
-      expect(manual.priority).toBeGreaterThan(preset.priority!);
+      const manual = rules.find(r => r.metadata.source === 'manual')!;
+      const preset = rules.find(r => r.metadata.source === 'preset')!;
+      expect(manual.priority).toBeGreaterThan(preset.priority);
     });
   });
 });

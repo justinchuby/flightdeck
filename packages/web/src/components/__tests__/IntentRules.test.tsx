@@ -1,13 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import type { IntentRuleV2 } from '../IntentRules/types';
+import type { IntentRule } from '../IntentRules/types';
 import { ACTION_DISPLAY, TRUST_PRESETS } from '../IntentRules/types';
-import {
-  backendToFrontend,
-  frontendToCreateBody,
-  frontendToPatchBody,
-  type BackendIntentRule,
-} from '../IntentRules/adapters';
 
 // Mock apiFetch — capture calls for assertion
 const mockApiFetch = vi.fn().mockResolvedValue([]);
@@ -22,12 +16,12 @@ import { RuleEditor } from '../IntentRules/RuleEditor';
 
 // ── Test Data ──────────────────────────────────────────────────────
 
-const makeRule = (overrides: Partial<IntentRuleV2> = {}): IntentRuleV2 => ({
+const makeRule = (overrides: Partial<IntentRule> = {}): IntentRule => ({
   id: 'rule-1',
-  name: 'Auto-approve style from devs',
+  name: 'Allow style from devs',
   enabled: true,
   priority: 1,
-  action: 'auto-approve',
+  action: 'allow',
   match: { categories: ['style'], roles: ['developer'] },
   conditions: [],
   metadata: {
@@ -41,158 +35,14 @@ const makeRule = (overrides: Partial<IntentRuleV2> = {}): IntentRuleV2 => ({
   ...overrides,
 });
 
-/** Backend-shaped rule as returned by GET /intents */
-const makeBackendRule = (overrides: Partial<BackendIntentRule> = {}): BackendIntentRule => ({
-  id: 'rule-backend-1',
-  category: 'style',
-  action: 'auto-approve',
-  source: 'manual',
-  approvalCount: 12,
-  createdAt: '2026-01-15T10:00:00Z',
-  lastMatchedAt: '2026-03-01T14:30:00Z',
-  description: 'Auto-approve style changes',
-  roleScopes: ['developer'],
-  conditions: [],
-  priority: 5,
-  effectiveness: {
-    totalMatches: 42,
-    autoApproved: 40,
-    overriddenByUser: 2,
-    lastEvaluatedAt: '2026-03-05T12:00:00Z',
-    score: 88,
-  },
-  enabled: true,
-  ...overrides,
-});
-
 beforeEach(() => {
   mockApiFetch.mockReset();
   mockApiFetch.mockResolvedValue([]);
 });
 
-// ── Adapter Tests ──────────────────────────────────────────────────
+// ── Tests ──────────────────────────────────────────────────────────
 
-describe('Intent Rules Adapters', () => {
-  describe('backendToFrontend', () => {
-    it('transforms a full backend rule to frontend shape', () => {
-      const backend = makeBackendRule();
-      const result = backendToFrontend(backend);
-
-      expect(result.id).toBe('rule-backend-1');
-      expect(result.name).toBe('Auto-approve style changes');
-      expect(result.enabled).toBe(true);
-      expect(result.priority).toBe(5);
-      expect(result.action).toBe('auto-approve');
-      expect(result.match.categories).toEqual(['style']);
-      expect(result.match.roles).toEqual(['developer']);
-      expect(result.metadata.source).toBe('manual');
-      expect(result.metadata.matchCount).toBe(42);
-      expect(result.metadata.effectivenessScore).toBe(88);
-      expect(result.metadata.issuesAfterMatch).toBe(2);
-      expect(result.metadata.createdAt).toBe('2026-01-15T10:00:00Z');
-      expect(result.metadata.lastMatchedAt).toBe('2026-03-01T14:30:00Z');
-    });
-
-    it('maps backend action "queue" to frontend "require-review"', () => {
-      const result = backendToFrontend(makeBackendRule({ action: 'queue' }));
-      expect(result.action).toBe('require-review');
-    });
-
-    it('maps backend action "alert" to frontend "auto-reject"', () => {
-      const result = backendToFrontend(makeBackendRule({ action: 'alert' }));
-      expect(result.action).toBe('auto-reject');
-    });
-
-    it('falls back to description or generated name', () => {
-      const noDesc = backendToFrontend(makeBackendRule({ description: undefined }));
-      expect(noDesc.name).toBe('auto-approve style');
-
-      const withDesc = backendToFrontend(makeBackendRule({ description: 'My Rule' }));
-      expect(withDesc.name).toBe('My Rule');
-    });
-
-    it('uses approvalCount when effectiveness is missing', () => {
-      const result = backendToFrontend(makeBackendRule({ effectiveness: undefined }));
-      expect(result.metadata.matchCount).toBe(12); // Falls back to approvalCount
-      expect(result.metadata.effectivenessScore).toBeNull();
-    });
-
-    it('handles missing optional fields gracefully', () => {
-      const minimal: BackendIntentRule = {
-        id: 'rule-min',
-        category: 'general',
-        action: 'auto-approve',
-        source: 'preset',
-        approvalCount: 0,
-        createdAt: '2026-01-01T00:00:00Z',
-        lastMatchedAt: null,
-        enabled: true,
-      };
-      const result = backendToFrontend(minimal);
-      expect(result.match.categories).toEqual(['general']);
-      expect(result.match.roles).toBeUndefined();
-      expect(result.conditions).toEqual([]);
-      expect(result.metadata.matchCount).toBe(0);
-    });
-
-    it('maps teach_me source to manual', () => {
-      const result = backendToFrontend(makeBackendRule({ source: 'teach_me' }));
-      expect(result.metadata.source).toBe('manual');
-    });
-  });
-
-  describe('frontendToCreateBody', () => {
-    it('transforms frontend rule to backend POST body', () => {
-      const rule = makeRule();
-      const body = frontendToCreateBody(rule);
-
-      expect(body.category).toBe('style');
-      expect(body.source).toBe('manual');
-      expect(body.action).toBe('auto-approve');
-      expect(body.description).toBe('Auto-approve style from devs');
-      expect(body.roleScopes).toEqual(['developer']);
-      expect(body.enabled).toBe(true);
-    });
-
-    it('maps require-review action to queue', () => {
-      const rule = makeRule({ action: 'require-review' });
-      const body = frontendToCreateBody(rule);
-      expect(body.action).toBe('queue');
-    });
-
-    it('maps auto-reject action to alert', () => {
-      const rule = makeRule({ action: 'auto-reject' });
-      const body = frontendToCreateBody(rule);
-      expect(body.action).toBe('alert');
-    });
-
-    it('defaults category to general if empty', () => {
-      const rule = makeRule({ match: { categories: [] } });
-      const body = frontendToCreateBody(rule);
-      expect(body.category).toBe('general');
-    });
-  });
-
-  describe('frontendToPatchBody', () => {
-    it('transforms frontend rule to backend PATCH body', () => {
-      const rule = makeRule({ name: 'Updated rule', action: 'require-review', priority: 10 });
-      const body = frontendToPatchBody(rule);
-
-      expect(body.action).toBe('queue');
-      expect(body.description).toBe('Updated rule');
-      expect(body.priority).toBe(10);
-      expect(body.roleScopes).toEqual(['developer']);
-      expect(body.enabled).toBe(true);
-      // PATCH body should NOT contain category or source
-      expect(body).not.toHaveProperty('category');
-      expect(body).not.toHaveProperty('source');
-    });
-  });
-});
-
-// ── Component Tests ────────────────────────────────────────────────
-
-describe('Intent Rules V2', () => {
+describe('Intent Rules', () => {
   describe('IntentRulesDashboard', () => {
     it('renders empty state with no rules', async () => {
       render(<IntentRulesDashboard />);
@@ -201,26 +51,32 @@ describe('Intent Rules V2', () => {
       expect(screen.getByText('New Rule')).toBeInTheDocument();
     });
 
-    it('fetches and displays rules from backend format', async () => {
-      const backendRules = [
-        makeBackendRule({ id: 'r1', description: 'Style auto', category: 'style' }),
-        makeBackendRule({ id: 'r2', description: 'Queue arch', category: 'architecture', action: 'queue' }),
-      ];
-      mockApiFetch.mockResolvedValueOnce(backendRules);
+    it('defaults to autonomous preset', async () => {
+      render(<IntentRulesDashboard />);
+      await screen.findByTestId('intent-rules-dashboard');
+      const presetBar = screen.getByTestId('trust-preset-bar');
+      expect(presetBar).toBeInTheDocument();
+    });
 
+    it('fetches and displays rules directly from backend', async () => {
+      const rules = [
+        makeRule({ id: 'r1', name: 'Allow style' }),
+        makeRule({ id: 'r2', name: 'Alert arch', action: 'alert' }),
+      ];
+      mockApiFetch.mockResolvedValueOnce(rules);
       render(<IntentRulesDashboard />);
       await waitFor(() => {
-        expect(screen.getByText('Style auto')).toBeInTheDocument();
-        expect(screen.getByText('Queue arch')).toBeInTheDocument();
+        expect(screen.getByText('Allow style')).toBeInTheDocument();
+        expect(screen.getByText('Alert arch')).toBeInTheDocument();
       });
     });
 
     it('shows summary stats when rules exist', async () => {
-      mockApiFetch.mockResolvedValueOnce([makeBackendRule()]);
+      mockApiFetch.mockResolvedValueOnce([makeRule()]);
       render(<IntentRulesDashboard />);
       await waitFor(() => {
         expect(screen.getByText(/1 rules active/)).toBeInTheDocument();
-        expect(screen.getByText(/42 total matches/)).toBeInTheDocument();
+        expect(screen.getByText(/47 total matches/)).toBeInTheDocument();
       });
     });
 
@@ -229,29 +85,23 @@ describe('Intent Rules V2', () => {
       await screen.findByTestId('intent-rules-dashboard');
       fireEvent.click(screen.getByText('New Rule'));
       expect(screen.getByTestId('rule-editor')).toBeInTheDocument();
-      expect(screen.getByText('New Intent Rule')).toBeInTheDocument();
     });
 
     it('calls DELETE API when rule is deleted', async () => {
-      mockApiFetch.mockResolvedValueOnce([makeBackendRule({ id: 'r-del' })]);
+      mockApiFetch.mockResolvedValueOnce([makeRule({ id: 'r-del' })]);
       render(<IntentRulesDashboard />);
-      await waitFor(() => expect(screen.getByText('Auto-approve style changes')).toBeInTheDocument());
-
-      // Delete button appears on hover (via CSS) but is in the DOM
+      await waitFor(() => expect(screen.getByText('Allow style from devs')).toBeInTheDocument());
       const deleteBtn = screen.getByTitle('Delete rule');
       await act(async () => { fireEvent.click(deleteBtn); });
-
       expect(mockApiFetch).toHaveBeenCalledWith('/intents/r-del', { method: 'DELETE' });
     });
 
-    it('calls PATCH API with correct body when toggle is clicked', async () => {
-      mockApiFetch.mockResolvedValueOnce([makeBackendRule({ id: 'r-tog', enabled: true })]);
+    it('calls PATCH API when toggle is clicked', async () => {
+      mockApiFetch.mockResolvedValueOnce([makeRule({ id: 'r-tog', enabled: true })]);
       render(<IntentRulesDashboard />);
-      await waitFor(() => expect(screen.getByText('Auto-approve style changes')).toBeInTheDocument());
-
+      await waitFor(() => expect(screen.getByText('Allow style from devs')).toBeInTheDocument());
       const toggleBtn = screen.getByLabelText('Disable rule');
       await act(async () => { fireEvent.click(toggleBtn); });
-
       expect(mockApiFetch).toHaveBeenCalledWith('/intents/r-tog', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -262,16 +112,36 @@ describe('Intent Rules V2', () => {
     it('applies trust preset via API', async () => {
       render(<IntentRulesDashboard />);
       await screen.findByTestId('intent-rules-dashboard');
-      await act(async () => { fireEvent.click(screen.getByText('Autonomous')); });
-
-      expect(mockApiFetch).toHaveBeenCalledWith('/intents/presets/autonomous', { method: 'POST' });
+      await act(async () => { fireEvent.click(screen.getByText('Conservative')); });
+      expect(mockApiFetch).toHaveBeenCalledWith('/intents/presets/conservative', { method: 'POST' });
     });
 
-    it('handles API error gracefully — keeps empty rules', async () => {
+    it('handles API error gracefully', async () => {
       mockApiFetch.mockRejectedValueOnce(new Error('Network error'));
       render(<IntentRulesDashboard />);
       await waitFor(() => {
         expect(screen.getByText(/No intent rules yet/)).toBeInTheDocument();
+      });
+    });
+
+    it('sends correct POST body for new rule', async () => {
+      mockApiFetch.mockResolvedValueOnce([]);
+      render(<IntentRulesDashboard />);
+      await screen.findByTestId('intent-rules-dashboard');
+      fireEvent.click(screen.getByText('New Rule'));
+      fireEvent.click(screen.getByText(/Style/));
+      mockApiFetch.mockResolvedValueOnce({ id: 'new-1' });
+      mockApiFetch.mockResolvedValueOnce([]);
+      fireEvent.click(screen.getByText('Save Rule'));
+      await waitFor(() => {
+        const postCall = mockApiFetch.mock.calls.find(
+          (c: any[]) => c[0] === '/intents' && c[1]?.method === 'POST'
+        );
+        expect(postCall).toBeDefined();
+        const body = JSON.parse(postCall![1].body);
+        expect(body.category).toBe('style');
+        expect(body.action).toBe('allow');
+        expect(body.name).toBeDefined();
       });
     });
   });
@@ -299,25 +169,19 @@ describe('Intent Rules V2', () => {
 
   describe('RuleRow', () => {
     it('renders rule with name and match count', () => {
-      render(
-        <RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
-      );
-      expect(screen.getByText('Auto-approve style from devs')).toBeInTheDocument();
+      render(<RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
+      expect(screen.getByText('Allow style from devs')).toBeInTheDocument();
       expect(screen.getByText('47 matches')).toBeInTheDocument();
     });
 
     it('shows role badges', () => {
-      render(
-        <RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
-      );
+      render(<RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
       expect(screen.getByText('developer')).toBeInTheDocument();
     });
 
     it('shows "All agents" when no roles specified', () => {
       const rule = makeRule({ match: { categories: ['style'], roles: undefined } });
-      render(
-        <RuleRow rule={rule} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
-      );
+      render(<RuleRow rule={rule} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
       expect(screen.getByText('All agents')).toBeInTheDocument();
     });
 
@@ -325,53 +189,48 @@ describe('Intent Rules V2', () => {
       const rule = makeRule({
         metadata: { ...makeRule().metadata, effectivenessScore: 33, issuesAfterMatch: 2 },
       });
-      render(
-        <RuleRow rule={rule} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
-      );
-      expect(screen.getByText(/2 auto-approved preceded failures/)).toBeInTheDocument();
+      render(<RuleRow rule={rule} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
+      expect(screen.getByText(/2 allowed decisions preceded failures/)).toBeInTheDocument();
     });
 
     it('applies dimmed style when disabled', () => {
-      const rule = makeRule({ enabled: false });
       const { container } = render(
-        <RuleRow rule={rule} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
+        <RuleRow rule={makeRule({ enabled: false })} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
       );
-      const row = container.querySelector('[data-testid="rule-row"]');
-      expect(row?.className).toContain('opacity-50');
+      expect(container.querySelector('[data-testid="rule-row"]')?.className).toContain('opacity-50');
     });
 
     it('expands to show editor on click', () => {
-      render(
-        <RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />,
-      );
-      fireEvent.click(screen.getByText('Auto-approve style from devs'));
+      render(<RuleRow rule={makeRule()} onToggle={vi.fn()} onDelete={vi.fn()} onSave={vi.fn()} />);
+      fireEvent.click(screen.getByText('Allow style from devs'));
       expect(screen.getByTestId('rule-editor')).toBeInTheDocument();
     });
 
-    it('calls onToggle when toggle button is clicked', () => {
+    it('calls onToggle', () => {
       const onToggle = vi.fn();
-      render(
-        <RuleRow rule={makeRule({ id: 'r1', enabled: true })} onToggle={onToggle} onDelete={vi.fn()} onSave={vi.fn()} />,
-      );
+      render(<RuleRow rule={makeRule({ id: 'r1' })} onToggle={onToggle} onDelete={vi.fn()} onSave={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Disable rule'));
       expect(onToggle).toHaveBeenCalledWith('r1', false);
     });
 
-    it('calls onDelete when delete button is clicked', () => {
+    it('calls onDelete', () => {
       const onDelete = vi.fn();
-      render(
-        <RuleRow rule={makeRule({ id: 'r1' })} onToggle={vi.fn()} onDelete={onDelete} onSave={vi.fn()} />,
-      );
+      render(<RuleRow rule={makeRule({ id: 'r1' })} onToggle={vi.fn()} onDelete={onDelete} onSave={vi.fn()} />);
       fireEvent.click(screen.getByTitle('Delete rule'));
       expect(onDelete).toHaveBeenCalledWith('r1');
     });
   });
 
   describe('RuleEditor', () => {
-    it('renders with save and cancel buttons', () => {
+    it('renders with save and cancel', () => {
       render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
       expect(screen.getByText('Save Rule')).toBeInTheDocument();
       expect(screen.getByText('Cancel')).toBeInTheDocument();
+    });
+
+    it('shows all three actions in dropdown', () => {
+      render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
+      expect(screen.getByDisplayValue(/Allow/)).toBeInTheDocument();
     });
 
     it('shows category chips', () => {
@@ -380,34 +239,30 @@ describe('Intent Rules V2', () => {
       expect(screen.getByText(/Architecture/)).toBeInTheDocument();
     });
 
-    it('save button is disabled when no categories selected', () => {
+    it('save disabled when no categories', () => {
       render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
-      const saveBtn = screen.getByText('Save Rule');
-      expect(saveBtn).toHaveAttribute('disabled');
+      expect(screen.getByText('Save Rule')).toHaveAttribute('disabled');
     });
 
-    it('save button enables after selecting a category', () => {
+    it('save enabled after selecting category', () => {
       render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
       fireEvent.click(screen.getByText(/Style/));
-      const saveBtn = screen.getByText('Save Rule');
-      expect(saveBtn).not.toHaveAttribute('disabled');
+      expect(screen.getByText('Save Rule')).not.toHaveAttribute('disabled');
     });
 
-    it('calls onSave with constructed rule when Save clicked', () => {
+    it('calls onSave with unified IntentRule', () => {
       const onSave = vi.fn();
       render(<RuleEditor onSave={onSave} onCancel={vi.fn()} />);
-      // Select a category
       fireEvent.click(screen.getByText(/Style/));
       fireEvent.click(screen.getByText('Save Rule'));
-
       expect(onSave).toHaveBeenCalledTimes(1);
-      const savedRule: IntentRuleV2 = onSave.mock.calls[0][0];
-      expect(savedRule.action).toBe('auto-approve');
-      expect(savedRule.match.categories).toContain('style');
-      expect(savedRule.enabled).toBe(true);
+      const saved: IntentRule = onSave.mock.calls[0][0];
+      expect(saved.action).toBe('allow');
+      expect(saved.match.categories).toContain('style');
+      expect(saved.metadata.source).toBe('manual');
     });
 
-    it('calls onCancel when Cancel clicked', () => {
+    it('calls onCancel', () => {
       const onCancel = vi.fn();
       render(<RuleEditor onSave={vi.fn()} onCancel={onCancel} />);
       fireEvent.click(screen.getByText('Cancel'));
@@ -418,22 +273,17 @@ describe('Intent Rules V2', () => {
       render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
       fireEvent.click(screen.getByText('+ Add condition'));
       expect(screen.getByDisplayValue('50')).toBeInTheDocument();
-
-      // Remove condition
       fireEvent.click(screen.getByText('✕'));
       expect(screen.queryByDisplayValue('50')).not.toBeInTheDocument();
     });
 
-    it('pre-fills fields when editing an existing rule', () => {
+    it('pre-fills when editing', () => {
       const existing = makeRule({ action: 'require-review', match: { categories: ['architecture'] } });
       render(<RuleEditor rule={existing} onSave={vi.fn()} onCancel={vi.fn()} />);
-
-      // Action select should show require-review
-      const actionSelect = screen.getByDisplayValue(/Require review/);
-      expect(actionSelect).toBeInTheDocument();
+      expect(screen.getByDisplayValue(/Require review/)).toBeInTheDocument();
     });
 
-    it('shows role input when "Specific roles" is selected', () => {
+    it('shows role input for specific roles', () => {
       render(<RuleEditor onSave={vi.fn()} onCancel={vi.fn()} />);
       fireEvent.click(screen.getByLabelText('Specific roles'));
       expect(screen.getByPlaceholderText('developer, qa_tester')).toBeInTheDocument();
@@ -442,10 +292,9 @@ describe('Intent Rules V2', () => {
 
   describe('types', () => {
     it('ACTION_DISPLAY covers all actions', () => {
-      expect(ACTION_DISPLAY['auto-approve'].label).toBe('Auto-approve');
+      expect(ACTION_DISPLAY['allow'].label).toBe('Allow');
+      expect(ACTION_DISPLAY['alert'].label).toBe('Alert & Allow');
       expect(ACTION_DISPLAY['require-review'].label).toBe('Require review');
-      expect(ACTION_DISPLAY['auto-reject'].label).toBe('Auto-reject');
-      expect(ACTION_DISPLAY['queue-silent'].label).toBe('Queue silent');
     });
 
     it('TRUST_PRESETS covers all presets', () => {

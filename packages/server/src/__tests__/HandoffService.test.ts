@@ -78,7 +78,7 @@ describe('HandoffService', () => {
 
     it('includes active intent rules', () => {
       decisionLog.addIntentRule('style', 'manual', {
-        description: 'Auto-approve style from devs',
+        name: 'Allow style from devs',
         enabled: true,
       });
       const record = service.generateBriefing({
@@ -86,7 +86,7 @@ describe('HandoffService', () => {
         agentRole: 'Dev',
         trigger: 'crash',
       });
-      expect(record.briefing.activeIntentRules).toContain('Auto-approve style from devs');
+      expect(record.briefing.activeIntentRules).toContain('Allow style from devs');
     });
   });
 

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
-import { ACTION_DISPLAY, type IntentRuleV2 } from './types';
+import { ACTION_DISPLAY, type IntentRule } from './types';
 import { RuleEditor } from './RuleEditor';
 
 interface RuleRowProps {
-  rule: IntentRuleV2;
+  rule: IntentRule;
   onToggle: (id: string, enabled: boolean) => void;
   onDelete: (id: string) => void;
-  onSave: (rule: IntentRuleV2) => void;
+  onSave: (rule: IntentRule) => void;
 }
 
 function effectivenessColor(score: number | null): string {
@@ -100,7 +100,7 @@ export function RuleRow({ rule, onToggle, onDelete, onSave }: RuleRowProps) {
       {/* Warning */}
       {hasWarning && !expanded && (
         <p className="text-[10px] text-yellow-500 px-10 pb-1.5">
-          ⚠ {rule.metadata.issuesAfterMatch} auto-approved preceded failures
+          ⚠ {rule.metadata.issuesAfterMatch} allowed decisions preceded failures
         </p>
       )}
 

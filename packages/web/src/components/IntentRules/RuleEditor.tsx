@@ -1,19 +1,19 @@
 import { useState, useMemo } from 'react';
-import { ACTION_DISPLAY, CONDITION_LABELS, CONDITION_UNITS, type IntentRuleV2, type RuleAction, type IntentCondition, type ConditionType, type ConditionOp } from './types';
+import { ACTION_DISPLAY, CONDITION_LABELS, CONDITION_UNITS, type IntentRule, type RuleAction, type IntentCondition, type ConditionType, type ConditionOp } from './types';
 import { CATEGORY_LABELS } from '../../constants/categories';
 
 interface RuleEditorProps {
-  rule?: IntentRuleV2;
-  onSave: (rule: IntentRuleV2) => void;
+  rule?: IntentRule;
+  onSave: (rule: IntentRule) => void;
   onCancel: () => void;
 }
 
-const ACTIONS: RuleAction[] = ['auto-approve', 'require-review', 'queue-silent', 'auto-reject'];
+const ACTIONS: RuleAction[] = ['allow', 'alert', 'require-review'];
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS);
 const CONDITION_TYPES: ConditionType[] = ['file_count', 'cost_estimate', 'time_elapsed', 'context_usage'];
 
 export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
-  const [action, setAction] = useState<RuleAction>(rule?.action ?? 'auto-approve');
+  const [action, setAction] = useState<RuleAction>(rule?.action ?? 'allow');
   const [categories, setCategories] = useState<string[]>(rule?.match.categories ?? []);
   const [scopeType, setScopeType] = useState<'all' | 'roles'>(
     rule?.match.roles && rule.match.roles.length > 0 ? 'roles' : 'all',
@@ -33,7 +33,7 @@ export function RuleEditor({ rule, onSave, onCancel }: RuleEditorProps) {
   const displayName = name || autoName;
 
   function handleSave() {
-    const saved: IntentRuleV2 = {
+    const saved: IntentRule = {
       id: rule?.id ?? `rule-${Date.now()}`,
       name: displayName,
       enabled: rule?.enabled ?? true,

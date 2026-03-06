@@ -150,8 +150,8 @@ describe('DecisionLog — Batch Operations', () => {
     it('adds and retrieves a rule', () => {
       const rule = log.addIntentRule('style', 'manual');
       expect(rule.id).toMatch(/^rule-/);
-      expect(rule.category).toBe('style');
-      expect(rule.source).toBe('manual');
+      expect(rule.match.categories).toContain('style');
+      expect(rule.metadata.source).toBe('manual');
       expect(log.getIntentRules()).toHaveLength(1);
     });
 
@@ -166,10 +166,10 @@ describe('DecisionLog — Batch Operations', () => {
     });
 
     it('persists rules across DecisionLog instances', () => {
-      log.addIntentRule('style', 'teach_me');
+      log.addIntentRule('style', 'manual');
       const log2 = new DecisionLog(db);
       expect(log2.getIntentRules()).toHaveLength(1);
-      expect(log2.getIntentRules()[0].category).toBe('style');
+      expect(log2.getIntentRules()[0].match.categories).toContain('style');
     });
 
     it('auto-approves decisions matching an intent rule', () => {
@@ -185,12 +185,12 @@ describe('DecisionLog — Batch Operations', () => {
       expect(d.status).toBe('recorded');
     });
 
-    it('increments approvalCount when a rule matches', () => {
+    it('increments matchCount when a rule matches', () => {
       const rule = log.addIntentRule('style', 'manual');
       log.add('a1', 'dev', 'Format code with prettier', '', true);
       const rules = log.getIntentRules();
-      expect(rules[0].approvalCount).toBe(1);
-      expect(rules[0].lastMatchedAt).toBeTruthy();
+      expect(rules[0].metadata.matchCount).toBe(1);
+      expect(rules[0].metadata.lastMatchedAt).toBeTruthy();
     });
   });
 

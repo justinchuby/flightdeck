@@ -1,6 +1,6 @@
-// Intent Rules V2 types — aligned with backend DecisionLog API
+// Intent Rules — unified types shared with backend (same shape, no adapters needed)
 
-export type RuleAction = 'auto-approve' | 'require-review' | 'auto-reject' | 'queue-silent';
+export type RuleAction = 'allow' | 'alert' | 'require-review';
 export type ConditionType = 'file_count' | 'cost_estimate' | 'time_elapsed' | 'context_usage';
 export type ConditionOp = 'lt' | 'gt' | 'between';
 
@@ -9,10 +9,9 @@ export interface IntentCondition {
   operator: ConditionOp;
   value: number;
   value2?: number;
-  unit?: string;
 }
 
-export interface IntentRuleV2 {
+export interface IntentRule {
   id: string;
   name: string;
   enabled: boolean;
@@ -21,7 +20,6 @@ export interface IntentRuleV2 {
   match: {
     categories: string[];
     roles?: string[];
-    agentIds?: string[];
   };
   conditions?: IntentCondition[];
   metadata: {
@@ -43,10 +41,9 @@ export const TRUST_PRESETS: Record<TrustPreset, { label: string; description: st
 };
 
 export const ACTION_DISPLAY: Record<RuleAction, { label: string; color: string; icon: string }> = {
-  'auto-approve': { label: 'Auto-approve', color: 'text-green-500', icon: '✅' },
-  'require-review': { label: 'Require review', color: 'text-yellow-500', icon: '⏸' },
-  'auto-reject': { label: 'Auto-reject', color: 'text-red-500', icon: '🚫' },
-  'queue-silent': { label: 'Queue silent', color: 'text-blue-400', icon: '🔇' },
+  'allow': { label: 'Allow', color: 'text-green-500', icon: '✅' },
+  'alert': { label: 'Alert & Allow', color: 'text-yellow-500', icon: '⚠️' },
+  'require-review': { label: 'Require review', color: 'text-red-400', icon: '⏸' },
 };
 
 export const CONDITION_LABELS: Record<ConditionType, string> = {

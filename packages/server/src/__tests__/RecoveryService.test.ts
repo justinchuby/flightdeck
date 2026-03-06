@@ -198,11 +198,11 @@ describe('RecoveryService', () => {
 
     it('includes active intent rules in briefing', () => {
       decisionLog.addIntentRule('style', 'manual', {
-        description: 'Auto-approve style from devs',
+        name: 'Allow style from devs',
         enabled: true,
       });
       const event = service.startRecovery({ originalAgentId: 'a', trigger: 'crash' })!;
-      expect(event.briefing!.activeIntentRules).toContain('Auto-approve style from devs');
+      expect(event.briefing!.activeIntentRules).toContain('Allow style from devs');
     });
   });
 

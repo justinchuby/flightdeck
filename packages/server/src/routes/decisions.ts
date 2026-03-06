@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
-import { DECISION_CATEGORIES, TRUST_PRESETS, type DecisionCategory, type TrustPreset } from '../coordination/DecisionLog.js';
+import { DECISION_CATEGORIES, TRUST_PRESETS, type DecisionCategory, type TrustPreset, type IntentAction } from '../coordination/DecisionLog.js';
 
 export function decisionsRoutes(ctx: AppContext): Router {
   const { agentManager, decisionLog } = ctx;
@@ -142,17 +142,15 @@ export function decisionsRoutes(ctx: AppContext): Router {
   });
 
   router.post('/intents', (req, res) => {
-    const { category, source, description, roleScopes, conditions, priority, action, enabled } = req.body ?? {};
+    const { category, name, roles, conditions, priority, action, enabled } = req.body ?? {};
     if (!DECISION_CATEGORIES.includes(category as DecisionCategory)) {
       return res.status(400).json({ error: `category must be one of: ${DECISION_CATEGORIES.join(', ')}` });
     }
-    const validSources = ['manual', 'teach_me', 'preset'];
-    const ruleSource = validSources.includes(source) ? source : 'manual';
-    const validActions = ['auto-approve', 'queue', 'alert'];
-    const ruleAction = validActions.includes(action) ? action : 'auto-approve';
-    const rule = decisionLog.addIntentRule(category as DecisionCategory, ruleSource, {
-      description,
-      roleScopes,
+    const validActions = ['allow', 'alert', 'require-review'];
+    const ruleAction = validActions.includes(action) ? action : 'allow';
+    const rule = decisionLog.addIntentRule(category as DecisionCategory, 'manual', {
+      name,
+      roles,
       conditions,
       priority,
       action: ruleAction,
@@ -165,15 +163,13 @@ export function decisionsRoutes(ctx: AppContext): Router {
     const rules = decisionLog.getIntentRules();
     const rule = rules.find(r => r.id === req.params.id);
     if (!rule) return res.status(404).json({ error: 'Intent rule not found' });
-    // Allow updating mutable fields
-    const { description, roleScopes, conditions, priority, enabled, action } = req.body ?? {};
-    if (description !== undefined) rule.description = description;
-    if (roleScopes !== undefined) rule.roleScopes = roleScopes;
+    const { name, roles, conditions, priority, enabled, action } = req.body ?? {};
+    if (name !== undefined) rule.name = name;
+    if (roles !== undefined) rule.match.roles = roles;
     if (conditions !== undefined) rule.conditions = conditions;
     if (priority !== undefined) rule.priority = priority;
     if (enabled !== undefined) rule.enabled = enabled;
-    if (action !== undefined && ['auto-approve', 'queue', 'alert'].includes(action)) rule.action = action;
-    // Force re-save
+    if (action !== undefined && ['allow', 'alert', 'require-review'].includes(action)) rule.action = action as IntentAction;
     (decisionLog as any).saveIntentRules();
     res.json(rule);
   });
