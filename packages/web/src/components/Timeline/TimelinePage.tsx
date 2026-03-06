@@ -315,18 +315,18 @@ export function TimelinePage({ api, ws }: Props) {
       {/* ARIA live regions for screen reader announcements */}
       <AccessibilityAnnouncer announcements={announcements} />
 
-      {/* StatusBar — always shows UNFILTERED crew health */}
-      <StatusBar
-        data={data}
-        newEventCount={newEventCount}
-        onErrorClick={handleStatusBarErrorClick}
-      />
-
-      {/* Project tabs — shared component */}
+      {/* Project tabs — select project before viewing project-specific status */}
       <ProjectTabs
         activeId={effectiveLeadId}
         onChange={setSelectedLead}
         className="px-6 pt-2 border-b border-th-border-muted timeline-lead-selector"
+      />
+
+      {/* StatusBar — shows UNFILTERED crew health for selected project */}
+      <StatusBar
+        data={data}
+        newEventCount={newEventCount}
+        onErrorClick={handleStatusBarErrorClick}
       />
 
       <div className="p-6 space-y-4 flex-1 flex flex-col min-h-0">
