@@ -15,7 +15,7 @@ export interface ReplayAgent {
 export interface Keyframe {
   timestamp: string;
   label: string;
-  type: 'spawn' | 'agent_exit' | 'delegation' | 'task' | 'milestone' | 'decision' | 'error' | 'commit';
+  type: 'spawn' | 'agent_exit' | 'delegation' | 'task' | 'milestone' | 'decision' | 'progress' | 'error' | 'commit';
 }
 
 export interface WorldState {
@@ -47,6 +47,7 @@ const KEYFRAME_TYPES: Record<string, Keyframe['type']> = {
   task_failed: 'task',
   decision_confirmed: 'decision',
   decision_rejected: 'decision',
+  progress_update: 'progress',
   error: 'error',
   commit: 'commit',
 };

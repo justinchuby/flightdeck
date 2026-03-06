@@ -2,12 +2,13 @@ import { useMemo } from 'react';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
 
 /** Only show meaningful progress events — filter out routine system noise */
-const MILESTONE_TYPES = new Set(['milestone', 'task', 'decision', 'commit', 'error']);
+const MILESTONE_TYPES = new Set(['milestone', 'task', 'decision', 'progress', 'commit', 'error']);
 
 const TYPE_ICONS: Record<string, string> = {
   decision: '⚡',
   milestone: '✅',
   task: '📋',
+  progress: '📊',
   error: '🔴',
   commit: '📦',
 };

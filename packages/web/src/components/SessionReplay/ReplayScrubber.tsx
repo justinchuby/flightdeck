@@ -19,6 +19,7 @@ const KEYFRAME_COLORS: Record<ReplayKeyframe['type'], string> = {
   delegation: 'bg-blue-400',
   task: 'bg-cyan-400',
   milestone: 'bg-purple-400',
+  progress: 'bg-indigo-400',
   error: 'bg-red-400',
   commit: 'bg-emerald-400',
 };
