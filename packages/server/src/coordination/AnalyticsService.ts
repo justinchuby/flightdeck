@@ -2,8 +2,6 @@ import type { Database } from '../db/database.js';
 import { projectSessions, taskCostRecords, sessionRetros } from '../db/schema.js';
 import { eq, sql, desc, and, inArray } from 'drizzle-orm';
 import { activityLog } from '../db/schema.js';
-import { estimateCostUsd } from '../constants/pricing.js';
-
 // ── Types ─────────────────────────────────────────────────────────
 
 export interface SessionListItem {
@@ -14,7 +12,8 @@ export interface SessionListItem {
   startedAt: string;
   endedAt: string | null;
   durationMs: number | null;
-  estimatedCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
   taskCount: number;
   agentCount: number;
 }
@@ -29,24 +28,19 @@ export interface SessionSummary {
   taskCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;
-  estimatedCostUsd: number;
 }
 
 export interface AnalyticsOverview {
   totalSessions: number;
-  totalCostUsd: number;
-  avgCostPerSession: number;
   totalInputTokens: number;
   totalOutputTokens: number;
   sessions: SessionSummary[];
-  costTrend: Array<{ date: string; costUsd: number }>;
   roleContributions: Array<{ role: string; taskCount: number; tokenUsage: number }>;
 }
 
 export interface SessionComparison {
   sessions: SessionSummary[];
   deltas: {
-    costDelta: number;
     tokenDelta: number;
     agentCountDelta: number;
   } | null;
@@ -109,7 +103,8 @@ export class AnalyticsService {
         startedAt: s.startedAt ?? '',
         endedAt: s.endedAt ?? null,
         durationMs: endMs && startMs ? endMs - startMs : null,
-        estimatedCostUsd: Math.round(estimateCostUsd(inputTokens, outputTokens) * 100) / 100,
+        totalInputTokens: inputTokens,
+        totalOutputTokens: outputTokens,
         taskCount: cost?.taskCount ?? 0,
         agentCount: agentCountByProject.get(s.leadId) ?? 0,
       };
@@ -171,24 +166,12 @@ export class AnalyticsService {
         taskCount: cost?.taskCount ?? 0,
         totalInputTokens: inputTokens,
         totalOutputTokens: outputTokens,
-        estimatedCostUsd: Math.round(estimateCostUsd(inputTokens, outputTokens) * 100) / 100,
       };
     });
 
     // Compute totals
     const totalInputTokens = summaries.reduce((sum, s) => sum + s.totalInputTokens, 0);
     const totalOutputTokens = summaries.reduce((sum, s) => sum + s.totalOutputTokens, 0);
-    const totalCostUsd = Math.round(estimateCostUsd(totalInputTokens, totalOutputTokens) * 100) / 100;
-
-    // Cost trend by date
-    const costByDate = new Map<string, number>();
-    for (const s of summaries) {
-      const date = s.startedAt.slice(0, 10); // YYYY-MM-DD
-      costByDate.set(date, (costByDate.get(date) ?? 0) + s.estimatedCostUsd);
-    }
-    const costTrend = [...costByDate.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, costUsd]) => ({ date, costUsd }));
 
     // Role contributions from activity log
     const roleRows = this.db.drizzle
@@ -208,12 +191,9 @@ export class AnalyticsService {
 
     return {
       totalSessions: summaries.length,
-      totalCostUsd,
-      avgCostPerSession: summaries.length > 0 ? Math.round(totalCostUsd / summaries.length * 100) / 100 : 0,
       totalInputTokens,
       totalOutputTokens,
       sessions: summaries,
-      costTrend,
       roleContributions,
     };
   }
@@ -258,13 +238,11 @@ export class AnalyticsService {
         taskCount: cost?.taskCount ?? 0,
         totalInputTokens: inputTokens,
         totalOutputTokens: outputTokens,
-        estimatedCostUsd: Math.round(estimateCostUsd(inputTokens, outputTokens) * 100) / 100,
       });
     }
 
     // Compute deltas if exactly 2 sessions
     const deltas = summaries.length === 2 ? {
-      costDelta: Math.round((summaries[1].estimatedCostUsd - summaries[0].estimatedCostUsd) * 100) / 100,
       tokenDelta: (summaries[1].totalInputTokens + summaries[1].totalOutputTokens) -
                   (summaries[0].totalInputTokens + summaries[0].totalOutputTokens),
       agentCountDelta: summaries[1].agentCount - summaries[0].agentCount,

@@ -2,7 +2,6 @@ import type { SessionSummary } from './types';
 
 interface PostSessionRetroCardProps {
   session: SessionSummary;
-  avgCost: number;
   avgTasks: number;
   onClose: () => void;
 }
@@ -27,7 +26,7 @@ function DeltaIndicator({ current, average, lowerIsBetter, label, unit }: {
   );
 }
 
-export function PostSessionRetroCard({ session, avgCost, avgTasks, onClose }: PostSessionRetroCardProps) {
+export function PostSessionRetroCard({ session, avgTasks, onClose }: PostSessionRetroCardProps) {
   const durationMs = session.endedAt
     ? new Date(session.endedAt).getTime() - new Date(session.startedAt).getTime()
     : 0;
@@ -49,20 +48,13 @@ export function PostSessionRetroCard({ session, avgCost, avgTasks, onClose }: Po
 
       <div className="flex gap-4 text-xs text-th-text-muted mb-3 flex-wrap">
         <span>Duration: {durationMin}m</span>
-        <span>Cost: ${session.estimatedCostUsd.toFixed(2)}</span>
+        <span>Tokens: {((session.totalInputTokens + session.totalOutputTokens) / 1000).toFixed(0)}k</span>
         <span>Tasks: {session.taskCount}</span>
         <span>Agents: {session.agentCount}</span>
       </div>
 
       <div className="space-y-1.5 mb-3">
         <p className="text-xs font-medium text-th-text-alt">Compared to your average:</p>
-        <DeltaIndicator
-          current={session.estimatedCostUsd}
-          average={avgCost}
-          lowerIsBetter
-          label="Cost"
-          unit="$"
-        />
         <DeltaIndicator
           current={session.taskCount}
           average={avgTasks}

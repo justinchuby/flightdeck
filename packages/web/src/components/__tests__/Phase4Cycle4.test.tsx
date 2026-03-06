@@ -48,9 +48,7 @@ vi.mock('../../services/PaletteSearchEngine', () => ({
   },
 }));
 
-vi.mock('../../constants/pricing', () => ({
-  estimateCostUsd: () => 2.47,
-}));
+// pricing module is now deprecated (no exports needed)
 
 // Mock localStorage for InstallPrompt (jsdom may not provide it)
 const localStorageMap = new Map<string, string>();

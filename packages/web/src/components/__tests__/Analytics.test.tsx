@@ -52,12 +52,9 @@ vi.mock('@visx/axis', () => ({
 vi.mock('../../hooks/useApi', () => ({
   apiFetch: vi.fn().mockResolvedValue({
     totalSessions: 0,
-    totalCostUsd: 0,
-    avgCostPerSession: 0,
     totalInputTokens: 0,
     totalOutputTokens: 0,
     sessions: [],
-    costTrend: [],
     roleContributions: [],
   }),
 }));
@@ -80,19 +77,14 @@ const makeSession = (leadId: string, cost: number, tasks: number): SessionSummar
   taskCount: tasks,
   totalInputTokens: 100_000,
   totalOutputTokens: 20_000,
-  estimatedCostUsd: cost,
 });
 
 const makeOverview = (sessions: SessionSummary[]): AnalyticsOverview => {
-  const totalCost = sessions.reduce((s, x) => s + x.estimatedCostUsd, 0);
   return {
     totalSessions: sessions.length,
-    totalCostUsd: totalCost,
-    avgCostPerSession: sessions.length > 0 ? totalCost / sessions.length : 0,
     totalInputTokens: sessions.reduce((s, x) => s + x.totalInputTokens, 0),
     totalOutputTokens: sessions.reduce((s, x) => s + x.totalOutputTokens, 0),
     sessions,
-    costTrend: sessions.map((s) => ({ date: s.startedAt.slice(0, 10), costUsd: s.estimatedCostUsd })),
     roleContributions: [
       { role: 'Developer', taskCount: 20, tokenUsage: 500_000 },
       { role: 'Reviewer', taskCount: 10, tokenUsage: 200_000 },
@@ -161,7 +153,7 @@ describe('Cross-Session Analytics', () => {
   describe('SessionScoreBadge', () => {
     it('renders 1-5 stars', () => {
       const session = makeSession('s1', 5, 12);
-      const { container } = render(<SessionScoreBadge session={session} avgCost={10} />);
+      const { container } = render(<SessionScoreBadge session={session} />);
       const text = container.textContent ?? '';
       // Should have exactly 5 characters (mix of ★ and ☆)
       expect(text.length).toBe(5);
@@ -200,10 +192,10 @@ describe('Cross-Session Analytics', () => {
   });
 
   describe('sessionScore', () => {
-    it('gives higher score for cheaper sessions', () => {
-      const cheap = makeSession('s1', 3, 10);
-      const expensive = makeSession('s2', 20, 2);
-      expect(sessionScore(cheap, 10)).toBeGreaterThan(sessionScore(expensive, 10));
+    it('gives higher score for sessions with more tasks', () => {
+      const manyTasks = makeSession('s1', 3, 10);
+      const fewTasks = makeSession('s2', 20, 1);
+      expect(sessionScore(manyTasks)).toBeGreaterThan(sessionScore(fewTasks));
     });
   });
 });

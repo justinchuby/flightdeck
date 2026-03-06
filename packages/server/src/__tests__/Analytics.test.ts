@@ -14,9 +14,7 @@ describe('AnalyticsService', () => {
   it('returns empty overview with no data', () => {
     const overview = service.getOverview();
     expect(overview.totalSessions).toBe(0);
-    expect(overview.totalCostUsd).toBe(0);
     expect(overview.sessions).toEqual([]);
-    expect(overview.costTrend).toEqual([]);
     expect(overview.roleContributions).toEqual([]);
   });
 
@@ -49,7 +47,7 @@ describe('AnalyticsService', () => {
     const comparison = service.compare(['lead-1', 'lead-2']);
     expect(comparison.sessions).toHaveLength(2);
     expect(comparison.deltas).not.toBeNull();
-    expect(comparison.deltas!.costDelta).toBe(0);
+    expect(comparison.deltas!.tokenDelta).toBe(0);
   });
 
   it('compare returns null deltas for 3+ sessions', () => {
@@ -74,7 +72,6 @@ describe('AnalyticsService', () => {
       expect(sessions[0].leadId).toBe('lead-1');
       expect(sessions[0].status).toBe('completed');
       expect(sessions[0].durationMs).toBe(90 * 60 * 1000); // 1.5 hours
-      expect(sessions[0].estimatedCostUsd).toBe(0);
       expect(sessions[0].taskCount).toBe(0);
       expect(sessions[0].agentCount).toBe(0);
     });
