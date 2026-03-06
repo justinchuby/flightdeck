@@ -25,8 +25,8 @@ features:
     title: Virtualized Chat
     details: High-performance chat with virtual scrolling for 1000+ messages. Pinned user message banners ensure important messages are never buried.
   - icon: ⚡
-    title: Workflow Automation
-    details: "'When X then Y' rules with 12 triggers × 12 actions. Predictions feed workflow triggers — the anticipation→action loop that makes Away Mode work."
+    title: Data Management
+    details: "Export sessions, manage projects, and control your data. Per-project tabs, cumulative flow diagrams, and bulk operations for managing multi-agent work."
   - icon: 📊
     title: Canvas & Task DAG
     details: Interactive node-graph of your agent crew with real-time status, communication edges, and conflict indicators.

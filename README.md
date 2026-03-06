@@ -19,16 +19,16 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 ### Screenshots
 
 <p align="center">
-  <img src="docs/images/06-command-palette.png" alt="Command Palette with smart AI suggestions" width="720" />
-  <br /><em>⌘K Command Palette — natural language commands with AI-powered suggestions</em>
+  <img src="docs/images/01-lead-dashboard.png" alt="Lead Dashboard — active projects, team status, and real-time progress" width="720" />
+  <br /><em>Lead Dashboard — your home screen for tracking projects, agents, and progress</em>
 </p>
 
 <details>
 <summary><strong>More screenshots</strong></summary>
 
-| Lead Dashboard | Canvas View |
+| Command Palette | Canvas View |
 |:-:|:-:|
-| <img src="docs/images/01-lead-dashboard.png" alt="Lead Dashboard with 67% progress and real conversation" width="400" /> | <img src="docs/images/03-canvas-with-panel.png" alt="Canvas with 7 agents and detail panel" width="400" /> |
+| <img src="docs/images/06-command-palette.png" alt="Command Palette with smart AI suggestions" width="400" /> | <img src="docs/images/03-canvas-with-panel.png" alt="Canvas with 7 agents and detail panel" width="400" /> |
 
 | Mission Control | Analytics |
 |:-:|:-:|

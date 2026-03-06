@@ -2,7 +2,7 @@
 
 Flightdeck ships 33+ features across three phases. This page provides a quick reference to everything available.
 
-![Command Palette — the central control surface](/images/06-command-palette.png)
+![Lead Dashboard — your home screen for tracking projects and agents](/images/01-lead-dashboard.png)
 
 ## Phase 2 — Core Observability & Control
 
