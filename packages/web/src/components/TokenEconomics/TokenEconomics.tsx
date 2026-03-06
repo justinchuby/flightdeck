@@ -53,6 +53,24 @@ function pressureTextColor(pct: number): string {
   return 'text-th-text-muted';
 }
 
+// ── Estimation ───────────────────────────────────────────────────────
+
+const CHARS_PER_TOKEN = 4;
+
+/** Estimate tokens from text length (~4 chars/token) */
+function estimateTokens(text: string | undefined): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / CHARS_PER_TOKEN);
+}
+
+interface AgentTokenData {
+  agent: AgentInfo;
+  input: number;
+  output: number;
+  total: number;
+  isEstimated: boolean;
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 interface TokenEconomicsProps {
@@ -63,18 +81,30 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
   const storeAgents = useAppStore((s) => s.agents);
   const agents = agentsProp && agentsProp.length > 0 ? agentsProp : storeAgents;
 
-  const { sorted, totalIn, totalOut } = useMemo(() => {
-    const withTokens = agents.filter(
-      (a) => (a.inputTokens ?? 0) > 0 || (a.outputTokens ?? 0) > 0,
-    );
-    const s = [...withTokens].sort(
-      (a, b) =>
-        ((b.inputTokens ?? 0) + (b.outputTokens ?? 0)) -
-        ((a.inputTokens ?? 0) + (a.outputTokens ?? 0)),
-    );
-    const tIn = agents.reduce((sum, a) => sum + (a.inputTokens ?? 0), 0);
-    const tOut = agents.reduce((sum, a) => sum + (a.outputTokens ?? 0), 0);
-    return { sorted: s, totalIn: tIn, totalOut: tOut };
+  const { sorted, totalIn, totalOut, anyEstimated } = useMemo(() => {
+    const data: AgentTokenData[] = [];
+
+    for (const a of agents) {
+      const realIn = a.inputTokens ?? 0;
+      const realOut = a.outputTokens ?? 0;
+      const hasReal = realIn > 0 || realOut > 0;
+
+      if (hasReal) {
+        data.push({ agent: a, input: realIn, output: realOut, total: realIn + realOut, isEstimated: false });
+      } else {
+        // Estimate from outputPreview content (~4 chars/token)
+        const estOut = estimateTokens(a.outputPreview);
+        if (estOut > 0) {
+          data.push({ agent: a, input: 0, output: estOut, total: estOut, isEstimated: true });
+        }
+      }
+    }
+
+    data.sort((a, b) => b.total - a.total);
+    const tIn = data.reduce((sum, d) => sum + d.input, 0);
+    const tOut = data.reduce((sum, d) => sum + d.output, 0);
+    const est = data.some((d) => d.isEstimated);
+    return { sorted: data, totalIn: tIn, totalOut: tOut, anyEstimated: est };
   }, [agents]);
 
   const total = totalIn + totalOut;
@@ -82,7 +112,7 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
   if (sorted.length === 0) {
     return (
       <div className="p-4 text-sm text-th-text-muted">
-        Token data not available — Copilot CLI does not expose token counts.
+        Token data not available — no agent output to estimate from.
       </div>
     );
   }
@@ -93,12 +123,12 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
       <div className="flex items-center justify-between rounded-lg bg-th-bg-alt/60 px-4 py-2.5 border border-th-border/50">
         <div className="flex items-center gap-2">
           <span className="text-base">📊</span>
-          <span className="font-medium text-th-text-alt">Token Usage</span>
+          <span className="font-medium text-th-text-alt">Token Usage{anyEstimated ? ' (est.)' : ''}</span>
         </div>
         <div className="flex items-center gap-4 font-mono text-xs">
-          <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(totalIn)} in</span>
-          <span className="text-emerald-600 dark:text-emerald-300">↓ {formatTokens(totalOut)} out</span>
-          <span className="text-th-text-alt font-semibold">{formatTokens(total)} total</span>
+          {totalIn > 0 && <span className="text-blue-600 dark:text-blue-300">↑ {anyEstimated ? '~' : ''}{formatTokens(totalIn)} in</span>}
+          <span className="text-emerald-600 dark:text-emerald-300">↓ {anyEstimated ? '~' : ''}{formatTokens(totalOut)} out</span>
+          <span className="text-th-text-alt font-semibold">{anyEstimated ? '~' : ''}{formatTokens(total)} total</span>
         </div>
       </div>
 
@@ -117,12 +147,11 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
             </tr>
           </thead>
           <tbody>
-            {sorted.map((agent) => {
-              const inT = agent.inputTokens ?? 0;
-              const outT = agent.outputTokens ?? 0;
+            {sorted.map((d) => {
+              const { agent, input: inT, output: outT, total: totalAgent, isEstimated } = d;
               const pct = contextPercent(agent);
-              const totalAgent = inT + outT;
               const shareOfTotal = total > 0 ? ((totalAgent / total) * 100).toFixed(0) : '0';
+              const prefix = isEstimated ? '~' : '';
 
               return (
                 <tr
@@ -140,25 +169,23 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
                     {agent.model || agent.role.model || '—'}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-blue-600 dark:text-blue-300">
-                    {formatTokens(inT)}
+                    {inT > 0 ? `${prefix}${formatTokens(inT)}` : '—'}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-emerald-600 dark:text-emerald-300">
-                    {formatTokens(outT)}
+                    {prefix}{formatTokens(outT)}
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-th-text-alt">
-                    {formatTokens(totalAgent)}
+                    {prefix}{formatTokens(totalAgent)}
                     <span className="ml-1 text-th-text-muted">({shareOfTotal}%)</span>
                   </td>
                   <td className="px-3 py-2">
                     {agent.contextWindowSize ? (
                       <div className="flex items-center gap-2">
-                        {/* Pressure bar with projection */}
                         <div className="flex-1 h-1.5 rounded-full bg-th-bg-muted overflow-hidden relative">
                           <div
                             className={`h-full rounded-full transition-all ${pressureColor(pct)}`}
                             style={{ width: `${pct}%` }}
                           />
-                          {/* Projected usage (dashed extension) */}
                           {agent.contextBurnRate && agent.contextBurnRate > 0 && pct < 100 && (
                             <div
                               className="absolute top-0 h-full rounded-full opacity-40 border-t border-dashed border-current"
@@ -178,7 +205,6 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
                       <span className="text-th-text-muted">—</span>
                     )}
                   </td>
-                  {/* Burn Rate + Time Remaining */}
                   <td className="px-3 py-2">
                     {agent.contextBurnRate && agent.contextBurnRate > 0 ? (
                       <div className="flex flex-col gap-0.5">
@@ -192,7 +218,7 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
                         )}
                       </div>
                     ) : (
-                      <span className="text-th-text-muted text-[10px]">Calculating…</span>
+                      <span className="text-th-text-muted text-[10px]">—</span>
                     )}
                   </td>
                 </tr>
@@ -202,12 +228,13 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
         </table>
       </div>
 
-      {/* Pressure warnings — enhanced with burn rate + time remaining */}
-      {sorted.some((a) => contextPercent(a) >= 70 || exhaustionUrgency(a.estimatedExhaustionMinutes) !== 'normal') && (
+      {/* Pressure warnings */}
+      {sorted.some((d) => contextPercent(d.agent) >= 70 || exhaustionUrgency(d.agent.estimatedExhaustionMinutes) !== 'normal') && (
         <div className="flex flex-col gap-1.5 text-xs">
           {sorted
-            .filter((a) => contextPercent(a) >= 70 || exhaustionUrgency(a.estimatedExhaustionMinutes) !== 'normal')
-            .map((a) => {
+            .filter((d) => contextPercent(d.agent) >= 70 || exhaustionUrgency(d.agent.estimatedExhaustionMinutes) !== 'normal')
+            .map((d) => {
+              const { agent: a } = d;
               const pct = contextPercent(a);
               const urgency = exhaustionUrgency(a.estimatedExhaustionMinutes);
               const isCritical = pct >= 90 || urgency === 'critical';
@@ -240,6 +267,13 @@ export function TokenEconomics({ agents: agentsProp }: TokenEconomicsProps = {})
               );
             })}
         </div>
+      )}
+
+      {/* Estimation disclaimer */}
+      {anyEstimated && (
+        <p className="text-[10px] text-th-text-muted px-1">
+          Estimated at ~4 chars/token from output content. Copilot CLI does not expose actual token counts.
+        </p>
       )}
     </div>
   );
