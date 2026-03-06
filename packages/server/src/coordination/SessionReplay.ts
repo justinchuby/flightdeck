@@ -115,6 +115,15 @@ export class SessionReplay {
     for (const entry of activities) {
       const type = KEYFRAME_TYPES[entry.actionType];
       if (type) {
+        // "Created & delegated to X" means a new agent was spawned AND given a task.
+        // Emit both a spawn and a delegation keyframe so the frontend counts agents.
+        if (type === 'delegation' && entry.summary.startsWith('Created &')) {
+          keyframes.push({
+            timestamp: entry.timestamp,
+            label: entry.summary.replace('Created & delegated to', 'Spawned').slice(0, 80),
+            type: 'spawn',
+          });
+        }
         keyframes.push({
           timestamp: entry.timestamp,
           label: entry.summary.slice(0, 80),
@@ -140,12 +149,35 @@ export class SessionReplay {
     const agentMap = new Map<string, ReplayAgent>();
 
     for (const entry of activities) {
+      // "Created & delegated to X" means a new agent was spawned
+      if (entry.actionType === 'delegated' && entry.summary.startsWith('Created &')) {
+        const details = entry.details as Record<string, string>;
+        const agentId = details.spawnedAgentId ?? details.agentId ?? entry.agentId;
+        const role = details.role ?? entry.agentRole;
+        agentMap.set(agentId, {
+          id: agentId,
+          role,
+          status: 'running',
+          spawnedAt: entry.timestamp,
+        });
+      }
+      // Legacy: support sub_agent_spawned if it exists
       if (entry.actionType === 'sub_agent_spawned') {
         const agentId = (entry.details as Record<string, string>).spawnedAgentId ?? entry.agentId;
         const role = (entry.details as Record<string, string>).role ?? entry.agentRole;
         agentMap.set(agentId, {
           id: agentId,
           role,
+          status: 'running',
+          spawnedAt: entry.timestamp,
+        });
+      }
+
+      // Auto-discover agents from non-spawn events (status_change, message_sent, etc.)
+      if (entry.actionType !== 'sub_agent_spawned' && !agentMap.has(entry.agentId)) {
+        agentMap.set(entry.agentId, {
+          id: entry.agentId,
+          role: entry.agentRole,
           status: 'running',
           spawnedAt: entry.timestamp,
         });
