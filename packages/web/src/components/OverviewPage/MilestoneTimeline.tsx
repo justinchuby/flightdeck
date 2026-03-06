@@ -1,12 +1,13 @@
-import { useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
 
+/** Only show meaningful progress events — filter out routine system noise */
+const MILESTONE_TYPES = new Set(['milestone', 'task', 'decision', 'commit', 'error']);
+
 const TYPE_ICONS: Record<string, string> = {
-  agent_spawned: '🟢',
-  agent_exit: '🔴',
   decision: '⚡',
-  delegation: '📋',
   milestone: '✅',
+  task: '📋',
   error: '🔴',
   commit: '📦',
 };
@@ -17,9 +18,12 @@ interface MilestoneTimelineProps {
 }
 
 export function MilestoneTimeline({ keyframes, onSeek }: MilestoneTimelineProps) {
-  const navigate = useNavigate();
+  const milestones = useMemo(
+    () => keyframes.filter((kf) => MILESTONE_TYPES.has(kf.type)),
+    [keyframes],
+  );
 
-  if (keyframes.length === 0) {
+  if (milestones.length === 0) {
     return (
       <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="milestone-timeline">
         <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider mb-3">
@@ -41,7 +45,7 @@ export function MilestoneTimeline({ keyframes, onSeek }: MilestoneTimelineProps)
         {/* Vertical line */}
         <div className="absolute left-[11px] top-2 bottom-2 w-px bg-th-border" />
 
-        {keyframes.map((kf, idx) => {
+        {milestones.map((kf, idx) => {
           const icon = TYPE_ICONS[kf.type] ?? '⏱';
           const time = new Date(kf.timestamp);
           const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

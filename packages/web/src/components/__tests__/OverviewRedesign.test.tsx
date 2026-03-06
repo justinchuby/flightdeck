@@ -83,18 +83,39 @@ describe('MilestoneTimeline', () => {
     expect(screen.getByText('No milestones yet')).toBeTruthy();
   });
 
-  it('renders keyframes', () => {
+  it('renders only progress keyframes, filtering out spawn/delegation noise', () => {
     const kf: ReplayKeyframe[] = [
-      { timestamp: '2025-01-01T10:00:00Z', label: 'Session started', type: 'agent_spawned' },
+      { timestamp: '2025-01-01T10:00:00Z', label: 'Spawned Developer', type: 'spawn' },
+      { timestamp: '2025-01-01T10:01:00Z', label: 'Created & delegated to Architect', type: 'delegation' },
       { timestamp: '2025-01-01T10:05:00Z', label: 'Task completed', type: 'milestone' },
+      { timestamp: '2025-01-01T10:06:00Z', label: 'Pushed commit abc123', type: 'commit' },
+      { timestamp: '2025-01-01T10:07:00Z', label: 'Terminated QA Tester', type: 'agent_exit' },
     ];
     render(
       <MemoryRouter>
         <MilestoneTimeline keyframes={kf} />
       </MemoryRouter>,
     );
-    expect(screen.getByText('Session started')).toBeTruthy();
+    // Progress events shown
     expect(screen.getByText('Task completed')).toBeTruthy();
+    expect(screen.getByText('Pushed commit abc123')).toBeTruthy();
+    // Noise filtered out
+    expect(screen.queryByText('Spawned Developer')).toBeNull();
+    expect(screen.queryByText(/Created & delegated/)).toBeNull();
+    expect(screen.queryByText('Terminated QA Tester')).toBeNull();
+  });
+
+  it('shows empty state when all keyframes are filtered noise', () => {
+    const kf: ReplayKeyframe[] = [
+      { timestamp: '2025-01-01T10:00:00Z', label: 'Spawned Developer', type: 'spawn' },
+      { timestamp: '2025-01-01T10:01:00Z', label: 'Created & delegated to Architect', type: 'delegation' },
+    ];
+    render(
+      <MemoryRouter>
+        <MilestoneTimeline keyframes={kf} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('No milestones yet')).toBeTruthy();
   });
 });
 
