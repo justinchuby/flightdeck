@@ -11,6 +11,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/' },
       { text: 'Features', link: '/guide/features' },
       { text: 'Reference', link: '/reference/api' },
+      { text: 'Blog', link: '/blog/introducing-flightdeck' },
       { text: 'GitHub', link: 'https://github.com/justinchuby/flightdeck' },
     ],
     sidebar: {
@@ -79,6 +80,15 @@ export default defineConfig({
           text: 'Development',
           items: [
             { text: 'Developer Guide', link: '/guide/developer-guide' },
+            { text: 'Usage Tips & Use Cases', link: '/guide/usage-tips' },
+          ],
+        },
+      ],
+      '/blog/': [
+        {
+          text: 'Blog',
+          items: [
+            { text: 'Introducing Flightdeck', link: '/blog/introducing-flightdeck' },
           ],
         },
       ],
