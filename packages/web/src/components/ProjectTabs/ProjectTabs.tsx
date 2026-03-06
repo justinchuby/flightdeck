@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useProjects } from '../../hooks/useProjects';
-import type { Project } from '../../types';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -58,6 +57,14 @@ export function ProjectTabs({ activeId, onChange, className }: ProjectTabsProps)
 
     return items;
   }, [leads, projects]);
+
+  // Auto-select first tab when nothing is selected or selection is stale
+  useEffect(() => {
+    if (tabs.length === 0) return;
+    if (!activeId || !tabs.some((t) => t.id === activeId)) {
+      onChange(tabs[0].id);
+    }
+  }, [activeId, tabs, onChange]);
 
   if (tabs.length === 0) return null;
 

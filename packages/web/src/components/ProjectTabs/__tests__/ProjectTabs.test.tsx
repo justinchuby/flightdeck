@@ -1,5 +1,8 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 // Mock stores and hooks
 vi.mock('../../../stores/appStore', () => ({
@@ -18,6 +21,7 @@ describe('ProjectTabs', () => {
   const onChange = vi.fn();
 
   beforeEach(() => {
+    cleanup();
     vi.clearAllMocks();
   });
 
@@ -63,7 +67,7 @@ describe('ProjectTabs', () => {
     vi.mocked(useAppStore).mockImplementation((selector: any) =>
       selector({
         agents: [
-          { id: 'lead-1', role: { id: 'lead', name: 'Lead' }, parentId: null, projectName: 'Live Project' },
+          { id: 'lead-1', role: { id: 'lead', name: 'Lead' }, parentId: null, projectName: 'Live Project', status: 'running' },
         ],
       }),
     );
@@ -93,5 +97,30 @@ describe('ProjectTabs', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(1);
     expect(screen.getByText('Alpha Live')).toBeTruthy();
+  });
+
+  it('auto-selects first tab when activeId is null', () => {
+    vi.mocked(useProjects).mockReturnValue({
+      projects: [
+        { id: 'p1', name: 'Alpha', description: '', cwd: null, status: 'completed', createdAt: '', updatedAt: '' },
+        { id: 'p2', name: 'Beta', description: '', cwd: null, status: 'completed', createdAt: '', updatedAt: '' },
+      ],
+      loading: false,
+    });
+
+    render(<ProjectTabs activeId={null} onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith('p1');
+  });
+
+  it('auto-selects first tab when activeId is not in tabs', () => {
+    vi.mocked(useProjects).mockReturnValue({
+      projects: [
+        { id: 'p1', name: 'Alpha', description: '', cwd: null, status: 'completed', createdAt: '', updatedAt: '' },
+      ],
+      loading: false,
+    });
+
+    render(<ProjectTabs activeId="nonexistent" onChange={onChange} />);
+    expect(onChange).toHaveBeenCalledWith('p1');
   });
 });
