@@ -32,7 +32,6 @@ export function servicesRoutes(ctx: AppContext): Router {
     escalationManager,
     modelSelector,
     tokenBudgetOptimizer,
-    meetingSummarizer,
     reportGenerator,
     projectTemplateRegistry,
     knowledgeTransfer,
@@ -375,38 +374,6 @@ export function servicesRoutes(ctx: AppContext): Router {
   router.get('/coordination/parallel-analysis', (_req, res) => {
     const analyzer = new ParallelAnalyzer(agentManager.getTaskDAG());
     res.json(analyzer.analyze());
-  });
-
-  // ── Meeting Summarizer ───────────────────────────────────────────────
-
-  router.get('/coordination/meetings', (_req, res) => {
-    if (!meetingSummarizer) { res.json([]); return; }
-    res.json(meetingSummarizer.getSummaries());
-  });
-
-  router.post('/coordination/meetings/summarize', (req, res) => {
-    if (!meetingSummarizer) {
-      res.status(503).json({ error: 'Meeting summarizer not available' });
-      return;
-    }
-    const { groupName, messages } = req.body as {
-      groupName?: string;
-      messages?: Array<{ from: string; content: string; timestamp: number }>;
-    };
-    if (!groupName || typeof groupName !== 'string') {
-      res.status(400).json({ error: 'groupName is required' });
-      return;
-    }
-    if (!Array.isArray(messages) || messages.length === 0) {
-      res.status(400).json({ error: 'messages array is required and must not be empty' });
-      return;
-    }
-    try {
-      const summary = meetingSummarizer.summarize(groupName, messages);
-      res.status(201).json(summary);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
   });
 
   // --- Session Report ---

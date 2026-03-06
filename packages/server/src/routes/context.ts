@@ -49,7 +49,6 @@ export interface AppContext {
   escalationManager?: import('../coordination/EscalationManager.js').EscalationManager;
   modelSelector?: ModelSelector;
   tokenBudgetOptimizer?: TokenBudgetOptimizer;
-  meetingSummarizer?: import('../coordination/MeetingSummarizer.js').MeetingSummarizer;
   reportGenerator?: ReportGenerator;
   projectTemplateRegistry?: import('../coordination/ProjectTemplates.js').ProjectTemplateRegistry;
   knowledgeTransfer?: import('../coordination/KnowledgeTransfer.js').KnowledgeTransfer;
