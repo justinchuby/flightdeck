@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { SessionScoreBadge } from './SessionScoreBadge';
 import type { SessionSummary } from './types';
 
 interface SessionHistoryTableProps {
@@ -91,7 +90,6 @@ export function SessionHistoryTable({
               <th className="pb-2 text-right cursor-pointer select-none" onClick={() => toggleSort('agents')}>
                 <span className="inline-flex items-center gap-0.5">Agents <SortIcon field="agents" /></span>
               </th>
-              <th className="pb-2 text-center">Score</th>
             </tr>
           </thead>
           <tbody>
@@ -120,13 +118,10 @@ export function SessionHistoryTable({
                 <td className="py-2 text-right text-th-text-alt">{((s.totalInputTokens + s.totalOutputTokens) / 1000).toFixed(0)}k</td>
                 <td className="py-2 text-right text-th-text-alt">{s.taskCount}</td>
                 <td className="py-2 text-right text-th-text-alt">{s.agentCount}</td>
-                <td className="py-2 text-center">
-                  <SessionScoreBadge session={s} />
-                </td>
               </tr>
             ))}
             {paged.length === 0 && (
-              <tr><td colSpan={onToggleCompare ? 8 : 7} className="py-8 text-center text-th-text-muted">No sessions found</td></tr>
+              <tr><td colSpan={onToggleCompare ? 7 : 6} className="py-8 text-center text-th-text-muted">No sessions found</td></tr>
             )}
           </tbody>
         </table>

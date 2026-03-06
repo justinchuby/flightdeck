@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { AnalyticsOverview, SessionSummary } from '../Analytics/types';
-import { generateInsights, sessionScore } from '../Analytics/types';
+import { generateInsights } from '../Analytics/types';
 
 // ── Mock visx (requires DOM measurements) ──────────────────────────
 
@@ -64,7 +64,6 @@ import { AnalyticsPage } from '../Analytics';
 import { TimeWindowSelector } from '../Analytics/TimeWindowSelector';
 import { SessionOverviewCard } from '../Analytics/SessionOverviewCard';
 import { InsightCard } from '../Analytics/InsightCard';
-import { SessionScoreBadge } from '../Analytics/SessionScoreBadge';
 
 // ── Test Data ──────────────────────────────────────────────────────
 
@@ -151,16 +150,6 @@ describe('Cross-Session Analytics', () => {
     });
   });
 
-  describe('SessionScoreBadge', () => {
-    it('renders 1-5 stars', () => {
-      const session = makeSession('s1', 5, 12);
-      const { container } = render(<SessionScoreBadge session={session} />);
-      const text = container.textContent ?? '';
-      // Should have exactly 5 characters (mix of ★ and ☆)
-      expect(text.length).toBe(5);
-    });
-  });
-
   describe('generateInsights', () => {
     it('returns empty for < 2 sessions', () => {
       const overview = makeOverview([makeSession('s1', 10, 5)]);
@@ -189,14 +178,6 @@ describe('Cross-Session Analytics', () => {
       ];
       const insights = generateInsights(overview);
       expect(insights.some((i) => i.type === 'role')).toBe(true);
-    });
-  });
-
-  describe('sessionScore', () => {
-    it('gives higher score for sessions with more tasks', () => {
-      const manyTasks = makeSession('s1', 3, 10);
-      const fewTasks = makeSession('s2', 20, 1);
-      expect(sessionScore(manyTasks)).toBeGreaterThan(sessionScore(fewTasks));
     });
   });
 });

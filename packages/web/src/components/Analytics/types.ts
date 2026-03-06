@@ -99,13 +99,3 @@ export function generateInsights(overview: AnalyticsOverview): AnalyticsInsight[
 
   return insights.slice(0, 5);
 }
-
-// ── Session scoring (1-5 stars) ─────────────────────────────────
-
-export function sessionScore(session: SessionSummary): number {
-  let score = 3;
-  // Task count
-  if (session.taskCount >= 10) score += 1;
-  else if (session.taskCount <= 1) score -= 1;
-  return Math.max(1, Math.min(5, score));
-}
