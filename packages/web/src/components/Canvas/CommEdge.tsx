@@ -9,8 +9,8 @@ function CommEdgeInner(props: EdgeProps & { data?: CanvasEdgeData }) {
   const isActive = data?.isActive ?? false;
   const isBroadcast = data?.types?.includes('broadcast');
 
-  // Stroke width by volume
-  const strokeWidth = count > 25 ? 4 : count > 10 ? 3 : count > 3 ? 2 : 1;
+  // Stroke width by volume (minimum 1.5 for visibility)
+  const strokeWidth = count > 25 ? 4 : count > 10 ? 3 : count > 3 ? 2 : 1.5;
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX, sourceY, targetX, targetY,
@@ -22,10 +22,10 @@ function CommEdgeInner(props: EdgeProps & { data?: CanvasEdgeData }) {
       <BaseEdge
         path={edgePath}
         style={{
-          stroke: isActive ? 'var(--color-indigo-400, #818cf8)' : 'var(--th-border, #374151)',
+          stroke: isActive ? 'var(--color-indigo-400, #818cf8)' : 'var(--chart-axis, #6b7280)',
           strokeWidth,
           strokeDasharray: isBroadcast ? '6 4' : undefined,
-          opacity: count === 0 ? 0.2 : isActive ? 1 : 0.5,
+          opacity: count === 0 ? 0.35 : isActive ? 1 : 0.65,
           transition: 'stroke 0.3s, opacity 0.3s',
         }}
       />

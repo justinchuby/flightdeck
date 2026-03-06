@@ -27,13 +27,16 @@ interface Props {
 export function OverviewPage(_props: Props) {
   const agents = useAppStore((s) => s.agents);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const projectIds = useLeadStore((s) => Object.keys(s.projects));
 
-  // Derive leadId
+  // Derive leadId — prefer selected, then active lead agent, then most recent project
   const leadId = useMemo(() => {
     if (selectedLeadId) return selectedLeadId;
     const lead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
-    return lead?.id ?? null;
-  }, [selectedLeadId, agents]);
+    if (lead?.id) return lead.id;
+    // Fallback to most recent known project for historical data
+    return projectIds.length > 0 ? projectIds[projectIds.length - 1] : null;
+  }, [selectedLeadId, agents, projectIds]);
 
   // ── Data state ─────────────────────────────────────────────────
   const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
@@ -122,7 +125,7 @@ export function OverviewPage(_props: Props) {
   if (!leadId) {
     return (
       <div className="flex-1 flex items-center justify-center text-th-text-muted text-sm">
-        No active session. Start a project to see the overview.
+        No session data yet. Start a project to see the overview.
       </div>
     );
   }
