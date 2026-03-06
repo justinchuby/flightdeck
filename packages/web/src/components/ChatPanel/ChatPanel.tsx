@@ -118,7 +118,10 @@ export function ChatPanel({ agentId, ws }: Props) {
         msgs.push({ type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
       }
     }
-    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}) });
+    const imgAttachments = attachments.length > 0
+      ? attachments.filter((a) => a.kind === 'image').map((a) => ({ name: a.name, mimeType: a.mimeType, thumbnailDataUrl: a.thumbnailDataUrl }))
+      : undefined;
+    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}), attachments: imgAttachments && imgAttachments.length > 0 ? imgAttachments : undefined });
     useAppStore.getState().updateAgent(agentId, { messages: msgs });
 
     if (broadcast) {

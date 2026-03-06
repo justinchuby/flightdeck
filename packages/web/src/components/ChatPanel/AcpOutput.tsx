@@ -384,8 +384,23 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
     return (
       <div data-user-prompt={item.index} className="flex justify-end items-start gap-2 py-1">
         <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
-        <div className="max-w-[80%] rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
-          <MentionText text={rawText} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+        <div className="max-w-[80%]">
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end">
+              {msg.attachments.map((att, ai) => (
+                <div key={ai} className="rounded-lg overflow-hidden border border-white/20">
+                  {att.thumbnailDataUrl ? (
+                    <img src={att.thumbnailDataUrl} alt={att.name} className="max-h-24 rounded-lg" />
+                  ) : (
+                    <div className="px-2 py-1 bg-blue-700 text-xs text-blue-200">{att.name}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
+            <MentionText text={rawText} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
+          </div>
         </div>
       </div>
     );

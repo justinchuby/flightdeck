@@ -86,6 +86,8 @@ export interface AcpTextChunk {
   data?: string;
   /** URI for resource content */
   uri?: string;
+  /** Image attachments sent with a user message */
+  attachments?: Array<{ name: string; mimeType: string; thumbnailDataUrl?: string }>;
 }
 
 export interface AcpToolCall {
