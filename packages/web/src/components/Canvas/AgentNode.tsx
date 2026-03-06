@@ -52,9 +52,9 @@ function AgentNodeInner({ data }: NodeProps & { data: CanvasNodeData }) {
       role="button"
       aria-label={`Agent: ${role} (${status}). Context: ${contextPct}%.`}
     >
-      {/* Connection handles */}
-      <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-th-border !border-0" />
-      <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-th-border !border-0" />
+      {/* Connection handles — hidden; canvas is read-only visualization */}
+      <Handle type="target" position={Position.Left} className="!w-0 !h-0 !min-w-0 !min-h-0 !border-0 !opacity-0 !pointer-events-none" />
+      <Handle type="source" position={Position.Right} className="!w-0 !h-0 !min-w-0 !min-h-0 !border-0 !opacity-0 !pointer-events-none" />
 
       {/* Status dot */}
       <div

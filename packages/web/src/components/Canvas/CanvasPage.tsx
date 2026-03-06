@@ -13,6 +13,7 @@ import {
   applyNodeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Info } from 'lucide-react';
 
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type AgentComm } from '../../stores/leadStore';
@@ -105,12 +106,15 @@ function CanvasInner() {
   if (agents.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8" data-testid="canvas-empty">
-        <div className="text-center">
-          <div className="text-4xl mb-3">🎯</div>
-          <h2 className="text-lg font-semibold text-th-text-alt mb-1">Canvas</h2>
-          <p className="text-sm text-th-text-muted max-w-xs">
-            Start a session to see agents appear on the spatial canvas.
-            Each agent becomes a node; communications become edges.
+        <div className="text-center max-w-sm">
+          <div className="text-4xl mb-3">🔗</div>
+          <h2 className="text-lg font-semibold text-th-text-alt mb-1">Live Agent Canvas</h2>
+          <p className="text-sm text-th-text-muted mb-3">
+            Agents will appear here as nodes, with connections showing their real-time communication.
+            Thicker edges mean more messages between agents.
+          </p>
+          <p className="text-xs text-th-text-muted">
+            Click any agent node to see details, tasks, and messages.
           </p>
         </div>
       </div>
@@ -137,6 +141,8 @@ function CanvasInner() {
           onNodesChange={onNodesChange}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
+          nodesConnectable={false}
+          connectOnClick={false}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.2}
@@ -150,6 +156,12 @@ function CanvasInner() {
             className="!bg-th-bg-alt !border-th-border !rounded-lg !shadow-sm"
           />
         </ReactFlow>
+
+        {/* Legend */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-th-bg-alt/90 border border-th-border/50 text-[10px] text-th-text-muted backdrop-blur-sm">
+          <Info size={12} className="shrink-0" />
+          <span>Live visualization — edges show agent messages</span>
+        </div>
       </div>
 
       {focusedAgent && (

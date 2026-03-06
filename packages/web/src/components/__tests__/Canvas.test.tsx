@@ -113,7 +113,7 @@ describe('Canvas Lite', () => {
         </MemoryRouter>,
       );
       expect(screen.getByTestId('canvas-empty')).toBeInTheDocument();
-      expect(screen.getByText('Canvas')).toBeInTheDocument();
+      expect(screen.getByText('Live Agent Canvas')).toBeInTheDocument();
     });
 
     it('renders ReactFlow when agents exist', () => {
