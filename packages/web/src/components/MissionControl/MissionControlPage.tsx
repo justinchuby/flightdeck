@@ -3,6 +3,7 @@ import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
+import { deriveAgentsFromKeyframes } from '../../hooks/useHistoricalAgents';
 import { HealthSummary } from './HealthSummary';
 import { AgentFleet } from './AgentFleet';
 import { DagMinimap } from './DagMinimap';
@@ -191,6 +192,7 @@ export function MissionControlPage() {
   // Fetch historical projects from REST API when no live data
   const [apiProjects, setApiProjects] = useState<Project[]>([]);
   const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
+  const fetchIdRef = useRef(0);
 
   useEffect(() => {
     apiFetch<Project[]>('/projects')
@@ -214,38 +216,32 @@ export function MissionControlPage() {
   // Derive agents from keyframes when no live agents exist
   useEffect(() => {
     if (liveAgents.length > 0 || !leadId) return;
+    const requestId = ++fetchIdRef.current;
     apiFetch<{ keyframes: any[] }>(`/replay/${leadId}/keyframes`)
       .then((data) => {
+        if (fetchIdRef.current !== requestId) return;
         const kf = data?.keyframes ?? [];
-        const derived: any[] = [];
-        for (const frame of kf) {
-          if (frame.type === 'spawn') {
-            const roleMatch = frame.label?.match(/^Spawned\s+(.+?):\s/);
-            const roleName = roleMatch?.[1] ?? 'Agent';
-            const roleId = roleName.toLowerCase().replace(/\s+/g, '-');
-            derived.push({
-              id: `mc-${derived.length}`,
-              parentId: leadId,
-              status: 'completed',
-              role: { id: roleId, name: roleName, icon: '🤖' },
-              model: undefined,
-              inputTokens: 0,
-              outputTokens: 0,
-              messages: [],
-            });
-          }
-        }
+        const derived = deriveAgentsFromKeyframes(kf).map((a) => ({
+          ...a,
+          parentId: leadId,
+          model: undefined,
+          messages: [],
+        }));
         if (derived.length > 0) {
           // Add a synthetic lead agent entry
           derived.unshift({
             id: leadId,
-            parentId: null,
+            parentId: null as any,
             status: 'completed',
             role: { id: 'lead', name: 'Lead', icon: '👑' },
             model: undefined,
             inputTokens: 0,
             outputTokens: 0,
+            createdAt: undefined as any,
             messages: [],
+            childIds: [] as never[],
+            contextWindowSize: 0,
+            contextWindowUsed: 0,
           });
         }
         setHistoricalAgents(derived);
