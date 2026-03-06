@@ -200,15 +200,15 @@ export function OverviewPage(_props: Props) {
       {/* Hero: Progress Timeline */}
       <ProgressTimeline data={timelineData} width={800} height={240} />
 
+      {/* Milestones */}
+      <MilestoneTimeline keyframes={keyframes} />
+
       {/* Stats row: Burndown + Cost + Key Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <CumulativeFlow data={flowData} />
         <CostCurve data={costData} />
         <KeyStats agents={displayAgents} totalTokens={totalTokens} sessionStart={sessionStart} />
       </div>
-
-      {/* Milestones */}
-      <MilestoneTimeline keyframes={keyframes} />
 
       {/* Agent Activity Heatmap */}
       <AgentHeatmap agents={displayAgents} buckets={heatmapBuckets} />
