@@ -77,16 +77,17 @@ export function OverviewPage(_props: Props) {
 
     try {
       // Fetch agents from REST API when live WebSocket agents are empty
+      let fetchedAgents: any[] = [];
       if (agents.length === 0) {
         try {
           const agentData = await apiFetch<any[]>('/agents');
-          const arr = Array.isArray(agentData) ? agentData : [];
-          if (mountedRef.current) setHistoricalAgents(arr);
+          fetchedAgents = Array.isArray(agentData) ? agentData : [];
+          if (mountedRef.current) setHistoricalAgents(fetchedAgents);
         } catch { /* API may not have agent list endpoint */ }
       }
 
-      // Use whichever agents are available for token calculations
-      const currentAgents = agents.length > 0 ? agents : historicalAgents;
+      // Use live agents if available, otherwise the just-fetched historical data
+      const currentAgents = agents.length > 0 ? agents : fetchedAgents;
 
       // Fetch keyframes for milestones
       const kfData = await apiFetch<{ keyframes: ReplayKeyframe[] }>(`/replay/${effectiveId}/keyframes`);
@@ -152,7 +153,7 @@ export function OverviewPage(_props: Props) {
     } catch {
       // API not ready — show empty states
     }
-  }, [effectiveId, agents.length, historicalAgents]);
+  }, [effectiveId, agents.length]);
 
   useEffect(() => {
     mountedRef.current = true;
