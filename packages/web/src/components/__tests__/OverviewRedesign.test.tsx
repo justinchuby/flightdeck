@@ -23,7 +23,17 @@ vi.mock('../../stores/leadStore', () => ({
 }));
 
 vi.mock('../../hooks/useApi', () => ({
-  apiFetch: vi.fn().mockResolvedValue({ ok: false }),
+  apiFetch: vi.fn().mockImplementation((path: string) => {
+    if (path === '/projects') {
+      return Promise.resolve([
+        { id: 'proj-1', name: 'Test Project', status: 'active', createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' },
+      ]);
+    }
+    if (path.includes('/keyframes')) {
+      return Promise.resolve({ keyframes: [] });
+    }
+    return Promise.resolve({ ok: false });
+  }),
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -99,5 +109,20 @@ describe('AgentHeatmap', () => {
       { agentId: 'a1', time: Date.now(), intensity: 0.8 },
     ]} />);
     expect(screen.getByTestId('agent-heatmap')).toBeTruthy();
+  });
+});
+
+describe('OverviewPage project selector', () => {
+  it('renders project selector when projects exist', async () => {
+    const { OverviewPage } = await import('../OverviewPage/OverviewPage');
+    render(
+      <MemoryRouter>
+        <OverviewPage />
+      </MemoryRouter>,
+    );
+    // Wait for project fetch to resolve
+    const selector = await screen.findByTestId('overview-project-selector');
+    expect(selector).toBeTruthy();
+    expect(screen.getByText('Test Project')).toBeTruthy();
   });
 });
