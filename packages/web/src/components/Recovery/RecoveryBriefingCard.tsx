@@ -105,7 +105,7 @@ export function RecoveryBriefingCard({ event, onApproved, onCancelled }: Recover
             onChange={(e) => setNarrative(e.target.value)}
             className="w-full h-24 bg-th-bg-alt border border-th-border rounded-md p-2 text-xs text-th-text-alt resize-y focus:ring-1 focus:ring-accent outline-none"
           />
-          <p className="text-[9px] text-th-text-muted text-right mt-0.5">~{estimatedTokens} tokens</p>
+          <p className="text-[9px] text-th-text-muted text-right mt-0.5">{narrative.length} chars</p>
         </div>
       )}
 

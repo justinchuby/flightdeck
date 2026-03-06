@@ -66,11 +66,9 @@ export function MobilePulse() {
         <span className="text-accent shrink-0">{stats.pendingCount} pend</span>
       )}
       {stats.totalTokens > 0 ? (
-        <span className="text-blue-400 shrink-0">
-          {stats.totalTokens >= 1_000_000 ? `${(stats.totalTokens / 1_000_000).toFixed(1)}M` : stats.totalTokens >= 1_000 ? `${(stats.totalTokens / 1_000).toFixed(0)}k` : stats.totalTokens} tok
-        </span>
+        <span className="text-th-text-muted shrink-0">—</span>
       ) : (
-        <span className="text-th-text-muted shrink-0">Tokens N/A</span>
+        <span className="text-th-text-muted shrink-0">—</span>
       )}
       <span className="w-px h-3 bg-th-border/50" />
       <span

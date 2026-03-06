@@ -77,7 +77,7 @@ export function LeadDashboard({ api, ws }: Props) {
   const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
-    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
+    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
     try {
       const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
@@ -731,7 +731,7 @@ export function LeadDashboard({ api, ws }: Props) {
       if (next.has(tabId)) {
         setSidebarTab((current) => {
           if (current === tabId) {
-            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'];
+            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
             return allSupportedTabs.find((id) => !next.has(id)) ?? 'team';
           }
           return current;
@@ -1051,15 +1051,7 @@ export function LeadDashboard({ api, ws }: Props) {
                 </div>
                 <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
                   {lead.status} · {agents.filter((a: any) => a.parentId === lead.id).length} agents
-                  {(() => {
-                    const allIds = [lead.id, ...(lead.childIds || [])];
-                    const total = allIds.reduce((s, id) => {
-                      const a = agents.find((ag: any) => ag.id === id);
-                      return s + (a?.inputTokens || 0) + (a?.outputTokens || 0);
-                    }, 0);
-                    return total > 0 ? ` · ${formatTokens(total)} tokens` : '';
-                  })()}
-                </div>
+                  </div>
               </button>
             );
           })}
@@ -1386,17 +1378,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   </div>
                 )}
                 {(() => {
-                  const leadIn = progress.leadTokens?.input || 0;
-                  const leadOut = progress.leadTokens?.output || 0;
-                  const teamIn = (progress.teamAgents || []).reduce((s: number, a: any) => s + (a.inputTokens || 0), 0);
-                  const teamOut = (progress.teamAgents || []).reduce((s: number, a: any) => s + (a.outputTokens || 0), 0);
-                  const total = leadIn + leadOut + teamIn + teamOut;
-                  return total > 0 ? (
-                    <div className="flex items-center gap-1.5 text-th-text-muted" title={`Input: ${formatTokens(leadIn + teamIn)} · Output: ${formatTokens(leadOut + teamOut)}`}>
-                      <BarChart3 className="w-4 h-4 text-purple-400" />
-                      <span>{formatTokens(total)} tokens</span>
-                    </div>
-                  ) : null;
+                  return null;
                 })()}
                 <div className="ml-auto">
                   <div className="w-32 bg-th-bg-muted rounded-full h-2">
@@ -1907,7 +1889,7 @@ export function LeadDashboard({ api, ws }: Props) {
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowTabConfig(false)} />
                           <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
-                            {(['team', 'comms', 'groups', 'dag', 'models', 'tokens', 'costs', 'timers'] as const).map((tabId) => (
+                            {(['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
                               <button
                                 key={tabId}
                                 onClick={() => toggleTabVisibility(tabId)}
@@ -1940,7 +1922,6 @@ export function LeadDashboard({ api, ws }: Props) {
                         No project selected
                       </div>
                     )}
-                    {sidebarTab === 'tokens' && <TokenEconomics agents={teamAgents as any} />}
                     {sidebarTab === 'costs' && <CostBreakdown />}
                     {sidebarTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
                   </div>
@@ -2191,18 +2172,12 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                     {(agent.model || agent.role.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
                     )}
-                    {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                      <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
-                    )}
                   </div>
                 )}
-                {!delegation && (agent.model || agent.role.model || agent.inputTokens > 0 || agent.outputTokens > 0) && (
+                {!delegation && (agent.model || agent.role.model) && (
                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
                     {(agent.model || agent.role.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
-                    )}
-                    {(agent.inputTokens > 0 || agent.outputTokens > 0) && (
-                      <span className="text-[9px] font-mono text-purple-400/70 shrink-0">{formatTokens(agent.inputTokens + agent.outputTokens)}</span>
                     )}
                   </div>
                 )}
@@ -2297,33 +2272,28 @@ function TeamStatusContent({ agents, delegations, comms, activity, allAgents, on
                 </div>
               )}
 
-              {/* Token Usage */}
-              {(selectedAgent.inputTokens > 0 || selectedAgent.outputTokens > 0) && (
+              {/* Token Usage — hidden (issue #106) */}
+
+              {/* Context Window — keep this, it's real data from ACP */}
+              {selectedAgent.contextWindowSize > 0 && (
                 <div className="px-5 py-3 border-b border-th-border">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Token Usage</h4>
-                  <div className="flex gap-4 text-xs font-mono">
-                    <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(selectedAgent.inputTokens)} in</span>
-                    <span className="text-green-600 dark:text-green-300">↓ {formatTokens(selectedAgent.outputTokens)} out</span>
-                    <span className="text-th-text-muted">Σ {formatTokens(selectedAgent.inputTokens + selectedAgent.outputTokens)}</span>
-                  </div>
-                  {selectedAgent.contextWindowSize > 0 && (
-                    <div className="mt-1.5">
-                      <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
-                        <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
-                        <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
-                      </div>
-                      <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
-                        <div
-                          className={`h-1 rounded-full transition-all ${
-                            selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
-                            selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.5 ? 'bg-yellow-500' :
-                            'bg-blue-500'
-                          }`}
-                          style={{ width: `${Math.min(100, Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100))}%` }}
-                        />
-                      </div>
+                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Context Window</h4>
+                  <div className="mt-1.5">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
+                      <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
+                      <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
                     </div>
-                  )}
+                    <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
+                      <div
+                        className={`h-1 rounded-full transition-all ${
+                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
+                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.5 ? 'bg-yellow-500' :
+                          'bg-blue-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 

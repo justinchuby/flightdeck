@@ -110,18 +110,7 @@ export function PulseStrip() {
 
   return (
     <div className="h-10 border-b border-th-border bg-th-bg-alt/40 flex items-center px-4 gap-6 text-xs shrink-0 overflow-x-auto">
-      {/* Session Tokens — only show when data exists */}
-      {stats.totalTokens > 0 && (
-        <>
-          <div className="flex items-center gap-1.5 text-th-text-muted" title={`~${formatTokensCompact(stats.totalTokens)} tokens total (~${formatTokensCompact(stats.totalInput)} in / ~${formatTokensCompact(stats.totalOutput)} out). Estimated from message length — actual usage may vary.`}>
-            <Hash className="w-3.5 h-3.5 text-blue-400" />
-            <span className="font-mono font-medium text-th-text-alt">{formatTokensCompact(stats.totalTokens)}<span className="text-th-text-muted ml-1 hidden sm:inline">tokens (est.)</span></span>
-          </div>
-
-          {/* Separator */}
-          <div className="w-px h-4 bg-th-border/50" />
-        </>
-      )}
+      {/* Session Tokens — hidden until estimation accuracy is improved (issue #106) */}
 
       {/* Agent Status Breakdown — click navigates to Agents page */}
       <Link to="/agents" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity" title={`${stats.agentCount} agents: ${stats.running} running, ${stats.idle} idle, ${stats.failed} failed — click to view`}>

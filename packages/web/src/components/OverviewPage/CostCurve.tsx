@@ -64,67 +64,12 @@ export function CostCurve({ data, width = 260, height = 180 }: CostCurveProps) {
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px]" data-testid="cost-curve">
       <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider mb-1">
-        Token Usage (est.)
+        Token Usage
       </h3>
-      <svg width={width} height={height - 32}>
-        <defs>
-          <linearGradient id="cost-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={areaColor} stopOpacity={0.4} />
-            <stop offset="100%" stopColor={areaColor} stopOpacity={0.05} />
-          </linearGradient>
-        </defs>
-        <Group left={MARGIN.left} top={MARGIN.top}>
-          {/* Area fill */}
-          <AreaClosed
-            data={data}
-            x={(d) => xScale(new Date(d.time)) ?? 0}
-            y={(d) => yScale(d.cumulativeCost) ?? 0}
-            yScale={yScale}
-            fill="url(#cost-gradient)"
-          />
-
-          {/* Line */}
-          <LinePath
-            data={data}
-            x={(d) => xScale(new Date(d.time)) ?? 0}
-            y={(d) => yScale(d.cumulativeCost) ?? 0}
-            stroke={areaColor}
-            strokeWidth={2}
-          />
-
-          <AxisBottom
-            top={innerH}
-            scale={xScale}
-            numTicks={3}
-            hideZero
-            tickFormat={(d) => {
-              const date = d instanceof Date ? d : new Date(d as number);
-              return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }}
-            stroke="#6b7280"
-            tickStroke="#6b7280"
-            tickLabelProps={() => ({
-              fill: '#9ca3af',
-              fontSize: 9,
-              textAnchor: 'middle' as const,
-            })}
-          />
-          <AxisLeft
-            scale={yScale}
-            numTicks={3}
-            hideZero
-            tickFormat={(v) => formatTokenAxis(v)}
-            stroke="#6b7280"
-            tickStroke="#6b7280"
-            tickLabelProps={() => ({
-              fill: '#9ca3af',
-              fontSize: 9,
-              textAnchor: 'end' as const,
-              dx: -4,
-            })}
-          />
-        </Group>
-      </svg>
+      {/* Token chart hidden — estimation accuracy insufficient (issue #106) */}
+      <div className="flex items-center justify-center h-[calc(100%-32px)] text-th-text-muted text-[10px]">
+        Token estimation temporarily hidden
+      </div>
     </div>
   );
 }

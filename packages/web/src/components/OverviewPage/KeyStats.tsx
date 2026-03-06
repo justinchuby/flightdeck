@@ -39,12 +39,6 @@ export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
         color: running > 0 ? 'text-blue-400' : 'text-th-text-muted',
       },
       {
-        label: 'Tokens (est.)',
-        value: hasTokenData ? `${tokenStr} total` : 'N/A',
-        icon: <Hash size={14} />,
-        color: hasTokenData ? 'text-th-text-alt' : 'text-th-text-muted',
-      },
-      {
         label: 'Duration',
         value: elapsedStr,
         icon: <Clock size={14} />,

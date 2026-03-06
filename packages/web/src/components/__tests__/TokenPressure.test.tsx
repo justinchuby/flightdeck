@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, Role } from '../../types';
 import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
 import { detectAlerts } from '../MissionControl/AlertsPanel';
+
+afterEach(cleanup);
 
 function makeRole(overrides: Partial<Role> = {}): Role {
   return {
@@ -35,43 +38,30 @@ beforeEach(() => {
   useAppStore.getState().setAgents([]);
 });
 
-describe('TokenEconomics — burn rate display', () => {
-  it('shows burn rate when contextBurnRate is available', () => {
+describe('TokenEconomics — hidden state (issue #106)', () => {
+  it('shows hidden notice instead of burn rate data', () => {
     useAppStore.getState().setAgents([
       makeAgent({
         inputTokens: 100_000,
         outputTokens: 50_000,
         contextWindowSize: 200_000,
         contextWindowUsed: 120_000,
-        contextBurnRate: 50, // 50 tokens/sec = ~3k/min
+        contextBurnRate: 50,
         estimatedExhaustionMinutes: 8,
       }),
     ]);
     render(<TokenEconomics />);
-    expect(screen.getByText('~3.0k/min')).toBeDefined();
-    expect(screen.getByText('~8 min left')).toBeDefined();
+    expect(screen.getByTestId('token-economics-hidden')).toBeDefined();
+    expect(screen.queryByText('~3.0k/min')).toBeNull();
   });
 
-  it('shows agent with no burn rate — no burn label rendered', () => {
-    useAppStore.getState().setAgents([
-      makeAgent({
-        inputTokens: 10_000,
-        outputTokens: 5_000,
-        contextWindowSize: 200_000,
-        contextWindowUsed: 10_000,
-      }),
-    ]);
-    render(<TokenEconomics />);
-    // Agent exists and is rendered, but no "Calculating..." since burn rate display was removed
-    expect(screen.queryByText('Calculating…')).toBeNull();
-  });
-
-  it('shows Burn Rate column header', () => {
+  it('does not render token table or burn rate column', () => {
     useAppStore.getState().setAgents([
       makeAgent({ inputTokens: 1000, outputTokens: 500 }),
     ]);
     render(<TokenEconomics />);
-    expect(screen.getByText('Burn Rate')).toBeDefined();
+    expect(screen.queryByText('Burn Rate')).toBeNull();
+    expect(screen.getByTestId('token-economics-hidden')).toBeDefined();
   });
 });
 

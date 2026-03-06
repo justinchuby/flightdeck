@@ -313,16 +313,9 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                   )}
                 </td>
 
-                {/* Token sparkline */}
+                {/* Token sparkline — hidden (issue #106) */}
                 <td className="px-3 py-2.5 hidden xl:table-cell">
-                  {(agent.inputTokens ?? 0) + (agent.outputTokens ?? 0) > 0 ? (
-                    <TokenHistoryCell
-                      agentId={agent.id}
-                      totalTokens={(agent.inputTokens ?? 0) + (agent.outputTokens ?? 0)}
-                    />
-                  ) : (
-                    <span className="text-xs text-th-text-muted">—</span>
-                  )}
+                  <span className="text-xs text-th-text-muted">—</span>
                 </td>
 
                 {/* Locks */}

@@ -114,18 +114,6 @@ export function FocusPanel({ agentId, onClose }: FocusPanelProps) {
                 <span className="text-th-text-muted">Status:</span>{' '}
                 <span className="text-th-text-alt capitalize">{agent.status}</span>
               </div>
-              {agent.inputTokens != null && (
-                <div className="text-[11px]">
-                  <span className="text-th-text-muted">Tokens in:</span>{' '}
-                  <span className="text-th-text-alt">{agent.inputTokens.toLocaleString()}</span>
-                </div>
-              )}
-              {agent.outputTokens != null && (
-                <div className="text-[11px]">
-                  <span className="text-th-text-muted">Tokens out:</span>{' '}
-                  <span className="text-th-text-alt">{agent.outputTokens.toLocaleString()}</span>
-                </div>
-              )}
               {agent.contextBurnRate != null && (
                 <div className="text-[11px]">
                   <span className="text-th-text-muted">Burn rate:</span>{' '}
@@ -169,12 +157,6 @@ export function FocusPanel({ agentId, onClose }: FocusPanelProps) {
           <div className="space-y-3">
             <div className="text-[11px] text-th-text-muted">
               <p>Token usage and cost metrics will appear here when the agent is active.</p>
-              {agent.inputTokens != null && (
-                <p className="mt-2">Input: {agent.inputTokens.toLocaleString()} tokens</p>
-              )}
-              {agent.outputTokens != null && (
-                <p>Output: {agent.outputTokens.toLocaleString()} tokens</p>
-              )}
             </div>
           </div>
         )}
