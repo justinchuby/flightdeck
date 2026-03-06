@@ -908,6 +908,8 @@ export function LeadDashboard({ api, ws }: Props) {
     return progressTeam.length > 0 ? progressTeam : derivedAgents;
   })();
 
+  const teamAgentIds = useMemo(() => new Set(teamAgents.map((a: any) => a.id)), [teamAgents]);
+
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Project list sidebar */}
@@ -1914,7 +1916,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     )}
                     {sidebarTab === 'tokens' && <TokenEconomics agents={teamAgents as any} />}
                     {sidebarTab === 'costs' && <CostBreakdown />}
-                    {sidebarTab === 'timers' && <TimerDisplay />}
+                    {sidebarTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
                   </div>
                   {/* Resize handle for tabbed section */}
                   <div

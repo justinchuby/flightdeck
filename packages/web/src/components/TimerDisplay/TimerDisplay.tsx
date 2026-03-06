@@ -93,13 +93,19 @@ function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: strin
   );
 }
 
-export function TimerDisplay() {
-  const timers = useTimerStore((s) => s.timers);
+export function TimerDisplay({ projectAgentIds }: { projectAgentIds?: Set<string> }) {
+  const allTimers = useTimerStore((s) => s.timers);
   const setTimers = useTimerStore((s) => s.setTimers);
   const removeTimer = useTimerStore((s) => s.removeTimer);
   const [filter, setFilter] = useState<TimerFilter>('active');
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+
+  // Filter timers by project agents when a project filter is provided
+  const timers = useMemo(() => {
+    if (!projectAgentIds || projectAgentIds.size === 0) return allTimers;
+    return allTimers.filter((t) => projectAgentIds.has(t.agentId));
+  }, [allTimers, projectAgentIds]);
 
   // Initial fetch — WS events keep it updated after this
   useEffect(() => {
