@@ -46,7 +46,7 @@ export function MilestoneTimeline({ keyframes, onSeek }: MilestoneTimelineProps)
         {/* Vertical line */}
         <div className="absolute left-[11px] top-2 bottom-2 w-px bg-th-border" />
 
-        {milestones.map((kf, idx) => {
+        {[...milestones].reverse().map((kf, idx) => {
           const icon = TYPE_ICONS[kf.type] ?? '⏱';
           const time = new Date(kf.timestamp);
           const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
