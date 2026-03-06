@@ -1,7 +1,9 @@
 import { Router } from 'express';
+import { eq } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
+import { dagTasks, projectSessions } from '../db/schema.js';
 
 export function projectsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
@@ -23,6 +25,47 @@ export function projectsRoutes(ctx: AppContext): Router {
     const sessions = projectRegistry.getSessions(project.id);
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
     res.json({ ...project, sessions, activeLeadId });
+  });
+
+  // Historical DAG tasks for a project (from database)
+  router.get('/projects/:id/dag', (req, res) => {
+    if (!_db) return res.json({ tasks: [], summary: {} });
+    // Find all lead IDs for this project
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json({ tasks: [], summary: {} });
+    const leadIds = new Set(leads.map((l) => l.leadId));
+    // Fetch all DAG tasks for those leads
+    const allTasks = _db.drizzle.select().from(dagTasks).all()
+      .filter((t) => leadIds.has(t.leadId));
+    // Build summary
+    const summary: Record<string, number> = {};
+    for (const t of allTasks) {
+      const status = t.dagStatus ?? 'pending';
+      summary[status] = (summary[status] ?? 0) + 1;
+    }
+    res.json({
+      tasks: allTasks.map((t) => ({
+        id: t.id,
+        leadId: t.leadId,
+        role: t.role,
+        title: t.title,
+        description: t.description,
+        files: JSON.parse(t.files ?? '[]'),
+        dependsOn: JSON.parse(t.dependsOn ?? '[]'),
+        dagStatus: t.dagStatus ?? 'pending',
+        priority: t.priority,
+        assignedAgentId: t.assignedAgentId,
+        createdAt: t.createdAt ?? '',
+        startedAt: t.startedAt ?? null,
+        completedAt: t.completedAt ?? null,
+      })),
+      fileLockMap: {},
+      summary,
+    });
   });
 
   router.post('/projects', (req, res) => {

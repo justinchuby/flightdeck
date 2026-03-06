@@ -114,6 +114,111 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
 }
 
 // ---------------------------------------------------------------------------
+// Reusable DAG task visualization panel
+// ---------------------------------------------------------------------------
+function DagPanel({
+  dagStatus,
+  dagView,
+  setDagView,
+}: {
+  dagStatus: DagStatus | null;
+  dagView: 'graph' | 'list' | 'gantt' | 'resource' | null;
+  setDagView: (v: 'graph' | 'list' | 'gantt' | 'resource' | null) => void;
+}) {
+  const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
+  const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
+
+  const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
+    id:          t.id,
+    title:       t.title || t.description || t.id,
+    status:      (['pending','running','done','failed','blocked','skipped'] as const)
+                   .includes(t.dagStatus as any)
+                   ? t.dagStatus as GanttTask['status']
+                   : 'pending',
+    assignee:    t.role,
+    dependsOn:   t.dependsOn,
+    createdAt:   parseDbTimestamp(t.createdAt),
+    startedAt:   t.startedAt ? parseDbTimestamp(t.startedAt) : undefined,
+    completedAt: t.completedAt ? parseDbTimestamp(t.completedAt) : undefined,
+  }));
+
+  const viewIcon =
+    effectiveView === 'graph' ? <Network size={14} className="text-blue-400" /> :
+    effectiveView === 'gantt' ? <BarChart2 size={14} className="text-purple-400" /> :
+    effectiveView === 'resource' ? <Users size={14} className="text-cyan-400" /> :
+    <LayoutList size={14} className="text-blue-400" />;
+
+  return (
+    <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col">
+      <div className="px-4 py-3 border-b border-th-border flex items-center justify-between">
+        <h3 className="text-sm font-medium text-th-text flex items-center gap-2">
+          {viewIcon}
+          Tasks
+          {dagStatus && (
+            <span className="text-xs text-th-text-muted font-normal">{dagStatus.tasks.length} total</span>
+          )}
+        </h3>
+        <div className="flex bg-th-bg rounded p-0.5 border border-th-border">
+          <button
+            onClick={() => setDagView('list')}
+            className={`p-1 rounded transition-colors ${
+              effectiveView === 'list' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+            }`}
+            title="List view"
+          >
+            <LayoutList size={13} />
+          </button>
+          <button
+            onClick={() => setDagView('graph')}
+            className={`p-1 rounded transition-colors ${
+              effectiveView === 'graph' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+            }`}
+            title="Graph view"
+          >
+            <Network size={13} />
+          </button>
+          <button
+            onClick={() => setDagView('gantt')}
+            className={`p-1 rounded transition-colors ${
+              effectiveView === 'gantt' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+            }`}
+            title="Gantt view"
+          >
+            <BarChart2 size={13} />
+          </button>
+          <button
+            onClick={() => setDagView('resource')}
+            className={`p-1 rounded transition-colors ${
+              effectiveView === 'resource' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+            }`}
+            title="Resource view"
+          >
+            <Users size={13} />
+          </button>
+        </div>
+      </div>
+      {effectiveView === 'graph' ? (
+        <div className="flex-1" style={{ minHeight: 400 }}>
+          <DagGraph dagStatus={dagStatus} />
+        </div>
+      ) : effectiveView === 'gantt' ? (
+        <div className="p-4 overflow-auto" style={{ maxHeight: 520 }}>
+          <DagGantt tasks={ganttTasks} />
+        </div>
+      ) : effectiveView === 'resource' ? (
+        <div className="max-h-[500px] overflow-y-auto">
+          <DagResourceView dagStatus={dagStatus} />
+        </div>
+      ) : (
+        <div className="max-h-[500px] overflow-y-auto">
+          <TaskDagPanelContent dagStatus={dagStatus} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Tab item — either an active lead or a persisted (inactive) project
 // ---------------------------------------------------------------------------
 type TabItem =
@@ -135,6 +240,7 @@ export function TaskQueuePanel({ api }: Props) {
   const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | 'resource' | null>('graph');
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resuming, setResuming] = useState<string | null>(null);
+  const [historicalDag, setHistoricalDag] = useState<DagStatus | null>(null);
 
   const leads = agents.filter((a: AgentInfo) => a.role?.id === 'lead' && !a.parentId);
 
@@ -181,6 +287,20 @@ export function TaskQueuePanel({ api }: Props) {
         })
         .catch(() => {});
     }
+  }, [selectedTab, currentTab?.type]);
+
+  // Fetch historical DAG tasks for persisted projects
+  useEffect(() => {
+    if (currentTab?.type !== 'persisted') {
+      setHistoricalDag(null);
+      return;
+    }
+    fetch(`/api/projects/${currentTab.project.id}/dag`)
+      .then(r => r.json())
+      .then((data: DagStatus) => {
+        if (data?.tasks?.length > 0) setHistoricalDag(data);
+      })
+      .catch(() => {});
   }, [selectedTab, currentTab?.type]);
 
   // Fetch progress + DAG for active leads
@@ -312,7 +432,7 @@ export function TaskQueuePanel({ api }: Props) {
             <p className="text-xs mt-1">Start a lead agent to see project tasks here</p>
           </div>
         ) : currentTab.type === 'persisted' ? (
-          /* Inactive project — show summary and resume button */
+          /* Inactive project — show summary, DAG tasks, and resume button */
           <div className="space-y-4 max-w-2xl mx-auto">
             <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-6">
               <h3 className="text-lg font-semibold text-th-text mb-2">{currentTab.project.name}</h3>
@@ -356,6 +476,20 @@ export function TaskQueuePanel({ api }: Props) {
                 )}
               </button>
             </div>
+
+            {/* Historical DAG tasks */}
+            {historicalDag && historicalDag.tasks.length > 0 && (
+              <>
+                <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-4">
+                  <h3 className="text-sm font-medium text-th-text mb-3 flex items-center gap-2">
+                    <Network size={14} className="text-cyan-400" />
+                    Progress (historical)
+                  </h3>
+                  <SessionProgress progress={null} dagStatus={historicalDag} />
+                </div>
+                <DagPanel dagStatus={historicalDag} dagView={dagView} setDagView={setDagView} />
+              </>
+            )}
           </div>
         ) : (
           /* Active lead — show progress and tasks */
@@ -368,100 +502,7 @@ export function TaskQueuePanel({ api }: Props) {
               <SessionProgress progress={progress} dagStatus={dagStatus} />
             </div>
 
-            {(() => {
-              const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
-              const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
-
-              // Map DagTask → GanttTask for the Gantt view.
-              const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
-                id:          t.id,
-                title:       t.title || t.description || t.id,
-                status:      (['pending','running','done','failed','blocked','skipped'] as const)
-                               .includes(t.dagStatus as any)
-                               ? t.dagStatus as GanttTask['status']
-                               : 'pending',
-                assignee:    t.role,
-                dependsOn:   t.dependsOn,
-                createdAt:   parseDbTimestamp(t.createdAt),
-                startedAt:   t.startedAt ? parseDbTimestamp(t.startedAt) : undefined,
-                completedAt: t.completedAt ? parseDbTimestamp(t.completedAt) : undefined,
-              }));
-
-              const viewIcon =
-                effectiveView === 'graph' ? <Network size={14} className="text-blue-400" /> :
-                effectiveView === 'gantt' ? <BarChart2 size={14} className="text-purple-400" /> :
-                effectiveView === 'resource' ? <Users size={14} className="text-cyan-400" /> :
-                <LayoutList size={14} className="text-blue-400" />;
-
-              return (
-                <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col">
-                  <div className="px-4 py-3 border-b border-th-border flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-th-text flex items-center gap-2">
-                      {viewIcon}
-                      Tasks
-                      {dagStatus && (
-                        <span className="text-xs text-th-text-muted font-normal">{dagStatus.tasks.length} total</span>
-                      )}
-                    </h3>
-                    <div className="flex bg-th-bg rounded p-0.5 border border-th-border">
-                      <button
-                        onClick={() => setDagView('list')}
-                        className={`p-1 rounded transition-colors ${
-                          effectiveView === 'list' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
-                        }`}
-                        title="List view"
-                      >
-                        <LayoutList size={13} />
-                      </button>
-                      <button
-                        onClick={() => setDagView('graph')}
-                        className={`p-1 rounded transition-colors ${
-                          effectiveView === 'graph' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
-                        }`}
-                        title="Graph view"
-                      >
-                        <Network size={13} />
-                      </button>
-                      <button
-                        onClick={() => setDagView('gantt')}
-                        className={`p-1 rounded transition-colors ${
-                          effectiveView === 'gantt' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
-                        }`}
-                        title="Gantt view"
-                      >
-                        <BarChart2 size={13} />
-                      </button>
-                      <button
-                        onClick={() => setDagView('resource')}
-                        className={`p-1 rounded transition-colors ${
-                          effectiveView === 'resource' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
-                        }`}
-                        title="Resource view"
-                      >
-                        <Users size={13} />
-                      </button>
-                    </div>
-                  </div>
-                  {effectiveView === 'graph' ? (
-                    <div className="flex-1" style={{ minHeight: 400 }}>
-                      <DagGraph dagStatus={dagStatus} />
-                    </div>
-                  ) : effectiveView === 'gantt' ? (
-                    <div className="p-4 overflow-auto" style={{ maxHeight: 520 }}>
-                      <DagGantt tasks={ganttTasks} />
-                    </div>
-                  ) : effectiveView === 'resource' ? (
-                    <div className="max-h-[500px] overflow-y-auto">
-                      <DagResourceView dagStatus={dagStatus} />
-                    </div>
-                  ) : (
-                    <div className="max-h-[500px] overflow-y-auto">
-                      <TaskDagPanelContent dagStatus={dagStatus} />
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            <DagPanel dagStatus={dagStatus} dagView={dagView} setDagView={setDagView} />
           </div>
         )}
       </div>
