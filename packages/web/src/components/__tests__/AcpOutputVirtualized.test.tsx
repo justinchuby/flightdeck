@@ -101,4 +101,35 @@ describe('AcpOutput (Virtualized)', () => {
     expect(container).toBeDefined();
     mockState.agents = origAgents;
   });
+
+  it('does not show pinned banner when user message is latest (pending response)', async () => {
+    const origAgents = mockState.agents;
+    mockState.agents = [{
+      id: 'test-agent',
+      role: 'Developer',
+      status: 'running',
+      plan: [],
+      messages: [
+        { type: 'text', text: 'Agent message', sender: 'agent', timestamp: Date.now() - 3000 },
+        { type: 'text', text: 'Latest user msg', sender: 'user', timestamp: Date.now() - 1000 },
+      ],
+    }];
+    render(<AcpOutput agentId="test-agent" />);
+    await waitFor(() => {
+      expect(screen.getByText('Latest user msg')).toBeInTheDocument();
+    });
+    // Banner should NOT show — user message is the latest (agent hasn't responded yet)
+    expect(screen.queryByText('Latest User Message')).not.toBeInTheDocument();
+    mockState.agents = origAgents;
+  });
+
+  it('does not show pinned banner when at bottom', async () => {
+    // Default atBottom state is true, so banner should be hidden even with buried user msg
+    render(<AcpOutput agentId="test-agent" />);
+    await waitFor(() => {
+      expect(screen.getByText('User says hi')).toBeInTheDocument();
+    });
+    // Banner should not show because atBottom starts as true
+    expect(screen.queryByText('Latest User Message')).not.toBeInTheDocument();
+  });
 });

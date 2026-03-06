@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
@@ -30,6 +30,7 @@ export function AcpOutput({ agentId }: Props) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
+  const [dismissedPinId, setDismissedPinId] = useState<number | null>(null);
 
   const plan = agent?.plan ?? [];
   const messages = agent?.messages ?? [];
@@ -85,6 +86,39 @@ export function AcpOutput({ agentId }: Props) {
 
   // Group consecutive agent messages, collecting interleaved system events
   const groupedTimeline = groupTimeline(timeline);
+
+  // Find the latest non-queued user message for the pinned banner
+  const latestUserMsg = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.sender === 'user' && !m.queued) return { msg: m, index: i };
+    }
+    return null;
+  }, [messages]);
+
+  // Check if the latest user message is the very last message (agent hasn't responded yet)
+  const isLatestUserPending = latestUserMsg && messages.length > 0 &&
+    messages[messages.length - 1].sender === 'user' && !messages[messages.length - 1].queued;
+
+  // Find which groupedTimeline index contains the latest user message
+  const pinnedTargetIndex = useMemo(() => {
+    if (!latestUserMsg) return -1;
+    for (let i = groupedTimeline.length - 1; i >= 0; i--) {
+      const item = groupedTimeline[i];
+      if (item.kind === 'message' && item.msg === latestUserMsg.msg) return i;
+    }
+    return -1;
+  }, [groupedTimeline, latestUserMsg]);
+
+  // Show pinned banner when: user msg exists, agent has responded after it (so it's buried),
+  // user hasn't dismissed it, and we're not at bottom (where it's already visible)
+  const showPinnedBanner = latestUserMsg && !isLatestUserPending &&
+    dismissedPinId !== latestUserMsg.index && !atBottom && pinnedTargetIndex >= 0;
+
+  // Reset dismissal when a new user message arrives
+  useEffect(() => {
+    if (latestUserMsg) setDismissedPinId(null);
+  }, [latestUserMsg?.index]);
 
   // Promote queued messages when agent responds (new agent message after queued user messages)
   useEffect(() => {
@@ -213,6 +247,38 @@ export function AcpOutput({ agentId }: Props) {
         )}
       />
     </div>
+    {/* Pinned user message banner — stays visible until dismissed or scrolled to */}
+    {showPinnedBanner && latestUserMsg && (
+      <div className="absolute top-0 left-0 right-0 z-10 mx-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="bg-blue-600/95 backdrop-blur-sm border border-blue-500/50 rounded-lg px-3 py-2 shadow-lg flex items-start gap-2">
+          <MessageSquare className="w-3.5 h-3.5 text-blue-200 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-blue-200/80 font-medium uppercase tracking-wider mb-0.5">Latest User Message</div>
+            <div className="text-sm text-white font-mono whitespace-pre-wrap line-clamp-3">
+              {typeof latestUserMsg.msg.text === 'string' ? latestUserMsg.msg.text : JSON.stringify(latestUserMsg.msg.text)}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => {
+                virtuosoRef.current?.scrollToIndex({ index: pinnedTargetIndex, align: 'center', behavior: 'smooth' });
+                setDismissedPinId(latestUserMsg.index);
+              }}
+              className="text-[10px] px-2 py-1 rounded bg-blue-500/50 hover:bg-blue-500/70 text-white transition-colors"
+            >
+              Jump
+            </button>
+            <button
+              onClick={() => setDismissedPinId(latestUserMsg.index)}
+              className="p-0.5 rounded hover:bg-blue-500/50 text-blue-200 transition-colors"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     <PromptNav containerRef={containerRef} messages={messages} useOriginalIndices />
     </div>
   );
