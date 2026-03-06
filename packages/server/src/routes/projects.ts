@@ -3,7 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
-import { dagTasks, projectSessions } from '../db/schema.js';
+import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers } from '../db/schema.js';
 
 export function projectsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
@@ -67,6 +67,75 @@ export function projectsRoutes(ctx: AppContext): Router {
       fileLockMap: {},
       summary,
     });
+  });
+
+  // Historical group chats for a project (from database)
+  router.get('/projects/:id/groups', (req, res) => {
+    if (!_db) return res.json([]);
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json([]);
+    const leadIds = leads.map((l) => l.leadId);
+
+    // Fetch all groups for those leads
+    const groups = _db.drizzle.select().from(chatGroups)
+      .where(inArray(chatGroups.leadId, leadIds))
+      .all();
+
+    // Fetch members and message counts for each group
+    const result = groups.map((g) => {
+      const members = _db.drizzle.select({ agentId: chatGroupMembers.agentId })
+        .from(chatGroupMembers)
+        .where(eq(chatGroupMembers.groupName, g.name))
+        .all()
+        .filter((m) => leadIds.includes(g.leadId));
+      const msgCount = _db.drizzle.select({ id: chatGroupMessages.id })
+        .from(chatGroupMessages)
+        .where(eq(chatGroupMessages.groupName, g.name))
+        .all()
+        .filter((m) => true).length; // count via length
+      return {
+        name: g.name,
+        leadId: g.leadId,
+        memberIds: members.map((m) => m.agentId),
+        messageCount: msgCount,
+        createdAt: g.createdAt,
+      };
+    });
+    res.json(result);
+  });
+
+  // Historical group chat messages for a specific group
+  router.get('/projects/:id/groups/:name/messages', (req, res) => {
+    if (!_db) return res.json([]);
+    const leads = _db.drizzle
+      .select({ leadId: projectSessions.leadId })
+      .from(projectSessions)
+      .where(eq(projectSessions.projectId, req.params.id))
+      .all();
+    if (leads.length === 0) return res.json([]);
+    const leadIds = leads.map((l) => l.leadId);
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+
+    const messages = _db.drizzle.select().from(chatGroupMessages)
+      .where(eq(chatGroupMessages.groupName, req.params.name))
+      .all()
+      .filter((m) => leadIds.includes(m.leadId))
+      .slice(-limit);
+
+    res.json(messages.map((m) => ({
+      id: m.id,
+      groupName: m.groupName,
+      leadId: m.leadId,
+      fromAgentId: m.fromAgentId,
+      fromRole: m.fromRole,
+      content: m.content,
+      reactions: JSON.parse(m.reactions ?? '{}'),
+      timestamp: m.timestamp,
+    })));
   });
 
   router.post('/projects', (req, res) => {

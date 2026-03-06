@@ -1900,7 +1900,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="flex-1 min-h-0 overflow-hidden">
                     {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
                     {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
-                    {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} />}
+                    {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} projectId={leadAgent?.projectId ?? (selectedLeadId?.startsWith('project:') ? selectedLeadId.slice(8) : null)} />}
                     {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
                     {sidebarTab === 'models' && leadAgent?.projectId && (
                       <div className="h-full overflow-y-auto p-2">
