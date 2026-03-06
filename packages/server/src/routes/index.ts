@@ -24,7 +24,6 @@ import { recoveryRoutes } from './recovery.js';
 import { handoffRoutes } from './handoffs.js';
 import { notificationRoutes } from './notifications.js';
 import { nlRoutes } from './nl.js';
-import { workflowRoutes } from './workflows.js';
 import { githubRoutes } from './github.js';
 import { conflictRoutes } from './conflicts.js';
 import { communityRoutes } from './community.js';
@@ -55,7 +54,6 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(handoffRoutes(ctx));
   router.use(notificationRoutes(ctx));
   router.use(nlRoutes(ctx));
-  router.use(workflowRoutes(ctx));
   router.use(githubRoutes(ctx));
   router.use(conflictRoutes(ctx));
   router.use(communityRoutes(ctx));

@@ -56,18 +56,9 @@ Quick reference for all APIs, hooks, components, and design tokens.
 > **Note:** The Predictions API has been removed. The endpoints below are no longer active.
 > See [Removed Components](#removed-components) for details.
 
-### Workflows
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/workflows` | List rules |
-| POST | `/workflows` | Create rule |
-| PUT | `/workflows/:id` | Update rule |
-| DELETE | `/workflows/:id` | Delete rule |
-| POST | `/workflows/reorder` | Reorder rules |
-| POST | `/workflows/:id/toggle` | Toggle rule on/off |
-| POST | `/workflows/:id/dry-run` | Test rule |
-| GET | `/workflows/templates` | Get templates |
-| GET | `/workflows/activity` | Activity log |
+### Workflows (Removed)
+
+> **Note:** The Workflow Automation API has been removed. This feature was incomplete and is no longer available.
 
 ### GitHub Integration
 | Method | Endpoint | Description |
@@ -180,9 +171,6 @@ All hooks are in `src/hooks/`. Import example: `import { useProjects } from '../
 | `useDiffSummary(agentId)` | `{ summary, loading }` | Lightweight diff stats |
 | `useProjects()` | `{ projects, loading }` | Fetch projects from REST API |
 | `useHistoricalAgents(projectId)` | `Agent[]` | Derive agent data from keyframes for historical sessions |
-| `useWorkflowRules()` | `{ rules, loading, createRule, updateRule, deleteRule, toggleRule, reorder, dryRun }` | Workflow CRUD |
-| `useWorkflowTemplates()` | `WorkflowTemplate[]` | Pre-built templates |
-| `useWorkflowActivity()` | `{ activity, loading }` | Firing event log |
 | `useConflicts()` | `{ conflicts, activeConflicts, loading, resolve, dismiss }` | Conflict alerts |
 | `useConflictConfig()` | `{ config, saveConfig }` | Detection config |
 | `useGitHubConnection()` | `{ connection, loading, connect, disconnect, testConnection }` | GitHub status |
