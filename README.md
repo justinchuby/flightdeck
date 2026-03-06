@@ -101,7 +101,7 @@ npm run dev
 - **Broadcasts** — Send a message to every active agent at once
 
 ### 📈 Visualization & Monitoring
-- **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, cost curve, and progress indicators with unified project tabs
+- **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, token usage curve, and progress indicators with unified project tabs
 - **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
 - **Timeline** — Swim-lane Gantt chart with decoupled vertical/horizontal scroll, Ctrl+wheel zoom, keyboard navigation, drag-to-pan, horizontal overflow for 10+ agents, and sticky Session Replay scrubber (4× default speed)
 - **Canvas** — Spatial agent graph with ReactFlow for visual crew topology and project tabs
@@ -180,7 +180,7 @@ React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×
 | **EagerScheduler** | Pre-assigns upcoming tasks to idle agents before they become active |
 | **TaskTemplates** | Reusable task templates with natural-language decomposition |
 | **SearchEngine** | Full-text search across messages, tasks, decisions, and activity |
-| **PerformanceScorecard** | Agent performance metrics: throughput, first-pass rate, velocity, cost efficiency |
+| **PerformanceScorecard** | Agent performance metrics: throughput, first-pass rate, velocity, token efficiency |
 | **DecisionRecords** | ADR-style structured decision records with status tracking |
 | **CoverageTracker** | Test coverage monitoring with regression detection and trend analysis |
 | **ComplexityMonitor** | File complexity analysis with 4-tier scoring and hotspot detection |
