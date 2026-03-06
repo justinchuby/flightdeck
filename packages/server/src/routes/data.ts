@@ -152,6 +152,20 @@ export function dataRoutes(ctx: AppContext): Router {
       const convoIds = convos.map(c => c.id);
       counts.messages = convoIds.length > 0 ? countWhere(messages, messages.conversationId, convoIds) : 0;
 
+      // Count orphaned projects (all sessions for that project are in the old set)
+      counts.projects = 0;
+      for (const pid of projectIds) {
+        const totalForProject = _db.drizzle
+          .select({ count: sql<number>`count(*)` })
+          .from(projectSessions)
+          .where(sql`${projectSessions.projectId} = ${pid}`)
+          .get();
+        const oldForProject = oldSessions.filter(s => s.projectId === pid).length;
+        if (oldForProject >= Number(totalForProject?.count ?? 0)) {
+          counts.projects += 1;
+        }
+      }
+
       const totalDeleted = Object.values(counts).reduce((a, b) => a + b, 0);
 
       if (dryRun) {
@@ -180,7 +194,7 @@ export function dataRoutes(ctx: AppContext): Router {
         const sessionIds = oldSessions.map(s => s.id);
         tx.delete(projectSessions).where(inArray(projectSessions.id, sessionIds)).run();
 
-        // Check if any projects now have zero sessions — delete those too
+        // Delete orphaned projects (no remaining sessions)
         for (const pid of projectIds) {
           const remaining = tx
             .select({ count: sql<number>`count(*)` })
@@ -189,7 +203,6 @@ export function dataRoutes(ctx: AppContext): Router {
             .get();
           if (Number(remaining?.count ?? 0) === 0) {
             tx.delete(projects).where(sql`${projects.id} = ${pid}`).run();
-            counts.projects = (counts.projects ?? 0) + 1;
           }
         }
       });
