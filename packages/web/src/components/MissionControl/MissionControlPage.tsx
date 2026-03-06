@@ -2,6 +2,7 @@ import { useMemo, useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
+import { apiFetch } from '../../hooks/useApi';
 import { HealthSummary } from './HealthSummary';
 import { AgentFleet } from './AgentFleet';
 import { DagMinimap } from './DagMinimap';
@@ -20,6 +21,7 @@ import { PRStatusPanel } from '../GitHub';
 import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 import type { PanelConfig } from '../../hooks/useDashboardLayout';
+import type { Project } from '../../types';
 
 // ── Panel renderer ────────────────────────────────────────────────────
 
@@ -183,19 +185,73 @@ function AgentDiffPanel({ agents, leadId }: { agents: any[]; leadId: string }) {
 export function MissionControlPage() {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const projects = useLeadStore((s) => s.projects);
-  const agents = useAppStore((s) => s.agents);
+  const liveAgents = useAppStore((s) => s.agents);
   const { panels } = useDashboardLayout();
+
+  // Fetch historical projects from REST API when no live data
+  const [apiProjects, setApiProjects] = useState<Project[]>([]);
+  const [historicalAgents, setHistoricalAgents] = useState<any[]>([]);
+
+  useEffect(() => {
+    apiFetch<Project[]>('/projects')
+      .then((ps) => {
+        if (Array.isArray(ps)) setApiProjects(ps.filter((p) => p.status !== 'archived'));
+      })
+      .catch(() => {});
+  }, []);
 
   const projectKeys = Object.keys(projects);
 
   // Auto-discover lead agents from appStore if leadStore has no projects yet
   const leadAgents = useMemo(
-    () => agents.filter((a) => a.role?.id === 'lead' && !a.parentId),
-    [agents],
+    () => liveAgents.filter((a) => a.role?.id === 'lead' && !a.parentId),
+    [liveAgents],
   );
 
-  // Auto-select: prefer selectedLeadId, then leadStore projects, then any live lead agent
-  const leadId = selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? null;
+  // Auto-select: prefer selectedLeadId, then leadStore, then live lead, then API projects
+  const leadId = selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? (apiProjects[0]?.id || null);
+
+  // Derive agents from keyframes when no live agents exist
+  useEffect(() => {
+    if (liveAgents.length > 0 || !leadId) return;
+    apiFetch<{ keyframes: any[] }>(`/replay/${leadId}/keyframes`)
+      .then((data) => {
+        const kf = data?.keyframes ?? [];
+        const derived: any[] = [];
+        for (const frame of kf) {
+          if (frame.type === 'spawn') {
+            const roleMatch = frame.label?.match(/^Spawned\s+(.+?):\s/);
+            const roleName = roleMatch?.[1] ?? 'Agent';
+            const roleId = roleName.toLowerCase().replace(/\s+/g, '-');
+            derived.push({
+              id: `mc-${derived.length}`,
+              parentId: leadId,
+              status: 'completed',
+              role: { id: roleId, name: roleName, icon: '🤖' },
+              model: undefined,
+              inputTokens: 0,
+              outputTokens: 0,
+              messages: [],
+            });
+          }
+        }
+        if (derived.length > 0) {
+          // Add a synthetic lead agent entry
+          derived.unshift({
+            id: leadId,
+            parentId: null,
+            status: 'completed',
+            role: { id: 'lead', name: 'Lead', icon: '👑' },
+            model: undefined,
+            inputTokens: 0,
+            outputTokens: 0,
+            messages: [],
+          });
+        }
+        setHistoricalAgents(derived);
+      })
+      .catch(() => {});
+  }, [liveAgents.length, leadId]);
 
   // Auto-register discovered leads into leadStore so panels can use them (run once per leadId)
   const registeredRef = useRef<string | null>(null);
@@ -207,10 +263,16 @@ export function MissionControlPage() {
     }
   }, [leadId, projects]);
 
+  // Use live agents or historical fallback
+  const agents = liveAgents.length > 0 ? liveAgents : historicalAgents;
+
   const teamAgents = useMemo(() => {
     if (!leadId) return [];
     return agents.filter((a) => a.parentId === leadId || a.id === leadId);
   }, [agents, leadId]);
+
+  // Find project name for display
+  const projectName = apiProjects.find((p) => p.id === leadId)?.name;
 
   if (!leadId) {
     return (
@@ -230,7 +292,11 @@ export function MissionControlPage() {
       <div className="flex items-center gap-3 shrink-0">
         <Activity size={20} className="text-th-text-muted" />
         <h1 className="text-lg font-semibold text-th-text-alt">Mission Control</h1>
-        <span className="text-xs text-th-text-muted font-mono">Lead: {leadId.slice(0, 8)}</span>
+        <span className="text-xs text-th-text-muted font-mono">
+          {projectName || `Lead: ${leadId.slice(0, 8)}`}
+          {teamAgents.length > 0 && ` · ${teamAgents.length} agents`}
+          {liveAgents.length === 0 && historicalAgents.length > 0 && ' (historical)'}
+        </span>
       </div>
 
       {/* Render all visible panels in user-defined order */}
