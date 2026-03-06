@@ -11,6 +11,7 @@ import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifi
 import { WorkflowDashboard } from '../Workflow';
 import { GitHubSetup } from '../GitHub';
 import { ConflictSettingsPanel } from '../Conflicts';
+import { DataManagement } from './DataManagement';
 
 interface Props {
   api: any;
@@ -233,6 +234,9 @@ export function SettingsPanel({ api }: Props) {
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <NotificationActivityLog />
       </section>
+
+      {/* Data Management */}
+      <DataManagement />
 
       {/* Roles */}
       <section className="mb-8">

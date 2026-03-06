@@ -28,6 +28,7 @@ import { workflowRoutes } from './workflows.js';
 import { githubRoutes } from './github.js';
 import { conflictRoutes } from './conflicts.js';
 import { communityRoutes } from './community.js';
+import { dataRoutes } from './data.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -58,4 +59,5 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(githubRoutes(ctx));
   router.use(conflictRoutes(ctx));
   router.use(communityRoutes(ctx));
+  router.use(dataRoutes(ctx));
 }
