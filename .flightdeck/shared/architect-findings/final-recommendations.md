@@ -265,7 +265,8 @@ function handleKeyDown(event: KeyboardEvent) {
   // Query fresh on each Tab — handles dynamic content, wizard steps, async loads
   const focusable = dialog!.querySelectorAll<HTMLElement>(
     'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), ' +
-    'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    'textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), ' +
+    'summary, [contenteditable]'
   );
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
@@ -280,7 +281,29 @@ function handleKeyDown(event: KeyboardEvent) {
 }
 ```
 
-Note: `:not([disabled])` was missing from the developer proposal's selector. Disabled elements must not be focusable.
+Note: `:not([disabled])` was missing from the developer proposal's selector. Disabled elements must not be focusable. Also: `summary` and `[contenteditable]` are natively focusable elements that were missing from the original selector — without them, `<details>` disclosures and rich-text editors inside modals would escape the focus trap (code reviewer catch).
+
+**Implementation note: `onClose` ref pattern**
+
+When `onClose` is included in the `useEffect` dependency array for the keyboard handler, inline callbacks (e.g. `<Modal onClose={() => setOpen(false)}>`) cause the effect to re-run every render — tearing down and re-attaching the document listener unnecessarily. Fix with a ref:
+
+```tsx
+const onCloseRef = useRef(onClose);
+onCloseRef.current = onClose;
+
+useEffect(() => {
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && closeOnEscape) {
+      event.stopPropagation();
+      onCloseRef.current();  // always calls latest callback
+      return;
+    }
+    // ... Tab handling ...
+  }
+  document.addEventListener('keydown', handleKeyDown);
+  return () => document.removeEventListener('keydown', handleKeyDown);
+}, [closeOnEscape]);  // onClose excluded — accessed via ref
+```
 
 **Critical review fix #2: Reference-counted scroll lock**
 
@@ -391,7 +414,12 @@ Keyboard-only users and screen readers cannot navigate or activate agent cards. 
   }}
 >
   {/* Card display content */}
-  <div role="toolbar" aria-label="Agent actions" onClick={e => e.stopPropagation()}>
+  <div
+    role="toolbar"
+    aria-label="Agent actions"
+    onClick={e => e.stopPropagation()}
+    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+  >
     <button aria-label={`Open terminal for ${agent.role.name}`}>...</button>
     <button aria-label={`Restart ${agent.role.name}`}>...</button>
     {/* ... other action buttons ... */}
@@ -403,7 +431,7 @@ Keyboard-only users and screen readers cannot navigate or activate agent cards. 
 
 1. **`<div role="button">` over `<button>`** — avoids invalid nested interactive content. `role="button"` requires manual `onKeyDown` for Enter/Space, but this is a 4-line addition.
 2. **`aria-label` excludes the truncated agent ID** — `agent.id.slice(0,8)` is meaningless to screen reader users (critical review feedback). The label conveys role name and status.
-3. **`role="toolbar"` wrapper** for action buttons — groups them semantically and allows `stopPropagation` at the group level, eliminating the need for individual `stopPropagation` on every action button.
+3. **`role="toolbar"` wrapper** for action buttons — groups them semantically and allows `stopPropagation` at the group level. **Important**: the toolbar also needs `onKeyDown` with `stopPropagation` for Enter/Space — otherwise pressing Enter on an inner button bubbles up and toggles card selection (code reviewer catch).
 4. **`aria-label` on every action button** — icon-only buttons must have text labels for screen readers.
 5. **Status dot gets `aria-hidden="true"`** — decorative, since status is already in the card's `aria-label`.
 
