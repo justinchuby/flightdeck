@@ -24,7 +24,7 @@ const KEYFRAME_COLORS: Record<ReplayKeyframe['type'], string> = {
   commit: 'bg-emerald-400',
 };
 
-const SPEED_OPTIONS = [1, 2, 4, 8, 16, 32];
+const SPEED_OPTIONS = [4, 8, 16, 32, 64, 120, 240, 720];
 
 // ── Component ────────────────────────────────────────────────────────
 
