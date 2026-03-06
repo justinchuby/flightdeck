@@ -19,7 +19,7 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 ### Screenshots
 
 <p align="center">
-  <img src="docs/images/01-lead-dashboard.png" alt="Lead Dashboard — active projects, team status, and real-time progress" width="720" />
+  <img src="packages/docs/public/screenshots/lead-dashboard.png" alt="Lead Dashboard — active projects, team status, and real-time progress" width="720" />
   <br /><em>Lead Dashboard — your home screen for tracking projects, agents, and progress</em>
 </p>
 

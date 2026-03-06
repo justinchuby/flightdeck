@@ -88,7 +88,7 @@ When multiple agents need to coordinate on a shared concern (API design, naming 
 
 The **Overview** page is your health dashboard for the entire crew.
 
-![Overview Dashboard](/images/02-overview.png)
+![Overview Dashboard](/screenshots/overview.png)
 
 ### Reading the Visualizations
 
@@ -112,7 +112,7 @@ The **Overview** page is your health dashboard for the entire crew.
 
 The **Timeline** is the most detailed view of what your agents did and when.
 
-![Timeline View](/images/09-timeline.png)
+![Timeline View](/screenshots/timeline.png)
 
 ### Reading the Gantt Chart
 
@@ -151,7 +151,7 @@ Use **16× or 32× speed** to quickly scan a multi-hour session in minutes. Swit
 
 The **Canvas** shows your agent crew as an interactive node graph.
 
-![Canvas View](/images/03-canvas-with-panel.png)
+![Canvas View](/screenshots/canvas.png)
 
 ### What You See
 

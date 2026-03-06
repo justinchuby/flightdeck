@@ -24,7 +24,7 @@ Multi-agent AI tools exist. But none of them show you what's happening inside. *
 
 Flightdeck gives you mission control.
 
-![Lead Dashboard — track every project, agent, and task at a glance](/images/01-lead-dashboard.png)
+![Lead Dashboard — track every project, agent, and task at a glance](/screenshots/lead-dashboard.png)
 
 One command to launch. No config, no API keys, no cloud dependency. Your data stays on your machine.
 
@@ -40,12 +40,12 @@ flightdeck
 ### 🎯 Canvas View
 See your agent crew as an interactive graph with real-time communication edges flowing between nodes. Click any agent to see their tasks, messages, and file locks. Spot conflicts before they happen.
 
-![Canvas View — agents as nodes, communication as edges](/images/03-canvas-with-panel.png)
+![Canvas View — agents as nodes, communication as edges](/screenshots/canvas.png)
 
 ### ⏪ Session Replay
 The **Timeline** page shows a swim-lane Gantt chart of exactly what each agent did and when. **Session Replay** lets you scrub through any past session at up to 32× speed — like a flight recorder for AI work. Hit Play and watch agents appear, task bars grow, and messages fire between them, all synchronized to a scrubber you can drag to any point.
 
-![Timeline page with Session Replay — Gantt chart with swim lanes for every agent](/images/09-timeline.png)
+![Timeline page with Session Replay — Gantt chart with swim lanes for every agent](/screenshots/timeline.png)
 
 ### 📊 Overview Dashboard
 Cumulative flow diagrams, agent activity heatmaps, and context usage tracking give you the full picture at a glance. See which projects are on track and which need attention.
