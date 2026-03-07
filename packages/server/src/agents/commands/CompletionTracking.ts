@@ -235,12 +235,17 @@ export function cleanupStaleDelegations(ctx: CommandHandlerContext, maxAgeMs = 3
 
 // ── DAG coverage warning ──────────────────────────────────────────────
 
+/** Track which leads have already been warned about low coverage to avoid spamming */
+const coverageWarningsSent = new Set<string>();
+
 function checkCoverageWarning(ctx: CommandHandlerContext, leadId: string): void {
+  if (coverageWarningsSent.has(leadId)) return;
   const activeAgents = ctx.getAllAgents()
     .filter(a => a.parentId === leadId && a.status !== 'terminated' && a.role.id !== 'secretary')
     .map(a => ({ id: a.id, role: a.role.id }));
   const dagStatus = ctx.taskDAG.getStatus(leadId, activeAgents);
   if (dagStatus.coverage && dagStatus.coverage.percentage < 80 && dagStatus.coverage.total >= 3) {
+    coverageWarningsSent.add(leadId);
     const lead = ctx.getAgent(leadId);
     if (lead) {
       lead.sendMessage(`[System] ⚠️ DAG coverage is ${dagStatus.coverage.percentage}% — ${dagStatus.coverage.untracked} active agent(s) have no DAG task. Use TASK_STATUS to see details.`);
@@ -248,7 +253,12 @@ function checkCoverageWarning(ctx: CommandHandlerContext, leadId: string): void 
   }
 }
 
-// ── Fix 4: Pre-termination dirty-file check ──────────────────────────
+/** Reset coverage warning dedup (e.g., when DAG is modified). Exported for testing. */
+export function resetCoverageWarning(leadId: string): void {
+  coverageWarningsSent.delete(leadId);
+}
+
+// ── Pre-termination dirty-file check ─────────────────────────────────
 
 function checkDirtyLockedFiles(ctx: CommandHandlerContext, agent: Agent, parent: Agent): void {
   let locks: { filePath: string }[];

@@ -546,15 +546,19 @@ function autoCreateDagTask(
 
   // Check for near-duplicate before auto-creating (active tasks only — done/skipped/cancelled are fair game for re-delegation)
   const existingTasks = ctx.taskDAG.getTasks(leadId);
-  const nearDuplicate = existingTasks
-    .filter(t => !['done', 'skipped', 'cancelled'].includes(t.dagStatus))
-    .find(
-      t => t.role === role
-        && descriptionSimilarity(taskText, t.description, t.title) > NEAR_DUPLICATE_THRESHOLD
-    );
+  let nearDuplicate: typeof existingTasks[number] | undefined;
+  let nearDuplicateScore = 0;
+  for (const t of existingTasks) {
+    if (['done', 'skipped', 'cancelled'].includes(t.dagStatus)) continue;
+    if (t.role !== role) continue;
+    const score = descriptionSimilarity(taskText, t.description, t.title);
+    if (score > NEAR_DUPLICATE_THRESHOLD && score > nearDuplicateScore) {
+      nearDuplicate = t;
+      nearDuplicateScore = score;
+    }
+  }
   if (nearDuplicate) {
-    const score = descriptionSimilarity(taskText, nearDuplicate.description, nearDuplicate.title);
-    if (score > VERY_LIKELY_DUPLICATE_THRESHOLD) {
+    if (nearDuplicateScore > VERY_LIKELY_DUPLICATE_THRESHOLD) {
       // Very likely duplicate — link to existing, but warn
       const linkableStatuses = ['ready', 'pending', 'blocked', 'paused', 'failed'];
       if (linkableStatuses.includes(nearDuplicate.dagStatus)) {
@@ -562,7 +566,7 @@ function autoCreateDagTask(
           ?? ctx.taskDAG.forceStartTask(leadId, nearDuplicate.id, agentId);
         if (started) {
           const lead = ctx.getAgent(leadId);
-          if (lead) lead.sendMessage(`[System] ℹ️ Linked delegation to existing task "${nearDuplicate.id}" (similarity: ${score.toFixed(2)}). If this is wrong, use ADD_TASK to create a separate entry.`);
+          if (lead) lead.sendMessage(`[System] ℹ️ Linked delegation to existing task "${nearDuplicate.id}" (similarity: ${nearDuplicateScore.toFixed(2)}). If this is wrong, use ADD_TASK to create a separate entry.`);
           logger.info('delegation', `DAG linked: delegation matched existing task "${nearDuplicate.id}" (was ${nearDuplicate.dagStatus})`);
           return { created: false, taskId: nearDuplicate.id, linked: true, depNotes };
         }
@@ -570,7 +574,7 @@ function autoCreateDagTask(
       return { created: false, taskId: '', duplicate: nearDuplicate.id, depNotes };
     }
     // Possible duplicate (0.8-0.95) — create anyway but warn
-    depNotes.push(`⚠️ Possible duplicate of "${nearDuplicate.id}" (similarity: ${score.toFixed(2)})`);
+    depNotes.push(`⚠️ Possible duplicate of "${nearDuplicate.id}" (similarity: ${nearDuplicateScore.toFixed(2)})`);
     // Fall through to create the task
   }
 
@@ -674,26 +678,34 @@ export function inferReviewDependencies(
   }
 
   // Strategy 3: Role reference (e.g., "review the developer's work")
-  // Run even if deps were found — there may be additional role-based deps
-  const roleMatches = [...taskDesc.matchAll(/(?:by|from|of)\s+(?:the\s+)?(?:all\s+)?(\w+?)(?:'s|s')?\b/gi)];
-  for (const roleMatch of roleMatches) {
-    const refRole = roleMatch[1].toLowerCase();
-    const roleTasks = allTasks.filter(t =>
-      t.role === refRole
-      && ['running', 'done'].includes(t.dagStatus)
-      && !deps.includes(t.id)
-    );
-    for (const task of roleTasks) {
-      deps.push(task.id);
+  // Only as fallback when Strategies 1-2 found nothing
+  if (deps.length === 0) {
+    const knownRoles = new Set(allTasks.map(t => t.role));
+    const roleMatches = [...taskDesc.matchAll(/(?:by|from|of)\s+(?:the\s+)?(?:all\s+)?(\w+?)(?:'s|s')?\b/gi)];
+    for (const roleMatch of roleMatches) {
+      let refRole = roleMatch[1].toLowerCase();
+      // Normalize plural role names (e.g., "developers" → "developer")
+      if (!knownRoles.has(refRole) && refRole.endsWith('s') && knownRoles.has(refRole.slice(0, -1))) {
+        refRole = refRole.slice(0, -1);
+      }
+      const roleTasks = allTasks.filter(t =>
+        t.role === refRole
+        && ['running', 'done'].includes(t.dagStatus)
+        && !deps.includes(t.id)
+      );
+      for (const task of roleTasks) {
+        deps.push(task.id);
+      }
     }
   }
 
   // Strategy 4: "all" reference (e.g., "review all completed work")
+  const MAX_AUTO_DEPS = 20;
   if (deps.length === 0 && /\b(all|every|everything)\b/i.test(taskDesc)) {
     const completedOrRunning = allTasks.filter(t =>
       ['running', 'done'].includes(t.dagStatus) && !deps.includes(t.id)
     );
-    for (const task of completedOrRunning) {
+    for (const task of completedOrRunning.slice(0, MAX_AUTO_DEPS)) {
       deps.push(task.id);
     }
   }

@@ -1069,4 +1069,18 @@ describe('Review dependency inference finds all matching tasks', () => {
     expect(deps).toContain('task-b');
     expect(deps).not.toContain('task-c'); // pending tasks excluded
   });
+
+  it('normalizes plural role names in Strategy 3 (e.g., "developers" → "developer")', () => {
+    const ctx = makeCtx();
+    (ctx.taskDAG.getTasks as any).mockReturnValue([
+      { id: 'dev-task-1', role: 'developer', dagStatus: 'done', assignedAgentId: 'agent-1', dependsOn: [], files: [] },
+      { id: 'dev-task-2', role: 'developer', dagStatus: 'done', assignedAgentId: 'agent-2', dependsOn: [], files: [] },
+    ]);
+
+    const deps = inferReviewDependencies(ctx as any, 'lead-001', 'Review work from the developers');
+
+    expect(deps).toContain('dev-task-1');
+    expect(deps).toContain('dev-task-2');
+    expect(deps.length).toBe(2);
+  });
 });
