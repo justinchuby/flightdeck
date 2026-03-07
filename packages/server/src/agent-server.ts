@@ -15,6 +15,74 @@ import { MassFailureDetector } from './daemon/MassFailureDetector.js';
 import { createAdapterForProvider, buildStartOptions } from './adapters/AdapterFactory.js';
 import type { AdapterConfig } from './adapters/AdapterFactory.js';
 import type { AgentAdapter } from './adapters/types.js';
+
+// ── Re-export adapter APIs ──────────────────────────────────────────
+// AgentServer is the sole owner of adapter code. All adapter imports
+// should flow through this module, not directly from adapters/.
+
+// Adapter implementations
+export { AcpAdapter } from './adapters/AcpAdapter.js';
+export { ClaudeSdkAdapter } from './adapters/ClaudeSdkAdapter.js';
+export { DaemonAdapter } from './adapters/DaemonAdapter.js';
+export type { DaemonAdapterOptions } from './adapters/DaemonAdapter.js';
+export { MockAdapter } from './adapters/MockAdapter.js';
+
+// Factory
+export { createAdapterForProvider, buildStartOptions, resolveBackend } from './adapters/AdapterFactory.js';
+export type { AdapterConfig, AdapterResult, BackendType } from './adapters/AdapterFactory.js';
+
+// Types
+export type {
+  AgentAdapter,
+  AdapterStartOptions,
+  AdapterFactory,
+  AdapterFactoryOptions,
+  ContentBlock,
+  PromptContent,
+  PromptOptions,
+  PromptResult,
+  StopReason,
+  UsageInfo,
+  ToolCallInfo,
+  ToolUpdateInfo,
+  PlanEntry,
+  AdapterCapabilities,
+  PermissionRequest,
+} from './adapters/types.js';
+
+// Model resolution
+export {
+  resolveModel,
+  isTierAlias,
+  getTierModels,
+  listTiers,
+  isValidModel,
+} from './adapters/ModelResolver.js';
+export type { ModelResolution, ModelTier } from './adapters/ModelResolver.js';
+
+// Provider presets
+export {
+  PROVIDER_PRESETS,
+  getPreset,
+  listPresets,
+  isValidProviderId,
+  detectInstalledProviders,
+} from './adapters/presets.js';
+export type { ProviderPreset, ProviderId, BinaryChecker } from './adapters/presets.js';
+
+// Role file writers
+export {
+  CopilotRoleFileWriter,
+  ClaudeRoleFileWriter,
+  GeminiRoleFileWriter,
+  CursorRoleFileWriter,
+  CodexRoleFileWriter,
+  OpenCodeRoleFileWriter,
+  createRoleFileWriter,
+  listRoleFileWriterProviders,
+  FLIGHTDECK_MARKER,
+} from './adapters/RoleFileWriter.js';
+export type { RoleDefinition, RoleFileWriter } from './adapters/RoleFileWriter.js';
 import type {
   AgentServerListener,
   TransportConnection,
