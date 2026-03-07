@@ -821,17 +821,128 @@ On server reconnect, the server needs to rebuild in-memory state (delegations, D
 
 **Daemon structured logging:** The daemon uses the same pino logger from R5, enabling correlation of daemon events with server events via `agentId`. At minimum, the daemon logs: connection events, auth attempts (success/fail), spawn/terminate calls, disconnections, and auto-shutdown timer state.
 
-### Copilot SDK `--resume` Impact
+### SDK Resume Analysis: Copilot, Claude, and Impact on Daemon Architecture
 
-The planned Copilot SDK natively supports `--resume <sessionId>`, which changes the cost/benefit of both phases:
+Both major CLI SDKs now support native session resume. This section analyzes the implications for the daemon design.
 
-**Phase 1 (auto-resume) improves dramatically:** `--resume` skips context window rebuild. Resume time drops from 5-15s to ~1-2s per agent. Context budget cost drops from "rebuild everything" to "resume token only." Phase 1 becomes nearly free.
+#### Copilot SDK Resume API
 
-**Phase 2 (daemon) still adds value:** Even with `--resume`, agents still die and restart on server restart. The daemon provides true zero-downtime — agents never notice the server restarted. For a 10-agent crew, that's 10-20s of resume time eliminated entirely.
+The GitHub Copilot SDK (`@github/copilot-sdk`) provides first-class session resume:
 
-**Daemon crash recovery simplifies:** With `--resume`, daemon crash recovery becomes: daemon restarts → server tells new daemon to `spawn --resume <sessionId>` for each agent → agents resume natively. Data loss drops from "30s of activity" to "current in-progress turn only."
+```typescript
+// Create a resumable session (must specify sessionId)
+const session = await client.createSession({
+  model: "gpt-4",
+  sessionId: "my-session-123",  // Required for later resume
+});
 
-**Recommendation:** Keep daemon design as-is. Add `--resume` support as a spawn option in the daemon protocol. Both Phase 1 and daemon crash recovery become 1-line changes (add `--resume` to spawn args), not architectural changes.
+// Resume later — restores conversation history, planning state, tool state from disk
+const resumed = await client.resumeSession("my-session-123", {
+  model: "gpt-4",  // Can change model on resume
+});
+```
+
+Session state persists to `~/.copilot/session-state/{sessionId}/` on disk. Resume restores full conversation context, tool state, and planning artifacts. Available in Node.js, Python, Go, and .NET SDKs.
+
+#### Claude SDK Resume API
+
+The Anthropic Claude Agent SDK provides resume, continue, and fork:
+
+```typescript
+// Resume a specific session
+const session = await unstable_v2_resumeSession("session-abc123");
+
+// Fork a session (branch from existing conversation)
+const forked = await unstable_v2_resumeSession("session-abc123", { forkSession: true });
+
+// Continue latest session (implicit resume)
+const continued = await query("Continue", { continue_conversation: true });
+```
+
+Claude's `fork` capability is unique — it creates a new session branching from an existing conversation, preserving history but allowing divergent exploration. This has interesting implications for agent workflows (e.g., "try approach A and approach B in parallel from the same analysis").
+
+#### Existing Resume Plumbing in Flightdeck
+
+**The codebase already supports `--resume`.** Key integration points:
+
+- **AgentAcpBridge.ts (line ~53):** Conditionally adds `--resume <sessionId>` to CLI args when `agent.resumeSessionId` is set
+- **AgentManager.spawn() (line ~270):** Accepts `resumeSessionId` parameter, passes to Agent constructor
+- **Agent.start() (line ~152):** Detects resume mode, skips initial prompt when resuming
+- **ProjectRegistry.ts:** Persists sessionIds to SQLite via `setSessionId()`, retrieves them via `getResumableSessions()`
+- **Session ready callback:** Stores sessionId for lead agents in DB and for child agents in agent memory
+
+**What's missing for full auto-resume:**
+1. Persist sessionIds for ALL agents (not just leads) in SQLite
+2. Auto-trigger resume on server restart (read persisted roster, spawn with `--resume`)
+3. Progress UI during resume
+4. Parallel resume (spawn all agents concurrently, not sequentially)
+
+#### SDK Resume vs Daemon: Honest Comparison
+
+| Metric | SDK Resume (Phase 1) | Daemon (Phase 2) |
+|--------|---------------------|-------------------|
+| Agent downtime | 1-15s (parallel resume, depends on crew size) | 0s |
+| Context preservation | Full (restored from disk) | Full (never lost) |
+| **In-flight turn** | **Lost** (current turn interrupted mid-execution) | **Preserved** (agent never notices restart) |
+| Budget cost on restart | ~0 (resume token only) | 0 |
+| Implementation complexity | Low (~100-200 lines, plumbing already exists) | High (~1000+ lines: daemon, protocol, transport, auth) |
+| Cross-platform | Trivial (just CLI args) | Complex (UDS, named pipes, platform-specific signals) |
+| Maintenance burden | Almost zero | Non-trivial (socket auth, reconnect protocol, event buffering, split-brain) |
+| Failure modes | Simple (agent resumes or doesn't) | Complex (split-brain, orphaned agents, zombies, stale sockets) |
+| Security surface | None (same process model) | Significant (UDS, token auth, TOCTOU prevention) |
+
+#### The Key Question: What Does the Daemon Actually Protect?
+
+With SDK resume available, the daemon's value reduces to **one thing: preserving in-flight turns**.
+
+When a developer saves a file and `tsx watch` restarts the server:
+- **Without daemon:** Agent mid-way through a 2-minute tool chain (writing 5 files, running tests, reviewing output) is interrupted. On resume, the agent has full context but must re-do the current turn's work. Cost: 1-3 minutes of wasted computation + budget.
+- **With daemon:** Agent never notices the restart. The tool chain completes uninterrupted.
+
+For an idle agent (between tasks, waiting for delegation), SDK resume is indistinguishable from daemon — both result in zero visible disruption.
+
+**Frequency analysis:** How often does a developer save a file while an agent is mid-turn?
+- 12-agent crew, average turn duration 45s, developer saves every 2 minutes
+- Probability of interrupting at least one agent per save: ~67%
+- Probability of interrupting the LEAD agent (highest impact): ~6%
+- Expected wasted work per save: ~30s of one agent's computation
+
+For small crews (1-3 agents), SDK resume is almost certainly sufficient. For large crews (10+), the cumulative interruption cost is significant.
+
+#### Recommendation: SDK-First Architecture
+
+**Phase 1 (SDK Resume) should be the primary investment. Phase 2 (Daemon) should be deferred to opt-in "pro mode."**
+
+This is already captured in the Product Positioning section, but the SDK research strengthens the case:
+
+1. **Phase 1 is 80% built.** Resume plumbing exists in AgentAcpBridge, AgentManager, and ProjectRegistry. Remaining work: persist all agent sessionIds, auto-resume on startup, parallel resume, progress UI. Estimated: 3-4 hours.
+
+2. **Phase 1 + SDK resume delivers 95% of the value.** Full context preservation, ~0 budget cost, 5-15s blip (or 1-2s with Copilot SDK's optimized resume). The only loss is in-flight turns.
+
+3. **Phase 2 (daemon) delivers the remaining 5% at 10x the complexity.** 1466 lines of design doc, ~2.5 days implementation, ongoing maintenance of socket protocol, cross-platform transport, authentication, event buffering, reconnect protocol, and failure handling.
+
+4. **The daemon should NOT be eliminated from the design.** It solves a real problem for power users with large crews. But it should be opt-in (`daemon.enabled: true`), not the default path. The SDK-first architecture is simpler, more portable, and easier to maintain.
+
+#### What "SDK-First, No Daemon" Looks Like
+
+```
+Developer saves file
+    → tsx watch sends SIGTERM to server
+    → gracefulShutdown() persists agent roster to SQLite:
+        [{id, role, sessionId, task, status, parentId, model, cwd}, ...]
+    → Server exits
+    → tsx watch spawns new server
+    → Server reads persisted roster from SQLite
+    → For each agent: AgentManager.spawn(role, task, { resumeSessionId })
+        → AgentAcpBridge adds --resume <sessionId> to CLI args
+        → Agent process starts, loads session state from disk
+        → Agent is ready in 1-2s (Copilot) or 5-15s (Claude, depends on context size)
+    → UI shows "Resuming N agents..." with per-agent progress
+    → All agents back online, full context, ready for work
+    → Total elapsed: 5-15s for crew of 12
+```
+
+**Recommendation:** Keep daemon design as-is (it's excellent documentation of the problem space). But **implement Phase 1 first**, evaluate whether the daemon adds enough value for the user's workflow, and build Phase 2 only if the 5-15s blip proves genuinely disruptive in practice.
 
 ### API Surface for Web Dashboard
 
