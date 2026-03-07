@@ -44,7 +44,7 @@ export function ensureSharedWorkspace(agent: Agent): void {
 export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: string): void {
   const rawModel = agent.model || agent.role.model;
 
-  const { adapter: conn, backend, fallback, fallbackReason } = createAdapterForProvider({
+  const adapterConfig = {
     provider: config.provider || 'copilot',
     sdkMode: config.sdkMode,
     autopilot: agent.autopilot,
@@ -54,7 +54,9 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
     envOverride: config.providerEnvOverride,
     cliArgs: config.cliArgs,
     cliCommand: config.cliCommand,
-  });
+  };
+
+  const { adapter: conn, backend, fallback, fallbackReason } = createAdapterForProvider(adapterConfig);
 
   if (fallback) {
     logger.warn({
@@ -76,23 +78,11 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
   agent.status = 'running';
   wireAcpEvents(agent, conn);
 
-  const startOpts = buildStartOptions(
-    {
-      provider: config.provider || 'copilot',
-      sdkMode: config.sdkMode,
-      model: rawModel,
-      binaryOverride: config.providerBinaryOverride,
-      argsOverride: config.providerArgsOverride,
-      envOverride: config.providerEnvOverride,
-      cliArgs: config.cliArgs,
-      cliCommand: config.cliCommand,
-    },
-    {
-      cwd: agent.cwd || process.cwd(),
-      sessionId: agent.resumeSessionId,
-      agentFlag: agentFlagForRole(agent.role.id),
-    },
-  );
+  const startOpts = buildStartOptions(adapterConfig, {
+    cwd: agent.cwd || process.cwd(),
+    sessionId: agent.resumeSessionId,
+    agentFlag: agentFlagForRole(agent.role.id),
+  });
 
   conn.start(startOpts).then((sessionId) => {
     agent.sessionId = sessionId;

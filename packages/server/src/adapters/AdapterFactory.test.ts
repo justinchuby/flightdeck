@@ -148,27 +148,35 @@ describe('AdapterFactory', () => {
       expect(result.backend).toBe('claude-sdk');
     });
 
-    it('returns fallback info when SDK fails', () => {
-      // Force ClaudeSdkAdapter constructor to throw
-      const originalClaudeSdk = vi.fn();
+    it('falls back to ACP when ClaudeSdkAdapter constructor throws', async () => {
+      // Clear module cache so doMock takes effect on re-import
+      vi.resetModules();
+
+      // Re-mock logger (cleared by resetModules)
+      vi.doMock('../utils/logger.js', () => ({
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+      }));
+
+      // Mock a broken ClaudeSdkAdapter
       vi.doMock('./ClaudeSdkAdapter.js', () => ({
         ClaudeSdkAdapter: class {
           constructor() {
-            throw new Error('SDK not available');
+            throw new Error('SDK package not installed');
           }
         },
       }));
 
-      // Since vi.doMock doesn't affect already-imported modules in this test,
-      // we test the fallback behavior differently — by verifying the interface
-      const result = createAdapterForProvider({
+      // Re-import factory to pick up the mock
+      const { createAdapterForProvider: createWithBrokenSdk } = await import('./AdapterFactory.js');
+      const result = createWithBrokenSdk({
         provider: 'claude',
         sdkMode: true,
       });
-      // ClaudeSdkAdapter constructor doesn't throw (mock SDK is available),
-      // so this should succeed
-      expect(result.backend).toBe('claude-sdk');
-      expect(result.fallback).toBe(false);
+
+      expect(result.backend).toBe('acp');
+      expect(result.fallback).toBe(true);
+      expect(result.fallbackReason).toContain('SDK package not installed');
+      expect(result.adapter.type).toBe('acp');
     });
 
     it('handles unknown provider gracefully (defaults to ACP)', () => {
