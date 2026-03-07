@@ -2395,36 +2395,30 @@ Use cases:
 - **Backup:** Export before a major change, import to roll back
 - **Sharing:** Publish team configs for common project types (React app team, Go API team)
 
-### Export: Team → Portable Bundle
+### Bundle File Structure
+
+The export produces a `.flightdeck-team/` directory (optionally compressed to `.flightdeck-team.tar.gz`):
 
 ```
-flightdeck team export --team alice-team --project acme-app --output ./alice-team-export
-```
-
-**What's included (persistent, portable state):**
-
-```
-alice-team-export/
-  manifest.json                     # Bundle metadata + version
-  team.json                         # Team config: teamId, name, creation date
-  agents/
-    arch-alpha.json                 # Agent identity: name, role, model, specialization
-    dev-bravo.json                  # Agent identity + config
+alice-team-export.flightdeck-team/
+  manifest.json                         # REQUIRED: version, checksums, metadata
+  team.json                             # REQUIRED: team identity and config
+  agents/                               # REQUIRED (may be empty)
+    arch-alpha.json                     # One file per agent
+    dev-bravo.json
     qa-charlie.json
-  knowledge/
-    core.json                       # Knowledge entries (category: core)
-    procedural.json                 # Learned procedures
-    semantic.json                   # Domain facts
-    episodic.json                   # Session summaries (sanitized)
-  training/
-    corrections.json                # Training corrections with tags
-    feedback.json                   # Positive/negative feedback history
-  dag-templates/
-    default-workflow.json           # Reusable DAG patterns / workflow templates
-  identity/
-    protection-hashes.json          # Identity protection hashes (prevents impersonation)
-  config/
-    team-config.yaml                # Provider preferences, model overrides, thresholds
+  knowledge/                            # OPTIONAL: knowledge entries by category
+    core.json                           # Array of KnowledgeExport entries
+    procedural.json
+    semantic.json
+    episodic.json                       # Optional — excluded with --exclude-episodic
+  training/                             # OPTIONAL: training history
+    corrections.json                    # Array of correction records
+    feedback.json                       # Array of feedback records
+  dag-templates/                        # OPTIONAL: workflow templates
+    default-workflow.json
+  config/                               # OPTIONAL: team-level config
+    team-config.json                    # Provider preferences, model overrides, thresholds
 ```
 
 **What's EXCLUDED (ephemeral, non-portable):**
@@ -2437,85 +2431,655 @@ alice-team-export/
 | File locks | Transient coordination state |
 | Message queue contents | Ephemeral delivery state |
 | Absolute file paths in cwd | Machine-specific |
+| agentId values | Instance-specific — new IDs generated on import |
+| Identity protection hashes | Machine-specific — regenerated on import |
 
-### Bundle Format
+### Bundle Format (TypeScript)
 
 ```typescript
-interface TeamBundle {
-  version: '1.0';                    // Bundle format version
-  exportedAt: string;                // ISO 8601 timestamp
-  flightdeckVersion: string;         // Flightdeck version that created the bundle
-  team: {
-    teamId: string;
-    name: string;
-    createdAt: string;
-    config: Record<string, unknown>;
+// ─── manifest.json ──────────────────────────────────────────
+
+interface BundleManifest {
+  bundleFormat: '1.0';                     // Bundle format version (semver major)
+  exportedAt: string;                      // ISO 8601 timestamp
+  flightdeckVersion: string;               // e.g., "0.9.0" — the version that created this bundle
+  sourceProjectId?: string;                // Where this was exported from (informational)
+  sourceTeamId: string;                    // Original teamId
+  checksum: string;                        // SHA-256 of all other files concatenated (integrity check)
+  stats: {
+    agentCount: number;
+    knowledgeCount: number;
+    correctionCount: number;
+    feedbackCount: number;
+    dagTemplateCount: number;
   };
-  agents: AgentExport[];
-  knowledge: KnowledgeExport[];
-  training: TrainingExport;
-  dagTemplates: DagTemplate[];
-  identityHashes: IdentityHash[];
 }
+
+// ─── team.json ──────────────────────────────────────────────
+
+interface TeamExport {
+  teamId: string;                          // Original teamId (may be renamed on import)
+  name: string;                            // Human-readable team name
+  createdAt: string;                       // When the team was first created
+  description?: string;
+  config: {
+    defaultProvider?: string;              // e.g., "claude"
+    defaultModel?: string;                 // e.g., "claude-sonnet-4.5"
+    massFailure?: {
+      threshold?: number;
+      windowMs?: number;
+      cooldownMs?: number;
+    };
+    customConfig?: Record<string, unknown>;
+  };
+}
+
+// ─── agents/<name>.json ─────────────────────────────────────
 
 interface AgentExport {
-  name: string;                      // Human-readable name
-  role: string;                      // Architect, Developer, etc.
-  model: string;                     // Default model preference
-  specialization: string[];          // Domain tags
-  totalSessions: number;             // Experience indicator
-  totalTasks: number;
-  taskSuccessRate: number;
-  feedbackScore?: number;
-  config: Record<string, unknown>;   // Agent-specific config overrides
+  // Identity (portable — survives import)
+  name: string;                            // Human-readable: "Arch-Alpha"
+  role: string;                            // "Architect", "Developer", "QA Tester", etc.
+  specialization: string[];                // ["System Design", "API Architecture", "TypeScript"]
+
+  // Preferences
+  model: string;                           // Preferred model: "claude-sonnet-4.5"
+  provider: string;                        // Preferred provider: "claude"
+  autopilot: boolean;                      // Default autopilot setting
+  systemPromptOverrides?: string;          // Custom system prompt additions
+
+  // Experience (informational — helps the importing user assess agent value)
+  stats: {
+    totalSessions: number;
+    totalTasks: number;
+    taskSuccessRate: number;               // 0.0-1.0
+    feedbackScore?: number;                // Aggregate user feedback score
+    firstActiveAt: string;                 // When this agent was first created
+    totalTokensUsed?: number;              // Lifetime token usage
+  };
+
+  // Agent-specific config overrides
+  config: Record<string, unknown>;
 }
+
+// ─── knowledge/<category>.json ──────────────────────────────
+
+// Each file contains an array of KnowledgeExport entries
+type KnowledgeFile = KnowledgeExport[];
 
 interface KnowledgeExport {
+  key: string;                             // Knowledge key (unique within category)
+  content: string;                         // The knowledge content
   category: 'core' | 'episodic' | 'procedural' | 'semantic';
-  key: string;
-  content: string;
-  confidence: number;
+  confidence: number;                      // 0.0-1.0
+  tags: string[];                          // Categorization tags
+  source: {
+    agentName?: string;                    // Which agent learned this (by name, not ID)
+    mechanism: 'self_learned' | 'taught' | 'corrected' | 'imported';
+    originalDate: string;                  // When this was originally created
+  };
+  accessCount: number;                     // How often this was retrieved (usefulness indicator)
+}
+
+// ─── training/corrections.json ──────────────────────────────
+
+type CorrectionsFile = CorrectionExport[];
+
+interface CorrectionExport {
+  agentName: string;                       // Which agent was corrected
+  correction: string;                      // The correction content
+  originalBehavior?: string;               // What the agent did wrong (context)
+  tags: string[];                          // e.g., ["naming-conventions", "test-coverage"]
+  date: string;                            // ISO 8601
+}
+
+// ─── training/feedback.json ─────────────────────────────────
+
+type FeedbackFile = FeedbackExport[];
+
+interface FeedbackExport {
+  agentName: string;                       // Which agent received feedback
+  type: 'positive' | 'negative';
+  context: string;                         // What the feedback was about
   tags: string[];
-  source: { mechanism: string; agentName?: string };
+  date: string;                            // ISO 8601
 }
 
-interface TrainingExport {
-  corrections: Array<{ agentName: string; correction: string; tags: string[]; date: string }>;
-  feedback: Array<{ agentName: string; type: 'positive' | 'negative'; context: string; date: string }>;
+// ─── dag-templates/<name>.json ──────────────────────────────
+
+interface DagTemplateExport {
+  name: string;                            // Template name: "default-workflow"
+  description: string;
+  tasks: Array<{
+    role: string;                          // Role for this task
+    title: string;
+    description: string;
+    dependsOn: string[];                   // Task names (within this template)
+    files?: string[];                      // Glob patterns for file scope
+    priority?: number;
+  }>;
 }
 ```
 
-### Import: Portable Bundle → Team
+### REST API Endpoints
+
+#### Export
 
 ```
-flightdeck team import --from ./alice-team-export --project billing-svc
+POST /api/teams/:teamId/export
 ```
 
-**Import process:**
-1. **Validate bundle:** Check `version` compatibility, required fields, schema integrity
-2. **Create team:** Register new team with imported config (or merge into existing team)
-3. **Create agents:** Populate agent roster from exported identities (new agentIds, same names/roles/specialization)
-4. **Load knowledge:** Import all knowledge entries, tagged with `mechanism: 'imported'` and source bundle reference
-5. **Load training:** Import corrections and feedback history
-6. **Load DAG templates:** Make templates available for the new project
-7. **Skip identity hashes:** Regenerate from imported agent configs (hashes are machine-specific)
+**Request body:**
+```typescript
+interface ExportRequest {
+  projectId: string;                       // Which project's knowledge to include
+  agents?: string[];                       // Agent names to include (default: all)
+  includeKnowledge?: boolean;              // Default: true
+  includeTraining?: boolean;               // Default: true
+  includeDagTemplates?: boolean;           // Default: true
+  excludeEpisodic?: boolean;              // Default: false — set true for more portable bundles
+  format: 'directory' | 'tar.gz';          // Output format
+}
+```
 
-**Conflict handling on import:**
-- **Duplicate teamId:** Prompt user: merge (combine agents + knowledge) or rename
-- **Duplicate agent names:** Auto-suffix (e.g., "Arch-Alpha" → "Arch-Alpha-2")
-- **Duplicate knowledge keys:** Keep both with different `source.mechanism` tags, let the agent reconcile during use
+**Response (200 OK):**
+```typescript
+// format: 'directory' → returns JSON with bundle content
+interface ExportResponse {
+  success: true;
+  bundle: TeamBundle;                      // Full bundle as JSON (for directory, client writes files)
+  stats: BundleManifest['stats'];
+}
+
+// format: 'tar.gz' → returns binary stream
+// Content-Type: application/gzip
+// Content-Disposition: attachment; filename="alice-team.flightdeck-team.tar.gz"
+```
+
+**Error responses:**
+
+| Status | Code | Cause |
+|--------|------|-------|
+| 404 | `TEAM_NOT_FOUND` | teamId doesn't exist |
+| 404 | `PROJECT_NOT_FOUND` | projectId doesn't exist or team has no data in this project |
+| 400 | `NO_AGENTS_MATCH` | `agents` filter matched zero agents |
+| 500 | `EXPORT_FAILED` | DB read failure or filesystem error |
+
+```typescript
+interface ExportErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+```
+
+#### Import
+
+```
+POST /api/teams/import
+```
+
+**Request body:**
+```typescript
+interface ImportRequest {
+  projectId: string;                       // Target project to import into
+  bundle: TeamBundle;                      // The full bundle (JSON mode)
+  // OR Content-Type: multipart/form-data with .tar.gz file
+
+  options: {
+    teamId?: string;                       // Override teamId (default: use bundle's teamId)
+    teamName?: string;                     // Override team name
+    conflictResolution: {
+      team: 'create_new' | 'merge' | 'fail';     // What if teamId exists
+      agents: 'rename' | 'skip' | 'overwrite';    // What if agent name exists
+      knowledge: 'keep_both' | 'prefer_import' | 'prefer_existing' | 'skip';
+    };
+    dryRun?: boolean;                      // Validate and report conflicts without importing
+  };
+}
+```
+
+**Response (200 OK):**
+```typescript
+interface ImportResponse {
+  success: true;
+  teamId: string;                          // Actual teamId used (may differ from bundle if renamed)
+  results: {
+    team: { action: 'created' | 'merged'; teamId: string };
+    agents: Array<{
+      name: string;
+      action: 'created' | 'renamed' | 'skipped' | 'overwritten';
+      newAgentId: string;                  // Generated agentId
+      renamedTo?: string;                  // If renamed, the new name
+    }>;
+    knowledge: {
+      imported: number;
+      skipped: number;
+      conflicts: number;
+      details: Array<{
+        key: string;
+        category: string;
+        action: 'imported' | 'skipped' | 'merged';
+        reason?: string;
+      }>;
+    };
+    training: {
+      correctionsImported: number;
+      feedbackImported: number;
+    };
+    dagTemplates: {
+      imported: number;
+      skipped: number;
+    };
+  };
+  warnings: string[];                      // Non-fatal issues encountered
+}
+
+// dryRun: true → same response shape but no DB writes. 'action' fields show what WOULD happen.
+```
+
+**Error responses:**
+
+| Status | Code | Cause |
+|--------|------|-------|
+| 400 | `INVALID_BUNDLE` | Bundle fails schema validation (missing fields, wrong types) |
+| 400 | `VERSION_INCOMPATIBLE` | Bundle format version not supported by this Flightdeck |
+| 400 | `CHECKSUM_MISMATCH` | Bundle integrity check failed (corrupt or tampered) |
+| 400 | `EMPTY_BUNDLE` | Bundle contains no agents and no knowledge |
+| 404 | `PROJECT_NOT_FOUND` | Target projectId doesn't exist |
+| 409 | `TEAM_EXISTS` | teamId already exists and `conflictResolution.team` is `'fail'` |
+| 413 | `BUNDLE_TOO_LARGE` | Bundle exceeds size limit (default 50MB) |
+| 500 | `IMPORT_FAILED` | DB write failure (rolled back, no partial import) |
+
+```typescript
+interface ImportErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+    validationErrors?: Array<{             // For INVALID_BUNDLE
+      path: string;                        // JSON path: "agents[0].role"
+      message: string;                     // "required field missing"
+    }>;
+  };
+}
+```
+
+### Import Validation Steps
+
+Import performs validation in order, failing fast on the first error:
+
+```typescript
+async function validateAndImport(req: ImportRequest): Promise<ImportResponse> {
+  // ─── Phase 1: Bundle integrity ────────────────────────────
+  // 1.1 Check manifest exists and has required fields
+  validateManifestSchema(req.bundle.manifest);
+
+  // 1.2 Check bundle format version compatibility
+  if (!isCompatibleVersion(req.bundle.manifest.bundleFormat)) {
+    throw new ImportError('VERSION_INCOMPATIBLE',
+      `Bundle format ${req.bundle.manifest.bundleFormat} not supported. ` +
+      `This Flightdeck supports format 1.x`);
+  }
+
+  // 1.3 Verify checksum (SHA-256 of all content files)
+  const computed = computeBundleChecksum(req.bundle);
+  if (computed !== req.bundle.manifest.checksum) {
+    throw new ImportError('CHECKSUM_MISMATCH',
+      `Expected ${req.bundle.manifest.checksum}, got ${computed}. Bundle may be corrupt.`);
+  }
+
+  // 1.4 Validate team.json schema
+  validateTeamSchema(req.bundle.team);
+
+  // 1.5 Validate each agent file schema
+  for (const agent of req.bundle.agents) {
+    validateAgentSchema(agent);
+    validateTeamIdFormat(agent.name);  // Agent names used in paths — same validation
+  }
+
+  // 1.6 Validate knowledge entries (check for oversized content, valid categories)
+  for (const entry of req.bundle.knowledge) {
+    validateKnowledgeSchema(entry);
+    if (entry.content.length > MAX_KNOWLEDGE_CONTENT_LENGTH) {
+      throw new ImportError('INVALID_BUNDLE',
+        `Knowledge entry "${entry.key}" exceeds max content length (${MAX_KNOWLEDGE_CONTENT_LENGTH})`);
+    }
+  }
+
+  // 1.7 Check total bundle size
+  const bundleSize = estimateBundleSize(req.bundle);
+  if (bundleSize > MAX_BUNDLE_SIZE_BYTES) {
+    throw new ImportError('BUNDLE_TOO_LARGE',
+      `Bundle is ${formatBytes(bundleSize)}, max is ${formatBytes(MAX_BUNDLE_SIZE_BYTES)}`);
+  }
+
+  // ─── Phase 2: Target validation ──────────────────────────
+  // 2.1 Check target project exists
+  const project = await db.select().from(projects)
+    .where(eq(projects.id, req.projectId)).get();
+  if (!project) throw new ImportError('PROJECT_NOT_FOUND');
+
+  // 2.2 Check team conflict
+  const targetTeamId = req.options.teamId ?? req.bundle.team.teamId;
+  validateTeamIdFormat(targetTeamId);  // Path traversal check
+  const existingTeam = await db.select().from(teams)
+    .where(eq(teams.teamId, targetTeamId)).get();
+
+  if (existingTeam) {
+    if (req.options.conflictResolution.team === 'fail') {
+      throw new ImportError('TEAM_EXISTS',
+        `Team "${targetTeamId}" already exists. Use 'create_new' or 'merge'.`);
+    }
+  }
+
+  // ─── Phase 3: Conflict detection ─────────────────────────
+  const conflicts = await detectConflicts(req, targetTeamId);
+
+  // ─── Phase 4: Dry run exit point ─────────────────────────
+  if (req.options.dryRun) {
+    return buildDryRunResponse(conflicts, req);
+  }
+
+  // ─── Phase 5: Atomic import (single transaction) ─────────
+  return await db.transaction(async (tx) => {
+    const results = await executeImport(tx, req, targetTeamId, conflicts);
+    return results;
+  });
+}
+```
+
+### Import Conflict Resolution
+
+#### Team ID Collision
+
+| Strategy | Behavior |
+|----------|----------|
+| `create_new` | Auto-generate a new teamId: `${originalId}-imported-${nanoid(4)}`. Original name preserved in team.name. |
+| `merge` | Add imported agents and knowledge to the existing team. Existing agents/knowledge are preserved. |
+| `fail` | Return 409 TEAM_EXISTS error. User must choose. |
+
+#### Agent Name Collision
+
+When an imported agent's `name` matches an existing agent on the target team:
+
+| Strategy | Behavior |
+|----------|----------|
+| `rename` | Auto-suffix: "Arch-Alpha" → "Arch-Alpha-2" (increment until unique). Response includes `renamedTo`. |
+| `skip` | Don't import this agent. Response marks it as `skipped`. Knowledge attributed to this agent is still imported. |
+| `overwrite` | Replace the existing agent's profile (role, model, specialization, stats) with the imported one. **Does NOT delete the existing agent's conversations or active sessions.** |
+
+```typescript
+function resolveAgentNameConflict(
+  name: string,
+  existing: AgentRosterEntry[],
+  strategy: 'rename' | 'skip' | 'overwrite',
+): { action: string; resolvedName: string } {
+  const existingNames = new Set(existing.map(a => a.name));
+  if (!existingNames.has(name)) {
+    return { action: 'created', resolvedName: name };
+  }
+
+  switch (strategy) {
+    case 'rename': {
+      let suffix = 2;
+      let candidate = `${name}-${suffix}`;
+      while (existingNames.has(candidate)) {
+        suffix++;
+        candidate = `${name}-${suffix}`;
+      }
+      return { action: 'renamed', resolvedName: candidate };
+    }
+    case 'skip':
+      return { action: 'skipped', resolvedName: name };
+    case 'overwrite':
+      return { action: 'overwritten', resolvedName: name };
+  }
+}
+```
+
+#### Knowledge Entry Collision
+
+When an imported knowledge entry has the same `(projectId, teamId, category, key)` as an existing entry:
+
+| Strategy | Behavior |
+|----------|----------|
+| `keep_both` | Import with a suffixed key: `"auth-flow"` → `"auth-flow:imported-2026-03-07"`. Both entries coexist. |
+| `prefer_import` | Overwrite the existing entry with the imported one. |
+| `prefer_existing` | Skip the import. Existing entry preserved. |
+| `skip` | Skip all conflicting entries. Only import entries with no conflict. |
+
+```typescript
+function resolveKnowledgeConflict(
+  entry: KnowledgeExport,
+  existing: KnowledgeEntry | null,
+  strategy: string,
+): { action: string; key: string } {
+  if (!existing) return { action: 'imported', key: entry.key };
+
+  switch (strategy) {
+    case 'keep_both': {
+      const date = new Date().toISOString().slice(0, 10);
+      return { action: 'imported', key: `${entry.key}:imported-${date}` };
+    }
+    case 'prefer_import':
+      return { action: 'merged', key: entry.key };
+    case 'prefer_existing':
+    case 'skip':
+      return { action: 'skipped', key: entry.key };
+  }
+}
+```
+
+### CLI Commands
+
+#### `flightdeck team export`
+
+```
+Usage: flightdeck team export [options]
+
+Export a team's accumulated expertise into a portable bundle.
+
+Options:
+  --team <teamId>           Team to export (required)
+  --project <projectId>     Project context for knowledge (required)
+  --output <path>           Output path (default: ./<teamId>.flightdeck-team/)
+  --format <type>           'directory' or 'tar.gz' (default: directory)
+  --agents <names>          Comma-separated agent names to include (default: all)
+  --knowledge-only          Export knowledge and training only, no agent profiles
+  --exclude-episodic        Exclude episodic knowledge (session-specific, less portable)
+  --exclude-training        Exclude training history (corrections + feedback)
+  --min-confidence <n>      Only export knowledge with confidence >= n (default: 0)
+  --quiet                   Suppress progress output
+
+Examples:
+  # Full team export
+  flightdeck team export --team alice-team --project acme-app
+
+  # Export as compressed archive
+  flightdeck team export --team alice-team --project acme-app --format tar.gz
+
+  # Export specific agents
+  flightdeck team export --team alice-team --project acme-app \
+    --agents arch-alpha,dev-bravo --output ./senior-agents
+
+  # High-confidence knowledge only (for sharing)
+  flightdeck team export --team alice-team --project acme-app \
+    --knowledge-only --min-confidence 0.8 --exclude-episodic
+
+Exit codes:
+  0  Success
+  1  Team or project not found
+  2  No data to export (empty team)
+  3  Output path already exists (use --force to overwrite)
+  4  Internal error
+```
+
+**CLI output example:**
+```
+$ flightdeck team export --team alice-team --project acme-app --output ./export
+
+Exporting team "alice-team" from project "acme-app"...
+  ✓ Team config
+  ✓ 3 agents (Arch-Alpha, Dev-Bravo, QA-Charlie)
+  ✓ 127 knowledge entries (core: 12, procedural: 45, semantic: 58, episodic: 12)
+  ✓ 12 corrections, 8 feedback entries
+  ✓ 1 DAG template
+
+Bundle written to ./export/alice-team.flightdeck-team/
+  Size: 284 KB
+  Checksum: sha256:a1b2c3d4...
+
+To import on another machine:
+  flightdeck team import --from ./export/alice-team.flightdeck-team/ --project <target-project>
+```
+
+#### `flightdeck team import`
+
+```
+Usage: flightdeck team import [options]
+
+Import a team bundle into a Flightdeck project.
+
+Options:
+  --from <path>             Path to .flightdeck-team/ directory or .tar.gz (required)
+  --project <projectId>     Target project to import into (required)
+  --team-id <teamId>        Override the imported team's ID
+  --team-name <name>        Override the imported team's name
+  --on-team-conflict <s>    'create_new', 'merge', or 'fail' (default: fail)
+  --on-agent-conflict <s>   'rename', 'skip', or 'overwrite' (default: rename)
+  --on-knowledge-conflict <s> 'keep_both', 'prefer_import', 'prefer_existing', 'skip'
+                            (default: keep_both)
+  --dry-run                 Validate and show what would happen without importing
+  --quiet                   Suppress progress output
+
+Examples:
+  # Basic import
+  flightdeck team import --from ./alice-team.flightdeck-team/ --project billing-svc
+
+  # Import with auto-rename on conflicts
+  flightdeck team import --from ./team.tar.gz --project my-app \
+    --on-team-conflict create_new --on-agent-conflict rename
+
+  # Dry run to preview
+  flightdeck team import --from ./team.flightdeck-team/ --project my-app --dry-run
+
+  # Merge into existing team (add agents + knowledge)
+  flightdeck team import --from ./senior-agents.flightdeck-team/ --project my-app \
+    --team-id existing-team --on-team-conflict merge --on-knowledge-conflict prefer_import
+
+Exit codes:
+  0  Success
+  1  Bundle not found or unreadable
+  2  Bundle validation failed (version, checksum, schema)
+  3  Target project not found
+  4  Team conflict (--on-team-conflict is 'fail')
+  5  Internal error (rolled back, no partial import)
+```
+
+**CLI output example:**
+```
+$ flightdeck team import --from ./alice-team.flightdeck-team/ --project billing-svc
+
+Validating bundle...
+  ✓ Format version 1.0 (compatible)
+  ✓ Checksum verified
+  ✓ 3 agents, 127 knowledge entries
+
+Importing into project "billing-svc"...
+  ✓ Team "alice-team" created (team-id: alice-team)
+  ✓ Agent "Arch-Alpha" created (agent-id: agt-x7k2m4)
+  ✓ Agent "Dev-Bravo" created (agent-id: agt-j8p5n9)
+  ✓ Agent "QA-Charlie" created (agent-id: agt-r3t6w1)
+  ✓ 127 knowledge entries imported (0 conflicts)
+  ✓ 12 corrections, 8 feedback entries imported
+  ✓ 1 DAG template imported
+  ⚠ 2 warnings:
+    - Episodic knowledge may reference project-specific context from "acme-app"
+    - Agent "Arch-Alpha" model preference "claude-sonnet-4.5" — verify provider config
+
+Import complete. Agents are in 'idle' state — assign tasks to activate them.
+```
+
+#### `flightdeck team list`
+
+```
+Usage: flightdeck team list [options]
+
+List teams and their agents.
+
+Options:
+  --project <projectId>     Filter by project
+  --format <type>           'table', 'json' (default: table)
+
+Example output:
+$ flightdeck team list --project acme-app
+
+Team          Agents  Knowledge  Status     Created
+alice-team    3       127        active     Jan 15, 2026
+bob-team      4       89         active     Feb 3, 2026
+ci-pipeline   2       34         idle       Feb 28, 2026
+```
 
 ### Selective Export
 
-```
-# Export specific agents only
-flightdeck team export --team alice-team --agents arch-alpha,dev-bravo --output ./partial
+```typescript
+// The export function accepts filters
+interface ExportOptions {
+  teamId: string;
+  projectId: string;
+  agentNames?: string[];           // Filter: only these agents (default: all)
+  knowledgeOnly?: boolean;         // Skip agent profiles
+  excludeEpisodic?: boolean;       // Skip episodic knowledge
+  excludeTraining?: boolean;       // Skip corrections + feedback
+  minConfidence?: number;          // Only knowledge with confidence >= threshold
+}
 
-# Export knowledge only (no agents)
-flightdeck team export --team alice-team --knowledge-only --output ./knowledge-dump
+async function exportTeam(options: ExportOptions): Promise<TeamBundle> {
+  const team = await loadTeam(options.teamId);
+  if (!team) throw new ExportError('TEAM_NOT_FOUND');
 
-# Export without episodic knowledge (session-specific, less portable)
-flightdeck team export --team alice-team --exclude-episodic --output ./portable
+  // Load agents (optionally filtered)
+  let agents = await loadAgentsForTeam(options.teamId, options.projectId);
+  if (options.agentNames?.length) {
+    agents = agents.filter(a => options.agentNames!.includes(a.name));
+    if (agents.length === 0) throw new ExportError('NO_AGENTS_MATCH');
+  }
+
+  // Load knowledge (optionally filtered)
+  let knowledge = await loadKnowledge(options.projectId, options.teamId);
+  if (options.excludeEpisodic) {
+    knowledge = knowledge.filter(k => k.category !== 'episodic');
+  }
+  if (options.minConfidence) {
+    knowledge = knowledge.filter(k => (k.confidence ?? 0) >= options.minConfidence!);
+  }
+
+  // Load training history
+  let training: TrainingExport = { corrections: [], feedback: [] };
+  if (!options.excludeTraining) {
+    training = await loadTrainingHistory(options.teamId, options.projectId);
+  }
+
+  // Build bundle
+  const bundle: TeamBundle = {
+    manifest: buildManifest(team, agents, knowledge, training),
+    team: serializeTeam(team),
+    agents: options.knowledgeOnly ? [] : agents.map(serializeAgent),
+    knowledge: knowledge.map(serializeKnowledge),
+    training,
+    dagTemplates: await loadDagTemplates(options.teamId),
+  };
+
+  // Compute checksum
+  bundle.manifest.checksum = computeChecksum(bundle);
+
+  return bundle;
+}
 ```
 
 ### .flightdeck/ as Portable Format
@@ -2527,25 +3091,43 @@ The filesystem mirror (`~/.flightdeck/projects/<id>/teams/<team-id>/`) is **stru
 - It lacks the **manifest** with version info and export metadata
 - It doesn't include **training history** (stored in separate DB tables, not mirrored to filesystem)
 
-**Recommendation:** The export command reads from the filesystem mirror + DB, filters out ephemeral state, adds the manifest, and produces the bundle. The import command reverses this. The filesystem mirror is a *source* for export, not the export format itself.
+**Implementation:** The export command reads from the DB (authoritative source), filters out ephemeral state, adds the manifest, and produces the bundle. The filesystem mirror is NOT read during export — the DB is the source of truth. The import command writes to the DB, and the SyncEngine mirrors to filesystem as usual.
 
 ### Version Compatibility
 
 ```typescript
-// On import, validate bundle version against current Flightdeck
-function validateBundleVersion(bundle: TeamBundle): ValidationResult {
-  const current = parseVersion(FLIGHTDECK_VERSION);
-  const bundleVersion = bundle.version;
+const SUPPORTED_BUNDLE_FORMATS = ['1.0'] as const;
 
-  // Semantic: same major = compatible, different major = breaking
-  if (bundleVersion === '1.0') {
-    return { compatible: true };
-  }
-  return {
-    compatible: false,
-    reason: `Bundle version ${bundleVersion} is not compatible with current Flightdeck`,
-    suggestion: 'Upgrade Flightdeck or re-export from a compatible version',
-  };
+function isCompatibleVersion(bundleFormat: string): boolean {
+  // Major version match: 1.x bundles work with 1.x Flightdeck
+  const bundleMajor = bundleFormat.split('.')[0];
+  return SUPPORTED_BUNDLE_FORMATS.some(v => v.split('.')[0] === bundleMajor);
+}
+
+// Future: when format 2.0 is released, add migration logic
+// function migrateBundleV1ToV2(bundle: TeamBundleV1): TeamBundleV2 { ... }
+```
+
+### Atomicity and Rollback
+
+**All import operations are wrapped in a single SQLite transaction.** If any step fails, the entire import is rolled back — no partial imports.
+
+```typescript
+async function executeImport(
+  tx: Transaction,
+  req: ImportRequest,
+  teamId: string,
+  conflicts: ConflictReport,
+): Promise<ImportResults> {
+  // All operations within this transaction — atomic commit or full rollback
+  const teamResult = await importTeam(tx, req.bundle.team, teamId, conflicts.team);
+  const agentResults = await importAgents(tx, req.bundle.agents, teamId, req.projectId, conflicts.agents);
+  const knowledgeResults = await importKnowledge(tx, req.bundle.knowledge, teamId, req.projectId, conflicts.knowledge);
+  const trainingResults = await importTraining(tx, req.bundle.training, teamId, agentResults);
+  const templateResults = await importDagTemplates(tx, req.bundle.dagTemplates, teamId);
+
+  return { teamResult, agentResults, knowledgeResults, trainingResults, templateResults };
+  // Transaction commits here — or rolls back if any step threw
 }
 ```
 
