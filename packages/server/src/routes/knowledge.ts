@@ -22,6 +22,26 @@ function paramStr(val: string | string[] | undefined): string {
   return Array.isArray(val) ? val[0] ?? '' : val ?? '';
 }
 
+/** Whitelist of metadata fields users may set via the UI */
+const ALLOWED_METADATA_FIELDS = new Set(['description', 'tags', 'label', 'notes']);
+
+/** Strip internal/reserved metadata fields — only allow safe user-provided ones */
+function sanitizeMetadata(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (k.startsWith('_')) continue;           // internal fields (_protectedHash, etc.)
+    if (!ALLOWED_METADATA_FIELDS.has(k)) continue; // only whitelisted fields
+    if (typeof v === 'string') {
+      cleaned[k] = v.slice(0, 1000);           // cap string values
+    } else if (typeof v === 'number' || typeof v === 'boolean') {
+      cleaned[k] = v;
+    }
+    // drop anything else (objects, arrays, functions)
+  }
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
 export function knowledgeRoutes(ctx: AppContext): Router {
   const { knowledgeStore, hybridSearchEngine, memoryCategoryManager, trainingCapture } = ctx;
   const router = Router();
@@ -107,6 +127,7 @@ export function knowledgeRoutes(ctx: AppContext): Router {
     if (!sanitizedKey) {
       return res.status(400).json({ error: 'Invalid key after sanitization' });
     }
+    const sanitizedMetadata = sanitizeMetadata(metadata);
 
     // Validate via category manager (enforces max limits, etc.)
     const validationError = memoryCategoryManager.validateMemory(projectId, category, sanitizedKey, sanitizedContent);
@@ -115,7 +136,7 @@ export function knowledgeRoutes(ctx: AppContext): Router {
     }
 
     try {
-      const entry = memoryCategoryManager.putMemory(projectId, category, sanitizedKey, sanitizedContent, metadata);
+      const entry = memoryCategoryManager.putMemory(projectId, category, sanitizedKey, sanitizedContent, sanitizedMetadata);
       logger.info({ module: 'knowledge', msg: 'Knowledge entry created', projectId, category, key: sanitizedKey });
       res.status(201).json(entry);
     } catch (err: any) {
