@@ -120,6 +120,17 @@ export interface AgentServerOptions {
   runtimeDir?: string;
   eventBufferOpts?: { maxEventsPerAgent?: number; maxTotalEvents?: number; maxEventAgeMs?: number };
   massFailureOpts?: { threshold?: number; windowMs?: number; cooldownMs?: number };
+  /** Optional persistence layer for agent state. */
+  persistence?: AgentServerPersistence;
+}
+
+/** Optional persistence callbacks for agent lifecycle events. */
+export interface AgentServerPersistence {
+  onAgentSpawned?(agentId: string, role: string, model: string): void;
+  onAgentTerminated?(agentId: string): void;
+  onAgentExited?(agentId: string, exitCode: number): void;
+  onStatusChanged?(agentId: string, status: AgentStatus): void;
+  onServerStop?(agents: ManagedAgent[]): void;
 }
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -137,6 +148,7 @@ export class AgentServer {
   private readonly agents = new Map<string, ManagedAgent>();
   private readonly eventBuffer: EventBuffer;
   private readonly massFailure: MassFailureDetector;
+  private readonly persistence: AgentServerPersistence | undefined;
 
   private connection: TransportConnection | null = null;
   private orphanTimer: ReturnType<typeof setTimeout> | null = null;
@@ -152,6 +164,7 @@ export class AgentServer {
     this.runtimeDir = opts.runtimeDir ?? process.cwd();
     this.eventBuffer = new EventBuffer(opts.eventBufferOpts);
     this.massFailure = new MassFailureDetector(opts.massFailureOpts);
+    this.persistence = opts.persistence;
   }
 
   // ── Getters ─────────────────────────────────────────────────────
@@ -211,6 +224,9 @@ export class AgentServer {
         resolve();
       });
     });
+    // Persist shutdown state for all agents before clearing
+    this.persistence?.onServerStop?.([...this.agents.values()]);
+
     await Promise.all(terminatePromises);
     this.agents.clear();
 
@@ -295,6 +311,7 @@ export class AgentServer {
       cleanups: [],
     };
     this.agents.set(agentId, agent);
+    this.persistence?.onAgentSpawned?.(agentId, msg.role, msg.model);
 
     // Wire adapter events
     this.wireAdapterEvents(agent);
@@ -337,8 +354,18 @@ export class AgentServer {
       return;
     }
 
-    agent.adapter.terminate();
     agent.status = 'stopping';
+
+    // Try graceful cancel first, then force terminate
+    if (agent.adapter.isPrompting) {
+      agent.adapter.cancel().catch(() => {}).finally(() => {
+        agent.adapter.terminate();
+      });
+    } else {
+      agent.adapter.terminate();
+    }
+
+    this.persistence?.onAgentTerminated?.(msg.agentId);
   }
 
   private handleListAgents(msg: ListAgentsMessage, conn: TransportConnection): void {
@@ -392,6 +419,9 @@ export class AgentServer {
 
     on<string>('text', (text) => send('text', { text }));
     on<string>('thinking', (text) => send('thinking', { text }));
+    on<string>('connected', (sessionId) => {
+      agent.sessionId = sessionId;
+    });
     on<any>('tool_call', (info) => send('tool_call', { ...info }));
     on<any>('tool_call_update', (info) => send('tool_call_update', { ...info }));
     on<any>('plan', (entries) => send('plan', { entries }));
@@ -412,6 +442,9 @@ export class AgentServer {
         timestamp: Date.now(),
       });
 
+      // Persist exit status
+      this.persistence?.onAgentExited?.(agent.id, code);
+
       const exitMsg: AgentServerMessage = {
         type: 'agent_exited',
         agentId: agent.id,
@@ -419,6 +452,18 @@ export class AgentServer {
         reason: code === 0 ? 'completed' : `exit code ${code}`,
       };
       this.bufferOrSend(exitMsg);
+
+      // Clean up: remove event listeners and agent from map
+      agent.cleanups.forEach((fn) => fn());
+      agent.cleanups.length = 0;
+      this.agents.delete(agent.id);
+    });
+
+    // Status change (idle/running transitions)
+    on<boolean>('prompting', (active) => {
+      agent.status = active ? 'running' : 'idle';
+      this.persistence?.onStatusChanged?.(agent.id, agent.status);
+      send('status_change', { status: agent.status, prompting: active });
     });
   }
 
