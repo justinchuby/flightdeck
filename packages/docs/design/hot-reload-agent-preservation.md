@@ -287,6 +287,116 @@ The `scripts/dev.mjs` launcher would be extended to:
 
 ---
 
+## Daemon Lifecycle Modes
+
+The daemon's behavior on server shutdown differs between production and development contexts. This addresses a critical UX expectation: Ctrl+C in production should cleanly stop everything, while code changes in dev mode should leave agents alive.
+
+### Production Mode (default)
+
+```
+User presses Ctrl+C (or server receives SIGTERM)
+    → gracefulShutdown() sends JSON-RPC: daemon.shutdown({ persist: false })
+    → Daemon terminates all agents (SIGTERM → 5s → SIGKILL escalation)
+    → Daemon exits
+    → Server exits
+    → No orphaned processes. Clean shutdown.
+```
+
+**Behavior:** Server stop → daemon stop → all agents terminate. The daemon is a companion process of the server, not an independent service. This meets the fundamental user expectation that Ctrl+C kills everything.
+
+**Detection:** Production mode is the default. The server sends an explicit `daemon.shutdown({ persist: false })` message during graceful shutdown, instructing the daemon to terminate agents and exit.
+
+### Dev Mode (`npm run dev` / `tsx watch`)
+
+```
+tsx watch detects file change → sends SIGTERM to server
+    → gracefulShutdown() closes daemon socket (no shutdown message sent)
+    → Server exits. Daemon detects socket EOF.
+    → Daemon enters orphaned mode: keeps all agents alive, starts auto-shutdown timer
+    → tsx watch spawns new server
+    → New server connects to daemon, authenticates, subscribes to agents
+    → Daemon cancels auto-shutdown timer
+    → All agents continue uninterrupted. Zero disruption.
+```
+
+**Behavior:** Server stop → daemon PERSISTS → agents survive. This enables the hot-reload iteration loop where agents developing Flightdeck survive restarts caused by their own code changes.
+
+**Detection:** Dev mode is activated when the server detects it was started by `tsx watch` (via `process.env.TSX_WATCH` or similar). In dev mode, `gracefulShutdown()` simply closes the daemon socket without sending a shutdown message. The daemon interprets a bare socket close (no `daemon.shutdown` received) as "server restarting, keep agents alive."
+
+**Auto-shutdown safety net:** If no server reconnects within the timeout (5 min with no agents, 30 min with active agents), the daemon terminates itself. This prevents orphaned daemons consuming resources if the developer walks away.
+
+### Protocol: Shutdown vs Disconnect
+
+The daemon distinguishes two server exit patterns via the JSON-RPC protocol:
+
+| Server Action | Daemon Interpretation | Daemon Behavior |
+|--------------|----------------------|-----------------|
+| Sends `daemon.shutdown({ persist: false })` then closes socket | **Intentional shutdown** (production) | Terminate all agents, exit daemon |
+| Sends `daemon.shutdown({ persist: true })` then closes socket | **Intentional persist** (override) | Keep agents alive, enter orphaned mode |
+| Closes socket without sending `daemon.shutdown` | **Server crashed or restarting** (dev) | Keep agents alive, enter orphaned mode, start auto-shutdown timer |
+
+```typescript
+// JSON-RPC shutdown message
+interface DaemonShutdownRequest {
+  method: 'daemon.shutdown';
+  params: {
+    persist: boolean;  // true = keep agents alive, false = terminate everything
+  };
+}
+```
+
+**The key design insight:** The daemon's default on unexpected disconnect is to KEEP agents alive (orphaned mode). Only an explicit `persist: false` message triggers agent termination. This is the safe default — it's better to have orphaned agents that auto-shutdown after a timeout than to lose work because a server crash was misinterpreted as an intentional stop.
+
+### Override Flags
+
+For cases where the default mode is wrong:
+
+| Flag | Effect | Use Case |
+|------|--------|----------|
+| `--daemon-persist` | Keep daemon alive on server exit, even in production mode | Long-running production deployments where agents should outlive the server |
+| `--no-daemon-persist` | Stop daemon on server exit, even in dev mode | Developer wants a clean slate on every restart |
+
+These map to the server's shutdown behavior:
+- `--daemon-persist`: server always closes socket without `daemon.shutdown` (like dev mode)
+- `--no-daemon-persist`: server always sends `daemon.shutdown({ persist: false })` (like production mode)
+
+Config file equivalent in `flightdeck.config.yaml`:
+```yaml
+daemon:
+  persistOnShutdown: auto  # 'auto' (default: dev=persist, prod=stop) | 'always' | 'never'
+```
+
+### Integration with Existing Shutdown Flow
+
+Current `gracefulShutdown()` in `index.ts`:
+```typescript
+function gracefulShutdown(signal: string) {
+  // 1. Close daemon socket (new — dev mode: just close, prod mode: send shutdown first)
+  if (daemonClient?.isConnected) {
+    if (shouldPersistDaemon()) {
+      daemonClient.close();  // Silent close → daemon keeps agents
+    } else {
+      await daemonClient.shutdown({ persist: false });  // Explicit stop → daemon terminates agents
+      daemonClient.close();
+    }
+  }
+  // 2. Close HTTP server
+  // 3. Close WebSocket server
+  // 4. Exit
+}
+
+function shouldPersistDaemon(): boolean {
+  if (config.daemon?.persistOnShutdown === 'always') return true;
+  if (config.daemon?.persistOnShutdown === 'never') return false;
+  // 'auto': persist in dev mode, stop in production
+  return isDevMode();  // true when started via tsx watch
+}
+```
+
+This maintains the shutdown order established in the group design review: close daemon socket FIRST, then HTTP, then WS. In dev mode, closing the socket releases the daemon for the new server immediately.
+
+---
+
 ## Security Model
 
 ### Threat Analysis
