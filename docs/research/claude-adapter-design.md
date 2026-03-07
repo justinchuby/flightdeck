@@ -1,8 +1,9 @@
 # ClaudeAdapter Design: Direct SDK Integration
 
 **Author:** Architect (5699527d)  
-**Status:** Draft  
+**Status:** Draft → Reviewed (C2, A1 fixes applied)  
 **Depends on:** R9 (AgentAdapter interface), Daemon design proposal  
+**Aligned with:** [Multi-Backend Adapter Architecture](multi-backend-adapter-architecture.md) (e7f14c5e)  
 
 ---
 
@@ -177,21 +178,37 @@ From `hot-reload-agent-preservation.md`:
 - AcpAdapter: spawns subprocess → communicates via stdio/ndjson → subprocess owns session
 - ClaudeAdapter: calls SDK directly → session runs in-process → Flightdeck owns session
 
-### 4.2 Interface Extension
+### 4.2 Interface Alignment
+
+> **Aligned with** the [Multi-Backend Adapter Architecture](multi-backend-adapter-architecture.md)
+> reconciled interface (e7f14c5e). Uses flat `AdapterStartOptions` with optional
+> fields and `backend` discriminator for backward compatibility.
 
 ```typescript
-// Extended start options
-export interface AdapterStartOptions {
-  cliCommand: string;
-  cliArgs?: string[];
+// ── Types aligned with multi-backend-adapter-architecture.md ────────
+
+type CliProvider = 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude-acp';
+type SdkProvider = 'claude-sdk';
+type BackendType = 'acp' | 'sdk' | 'daemon' | 'mock';
+
+// Flat start options — backward-compatible with existing AcpAdapter callers
+interface AdapterStartOptions {
+  cliCommand: string;         // Required for ACP, ignored by SDK
+  baseArgs?: string[];        // Provider-specific ACP flags
+  cliArgs?: string[];         // User-specified additional args
   cwd?: string;
-  // NEW: Session resume support
-  resumeSessionId?: string;    // Resume a specific session
-  forkSessionId?: string;      // Fork from an existing session
+  sessionId?: string;         // For resume (both ACP and SDK)
+  backend?: BackendType;      // Default: 'acp' for backward compat
+  // SDK-specific (ignored by AcpAdapter):
+  model?: string;
+  apiKey?: string;
+  systemPrompt?: string;
+  maxTurns?: number;
+  allowedTools?: string[];
 }
 
-// NEW: Session info for listing
-export interface SessionInfo {
+// Session info for listing (used by listSessions())
+interface SessionInfo {
   sessionId: string;
   summary: string;
   lastModified: number;
@@ -199,50 +216,89 @@ export interface SessionInfo {
   gitBranch?: string;
 }
 
-// Extended adapter capabilities
-export interface AdapterCapabilities {
+// Adapter capabilities — queryable by consumers
+interface AdapterCapabilities {
   supportsImages: boolean;
   supportsMcp: boolean;
   supportsPlans: boolean;
-  // NEW
-  supportsResume: boolean;      // Can resume prior sessions
-  supportsFork: boolean;        // Can fork sessions
-  supportsSubagents: boolean;   // Can spawn subagents
-  supportsHooks: boolean;       // Can intercept tool calls
+  supportsUsage: boolean;          // Token/cost tracking
+  supportsSessionResume: boolean;  // Can resume sessions
+  supportsThinking: boolean;       // Emits thinking events
+  requiresProcess: boolean;        // true for subprocess, false for SDK
 }
 
-// Factory update
-export interface AdapterFactoryOptions {
-  type: 'acp' | 'claude' | 'mock';
+// AgentAdapter gains backend + capabilities fields
+interface AgentAdapter extends EventEmitter {
+  readonly type: string;
+  readonly backend: BackendType;               // NEW
+  readonly capabilities: AdapterCapabilities;  // NEW (was standalone)
+  readonly isConnected: boolean;
+  readonly isPrompting: boolean;
+  readonly promptingStartedAt: number | null;
+  readonly currentSessionId: string | null;
+  readonly supportsImages: boolean;
+
+  start(opts: AdapterStartOptions): Promise<string>;
+  prompt(content: PromptContent, opts?: PromptOptions): Promise<PromptResult>;
+  cancel(): Promise<void>;
+  terminate(): void;
+  resolvePermission(approved: boolean): void;
+}
+
+// Factory expanded for all backend types
+interface AdapterFactoryOptions {
+  type: BackendType;
+  provider?: CliProvider | SdkProvider;
   autopilot?: boolean;
-  // Claude-specific
-  apiKey?: string;
   model?: string;
 }
 ```
+
+**Why flat options instead of discriminated union?** (per multi-backend doc)
+The discriminated union (`AcpStartOptions | SdkStartOptions`) is more type-safe but breaks
+backward compatibility — every existing `start()` call site needs updating. Flat with optional
+fields enables incremental migration: add `backend: 'sdk'` to new callers, existing ACP callers
+work unchanged.
 
 ### 4.3 ClaudeAdapter Implementation
 
 ```typescript
 import { query, listSessions, type Query, type Options, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import type {
   AgentAdapter, AdapterStartOptions, PromptContent,
   PromptOptions, PromptResult, UsageInfo, ToolCallInfo,
-  ToolUpdateInfo, PlanEntry, PermissionRequest
+  ToolUpdateInfo, PlanEntry, PermissionRequest,
+  AdapterCapabilities, BackendType
 } from './types.js';
 
 export class ClaudeAdapter extends EventEmitter implements AgentAdapter {
-  readonly type = 'claude';
+  readonly type = 'claude-sdk';
+  readonly backend: BackendType = 'sdk';
+  readonly capabilities: AdapterCapabilities = {
+    supportsImages: true,
+    supportsMcp: true,
+    supportsPlans: false,
+    supportsUsage: true,
+    supportsSessionResume: true,
+    supportsThinking: true,
+    requiresProcess: false,
+  };
   
+  // Two-layer session ID: Flightdeck ID is returned immediately from start(),
+  // SDK session ID is captured asynchronously and mapped via sdkSessionId.
+  private flightdeckSessionId: string | null = null;
+  private sdkSessionId: string | null = null;
+
   private _isConnected = false;
   private _isPrompting = false;
   private _promptingStartedAt: number | null = null;
-  private sessionId: string | null = null;
   private activeQuery: Query | null = null;
   private abortController: AbortController | null = null;
   private cwd: string = process.cwd();
   private model: string;
+  private autopilot: boolean;
   private pendingPermission: {
     resolve: (result: { allow: boolean }) => void;
   } | null = null;
@@ -257,52 +313,41 @@ export class ClaudeAdapter extends EventEmitter implements AgentAdapter {
   get isConnected() { return this._isConnected; }
   get isPrompting() { return this._isPrompting; }
   get promptingStartedAt() { return this._promptingStartedAt; }
-  get currentSessionId() { return this.sessionId; }
+  get currentSessionId() { return this.flightdeckSessionId; }
   get supportsImages() { return true; }
 
   // ── Start / Resume ───────────────────────────────────────
+  //
+  // FIX C2: start() returns a stable Flightdeck-generated UUID immediately.
+  // AgentManager can use this for session-to-agent mapping right away.
+  // The real SDK session ID is captured asynchronously during the first
+  // prompt() call and stored in sdkSessionId. The mapping between
+  // flightdeckSessionId and sdkSessionId is persisted in the
+  // agent_sessions table.
+  //
   async start(opts: AdapterStartOptions): Promise<string> {
     this.cwd = opts.cwd ?? process.cwd();
     this.abortController = new AbortController();
     
-    const sdkOptions: Options = {
-      cwd: this.cwd,
-      model: this.model,
-      abortController: this.abortController,
-      // Tools: inherit Claude Code's built-in tools
-      tools: { type: 'preset', preset: 'claude_code' },
-      // Load project settings (CLAUDE.md, etc.)
-      settingSources: ['project'],
-      // Permission handling
-      permissionMode: this.autopilot ? 'acceptEdits' : 'default',
-      canUseTool: this.autopilot ? undefined : this.handlePermission.bind(this),
-      // Session management
-      ...(opts.resumeSessionId ? { resume: opts.resumeSessionId } : {}),
-      ...(opts.forkSessionId ? { resume: opts.forkSessionId, forkSession: true } : {}),
-      // Hooks for lifecycle events
-      hooks: {
-        SessionStart: [{ hooks: [this.onSessionStart.bind(this)] }],
-        SessionEnd: [{ hooks: [this.onSessionEnd.bind(this)] }],
-        PreToolUse: [{ hooks: [this.onPreToolUse.bind(this)] }],
-        PostToolUse: [{ hooks: [this.onPostToolUse.bind(this)] }],
-      },
-    };
-
-    // NOTE: We do NOT call query() here. query() is called in prompt().
-    // start() just initializes the adapter state.
-    // If resuming, we validate the session exists.
-    if (opts.resumeSessionId) {
+    if (opts.sessionId) {
+      // Resume: reuse the Flightdeck session ID and map to SDK session
       const sessions = await listSessions({ dir: this.cwd });
-      const found = sessions.find(s => s.sessionId === opts.resumeSessionId);
+      const found = sessions.find(s => s.sessionId === opts.sessionId);
       if (!found) {
-        throw new Error(`Session ${opts.resumeSessionId} not found in ${this.cwd}`);
+        throw new Error(`Session ${opts.sessionId} not found in ${this.cwd}`);
       }
-      this.sessionId = opts.resumeSessionId;
+      this.flightdeckSessionId = opts.sessionId;
+      this.sdkSessionId = opts.sessionId;  // For resume, IDs are the same
+    } else {
+      // New session: generate a Flightdeck UUID now.
+      // SDK session ID is captured in prompt() and mapped later.
+      this.flightdeckSessionId = randomUUID();
+      this.sdkSessionId = null;  // Will be set on first prompt()
     }
 
     this._isConnected = true;
-    this.emit('connected', this.sessionId ?? 'pending');
-    return this.sessionId ?? 'pending';
+    this.emit('connected', this.flightdeckSessionId);
+    return this.flightdeckSessionId;
   }
 
   // ── Prompt ───────────────────────────────────────────────
@@ -326,8 +371,15 @@ export class ClaudeAdapter extends EventEmitter implements AgentAdapter {
       settingSources: ['project'],
       permissionMode: this.autopilot ? 'acceptEdits' : 'default',
       canUseTool: this.autopilot ? undefined : this.handlePermission.bind(this),
-      // Resume the session if we have one
-      ...(this.sessionId ? { resume: this.sessionId } : {}),
+      // Resume the SDK session if we have one
+      ...(this.sdkSessionId ? { resume: this.sdkSessionId } : {}),
+      // Hooks for lifecycle events
+      hooks: {
+        SessionStart: [{ hooks: [this.onSessionStart.bind(this)] }],
+        SessionEnd: [{ hooks: [this.onSessionEnd.bind(this)] }],
+        PreToolUse: [{ hooks: [this.onPreToolUse.bind(this)] }],
+        PostToolUse: [{ hooks: [this.onPostToolUse.bind(this)] }],
+      },
     };
 
     try {
@@ -338,10 +390,15 @@ export class ClaudeAdapter extends EventEmitter implements AgentAdapter {
       for await (const message of this.activeQuery) {
         this.processMessage(message);
         
-        // Capture session ID from init message
+        // Capture SDK session ID from init message and persist mapping
         if (message.type === 'system' && message.subtype === 'init') {
-          this.sessionId = message.session_id;
-          this.emit('connected', this.sessionId);
+          this.sdkSessionId = message.session_id;
+          // Emit session_mapped so AgentManager can persist the mapping:
+          //   flightdeckSessionId → sdkSessionId
+          this.emit('session_mapped', {
+            flightdeckSessionId: this.flightdeckSessionId,
+            sdkSessionId: this.sdkSessionId,
+          });
         }
 
         // Capture result
@@ -353,8 +410,7 @@ export class ClaudeAdapter extends EventEmitter implements AgentAdapter {
               outputTokens: message.usage.output_tokens,
             };
           }
-          // Persist session ID for future resume
-          this.sessionId = message.session_id;
+          this.sdkSessionId = message.session_id;
         }
       }
 
@@ -533,37 +589,50 @@ export class ClaudeAdapter extends EventEmitter implements AgentAdapter {
 
 ### 4.4 SQLite Session Persistence
 
-The SDK handles its own session persistence at `~/.claude/projects/`. For Flightdeck, we need additional metadata in our database to link sessions to agents:
+The SDK handles its own session persistence at `~/.claude/projects/`. For Flightdeck, we need additional metadata in our database to link sessions to agents.
+
+**Two-layer session ID design (C2 fix):**
+- `flightdeck_session_id`: Generated by `start()` immediately via `randomUUID()`. Returned to AgentManager for instant mapping.
+- `sdk_session_id`: Captured asynchronously from the SDK's `SystemMessage` init event during the first `prompt()` call. May be the same as `flightdeck_session_id` for resumed sessions.
+- The `session_mapped` event (emitted during first prompt) tells AgentManager to persist the mapping.
 
 ```sql
 -- New table: agent_sessions (links Flightdeck agents to SDK sessions)
 CREATE TABLE agent_sessions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  agent_id TEXT NOT NULL,                 -- Flightdeck agent UUID
-  session_id TEXT NOT NULL,               -- Claude SDK session UUID
-  adapter_type TEXT NOT NULL DEFAULT 'claude',
+  agent_id TEXT NOT NULL,                       -- Flightdeck agent UUID
+  flightdeck_session_id TEXT NOT NULL UNIQUE,   -- Returned by start(), used by AgentManager
+  sdk_session_id TEXT,                          -- From SDK init, NULL until first prompt()
+  adapter_type TEXT NOT NULL DEFAULT 'claude',  -- 'claude' | 'acp'
   cwd TEXT NOT NULL,
   model TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_active_at TEXT NOT NULL DEFAULT (datetime('now')),
-  status TEXT NOT NULL DEFAULT 'active',  -- active | paused | terminated
+  status TEXT NOT NULL DEFAULT 'active',        -- active | paused | terminated
   total_input_tokens INTEGER DEFAULT 0,
   total_output_tokens INTEGER DEFAULT 0,
   total_cost_usd REAL DEFAULT 0.0,
-  metadata TEXT                           -- JSON: { gitBranch, summary, ... }
+  metadata TEXT                                 -- JSON: { gitBranch, summary, ... }
 );
 
 CREATE INDEX idx_agent_sessions_agent ON agent_sessions(agent_id);
-CREATE INDEX idx_agent_sessions_session ON agent_sessions(session_id);
+CREATE INDEX idx_agent_sessions_fd_session ON agent_sessions(flightdeck_session_id);
+CREATE INDEX idx_agent_sessions_sdk_session ON agent_sessions(sdk_session_id);
 CREATE INDEX idx_agent_sessions_status ON agent_sessions(status);
 ```
+
+**Session mapping lifecycle:**
+1. `start()` → inserts row with `flightdeck_session_id`, `sdk_session_id = NULL`
+2. First `prompt()` → SDK returns init message → `session_mapped` event → UPDATE sets `sdk_session_id`
+3. Future resumes use `sdk_session_id` for `query({ resume })`, `flightdeck_session_id` for agent lookups
+4. For resumed sessions, `flightdeck_session_id === sdk_session_id` (no mapping needed)
 
 **What to persist in Flightdeck DB vs what the SDK handles:**
 
 | Data | Where | Why |
 |------|-------|-----|
 | Conversation history | SDK (`~/.claude/`) | SDK manages JSONL files natively |
-| Session ↔ agent mapping | Flightdeck DB | Link sessions to our agent model |
+| Session ↔ agent mapping | Flightdeck DB | Link Flightdeck IDs to SDK IDs |
 | Token usage / cost | Flightdeck DB | Aggregate billing, budget enforcement |
 | Permission decisions | Flightdeck DB | Audit trail |
 | Session status | Flightdeck DB | Track active/paused/terminated |
@@ -573,7 +642,7 @@ CREATE INDEX idx_agent_sessions_status ON agent_sessions(status);
 
 | SDK Source | Adapter Event | Notes |
 |-----------|---------------|-------|
-| `SystemMessage` (init) | `'connected'` (sessionId) | First message; contains session_id |
+| `SystemMessage` (init) | `'session_mapped'` ({flightdeckSessionId, sdkSessionId}) | Maps Flightdeck UUID → SDK UUID |
 | `SystemMessage` (compact_boundary) | `'text'` (notification) | Context was compacted |
 | `AssistantMessage` → text block | `'text'` (text) | Claude's response text |
 | `AssistantMessage` → thinking block | `'thinking'` (text) | Extended thinking output |
@@ -696,10 +765,11 @@ The ClaudeAdapter translates the richer SDK permission request into our `Permiss
 **Daemon startup flow:**
 ```
 1. Daemon starts
-2. Read agent_sessions table for status='active' sessions
-3. For each: create ClaudeAdapter, call start({ resumeSessionId })
-4. Agents resume with full context from prior conversation
-5. API server connects to daemon, AgentManager discovers running agents
+2. Read agent_sessions table for status='active', get sdk_session_id for each
+3. For each: create ClaudeAdapter, call start({ sessionId: sdk_session_id })
+4. start() returns flightdeck_session_id immediately — mapping already exists in DB
+5. Agents resume with full context from prior conversation
+6. API server connects to daemon, AgentManager discovers running agents via flightdeck_session_id
 ```
 
 ---
@@ -846,3 +916,12 @@ The subprocess model can't survive server restarts without a daemon. The in-proc
 4. **SDK handles the hard parts.** Session persistence, context compaction, tool execution, retry logic — all built in. The adapter is ~400 lines of event translation, not 2000 lines of agent loop reimplementation.
 
 5. **Hooks unlock governance.** The SDK's 18 hook events map cleanly to our R4 GovernancePipeline. Pre/post tool hooks → governance pre/post hooks. This is a natural integration point.
+
+---
+
+## 9. Review Log
+
+| Finding | Severity | Fix Applied |
+|---------|----------|-------------|
+| **C2**: `start()` returns `'pending'` for new sessions — breaks AgentManager session-to-agent mapping | MEDIUM | Two-layer session ID: `start()` generates a Flightdeck UUID (`randomUUID()`) returned immediately. SDK session ID captured asynchronously during first `prompt()` and mapped via `session_mapped` event. SQLite `agent_sessions` table stores both IDs. |
+| **A1**: `AdapterStartOptions` conflicts with multi-backend-adapter-architecture.md | HIGH | Replaced custom interface with flat `AdapterStartOptions` from reconciled design (e7f14c5e): `backend?: BackendType`, `sessionId?: string` (not `resumeSessionId`/`forkSessionId`), added `baseArgs`, `model`, `apiKey`, `systemPrompt`, `maxTurns`, `allowedTools`. Aligned `AdapterCapabilities` fields (`supportsUsage`, `supportsSessionResume`, `supportsThinking`, `requiresProcess`). Aligned `AdapterFactoryOptions` with `BackendType` + `provider`. |
