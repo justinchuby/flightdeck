@@ -47,3 +47,8 @@ export {
   isValidScope,
   validateMessage,
 } from './types.js';
+
+export { ForkListener, type ForkListenerOptions, type ForkProcess } from './ForkListener.js';
+
+export { ForkTransport } from './ForkTransport.js';
+export type { ForkTransportOptions } from './ForkTransport.js';
