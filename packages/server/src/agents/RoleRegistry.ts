@@ -411,14 +411,11 @@ Create a new agent with a specific role and model (optionally assign a task imme
 \`⟦⟦ CREATE_AGENT {"role": "code-reviewer", "model": "gemini-3-pro-preview", "task": "Review the auth implementation"} ⟧⟧\`
 \`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "sessionId": "session-id-to-resume"} ⟧⟧\`
 
-**Link agents to DAG tasks:** When a DAG task already exists (from DECLARE_TASKS or ADD_TASK), ALWAYS include \`dagTaskId\` to explicitly bind the agent to that task:
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Extract RoPEConfig", "dagTaskId": "rope-config"} ⟧⟧\`
-Without \`dagTaskId\`, the system falls back to fuzzy matching which can mismatch or create duplicates. See AUTO-DAG FROM DELEGATIONS below for details.
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Extract RoPEConfig", "dagTaskId": "rope-config"} ⟧⟧\`  ← always include dagTaskId when a DAG task exists (see AUTO-DAG section below)
 
 Delegate a task to an existing agent (use the agent's ID from QUERY_CREW or creation ACK):
 \`⟦⟦ DELEGATE {"to": "agent-id", "task": "Fix the remaining test failures", "context": "See reviewer feedback above"} ⟧⟧\`
-\`⟦⟦ DELEGATE {"to": "agent-id", "task": "Remove dead fields", "dagTaskId": "dead-fields"} ⟧⟧\`
-Include \`dagTaskId\` when delegating work that corresponds to an existing DAG task (same rationale as CREATE_AGENT above).
+\`⟦⟦ DELEGATE {"to": "agent-id", "task": "Remove dead fields", "dagTaskId": "dead-fields"} ⟧⟧\`  ← always include dagTaskId
 
 Send a message to a running agent (use the agent's ID):
 \`⟦⟦ AGENT_MESSAGE {"to": "agent-id", "content": "Please also add input validation"} ⟧⟧\`
@@ -512,7 +509,14 @@ When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG tas
   \`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Remove dead fields", "dagTaskId": "dead-fields"} ⟧⟧\`
   \`⟦⟦ DELEGATE {"to": "agent-id", "task": "Review RoPEConfig changes", "dagTaskId": "review-rope"} ⟧⟧\`
 - Without \`dagTaskId\`, the system falls back to fuzzy matching by role and description. This is unreliable — it can match the wrong task or create duplicates.
-- Rule of thumb: Always include \`dagTaskId\`.
+- Rule of thumb: if you know the task ID, always include \`dagTaskId\`. Only omit it for ad-hoc work that has no pre-declared DAG task.
+
+**Ad-hoc delegation (no DECLARE_TASKS):** If you're delegating emergent work that isn't in the DAG yet, use ADD_TASK first, then DELEGATE with dagTaskId:
+  \`⟦⟦ ADD_TASK {"taskId": "fix-auth-bug", "role": "developer", "description": "Fix auth token expiry bug", "dependsOn": ["setup-auth"]} ⟧⟧\`
+  \`⟦⟦ DELEGATE {"to": "agent-id", "task": "Fix the auth token expiry bug", "dagTaskId": "fix-auth-bug"} ⟧⟧\`
+This ensures the task is properly tracked in the DAG with correct dependencies, rather than relying on auto-creation and the Secretary to infer dependencies after the fact.
+
+**If you see ⚠️ dagTaskId missing:** Run TASK_STATUS to check the current DAG, find the correct task ID, and use it in future delegations. If the task doesn't exist yet, use ADD_TASK to create it.
 
 == ADDITIONAL COMMANDS ==
 Defer non-blocking issues for later follow-up:

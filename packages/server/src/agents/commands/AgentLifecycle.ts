@@ -493,7 +493,7 @@ function linkDelegationToDag(
     if (ctx.taskDAG.getTasks(leadId).length > 0) {
       const method = autoResult.linked ? 'fuzzy-matched' : autoResult.created ? 'auto-created' : 'failed to link';
       logger.warn('delegation', `${commandName} without dagTaskId — ${method} for "${task.slice(0, 80)}". Prefer explicit dagTaskId.`);
-      dagNote += `\n💡 Tip: Add dagTaskId to ${commandName} for reliable DAG tracking.`;
+      dagNote += `\n⚠️ dagTaskId missing — task was ${method}. Include dagTaskId in ${commandName} to avoid mismatches.`;
     }
     if (autoResult.linked) {
       dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]` + dagNote;
