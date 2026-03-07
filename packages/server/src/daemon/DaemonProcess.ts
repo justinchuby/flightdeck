@@ -187,8 +187,11 @@ export class DaemonProcess {
     return this._mode;
   }
 
-  /** Switch lifecycle mode at runtime. */
+  /** Switch lifecycle mode at runtime. Throws if mode is invalid. */
   setMode(mode: DaemonLifecycleMode): void {
+    if (mode !== 'production' && mode !== 'development') {
+      throw new Error(`Invalid lifecycle mode: '${String(mode)}'. Must be 'production' or 'development'.`);
+    }
     const previous = this._mode;
     this._mode = mode;
     if (previous !== mode) {
@@ -852,6 +855,11 @@ export class DaemonProcess {
     const params = request.params as unknown as ConfigureParams | undefined;
 
     if (params?.mode) {
+      if (params.mode !== 'production' && params.mode !== 'development') {
+        this.sendError(request.id, RPC_ERRORS.INVALID_PARAMS,
+          `Invalid lifecycle mode: '${String(params.mode)}'. Must be 'production' or 'development'.`);
+        return;
+      }
       this.setMode(params.mode);
     }
 

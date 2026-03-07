@@ -572,6 +572,16 @@ describe('Daemon lifecycle modes', () => {
       await daemon.stop();
     });
 
+    it('rejects invalid mode strings at runtime', async () => {
+      const daemon = new DaemonProcess({ socketDir: tempDir, mode: 'production' });
+      await daemon.start();
+
+      expect(() => daemon.setMode('foo' as any)).toThrow(/Invalid lifecycle mode.*foo/);
+      expect(daemon.mode).toBe('production'); // unchanged
+
+      await daemon.stop();
+    });
+
     it('includes mode in auth result', async () => {
       const daemon = new DaemonProcess({ socketDir: tempDir, mode: 'development' });
       await daemon.start();
