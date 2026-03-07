@@ -2,7 +2,8 @@
 
 > **Author**: Architect (e7f14c5e)  
 > **Date**: 2026-03-07  
-> **Depends on**: R9 AgentAdapter (done), Multi-CLI Research (done), Daemon Design Doc (done)
+> **Depends on**: R9 AgentAdapter (done), Multi-CLI Research (done), Daemon Design Doc (done)  
+> **Status**: Canonical reference for AdapterStartOptions (reconciled across multi-cli-acp-research.md and claude-adapter-design.md)
 
 ---
 
@@ -96,44 +97,55 @@ AgentAdapter (interface)
 
 ### Interface Changes
 
-#### 1. Split StartOptions into a discriminated union
+#### 1. Canonical AdapterStartOptions (flat, backward-compatible)
+
+> **Reconciliation note**: An earlier draft proposed a discriminated union
+> (`AcpStartOptions | SdkStartOptions | DaemonStartOptions`). This was rejected
+> because it breaks all 35+ existing `start()` callers — each would need a mandatory
+> `backend` field added. The flat approach with optional fields enables incremental
+> migration: existing ACP callers work unchanged, new SDK callers add `backend: 'sdk'`
+> and SDK-specific fields. If we were starting from scratch, the union would be
+> preferable for type safety. Given R9 is already consumed, pragmatism wins.
+>
+> This is the **canonical interface** — `multi-cli-acp-research.md` and
+> `claude-adapter-design.md` reference this definition.
 
 ```typescript
-// ── Start Options (discriminated union) ─────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────
 
-interface AcpStartOptions {
-  backend: 'acp';
+type CliProvider = 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude-acp';
+type SdkProvider = 'claude-sdk';
+type BackendType = 'acp' | 'sdk' | 'daemon' | 'mock';
+
+// ── Canonical Start Options (flat, backward-compatible) ─────────────
+
+interface AdapterStartOptions {
+  // ACP fields (required for ACP, ignored by SDK):
   cliCommand: string;
-  baseArgs?: string[];      // Provider-specific ACP flags
-  cliArgs?: string[];       // User-specified additional args
+  baseArgs?: string[];        // Provider-specific ACP flags (e.g., ['--experimental-acp'])
+  cliArgs?: string[];         // User-specified additional args
   cwd?: string;
-  sessionId?: string;       // For session/load resume
-}
 
-interface SdkStartOptions {
-  backend: 'sdk';
-  model: string;            // e.g., 'claude-sonnet-4-20250514'
-  apiKey?: string;          // Falls back to env var
-  cwd?: string;
-  sessionId?: string;       // For SDK resumeSession()
-  systemPrompt?: string;    // Agent's system prompt
-  maxTurns?: number;        // Safety limit
-  allowedTools?: string[];  // Tool allowlist
-}
+  // Shared fields:
+  sessionId?: string;         // For resume — ACP uses session/load, SDK uses resumeSession()
+  backend?: BackendType;      // Default: 'acp' for backward compat
 
-interface DaemonStartOptions {
-  backend: 'daemon';
-  socketPath: string;
-  agentId: string;          // ID on daemon side
-  sessionId?: string;
-}
+  // SDK-specific (ignored by AcpAdapter):
+  model?: string;             // e.g., 'claude-sonnet-4-20250514'
+  apiKey?: string;            // Falls back to ANTHROPIC_API_KEY env var
+  systemPrompt?: string;      // Agent's system prompt
+  maxTurns?: number;          // Safety limit
+  allowedTools?: string[];    // Tool allowlist
 
-type AdapterStartOptions = AcpStartOptions | SdkStartOptions | DaemonStartOptions;
+  // Daemon-specific (ignored by AcpAdapter and ClaudeSdkAdapter):
+  socketPath?: string;        // UDS path for daemon connection
+  agentId?: string;           // Agent ID on daemon side
+}
 ```
 
-**Why discriminated union?** Type-safe — each backend gets exactly the config it needs. No optional `cliCommand` that's required for ACP but meaningless for SDK.
+**Why flat instead of discriminated union?** The R9 `AgentAdapter.start()` is already consumed by AgentAcpBridge, AgentManager, and tests. A discriminated union would require every caller to add `backend: 'acp'` — a mechanical but risky mass migration. Flat + optional gives us incremental adoption: existing callers pass `{ cliCommand, cliArgs, cwd }` unchanged (defaults to ACP behavior), new SDK callers add `backend: 'sdk'` and SDK fields. Runtime validation in each adapter's `start()` method catches misconfiguration.
 
-**Backward compatibility**: The old `AdapterStartOptions` shape (`{ cliCommand, cliArgs?, cwd? }`) is structurally compatible with `AcpStartOptions` if we add `backend: 'acp'` to existing callers. Migration is mechanical: add one field to each call site.
+**Precedent**: This is the same pattern Express uses for `RequestHandler` options — one flat type with context-dependent fields rather than overloads per middleware type.
 
 #### 2. Add capabilities to the interface
 
@@ -222,8 +234,7 @@ class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   get supportsImages() { return true; }
 
   async start(opts: AdapterStartOptions): Promise<string> {
-    if (opts.backend !== 'sdk') throw new Error('ClaudeSdkAdapter requires sdk backend options');
-    
+    // SDK adapter ignores ACP-specific fields (cliCommand, baseArgs, cliArgs)
     this.agent = createAgent({
       model: opts.model || this.opts.model || 'claude-sonnet-4-20250514',
       systemPrompt: opts.systemPrompt,
@@ -550,6 +561,11 @@ This enables mixed-backend crews where the model/provider choice is per-role.
 +   allowedTools?: string[];
   }
 
++   // Daemon-specific (ignored by AcpAdapter and ClaudeSdkAdapter):
++   socketPath?: string;
++   agentId?: string;
+  }
+
   interface AgentAdapter extends EventEmitter {
     readonly type: string;
 +   readonly backend: BackendType;
@@ -577,11 +593,8 @@ This enables mixed-backend crews where the model/provider choice is per-role.
   }
 ```
 
-### Why flat options instead of discriminated union
-
-The discriminated union (`AcpStartOptions | SdkStartOptions`) is more type-safe but breaks backward compatibility — every existing `start()` call site needs updating. The flat approach with optional fields is less pure but enables incremental migration: add `backend: 'acp'` to callers one at a time, or never (the default is `'acp'`).
-
-If we were starting from scratch, I'd use the discriminated union. But R9's interface is already consumed by AgentAcpBridge, AgentManager, and tests. Flat + optional is pragmatic.
+> **Note**: The canonical `AdapterStartOptions` definition is in §1 ("Canonical AdapterStartOptions")
+> above. This diff shows only the delta from the current `types.ts` on disk.
 
 ---
 
@@ -607,6 +620,72 @@ If we were starting from scratch, I'd use the discriminated union. But R9's inte
 | Mixed-backend daemon complexity | Medium | SDK agents bypass daemon — simpler, not harder |
 | SDK dependency size | Low | Optional dep, tree-shaked if not used |
 | Event format differences (SDK vs ACP) | Medium | Normalize in adapter, consistent events to consumers |
+
+---
+
+## Security Considerations
+
+### Trust Boundary Differences by Backend Type
+
+The ACP subprocess model and the SDK direct model have fundamentally different trust boundaries. This affects where API keys live, what an attacker gains from a process compromise, and how much isolation the server has from agent code.
+
+#### ACP Subprocess Model (Copilot, Gemini, Cursor, Codex)
+
+```
+┌─────────────────────┐     stdio pipes     ┌──────────────────────┐
+│  Server Process      │ ◄──────────────────► │  CLI Child Process   │
+│  (no API key)        │    JSON-RPC          │  (holds API key in   │
+│                      │                      │   its own env/memory)│
+└─────────────────────┘                      └──────────────────────┘
+```
+
+- **API key location**: In the child process environment (`GITHUB_TOKEN`, `GEMINI_API_KEY`, etc.), NOT in server memory.
+- **Trust boundary**: The server and CLI are separate OS processes. The server sends prompts over stdio; the CLI authenticates with its provider independently.
+- **Compromise impact**: If the server process is compromised, the attacker can send prompts through the CLI (which they could already do), but does NOT automatically gain the API key. They'd need to read `/proc/<pid>/environ` or similar OS-level access.
+- **With daemon**: The trust boundary widens slightly — the daemon holds child processes, so compromising the daemon gives access to the CLIs' stdin/stdout. But API keys remain in child process memory, not daemon memory.
+
+#### SDK Direct Model (Claude Agent SDK)
+
+```
+┌──────────────────────────────────────────┐
+│  Server Process                           │
+│  ┌─────────────────────────────────────┐ │
+│  │  ClaudeSdkAdapter                    │ │
+│  │  - API key in process memory         │ │
+│  │  - Direct HTTPS to api.anthropic.com │ │
+│  └─────────────────────────────────────┘ │
+└──────────────────────────────────────────┘
+```
+
+- **API key location**: In the server process memory (`ANTHROPIC_API_KEY` loaded into the SDK client). This is a **security boundary collapse** — the API key shares address space with all other server code.
+- **Trust boundary**: None between server and agent. The SDK runs in-process; the server IS the agent runtime.
+- **Compromise impact**: If the server process is compromised, the attacker gains the API key directly — it's in the same process memory. They can make arbitrary API calls, exfiltrate the key, or modify agent behavior.
+- **No daemon involvement**: SDK agents are in-process, so the daemon's isolation doesn't help.
+
+#### Comparison Matrix
+
+| Property | ACP Subprocess | SDK Direct |
+|----------|---------------|------------|
+| API key location | Child process env | Server process memory |
+| Process isolation | ✅ Separate PID, address space | ❌ Same process |
+| Compromise → API key | Requires `/proc` or ptrace | Immediate (same memory) |
+| Compromise → agent control | Send prompts via stdio | Full — modify SDK calls |
+| Daemon adds isolation | ✅ Moves children to daemon PID | ❌ N/A (no process) |
+| Key rotation | Restart child with new env | Restart server or hot-swap in memory |
+
+#### Mitigations for SDK Model
+
+1. **Least-privilege API keys**: Use Anthropic API keys scoped to the minimum permissions needed. If the API supports key scoping (rate limits, model restrictions), use it.
+2. **Key injection at startup only**: Read `ANTHROPIC_API_KEY` from env at adapter creation time, don't store it beyond the SDK client instance. If the SDK client is garbage-collected, the key reference should go with it.
+3. **No key logging**: The R5 structured logger already has R12 redaction (`redact()` / `redactObject()`) — ensure API keys are in the redaction pattern list.
+4. **Process-level isolation (future)**: If SDK agents need stronger isolation, they could run in a Worker thread with a restricted `env`. This is a future enhancement, not a Phase 1 requirement.
+5. **Defense in depth**: The server already runs behind authentication (GitHub OAuth). An attacker would need to compromise the server process itself, not just the HTTP endpoint.
+
+#### Assessment
+
+The SDK model's security boundary collapse is a real tradeoff, not a blocker. It's the same trust model used by every server-side SDK integration (Stripe keys in Express servers, AWS credentials in Lambda, etc.). The subprocess model provides slightly better isolation by accident (CLI manages its own auth), but both models rely on the same fundamental assumption: the server process is trusted.
+
+**Recommendation**: Document this tradeoff in operator-facing docs so self-hosted deployments can make informed choices. For managed deployments, the SDK model is acceptable with standard key management practices.
 
 ---
 
