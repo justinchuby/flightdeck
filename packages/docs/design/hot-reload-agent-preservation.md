@@ -724,10 +724,12 @@ This mirrors `AcpAdapter`'s existing `process.on('exit', ...)` handler. The daem
 
 #### Event Buffering on Server Reconnect
 
-When the API server restarts and reconnects to the daemon, there's a window where agent events could be lost (old socket closing, new socket opening). The daemon must buffer events during disconnection:
+When the API server restarts and reconnects to the daemon, there's a window where agent events could be lost (old socket closing, new socket opening). The daemon must buffer events **only during the disconnected window** (not permanently — when a server is connected and consuming events, the buffer stays empty).
 
 - **Buffer size:** Last 100 events per agent, or 30 seconds' worth, whichever is smaller
-- **On reconnect:** Server sends `subscribe(agentId)` for each known agent, daemon replays buffered events in order
+- **Buffer lifecycle:** Start buffering on server disconnect, stop and drain on reconnect
+- **On reconnect:** Server sends `subscribe(agentId, { lastSeenEventId })` for each known agent. Daemon replays events after that ID.
+- **Fresh server restart (no prior state):** Server sends `subscribe(agentId, { fromStart: true })`. Daemon replays: (1) full agent descriptor (role, status, sessionId, task, pid), then (2) all buffered events. This is the reconnect protocol's most important message.
 - **Buffer overflow:** Oldest events dropped (FIFO). Server can request full state sync via `list()` if needed
 
 #### Orphaned Mode (Server Disconnect)
@@ -743,11 +745,22 @@ This is the key behavior that makes the daemon valuable: server crash/restart is
 
 #### Single-Client Mode
 
-The daemon accepts **one server connection at a time**. If a second server attempts to connect (e.g., developer runs `npm run dev` in two terminals):
+The daemon accepts **one server connection at a time**. Connection management:
 
-- Second connection is rejected after auth with error: `{ "error": "Another server is already connected" }`
-- Server logs: `[daemon] Connection rejected — daemon already has an active client`
-- The UI should surface this as: "Another Flightdeck instance is connected to the agent host"
+- **Normal case:** First server connects and authenticates → becomes the active client
+- **Second connection attempt:** Rejected after auth with informative error:
+  ```json
+  { "error": "Connection rejected: server PID 12345 connected 47s ago is still active. If this is stale, wait for heartbeat timeout (10s) or restart the daemon." }
+  ```
+- **Split-brain mitigation (tsx watch fast restart):** When `tsx watch` restarts the server, the old server may still be shutting down (up to 5s graceful timeout). To minimize this window, the server closes the daemon socket connection **FIRST** in `gracefulShutdown()`, before stopping HTTP/WS/services. This releases the daemon for the new server immediately — agent lifecycle is the daemon's responsibility, not the server's.
+
+  **Revised shutdown order:**
+  ```
+  Current:  stop agents → close WS → close HTTP → exit
+  With daemon: close daemon socket → close WS → close HTTP → exit
+  ```
+
+- **Eviction on stale connection:** If the daemon's heartbeat detects the old server is dead (3 missed pings / 30s), it auto-evicts the stale connection. The next server connect succeeds immediately.
 
 Multi-client adds massive complexity for a scenario that shouldn't happen. Single-client is the 80/20 solution.
 
@@ -767,6 +780,46 @@ Error: Socket directory ~/.flightdeck/run/ is owned by uid 0 (root), but daemon
 is running as uid 1000. This usually means a previous run used sudo. Fix:
   sudo rm -rf ~/.flightdeck/run/
 ```
+
+#### Zombie Agent Escalation
+
+When terminating an agent (via `terminate(agentId)`, emergency stop, or daemon shutdown), the daemon uses escalating force:
+
+```
+SIGTERM → wait 5s → SIGKILL → wait 2s → force remove from roster
+```
+
+If SIGKILL doesn't reap the process within 2s (true zombie in Z state), the daemon logs an error and forcibly removes the agent from its internal roster. Node's `child_process` calls `waitpid()` internally which should handle this, but the 2s timeout is belt-and-suspenders.
+
+This mirrors `AcpAdapter.terminate()` (line ~370 in AcpAdapter.ts) which already sends `stdin.end()` + `process.kill()`.
+
+#### Auto-Shutdown Timer
+
+If the developer closes their terminal or the server crashes hard (SIGKILL, OOM), the daemon keeps running with potentially orphaned agents consuming resources. The daemon implements an auto-shutdown timer:
+
+- **No server connected + no running agents:** Auto-shutdown after **5 minutes**
+- **No server connected + agents still running:** Auto-shutdown after **30 minutes** (developer may be restarting their environment)
+- **Server connected:** Timer is cancelled/not started
+
+The countdown is written to a status file so `flightdeck daemon status` can display: `Auto-shutdown in 4m23s (no server connected, 3 agents running)`.
+
+The daemon also watches for its parent process (`dev.mjs`) — if the parent exits, start the countdown immediately.
+
+#### Reconnect State Strategy
+
+On server reconnect, the server needs to rebuild in-memory state (delegations, DAG task assignments, completion tracking, message queues). Two options were considered:
+
+**Option A (chosen): Server reconstructs from SQLite.** Delegations, DAG tasks, file locks, and agent metadata are already persisted. The server's existing "resume project" flow rebuilds this state. The daemon only provides: agent IDs, session IDs, PIDs, and event streams. All business logic state lives in the server + SQLite.
+
+**Option B (rejected): Daemon persists server snapshots.** Server sends `snapshot(state)` every 30s, daemon stores it, server calls `getSnapshot()` on reconnect. Rejected because it couples the daemon to server internals and makes the daemon a second source of truth.
+
+**Principle: The daemon stays dumb, the server stays smart.** The daemon understands processes, pipes, and events. It does not understand delegations, DAG tasks, or business logic.
+
+#### Protocol Hardening
+
+**JSON-RPC message size limit:** Max 10MB per message. A malicious or buggy client sending a multi-GB payload would cause OOM. The daemon enforces this on the socket read buffer and disconnects violators.
+
+**Daemon structured logging:** The daemon uses the same pino logger from R5, enabling correlation of daemon events with server events via `agentId`. At minimum, the daemon logs: connection events, auth attempts (success/fail), spawn/terminate calls, disconnections, and auto-shutdown timer state.
 
 ### Copilot SDK `--resume` Impact
 
@@ -802,7 +855,15 @@ Existing endpoints work unchanged — `POST /api/agents` (spawn), `DELETE /api/a
 | `daemon:reconnecting` | `{}` | Server lost daemon, attempting reconnect |
 | `daemon:fallback` | `{}` | Server fell back to direct ACP spawn |
 
-**Key R9 alignment (@e7f14c5e):** The `AgentAdapter` interface from R9 is exactly the abstraction boundary the daemon client needs. `AcpAdapter` implements it for direct spawn; a future `DaemonAdapter` implements the same interface, proxying through the socket. All downstream code (AgentManager, CommandDispatcher, routes) sees zero changes.
+**Key R9 alignment (@e7f14c5e):** The `AgentAdapter` interface from R9 (`packages/server/src/adapters/types.ts`) is exactly the abstraction boundary the daemon client needs. The migration path:
+
+1. **Current:** `createAdapter()` returns `AcpAdapter` (direct spawn via child_process)
+2. **With daemon:** `createAdapter()` returns `DaemonAdapter` (proxy via Unix socket JSON-RPC)
+3. **Fallback:** If daemon unavailable, `createAdapter()` falls back to `AcpAdapter` silently
+
+The adapter factory in `adapters/index.ts` already has a `type` parameter for this. `DaemonAdapter` serializes `AgentAdapter` method calls (start, prompt, terminate) to JSON-RPC and deserializes events back. Zero changes to AgentManager, AgentAcpBridge, CommandDispatcher, or any route files. The entire daemon integration is contained to: one new adapter class + factory logic + container wiring.
+
+**This is the 10x architectural win — R9 pre-built the seam.**
 
 ### Future Considerations
 
@@ -840,65 +901,66 @@ Items identified during design review that are worth noting but not specced in d
 
 ## Implementation Timeline (AI-Assisted, 12 Agents)
 
-The original estimates (1-2 days for Phase 1, 2-3 weeks for Phase 2) assumed a single developer working sequentially. With 12 AI agents working in parallel, the critical path compresses to hours.
+The original estimates (1-2 days for Phase 1, 2-3 weeks for Phase 2) assumed a single developer working sequentially. With 12 AI agents working in parallel, the critical path compresses significantly. Timeline revised based on group consensus (@e7f14c5e, @bb14c13b).
 
-### Phase 1: Enhanced Auto-Resume — ~1 hour
+### Phase 1: Enhanced Auto-Resume — ~3-4 hours
 
 Three agents in parallel, all workstreams independent:
 
 | Agent | Task | Estimated |
 |-------|------|-----------|
-| Developer A | Roster persistence in `gracefulShutdown()` + auto-resume on startup | ~1 hour |
-| Developer B | UI banner ("🔄 Resuming N agents...") + WebSocket notification | ~1 hour |
-| QA Tester | Integration test: restart server during active session, verify resume | ~1 hour |
+| Developer A | Roster persistence in `gracefulShutdown()` + auto-resume on startup | ~2-3 hours |
+| Developer B | UI banner ("🔄 Resuming N agents...") + WebSocket notification | ~2-3 hours |
+| QA Tester | Integration test: restart server during active session, verify resume | ~3-4 hours |
 
-**Critical path:** ~1 hour.
+**Critical path:** ~3-4 hours.
 
-### Phase 2: Agent Host Daemon — ~4-6 hours
+### Phase 2: Agent Host Daemon — ~2-2.5 days
 
-The daemon has ~8 independent workstreams. With 12 agents, the constraint is dependency sequencing, not headcount.
+The daemon itself is ~300 lines, but the reconnect protocol (event buffering, replay, state reconciliation) and operational hardening (single-client, auto-shutdown, zombie escalation) are the real work.
 
-#### Hour 1: Protocol Design + Foundation (4 agents in parallel)
+#### Day 1: Core Daemon + DaemonAdapter (8 agents in parallel)
 
 | Agent | Task |
 |-------|------|
 | Architect | Design `AgentHostProtocol.ts` — JSON-RPC types, Zod schemas, event stream format |
-| Developer A | `AgentHostDaemon.ts` skeleton — socket listener, connection lifecycle, auth handshake, stale socket cleanup |
+| Developer A | `AgentHostDaemon.ts` — socket listener, connection lifecycle, auth handshake, stale socket cleanup |
 | Developer B | Security module — token generation, file permissions, socket directory, kill sentinel |
-| Developer C | `AgentHostClient.ts` skeleton — connect, authenticate, reconnect-on-disconnect |
+| Developer C | `DaemonAdapter.ts` — implements `AgentAdapter` interface, proxy via socket |
+| Developer D | `AgentAcpBridge.ts` refactor — swap AcpAdapter for DaemonAdapter when daemon detected |
+| Developer E | `scripts/dev.mjs` update — daemon lifecycle (check, start, health, leave running on server stop) |
+| Developer F | `flightdeck daemon stop/status` CLI commands + emergency kill switch |
+| QA Tester | Unit tests: daemon protocol, auth, spawn/terminate, stale socket cleanup |
 
-#### Hour 2-3: Core Implementation (8 agents, after protocol types land)
-
-| Agent | Task |
-|-------|------|
-| Developer A | Daemon: spawn, terminate, prompt — bridge ACP stdio ↔ socket JSON-RPC |
-| Developer B | Daemon: event subscription, multiplexed event streaming over socket |
-| Developer C | Client: spawn/terminate/prompt proxy methods, matching AcpAdapter's EventEmitter interface |
-| Developer D | Client: event demuxing, reconnect with re-subscription |
-| Developer E | `AgentAcpBridge.ts` refactor — swap AcpAdapter for AgentHostClient when daemon detected |
-| Developer F | `scripts/dev.mjs` update — daemon lifecycle (check, start, health, leave running on server stop) |
-| Developer G | `flightdeck daemon stop/status` CLI commands + emergency kill switch |
-| QA Tester A | Unit tests: daemon protocol, auth, spawn/terminate, stale socket cleanup |
-
-#### Hour 4-6: Integration + Polish (6 agents)
+#### Day 2: Reconnect Protocol + Resilience (6-8 agents)
 
 | Agent | Task |
 |-------|------|
-| Developer A | `AgentManager.ts` refactor — delegate to client, handle daemon-not-available fallback |
-| Developer B | Daemon health monitoring — heartbeat, auto-cleanup of stale sockets, kill sentinel polling |
-| QA Tester A | End-to-end: start daemon → start server → spawn agents → restart server → verify agents alive |
-| QA Tester B | Edge cases: daemon crash recovery, auth failure, stale socket cleanup, emergency kill switch |
+| Developer A | Event buffering — buffer during disconnect, replay on subscribe with lastSeenEventId |
+| Developer B | Orphaned mode — server disconnect detection, keep agents alive, visible countdown |
+| Developer C | Single-client enforcement — reject second connection, informative error, eviction on stale |
+| Developer D | Auto-shutdown timer — 5min/30min, visible in status file, parent process watch |
+| Developer E | Zombie escalation — SIGTERM → 5s → SIGKILL → 2s → force roster removal |
+| Developer F | `AgentManager.ts` refactor — delegate to DaemonAdapter, handle daemon-not-available fallback |
+| QA Tester A | Integration: start daemon → start server → spawn agents → restart server → verify agents alive |
+| QA Tester B | Edge cases: daemon crash recovery, auth failure, split-brain, stale socket, emergency kill |
+
+#### Day 2.5: Hardening + Polish (4-6 agents)
+
+| Agent | Task |
+|-------|------|
+| Developer A | Protocol hardening — 10MB message limit, structured pino logging, socket ownership check |
+| Developer B | Reconnect state reconciliation — server rebuilds delegations/DAG from SQLite on reconnect |
+| QA Tester | End-to-end: full lifecycle including crash recovery, budget-kill, auto-shutdown |
 | Tech Writer | Update README, add `docs/daemon-architecture.md`, emergency procedure docs |
 | Code Reviewer | Review all daemon PRs before merge |
-
-**Critical path:** ~6 hours (protocol → daemon/client core → integration testing). Most work parallelizes after the Hour 1 protocol design.
 
 ### Phase Comparison
 
 | | Single Developer | 12 AI Agents | Speedup |
 |---|---|---|---|
-| Phase 1 | 1-2 days | ~1 hour | ~12x |
-| Phase 2 | 2-3 weeks | ~4-6 hours | ~20-30x |
-| **Total** | **2.5-3.5 weeks** | **~5-7 hours** | **~25x** |
+| Phase 1 | 1-2 days | ~3-4 hours | ~5x |
+| Phase 2 | 2-3 weeks | ~2-2.5 days | ~5-6x |
+| **Total** | **2.5-3.5 weeks** | **~2.5-3 days** | **~5-6x** |
 
-12 agents working in parallel with clear dependency ordering and independent workstreams compress what would be weeks of sequential development into a single focused session.
+The core daemon is straightforward (DaemonAdapter + socket protocol). The bulk of Phase 2 time is in operational resilience — reconnect buffering, split-brain mitigation, crash recovery, and edge case testing. These are inherently sequential to validate correctly.
