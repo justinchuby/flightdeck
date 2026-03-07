@@ -146,10 +146,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       if (this._exited) return;
       this._exited = true;
       const errCode = (err as NodeJS.ErrnoException).code;
-      logger.error('acp', `Spawn error for "${opts.cliCommand}": ${err.message}`, {
-        code: errCode,
-        command: opts.cliCommand,
-      });
+      logger.error({ module: 'acp', msg: 'Spawn error', err: err.message, code: errCode, cliCommand: opts.cliCommand });
       this._isConnected = false;
       this.emit('exit', 1);
     });
@@ -160,7 +157,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       this._isConnected = false;
       const exitCode = typeof code === 'number' ? code : 1;
       if (code === null && signal) {
-        logger.warn('acp', `ACP process exited due to signal "${signal}", normalizing exit code to ${exitCode}`);
+        logger.warn({ module: 'acp', msg: 'Process exited via signal', signal, exitCode });
       }
       this.emit('exit', exitCode);
     });
@@ -358,7 +355,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       }
       flushText();
       this.prompt(merged).catch((err: Error) => {
-        logger.error('acp', `Drained prompt failed: ${err?.message || err}`);
+        logger.error({ module: 'acp', msg: 'Drained prompt failed', err: err?.message || String(err) });
       });
     } else {
       this.emit('idle');

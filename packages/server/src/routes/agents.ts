@@ -42,7 +42,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     const { roleId, task, mode, autopilot, model, sessionId } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) {
-      logger.warn('api', `POST /agents — unknown role: ${roleId}`);
+      logger.warn({ module: 'api', msg: 'POST /agents — unknown role', roleId });
       return res.status(400).json({ error: `Unknown role: ${roleId}` });
     }
     try {
@@ -57,10 +57,10 @@ export function agentsRoutes(ctx: AppContext): Router {
       }
 
       const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined, undefined, options);
-      logger.info('api', `POST /agents — ${sessionId ? 'resumed' : 'spawned'} ${role.name} (${agent.id.slice(0, 8)})`, { model: model || role.model, sessionId });
+      logger.info({ module: 'api', msg: `POST /agents — ${sessionId ? 'resumed' : 'spawned'}`, agentId: agent.id, roleName: role.name, model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
-      logger.error('api', `POST /agents — ${err.message}`);
+      logger.error({ module: 'api', msg: 'POST /agents failed', err: err.message });
       res.status(429).json({ error: err.message });
     }
   });
@@ -78,7 +78,7 @@ export function agentsRoutes(ctx: AppContext): Router {
       agentManager.markHumanInterrupt(agent.id);
       res.json({ ok: true });
     } catch (err) {
-      logger.debug('api', 'Failed to interrupt agent', { error: (err as Error).message });
+      logger.debug({ module: 'api', msg: 'Failed to interrupt agent', err: (err as Error).message });
       res.json({ ok: false, error: 'Cancel not supported for this agent mode' });
     }
   });
@@ -125,7 +125,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     const { text } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
-    logger.info('api', `Input → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+    logger.info({ module: 'api', msg: 'Input received', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80) });
     agent.write(text);
     res.json({ ok: true });
   });
@@ -147,12 +147,12 @@ export function agentsRoutes(ctx: AppContext): Router {
     const content = buildContentBlocks(formatted, attachments, agent.supportsImages);
 
     if (mode === 'interrupt') {
-      logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      logger.info({ module: 'api', msg: 'Interrupt message', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80), attachments: attachments?.length || 0 });
       agentManager.markHumanInterrupt(agent.id);
       await agent.interruptWithMessage(content);
       res.json({ ok: true, mode: 'interrupt', status: agent.status });
     } else {
-      logger.info('api', `Queued message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      logger.info({ module: 'api', msg: 'Queued message', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80), attachments: attachments?.length || 0 });
       agent.queueMessage(content);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount, status: agent.status });
     }
@@ -164,7 +164,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     const { model } = req.body;
     if (model !== undefined) {
       agent.model = model;
-      logger.info('api', `Updated model for ${agent.role.name} (${req.params.id.slice(0, 8)}): ${model}`);
+      logger.info({ module: 'api', msg: 'Model updated', agentId: req.params.id, roleName: agent.role.name, model });
     }
     res.json(agent.toJSON());
   });

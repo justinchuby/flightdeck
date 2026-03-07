@@ -50,7 +50,7 @@ export class WebSocketServer {
     // EADDRINUSE is handled by listenWithRetry in index.ts (auto-port-finding);
     // this handler catches any residual or runtime WSS errors.
     this.wss.on('error', (err: Error & { code?: string }) => {
-      logger.error('ws', `WebSocket server error: ${err.message}`);
+      logger.error({ module: 'comms', msg: 'WebSocket server error', err: err.message });
     });
 
     this.wss.on('connection', (ws, req) => {
@@ -419,10 +419,10 @@ export class WebSocketServer {
         if (msg.agentId) {
           const agent = this.agentManager.get(msg.agentId);
           if (agent) {
-            logger.info('ws', `Input → ${agent.role.name} (${msg.agentId.slice(0, 8)}): "${(msg.text || '').slice(0, 80)}"`);
+            logger.info({ module: 'comms', msg: 'WS input', agentId: msg.agentId, roleName: agent.role.name, textPreview: (msg.text || '').slice(0, 80) });
             agent.write(msg.text, { priority: true });
           } else {
-            logger.warn('ws', `Input for unknown agent ${msg.agentId.slice(0, 8)}`);
+            logger.warn({ module: 'comms', msg: 'Input for unknown agent', agentId: msg.agentId });
           }
         }
         break;

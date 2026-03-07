@@ -1,4 +1,5 @@
 import { existsSync, renameSync } from 'fs';
+import { logger } from './utils/logger.js';
 
 /** Hard ceiling for auto-scaling concurrency. Prevents runaway agent spawning. */
 export const MAX_CONCURRENCY_LIMIT = 200;
@@ -31,7 +32,7 @@ function resolveDbPath(explicit: string | undefined): string {
           renameSync(legacyPath + suffix, newPath + suffix);
         }
       }
-      console.log(`📦 Migrated database: ${legacyPath} → ${newPath}`);
+      logger.info({ module: 'config', msg: 'Database migrated', legacyPath, newPath });
     } catch {
       // If rename fails (e.g. permissions), fall back to legacy path
       return legacyPath;

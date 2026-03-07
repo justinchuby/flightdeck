@@ -36,16 +36,16 @@ export class ConfigStore extends EventEmitter {
       try {
         const content = readFileSync(filePath, 'utf-8');
         const { config, warnings } = loadConfig(content, null);
-        for (const w of warnings) logger.warn('config', w);
+        for (const w of warnings) logger.warn({ module: 'config', msg: w });
         this._config = config;
-        logger.info('config', `Loaded config from ${filePath}`);
+        logger.info({ module: 'config', msg: 'Config loaded', filePath });
       } catch (err: any) {
-        logger.warn('config', `Failed to load ${filePath}, using defaults: ${err.message}`);
+        logger.warn({ module: 'config', msg: 'Config load failed, using defaults', filePath, err: err.message });
         this._config = getDefaultConfig();
       }
     } else {
       this._config = getDefaultConfig();
-      logger.info('config', `No config file at ${filePath} — using defaults`);
+      logger.info({ module: 'config', msg: 'No config file, using defaults', filePath });
     }
   }
 
@@ -97,10 +97,10 @@ export class ConfigStore extends EventEmitter {
       const previous = this._config;
       this._config = config;
 
-      for (const w of warnings) logger.warn('config', w);
-      logger.info('config', `Config reloaded: ${diffs.length} change(s)`);
+      for (const w of warnings) logger.warn({ module: 'config', msg: w });
+      logger.info({ module: 'config', msg: 'Config reloaded', changeCount: diffs.length });
       for (const d of diffs) {
-        logger.info('config', `  ${d.section}.${d.field}: ${JSON.stringify(d.oldValue)} → ${JSON.stringify(d.newValue)}`);
+        logger.info({ module: 'config', msg: 'Config change', section: d.section, field: d.field, oldValue: d.oldValue, newValue: d.newValue });
       }
 
       // Emit global reload event
@@ -117,7 +117,7 @@ export class ConfigStore extends EventEmitter {
         } satisfies ConfigSectionChangedEvent);
       }
     } catch (err: any) {
-      logger.error('config', `Config reload failed — keeping previous config: ${err.message}`);
+      logger.error({ module: 'config', msg: 'Config reload failed, keeping previous', err: err.message });
       this.emit('config:reload_failed', { error: err.message, content });
     }
   }

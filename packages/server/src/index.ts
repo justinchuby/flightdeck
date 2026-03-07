@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { getConfig, updateConfig } from './config.js';
+import { logger } from './utils/logger.js';
 import { originValidation } from './middleware/originValidation.js';
 import { authMiddleware, initAuth, getAuthSecret } from './middleware/auth.js';
 import { requestContextMiddleware } from './middleware/requestContext.js';
@@ -139,6 +140,6 @@ function gracefulShutdown(signal: string) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('unhandledRejection', (reason: unknown) => {
-  console.error('Unhandled promise rejection:', reason);
+  logger.error({ module: 'api', msg: 'Unhandled promise rejection', err: String(reason) });
   gracefulShutdown('unhandledRejection');
 });

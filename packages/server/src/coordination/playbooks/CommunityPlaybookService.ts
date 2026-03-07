@@ -219,7 +219,7 @@ export class CommunityPlaybookService {
 
     this.playbooks.push(playbook);
     this.savePlaybooks();
-    logger.info('community', `Published playbook "${playbook.name}"`, { id: playbook.id });
+    logger.info({ module: 'project', msg: 'Playbook published', playbookId: playbook.id, name: playbook.name });
     return playbook;
   }
 
@@ -238,7 +238,7 @@ export class CommunityPlaybookService {
     playbook.updatedAt = new Date().toISOString();
 
     this.savePlaybooks();
-    logger.info('community', `Updated playbook "${playbook.name}"`, { id });
+    logger.info({ module: 'project', msg: 'Playbook updated', playbookId: id, name: playbook.name });
     return playbook;
   }
 
@@ -251,7 +251,7 @@ export class CommunityPlaybookService {
     this.reviews = this.reviews.filter(r => r.playbookId !== id);
     this.savePlaybooks();
     this.saveReviews();
-    logger.info('community', `Unpublished playbook "${removed.name}"`, { id });
+    logger.info({ module: 'project', msg: 'Playbook unpublished', playbookId: id, name: removed.name });
     return true;
   }
 
@@ -286,10 +286,7 @@ export class CommunityPlaybookService {
     this.reviews.push(review);
     this.recalculateRating(playbookId);
     this.saveReviews();
-    logger.info('community', `Review added for playbook "${playbook.name}"`, {
-      playbookId,
-      rating,
-    });
+    logger.info({ module: 'project', msg: 'Review added', playbookId, playbookName: playbook.name, rating });
     return review;
   }
 
@@ -320,10 +317,7 @@ export class CommunityPlaybookService {
 
     this.playbooks.push(forked);
     this.savePlaybooks();
-    logger.info('community', `Forked playbook "${source.name}" → "${forked.name}"`, {
-      sourceId: id,
-      forkId: forked.id,
-    });
+    logger.info({ module: 'project', msg: 'Playbook forked', sourceId: id, forkId: forked.id, sourceName: source.name, forkName: forked.name });
 
     return {
       id: forked.id,
@@ -352,7 +346,7 @@ export class CommunityPlaybookService {
     playbook.version = version;
     playbook.updatedAt = entry.publishedAt;
     this.savePlaybooks();
-    logger.info('community', `Published version ${version} for "${playbook.name}"`, { id });
+    logger.info({ module: 'project', msg: 'Version published', playbookId: id, version, name: playbook.name });
     return true;
   }
 
@@ -370,7 +364,7 @@ export class CommunityPlaybookService {
 
     playbook.featured = featured;
     this.savePlaybooks();
-    logger.info('community', `Set featured=${featured} for "${playbook.name}"`, { id });
+    logger.info({ module: 'project', msg: 'Featured status changed', playbookId: id, featured, name: playbook.name });
     return true;
   }
 
