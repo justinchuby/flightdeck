@@ -238,7 +238,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   onShutdown('agentManager', () => agentManager.shutdownAll());
 
   // SessionResumeManager: persists agent roster on lifecycle events, handles resume on startup
-  const sessionResumeManager = new SessionResumeManager(agentManager, agentRosterRepository, activeDelegationRepository, roleRegistry);
+  const sessionResumeManager = new SessionResumeManager(agentManager, agentRosterRepository, activeDelegationRepository, roleRegistry, effectiveConfig);
   onShutdown('sessionResumeManager', () => sessionResumeManager.dispose());
 
   // ── Tier 5: AgentManager-dependent services ────────────

@@ -6,8 +6,13 @@ import { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js'
 import { SessionResumeManager, type ResumeResult } from '../agents/SessionResumeManager.js';
 import type { AgentJSON } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
+import type { ServerConfig } from '../config.js';
 
 // ── Test helpers ────────────────────────────────────────────────────
+
+const testConfig: Partial<ServerConfig> = {
+  provider: 'copilot', // copilot supports resume
+};
 
 const testRole: Role = {
   id: 'developer',
@@ -109,6 +114,7 @@ describe('SessionResumeManager', () => {
       rosterRepo,
       delegationRepo,
       mockRoleRegistry as any,
+      testConfig as ServerConfig,
     );
   });
 
@@ -377,6 +383,47 @@ describe('SessionResumeManager', () => {
     });
   });
 
+  // ── Provider resume capability ─────────────────────────────────
+
+  describe('provider resume capability', () => {
+    it('reports supportsResume=true for copilot', () => {
+      expect(manager.providerSupportsResume).toBe(true);
+    });
+
+    it('reports supportsResume=false for gemini', () => {
+      const geminiManager = new SessionResumeManager(
+        mockAgentManager as any, rosterRepo, delegationRepo,
+        mockRoleRegistry as any, { ...testConfig, provider: 'gemini' } as ServerConfig,
+      );
+      expect(geminiManager.providerSupportsResume).toBe(false);
+      geminiManager.dispose();
+    });
+
+    it('starts agents fresh when provider does not support resume', async () => {
+      const noResumeManager = new SessionResumeManager(
+        mockAgentManager as any, rosterRepo, delegationRepo,
+        mockRoleRegistry as any, { ...testConfig, provider: 'codex' } as ServerConfig,
+      );
+
+      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1', undefined, { task: 'Build API' });
+      mockAgentManager.spawnResult = { id: 'agent-1', sessionId: null };
+
+      const result = await noResumeManager.resumeAll();
+      expect(result.succeeded).toBe(1);
+      // Should NOT pass resumeSessionId
+      expect(mockAgentManager.spawnCalls[0].resumeSessionId).toBeUndefined();
+      noResumeManager.dispose();
+    });
+
+    it('passes resumeSessionId when provider supports resume', async () => {
+      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-abc');
+
+      await manager.resumeAll();
+
+      expect(mockAgentManager.spawnCalls[0].resumeSessionId).toBe('session-abc');
+    });
+  });
+
   // ── Dispose ───────────────────────────────────────────────────────
 
   describe('dispose', () => {
@@ -445,6 +492,7 @@ describe('SessionResumeManager', () => {
         rosterRepo,
         delegationRepo,
         mockRoleRegistry as any,
+        testConfig as ServerConfig,
       );
 
       // Resume

@@ -23,6 +23,8 @@ import type { AgentRosterRepository, AgentStatus as RosterStatus } from '../db/A
 import type { ActiveDelegationRepository, DelegationRecord } from '../db/ActiveDelegationRepository.js';
 import type { RoleRegistry } from './RoleRegistry.js';
 import type { AgentJSON } from './Agent.js';
+import type { ServerConfig } from '../config.js';
+import { getPreset } from '../adapters/presets.js';
 import { logger } from '../utils/logger.js';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -66,8 +68,15 @@ export class SessionResumeManager {
     private agentRosterRepo: AgentRosterRepository,
     private activeDelegationRepo: ActiveDelegationRepository,
     private roleRegistry: RoleRegistry,
+    private config: ServerConfig,
   ) {
     this.bindLifecycleEvents();
+  }
+
+  /** Check if the current CLI provider supports SDK session resume. */
+  get providerSupportsResume(): boolean {
+    const preset = getPreset(this.config.provider || 'copilot');
+    return preset?.supportsResume ?? false;
   }
 
   // ── Lifecycle event handlers (persist on mutation) ────────────────
@@ -150,28 +159,31 @@ export class SessionResumeManager {
       return { total: 0, succeeded: 0, failed: 0, skipped: 0, results: [] };
     }
 
+    // Check if the current CLI provider supports session resume
+    if (!this.providerSupportsResume) {
+      const provider = this.config.provider || 'copilot';
+      logger.info({
+        module: 'resume',
+        msg: `Provider '${provider}' does not support session resume — starting ${candidates.length} agent(s) fresh`,
+      });
+
+      // Start agents fresh (without resumeSessionId) so they get role + task context
+      const results = await Promise.allSettled(
+        candidates.map((agent) => this.startFresh(agent.agentId)),
+      );
+
+      const mapped = this.mapResults(results, candidates);
+      return this.summarizeResults(candidates.length, mapped);
+    }
+
     logger.info({ module: 'resume', msg: `Attempting to resume ${candidates.length} agent(s)` });
 
     const results = await Promise.allSettled(
       candidates.map((agent) => this.resumeAgent(agent.agentId)),
     );
 
-    const mapped: ResumeResult[] = results.map((r, i) =>
-      r.status === 'fulfilled'
-        ? r.value
-        : { agentId: candidates[i].agentId, success: false, error: String(r.reason) },
-    );
-
-    const succeeded = mapped.filter((r) => r.success).length;
-    const failed = mapped.filter((r) => !r.success && !r.error?.includes('No sessionId')).length;
-    const skipped = mapped.filter((r) => r.error?.includes('No sessionId')).length;
-
-    logger.info({
-      module: 'resume',
-      msg: `Resume complete: ${succeeded} succeeded, ${failed} failed, ${skipped} skipped (no sessionId)`,
-    });
-
-    return { total: candidates.length, succeeded, failed, skipped, results: mapped };
+    const mapped = this.mapResults(results, candidates);
+    return this.summarizeResults(candidates.length, mapped);
   }
 
   /** Resume a single agent by its roster ID. */
@@ -218,6 +230,41 @@ export class SessionResumeManager {
     }
   }
 
+  /** Start an agent fresh (no session resume) — used when provider doesn't support resume. */
+  async startFresh(agentId: string): Promise<ResumeResult> {
+    const record = this.agentRosterRepo.getAgent(agentId);
+    if (!record) {
+      return { agentId, success: false, error: 'Agent not found in roster' };
+    }
+
+    const role = this.roleRegistry.get(record.role);
+    if (!role) {
+      return { agentId, success: false, error: `Role '${record.role}' not found in registry` };
+    }
+
+    const metadata = record.metadata as Record<string, string> | undefined;
+
+    try {
+      const agent = this.agentManager.spawn(
+        role,
+        metadata?.task,
+        metadata?.parentId,
+        undefined,
+        record.model !== 'default' ? record.model : undefined,
+        metadata?.cwd,
+        undefined,           // no resumeSessionId — fresh start
+        agentId,
+        { projectId: record.projectId },
+      );
+
+      return { agentId: agent.id, success: true };
+    } catch (err) {
+      this.agentRosterRepo.updateStatus(agentId, 'terminated');
+      logger.warn({ module: 'resume', msg: 'Agent fresh start failed', agentId, err: String(err) });
+      return { agentId, success: false, error: String(err) };
+    }
+  }
+
   // ── Recovery queries ──────────────────────────────────────────────
 
   /** Get all in-flight delegations (for recovery awareness). */
@@ -231,6 +278,30 @@ export class SessionResumeManager {
   }
 
   // ── Cleanup ───────────────────────────────────────────────────────
+
+  private mapResults(
+    results: PromiseSettledResult<ResumeResult>[],
+    candidates: { agentId: string }[],
+  ): ResumeResult[] {
+    return results.map((r, i) =>
+      r.status === 'fulfilled'
+        ? r.value
+        : { agentId: candidates[i].agentId, success: false, error: String(r.reason) },
+    );
+  }
+
+  private summarizeResults(total: number, mapped: ResumeResult[]): ResumeAllResult {
+    const succeeded = mapped.filter((r) => r.success).length;
+    const failed = mapped.filter((r) => !r.success && !r.error?.includes('No sessionId')).length;
+    const skipped = mapped.filter((r) => r.error?.includes('No sessionId')).length;
+
+    logger.info({
+      module: 'resume',
+      msg: `Resume complete: ${succeeded} succeeded, ${failed} failed, ${skipped} skipped (no sessionId)`,
+    });
+
+    return { total, succeeded, failed, skipped, results: mapped };
+  }
 
   /** Remove all lifecycle event listeners. */
   dispose(): void {
