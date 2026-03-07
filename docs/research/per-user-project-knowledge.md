@@ -297,10 +297,11 @@ POST /api/projects               # Create new project (now also creates project.
 │                        Storage Modes                             │
 │                                                                  │
 │  REPO MODE (storage: 'repo')                                    │
-│  Everything in <cwd>/.flightdeck/                               │
+│  Everything in <git-root>/.flightdeck/                          │
 │  ✓ Committable, shareable with team                             │
 │  ✓ Visible in project directory                                 │
 │  ✗ Pollutes repo if not gitignored                              │
+│  NOTE: Always at git repo root, not process cwd                 │
 │                                                                  │
 │  HOME MODE (storage: 'home')                                    │
 │  Everything in ~/.flightdeck/projects/<id>/                     │
@@ -309,7 +310,7 @@ POST /api/projects               # Create new project (now also creates project.
 │  ✗ Not shareable with team                                      │
 │                                                                  │
 │  HYBRID MODE (storage: 'hybrid')  ← DEFAULT                    │
-│  Team knowledge → <cwd>/.flightdeck/                            │
+│  Team knowledge → <git-root>/.flightdeck/                       │
 │  Personal training → ~/.flightdeck/projects/<id>/               │
 │  ✓ Best of both worlds                                          │
 │  ✓ Current .flightdeck/shared/ usage maps cleanly               │
@@ -320,9 +321,9 @@ POST /api/projects               # Create new project (now also creates project.
 
 | Data Type | Location | Rationale |
 |-----------|----------|-----------|
-| **Agent artifacts** (shared/) | `<cwd>/.flightdeck/shared/` | Team-visible, version-controllable |
-| **Project skills** | `<cwd>/.flightdeck/skills/` | Shared knowledge, committable |
-| **Exports** | `<cwd>/.flightdeck/exports/` | Session exports |
+| **Agent artifacts** (shared/) | `<git-root>/.flightdeck/shared/` | Team-visible, version-controllable |
+| **Project skills** | `<git-root>/.flightdeck/skills/` | Shared knowledge, committable |
+| **Exports** | `<git-root>/.flightdeck/exports/` | Session exports |
 | **Training** (corrections) | `~/.flightdeck/projects/<id>/training/` | Personal, not for team |
 | **Preferences** | `~/.flightdeck/projects/<id>/preferences.yaml` | Personal style choices |
 | **Architecture knowledge** | `~/.flightdeck/projects/<id>/knowledge/` | Auto-learned, could drift |
@@ -341,6 +342,9 @@ export class StorageResolver {
   resolve(projectId: string, dataType: StorageDataType): string {
     const meta = this.getProjectMetadata(projectId);
     const homePath = path.join(homedir(), '.flightdeck', 'projects', projectId);
+    // IMPORTANT: .flightdeck/ goes at the git repo root, NOT process cwd.
+    // meta.cwd stores the repo root (resolved via `git rev-parse --show-toplevel`
+    // at project creation time).
     const repoPath = path.join(meta.cwd, '.flightdeck');
 
     switch (meta.storage) {
@@ -384,7 +388,57 @@ const DATA_TYPE_DIRS: Record<StorageDataType, string> = {
 const TEAM_DATA_TYPES: StorageDataType[] = ['shared', 'skills', 'exports'];
 ```
 
-### 3.4 Migration from Current .flightdeck/shared/
+### 3.4 Git Repo Root Detection
+
+**Critical:** In-repo `.flightdeck/` MUST be placed at the git repository root, not at `process.cwd()`. The current `ensureSharedWorkspace()` uses `agent.cwd || process.cwd()` which may not be the repo root if the server is started from a subdirectory.
+
+```typescript
+// packages/server/src/knowledge/repoRoot.ts
+
+import { execSync } from 'child_process';
+
+/**
+ * Detect the git repo root for the given directory.
+ * Returns the absolute path to the repo root, or the directory itself
+ * if it's not a git repository.
+ *
+ * This is the ONLY correct place to anchor <repo>/.flightdeck/ —
+ * never use process.cwd() or agent.cwd directly.
+ */
+export function resolveRepoRoot(cwd: string): string {
+  try {
+    const root = execSync('git rev-parse --show-toplevel', {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],  // Suppress stderr
+    }).trim();
+    return root;
+  } catch {
+    // Not a git repo — fall back to the directory itself
+    return cwd;
+  }
+}
+```
+
+**Where this gets called:**
+1. **Project creation** — `cwd` stored in `project.yaml` is always `resolveRepoRoot(providedCwd)`, never raw cwd
+2. **`ensureSharedWorkspace()`** — must be updated to use `resolveRepoRoot(agent.cwd)` instead of `agent.cwd || process.cwd()`
+3. **StorageResolver** — `meta.cwd` already stores the repo root (resolved at creation time)
+
+**Update to `ensureSharedWorkspace()` (AgentAcpBridge.ts):**
+```typescript
+// BEFORE (current — may not be repo root):
+const baseDir = agent.cwd || process.cwd();
+const newBase = join(baseDir, '.flightdeck');
+
+// AFTER (anchored at git root):
+const rawDir = agent.cwd || process.cwd();
+const baseDir = resolveRepoRoot(rawDir);
+const newBase = join(baseDir, '.flightdeck');
+```
+
+### 3.5 Migration from Current .flightdeck/shared/
 
 Current state: `.flightdeck/shared/` exists in the repo working directory (gitignored). It contains 144+ agent artifact subdirectories. This maps to **hybrid mode** naturally:
 
@@ -392,7 +446,7 @@ Current state: `.flightdeck/shared/` exists in the repo working directory (gitig
 CURRENT                                    NEW (hybrid mode)
 ─────────────────────                      ─────────────────────────────
 
-<cwd>/.flightdeck/                         <cwd>/.flightdeck/
+<git-root>/.flightdeck/                    <git-root>/.flightdeck/
 ├── shared/                                ├── shared/           ← UNCHANGED
 │   ├── architect-a1b2c3d4/                │   ├── architect-a1b2c3d4/
 │   └── developer-f8e7d6c5/               │   └── developer-f8e7d6c5/
@@ -410,9 +464,9 @@ CURRENT                                    NEW (hybrid mode)
 
 **Migration is additive:** Current `.flightdeck/shared/` continues to work as-is. New files are created alongside (repo) or in home dir (personal). Zero breaking changes.
 
-The `ensureSharedWorkspace()` function in `AgentAcpBridge.ts` (lines 15-37) continues to work — it creates `.flightdeck/shared/` in the repo. The new system adds `~/.flightdeck/projects/<id>/` for personal data.
+The `ensureSharedWorkspace()` function in `AgentAcpBridge.ts` (lines 15-37) needs a one-line update to use `resolveRepoRoot()` (see §3.4). The new system adds `~/.flightdeck/projects/<id>/` for personal data.
 
-### 3.5 WorktreeManager Symlink Update
+### 3.6 WorktreeManager Symlink Update
 
 The current symlink logic in `WorktreeManager.ts` (line 78) symlinks the repo's `.flightdeck` into worktrees. This works unchanged for `repo` and `hybrid` modes. For `home` mode, worktrees need a symlink to the home dir path instead:
 
