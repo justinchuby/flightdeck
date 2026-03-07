@@ -430,10 +430,10 @@ Tables that benefit most from the mirror:
 Default to home dir. User can opt in to repo storage. Both modes use `projects/<id>/` namespacing to support **multiple Flightdeck projects per git repo** (monorepo scenario).
 
 ```
-if (user chose 'repo' at project creation):
+if (user chose 'local' at project creation):
   mirrorRoot = <git-root>/.flightdeck/projects/<project-id>/
 else:
-  mirrorRoot = ~/.flightdeck/projects/<project-id>/   # always the default
+  mirrorRoot = ~/.flightdeck/projects/<project-id>/   # always the default ('user' mode)
 ```
 
 | Scenario | Location | Git-trackable? |
@@ -445,7 +445,7 @@ else:
 
 **Monorepo support**: Project identity is NOT 1:1 with a git repo. Multiple Flightdeck projects can exist in the same repo. The `projects/<id>/` directory under `.flightdeck/` prevents collisions. Project discovery scans for all `project.yaml` files under `<git-root>/.flightdeck/projects/*/` (repo mode) and `~/.flightdeck/projects/*/` (home mode) to find projects linked to the current repo.
 
-The choice is stored in `project.yaml` (`storageLocation: 'home' | 'repo'`, default `'home'`). One location per project — no coexistence.
+The choice is stored in `project.yaml` (`storageLocation: 'user' | 'local'`, default `'user'`). One location per project — no coexistence. Implementation: `StorageManager.getProjectDir(id, mode)` from `'../storage/index.js'`.
 
 ---
 
