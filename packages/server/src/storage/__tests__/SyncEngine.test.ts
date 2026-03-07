@@ -290,4 +290,52 @@ describe('SyncEngine', () => {
       expect(recursiveResult).toBe(0);
     });
   });
+
+  describe('knowledge sync', () => {
+    it('writes knowledge entries as markdown files', () => {
+      const provider = createMockProvider({
+        getKnowledge: () => [
+          { category: 'core' as const, key: 'rules', content: 'Be concise', updatedAt: '2026-01-01T00:00:00Z' },
+          { category: 'semantic' as const, key: 'stack', content: 'TypeScript + React', updatedAt: '2026-01-01T00:00:00Z' },
+        ],
+      });
+      const engine = new SyncEngine(storage, provider);
+      engine.syncNow();
+
+      const projectDir = storage.getProjectDir('test-proj-a1b2');
+      expect(existsSync(join(projectDir, 'knowledge', 'core', 'rules.md'))).toBe(true);
+      expect(existsSync(join(projectDir, 'knowledge', 'semantic', 'stack.md'))).toBe(true);
+
+      const content = readFileSync(join(projectDir, 'knowledge', 'core', 'rules.md'), 'utf-8');
+      expect(content).toContain('Be concise');
+      expect(content).toContain('category: core');
+    });
+
+    it('cleans up orphaned knowledge files when entries are deleted', () => {
+      // First sync with an entry
+      const entries = [
+        { category: 'semantic' as const, key: 'fact', content: 'Old fact', updatedAt: '2026-01-01T00:00:00Z' },
+      ];
+      const provider = createMockProvider({
+        getKnowledge: () => entries,
+      });
+      const engine = new SyncEngine(storage, provider);
+      engine.syncNow();
+
+      const projectDir = storage.getProjectDir('test-proj-a1b2');
+      const filePath = join(projectDir, 'knowledge', 'semantic', 'fact.md');
+      expect(existsSync(filePath)).toBe(true);
+
+      // Second sync with entry removed — simulates deletion from DB
+      entries.length = 0;
+      engine.syncNow();
+
+      // File should be deleted
+      expect(existsSync(filePath)).toBe(false);
+
+      // Manifest should not reference it
+      const manifest = storage.readSyncManifest('test-proj-a1b2');
+      expect(manifest.files['knowledge/semantic/fact.md']).toBeUndefined();
+    });
+  });
 });

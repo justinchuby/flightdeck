@@ -117,9 +117,7 @@ export class KnowledgeStore {
   search(projectId: string, query: string, options?: SearchOptions): KnowledgeEntry[] {
     const limit = options?.limit ?? 20;
     const category = options?.category;
-
-    // Sanitize query for FTS5 — double-quote terms to avoid syntax errors
-    const safeQuery = query.replace(/"/g, '""');
+    const ftsQuery = sanitizeFts5Query(query);
 
     let results: Array<{ id: number }>;
     if (category) {
@@ -131,7 +129,7 @@ export class KnowledgeStore {
            AND k.category = ?
          ORDER BY bm25(knowledge_fts)
          LIMIT ?`,
-        [`"${safeQuery}"`, projectId, category, limit],
+        [ftsQuery, projectId, category, limit],
       );
     } else {
       results = this.db.all<{ id: number }>(
@@ -141,7 +139,7 @@ export class KnowledgeStore {
            AND k.project_id = ?
          ORDER BY bm25(knowledge_fts)
          LIMIT ?`,
-        [`"${safeQuery}"`, projectId, limit],
+        [ftsQuery, projectId, limit],
       );
     }
 
@@ -172,7 +170,7 @@ export class KnowledgeStore {
   searchWithScores(projectId: string, query: string, options?: SearchOptions): ScoredKnowledgeEntry[] {
     const limit = options?.limit ?? 20;
     const category = options?.category;
-    const safeQuery = query.replace(/"/g, '""');
+    const ftsQuery = sanitizeFts5Query(query);
 
     let results: Array<{ id: number; score: number }>;
     if (category) {
@@ -184,7 +182,7 @@ export class KnowledgeStore {
            AND k.category = ?
          ORDER BY bm25(knowledge_fts)
          LIMIT ?`,
-        [`"${safeQuery}"`, projectId, category, limit],
+        [ftsQuery, projectId, category, limit],
       );
     } else {
       results = this.db.all<{ id: number; score: number }>(
@@ -194,7 +192,7 @@ export class KnowledgeStore {
            AND k.project_id = ?
          ORDER BY bm25(knowledge_fts)
          LIMIT ?`,
-        [`"${safeQuery}"`, projectId, limit],
+        [ftsQuery, projectId, limit],
       );
     }
 
@@ -291,4 +289,20 @@ export class KnowledgeStore {
       updatedAt: row.updatedAt,
     };
   }
+}
+
+/**
+ * Sanitize a user query for FTS5.
+ * Splits into individual terms, quotes each to prevent syntax errors,
+ * and joins with implicit AND (FTS5 default operator).
+ * Multi-word queries like "React testing" match entries containing both words
+ * anywhere (not just as an exact phrase).
+ */
+function sanitizeFts5Query(query: string): string {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((term) => `"${term.replace(/"/g, '""')}"`)
+  return terms.join(' ') || '""';
 }

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import YAML from 'yaml';
 import type { StorageManager } from './StorageManager.js';
@@ -152,10 +152,14 @@ export class SyncEngine {
         this.syncFile(projectDir, relPath, mdContent, manifest, newFiles);
       }
 
-      // Carry forward non-knowledge file hashes, mark deleted knowledge files
+      // Clean up orphaned knowledge files and carry forward non-knowledge hashes
       for (const [relPath, hash] of Object.entries(manifest.files)) {
         if (relPath.startsWith('knowledge/') && !seenPaths.has(relPath)) {
-          // Knowledge entry was deleted from DB — don't carry forward (file gets orphaned)
+          // Knowledge entry was deleted from DB — remove the orphaned file
+          const absPath = join(projectDir, relPath);
+          try {
+            if (existsSync(absPath)) unlinkSync(absPath);
+          } catch { /* best-effort cleanup */ }
           continue;
         }
         if (!newFiles[relPath]) {

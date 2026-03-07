@@ -215,6 +215,20 @@ describe('KnowledgeStore', () => {
       const results = store.search(projectId, 'typed superset');
       expect(results.every((r) => r.key !== 'typescript')).toBe(true);
     });
+
+    it('finds entries with multi-word queries (non-phrase, implicit AND)', () => {
+      // "React testing" should match 'stack' entry which has both words non-adjacent
+      const results = store.search(projectId, 'React testing');
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      // The 'stack' entry has "TypeScript and React with vitest for testing"
+      expect(results.some((r) => r.key === 'stack')).toBe(true);
+    });
+
+    it('handles queries with special FTS5 characters', () => {
+      store.put(projectId, 'semantic', 'special', 'C++ and C# are programming languages');
+      const results = store.search(projectId, 'programming');
+      expect(results.some((r) => r.key === 'special')).toBe(true);
+    });
   });
 
   describe('metadata handling', () => {
