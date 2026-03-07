@@ -32,6 +32,12 @@ import { HybridSearchEngine } from './knowledge/HybridSearchEngine.js';
 import { MemoryCategoryManager } from './knowledge/MemoryCategoryManager.js';
 import { TrainingCapture } from './knowledge/TrainingCapture.js';
 
+// ── Imports: Daemon Services ───────────────────────────────
+import { DaemonProcess } from './daemon/DaemonProcess.js';
+import { DaemonClient } from './daemon/DaemonClient.js';
+import { ReconnectProtocol } from './daemon/ReconnectProtocol.js';
+import { MassFailureDetector } from './daemon/MassFailureDetector.js';
+
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
 import { MessageBus } from './comms/MessageBus.js';
 import { EventPipeline, taskCompletedHandler, commitQualityGateHandler, delegationTracker } from './coordination/events/EventPipeline.js';
@@ -165,6 +171,14 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const memoryCategoryManager = new MemoryCategoryManager(knowledgeStore);
   const hybridSearchEngine = new HybridSearchEngine(knowledgeStore);
   const trainingCapture = new TrainingCapture(knowledgeStore);
+
+  // ── Daemon Services ────────────────────────────────────
+  const daemonProcess = new DaemonProcess({
+    mode: (effectiveConfig as any).daemonMode ?? 'development',
+  });
+  const daemonClient = new DaemonClient();
+  const reconnectProtocol = new ReconnectProtocol(daemonClient);
+  const massFailureDetector = new MassFailureDetector();
   const timerRegistry = new TimerRegistry(db.drizzle);
   const costTracker = new CostTracker(db);
   const messageQueueStore = new MessageQueueStore(db);
@@ -344,6 +358,10 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     hybridSearchEngine,
     memoryCategoryManager,
     trainingCapture,
+    daemonProcess,
+    daemonClient,
+    reconnectProtocol,
+    massFailureDetector,
 
     // Lifecycle
     async shutdown() {

@@ -20,6 +20,10 @@ import type { KnowledgeStore } from '../knowledge/KnowledgeStore.js';
 import type { HybridSearchEngine } from '../knowledge/HybridSearchEngine.js';
 import type { MemoryCategoryManager } from '../knowledge/MemoryCategoryManager.js';
 import type { TrainingCapture } from '../knowledge/TrainingCapture.js';
+import type { DaemonProcess } from '../daemon/DaemonProcess.js';
+import type { DaemonClient } from '../daemon/DaemonClient.js';
+import type { ReconnectProtocol } from '../daemon/ReconnectProtocol.js';
+import type { MassFailureDetector } from '../daemon/MassFailureDetector.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { execSync } from 'node:child_process';
 
@@ -64,6 +68,10 @@ export interface AppContext {
   hybridSearchEngine?: HybridSearchEngine;
   memoryCategoryManager?: MemoryCategoryManager;
   trainingCapture?: TrainingCapture;
+  daemonProcess?: DaemonProcess;
+  daemonClient?: DaemonClient;
+  reconnectProtocol?: ReconnectProtocol;
+  massFailureDetector?: MassFailureDetector;
 }
 
 // Rate limiters for expensive operations
