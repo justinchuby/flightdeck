@@ -13,6 +13,7 @@
  * Design: docs/design/agent-server-architecture.md
  */
 import { fork, type ChildProcess } from 'node:child_process';
+import { createConnection, type Socket } from 'node:net';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { logger } from '../utils/logger.js';
@@ -21,9 +22,16 @@ import {
   type TransportState,
   type OrchestratorMessage,
   type AgentServerMessage,
+  type PongMessage,
   validateMessage,
   isAgentServerMessage,
 } from './types.js';
+import {
+  AgentServerHealth,
+  type AgentServerHealthOptions,
+  type HealthState,
+  type HealthStateChange,
+} from '../agents/AgentServerHealth.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -34,6 +42,10 @@ export interface ForkTransportOptions {
   stateDir?: string;
   /** PID filename (default: 'agent-server.pid'). */
   pidFileName?: string;
+  /** Port filename (default: 'agent-server.port'). */
+  portFileName?: string;
+  /** Token filename (default: 'agent-server.token'). */
+  tokenFileName?: string;
   /** Node.js args passed to fork (e.g., ['--max-old-space-size=4096']). */
   execArgv?: string[];
   /** Environment variables for the child process. */
@@ -48,6 +60,8 @@ export interface ForkTransportOptions {
   reconnectDelayMs?: number;
   /** Max consecutive reconnect attempts (default: 5). */
   maxReconnectAttempts?: number;
+  /** TCP host for reconnection (default: '127.0.0.1'). */
+  tcpHost?: string;
 }
 
 /** Internal ready message sent by child on startup. */
@@ -77,10 +91,14 @@ export class ForkTransport implements AgentServerTransport {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
+  private pingCounter = 0;
+  private health: AgentServerHealth | null = null;
 
   private readonly serverScript: string;
   private readonly stateDir: string;
   private readonly pidFilePath: string;
+  private readonly portFilePath: string;
+  private readonly tokenFilePath: string;
   private readonly execArgv: string[];
   private readonly childEnv: Record<string, string>;
   private readonly readyTimeoutMs: number;
@@ -88,11 +106,18 @@ export class ForkTransport implements AgentServerTransport {
   private readonly autoReconnect: boolean;
   private readonly reconnectDelayMs: number;
   private readonly maxReconnectAttempts: number;
+  private readonly tcpHost: string;
+
+  /** TCP socket used for reconnection (null when using IPC). */
+  private tcpSocket: Socket | null = null;
+  private tcpBuffer = '';
 
   constructor(options: ForkTransportOptions) {
     this.serverScript = resolve(options.serverScript);
     this.stateDir = options.stateDir ?? DEFAULT_STATE_DIR;
     this.pidFilePath = join(this.stateDir, options.pidFileName ?? 'agent-server.pid');
+    this.portFilePath = join(this.stateDir, options.portFileName ?? 'agent-server.port');
+    this.tokenFilePath = join(this.stateDir, options.tokenFileName ?? 'agent-server.token');
     this.execArgv = options.execArgv ?? [];
     this.childEnv = options.env ?? {};
     this.readyTimeoutMs = options.readyTimeoutMs ?? 10_000;
@@ -100,6 +125,7 @@ export class ForkTransport implements AgentServerTransport {
     this.autoReconnect = options.autoReconnect ?? true;
     this.reconnectDelayMs = options.reconnectDelayMs ?? 1_000;
     this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
+    this.tcpHost = options.tcpHost ?? '127.0.0.1';
   }
 
   // ── AgentServerTransport interface ────────────────────────────
@@ -122,6 +148,24 @@ export class ForkTransport implements AgentServerTransport {
     // Try reconnecting to an existing agent server first
     const existingPid = this.readPidFile();
     if (existingPid !== null && this.isProcessAlive(existingPid)) {
+      // Prefer TCP reconnection (with auth) when port + token files exist
+      const port = this.readPortFile();
+      const token = this.readTokenFile();
+      if (port !== null && token !== null) {
+        try {
+          await this.reconnectViaTcp(port, token);
+          return;
+        } catch (err) {
+          logger.info({
+            module: 'fork-transport',
+            msg: 'TCP reconnect failed, trying IPC re-fork',
+            pid: existingPid,
+            err: String(err),
+          });
+        }
+      }
+
+      // Fallback: IPC re-fork
       try {
         await this.reconnectToExisting(existingPid);
         return;
@@ -142,6 +186,11 @@ export class ForkTransport implements AgentServerTransport {
 
   async disconnect(): Promise<void> {
     this.cancelReconnect();
+    this.stopHealthCheck();
+
+    if (this.tcpSocket) {
+      this.cleanupTcpSocket();
+    }
 
     if (this.child) {
       // Disconnect the IPC channel but leave the child running (detached)
@@ -152,11 +201,23 @@ export class ForkTransport implements AgentServerTransport {
   }
 
   send(message: OrchestratorMessage): void {
-    if (this._state !== 'connected' || !this.child?.connected) {
+    if (this._state !== 'connected') {
       throw new Error(`Cannot send: transport is ${this._state}`);
     }
 
-    this.child.send(message);
+    // TCP path
+    if (this.tcpSocket && !this.tcpSocket.destroyed) {
+      this.tcpSocket.write(JSON.stringify(message) + '\n');
+      return;
+    }
+
+    // IPC path
+    if (this.child?.connected) {
+      this.child.send(message);
+      return;
+    }
+
+    throw new Error('Cannot send: no active connection');
   }
 
   onMessage(handler: (message: AgentServerMessage) => void): () => void {
@@ -175,6 +236,11 @@ export class ForkTransport implements AgentServerTransport {
   dispose(): void {
     this.disposed = true;
     this.cancelReconnect();
+    this.stopHealthCheck();
+
+    if (this.tcpSocket) {
+      this.cleanupTcpSocket();
+    }
 
     if (this.child) {
       this.detachChild();
@@ -193,6 +259,44 @@ export class ForkTransport implements AgentServerTransport {
   /** Get the PID file path. */
   get pidFile(): string {
     return this.pidFilePath;
+  }
+
+  // ── Health Check ─────────────────────────────────────────────
+
+  /**
+   * Start periodic health checking via ping/pong.
+   * Automatically sends pings and tracks pong responses.
+   * Pong messages are intercepted before reaching normal message handlers.
+   */
+  startHealthCheck(options?: AgentServerHealthOptions): AgentServerHealth {
+    this.stopHealthCheck();
+
+    this.health = new AgentServerHealth(() => {
+      const requestId = `hb-${++this.pingCounter}`;
+      this.send({ type: 'ping', requestId });
+      return requestId;
+    }, options);
+
+    this.health.start();
+    return this.health;
+  }
+
+  /** Stop the health check interval. */
+  stopHealthCheck(): void {
+    if (this.health) {
+      this.health.stop();
+      this.health = null;
+    }
+  }
+
+  /** Current health state, or null if health checking is not active. */
+  get healthState(): HealthState | null {
+    return this.health?.state ?? null;
+  }
+
+  /** The AgentServerHealth instance, or null if not active. */
+  get healthMonitor(): AgentServerHealth | null {
+    return this.health;
   }
 
   // ── Fork new server ───────────────────────────────────────────
@@ -334,6 +438,170 @@ export class ForkTransport implements AgentServerTransport {
     });
   }
 
+  // ── TCP reconnection with auth ────────────────────────────────
+
+  private async reconnectViaTcp(port: number, token: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          this.cleanupTcpSocket();
+          reject(new Error(`TCP reconnect timed out after ${this.reconnectTimeoutMs}ms`));
+        }
+      }, this.reconnectTimeoutMs);
+
+      try {
+        this.tcpSocket = createConnection({ host: this.tcpHost, port });
+      } catch (err) {
+        settled = true;
+        clearTimeout(timeout);
+        reject(new Error(`TCP connect failed: ${String(err)}`));
+        return;
+      }
+
+      this.tcpSocket.setEncoding('utf-8');
+
+      this.tcpSocket.on('connect', () => {
+        // Send AuthenticateMessage as first message
+        const authMsg = {
+          type: 'authenticate',
+          requestId: `auth-${Date.now()}`,
+          token,
+        };
+        this.tcpSocket!.write(JSON.stringify(authMsg) + '\n');
+      });
+
+      this.tcpSocket.on('data', (data: string) => {
+        if (settled) {
+          // After auth, route messages normally
+          this.handleTcpData(data);
+          return;
+        }
+
+        // During auth, look for AuthResultMessage
+        this.tcpBuffer += data;
+        const lines = this.tcpBuffer.split('\n');
+        this.tcpBuffer = lines.pop()!;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          try {
+            const msg = JSON.parse(trimmed);
+            if (msg.type === 'auth_result') {
+              settled = true;
+              clearTimeout(timeout);
+
+              if (msg.success) {
+                this.setupTcpHandlers();
+                this.setState('connected');
+                resolve();
+              } else {
+                this.cleanupTcpSocket();
+                reject(new Error(`TCP auth rejected: ${msg.error ?? 'unknown'}`));
+              }
+              return;
+            }
+            if (msg.type === 'error' && (msg.code === 'AUTH_REQUIRED' || msg.code === 'AUTH_FAILED')) {
+              settled = true;
+              clearTimeout(timeout);
+              this.cleanupTcpSocket();
+              reject(new Error(`TCP auth error: ${msg.message}`));
+              return;
+            }
+          } catch {
+            // Ignore parse errors during auth
+          }
+        }
+      });
+
+      this.tcpSocket.on('error', (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          this.cleanupTcpSocket();
+          reject(new Error(`TCP socket error: ${err.message}`));
+        }
+      });
+
+      this.tcpSocket.on('close', () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          this.tcpSocket = null;
+          reject(new Error('TCP socket closed before auth completed'));
+        }
+      });
+    });
+  }
+
+  private setupTcpHandlers(): void {
+    if (!this.tcpSocket) return;
+
+    // Remove connect-phase listeners and add runtime listeners
+    this.tcpSocket.removeAllListeners('data');
+    this.tcpSocket.removeAllListeners('error');
+    this.tcpSocket.removeAllListeners('close');
+
+    this.tcpSocket.on('data', (data: string) => {
+      this.handleTcpData(data);
+    });
+
+    this.tcpSocket.on('close', () => {
+      logger.info({ module: 'fork-transport', msg: 'TCP connection closed' });
+      this.tcpSocket = null;
+      this.handleUnexpectedDisconnect('TCP connection closed');
+    });
+
+    this.tcpSocket.on('error', (err) => {
+      logger.warn({ module: 'fork-transport', msg: 'TCP socket error', err: String(err) });
+    });
+  }
+
+  /** Parse NDJSON data from TCP socket and dispatch messages. */
+  private handleTcpData(data: string): void {
+    this.tcpBuffer += data;
+    const lines = this.tcpBuffer.split('\n');
+    this.tcpBuffer = lines.pop()!;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      try {
+        const raw = JSON.parse(trimmed);
+        const validated = validateMessage(raw);
+        if (validated && isAgentServerMessage(validated)) {
+          // Feed pongs to the health monitor
+          if (validated.type === 'pong' && this.health) {
+            this.health.recordPong((validated as PongMessage).requestId);
+          }
+
+          for (const handler of this.messageHandlers) {
+            try {
+              handler(validated);
+            } catch (err) {
+              logger.error({ module: 'fork-transport', msg: 'Message handler error', err: String(err) });
+            }
+          }
+        }
+      } catch {
+        logger.warn({ module: 'fork-transport', msg: 'Invalid JSON from TCP', data: data.slice(0, 100) });
+      }
+    }
+  }
+
+  private cleanupTcpSocket(): void {
+    if (!this.tcpSocket) return;
+    this.tcpSocket.removeAllListeners();
+    try { this.tcpSocket.destroy(); } catch { /* ignore */ }
+    this.tcpSocket = null;
+    this.tcpBuffer = '';
+  }
+
   // ── Child process management ──────────────────────────────────
 
   private setupChildHandlers(): void {
@@ -369,6 +637,11 @@ export class ForkTransport implements AgentServerTransport {
   private handleChildMessage(msg: unknown): void {
     const validated = validateMessage(msg);
     if (validated && isAgentServerMessage(validated)) {
+      // Feed pongs to the health monitor
+      if (validated.type === 'pong' && this.health) {
+        this.health.recordPong((validated as PongMessage).requestId);
+      }
+
       for (const handler of this.messageHandlers) {
         try {
           handler(validated);
@@ -489,6 +762,29 @@ export class ForkTransport implements AgentServerTransport {
       }
     } catch {
       // Ignore cleanup errors
+    }
+  }
+
+  // ── Port / Token file readers ─────────────────────────────────
+
+  private readPortFile(): number | null {
+    try {
+      if (!existsSync(this.portFilePath)) return null;
+      const content = readFileSync(this.portFilePath, 'utf-8').trim();
+      const port = parseInt(content, 10);
+      return Number.isFinite(port) && port > 0 && port <= 65535 ? port : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private readTokenFile(): string | null {
+    try {
+      if (!existsSync(this.tokenFilePath)) return null;
+      const token = readFileSync(this.tokenFilePath, 'utf-8').trim();
+      return token.length > 0 ? token : null;
+    } catch {
+      return null;
     }
   }
 

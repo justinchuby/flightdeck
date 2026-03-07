@@ -12,7 +12,7 @@
  * Design: docs/design/agent-server-architecture.md (AS3)
  */
 import { createServer, type Server, type Socket } from 'node:net';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
 import { logger } from '../utils/logger.js';
 import type {
@@ -20,6 +20,7 @@ import type {
   TransportConnection,
   OrchestratorMessage,
   AgentServerMessage,
+  AuthenticateMessage,
 } from './types.js';
 import { validateMessage, isOrchestratorMessage } from './types.js';
 
@@ -30,10 +31,14 @@ export interface ForkListenerOptions {
   portFileDir?: string;
   /** Port file name (default: 'agent-server.port'). */
   portFileName?: string;
+  /** Token file name (default: 'agent-server.token'). */
+  tokenFileName?: string;
   /** TCP host to bind (default: '127.0.0.1'). */
   tcpHost?: string;
   /** TCP port to bind — 0 for OS-assigned (default: 0). */
   tcpPort?: number;
+  /** Auth timeout for TCP connections in ms (default: 5000). */
+  authTimeoutMs?: number;
   /** Override process object for testing. */
   process?: ForkProcess;
 }
@@ -49,9 +54,14 @@ export interface ForkProcess {
 const DEFAULTS = {
   portFileDir: process.cwd(),
   portFileName: 'agent-server.port',
+  tokenFileName: 'agent-server.token',
   tcpHost: '127.0.0.1',
   tcpPort: 0,
+  authTimeoutMs: 5_000,
 };
+
+/** Token byte length (256 bits). */
+const TOKEN_BYTES = 32;
 
 // ── ForkListener ────────────────────────────────────────────────────
 
@@ -63,7 +73,11 @@ export class ForkListener implements AgentServerListener {
   private tcpServer: Server | null = null;
   private tcpPort: number | null = null;
   private portFilePath: string | null = null;
+  private tokenFilePath: string | null = null;
   private listening = false;
+
+  /** 256-bit auth token for TCP connections (hex-encoded). */
+  private authToken: string | null = null;
 
   /** Active IPC connection (at most one — the parent process). */
   private ipcConnection: IpcConnection | null = null;
@@ -74,11 +88,14 @@ export class ForkListener implements AgentServerListener {
     this.opts = {
       portFileDir: options?.portFileDir ?? DEFAULTS.portFileDir,
       portFileName: options?.portFileName ?? DEFAULTS.portFileName,
+      tokenFileName: options?.tokenFileName ?? DEFAULTS.tokenFileName,
       tcpHost: options?.tcpHost ?? DEFAULTS.tcpHost,
       tcpPort: options?.tcpPort ?? DEFAULTS.tcpPort,
+      authTimeoutMs: options?.authTimeoutMs ?? DEFAULTS.authTimeoutMs,
     };
     this.proc = options?.process ?? process;
     this.portFilePath = `${this.opts.portFileDir}/${this.opts.portFileName}`;
+    this.tokenFilePath = `${this.opts.portFileDir}/${this.opts.tokenFileName}`;
   }
 
   /** Whether the listener is actively accepting connections. */
@@ -101,6 +118,9 @@ export class ForkListener implements AgentServerListener {
   listen(): void {
     if (this.listening) return;
     this.listening = true;
+
+    // Generate auth token for TCP connections
+    this.authToken = randomBytes(TOKEN_BYTES).toString('hex');
 
     this.setupIpc();
     this.setupTcp();
@@ -128,8 +148,9 @@ export class ForkListener implements AgentServerListener {
       this.tcpServer = null;
     }
 
-    // Clean up port file
+    // Clean up port file and token file
     this.removePortFile();
+    this.removeTokenFile();
 
     // Remove IPC handlers
     this.proc.off('message', this.onIpcMessage);
@@ -209,19 +230,97 @@ export class ForkListener implements AgentServerListener {
       this.tcpConnections.delete(conn.id);
     });
 
-    this.emitConnection(conn);
+    // TCP connections require auth — wait for AuthenticateMessage before emitting
+    this.awaitAuth(conn);
 
     logger.info({
       module: 'fork-listener',
-      msg: 'TCP connection accepted',
+      msg: 'TCP connection accepted — awaiting auth',
       connectionId: conn.id,
       remote: `${socket.remoteAddress}:${socket.remotePort}`,
     });
   }
 
+  /**
+   * Wait for an AuthenticateMessage as the first message on a TCP connection.
+   * On success: send auth_result success and emit the connection.
+   * On failure/timeout: send auth_result failure and close.
+   */
+  private awaitAuth(conn: TcpConnection): void {
+    let settled = false;
+
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      unsub();
+      conn.send({ type: 'error', code: 'AUTH_REQUIRED', message: 'Auth timeout — no authenticate message received' });
+      conn.close();
+      logger.warn({ module: 'fork-listener', msg: 'TCP auth timeout', connectionId: conn.id });
+    }, this.opts.authTimeoutMs);
+
+    const unsub = conn.onMessage((msg: OrchestratorMessage) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      unsub();
+
+      if (msg.type !== 'authenticate') {
+        conn.send({ type: 'error', code: 'AUTH_REQUIRED', message: 'First message must be authenticate' });
+        conn.close();
+        logger.warn({ module: 'fork-listener', msg: 'TCP auth failed — wrong message type', connectionId: conn.id, received: msg.type });
+        return;
+      }
+
+      if (!this.validateToken((msg as AuthenticateMessage).token)) {
+        conn.send({ type: 'auth_result', requestId: msg.requestId, success: false, error: 'Invalid token' });
+        conn.close();
+        logger.warn({ module: 'fork-listener', msg: 'TCP auth failed — invalid token', connectionId: conn.id });
+        return;
+      }
+
+      // Auth success — send result and emit the connection on next tick
+      // (deferred to avoid Set iterator picking up newly-added handlers during dispatch)
+      conn.send({ type: 'auth_result', requestId: msg.requestId, success: true });
+      queueMicrotask(() => {
+        this.emitConnection(conn);
+        logger.info({ module: 'fork-listener', msg: 'TCP connection authenticated', connectionId: conn.id });
+      });
+    });
+
+    // If connection drops before auth completes
+    conn.onDisconnect(() => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+      }
+    });
+  }
+
+  /**
+   * Validate a token using timing-safe comparison.
+   */
+  private validateToken(token: string): boolean {
+    if (!this.authToken) return false;
+    const expected = Buffer.from(this.authToken, 'utf-8');
+    const received = Buffer.from(token, 'utf-8');
+    if (expected.length !== received.length) return false;
+    return timingSafeEqual(expected, received);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────
 
   private emitConnection(connection: TransportConnection): void {
+    // Auto-respond to ping messages with pong
+    connection.onMessage((msg) => {
+      if (msg.type === 'ping') {
+        connection.send({
+          type: 'pong',
+          requestId: msg.requestId,
+          timestamp: Date.now(),
+        });
+      }
+    });
+
     for (const handler of this.connectionHandlers) {
       try {
         handler(connection);
@@ -242,6 +341,14 @@ export class ForkListener implements AgentServerListener {
     } catch (err) {
       logger.warn({ module: 'fork-listener', msg: 'Failed to write port file', error: String(err) });
     }
+
+    // Write auth token file with restrictive permissions
+    if (!this.tokenFilePath || !this.authToken) return;
+    try {
+      writeFileSync(this.tokenFilePath, this.authToken, { mode: 0o600 });
+    } catch (err) {
+      logger.warn({ module: 'fork-listener', msg: 'Failed to write token file', error: String(err) });
+    }
   }
 
   private removePortFile(): void {
@@ -249,6 +356,17 @@ export class ForkListener implements AgentServerListener {
     try {
       if (existsSync(this.portFilePath)) {
         unlinkSync(this.portFilePath);
+      }
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
+  private removeTokenFile(): void {
+    if (!this.tokenFilePath) return;
+    try {
+      if (existsSync(this.tokenFilePath)) {
+        unlinkSync(this.tokenFilePath);
       }
     } catch {
       // Best-effort cleanup

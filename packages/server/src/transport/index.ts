@@ -52,3 +52,11 @@ export { ForkListener, type ForkListenerOptions, type ForkProcess } from './Fork
 
 export { ForkTransport } from './ForkTransport.js';
 export type { ForkTransportOptions } from './ForkTransport.js';
+
+export {
+  AgentServerHealth,
+  type HealthState,
+  type HealthStateChange,
+  type AgentServerHealthOptions,
+  type PingSender,
+} from '../agents/AgentServerHealth.js';
