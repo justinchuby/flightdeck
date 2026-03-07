@@ -426,24 +426,23 @@ Tables that benefit most from the mirror:
 
 ### Storage Location
 
-Smart defaults with user override at project creation:
+Default to home dir. User can opt in to repo storage for solo projects:
 
 ```
-if (user chose 'home dir' at project creation):
-  mirrorRoot = ~/.flightdeck/projects/<project-id>/
-else if (git rev-parse --show-toplevel succeeds):
-  mirrorRoot = <git-root>/.flightdeck/          # default when git exists
+if (user chose 'repo' at project creation):
+  mirrorRoot = <git-root>/.flightdeck/
 else:
-  mirrorRoot = ~/.flightdeck/projects/<project-id>/
+  mirrorRoot = ~/.flightdeck/projects/<project-id>/   # always the default
 ```
 
-| Scenario | Default | Location | Git-trackable? |
-|----------|---------|---------|----------------|
-| Git repo, no override | ✅ Auto | `<git-root>/.flightdeck/` | ✅ Yes |
-| Git repo, user opts out | Override | `~/.flightdeck/projects/<id>/` | ❌ No |
-| No git repo | ✅ Auto | `~/.flightdeck/projects/<id>/` | ❌ No |
+| Scenario | Location | Git-trackable? |
+|----------|---------|----------------|
+| Default (always) | `~/.flightdeck/projects/<id>/` | ❌ No |
+| User opts in to repo storage | `<git-root>/.flightdeck/` | ✅ Yes |
 
-The choice is stored in `project.yaml` (`storageLocation: 'repo' | 'home'`). One location per project — no coexistence.
+**Rationale**: Don't pollute multi-contributor repos with `.flightdeck/` by default. The user explicitly opts in to repo storage (e.g., solo projects where they want to commit project config).
+
+The choice is stored in `project.yaml` (`storageLocation: 'home' | 'repo'`, default `'home'`). One location per project — no coexistence.
 
 ---
 
@@ -1108,5 +1107,5 @@ function safeReadYaml<T>(path: string, schema: z.ZodSchema<T>, fallback: T): T {
 ### D9: Schema version in every file, lazy migration on read
 **Why**: Files only get rewritten when Flightdeck actually changes them — preserves user formatting, avoids noisy diffs, respects file ownership. Explicit `flightdeck migrate-files` command available for users who want clean files.
 
-### D10: Smart-default storage location with user override
-**Why**: Git repo → `<git-root>/.flightdeck/` by default. No git → `~/.flightdeck/projects/<id>/`. User can override to home dir even in a git repo (e.g., don't want `.flightdeck/` committed). Choice stored in `project.yaml`. One location per project, no coexistence.
+### D10: Home dir by default, repo storage opt-in
+**Why**: `~/.flightdeck/projects/<id>/` is always the default — don't pollute multi-contributor repos with `.flightdeck/`. User can opt in to `<git-root>/.flightdeck/` for solo projects where they want to commit config. Choice stored in `project.yaml`.
