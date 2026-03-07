@@ -424,23 +424,26 @@ Tables that benefit most from the mirror:
 └── .gitattributes               # Git merge strategies for YAML files
 ```
 
-### Storage Location (Deterministic)
+### Storage Location
 
-No user choice needed. Automatic detection:
+Smart defaults with user override at project creation:
 
 ```
-if (git rev-parse --show-toplevel succeeds):
-  mirrorRoot = <git-root>/.flightdeck/
+if (user chose 'home dir' at project creation):
+  mirrorRoot = ~/.flightdeck/projects/<project-id>/
+else if (git rev-parse --show-toplevel succeeds):
+  mirrorRoot = <git-root>/.flightdeck/          # default when git exists
 else:
   mirrorRoot = ~/.flightdeck/projects/<project-id>/
 ```
 
-| Condition | Location | Git-trackable? |
-|-----------|---------|----------------|
-| Inside a git repo | `<git-root>/.flightdeck/` | ✅ Yes |
-| Not in a git repo | `~/.flightdeck/projects/<id>/` | ❌ No (fallback) |
+| Scenario | Default | Location | Git-trackable? |
+|----------|---------|---------|----------------|
+| Git repo, no override | ✅ Auto | `<git-root>/.flightdeck/` | ✅ Yes |
+| Git repo, user opts out | Override | `~/.flightdeck/projects/<id>/` | ❌ No |
+| No git repo | ✅ Auto | `~/.flightdeck/projects/<id>/` | ❌ No |
 
-One location per project. No "choose your mode." No coexistence complexity.
+The choice is stored in `project.yaml` (`storageLocation: 'repo' | 'home'`). One location per project — no coexistence.
 
 ---
 
@@ -1105,5 +1108,5 @@ function safeReadYaml<T>(path: string, schema: z.ZodSchema<T>, fallback: T): T {
 ### D9: Schema version in every file, lazy migration on read
 **Why**: Files only get rewritten when Flightdeck actually changes them — preserves user formatting, avoids noisy diffs, respects file ownership. Explicit `flightdeck migrate-files` command available for users who want clean files.
 
-### D10: Deterministic storage location, no user choice
-**Why**: In a git repo → `<git-root>/.flightdeck/`. Not in git → `~/.flightdeck/projects/<id>/`. Automatic detection via `git rev-parse --show-toplevel`. One rule, no configuration, no coexistence complexity. Team sharing handled via `.gitignore` (commit knowledge/training, ignore sessions/dag).
+### D10: Smart-default storage location with user override
+**Why**: Git repo → `<git-root>/.flightdeck/` by default. No git → `~/.flightdeck/projects/<id>/`. User can override to home dir even in a git repo (e.g., don't want `.flightdeck/` committed). Choice stored in `project.yaml`. One location per project, no coexistence.
