@@ -25,6 +25,19 @@ const config = getConfig();
 // ── Build service container (restores persisted settings internally) ──
 const container = await createContainer({ config, repoRoot });
 
+// ── Fork agent server (two-process architecture) ─────────────────
+// The agent server runs in a detached child process that survives
+// orchestrator restarts. connect() forks or reconnects via PID file.
+if (container.agentServerClient) {
+  container.agentServerClient.connect().then(() => {
+    console.log('🔌 Agent server connected');
+    container.agentServerHealth?.start();
+  }).catch((err: Error) => {
+    console.warn(`⚠️  Agent server connection failed: ${err.message}`);
+    console.warn('   Orchestrator will operate without agent server. Retry with restart.');
+  });
+}
+
 // ── Express app ────────────────────────────────────────────
 const app = express();
 app.use(cors({

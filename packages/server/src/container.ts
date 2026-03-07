@@ -177,8 +177,17 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const trainingCapture = new TrainingCapture(knowledgeStore);
 
   // ── Agent Server Transport & Client ─────────────────────
+  // In dev mode (tsx), fork the TypeScript source directly using tsx loader.
+  // In production, fork the compiled JS entry point.
+  const isTsx = process.argv[1]?.includes('tsx') || !!process.env.TSX;
+  const agentServerScript = isTsx
+    ? `${repoRoot}/packages/server/src/agent-server-entry.ts`
+    : `${repoRoot}/packages/server/dist/agent-server-entry.js`;
+  const agentServerExecArgv = isTsx ? ['--import', 'tsx'] : [];
+
   const forkTransport = new ForkTransport({
-    serverScript: `${repoRoot}/packages/server/dist/agent-server-entry.js`,
+    serverScript: agentServerScript,
+    execArgv: agentServerExecArgv,
     stateDir: process.env.FLIGHTDECK_STATE_DIR,
   });
   const agentServerClient = new AgentServerClient(
