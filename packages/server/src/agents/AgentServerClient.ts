@@ -106,6 +106,11 @@ export class AgentServerClient extends EventEmitter {
     return this.pendingRequests.size;
   }
 
+  /** Number of agents being tracked for event replay. */
+  get trackedAgentCount(): number {
+    return this.lastSeenEventIds.size;
+  }
+
   // ── Connection ────────────────────────────────────────────────
 
   /**
@@ -254,6 +259,31 @@ export class AgentServerClient extends EventEmitter {
     return this.lastSeenEventIds.get(agentId);
   }
 
+  /**
+   * Re-subscribe all tracked agents with their last seen event IDs.
+   * Call this manually after a reconnect if the automatic re-subscribe
+   * in handleStateChange doesn't cover your use case.
+   */
+  resubscribeAll(): void {
+    for (const [agentId, lastEventId] of this.lastSeenEventIds) {
+      this.subscribe(agentId, lastEventId);
+    }
+
+    logger.info({
+      module: 'agent-server-client',
+      msg: 'Re-subscribed all tracked agents',
+      count: this.lastSeenEventIds.size,
+    });
+  }
+
+  /**
+   * Stop tracking an agent's event cursor. Call when an agent exits
+   * and you no longer need replay for it.
+   */
+  clearTracking(agentId: string): void {
+    this.lastSeenEventIds.delete(agentId);
+  }
+
   // ── Request/Response ──────────────────────────────────────────
 
   /**
@@ -332,6 +362,8 @@ export class AgentServerClient extends EventEmitter {
 
       case 'agent_exited':
         this.emit('agentExited', message);
+        // Keep tracking for a brief period — the orchestrator may want to
+        // query final events. Caller can clearTracking() when ready.
         break;
 
       case 'error':

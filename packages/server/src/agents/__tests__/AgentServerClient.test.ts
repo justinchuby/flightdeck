@@ -651,6 +651,241 @@ describe('AgentServerClient', () => {
     });
   });
 
+  // ── Event Replay on Reconnect ───────────────────────────────
+
+  describe('event replay on reconnect', () => {
+    beforeEach(async () => {
+      await client.connect();
+    });
+
+    it('sends subscribe with lastSeenEventId on reconnect', () => {
+      // Receive events to establish cursors
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-50',
+        eventType: 'text',
+        data: { text: 'before disconnect' },
+      });
+
+      transport.sent.length = 0;
+
+      // Simulate disconnect → reconnect
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs).toHaveLength(1);
+      expect(subs[0]).toMatchObject({
+        type: 'subscribe',
+        scope,
+        agentId: 'agent-001',
+        lastSeenEventId: 'evt-50',
+      });
+    });
+
+    it('re-subscribes multiple agents with correct cursors', () => {
+      // Track events for 3 agents
+      for (const [agentId, eventId] of [['a1', 'evt-10'], ['a2', 'evt-20'], ['a3', 'evt-30']]) {
+        transport.receiveMessage({
+          type: 'agent_event',
+          agentId,
+          eventId,
+          eventType: 'text',
+          data: {},
+        });
+      }
+
+      transport.sent.length = 0;
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs).toHaveLength(3);
+
+      const cursors = new Map(subs.map(s => [(s as any).agentId, (s as any).lastSeenEventId]));
+      expect(cursors.get('a1')).toBe('evt-10');
+      expect(cursors.get('a2')).toBe('evt-20');
+      expect(cursors.get('a3')).toBe('evt-30');
+    });
+
+    it('replayed events are emitted through normal agentEvent handler', () => {
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-5',
+        eventType: 'text',
+        data: {},
+      });
+
+      // Simulate disconnect → reconnect
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      // Server replays missed events through the same channel
+      const spy = vi.fn();
+      client.on('agentEvent', spy);
+
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-6',
+        eventType: 'text',
+        data: { text: 'replayed event' },
+      });
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-7',
+        eventType: 'tool_call',
+        data: { info: {} },
+      });
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(client.getLastSeenEventId('agent-001')).toBe('evt-7');
+    });
+
+    it('updates cursor during replay so subsequent reconnects resume correctly', () => {
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-10',
+        eventType: 'text',
+        data: {},
+      });
+
+      // First reconnect
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      // Server replays events 11-15
+      for (let i = 11; i <= 15; i++) {
+        transport.receiveMessage({
+          type: 'agent_event',
+          agentId: 'agent-001',
+          eventId: `evt-${i}`,
+          eventType: 'text',
+          data: {},
+        });
+      }
+
+      expect(client.getLastSeenEventId('agent-001')).toBe('evt-15');
+
+      // Second reconnect should use evt-15
+      transport.sent.length = 0;
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs[0]).toMatchObject({ lastSeenEventId: 'evt-15' });
+    });
+
+    it('does not re-subscribe agents that have been cleared', () => {
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-5',
+        eventType: 'text',
+        data: {},
+      });
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-002',
+        eventId: 'evt-3',
+        eventType: 'text',
+        data: {},
+      });
+
+      // Clear tracking for agent-001
+      client.clearTracking('agent-001');
+
+      transport.sent.length = 0;
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs).toHaveLength(1);
+      expect((subs[0] as any).agentId).toBe('agent-002');
+    });
+
+    it('resubscribeAll() manually triggers re-subscription', () => {
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-10',
+        eventType: 'text',
+        data: {},
+      });
+
+      transport.sent.length = 0;
+      client.resubscribeAll();
+
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs).toHaveLength(1);
+      expect(subs[0]).toMatchObject({
+        agentId: 'agent-001',
+        lastSeenEventId: 'evt-10',
+      });
+    });
+
+    it('trackedAgentCount reflects number of tracked agents', () => {
+      expect(client.trackedAgentCount).toBe(0);
+
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-1',
+        eventType: 'text',
+        data: {},
+      });
+      expect(client.trackedAgentCount).toBe(1);
+
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-002',
+        eventId: 'evt-2',
+        eventType: 'text',
+        data: {},
+      });
+      expect(client.trackedAgentCount).toBe(2);
+
+      client.clearTracking('agent-001');
+      expect(client.trackedAgentCount).toBe(1);
+    });
+
+    it('handles reconnect with no tracked agents (no subscriptions sent)', () => {
+      transport.sent.length = 0;
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs).toHaveLength(0);
+    });
+
+    it('handles rapid disconnect/reconnect cycles', () => {
+      transport.receiveMessage({
+        type: 'agent_event',
+        agentId: 'agent-001',
+        eventId: 'evt-5',
+        eventType: 'text',
+        data: {},
+      });
+
+      transport.sent.length = 0;
+
+      // Rapid cycles
+      transport.setState('disconnected');
+      transport.setState('connected');
+      transport.setState('disconnected');
+      transport.setState('connected');
+
+      // Each connected event triggers re-subscribe
+      const subs = transport.sent.filter(m => m.type === 'subscribe');
+      expect(subs).toHaveLength(2);
+      expect(subs.every(s => (s as any).lastSeenEventId === 'evt-5')).toBe(true);
+    });
+  });
+
   // ── dispose() ─────────────────────────────────────────────────
 
   describe('dispose', () => {
