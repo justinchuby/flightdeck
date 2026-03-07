@@ -8,6 +8,7 @@ import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, Delegation } from './types.js';
 import type { DagTask } from '../../tasks/TaskDAG.js';
 import { logger } from '../../utils/logger.js';
+import { redact } from '../../utils/redaction.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -60,7 +61,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
     if (del.toAgentId === agent.id && del.status === 'active') {
       del.status = 'completed';
       del.completedAt = new Date().toISOString();
-      del.result = agent.getTaskOutput(16000);
+      del.result = redact(agent.getTaskOutput(16000)).text;
     }
   }
 
@@ -131,7 +132,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = exitCode === 0 ? 'completed' : 'failed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.getTaskOutput(16000);
+        del.result = redact(agent.getTaskOutput(16000)).text;
       }
     }
     return;
@@ -141,7 +142,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
     if (del.toAgentId === agent.id && del.status === 'active') {
       del.status = exitCode === 0 ? 'completed' : 'failed';
       del.completedAt = new Date().toISOString();
-      del.result = agent.getTaskOutput(16000);
+      del.result = redact(agent.getTaskOutput(16000)).text;
     }
   }
 

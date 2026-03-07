@@ -1,4 +1,5 @@
 import { Server as HttpServer } from 'http';
+import { v4 as uuid } from 'uuid';
 import { WebSocketServer as WsServer, WebSocket } from 'ws';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
@@ -7,7 +8,7 @@ import type { DecisionLog, Decision } from '../coordination/DecisionLog.js';
 import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { getAuthSecret } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
-import { v4 as uuid } from 'uuid';
+import { redactWsMessage } from '../utils/redaction.js';
 
 interface ClientConnection {
   id: string;
@@ -447,7 +448,7 @@ export class WebSocketServer {
   }
 
   private broadcast(msg: any, filter: (c: ClientConnection) => boolean): void {
-    const payload = JSON.stringify(msg);
+    const payload = JSON.stringify(redactWsMessage(msg));
     for (const client of this.clients.values()) {
       if (client.ws.readyState === WebSocket.OPEN && filter(client)) {
         try {

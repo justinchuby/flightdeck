@@ -3,6 +3,7 @@ import { eq, desc, asc, gt, lte, sql, inArray, and } from 'drizzle-orm';
 import { Database } from '../db/database.js';
 import { activityLog } from '../db/schema.js';
 import { logger } from '../utils/logger.js';
+import { redact, redactObject } from '../utils/redaction.js';
 
 export type ActionType =
   | 'file_edit'
@@ -65,8 +66,8 @@ export class ActivityLedger extends EventEmitter {
     details: Record<string, any> = {},
     projectId = '',
   ): ActivityEntry {
-    const detailsJson = JSON.stringify(details);
-    this.buffer.push({ agentId, agentRole, actionType, summary, details: detailsJson, projectId });
+    const detailsJson = JSON.stringify(redactObject(details).data);
+    this.buffer.push({ agentId, agentRole, actionType, summary: redact(summary).text, details: detailsJson, projectId });
     if (this.buffer.length >= this.FLUSH_BATCH_SIZE) {
       this.flush();
     }

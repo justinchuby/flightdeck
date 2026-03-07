@@ -2,6 +2,7 @@
  * Simple structured logger for Flightdeck server.
  * Outputs timestamped, categorized messages to stdout/stderr.
  */
+import { redact, redactObject } from './redaction.js';
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
@@ -34,9 +35,9 @@ function log(level: LogLevel, category: string, message: string, details?: Recor
   const color = CATEGORY_COLORS[category] ?? '';
   const time = `${DIM}${formatTime()}${RESET}`;
   const cat = `${color}[${category}]${RESET}`;
-  const detailStr = details ? ` ${DIM}${JSON.stringify(details)}${RESET}` : '';
+  const detailStr = details ? ` ${DIM}${JSON.stringify(redactObject(details).data)}${RESET}` : '';
 
-  const line = `${time} ${icon} ${cat} ${message}${detailStr}`;
+  const line = `${time} ${icon} ${cat} ${redact(message).text}${detailStr}`;
 
   if (level === 'error') {
     process.stderr.write(line + '\n');

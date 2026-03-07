@@ -4,6 +4,7 @@ import type { AcpConnection, ToolCallInfo, PlanEntry, PromptContent } from '../a
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
 import type { UsageInfo, CompactionInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
@@ -647,7 +648,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),
-      outputPreview: this.getRecentOutput(4000),
+      outputPreview: redact(this.getRecentOutput(4000)).text,
       plan: this.plan,
       toolCalls: this.toolCalls.slice(-50),
       sessionId: this.sessionId,
