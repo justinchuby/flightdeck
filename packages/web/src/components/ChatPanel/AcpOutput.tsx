@@ -5,6 +5,7 @@ import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare } from 'lucide-react';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
+import { splitCommandBlocks } from '../../utils/commandParser';
 import { PromptNav, hasUserMention } from '../PromptNav';
 import { groupTimeline, type TimelineItem, type GroupedTimelineItem } from './groupTimeline';
 
@@ -595,7 +596,8 @@ function isRealCommandBlock(text: string): boolean {
 
 /** Render agent text with ⟦⟦ ⟧⟧ blocks separated and inline markdown + tables */
 function AgentTextBlockSimple({ text }: { text: string }) {
-  const segments = text.split(/(⟦⟦[\s\S]*?⟧⟧)/g);
+  // Depth-aware split handles nested ⟦⟦ ⟧⟧ inside command JSON payloads
+  const segments = splitCommandBlocks(text);
   return (
     <>
       {segments.map((seg, i) => {
@@ -608,19 +610,10 @@ function AgentTextBlockSimple({ text }: { text: string }) {
           return <BlockMarkdownSimple key={i} text={seg} />;
         }
         // Unclosed ⟦⟦ block (still streaming or split across messages)
-        if (seg.includes('⟦⟦') && !seg.includes('⟧⟧')) {
-          const idx = seg.indexOf('⟦⟦');
-          const before = seg.slice(0, idx);
-          const cmdBlock = seg.slice(idx);
-          if (isRealCommandBlock(cmdBlock)) {
-            return (
-              <span key={i}>
-                {before.trim() ? <BlockMarkdownSimple text={before} /> : null}
-                <CollapsibleCommandBlockSimple text={cmdBlock} />
-              </span>
-            );
+        if (seg.startsWith('⟦⟦')) {
+          if (isRealCommandBlock(seg)) {
+            return <CollapsibleCommandBlockSimple key={i} text={seg} />;
           }
-          // Not a real command — render entire segment as text
           return seg.trim() ? <BlockMarkdownSimple key={i} text={seg} /> : null;
         }
         // Dangling ⟧⟧ from a block that started in a previous message

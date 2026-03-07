@@ -46,7 +46,17 @@ export function agentsRoutes(ctx: AppContext): Router {
       return res.status(400).json({ error: `Unknown role: ${roleId}` });
     }
     try {
-      const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined);
+      // Auto-create a project for lead agents so they always have a projectId.
+      // Without this, the entire delegation tree inherits undefined and
+      // activities log with projectId: '', breaking scoped queries.
+      let options: { projectName?: string; projectId?: string } | undefined;
+      if (role.id === 'lead' && ctx.projectRegistry) {
+        const projectName = `Project ${new Date().toLocaleDateString()}`;
+        const project = ctx.projectRegistry.create(projectName, task ?? '');
+        options = { projectName: project.name, projectId: project.id };
+      }
+
+      const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined, undefined, options);
       logger.info('api', `POST /agents — ${sessionId ? 'resumed' : 'spawned'} ${role.name} (${agent.id.slice(0, 8)})`, { model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {

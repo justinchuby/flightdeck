@@ -154,6 +154,7 @@ export const chatGroupMessages = sqliteTable('chat_group_messages', {
 export const dagTasks = sqliteTable('dag_tasks', {
   id: text('id').notNull(),
   leadId: text('lead_id').notNull(),
+  projectId: text('project_id'),
   role: text('role').notNull(),
   title: text('title'),
   description: text('description').notNull().default(''),
@@ -170,6 +171,7 @@ export const dagTasks = sqliteTable('dag_tasks', {
   primaryKey({ columns: [table.id, table.leadId] }),
   index('idx_dag_tasks_lead').on(table.leadId),
   index('idx_dag_tasks_status').on(table.dagStatus),
+  index('idx_dag_tasks_project').on(table.projectId),
 ]);
 
 // ── Deferred Issues ──────────────────────────────────────────────

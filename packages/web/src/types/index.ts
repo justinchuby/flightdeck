@@ -192,7 +192,7 @@ export interface Decision {
   title: string;
   rationale: string;
   needsConfirmation?: boolean;
-  status?: 'recorded' | 'confirmed' | 'rejected';
+  status?: 'recorded' | 'confirmed' | 'rejected' | 'dismissed';
   autoApproved?: boolean;
   confirmedAt?: string | null;
   category?: string;

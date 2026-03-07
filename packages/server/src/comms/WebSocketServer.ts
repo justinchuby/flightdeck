@@ -185,6 +185,12 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:tool_call', ...data }, projectId);
     });
 
+    // Broadcast immediately (not batched) so it arrives before any text from the new turn
+    this.track(agentManager, 'agent:response_start', (data: any) => {
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:response_start', ...data }, projectId);
+    });
+
     // WebSocket subscription architecture:
     // - Agent connections subscribe to specific agent IDs (project-scoped participants)
     // - UI connections subscribe to '*' (all agents) because the dashboard is an observer
@@ -304,6 +310,11 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'decision:rejected', decision }, projectId);
     });
 
+    this.track(decisionLog, 'decision:dismissed', (decision: any) => {
+      const projectId = decision.projectId ?? this.resolveAgentProjectId(decision.agentId);
+      this.broadcastToProject({ type: 'decision:dismissed', decision }, projectId);
+    });
+
     this.track(decisionLog, 'decisions:batch_confirmed', (decisions: Decision[]) => {
       if (decisions.length === 0) return;
       const projectId = decisions[0].projectId ?? this.resolveAgentProjectId(decisions[0].agentId);
@@ -314,6 +325,12 @@ export class WebSocketServer {
       if (decisions.length === 0) return;
       const projectId = decisions[0].projectId ?? this.resolveAgentProjectId(decisions[0].agentId);
       this.broadcastToProject({ type: 'decisions:batch', action: 'reject', decisions }, projectId);
+    });
+
+    this.track(decisionLog, 'decisions:batch_dismissed', (decisions: Decision[]) => {
+      if (decisions.length === 0) return;
+      const projectId = decisions[0].projectId ?? this.resolveAgentProjectId(decisions[0].agentId);
+      this.broadcastToProject({ type: 'decisions:batch', action: 'dismiss', decisions }, projectId);
     });
 
     this.track(decisionLog, 'intent:alert', (data: any) => {

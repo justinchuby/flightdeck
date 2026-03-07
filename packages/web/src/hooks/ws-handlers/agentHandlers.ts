@@ -1,5 +1,6 @@
 import { useAppStore } from '../../stores/appStore';
 import { useToastStore } from '../../components/Toast';
+import { hasUnclosedCommandBlock } from '../../utils/commandParser';
 import type { HandlerContext } from './index';
 
 export function handleAgentSpawned(msg: any, ctx: HandlerContext): void {
@@ -70,7 +71,7 @@ export function handleAgentText(msg: any, ctx: HandlerContext): void {
 
   const appendTarget = appendIdx >= 0 ? msgs[appendIdx] : null;
   const appendText = appendTarget?.text ?? '';
-  const hasUnclosedCommand = appendText.lastIndexOf('⟦') > appendText.lastIndexOf('⟧');
+  const hasUnclosedCommand = hasUnclosedCommandBlock(appendText);
   if (appendTarget && (!needsNewline || hasUnclosedCommand)) {
     msgs[appendIdx] = { ...appendTarget, text: appendText + rawText, timestamp: appendTarget.timestamp || Date.now() };
   } else {

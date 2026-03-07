@@ -39,7 +39,19 @@ function CanvasInner() {
   const liveAgents = useAppStore((s) => s.agents);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const effectiveLeadId = selectedProjectId ?? selectedLeadId ?? null;
+
+  // Resolve tab selection (projectId) to actual agent UUID for agent interactions
+  const effectiveLeadId = useMemo(() => {
+    const tabId = selectedProjectId ?? selectedLeadId ?? null;
+    if (!tabId) return null;
+    // Check if tabId matches a live lead's projectId
+    const leadByProject = liveAgents.find(
+      (a) => a.projectId === tabId && a.role?.id === 'lead' && !a.parentId,
+    );
+    if (leadByProject) return leadByProject.id;
+    return tabId;
+  }, [selectedProjectId, selectedLeadId, liveAgents]);
+
   const project = useLeadStore((s) =>
     effectiveLeadId ? s.projects[effectiveLeadId] : null,
   );

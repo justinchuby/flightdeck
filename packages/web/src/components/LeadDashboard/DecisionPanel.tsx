@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Check, X, Lightbulb } from 'lucide-react';
+import { Check, X, Lightbulb, EyeOff } from 'lucide-react';
 
 /** Inline comment + action buttons for pending decisions in the banner */
-export function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
+export function BannerDecisionActions({ decisionId, onConfirm, onReject, onDismiss }: {
   decisionId: string;
   onConfirm: (id: string, reason?: string) => void;
   onReject: (id: string, reason?: string) => void;
+  onDismiss?: (id: string) => void;
 }) {
   const [reason, setReason] = useState('');
   return (
@@ -36,11 +37,22 @@ export function BannerDecisionActions({ decisionId, onConfirm, onReject }: {
       >
         <X className="w-3.5 h-3.5" />
       </button>
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label="Dismiss decision"
+          onClick={() => onDismiss(decisionId)}
+          className="p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 dark:text-gray-300 transition-colors"
+          title="Dismiss (ignore)"
+        >
+          <EyeOff className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 }
 
-export function DecisionPanelContent({ decisions, onConfirm, onReject }: { decisions: any[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void }) {
+export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss }: { decisions: any[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void; onDismiss?: (id: string) => void }) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
   const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
@@ -71,7 +83,7 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject }: { decis
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
                     )}
                     {d.status && d.status !== 'recorded' && (
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/20 text-green-600 dark:text-green-300' : 'bg-red-500/20 text-red-600 dark:text-red-300'}`}>{d.status}</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${d.status === 'confirmed' ? 'bg-green-500/20 text-green-600 dark:text-green-300' : d.status === 'dismissed' ? 'bg-gray-500/20 text-gray-400' : 'bg-red-500/20 text-red-600 dark:text-red-300'}`}>{d.status}</span>
                     )}
                   </div>
                   {d.rationale && <p className="text-xs font-mono text-th-text-muted mt-1 line-clamp-2">{d.rationale}</p>}
@@ -99,6 +111,14 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject }: { decis
                         >
                           <X className="w-3 h-3" /> Reject
                         </button>
+                        {onDismiss && (
+                          <button
+                            onClick={() => { onDismiss(d.id); }}
+                            className="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 dark:text-gray-300 flex items-center gap-1"
+                          >
+                            <EyeOff className="w-3 h-3" /> Dismiss
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

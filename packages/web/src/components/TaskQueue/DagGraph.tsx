@@ -557,7 +557,7 @@ function dagToFlow(tasks: DagTask[]): { nodes: Node<DagTaskNodeData>[]; edges: E
           id: `${dep}->${t.id}`,
           source: dep,
           target: t.id,
-          type: 'bezier',
+          type: 'default',
           animated: status === 'running',
           style: {
             stroke: color,

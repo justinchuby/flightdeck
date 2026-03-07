@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { GitBranch } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
+import { apiFetch } from '../../hooks/useApi';
 import { dagMinimapColor } from '../../utils/statusColors';
 import type { DagStatus } from '../../types';
 
@@ -53,11 +55,34 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
 // ── DagMinimap ───────────────────────────────────────────────────────
 
 interface DagMinimapProps {
-  leadId: string;
+  /** Project UUID — used to fetch DAG from /projects/:id/dag */
+  projectId: string;
+  /** Optional lead agent UUID — used as fallback store key */
+  leadId?: string;
 }
 
-export function DagMinimap({ leadId }: DagMinimapProps) {
-  const dagStatus = useLeadStore((s) => s.projects[leadId]?.dagStatus);
+export function DagMinimap({ projectId, leadId }: DagMinimapProps) {
+  // Try store first (populated by LeadDashboard for live sessions)
+  const storeDag = useLeadStore((s) =>
+    s.projects[projectId]?.dagStatus ?? (leadId ? s.projects[leadId]?.dagStatus : null),
+  );
+
+  // Fetch directly by projectId when store has no data
+  const [fetchedDag, setFetchedDag] = useState<DagStatus | null>(null);
+  const fetchIdRef = useRef(0);
+
+  useEffect(() => {
+    if (storeDag) { setFetchedDag(null); return; }
+    const requestId = ++fetchIdRef.current;
+    apiFetch<DagStatus>(`/projects/${projectId}/dag`)
+      .then((data) => {
+        if (fetchIdRef.current !== requestId) return;
+        if (data?.tasks) setFetchedDag(data);
+      })
+      .catch(() => {});
+  }, [projectId, storeDag]);
+
+  const dagStatus = storeDag ?? fetchedDag;
 
   if (!dagStatus || dagStatus.tasks.length === 0) {
     return (

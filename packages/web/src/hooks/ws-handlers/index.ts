@@ -72,6 +72,7 @@ const handlerMap: Record<string, MessageHandler> = {
   'lead:decision': handleLeadDecision,
   'decision:confirmed': handleDecisionResolved,
   'decision:rejected': handleDecisionResolved,
+  'decision:dismissed': handleDecisionResolved,
   'decisions:batch': handleDecisionsBatch,
 };
 

@@ -149,4 +149,73 @@ describe('DecisionLog', () => {
     expect(confirmCount).toBe(0);
     expect(log.getById(d.id)?.status).toBe('rejected');
   });
+
+  // ── Dismiss ──────────────────────────────────────────────────────
+
+  it('dismisses a recorded decision', () => {
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    const dismissed = log.dismiss(d.id);
+    expect(dismissed?.status).toBe('dismissed');
+    expect(dismissed?.confirmedAt).toBeTruthy();
+    expect(log.getNeedingConfirmation()).toHaveLength(0);
+  });
+
+  it('emits decision:dismissed event', () => {
+    let emitted: any = null;
+    log.on('decision:dismissed', (d) => { emitted = d; });
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    log.dismiss(d.id);
+    expect(emitted?.id).toBe(d.id);
+    expect(emitted?.status).toBe('dismissed');
+  });
+
+  it('double-dismiss is idempotent (no duplicate events)', () => {
+    let dismissCount = 0;
+    log.on('decision:dismissed', () => { dismissCount++; });
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    log.dismiss(d.id);
+    log.dismiss(d.id);
+    expect(dismissCount).toBe(1);
+    expect(log.getById(d.id)?.status).toBe('dismissed');
+  });
+
+  it('cannot dismiss already-confirmed decision', () => {
+    let dismissCount = 0;
+    log.on('decision:dismissed', () => { dismissCount++; });
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    log.confirm(d.id);
+    log.dismiss(d.id);
+    expect(dismissCount).toBe(0);
+    expect(log.getById(d.id)?.status).toBe('confirmed');
+  });
+
+  it('cannot dismiss already-rejected decision', () => {
+    let dismissCount = 0;
+    log.on('decision:dismissed', () => { dismissCount++; });
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    log.reject(d.id);
+    log.dismiss(d.id);
+    expect(dismissCount).toBe(0);
+    expect(log.getById(d.id)?.status).toBe('rejected');
+  });
+
+  it('cannot confirm already-dismissed decision', () => {
+    let confirmCount = 0;
+    log.on('decision:confirmed', () => { confirmCount++; });
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    log.dismiss(d.id);
+    log.confirm(d.id);
+    expect(confirmCount).toBe(0);
+    expect(log.getById(d.id)?.status).toBe('dismissed');
+  });
+
+  it('cannot reject already-dismissed decision', () => {
+    let rejectCount = 0;
+    log.on('decision:rejected', () => { rejectCount++; });
+    const d = log.add('a1', 'lead', 'D1', '', true);
+    log.dismiss(d.id);
+    log.reject(d.id);
+    expect(rejectCount).toBe(0);
+    expect(log.getById(d.id)?.status).toBe('dismissed');
+  });
 });

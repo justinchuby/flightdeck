@@ -5,7 +5,7 @@ import { apiFetch } from '../../hooks/useApi';
 
 /**
  * Swipe-to-approve card stack for mobile.
- * Right swipe = approve, left swipe = reject, up swipe = skip.
+ * Right swipe = approve, left swipe = reject, up swipe = dismiss.
  * Shows peeking cards behind the active card for depth.
  */
 export function MobileApprovalStack() {
@@ -39,14 +39,19 @@ export function MobileApprovalStack() {
     advance();
   }, [current, removePendingDecision, advance]);
 
-  const handleSkip = useCallback(() => {
+  const handleDismiss = useCallback(async () => {
+    if (!current) return;
+    try {
+      await apiFetch(`/decisions/${current.id}/dismiss`, { method: 'POST' });
+      removePendingDecision(current.id);
+    } catch { /* toast handled elsewhere */ }
     advance();
-  }, [advance]);
+  }, [current, removePendingDecision, advance]);
 
   const swipe = useSwipeGesture({
     onSwipeRight: handleApprove,
     onSwipeLeft: handleReject,
-    onSwipeUp: handleSkip,
+    onSwipeUp: handleDismiss,
   });
 
   if (pendingDecisions.length === 0 || currentIndex >= pendingDecisions.length) {
@@ -64,6 +69,7 @@ export function MobileApprovalStack() {
       {/* Directional hints */}
       <div className="flex justify-between text-xs text-th-text-muted mb-2 px-4">
         <span>← REJECT</span>
+        <span className="text-gray-500">↑ DISMISS</span>
         <span>APPROVE →</span>
       </div>
 
@@ -150,10 +156,10 @@ export function MobileApprovalStack() {
           ✗ Reject
         </button>
         <button
-          onClick={handleSkip}
-          className="px-4 py-2 text-xs rounded-lg border border-th-border text-th-text-muted hover:bg-th-bg-alt"
+          onClick={handleDismiss}
+          className="px-4 py-2 text-xs rounded-lg border border-gray-400/30 text-gray-400 hover:bg-gray-400/10"
         >
-          Skip ↑
+          Dismiss ↑
         </button>
         <button
           onClick={handleApprove}

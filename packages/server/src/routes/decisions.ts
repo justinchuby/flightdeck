@@ -68,6 +68,17 @@ export function decisionsRoutes(ctx: AppContext): Router {
     res.json(decision);
   });
 
+  // Dismiss — silently removes from queue without notifying the lead agent
+  router.post('/decisions/:id/dismiss', (req, res) => {
+    const decisionId = req.params.id as string;
+    const decision = decisionLog.dismiss(decisionId);
+    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    // Discard any pending system action
+    agentManager.consumePendingSystemAction(decisionId);
+    // No lead notification — dismiss is silent
+    res.json(decision);
+  });
+
   router.post('/decisions/:id/respond', (req, res) => {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'message required' });
@@ -101,13 +112,15 @@ export function decisionsRoutes(ctx: AppContext): Router {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'ids must be a non-empty array' });
     }
-    if (action !== 'confirm' && action !== 'reject') {
-      return res.status(400).json({ error: 'action must be "confirm" or "reject"' });
+    if (action !== 'confirm' && action !== 'reject' && action !== 'dismiss') {
+      return res.status(400).json({ error: 'action must be "confirm", "reject", or "dismiss"' });
     }
 
     const result = action === 'confirm'
       ? decisionLog.confirmBatch(ids)
-      : decisionLog.rejectBatch(ids);
+      : action === 'reject'
+        ? decisionLog.rejectBatch(ids)
+        : decisionLog.dismissBatch(ids);
 
     // Notify lead agents and execute system actions for each confirmed decision
     for (const decision of result.results) {
@@ -124,12 +137,15 @@ export function decisionsRoutes(ctx: AppContext): Router {
           const reasonText = reason ? ` User comment: "${reason}"` : '';
           lead.sendMessage(`[Decision Approved] "${decision.title}" by ${decision.agentRole} has been approved by the user (batch).${reasonText}`);
         }
-      } else {
+      } else if (action === 'reject') {
         agentManager.consumePendingSystemAction(decision.id);
         if (lead && (lead.status === 'running' || lead.status === 'idle')) {
           const reasonText = reason ? ` User comment: "${reason}"` : '';
           lead.sendMessage(`[Decision Rejected] "${decision.title}" by ${decision.agentRole} has been REJECTED by the user (batch). Please revise your approach.${reasonText}`);
         }
+      } else {
+        // dismiss — discard system action, no lead notification
+        agentManager.consumePendingSystemAction(decision.id);
       }
     }
 

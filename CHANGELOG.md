@@ -29,16 +29,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Group chat history** — Group chats persist per project and load from REST API for historical sessions.
 - **Skill reference files** — 5 `.copilot/skills/` files documenting dev patterns, common bugs, user preferences, infrastructure, and testing patterns.
 - **Comprehensive Timeline tests** — 45 tests covering scroll axis separation, zoom controls, drag-to-pan, horizontal overflow, keyboard navigation, lane layout, and replay controls.
+- **Decision dismiss/ignore** — Dismiss clears decisions without notifying the lead agent. Works in individual decision UI, batch approval sidebar, keyboard shortcut ('d'), and mobile swipe-up gesture.
 
 ### Changed
 
 - **Token display** — Removed monetary cost estimates. Token counts shown as estimates with `~` prefix and `(est.)` suffix.
 - **Default replay speed** — Changed from 1× to 4× for faster session review.
 - **Milestone curation** — Filtered from all system events to meaningful progress markers only.
+- **Sidebar nav cleanup** — Removed agent count badge from Team sidebar tab (distracting)
 - Vite proxy target is now configurable via `SERVER_PORT` env var instead of hardcoded `:3001`
 
 ### Fixed
 
+- **Timeline scrub display for untitled projects** — SessionReplay team-resolution fallback now correctly resolves agents when project has no title
+- **ProjectTabs/OverviewPage project identity** — Tab IDs and replay fetches now use project UUID instead of agent UUID, fixing timeline data mismatch for untitled projects
+- **Project creation always assigns valid ID** — All spawn paths (lead/start, POST /agents, resume) now guarantee a project UUID; AgentManager has 4-layer fallback
+- **Auto-DAG stuck pending tasks** — DAG engine now checks dependency satisfaction at task creation time, not only reactively; fixes tasks with pre-completed deps getting stuck
+- **Ghost 'not in DAG' warning** — Fixed false warning firing on every completed task (#104)
+- **Message segmentation** — Replaced heuristic-based bubble breaks with deterministic `agent:response_start` server signal for reliable message grouping
+- **COMMIT command silent file exclusion** — Now warns about untracked files in related packages when new files aren't locked
+- **Spawn mock arg count in CI** — Updated api.integration.test.ts for 9-arg spawn signature after project creation fix
+- **Stale MobileApprovalStack test** — Updated Skip → Dismiss assertion after dismiss feature rename
 - **Gantt chart vertical alignment** — fixed SVG viewBox stretching, time axis overlap with first task row, and container height formula for small task counts
 - **Array sanitization in Community Playbooks** — secrets inside arrays now detected and stripped
 - **PredictionService expired accuracy** — expired predictions marked instead of removed, counted correctly in accuracy stats

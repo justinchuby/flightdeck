@@ -343,18 +343,25 @@ export function LeadDashboard({ api, ws }: Props) {
     }).catch(() => {});
   }, [selectedLeadId, isActiveAgent]);
 
-  // Fetch DAG status for selected lead
+  // Fetch DAG status for selected lead — always use agent UUID for /api/lead/:id/dag
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const fetchDag = () => {
       fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
-        if (data && data.tasks) useLeadStore.getState().setDagStatus(selectedLeadId, data as DagStatus);
+        if (data && data.tasks) {
+          const store = useLeadStore.getState();
+          store.setDagStatus(selectedLeadId, data as DagStatus);
+          // Also store under projectId so DagMinimap can find it by either key
+          if (historicalProjectId && historicalProjectId !== selectedLeadId) {
+            store.setDagStatus(historicalProjectId, data as DagStatus);
+          }
+        }
       }).catch(() => {});
     };
     fetchDag();
     const interval = setInterval(fetchDag, 10000);
     return () => clearInterval(interval);
-  }, [selectedLeadId, isActiveAgent]);
+  }, [selectedLeadId, historicalProjectId, isActiveAgent]);
 
   // Listen for lead-specific WebSocket events
   useEffect(() => {
@@ -587,7 +594,12 @@ export function LeadDashboard({ api, ws }: Props) {
       // DAG status updates
       if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
         fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
-          if (data && data.tasks) store.setDagStatus(selectedLeadId!, data as DagStatus);
+          if (data && data.tasks) {
+            store.setDagStatus(selectedLeadId!, data as DagStatus);
+            if (historicalProjectId && historicalProjectId !== selectedLeadId) {
+              store.setDagStatus(historicalProjectId, data as DagStatus);
+            }
+          }
         }).catch(() => {});
       }
 
@@ -904,6 +916,19 @@ export function LeadDashboard({ api, ws }: Props) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
+    });
+    if (resp.ok) {
+      const decision = await resp.json();
+      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
+    }
+  }, [selectedLeadId]);
+
+  const handleDismissDecision = useCallback(async (decisionId: string) => {
+    if (!selectedLeadId) return;
+    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'dismissed', confirmedAt: new Date().toISOString() });
+    const resp = await fetch(`/api/decisions/${decisionId}/dismiss`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     });
     if (resp.ok) {
       const decision = await resp.json();
@@ -1529,6 +1554,7 @@ export function LeadDashboard({ api, ws }: Props) {
                           decisionId={d.id}
                           onConfirm={handleConfirmDecision}
                           onReject={handleRejectDecision}
+                          onDismiss={handleDismissDecision}
                         />
                       </div>
                     ))}
@@ -1834,7 +1860,7 @@ export function LeadDashboard({ api, ws }: Props) {
                     <span className="text-[10px] text-th-text-muted ml-auto">{decisions.length}</span>
                   </div>
                   <div className="flex-1 min-h-0 overflow-y-auto">
-                    <DecisionPanelContent decisions={decisions} onConfirm={handleConfirmDecision} onReject={handleRejectDecision} />
+                    <DecisionPanelContent decisions={decisions} onConfirm={handleConfirmDecision} onReject={handleRejectDecision} onDismiss={handleDismissDecision} />
                   </div>
                   {/* Resize handle for decisions panel */}
                   <div
@@ -1849,7 +1875,7 @@ export function LeadDashboard({ api, ws }: Props) {
                   <div className="flex flex-wrap border-b border-th-border shrink-0 items-center">
                     {(() => {
                       const allTabs: Record<string, { icon: React.ReactNode; label: string; badge?: number }> = {
-                        team: { icon: <Bot className="w-3 h-3" />, label: 'Team', badge: teamAgents.length },
+                        team: { icon: <Bot className="w-3 h-3" />, label: 'Team' },
                         comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
                         groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
                         dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },

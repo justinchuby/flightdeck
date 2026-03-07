@@ -41,7 +41,7 @@
   --chart-edge-report: 16 185 129;      /* emerald-500 */
 
   /* ── Progress Colors ────────────────────────────────────────────── */
-  --chart-progress-completed: 16 185 129;   /* emerald-500 */
+  --chart-progress-completed: 168 85 247;   /* purple-500 */
   --chart-progress-active: 59 130 246;      /* blue-500 */
   --chart-progress-remaining: 107 114 128;  /* gray-500 */
 
@@ -88,7 +88,7 @@
   --chart-edge-report: 52 211 153;       /* emerald-400 */
 
   /* Progress — brighter */
-  --chart-progress-completed: 52 211 153;    /* emerald-400 */
+  --chart-progress-completed: 192 132 252;    /* purple-400 */
   --chart-progress-active: 96 165 250;       /* blue-400 */
   --chart-progress-remaining: 156 163 175;   /* gray-400 */
 

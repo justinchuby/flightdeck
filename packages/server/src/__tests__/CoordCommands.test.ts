@@ -57,12 +57,18 @@ function getGitCommitArgs(): string[] | undefined {
 }
 
 // Helper: make mockExecFile resolve successfully (commit + post-commit dirty-tree check)
-function mockExecFileSuccess(stdout = 'abc1234 feat: stuff\n 1 file changed', dirtyFiles?: string[], untrackedFiles?: string[]) {
+function mockExecFileSuccess(stdout = 'abc1234 feat: stuff\n 1 file changed', dirtyFiles?: string[], statusFiles?: string[]) {
   mockExecFile.mockImplementation((_file: string, args: string[], _opts: any, cb: Function) => {
-    if (args[0] === 'diff') {
+    if (args[0] === 'status' && args[1] === '--porcelain') {
+      // Pre-commit status check
+      const lines = (statusFiles ?? []).join('\n');
+      cb(null, { stdout: lines + '\n', stderr: '' });
+    } else if (args[0] === 'diff' && args.includes('--')) {
+      // Post-commit dirty-tree check (scoped)
       cb(null, { stdout: (dirtyFiles ?? []).join('\n') + '\n', stderr: '' });
     } else if (args[0] === 'ls-files') {
-      cb(null, { stdout: (untrackedFiles ?? []).join('\n') + '\n', stderr: '' });
+      // Post-commit untracked check
+      cb(null, { stdout: '\n', stderr: '' });
     } else if (args[0] === 'add') {
       cb(null, { stdout: '', stderr: '' });
     } else {
@@ -81,7 +87,7 @@ function mockExecFileFailure(message = 'nothing to commit') {
 // Helper: commit succeeds but dirty-tree check fails
 function mockExecFileCommitOkVerifyFail(stdout = 'abc1234 feat: stuff\n 1 file changed') {
   mockExecFile.mockImplementation((_file: string, args: string[], _opts: any, cb: Function) => {
-    if (args[0] === 'diff' || args[0] === 'ls-files') {
+    if (args[0] === 'status' || args[0] === 'diff' || args[0] === 'ls-files') {
       cb(new Error('fatal: not a git repository'), { stdout: '', stderr: '' });
     } else if (args[0] === 'add') {
       cb(null, { stdout: '', stderr: '' });
@@ -603,10 +609,10 @@ describe('CoordCommands — COMMIT handler', () => {
 
       await commit.handler(agent, '⟦⟦ COMMIT {"message": "verify me"} ⟧⟧');
 
-      // Pre-commit untracked detection + git add + git commit + 2 post-commit checks = 5 calls
+      // Pre-commit status + git add + git commit + 2 post-commit checks = 5 calls
       expect(mockExecFile).toHaveBeenCalledTimes(5);
-      // First call: pre-commit untracked detection (git ls-files)
-      expect(mockExecFile.mock.calls[0][1][0]).toBe('ls-files');
+      // First call: pre-commit status check (git status --porcelain)
+      expect(mockExecFile.mock.calls[0][1][0]).toBe('status');
       // Second call: git add
       expect(mockExecFile.mock.calls[1][1][0]).toBe('add');
       expect(mockExecFile.mock.calls[1][1]).toContain('src/file.ts');
@@ -715,11 +721,11 @@ describe('CoordCommands — COMMIT handler', () => {
     });
   });
 
-  // ── Untracked file auto-inclusion ──────────────────────────────────────
+  // ── Untracked/modified file warning ─────────────────────────────────
 
-  describe('untracked file auto-inclusion', () => {
-    it('auto-includes untracked files in same directory as locked files', async () => {
-      mockExecFileSuccess(undefined, [], ['src/foo.test.ts']);
+  describe('uncommitted file warning', () => {
+    it('warns about untracked files not included in commit', async () => {
+      mockExecFileSuccess(undefined, [], ['?? src/foo.test.ts']);
       const ctx = makeCtx({
         lockRegistry: {
           getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/foo.ts' }]),
@@ -730,16 +736,40 @@ describe('CoordCommands — COMMIT handler', () => {
 
       await commit.handler(agent, '⟦⟦ COMMIT {"message": "with untracked"} ⟧⟧');
 
+      // No auto-inclusion — just warns the agent
       const addArgs = getGitAddArgs()!;
       expect(addArgs).toContain('src/foo.ts');
-      expect(addArgs).toContain('src/foo.test.ts');
+      expect(addArgs).not.toContain('src/foo.test.ts');
       expect(agent.sendMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Auto-including 1 new file(s)'),
+        expect.stringContaining('uncommitted file(s) not in this commit'),
+      );
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('src/foo.test.ts'),
       );
     });
 
-    it('does NOT include untracked files in unrelated directories', async () => {
-      mockExecFileSuccess(undefined, [], ['lib/unrelated.ts']);
+    it('warns about modified files not included in commit', async () => {
+      mockExecFileSuccess(undefined, [], [' M packages/web/src/components/AcpOutput.tsx']);
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'packages/web/src/hooks/useWebSocket.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "partial changes"} ⟧⟧');
+
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('uncommitted file(s) not in this commit'),
+      );
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('AcpOutput.tsx'),
+      );
+    });
+
+    it('does NOT warn about files already in the commit', async () => {
+      mockExecFileSuccess(undefined, [], [' M src/foo.ts']);
       const ctx = makeCtx({
         lockRegistry: {
           getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/foo.ts' }]),
@@ -748,15 +778,50 @@ describe('CoordCommands — COMMIT handler', () => {
       const agent = makeAgent();
       const commit = getCommitHandler(ctx);
 
-      await commit.handler(agent, '⟦⟦ COMMIT {"message": "scoped only"} ⟧⟧');
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "all included"} ⟧⟧');
 
-      const addArgs = getGitAddArgs()!;
-      expect(addArgs).toContain('src/foo.ts');
-      expect(addArgs).not.toContain('lib/unrelated.ts');
+      const warnings = agent.sendMessage.mock.calls.filter(
+        (c: any[]) => (c[0] as string).includes('uncommitted file(s)'),
+      );
+      expect(warnings).toHaveLength(0);
     });
 
-    it('gracefully handles untracked detection failure', async () => {
-      // mockExecFileCommitOkVerifyFail fails git ls-files but succeeds on commit
+    it('does NOT warn when no uncommitted files exist', async () => {
+      mockExecFileSuccess(undefined, []);
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/foo.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "clean"} ⟧⟧');
+
+      const warnings = agent.sendMessage.mock.calls.filter(
+        (c: any[]) => (c[0] as string).includes('uncommitted file(s)'),
+      );
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('warns about both untracked and modified files together', async () => {
+      mockExecFileSuccess(undefined, [], ['?? src/new.ts', ' M src/changed.ts']);
+      const ctx = makeCtx({
+        lockRegistry: {
+          getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/main.ts' }]),
+        },
+      });
+      const agent = makeAgent();
+      const commit = getCommitHandler(ctx);
+
+      await commit.handler(agent, '⟦⟦ COMMIT {"message": "multi"} ⟧⟧');
+
+      expect(agent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('2 uncommitted file(s)'),
+      );
+    });
+
+    it('gracefully handles status check failure', async () => {
       mockExecFileCommitOkVerifyFail();
       const ctx = makeCtx({
         lockRegistry: {
@@ -768,31 +833,9 @@ describe('CoordCommands — COMMIT handler', () => {
 
       await commit.handler(agent, '⟦⟦ COMMIT {"message": "safe"} ⟧⟧');
 
-      // Should still commit successfully even if untracked detection fails
       expect(agent.sendMessage).toHaveBeenCalledWith(
         expect.stringContaining('COMMIT succeeded'),
       );
-    });
-
-    it('sends auto-include message with correct file count', async () => {
-      mockExecFileSuccess(undefined, [], ['src/a.test.ts', 'src/b.test.ts', 'src/c.test.ts']);
-      const ctx = makeCtx({
-        lockRegistry: {
-          getByAgent: vi.fn().mockReturnValue([{ filePath: 'src/main.ts' }]),
-        },
-      });
-      const agent = makeAgent();
-      const commit = getCommitHandler(ctx);
-
-      await commit.handler(agent, '⟦⟦ COMMIT {"message": "multi untracked"} ⟧⟧');
-
-      expect(agent.sendMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Auto-including 3 new file(s)'),
-      );
-      const addArgs = getGitAddArgs()!;
-      expect(addArgs).toContain('src/a.test.ts');
-      expect(addArgs).toContain('src/b.test.ts');
-      expect(addArgs).toContain('src/c.test.ts');
     });
   });
 

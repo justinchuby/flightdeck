@@ -553,6 +553,7 @@ function autoCreateDagTask(
   }
 
   const autoId = generateAutoTaskId(role, taskText);
+  const projectId = ctx.getProjectIdForAgent(leadId);
   let autoTask;
   try {
     autoTask = ctx.taskDAG.addTask(leadId, {
@@ -560,7 +561,7 @@ function autoCreateDagTask(
       role,
       title: taskText.slice(0, 120),
       description: taskText,
-    });
+    }, projectId);
   } catch (e: any) {
     logger.warn('delegation', `Auto-DAG creation failed for "${autoId}": ${e.message}`);
     return { created: false, taskId: autoId, depNotes };

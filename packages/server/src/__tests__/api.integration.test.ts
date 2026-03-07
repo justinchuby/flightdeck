@@ -318,6 +318,8 @@ describe('Agents', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
+      undefined,
     );
   });
 

@@ -3,7 +3,7 @@ import { eq, asc, and, inArray, lte } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { decisions } from '../db/schema.js';
 
-export type DecisionStatus = 'recorded' | 'confirmed' | 'rejected';
+export type DecisionStatus = 'recorded' | 'confirmed' | 'rejected' | 'dismissed';
 
 export const DECISION_CATEGORIES = ['style', 'architecture', 'tool_access', 'dependency', 'testing', 'general'] as const;
 export type DecisionCategory = (typeof DECISION_CATEGORIES)[number];
@@ -513,6 +513,21 @@ export class DecisionLog extends EventEmitter {
     return decision;
   }
 
+  dismiss(id: string): Decision | undefined {
+    this.cancelAutoApproveTimer(id);
+    const existing = this.getById(id);
+    if (!existing || existing.status !== 'recorded') return existing;
+    const confirmedAt = new Date().toISOString();
+    this.db.drizzle
+      .update(decisions)
+      .set({ status: 'dismissed', confirmedAt })
+      .where(eq(decisions.id, id))
+      .run();
+    const decision = this.getById(id);
+    if (decision) this.emit('decision:dismissed', decision);
+    return decision;
+  }
+
   private cancelAutoApproveTimer(id: string): void {
     const timer = this.autoApproveTimers.get(id);
     if (timer) {
@@ -561,6 +576,16 @@ export class DecisionLog extends EventEmitter {
       if (rejected) results.push(rejected);
     }
     this.emit('decisions:batch_rejected', results);
+    return { updated: results.length, results };
+  }
+
+  dismissBatch(ids: string[]): BatchResult {
+    const results: Decision[] = [];
+    for (const id of ids) {
+      const dismissed = this.dismiss(id);
+      if (dismissed) results.push(dismissed);
+    }
+    this.emit('decisions:batch_dismissed', results);
     return { updated: results.length, results };
   }
 

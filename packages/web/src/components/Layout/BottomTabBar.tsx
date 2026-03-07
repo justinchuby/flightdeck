@@ -17,17 +17,13 @@ interface Tab {
 export function BottomTabBar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const agents = useAppStore(s => s.agents);
   const pendingCount = useAppStore(s => s.pendingDecisions.length);
   const [showMore, setShowMore] = useState(false);
 
-  const failedCount = agents.filter(a => a.status === 'failed').length;
-  const runningCount = agents.filter(a => a.status === 'running').length;
-
   const tabs: Tab[] = [
     { icon: '🏠', label: 'Home', route: '/overview' },
-    { icon: '📋', label: 'Tasks', route: '/tasks', badge: runningCount || undefined },
-    { icon: '👥', label: 'Agents', route: '/agents', badge: failedCount || undefined },
+    { icon: '📋', label: 'Tasks', route: '/tasks' },
+    { icon: '👥', label: 'Agents', route: '/agents' },
     { icon: '📊', label: 'Timeline', route: '/timeline' },
   ];
 
@@ -39,7 +35,6 @@ export function BottomTabBar() {
     { icon: '⚙️', label: 'Canvas', route: '/canvas' },
     { icon: '📈', label: 'Analytics', route: '/analytics' },
     { icon: '💬', label: 'Groups', route: '/groups' },
-    { icon: '🔗', label: 'GitHub', route: '/github' },
     { icon: '⚙', label: 'Settings', route: '/settings' },
   ];
 

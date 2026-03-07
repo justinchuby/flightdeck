@@ -64,10 +64,16 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
         }
       }
     } else if (!dagTask) {
-      // Task not in DAG — nudge the lead to track it
-      const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
-      if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
-        parent.sendMessage(`[System] ⚠ This task was NOT in the DAG. Use COMPLETE_TASK or ADD_TASK (with status "done") to keep the DAG current.`);
+      // If this agent was linked to a DAG task that's already been handled
+      // (e.g., completed via COMPLETE_TASK), don't emit a spurious warning.
+      const taskAlreadyTracked = agent.dagTaskId &&
+        ctx.taskDAG.getTask(agent.parentId!, agent.dagTaskId) != null;
+      if (!taskAlreadyTracked) {
+        // Task genuinely not in DAG — nudge the lead to track it
+        const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
+        if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
+          parent.sendMessage(`[System] ⚠ This task was NOT in the DAG. Use COMPLETE_TASK or ADD_TASK (with status "done") to keep the DAG current.`);
+        }
       }
     }
   }
@@ -147,10 +153,16 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
         }
       }
     } else if (!dagTask) {
-      // Task not in DAG — nudge the lead to track it
-      const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
-      if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
-        parent.sendMessage(`[System] ⚠ This task was NOT in the DAG. Use COMPLETE_TASK or ADD_TASK (with status "done") to keep the DAG current.`);
+      // If this agent was linked to a DAG task that's already been handled
+      // (e.g., completed via COMPLETE_TASK), don't emit a spurious warning.
+      const taskAlreadyTracked = agent.dagTaskId &&
+        ctx.taskDAG.getTask(agent.parentId!, agent.dagTaskId) != null;
+      if (!taskAlreadyTracked) {
+        // Task genuinely not in DAG — nudge the lead to track it
+        const dagStatus = ctx.taskDAG.getStatus(agent.parentId);
+        if (dagStatus.summary.pending + dagStatus.summary.ready + dagStatus.summary.running > 0) {
+          parent.sendMessage(`[System] ⚠ This task was NOT in the DAG. Use COMPLETE_TASK or ADD_TASK (with status "done") to keep the DAG current.`);
+        }
       }
     }
   }

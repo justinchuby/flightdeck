@@ -53,8 +53,6 @@ function NavItem({ to, icon: Icon, label, badge, end }: {
 }
 
 export function Sidebar() {
-  const agents = useAppStore((s) => s.agents);
-  const runningCount = agents.filter((a) => a.status === 'running').length;
   const pendingCount = useAppStore((s) => s.pendingDecisions.length);
 
   const [moreOpen, setMoreOpen] = useState(() => {
@@ -78,7 +76,6 @@ export function Sidebar() {
           label={label}
           end={to === '/' || to === '/agents'}
           badge={
-            to === '/agents' ? (runningCount > 0 ? runningCount : null) :
             to === '/tasks' ? (pendingCount > 0 ? pendingCount : null) :
             null
           }

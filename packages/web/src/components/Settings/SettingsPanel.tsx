@@ -8,7 +8,6 @@ import { PlaybookLibrary } from '../Playbooks';
 import { IntentRulesDashboard } from '../IntentRules';
 import { RecoverySettingsPanel, RecoveryMetricsCard } from '../Recovery';
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
-import { GitHubSetup } from '../GitHub';
 import { ConflictSettingsPanel } from '../Conflicts';
 import { DataManagement } from './DataManagement';
 
@@ -197,11 +196,6 @@ export function SettingsPanel({ api }: Props) {
       {/* Intent Rules */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <IntentRulesDashboard />
-      </section>
-
-      {/* GitHub Integration */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <GitHubSetup />
       </section>
 
       {/* Conflict Detection */}

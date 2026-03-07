@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Check, X, ChevronDown, ChevronRight, Clock, Lightbulb } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronRight, Clock, Lightbulb, EyeOff } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { useToastStore } from '../Toast';
@@ -56,6 +56,12 @@ export function ApprovalQueue() {
           e.preventDefault();
           batchResolve('reject');
         }
+      } else if (e.key === 'd' && !e.metaKey && !e.ctrlKey) {
+        // 'd' to dismiss selected
+        if (selectedIds.size > 0) {
+          e.preventDefault();
+          batchResolve('dismiss');
+        }
       }
     };
     window.addEventListener('keydown', handler);
@@ -111,7 +117,7 @@ export function ApprovalQueue() {
   }, []);
 
   // Resolve a single decision
-  const resolveDecision = useCallback(async (id: string, action: 'confirm' | 'reject') => {
+  const resolveDecision = useCallback(async (id: string, action: 'confirm' | 'reject' | 'dismiss') => {
     setProcessingIds((prev) => new Set(prev).add(id));
     try {
       await apiFetch(`/decisions/${id}/${action}`, {
@@ -124,7 +130,7 @@ export function ApprovalQueue() {
       const leadId = leadState.selectedLeadId;
       if (leadId) {
         leadState.updateDecision(leadId, id, {
-          status: action === 'confirm' ? 'confirmed' : 'rejected',
+          status: action === 'confirm' ? 'confirmed' : action === 'reject' ? 'rejected' : 'dismissed',
           confirmedAt: new Date().toISOString(),
         });
       }
@@ -145,7 +151,7 @@ export function ApprovalQueue() {
   }, [addToast]);
 
   // Batch resolve selected decisions
-  const batchResolve = useCallback(async (action: 'confirm' | 'reject') => {
+  const batchResolve = useCallback(async (action: 'confirm' | 'reject' | 'dismiss') => {
     if (selectedIds.size === 0) return;
     const ids = [...selectedIds];
     setProcessingIds(new Set(ids));
@@ -183,14 +189,14 @@ export function ApprovalQueue() {
       if (leadId) {
         for (const id of ids) {
           leadState.updateDecision(leadId, id, {
-            status: action === 'confirm' ? 'confirmed' : 'rejected',
+            status: action === 'confirm' ? 'confirmed' : action === 'reject' ? 'rejected' : 'dismissed',
             confirmedAt: new Date().toISOString(),
           });
         }
       }
 
       setSelectedIds(new Set());
-      const verb = action === 'confirm' ? 'approved' : 'rejected';
+      const verb = action === 'confirm' ? 'approved' : action === 'reject' ? 'rejected' : 'dismissed';
       addToast('success', `${ids.length} decision${ids.length > 1 ? 's' : ''} ${verb}`);
 
       // Teach Me: show prompt after 1s delay (PM requirement: don't stack with toast)
@@ -256,6 +262,12 @@ export function ApprovalQueue() {
         <div className="flex items-center gap-2 px-4 py-2 bg-th-bg-alt/60 border-b border-th-border shrink-0">
           <span className="text-xs text-th-text-muted">{selectedIds.size} selected</span>
           <div className="flex-1" />
+          <button
+            onClick={() => batchResolve('dismiss')}
+            className="px-3 py-1 text-xs font-medium rounded-md bg-gray-600/20 text-gray-400 border border-gray-600/30 hover:bg-gray-600/30 transition-colors"
+          >
+            Dismiss Selected
+          </button>
           <button
             onClick={() => batchResolve('reject')}
             className="px-3 py-1 text-xs font-medium rounded-md bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors"
@@ -366,15 +378,22 @@ export function ApprovalQueue() {
                         {/* Quick action buttons */}
                         <div className="flex items-center gap-1 shrink-0">
                           <button
+                            onClick={() => resolveDecision(decision.id, 'dismiss')}
+                            title="Dismiss (d)"
+                            className="p-1 rounded hover:bg-gray-500/20 text-th-text-muted hover:text-gray-400 transition-colors"
+                          >
+                            <EyeOff className="w-3.5 h-3.5" />
+                          </button>
+                          <button
                             onClick={() => resolveDecision(decision.id, 'reject')}
-                            title="Reject"
+                            title="Reject (r)"
                             className="p-1 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400 transition-colors"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => resolveDecision(decision.id, 'confirm')}
-                            title="Approve"
+                            title="Approve (a)"
                             className="p-1 rounded hover:bg-green-500/20 text-th-text-muted hover:text-green-400 transition-colors"
                           >
                             <Check className="w-3.5 h-3.5" />

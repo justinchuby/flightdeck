@@ -99,7 +99,84 @@ describe('ProjectTabs', () => {
     expect(screen.getByText('Alpha Live')).toBeTruthy();
   });
 
+  it('uses lead.projectId as tab ID when available', () => {
+    vi.mocked(useAppStore).mockImplementation((selector: any) =>
+      selector({
+        agents: [
+          { id: 'agent-uuid-1', projectId: 'proj-uuid-1', role: { id: 'lead', name: 'Lead' }, parentId: null, projectName: 'My Project', status: 'running' },
+        ],
+      }),
+    );
+    vi.mocked(useProjects).mockReturnValue({ projects: [], loading: false });
+
+    render(<ProjectTabs activeId="proj-uuid-1" onChange={onChange} />);
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByText('My Project')).toBeTruthy();
+  });
+
+  it('deduplicates live lead by projectId against historical project', () => {
+    vi.mocked(useAppStore).mockImplementation((selector: any) =>
+      selector({
+        agents: [
+          { id: 'agent-uuid-1', projectId: 'proj-1', role: { id: 'lead', name: 'Lead' }, parentId: null, projectName: 'Live Alpha', status: 'running' },
+        ],
+      }),
+    );
+    vi.mocked(useProjects).mockReturnValue({
+      projects: [
+        { id: 'proj-1', name: 'Historical Alpha', description: '', cwd: null, status: 'completed', createdAt: '', updatedAt: '' },
+      ],
+      loading: false,
+    });
+
+    render(<ProjectTabs activeId="proj-1" onChange={onChange} />);
+    // Live version should win; historical duplicate suppressed
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(1);
+    expect(screen.getByText('Live Alpha')).toBeTruthy();
+  });
+
+  it('falls back to lead.id when projectId is missing', () => {
+    vi.mocked(useAppStore).mockImplementation((selector: any) =>
+      selector({
+        agents: [
+          { id: 'agent-uuid-1', role: { id: 'lead', name: 'Lead' }, parentId: null, projectName: 'Untitled', status: 'running' },
+        ],
+      }),
+    );
+    vi.mocked(useProjects).mockReturnValue({ projects: [], loading: false });
+
+    render(<ProjectTabs activeId="agent-uuid-1" onChange={onChange} />);
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(1);
+    fireEvent.click(tabs[0]);
+    expect(onChange).toHaveBeenCalledWith('agent-uuid-1');
+  });
+
+  it('falls back to lead.id when projectId is empty string (untitled project)', () => {
+    vi.mocked(useAppStore).mockImplementation((selector: any) =>
+      selector({
+        agents: [
+          { id: 'agent-uuid-1', projectId: '', role: { id: 'lead', name: 'Lead' }, parentId: null, projectName: '', status: 'running' },
+        ],
+      }),
+    );
+    vi.mocked(useProjects).mockReturnValue({ projects: [], loading: false });
+
+    render(<ProjectTabs activeId="agent-uuid-1" onChange={onChange} />);
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(1);
+    fireEvent.click(tabs[0]);
+    // Empty string projectId is falsy, so falls back to lead.id
+    expect(onChange).toHaveBeenCalledWith('agent-uuid-1');
+  });
+
   it('auto-selects first tab when activeId is null', () => {
+    vi.mocked(useAppStore).mockImplementation((selector: any) =>
+      selector({ agents: [] }),
+    );
     vi.mocked(useProjects).mockReturnValue({
       projects: [
         { id: 'p1', name: 'Alpha', description: '', cwd: null, status: 'completed', createdAt: '', updatedAt: '' },
@@ -113,6 +190,9 @@ describe('ProjectTabs', () => {
   });
 
   it('auto-selects first tab when activeId is not in tabs', () => {
+    vi.mocked(useAppStore).mockImplementation((selector: any) =>
+      selector({ agents: [] }),
+    );
     vi.mocked(useProjects).mockReturnValue({
       projects: [
         { id: 'p1', name: 'Alpha', description: '', cwd: null, status: 'completed', createdAt: '', updatedAt: '' },

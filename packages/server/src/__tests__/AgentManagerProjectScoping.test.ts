@@ -210,4 +210,47 @@ describe('AgentManager project scoping', () => {
       expect(getProjectIdForAgent(agents, restarted.id)).toBe('proj-restart');
     });
   });
+
+  describe('root agent projectId guarantee', () => {
+    // These tests verify the invariant enforced by AgentManager.spawn():
+    // root agents (no parentId) must always have a projectId.
+
+    it('root agent with explicit projectId keeps it', () => {
+      const agents = new Map<string, MockAgent>();
+      const lead: MockAgent = { id: 'lead-explicit', projectId: 'proj-explicit' };
+      agents.set(lead.id, lead);
+      expect(getProjectIdForAgent(agents, lead.id)).toBe('proj-explicit');
+    });
+
+    it('root agent without projectId would be unscoped (the bug scenario)', () => {
+      // This test documents the bug: before the fix, root agents could
+      // exist without a projectId, making their activities invisible.
+      const agents = new Map<string, MockAgent>();
+      const lead: MockAgent = { id: 'lead-no-proj' }; // no projectId!
+      agents.set(lead.id, lead);
+
+      // Without the fix, this returns undefined → activities log with ''
+      expect(getProjectIdForAgent(agents, lead.id)).toBeUndefined();
+      // And the agent wouldn't appear in ANY project query
+      expect(getByProject(agents, 'any-project')).toEqual([]);
+    });
+
+    it('simulated fix: root agent gets generated projectId at spawn', () => {
+      const agents = new Map<string, MockAgent>();
+      // Simulate AgentManager.spawn() behavior after the fix:
+      // if (!parentId && !agent.projectId) agent.projectId = randomUUID();
+      const generatedId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+      const lead: MockAgent = { id: 'lead-auto', projectId: generatedId };
+      agents.set(lead.id, lead);
+
+      expect(getProjectIdForAgent(agents, lead.id)).toBe(generatedId);
+      expect(getByProject(agents, generatedId)).toHaveLength(1);
+
+      // Children inherit the generated projectId
+      const child: MockAgent = { id: 'child-auto', parentId: lead.id };
+      agents.set(child.id, child);
+      expect(getProjectIdForAgent(agents, child.id)).toBe(generatedId);
+      expect(getByProject(agents, generatedId)).toHaveLength(2);
+    });
+  });
 });

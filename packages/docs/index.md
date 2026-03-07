@@ -8,9 +8,6 @@ hero:
     - theme: brand
       text: Get Started
       link: /guide/quickstart
-    - theme: alt
-      text: API Reference
-      link: /reference/api
 features:
   - icon: 🚀
     title: One Command to Launch

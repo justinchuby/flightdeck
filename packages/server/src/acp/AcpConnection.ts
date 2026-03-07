@@ -294,6 +294,7 @@ export class AcpConnection extends EventEmitter {
     this._isPrompting = true;
     this._promptingStartedAt = Date.now();
     this.emit('prompting', true);
+    this.emit('response_start');
 
     const blocks: acp.ContentBlock[] = typeof content === 'string'
       ? [{ type: 'text', text: content }]

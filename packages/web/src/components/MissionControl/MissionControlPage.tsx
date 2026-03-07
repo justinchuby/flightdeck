@@ -17,7 +17,6 @@ import { CommFlowGraph } from '../CommFlow';
 import { DiffPreview } from '../DiffPreview';
 import { DebatesPanel } from '../Debates';
 import { HandoffHistoryPanel } from '../Handoff';
-import { PRStatusPanel } from '../GitHub';
 import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { useDashboardLayout } from '../../hooks/useDashboardLayout';
 import { useProjects } from '../../hooks/useProjects';
@@ -26,7 +25,7 @@ import type { PanelConfig } from '../../hooks/useDashboardLayout';
 
 // ── Panel renderer ────────────────────────────────────────────────────
 
-function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: string; agents: any[] }) {
+function PanelSlot({ panel, leadId, projectId, agents }: { panel: PanelConfig; leadId: string; projectId: string; agents: any[] }) {
   switch (panel.id) {
     case 'alerts':
       return <AlertsPanel leadId={leadId} />;
@@ -41,7 +40,7 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
     case 'fleet':
       return <AgentFleet leadId={leadId} agents={agents} />;
     case 'dag':
-      return <DagMinimap leadId={leadId} />;
+      return <DagMinimap projectId={projectId} leadId={leadId} />;
     case 'activity':
       return <ActivityFeed leadId={leadId} />;
     case 'heatmap': {
@@ -114,12 +113,6 @@ function PanelSlot({ panel, leadId, agents }: { panel: PanelConfig; leadId: stri
       return (
         <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
           <HandoffHistoryPanel />
-        </div>
-      );
-    case 'github':
-      return (
-        <div className="bg-th-bg rounded-lg border border-th-border-muted p-4">
-          <PRStatusPanel />
         </div>
       );
     default:
@@ -198,7 +191,28 @@ export function MissionControlPage() {
   );
 
   // Priority: user-selected tab > sidebar > leadStore > live lead > API projects
-  const leadId = selectedProjectId ?? selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? (apiProjects[0]?.id || null);
+  // selectedProjectId from ProjectTabs is a project UUID (lead.projectId || lead.id)
+  const tabId = selectedProjectId ?? selectedLeadId ?? projectKeys[0] ?? leadAgents[0]?.id ?? (apiProjects[0]?.id || null);
+
+  // Resolve leadId (agent UUID) for agent-related panels
+  // and projectId for DAG/data panels
+  const { leadId, projectId } = useMemo(() => {
+    if (!tabId) return { leadId: null as string | null, projectId: null as string | null };
+    // Check if tabId matches a live lead's projectId
+    const leadByProject = liveAgents.find(
+      (a) => a.projectId === tabId && a.role?.id === 'lead' && !a.parentId,
+    );
+    if (leadByProject) {
+      return { leadId: leadByProject.id, projectId: tabId };
+    }
+    // Check if tabId IS a lead agent UUID
+    const leadById = liveAgents.find((a) => a.id === tabId && a.role?.id === 'lead');
+    if (leadById) {
+      return { leadId: tabId, projectId: leadById.projectId || tabId };
+    }
+    // Historical/API fallback — use tabId for both
+    return { leadId: tabId, projectId: tabId };
+  }, [tabId, liveAgents]);
 
   // Derive agents from keyframes when no live agents exist
   useEffect(() => {
@@ -295,7 +309,7 @@ export function MissionControlPage() {
       {/* Render all visible panels in user-defined order */}
       {panels.map((panel) => (
         <div key={panel.id} className="shrink-0">
-          <PanelSlot panel={panel} leadId={leadId} agents={teamAgents} />
+          <PanelSlot panel={panel} leadId={leadId} projectId={projectId ?? leadId} agents={teamAgents} />
         </div>
       ))}
       </div>

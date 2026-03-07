@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Lightbulb, FolderOpen } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { InlineMarkdownWithMentions } from '../../utils/markdown';
+import { splitCommandBlocks } from '../../utils/commandParser';
 import type { AcpTextChunk } from '../../types';
 
 export function InlineMarkdown({ text }: { text: string }) {
@@ -123,8 +124,8 @@ export function isRealCommandBlock(text: string): boolean {
 }
 
 export function AgentTextBlock({ text }: { text: string }) {
-  // Split on ⟦⟦ ... ⟧⟧ blocks (complete) and also detect unclosed ⟦⟦ blocks
-  const segments = text.split(/(⟦⟦[\s\S]*?⟧⟧)/g);
+  // Depth-aware split handles nested ⟦⟦ ⟧⟧ inside command JSON payloads
+  const segments = splitCommandBlocks(text);
   return (
     <>
       {segments.map((seg, i) => {
@@ -136,17 +137,9 @@ export function AgentTextBlock({ text }: { text: string }) {
           return <MarkdownWithTables key={i} text={seg} />;
         }
         // Unclosed ⟦⟦ block (still streaming or split across messages)
-        if (seg.includes('⟦⟦') && !seg.includes('⟧⟧')) {
-          const idx = seg.indexOf('⟦⟦');
-          const before = seg.slice(0, idx);
-          const cmdBlock = seg.slice(idx);
-          if (isRealCommandBlock(cmdBlock)) {
-            return (
-              <span key={i}>
-                {before.trim() ? <MarkdownWithTables text={before} /> : null}
-                <CollapsibleCommandBlock text={cmdBlock} />
-              </span>
-            );
+        if (seg.startsWith('⟦⟦')) {
+          if (isRealCommandBlock(seg)) {
+            return <CollapsibleCommandBlock key={i} text={seg} />;
           }
           return <MarkdownWithTables key={i} text={seg} />;
         }

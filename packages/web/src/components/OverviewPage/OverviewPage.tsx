@@ -37,11 +37,16 @@ export function OverviewPage(_props: Props) {
 
   // Derive the effective ID used for data fetching.
   // Priority: user-picked project (explicit) > live lead agent > sidebar > first project
+  // Uses lead.projectId (project registry UUID) when available so replay fetches
+  // match the projectId stored in activity events.
   const effectiveId = useMemo(() => {
     if (selectedProjectId) return selectedProjectId;
-    if (selectedLeadId) return selectedLeadId;
+    if (selectedLeadId) {
+      const lead = agents.find((a) => a.id === selectedLeadId);
+      return lead?.projectId || selectedLeadId;
+    }
     const lead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
-    if (lead?.id) return lead.id;
+    if (lead) return lead.projectId || lead.id;
     return projects.length > 0 ? projects[0].id : null;
   }, [selectedLeadId, agents, selectedProjectId, projects]);
 
@@ -172,7 +177,7 @@ export function OverviewPage(_props: Props) {
   // ── Session start time ─────────────────────────────────────────
   const sessionStart = useMemo(() => {
     if (keyframes.length > 0) return keyframes[0].timestamp;
-    const lead = displayAgents.find((a: any) => a.id === effectiveId);
+    const lead = displayAgents.find((a: any) => a.id === effectiveId || a.projectId === effectiveId);
     return lead?.createdAt ?? undefined;
   }, [keyframes, displayAgents, effectiveId]);
 

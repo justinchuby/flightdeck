@@ -219,12 +219,12 @@ describe('MobileApprovalStack', () => {
     expect(screen.getByText('Card 1 of 2')).toBeInTheDocument();
   });
 
-  it('has Approve, Reject, and Skip buttons', () => {
+  it('has Approve, Reject, and Dismiss buttons', () => {
     mockPendingDecisions = [makeDecision()];
     render(<MobileApprovalStack />);
     expect(screen.getByText(/Approve/)).toBeInTheDocument();
     expect(screen.getByText(/Reject/)).toBeInTheDocument();
-    expect(screen.getByText(/Skip/)).toBeInTheDocument();
+    expect(screen.getByText(/Dismiss/)).toBeInTheDocument();
   });
 
   it('calls apiFetch on Approve click', async () => {

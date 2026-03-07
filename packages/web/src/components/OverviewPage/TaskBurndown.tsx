@@ -62,7 +62,7 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
             <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(234, 179, 8, 0.5)' }} /> Active
           </span>
           <span className="flex items-center gap-1 text-[9px] text-th-text-muted">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(34, 197, 94, 0.5)' }} /> Done
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(168, 85, 247, 0.5)' }} /> Done
           </span>
         </div>
       </div>
@@ -94,8 +94,8 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
             x={(d) => xScale(new Date(d.time)) ?? 0}
             y={(d) => yScale(d.completed) ?? 0}
             yScale={yScale}
-            fill="rgba(34, 197, 94, 0.2)"
-            stroke="rgba(34, 197, 94, 0.6)"
+            fill="rgba(168, 85, 247, 0.2)"
+            stroke="rgba(168, 85, 247, 0.6)"
             strokeWidth={1.5}
             curve={curveMonotoneX}
           />

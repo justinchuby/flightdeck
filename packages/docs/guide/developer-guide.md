@@ -60,16 +60,6 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 
 > **Note:** The Workflow Automation API has been removed. This feature was incomplete and is no longer available.
 
-### GitHub Integration
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/github/status` | Connection status |
-| POST | `/github/connect` | Connect with PAT |
-| POST | `/github/disconnect` | Disconnect |
-| POST | `/github/test` | Test connection |
-| GET | `/github/pulls` | List PRs |
-| POST | `/github/pulls` | Create PR |
-| POST | `/github/pulls/:number/ready` | Mark PR ready |
 | GET | `/commits` | List commits |
 | GET | `/commits/by-task/:taskId` | Commits for task |
 
@@ -167,9 +157,6 @@ All hooks are in `src/hooks/`. Import example: `import { useProjects } from '../
 | `useHistoricalAgents(projectId)` | `Agent[]` | Derive agent data from keyframes for historical sessions |
 | `useConflicts()` | `{ conflicts, activeConflicts, loading, resolve, dismiss }` | Conflict alerts |
 | `useConflictConfig()` | `{ config, saveConfig }` | Detection config |
-| `useGitHubConnection()` | `{ connection, loading, connect, disconnect, testConnection }` | GitHub status |
-| `usePullRequests()` | `{ pulls, loading, createPR, markReady, refetch }` | PRs with 30s polling |
-| `useCommitLinks()` | `CommitTaskLink[]` | Commit-to-task links |
 | `useSessionReplay(leadId)` | `{ keyframes, worldState, playing, currentTime, seek, setSpeed, ... }` | Session replay |
 
 ### UI State Hooks

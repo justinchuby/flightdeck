@@ -51,7 +51,8 @@ function handleDeclareTasks(ctx: CommandHandlerContext, agent: Agent, data: stri
   try {
     const req = parseCommandPayload(agent, match[1], declareTasksSchema, 'DECLARE_TASKS');
     if (!req) return;
-    const { tasks, conflicts, linkedAutoTasks } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[]);
+    const projectId = ctx.getProjectIdForAgent(agent.id);
+    const { tasks, conflicts, linkedAutoTasks } = ctx.taskDAG.declareTaskBatch(agent.id, req.tasks as DagTaskInput[], projectId);
     let msg = `[System] Task DAG declared: ${tasks.length} tasks added.`;
     if (linkedAutoTasks.length > 0) {
       msg += `\n🔗 Linked ${linkedAutoTasks.length} declared task(s) to existing auto-created tasks:`;
@@ -229,7 +230,8 @@ function handleAddTask(ctx: CommandHandlerContext, agent: Agent, data: string): 
   try {
     const req = parseCommandPayload(agent, match[1], addTaskSchema, 'ADD_TASK');
     if (!req) return;
-    const task = ctx.taskDAG.addTask(agent.id, req);
+    const projectId = ctx.getProjectIdForAgent(agent.id);
+    const task = ctx.taskDAG.addTask(agent.id, req, projectId);
     let msg = `[System] Task "${task.id}" added (${task.dagStatus}).`;
     if (task.dagStatus === 'ready') {
       msg += ` Ready for delegation — use DELEGATE or CREATE_AGENT to assign it.`;
@@ -315,6 +317,11 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
 
         const newlyReady = ctx.taskDAG.completeTask(agent.parentId, taskId);
 
+        // Log to activity ledger so keyframes/milestones track completion
+        ctx.activityLedger.log(agent.id, agent.role.id, 'task_completed',
+          `Completed task "${taskId}": ${summary}`,
+          { taskId }, ctx.getProjectIdForAgent(agent.id) ?? '');
+
         // Notify parent with completion details and newly ready tasks
         let parentMsg = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) completed DAG task "${taskId}".\nStatus: ${status}\nSummary: ${summary}`;
         if (newlyReady && newlyReady.length > 0) {
@@ -358,6 +365,12 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       return;
     }
     const newlyReady = ctx.taskDAG.completeTask(agent.id, req.taskId);
+
+    // Log to activity ledger so keyframes/milestones track completion
+    ctx.activityLedger.log(agent.id, agent.role.id, 'task_completed',
+      `Completed task "${req.taskId}"${summary ? ': ' + summary.slice(0, 200) : ''}`,
+      { taskId: req.taskId }, ctx.getProjectIdForAgent(agent.id) ?? '');
+
     let msg = `[System] Task "${req.taskId}" marked as done.`;
     if (summary) msg += ` Summary: ${summary}`;
     if (newlyReady && newlyReady.length > 0) {

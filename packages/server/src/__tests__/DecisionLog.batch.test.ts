@@ -107,6 +107,54 @@ describe('DecisionLog — Batch Operations', () => {
     });
   });
 
+  describe('dismissBatch', () => {
+    it('dismisses multiple decisions at once', () => {
+      const d1 = log.add('a1', 'dev', 'D1', '', true);
+      const d2 = log.add('a1', 'dev', 'D2', '', true);
+      const d3 = log.add('a1', 'dev', 'D3', '', true);
+
+      const result = log.dismissBatch([d1.id, d2.id, d3.id]);
+      expect(result.updated).toBe(3);
+      expect(result.results).toHaveLength(3);
+      expect(result.results.every(d => d.status === 'dismissed')).toBe(true);
+    });
+
+    it('skips already-dismissed decisions without re-emitting', () => {
+      let dismissCount = 0;
+      log.on('decision:dismissed', () => { dismissCount++; });
+      const d1 = log.add('a1', 'dev', 'D1', '', true);
+      log.dismiss(d1.id);
+      expect(dismissCount).toBe(1);
+      log.dismissBatch([d1.id]);
+      expect(dismissCount).toBe(1);
+    });
+
+    it('emits batch dismissed event', () => {
+      let emitted: any = null;
+      log.on('decisions:batch_dismissed', (d) => { emitted = d; });
+      const d1 = log.add('a1', 'dev', 'D1', '', true);
+      log.dismissBatch([d1.id]);
+      expect(emitted).toHaveLength(1);
+    });
+
+    it('skips confirmed/rejected decisions in batch', () => {
+      const d1 = log.add('a1', 'dev', 'D1', '', true);
+      const d2 = log.add('a1', 'dev', 'D2', '', true);
+      const d3 = log.add('a1', 'dev', 'D3', '', true);
+      log.confirm(d1.id);
+      log.reject(d2.id);
+
+      const result = log.dismissBatch([d1.id, d2.id, d3.id]);
+      // Only d3 is actually dismissed; d1 and d2 are returned as-is (confirmed/rejected)
+      expect(result.updated).toBe(3);
+      expect(result.results).toHaveLength(3);
+      // Only d3 should have 'dismissed' status
+      const dismissed = result.results.filter(d => d.status === 'dismissed');
+      expect(dismissed).toHaveLength(1);
+      expect(dismissed[0].id).toBe(d3.id);
+    });
+  });
+
   // ── Teach Me suggestion ───────────────────────────────────────────
 
   describe('Teach Me suggestion', () => {

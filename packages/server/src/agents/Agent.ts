@@ -171,6 +171,7 @@ export class Agent {
   /** @internal */ _notifySessionReady(sessionId: string): void { this.events.notifySessionReady(sessionId); }
   /** @internal */ _notifyContextCompacted(info: CompactionInfo): void { this.events.notifyContextCompacted(info); }
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
+  /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
   /** @internal */ _drainOneMessage(): void {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
@@ -555,6 +556,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   /** Register a listener for token usage updates (for cost tracking). */
   onUsage(listener: (info: { agentId: string; inputTokens: number; outputTokens: number; dagTaskId?: string }) => void): void { this.events.onUsage(listener); }
   onThinking(listener: (text: string) => void): void { this.events.onThinking(listener); }
+  onResponseStart(listener: () => void): void { this.events.onResponseStart(listener); }
 
   getBufferedOutput(): string {
     return this.messages.join('');

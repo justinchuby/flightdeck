@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { useGroupStore, groupKey } from '../stores/groupStore';
 import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
+import { hasUnclosedCommandBlock } from '../utils/commandParser';
 import type { WsMessage } from '../types';
 import { getAuthToken } from './useApi';
 
@@ -20,7 +21,7 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnectRef = useRef(true);
-  // Track agents that had a tool call since their last text — next append needs a newline separator
+  // Track agents that had a tool call or response_start since their last text — next append needs a newline separator
   const pendingNewlineRef = useRef<Set<string>>(new Set());
   const setConnected = useAppStore((s) => s.setConnected);
   const setAgents = useAppStore((s) => s.setAgents);
@@ -88,16 +89,30 @@ export function useWebSocket() {
           const prev = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
           const wasIdle = prev && (prev.status === 'idle' || prev.status === 'completed');
           updateAgent(msg.agentId, { status: msg.status });
-          // When agent transitions from idle back to running, it received new input.
-          // Insert a separator so next agent:text creates a new bubble.
+          // When agent transitions from idle back to running, insert a turn separator.
+          // Due to status throttling (500ms), text from the new response may have already
+          // arrived before this status change. In that case, insert the separator BEFORE
+          // the new-turn text so it appears in the right visual position.
           if (msg.status === 'running' && wasIdle) {
             const existing = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
             if (existing?.messages?.length) {
-              const last = existing.messages[existing.messages.length - 1];
+              const msgs = [...existing.messages];
+              const last = msgs[msgs.length - 1];
               if (last?.sender === 'agent') {
-                updateAgent(msg.agentId, {
-                  messages: [...existing.messages, { type: 'text', text: '---', sender: 'system' as any }],
-                });
+                const separator = { type: 'text' as const, text: '---', sender: 'system' as any };
+                // If the last agent message was just created (< 2s ago), text from the new
+                // turn already arrived — insert separator before it, not after.
+                if (last.timestamp && Date.now() - last.timestamp < 2000 && msgs.length >= 2) {
+                  const prev = msgs[msgs.length - 2];
+                  if (prev?.sender === 'agent' || prev?.sender === undefined) {
+                    msgs.splice(msgs.length - 1, 0, separator);
+                  } else {
+                    msgs.push(separator);
+                  }
+                } else {
+                  msgs.push(separator);
+                }
+                updateAgent(msg.agentId, { messages: msgs });
               }
             }
           }
@@ -137,8 +152,9 @@ export function useWebSocket() {
 
           const appendTarget = appendIdx >= 0 ? msgs[appendIdx] : null;
           const appendText = appendTarget?.text ?? '';
-          const hasUnclosedCommand = appendText.lastIndexOf('⟦') > appendText.lastIndexOf('⟧');
-          if (appendTarget && (!needsNewline || hasUnclosedCommand)) {
+          const hasUnclosedCommand = hasUnclosedCommandBlock(appendText);
+          // Append if: unclosed command (always finish it) OR no break signal pending
+          if (appendTarget && (hasUnclosedCommand || !needsNewline)) {
             msgs[appendIdx] = { ...appendTarget, text: appendText + rawText, timestamp: appendTarget.timestamp || Date.now() };
           } else {
             msgs.push({ type: 'text', text: rawText, sender: 'agent', timestamp: Date.now() });
@@ -156,6 +172,12 @@ export function useWebSocket() {
             ? calls.map((tc, i) => (i === idx ? msg.toolCall : tc))
             : [...calls, msg.toolCall];
           updateAgent(msg.agentId, { toolCalls: updated });
+          break;
+        }
+        case 'agent:response_start': {
+          // Server signals a new LLM sampling turn is about to begin.
+          // Set the pending newline flag so the next agent:text creates a new bubble.
+          pendingNewlineRef.current.add(msg.agentId);
           break;
         }
         case 'agent:content': {
@@ -341,7 +363,8 @@ export function useWebSocket() {
           break;
         }
         case 'decision:confirmed':
-        case 'decision:rejected': {
+        case 'decision:rejected':
+        case 'decision:dismissed': {
           const decisionId = msg.decisionId ?? msg.id;
           if (decisionId) {
             useAppStore.getState().removePendingDecision(decisionId);

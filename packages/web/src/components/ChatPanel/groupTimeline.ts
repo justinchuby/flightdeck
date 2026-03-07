@@ -34,6 +34,7 @@ export type GroupedTimelineItem = AgentGroup | TimelineItem;
  * - Single-message groups with no system events → optimize to standalone TimelineItem
  * - Outgoing DM notifications (📤) are silently dropped
  */
+
 export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
   const result: GroupedTimelineItem[] = [];
   let currentGroup: { messages: Array<{ msg: AcpTextChunk; index: number }>; systemEvents: TimelineItem[] } | null = null;

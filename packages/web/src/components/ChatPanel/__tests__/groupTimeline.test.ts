@@ -263,4 +263,59 @@ describe('groupTimeline', () => {
       expect(result[0].messages).toHaveLength(2);
     }
   });
+
+  it('groups all consecutive agent messages regardless of time gap', () => {
+    const items: TimelineItem[] = [
+      msg('response 1', 'agent', 1000, 0),
+      msg('response 2', 'agent', 5000, 1), // 4s gap — still same group (no time heuristic)
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('agent-group');
+    if (result[0].kind === 'agent-group') {
+      expect(result[0].messages).toHaveLength(2);
+    }
+  });
+
+  it('keeps agent messages grouped when gap is under 2s', () => {
+    const items: TimelineItem[] = [
+      msg('streaming chunk 1', 'agent', 1000, 0),
+      msg('streaming chunk 2', 'agent', 1100, 1), // 100ms gap → same group
+      msg('streaming chunk 3', 'agent', 1200, 2), // 100ms gap → same group
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('agent-group');
+    if (result[0].kind === 'agent-group') {
+      expect(result[0].messages).toHaveLength(3);
+    }
+  });
+
+  it('thinking followed by agent message stays in same group regardless of gap', () => {
+    const items: TimelineItem[] = [
+      msg('thinking...', 'thinking', 1000, 0),
+      msg('agent response', 'agent', 5000, 1), // 4s after thinking → same group
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('agent-group');
+    if (result[0].kind === 'agent-group') {
+      expect(result[0].messages).toHaveLength(2);
+    }
+  });
+
+  it('multiple turns without separator stay in same group', () => {
+    const items: TimelineItem[] = [
+      msg('turn 1 text', 'agent', 1000, 0),
+      msg('turn 1 more', 'agent', 1500, 1),
+      msg('turn 2 text', 'agent', 10000, 2),      // 8.5s gap
+      msg('turn 2 more', 'agent', 10500, 3),
+    ];
+    const result = groupTimeline(items);
+    // Without time-gap heuristic, all consecutive agent messages group together.
+    // Turn boundaries are handled by agent:response_start creating separate message entries.
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('agent-group');
+    if (result[0].kind === 'agent-group') expect(result[0].messages).toHaveLength(4);
+  });
 });

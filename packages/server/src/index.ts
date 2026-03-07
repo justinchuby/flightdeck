@@ -38,7 +38,6 @@ import { NotificationManager } from './coordination/NotificationManager.js';
 import { EscalationManager } from './coordination/EscalationManager.js';
 import { ModelSelector } from './agents/ModelSelector.js';
 import { TokenBudgetOptimizer } from './agents/TokenBudgetOptimizer.js';
-import { MeetingSummarizer } from './coordination/MeetingSummarizer.js';
 import { ReportGenerator } from './coordination/ReportGenerator.js';
 import { ProjectTemplateRegistry } from './coordination/ProjectTemplates.js';
 import { KnowledgeTransfer } from './coordination/KnowledgeTransfer.js';
@@ -152,9 +151,6 @@ const tokenBudgetOptimizer = new TokenBudgetOptimizer();
 import { CostTracker } from './agents/CostTracker.js';
 const costTracker = new CostTracker(db);
 
-// Meeting summarizer — synthesizes group chat outcomes into structured meeting notes
-const meetingSummarizer = new MeetingSummarizer();
-
 // Report generator — produces HTML/Markdown session summary reports
 const reportGenerator = new ReportGenerator();
 
@@ -189,20 +185,7 @@ agentManager.setProjectRegistry(projectRegistry);
 const contextRefresher = new ContextRefresher(agentManager, lockRegistry, activityLedger);
 const wsServer = new WebSocketServer(httpServer, agentManager, lockRegistry, activityLedger, decisionLog, chatGroupRegistry);
 
-// CI runner — auto-builds and tests after commits, reports results to agents
-import { CIRunner } from './coordination/CIRunner.js';
-const ciRunner = new CIRunner({
-  cwd: repoRoot,
-  getAgent: (id) => agentManager.get(id),
-  getAllAgents: () => agentManager.getAll(),
-  activityLedger,
-  taskDAG,
-});
-eventPipeline.register(ciRunner.createHandler());
-ciRunner.on('ci:complete', (result: { success: boolean }) => {
-  wsServer.broadcastEvent({ type: 'ci:complete', success: result.success });
-  // CI events are global — no project scoping (they apply to the shared repo)
-});
+// ── Session replay ─────────────────────
 
 // Proactive alert engine — watches for stuck agents, context pressure, stale decisions
 import { AlertEngine } from './coordination/AlertEngine.js';
@@ -314,7 +297,7 @@ const complexityMonitor = new ComplexityMonitor(repoRoot);
 const dependencyScanner = new DependencyScanner(repoRoot);
 
 // Wire up API routes
-app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore, coverageTracker, complexityMonitor, dependencyScanner, notificationManager, escalationManager, modelSelector, tokenBudgetOptimizer, meetingSummarizer, reportGenerator, projectTemplateRegistry, knowledgeTransfer, eventPipeline));
+app.use('/api', apiRouter(agentManager, roleRegistry, config, db, lockRegistry, activityLedger, decisionLog, projectRegistry, alertEngine, capabilityRegistry, sessionRetro, sessionExporter, eagerScheduler, fileDependencyGraph, agentMatcher, retryManager, crashForensics, webhookManager, taskTemplateRegistry, taskDecomposer, searchEngine, performanceTracker, decisionRecordStore, coverageTracker, complexityMonitor, dependencyScanner, notificationManager, escalationManager, modelSelector, tokenBudgetOptimizer, reportGenerator, projectTemplateRegistry, knowledgeTransfer, eventPipeline));
 
 // Serve built web frontend in production
 const webDistPath = path.resolve(__dirname, '../../web/dist');

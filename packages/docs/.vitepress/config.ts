@@ -10,7 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/' },
       { text: 'Features', link: '/guide/features' },
-      { text: 'Design', link: '/design/docker-sandboxing' },
+      { text: 'Reference', link: '/reference/api' },
       { text: 'Blog', link: '/blog/introducing-flightdeck' },
       { text: 'GitHub', link: 'https://github.com/justinchuby/flightdeck' },
     ],
@@ -84,17 +84,42 @@ export default defineConfig({
             { text: 'Usage Tips & Use Cases', link: '/guide/usage-tips' },
           ],
         },
+      ],
+      '/blog/': [
         {
-          text: 'Internal — Contributors Only',
-          collapsed: true,
+          text: 'Blog',
+          items: [
+            { text: 'Introducing Flightdeck', link: '/blog/introducing-flightdeck' },
+          ],
+        },
+      ],
+      '/reference/': [
+        {
+          text: 'Design Documents',
+          items: [
+            { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
+          ],
+        },
+        {
+          text: 'API Reference (Internal)',
           items: [
             { text: 'REST API', link: '/reference/api' },
             { text: 'WebSocket Events', link: '/reference/websocket' },
             { text: 'Timeline Components', link: '/reference/timeline-api' },
             { text: 'Database Schema', link: '/reference/database' },
-            { text: 'NL Commands API', link: '/reference/nl-api' },
-            { text: 'GitHub & Conflicts API', link: '/reference/github-api' },
-            { text: 'Playbooks & Roles API', link: '/reference/playbooks-api' },
+          ],
+        },
+        {
+          text: 'Feature APIs (Internal)',
+          items: [
+            { text: 'NL Commands', link: '/reference/nl-api' },
+            { text: 'GitHub & Conflicts', link: '/reference/github-api' },
+            { text: 'Playbooks & Roles', link: '/reference/playbooks-api' },
+          ],
+        },
+        {
+          text: 'Architecture (Internal)',
+          items: [
             { text: 'Configuration', link: '/reference/configuration' },
             { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },
             { text: 'Design Decisions', link: '/reference/design-decisions' },
@@ -108,18 +133,8 @@ export default defineConfig({
             { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
           ],
         },
-      ],
-      '/blog/': [
         {
-          text: 'Blog',
-          items: [
-            { text: 'Introducing Flightdeck', link: '/blog/introducing-flightdeck' },
-          ],
-        },
-      ],
-      '/reference/': [
-        {
-          text: 'Core API',
+          text: 'API Reference (Internal)',
           items: [
             { text: 'REST API', link: '/reference/api' },
             { text: 'WebSocket Events', link: '/reference/websocket' },
@@ -128,7 +143,7 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Feature APIs',
+          text: 'Feature APIs (Internal)',
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
             { text: 'GitHub & Conflicts', link: '/reference/github-api' },
@@ -136,7 +151,7 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Architecture',
+          text: 'Architecture (Internal)',
           items: [
             { text: 'Configuration', link: '/reference/configuration' },
             { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },

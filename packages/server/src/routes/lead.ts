@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import type { ContentBlock } from '@agentclientprotocol/sdk';
 import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
@@ -54,6 +55,11 @@ export function leadRoutes(ctx: AppContext): Router {
           project = projectRegistry.create(projectName, task ?? '', cwd);
         }
         resolvedProjectId = project.id;
+      } else {
+        // No project registry available — still ensure a valid project ID
+        // so activities and agents are always scoped to a project.
+        resolvedProjectId = randomUUID();
+        logger.warn('lead', `ProjectRegistry unavailable — generated fallback projectId ${resolvedProjectId.slice(0, 8)}`);
       }
 
       const agent = agentManager.spawn(role, task, undefined, true, model, cwd, resumeSessionId, undefined, { projectName: resolvedProjectName, projectId: resolvedProjectId });

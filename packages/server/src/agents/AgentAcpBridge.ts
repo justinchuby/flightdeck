@@ -175,4 +175,9 @@ function wireAcpEvents(agent: Agent, conn: AcpConnection): void {
       agent._notifyStatusChange(agent.status);
     }
   });
+
+  conn.on('response_start', () => {
+    if (agent._isTerminated) return;
+    agent._notifyResponseStart();
+  });
 }

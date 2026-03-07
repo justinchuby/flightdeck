@@ -30,16 +30,21 @@ export function ProjectTabs({ activeId, onChange, className }: ProjectTabsProps)
     [liveAgents],
   );
 
-  // Build unified tab list: live leads first, then historical projects (excluding dups)
+  // Build unified tab list: live leads first, then historical projects (excluding dups).
+  // Use lead.projectId (project registry UUID) as the tab ID when available so that
+  // replay fetches match the projectId stored in activity events.
   const tabs = useMemo(() => {
     const items: Array<{ id: string; label: string; isLive: boolean }> = [];
     const seen = new Set<string>();
 
     for (const lead of leads) {
+      const tabId = lead.projectId || lead.id;
+      seen.add(tabId);
+      // Track agent ID too so historical projects keyed by agent UUID are also deduped
       seen.add(lead.id);
       const active = lead.status === 'running' || lead.status === 'creating' || lead.status === 'idle';
       items.push({
-        id: lead.id,
+        id: tabId,
         label: lead.projectName || lead.role?.name || lead.id.slice(0, 8),
         isLive: active,
       });

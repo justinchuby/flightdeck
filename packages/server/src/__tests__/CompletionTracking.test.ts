@@ -7,7 +7,7 @@ const mockExecFile = vi.fn();
 vi.mock('child_process', () => ({ execFile: (...args: any[]) => mockExecFile(...args) }));
 
 // Import AFTER mocking child_process
-const { notifyParentOfCompletion } = await import('../agents/commands/CompletionTracking.js');
+const { notifyParentOfCompletion, notifyParentOfIdle } = await import('../agents/commands/CompletionTracking.js');
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -172,6 +172,137 @@ describe('checkDirtyLockedFiles (via notifyParentOfCompletion)', () => {
       expect((parent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('and 3 more'),
       );
+    });
+  });
+});
+
+// ── Ghost 'not in DAG' warning tests ──────────────────────────────────
+
+describe('ghost DAG warning suppression', () => {
+  let parent: Agent;
+  let child: Agent;
+  let ctx: CommandHandlerContext;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    parent = makeParent();
+    child = makeAgent();
+    ctx = makeCtx({
+      getAgent: vi.fn().mockImplementation((id: string) =>
+        id === parent.id ? parent : id === child.id ? child : undefined,
+      ),
+    });
+  });
+
+  describe('notifyParentOfCompletion', () => {
+    it('does NOT emit warning when task was already completed via COMPLETE_TASK', () => {
+      // Agent has a dagTaskId — it was linked to the DAG
+      child = makeAgent({ dagTaskId: 'task-1' });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null), // task is 'done', not 'running'/'ready'
+          getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'done' }), // task exists in DAG
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 2, ready: 1, running: 0 } }),
+        },
+      });
+
+      notifyParentOfCompletion(ctx, child, 0);
+
+      // Should NOT contain the "not in the DAG" warning
+      const warningCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('NOT in the DAG'),
+      );
+      expect(warningCalls).toHaveLength(0);
+    });
+
+    it('DOES emit warning when task genuinely is not in the DAG', () => {
+      // Agent has NO dagTaskId — it was never linked
+      child = makeAgent({ dagTaskId: null });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue(null), // task doesn't exist
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 2, ready: 1, running: 0 } }),
+        },
+      });
+
+      notifyParentOfCompletion(ctx, child, 0);
+
+      const warningCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('NOT in the DAG'),
+      );
+      expect(warningCalls).toHaveLength(1);
+    });
+
+    it('does NOT emit warning when task was skipped in DAG', () => {
+      child = makeAgent({ dagTaskId: 'task-skipped' });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue({ id: 'task-skipped', dagStatus: 'skipped' }),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 1, ready: 0, running: 0 } }),
+        },
+      });
+
+      notifyParentOfCompletion(ctx, child, 0);
+
+      const warningCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('NOT in the DAG'),
+      );
+      expect(warningCalls).toHaveLength(0);
+    });
+  });
+
+  describe('notifyParentOfIdle', () => {
+    it('does NOT emit warning when task was already completed via COMPLETE_TASK', () => {
+      child = makeAgent({ dagTaskId: 'task-1' });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'done' }),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 2, ready: 1, running: 0 } }),
+        },
+      });
+
+      notifyParentOfIdle(ctx, child);
+
+      const warningCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('NOT in the DAG'),
+      );
+      expect(warningCalls).toHaveLength(0);
+    });
+
+    it('DOES emit warning when task genuinely is not in the DAG', () => {
+      child = makeAgent({ dagTaskId: null });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue(null),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 2, ready: 1, running: 0 } }),
+        },
+      });
+
+      notifyParentOfIdle(ctx, child);
+
+      const warningCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('NOT in the DAG'),
+      );
+      expect(warningCalls).toHaveLength(1);
     });
   });
 });

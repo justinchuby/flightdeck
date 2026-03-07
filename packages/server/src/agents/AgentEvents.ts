@@ -37,6 +37,7 @@ export class AgentEventEmitter {
   private sessionReadyListeners: Array<(sessionId: string) => void> = [];
   private contextCompactedListeners: Array<(info: CompactionInfo) => void> = [];
   private usageListeners: Array<(info: UsageInfo) => void> = [];
+  private responseStartListeners: Array<() => void> = [];
 
   private _idleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly IDLE_DEBOUNCE_MS = 500;
@@ -55,6 +56,7 @@ export class AgentEventEmitter {
   onSessionReady(listener: (sessionId: string) => void): void { this.sessionReadyListeners.push(listener); }
   onContextCompacted(listener: (info: CompactionInfo) => void): void { this.contextCompactedListeners.push(listener); }
   onUsage(listener: (info: UsageInfo) => void): void { this.usageListeners.push(listener); }
+  onResponseStart(listener: () => void): void { this.responseStartListeners.push(listener); }
 
   // ── Notification (called by AgentAcpBridge and Agent internals) ─────────
 
@@ -69,6 +71,7 @@ export class AgentEventEmitter {
   notifySessionReady(sessionId: string): void { for (const l of this.sessionReadyListeners) l(sessionId); }
   notifyContextCompacted(info: CompactionInfo): void { for (const l of this.contextCompactedListeners) l(info); }
   notifyUsage(info: UsageInfo): void { for (const l of this.usageListeners) l(info); }
+  notifyResponseStart(): void { for (const l of this.responseStartListeners) l(); }
 
   /**
    * Debounced status notification. Idle transitions are delayed to avoid
@@ -104,6 +107,7 @@ export class AgentEventEmitter {
     this.contextCompactedListeners.length = 0;
     this.thinkingListeners.length = 0;
     this.usageListeners.length = 0;
+    this.responseStartListeners.length = 0;
     if (this._idleDebounceTimer) {
       clearTimeout(this._idleDebounceTimer);
       this._idleDebounceTimer = null;

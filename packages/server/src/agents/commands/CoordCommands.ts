@@ -228,19 +228,24 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
     // Merge: locked files + any explicitly specified files (deduplicated)
     const allPaths = new Set([...lockedPaths, ...explicitFiles]);
 
-    // Auto-include untracked files in directories where agent has locked files
+    // Report untracked and modified files so the agent can decide whether to include them.
+    // No assumptions about project layout — just list what git sees and let the agent decide.
     const cwd = agent.cwd || process.cwd();
     try {
-      const { stdout: untrackedOut } = await execFileAsync('git', ['ls-files', '--others', '--exclude-standard'], { cwd, timeout: 10_000 });
-      const untrackedFiles = untrackedOut.trim().split('\n').filter(Boolean);
-      const lockedDirs = new Set([...allPaths].map(f => path.dirname(f)));
-      const relatedUntracked = untrackedFiles.filter(f => lockedDirs.has(path.dirname(f)));
-      relatedUntracked.forEach(f => allPaths.add(f));
-      if (relatedUntracked.length > 0) {
-        agent.sendMessage(`[System] Auto-including ${relatedUntracked.length} new file(s): ${relatedUntracked.join(', ')}`);
+      const { stdout: statusOut } = await execFileAsync('git', ['status', '--porcelain'], { cwd, timeout: 10_000 });
+      const lines = statusOut.trimEnd().split('\n').filter(Boolean);
+      // Porcelain format: 'XY path' — extract path after the 3-char prefix (2 status chars + space)
+      const uncommitted = lines
+        .filter(l => l.startsWith('??') || l.startsWith(' M') || l.startsWith('M ') || l.startsWith('MM') || l.startsWith('A ') || l.startsWith(' A'))
+        .map(l => l.substring(3))
+        .filter(f => !allPaths.has(f));
+      if (uncommitted.length > 0) {
+        const listed = uncommitted.slice(0, 15).join(', ');
+        const more = uncommitted.length > 15 ? ` (and ${uncommitted.length - 15} more)` : '';
+        agent.sendMessage(`[System] ⚠ Warning: ${uncommitted.length} uncommitted file(s) not in this commit: ${listed}${more}. Use LOCK_FILE to include them, or specify them with {"files": [...]}.`);
       }
     } catch {
-      logger.debug('commit', `Untracked file detection failed for ${agent.id.slice(0, 8)}`);
+      logger.debug('commit', `Pre-commit status check failed for ${agent.id.slice(0, 8)}`);
     }
 
     const files = Array.from(allPaths);
@@ -252,8 +257,8 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
     const coAuthor = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>';
     const modelName = agent.model || agent.role.model || 'unknown';
-    const signoff = `Signed-off-by: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName}]`;
-    const commitMsg = `${message}\n\n${coAuthor}\n${signoff}`;
+    const signoff = `Agent-signed-off: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName}]`;
+    const commitMsg = `${message}\n\n${signoff}\n${coAuthor}`;
 
     // Cross-platform: use execFile with args arrays (no shell quoting needed)
     await execFileAsync('git', ['add', ...files], { cwd, timeout: 30_000 })

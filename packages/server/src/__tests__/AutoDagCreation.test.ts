@@ -45,7 +45,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
     taskDAG: {
       findReadyTask: vi.fn().mockReturnValue(null),
       startTask: vi.fn().mockReturnValue({ id: 'auto-task', dagStatus: 'running' }),
-      addTask: vi.fn().mockImplementation((_leadId: string, task: any) => ({
+      addTask: vi.fn().mockImplementation((_leadId: string, task: any, _projectId?: string) => ({
         id: task.taskId,
         role: task.role,
         title: task.title,
@@ -65,6 +65,7 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
       forceStartTask: vi.fn().mockReturnValue(null),
     },
     getAgent: vi.fn().mockReturnValue(undefined),
+    getProjectIdForAgent: vi.fn().mockReturnValue('proj-1'),
     getAllAgents: vi.fn().mockReturnValue([child]),
     getRunningCount: vi.fn().mockReturnValue(1),
     spawnAgent: vi.fn().mockReturnValue(child),
@@ -116,7 +117,7 @@ describe('Auto-DAG creation from CREATE_AGENT', () => {
     expect(ctx.taskDAG.addTask).toHaveBeenCalledWith('lead-001', expect.objectContaining({
       role: 'developer',
       description: 'Fix the login bug',
-    }));
+    }), 'proj-1');
     expect(ctx.taskDAG.startTask).toHaveBeenCalled();
     // Ack message should mention auto-created
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('auto-created'));
@@ -293,7 +294,7 @@ describe('Auto-DAG creation from DELEGATE', () => {
     expect(ctx.taskDAG.addTask).toHaveBeenCalledWith('lead-001', expect.objectContaining({
       role: 'developer',
       description: 'Write the tests',
-    }));
+    }), 'proj-1');
     expect(ctx.taskDAG.startTask).toHaveBeenCalled();
     expect(agent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('auto-created'));
   });

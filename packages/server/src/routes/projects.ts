@@ -30,18 +30,28 @@ export function projectsRoutes(ctx: AppContext): Router {
   // Historical DAG tasks for a project (from database)
   router.get('/projects/:id/dag', (req, res) => {
     if (!_db) return res.json({ tasks: [], summary: {} });
-    // Find all lead IDs for this project
-    const leads = _db.drizzle
-      .select({ leadId: projectSessions.leadId })
-      .from(projectSessions)
-      .where(eq(projectSessions.projectId, req.params.id))
+    const projectId = req.params.id;
+
+    // Primary: query by project_id column directly
+    let allTasks = _db.drizzle.select().from(dagTasks)
+      .where(eq(dagTasks.projectId, projectId))
       .all();
-    if (leads.length === 0) return res.json({ tasks: [], summary: {} });
-    const leadIds = leads.map((l) => l.leadId);
-    // Fetch DAG tasks scoped to those leads
-    const allTasks = _db.drizzle.select().from(dagTasks)
-      .where(inArray(dagTasks.leadId, leadIds))
-      .all();
+
+    // Fallback: older tasks without project_id — join through projectSessions
+    if (allTasks.length === 0) {
+      const leads = _db.drizzle
+        .select({ leadId: projectSessions.leadId })
+        .from(projectSessions)
+        .where(eq(projectSessions.projectId, projectId))
+        .all();
+      if (leads.length > 0) {
+        const leadIds = leads.map((l) => l.leadId);
+        allTasks = _db.drizzle.select().from(dagTasks)
+          .where(inArray(dagTasks.leadId, leadIds))
+          .all();
+      }
+    }
+
     // Build summary
     const summary: Record<string, number> = {};
     for (const t of allTasks) {
@@ -52,6 +62,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       tasks: allTasks.map((t) => ({
         id: t.id,
         leadId: t.leadId,
+        projectId: t.projectId ?? null,
         role: t.role,
         title: t.title,
         description: t.description,

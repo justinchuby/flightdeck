@@ -4,7 +4,6 @@ import { Users, AlertCircle, Brain } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import { PulseRecoveryIndicator } from '../Recovery';
-import { PulsePRIndicator } from '../GitHub';
 import { PulseConflictIndicator } from '../Conflicts';
 
 // ── Token pressure helpers ───────────────────────────────────────────
@@ -189,12 +188,6 @@ export function PulseStrip() {
 
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />
-
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
-
-      {/* PR Status */}
-      <PulsePRIndicator />
 
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />

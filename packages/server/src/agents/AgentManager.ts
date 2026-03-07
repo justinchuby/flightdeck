@@ -1,4 +1,5 @@
 import { Agent, isTerminalStatus } from './Agent.js';
+import { randomUUID } from 'crypto';
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
@@ -37,6 +38,7 @@ export interface AgentManagerEvents {
   'agent:terminated': string;
   'agent:exit': { agentId: string; code: number };
   'agent:text': { agentId: string; text: string };
+  'agent:response_start': { agentId: string };
   'agent:tool_call': { agentId: string; toolCall: ToolCallInfo };
   'agent:content': { agentId: string; content: string };
   'agent:thinking': { agentId: string; text: string };
@@ -340,6 +342,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
 
+    // Ensure root agents (no parent) always have a projectId.
+    // This prevents "untitled project" scenarios where activities are logged
+    // with projectId: '' and become invisible to scoped queries.
+    if (!parentId && !agent.projectId) {
+      agent.projectId = randomUUID();
+      logger.warn('agent', `Root agent ${agent.id.slice(0, 8)} spawned without projectId — generated ${agent.projectId.slice(0, 8)}`);
+    }
+
     this.agents.set(agent.id, agent);
 
     // Create a conversation thread for this agent (for persistent message history)
@@ -360,6 +370,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onToolCall((info) => {
       this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+    });
+
+    agent.onResponseStart(() => {
+      this.emit('agent:response_start', { agentId: agent.id });
     });
 
     agent.onContent((content) => {
