@@ -257,8 +257,8 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
     const coAuthor = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>';
     const modelName = agent.model || agent.role.model || 'unknown';
-    const signoff = `Signed-off-by: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName}]`;
-    const commitMsg = `${message}\n\n${coAuthor}\n${signoff}`;
+    const signoff = `Agent-signed-off: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName}]`;
+    const commitMsg = `${message}\n\n${signoff}\n${coAuthor}`;
 
     // Cross-platform: use execFile with args arrays (no shell quoting needed)
     await execFileAsync('git', ['add', ...files], { cwd, timeout: 30_000 })
