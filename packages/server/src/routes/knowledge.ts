@@ -1,12 +1,25 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import type { KnowledgeCategory } from '../knowledge/types.js';
+import { sanitizeContent } from '../knowledge/index.js';
 
 const VALID_CATEGORIES = new Set<string>(['core', 'episodic', 'procedural', 'semantic']);
+const UI_WRITABLE_CATEGORIES = new Set<string>(['episodic', 'procedural', 'semantic']);
+const MAX_SEARCH_QUERY_LENGTH = 500;
+
+const knowledgeReadLimiter = rateLimit({ windowMs: 60_000, max: 120, message: 'Too many knowledge read requests' });
+const knowledgeWriteLimiter = rateLimit({ windowMs: 60_000, max: 30, message: 'Too many knowledge write requests' });
+const knowledgeSearchLimiter = rateLimit({ windowMs: 60_000, max: 60, message: 'Too many knowledge search requests' });
 
 function isValidCategory(cat: string): cat is KnowledgeCategory {
   return VALID_CATEGORIES.has(cat);
+}
+
+/** Extract a single string param (Express 5 may return string | string[]) */
+function paramStr(val: string | string[] | undefined): string {
+  return Array.isArray(val) ? val[0] ?? '' : val ?? '';
 }
 
 export function knowledgeRoutes(ctx: AppContext): Router {
@@ -16,9 +29,9 @@ export function knowledgeRoutes(ctx: AppContext): Router {
   // --- Knowledge CRUD ---
 
   /** List knowledge entries for a project, optionally filtered by category */
-  router.get('/projects/:id/knowledge', (req, res) => {
+  router.get('/projects/:id/knowledge', knowledgeReadLimiter, (req, res) => {
     if (!knowledgeStore) return res.status(503).json({ error: 'Knowledge store not available' });
-    const projectId = req.params.id;
+    const projectId = paramStr(req.params.id);
     const category = typeof req.query.category === 'string' ? req.query.category : undefined;
 
     if (category && !isValidCategory(category)) {
@@ -32,10 +45,11 @@ export function knowledgeRoutes(ctx: AppContext): Router {
   });
 
   /** Search knowledge entries using full-text search */
-  router.get('/projects/:id/knowledge/search', (req, res) => {
-    const projectId = req.params.id;
-    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    if (!query) return res.status(400).json({ error: 'Query parameter "q" is required' });
+  router.get('/projects/:id/knowledge/search', knowledgeSearchLimiter, (req, res) => {
+    const projectId = paramStr(req.params.id);
+    const rawQuery = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (!rawQuery) return res.status(400).json({ error: 'Query parameter "q" is required' });
+    const query = rawQuery.slice(0, MAX_SEARCH_QUERY_LENGTH);
 
     // Prefer hybrid search if available, fall back to FTS5-only
     if (hybridSearchEngine) {
@@ -58,23 +72,23 @@ export function knowledgeRoutes(ctx: AppContext): Router {
   });
 
   /** Get category stats for a project */
-  router.get('/projects/:id/knowledge/stats', (req, res) => {
+  router.get('/projects/:id/knowledge/stats', knowledgeReadLimiter, (req, res) => {
     if (!memoryCategoryManager) return res.status(503).json({ error: 'Knowledge manager not available' });
-    const stats = memoryCategoryManager.getCategoryStats(req.params.id);
+    const stats = memoryCategoryManager.getCategoryStats(paramStr(req.params.id));
     res.json(stats);
   });
 
   /** Get training summary (corrections + feedback) for a project */
-  router.get('/projects/:id/knowledge/training', (req, res) => {
+  router.get('/projects/:id/knowledge/training', knowledgeReadLimiter, (req, res) => {
     if (!trainingCapture) return res.status(503).json({ error: 'Training capture not available' });
-    const summary = trainingCapture.getTrainingSummary(req.params.id);
+    const summary = trainingCapture.getTrainingSummary(paramStr(req.params.id));
     res.json(summary);
   });
 
   /** Create or update a knowledge entry */
-  router.post('/projects/:id/knowledge', (req, res) => {
+  router.post('/projects/:id/knowledge', knowledgeWriteLimiter, (req, res) => {
     if (!memoryCategoryManager) return res.status(503).json({ error: 'Knowledge manager not available' });
-    const projectId = req.params.id;
+    const projectId = paramStr(req.params.id);
     const { category, key, content, metadata } = req.body;
 
     if (!category || !key || !content) {
@@ -83,16 +97,26 @@ export function knowledgeRoutes(ctx: AppContext): Router {
     if (!isValidCategory(category)) {
       return res.status(400).json({ error: `Invalid category: ${category}. Must be one of: core, episodic, procedural, semantic` });
     }
+    if (!UI_WRITABLE_CATEGORIES.has(category)) {
+      return res.status(403).json({ error: 'Core entries cannot be created or modified via the UI' });
+    }
 
-    // Validate via category manager (enforces read-only core, max limits, etc.)
-    const validationError = memoryCategoryManager.validateMemory(projectId, category, key, content);
+    // Sanitize content to prevent prompt injection
+    const sanitizedContent = sanitizeContent(String(content));
+    const sanitizedKey = String(key).slice(0, 200).replace(/[^\w\s\-_.]/g, '');
+    if (!sanitizedKey) {
+      return res.status(400).json({ error: 'Invalid key after sanitization' });
+    }
+
+    // Validate via category manager (enforces max limits, etc.)
+    const validationError = memoryCategoryManager.validateMemory(projectId, category, sanitizedKey, sanitizedContent);
     if (validationError) {
       return res.status(400).json({ error: validationError });
     }
 
     try {
-      const entry = memoryCategoryManager.putMemory(projectId, category, key, content, metadata);
-      logger.info({ module: 'knowledge', msg: 'Knowledge entry created', projectId, category, key });
+      const entry = memoryCategoryManager.putMemory(projectId, category, sanitizedKey, sanitizedContent, metadata);
+      logger.info({ module: 'knowledge', msg: 'Knowledge entry created', projectId, category, key: sanitizedKey });
       res.status(201).json(entry);
     } catch (err: any) {
       logger.error({ module: 'knowledge', msg: 'Failed to create knowledge entry', err: err.message });
@@ -101,9 +125,11 @@ export function knowledgeRoutes(ctx: AppContext): Router {
   });
 
   /** Delete a knowledge entry */
-  router.delete('/projects/:id/knowledge/:category/:key', (req, res) => {
+  router.delete('/projects/:id/knowledge/:category/:key', knowledgeWriteLimiter, (req, res) => {
     if (!memoryCategoryManager) return res.status(503).json({ error: 'Knowledge manager not available' });
-    const { id: projectId, category, key } = req.params;
+    const projectId = paramStr(req.params.id);
+    const category = paramStr(req.params.category);
+    const key = paramStr(req.params.key);
 
     if (!isValidCategory(category)) {
       return res.status(400).json({ error: `Invalid category: ${category}` });

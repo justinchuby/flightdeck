@@ -295,7 +295,6 @@ function NewEntryForm({
           <option value="semantic">Semantic</option>
           <option value="procedural">Procedural</option>
           <option value="episodic">Episodic</option>
-          <option value="core">Core</option>
         </select>
         <input
           type="text"
