@@ -269,8 +269,18 @@ function handleCancelTask(ctx: CommandHandlerContext, agent: Agent, data: string
 function handleResetDAG(ctx: CommandHandlerContext, agent: Agent, _data: string): void {
   if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can reset the DAG.'); return; }
   const count = ctx.taskDAG.resetDAG(agent.id);
+  // Cancel all active delegations for this lead so heartbeat doesn't show stale counts
+  let cancelledDelegations = 0;
+  for (const [, del] of ctx.delegations) {
+    if (del.fromAgentId === agent.id && del.status === 'active') {
+      del.status = 'cancelled';
+      del.completedAt = new Date().toISOString();
+      cancelledDelegations++;
+    }
+  }
   if (count > 0) {
-    agent.sendMessage(`[System] DAG reset: ${count} task(s) removed. You can now DECLARE_TASKS again.`);
+    const delNote = cancelledDelegations > 0 ? ` ${cancelledDelegations} delegation(s) cancelled.` : '';
+    agent.sendMessage(`[System] DAG reset: ${count} task(s) removed.${delNote} You can now DECLARE_TASKS again.`);
   } else {
     agent.sendMessage('[System] No DAG tasks to reset.');
   }
@@ -355,6 +365,13 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         }
         // Prevent duplicate report when agent goes idle after COMPLETE_TASK
         ctx.reportedCompletions.add(`${agent.id}:idle`);
+        // Mark delegation as completed so heartbeat doesn't show stale counts
+        for (const [, del] of ctx.delegations) {
+          if (del.toAgentId === agent.id && del.status === 'active') {
+            del.status = 'completed';
+            del.completedAt = new Date().toISOString();
+          }
+        }
         ctx.emit('dag:updated', { leadId: agent.parentId });
         agent.sendMessage(`[System] Task "${taskId}" marked as done in DAG.${newlyReady && newlyReady.length > 0 ? ` ${newlyReady.length} task(s) now ready.` : ''}`);
       } else {
@@ -369,6 +386,13 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         }
         // Prevent duplicate report when agent goes idle after COMPLETE_TASK
         ctx.reportedCompletions.add(`${agent.id}:idle`);
+        // Mark delegation as completed so heartbeat doesn't show stale counts
+        for (const [, del] of ctx.delegations) {
+          if (del.toAgentId === agent.id && del.status === 'active') {
+            del.status = 'completed';
+            del.completedAt = new Date().toISOString();
+          }
+        }
         agent.sendMessage(`[System] Task completion signaled to parent. (No DAG task ID — use dagTaskId for DAG integration.)`);
       }
       return;
