@@ -20,11 +20,11 @@ import type { KnowledgeStore } from '../knowledge/KnowledgeStore.js';
 import type { HybridSearchEngine } from '../knowledge/HybridSearchEngine.js';
 import type { MemoryCategoryManager } from '../knowledge/MemoryCategoryManager.js';
 import type { TrainingCapture } from '../knowledge/TrainingCapture.js';
-import type { DaemonProcess } from '../daemon/DaemonProcess.js';
-import type { DaemonClient } from '../daemon/DaemonClient.js';
-import type { ReconnectProtocol } from '../daemon/ReconnectProtocol.js';
 import type { MassFailureDetector } from '../daemon/MassFailureDetector.js';
+import type { AgentRosterRepository } from '../db/AgentRosterRepository.js';
 import type { AgentServerClient } from '../agents/AgentServerClient.js';
+import type { AgentServerHealth } from '../agents/AgentServerHealth.js';
+import type { TeamExporter } from '../teams/TeamExporter.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { execSync } from 'node:child_process';
 
@@ -69,11 +69,11 @@ export interface AppContext {
   hybridSearchEngine?: HybridSearchEngine;
   memoryCategoryManager?: MemoryCategoryManager;
   trainingCapture?: TrainingCapture;
-  daemonProcess?: DaemonProcess;
-  daemonClient?: DaemonClient;
-  reconnectProtocol?: ReconnectProtocol;
-  massFailureDetector?: MassFailureDetector;
   agentServerClient?: AgentServerClient;
+  agentServerHealth?: AgentServerHealth;
+  massFailureDetector?: MassFailureDetector;
+  teamExporter?: TeamExporter;
+  agentRoster?: AgentRosterRepository;
 }
 
 // Rate limiters for expensive operations

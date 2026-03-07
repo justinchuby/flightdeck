@@ -29,6 +29,7 @@ import { communityRoutes } from './community.js';
 import { dataRoutes } from './data.js';
 import { knowledgeRoutes } from './knowledge.js';
 import { daemonRoutes } from './daemon.js';
+import { teamsRoutes } from './teams.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -60,4 +61,5 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(dataRoutes(ctx));
   router.use(knowledgeRoutes(ctx));
   router.use(daemonRoutes(ctx));
+  router.use(teamsRoutes(ctx));
 }
