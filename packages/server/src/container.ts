@@ -66,6 +66,7 @@ import { PerformanceTracker } from './coordination/reporting/PerformanceScorecar
 // ── Imports: Tier 6 (HTTP/WS) ──────────────────────────────
 import { WebSocketServer } from './comms/WebSocketServer.js';
 import { Scheduler } from './utils/Scheduler.js';
+import { runWithAgentContext } from './middleware/requestContext.js';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -396,11 +397,13 @@ function wireEvents(c: ServiceContainer): void {
   // Timer events → agent message delivery + WS broadcast
   timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
     const agent = agentManager.get(timer.agentId);
-    if (agent && agent.status !== 'completed' && agent.status !== 'failed' && agent.status !== 'terminated') {
-      agent.queueMessage(`[System Timer "${timer.label}"] ${timer.message}`);
-    }
     const projectId = agentManager.getProjectIdForAgent(timer.agentId);
-    c.internal.wsServer?.broadcastEvent({ type: 'timer:fired', timer }, projectId);
+    runWithAgentContext(timer.agentId, agent?.role.name ?? 'unknown', projectId, () => {
+      if (agent && agent.status !== 'completed' && agent.status !== 'failed' && agent.status !== 'terminated') {
+        agent.queueMessage(`[System Timer "${timer.label}"] ${timer.message}`);
+      }
+      c.internal.wsServer?.broadcastEvent({ type: 'timer:fired', timer }, projectId);
+    });
   });
   timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string }) => {
     const projectId = agentManager.getProjectIdForAgent(timer.agentId);

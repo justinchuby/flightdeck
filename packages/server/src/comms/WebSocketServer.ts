@@ -9,6 +9,7 @@ import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { getAuthSecret } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 import { redactWsMessage } from '../utils/redaction.js';
+import { runWithWsContext } from '../middleware/requestContext.js';
 
 interface ClientConnection {
   id: string;
@@ -371,6 +372,7 @@ export class WebSocketServer {
     client: ClientConnection,
     msg: any,
   ): void {
+    runWithWsContext(client.id, client.subscribedProject ?? undefined, () => {
     switch (msg.type) {
       case 'subscribe':
         // Subscribe to agent output (or '*' for all)
@@ -445,6 +447,7 @@ export class WebSocketServer {
         this.decisionLog.resumeTimers();
         break;
     }
+    }); // end runWithWsContext
   }
 
   private broadcast(msg: any, filter: (c: ClientConnection) => boolean): void {

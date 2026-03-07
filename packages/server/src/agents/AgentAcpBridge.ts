@@ -8,6 +8,7 @@ import { AcpAdapter } from '../adapters/AcpAdapter.js';
 import type { AgentAdapter, ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { runWithAgentContext } from '../middleware/requestContext.js';
 import { agentFlagForRole } from './agentFiles.js';
 import type { Agent } from './Agent.js';
 
@@ -80,7 +81,10 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
 
 /** Wire ACP protocol events to Agent state and listeners. */
 function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
-  conn.on('text', (text: string) => {
+  const withCtx = <T>(fn: () => T): T =>
+    runWithAgentContext(agent.id, agent.role.name, agent.projectId, fn);
+
+  conn.on('text', (text: string) => withCtx(() => {
     if (agent._isTerminated) return;
     agent.messages.push(text);
     if (agent.messages.length > agent._maxMessages) {
@@ -89,17 +93,17 @@ function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     // Estimate tokens from content length when ACP doesn't provide usage events
     agent.estimateTokensFromContent(text);
     agent._notifyData(text);
-  });
+  }));
 
-  conn.on('content', (content: any) => {
+  conn.on('content', (content: any) => withCtx(() => {
     agent._notifyContent(content);
-  });
+  }));
 
-  conn.on('thinking', (text: string) => {
+  conn.on('thinking', (text: string) => withCtx(() => {
     agent._notifyThinking(text);
-  });
+  }));
 
-  conn.on('tool_call', (info: ToolCallInfo) => {
+  conn.on('tool_call', (info: ToolCallInfo) => withCtx(() => {
     if (agent._isTerminated) return;
     const idx = agent.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
     if (idx >= 0) {
@@ -111,58 +115,55 @@ function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
       }
     }
     agent._notifyToolCall(info);
-  });
+  }));
 
-  conn.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => {
+  conn.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => withCtx(() => {
     const idx = agent.toolCalls.findIndex((t) => t.toolCallId === update.toolCallId);
     if (idx >= 0) {
       agent.toolCalls[idx] = { ...agent.toolCalls[idx], ...update };
     }
     agent._notifyToolCall(agent.toolCalls[idx] ?? update as ToolCallInfo);
-  });
+  }));
 
-  conn.on('plan', (entries: PlanEntry[]) => {
+  conn.on('plan', (entries: PlanEntry[]) => withCtx(() => {
     agent.plan = entries;
     agent._notifyPlan(entries);
-  });
+  }));
 
-  conn.on('permission_request', (request: any) => {
+  conn.on('permission_request', (request: any) => withCtx(() => {
     agent._notifyPermissionRequest(request);
-  });
+  }));
 
-  conn.on('usage', (usage: { inputTokens: number; outputTokens: number }) => {
+  conn.on('usage', (usage: { inputTokens: number; outputTokens: number }) => withCtx(() => {
     agent.inputTokens = usage.inputTokens;
     agent.outputTokens = usage.outputTokens;
     agent.hasRealUsageData = true;
     agent._notifyUsage({ agentId: agent.id, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, dagTaskId: agent.dagTaskId });
-  });
+  }));
 
-  conn.on('usage_update', (info: { size: number; used: number }) => {
+  conn.on('usage_update', (info: { size: number; used: number }) => withCtx(() => {
     const previousUsed = agent.contextWindowUsed;
     agent.contextWindowSize = info.size;
     agent.contextWindowUsed = info.used;
 
-    // Record sample for burn rate calculation
     agent.recordTokenSample(info.used);
 
-    // Detect compaction: significant drop (>30%) in context usage
     if (previousUsed > 0 && info.used < previousUsed * 0.7 && previousUsed > 10000) {
       const percentDrop = Math.round(((previousUsed - info.used) / previousUsed) * 100);
       agent._notifyContextCompacted({ previousUsed, currentUsed: info.used, percentDrop });
     }
-  });
+  }));
 
-  conn.on('exit', (code: number) => {
+  conn.on('exit', (code: number) => withCtx(() => {
     if (!agent._isTerminated) {
       agent.status = code === 0 ? 'completed' : 'failed';
     }
     agent._notifyExit(code);
-  });
+  }));
 
-  conn.on('prompt_complete', (_stopReason: string) => {
+  conn.on('prompt_complete', (_stopReason: string) => withCtx(() => {
     if (agent._isTerminated) return;
     if (agent.status === 'running' && !conn.isPrompting) {
-      // Drain queued messages before going idle (unless system is paused)
       if (!agent.systemPaused && agent.pendingMessageCount > 0) {
         agent._drainOneMessage();
         return;
@@ -171,18 +172,18 @@ function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
       agent._notifyStatusChange(agent.status);
       agent._notifyHung(0);
     }
-  });
+  }));
 
-  conn.on('prompting', (active: boolean) => {
+  conn.on('prompting', (active: boolean) => withCtx(() => {
     if (agent._isTerminated) return;
     if (active && agent.status !== 'running') {
       agent.status = 'running';
       agent._notifyStatusChange(agent.status);
     }
-  });
+  }));
 
-  conn.on('response_start', () => {
+  conn.on('response_start', () => withCtx(() => {
     if (agent._isTerminated) return;
     agent._notifyResponseStart();
-  });
+  }));
 }

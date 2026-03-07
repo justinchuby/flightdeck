@@ -9,6 +9,7 @@
  */
 import type { Agent } from './Agent.js';
 import { logger } from '../utils/logger.js';
+import { runWithAgentContext } from '../middleware/requestContext.js';
 import type { CommandEntry, CommandContext, CommandHandlerContext, Delegation } from './commands/types.js';
 import { GovernancePipeline } from '../governance/GovernancePipeline.js';
 import type { HookContext } from '../governance/types.js';
@@ -117,9 +118,16 @@ export class CommandDispatcher {
    * Keep only trailing text that might be the start of a new command.
    */
   scanBuffer(agent: Agent): void {
-    let buf = this.textBuffers.get(agent.id) || '';
+    const buf = this.textBuffers.get(agent.id) || '';
     if (!buf) return;
 
+    runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+      this._scanBufferInner(agent, buf);
+    });
+  }
+
+  private _scanBufferInner(agent: Agent, initialBuf: string): void {
+    let buf = initialBuf;
     let found = true;
     while (found) {
       found = false;

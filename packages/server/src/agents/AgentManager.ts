@@ -28,6 +28,7 @@ import { TypedEmitter } from '../utils/TypedEmitter.js';
 import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { runWithAgentContext } from '../middleware/requestContext.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -361,16 +362,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     // Listen for data to detect sub-agent spawn requests and coordination commands
     agent.onData((data) => {
-      this.emit('agent:text', { agentId: agent.id, text: data });
-      // Buffer agent output — flush after 2s of silence or on status change
-      this.bufferAgentMessage(agent.id, data);
-      // Buffer ACP text and scan for complete command patterns
-      this.dispatcher.appendToBuffer(agent.id, data);
-      this.dispatcher.scanBuffer(agent);
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:text', { agentId: agent.id, text: data });
+        this.bufferAgentMessage(agent.id, data);
+        this.dispatcher.appendToBuffer(agent.id, data);
+        this.dispatcher.scanBuffer(agent);
+      });
     });
 
     agent.onToolCall((info) => {
-      this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+      });
     });
 
     agent.onResponseStart(() => {
@@ -454,29 +457,29 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     agent.onStatus((status) => {
-      this.emit('agent:status', { agentId: agent.id, status });
-      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
-      // Flush buffered messages on turn boundaries
-      if (status === 'idle' || isTerminalStatus(status)) {
-        this.flushAgentMessage(agent.id);
-      }
-
-      // Track lead idle timing for heartbeat
-      if (agent.role.id === 'lead') {
-        if (status === 'idle') {
-          this.heartbeat.trackIdle(agent.id);
-        } else if (status === 'running') {
-          this.heartbeat.trackActive(agent.id);
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:status', { agentId: agent.id, status });
+        this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
+        if (status === 'idle' || isTerminalStatus(status)) {
+          this.flushAgentMessage(agent.id);
         }
-      }
 
-      // When a child agent goes idle (prompt complete), notify its parent
-      if (status === 'idle' && agent.parentId) {
-        this.dispatcher.notifyParentOfIdle(agent);
-      }
+        if (agent.role.id === 'lead') {
+          if (status === 'idle') {
+            this.heartbeat.trackIdle(agent.id);
+          } else if (status === 'running') {
+            this.heartbeat.trackActive(agent.id);
+          }
+        }
+
+        if (status === 'idle' && agent.parentId) {
+          this.dispatcher.notifyParentOfIdle(agent);
+        }
+      });
     });
 
     agent.onExit((code) => {
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
       this.flushAgentMessage(agent.id);
       this.clearHungTimer(agent.id);
       this.dispatcher.clearBuffer(agent.id);
@@ -568,21 +571,24 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const crashKey = `${agent.role?.id ?? 'unknown'}:${agent.task ?? ''}`;
         this.crashCounts.delete(crashKey);
       }
+      });
     });
 
     agent.onHung((elapsedMs) => {
-      this.emit('agent:hung', { agentId: agent.id, elapsedMs });
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:hung', { agentId: agent.id, elapsedMs });
 
-      if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
-        const timer = setTimeout(() => {
-          this.hungTimers.delete(agent.id);
-          if (agent.status === 'idle') {
-            this.terminate(agent.id);
-            this.emit('agent:hung_terminated', { agentId: agent.id });
-          }
-        }, this.autoTerminateTimeoutMs);
-        this.hungTimers.set(agent.id, timer);
-      }
+        if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
+          const timer = setTimeout(() => {
+            this.hungTimers.delete(agent.id);
+            if (agent.status === 'idle') {
+              this.terminate(agent.id);
+              this.emit('agent:hung_terminated', { agentId: agent.id });
+            }
+          }, this.autoTerminateTimeoutMs);
+          this.hungTimers.set(agent.id, timer);
+        }
+      });
     });
 
     // Helper: post-start actions (emit events after cwd is set)
