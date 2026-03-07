@@ -47,6 +47,7 @@ import {
   isRequest,
 } from './DaemonProtocol.js';
 import { createTransport, type TransportAdapter } from './platform.js';
+import { MassFailureDetector } from './MassFailureDetector.js';
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -92,109 +93,6 @@ interface ConnectedClient {
   buffer: string;
 }
 
-// ── Mass Failure Detector ───────────────────────────────────────────
-
-interface ExitRecord {
-  agentId: string;
-  exitCode: number | null;
-  signal: string | null;
-  error: string | null;
-  timestamp: number;
-}
-
-class MassFailureDetector {
-  private recentExits: ExitRecord[] = [];
-  private paused = false;
-  private pausedAt: number | null = null;
-  private resumeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor(
-    private threshold = 3,
-    private windowMs = 60_000,
-    private cooldownMs = 120_000,
-  ) {}
-
-  recordExit(record: ExitRecord): MassFailureData | null {
-    this.recentExits.push(record);
-    if (this.recentExits.length > 50) this.recentExits.shift();
-
-    if (this.paused) return null;
-
-    const now = Date.now();
-    const windowStart = now - this.windowMs;
-    const recentInWindow = this.recentExits.filter(r => r.timestamp >= windowStart);
-
-    if (recentInWindow.length >= this.threshold) {
-      this.paused = true;
-      this.pausedAt = now;
-      const pausedUntil = new Date(now + this.cooldownMs).toISOString();
-
-      this.resumeTimer = setTimeout(() => {
-        this.paused = false;
-        this.pausedAt = null;
-        this.resumeTimer = null;
-      }, this.cooldownMs);
-
-      return {
-        exitCount: recentInWindow.length,
-        windowSeconds: Math.round((now - recentInWindow[0].timestamp) / 1000),
-        recentExits: recentInWindow.map(r => ({
-          agentId: r.agentId,
-          exitCode: r.exitCode,
-          signal: r.signal,
-          error: r.error,
-          timestamp: new Date(r.timestamp).toISOString(),
-        })),
-        pausedUntil,
-        likelyCause: this.detectCause(recentInWindow),
-      };
-    }
-
-    return null;
-  }
-
-  get isPaused(): boolean {
-    return this.paused;
-  }
-
-  resume(): void {
-    this.paused = false;
-    this.pausedAt = null;
-    if (this.resumeTimer) {
-      clearTimeout(this.resumeTimer);
-      this.resumeTimer = null;
-    }
-  }
-
-  configure(opts: { threshold?: number; windowMs?: number; cooldownMs?: number }): void {
-    if (opts.threshold !== undefined) this.threshold = opts.threshold;
-    if (opts.windowMs !== undefined) this.windowMs = opts.windowMs;
-    if (opts.cooldownMs !== undefined) this.cooldownMs = opts.cooldownMs;
-  }
-
-  dispose(): void {
-    if (this.resumeTimer) {
-      clearTimeout(this.resumeTimer);
-      this.resumeTimer = null;
-    }
-  }
-
-  private detectCause(exits: ExitRecord[]): MassFailureData['likelyCause'] {
-    const errors = exits.map(e => e.error ?? '').filter(Boolean);
-    if (errors.length === 0) return 'unknown';
-
-    if (errors.every(e => /401|unauthorized/i.test(e))) return 'auth_failure';
-    if (errors.every(e => /429|rate.?limit/i.test(e))) return 'rate_limit';
-    if (errors.every(e => /503|unavailable/i.test(e))) return 'model_unavailable';
-
-    const signals = exits.map(e => e.signal).filter(Boolean);
-    if (signals.every(s => s === 'SIGKILL') || exits.every(e => e.exitCode === 137)) {
-      return 'resource_exhaustion';
-    }
-
-    return 'unknown';
-  }
-}
 
 // ── Daemon Process ──────────────────────────────────────────────────
 
@@ -240,11 +138,7 @@ export class DaemonProcess {
     this.eventBuffer = new EventBuffer();
 
     const mf = options.massFailure ?? {};
-    this.massFailureDetector = new MassFailureDetector(
-      mf.threshold,
-      mf.windowMs,
-      mf.cooldownMs,
-    );
+    this.massFailureDetector = new MassFailureDetector(mf);
   }
 
   /**
