@@ -32,10 +32,12 @@ import { HybridSearchEngine } from './knowledge/HybridSearchEngine.js';
 import { MemoryCategoryManager } from './knowledge/MemoryCategoryManager.js';
 import { TrainingCapture } from './knowledge/TrainingCapture.js';
 
-// ── Imports: Daemon Services ───────────────────────────────
-import { DaemonProcess } from './daemon/DaemonProcess.js';
-import { DaemonClient } from './daemon/DaemonClient.js';
-import { ReconnectProtocol } from './daemon/ReconnectProtocol.js';
+import { randomUUID } from 'node:crypto';
+
+// ── Imports: Agent Server Transport & Client ────────────────
+import { ForkTransport } from './transport/ForkTransport.js';
+import { AgentServerClient } from './agents/AgentServerClient.js';
+import { AgentServerHealth } from './agents/AgentServerHealth.js';
 import { MassFailureDetector } from './daemon/MassFailureDetector.js';
 
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
@@ -172,12 +174,20 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const hybridSearchEngine = new HybridSearchEngine(knowledgeStore);
   const trainingCapture = new TrainingCapture(knowledgeStore);
 
-  // ── Daemon Services ────────────────────────────────────
-  const daemonProcess = new DaemonProcess({
-    mode: (effectiveConfig as any).daemonMode ?? 'development',
+  // ── Agent Server Transport & Client ─────────────────────
+  const forkTransport = new ForkTransport({
+    serverScript: `${repoRoot}/packages/server/dist/agent-server-entry.js`,
+    stateDir: process.env.FLIGHTDECK_STATE_DIR,
   });
-  const daemonClient = new DaemonClient();
-  const reconnectProtocol = new ReconnectProtocol(daemonClient);
+  const agentServerClient = new AgentServerClient(
+    forkTransport,
+    { projectId: (effectiveConfig as any).projectId ?? 'default', teamId: (effectiveConfig as any).teamId ?? 'default' },
+  );
+  const agentServerHealth = new AgentServerHealth(
+    () => { const id = randomUUID(); agentServerClient.ping(); return id; },
+  );
+  onShutdown('agentServerHealth', () => agentServerHealth.stop());
+  onShutdown('agentServerClient', () => { agentServerClient.dispose(); });
   const massFailureDetector = new MassFailureDetector();
   const timerRegistry = new TimerRegistry(db.drizzle);
   const costTracker = new CostTracker(db);
@@ -254,6 +264,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       db, deferredIssueRegistry, timerRegistry, capabilityInjector,
       taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker,
       governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository,
+      agentServerClient,
     },
   );
   agentManager.setProjectRegistry(projectRegistry);
@@ -358,10 +369,10 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     hybridSearchEngine,
     memoryCategoryManager,
     trainingCapture,
-    daemonProcess,
-    daemonClient,
-    reconnectProtocol,
+    agentServerClient,
+    agentServerHealth,
     massFailureDetector,
+    agentRoster: agentRosterRepository,
 
     // Lifecycle
     async shutdown() {

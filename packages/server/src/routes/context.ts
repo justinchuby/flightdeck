@@ -72,6 +72,12 @@ export interface AppContext {
   agentServerClient?: AgentServerClient;
   agentServerHealth?: AgentServerHealth;
   massFailureDetector?: MassFailureDetector;
+  /** @deprecated Use agentServerClient instead. Kept for daemon.ts route compat. */
+  daemonProcess?: import('../daemon/DaemonProcess.js').DaemonProcess;
+  /** @deprecated Use agentServerClient instead. Kept for daemon.ts route compat. */
+  daemonClient?: import('../daemon/DaemonClient.js').DaemonClient;
+  /** @deprecated Use agentServerClient instead. Kept for daemon.ts route compat. */
+  reconnectProtocol?: import('../daemon/ReconnectProtocol.js').ReconnectProtocol;
   teamExporter?: TeamExporter;
   agentRoster?: AgentRosterRepository;
 }
