@@ -2365,6 +2365,175 @@ Phase 1 ships first as the foundation and recovery path. Invest in polish since 
 
 ---
 
+## Architectural Assessment: Daemon vs Process Isolation
+
+*Added in response to the question: "Is the full daemon over-engineered? Could simple process isolation achieve the same goal?"*
+
+This is an honest assessment of what we built, what's essential, and whether a simpler architecture would suffice.
+
+### What We Built
+
+| Module | LOC | Tests | Purpose |
+|--------|-----|-------|---------|
+| DaemonProcess.ts | 1,034 | 73 | Core daemon: socket server, auth, agent management, lifecycle |
+| platform.ts | 600 | 30 | Cross-platform IPC (Linux/macOS/Windows/TCP fallback) |
+| DaemonAdapter.ts | 540 | 50 | AgentAdapter bridge: proxies spawn/prompt/terminate via daemon |
+| ReconnectProtocol.ts | 449 | 35 | Auto-reconnect, event ID tracking, agent reconciliation |
+| DaemonClient.ts | 423 | — | Server-side client: connect, auth, heartbeat, RPC dispatch |
+| DaemonProtocol.ts | 266 | — | JSON-RPC 2.0 type definitions |
+| MassFailureDetector.ts | 252 | 42 | Sliding window failure detection, cause heuristics |
+| EventBuffer.ts | 169 | — | Buffer events during server disconnect |
+| **Total** | **3,726** | **230** | |
+
+### The Process Isolation Alternative
+
+**Core insight:** The daemon is solving one problem — agents must survive server restarts. The simplest way to achieve this is to run agents in a separate process that doesn't restart when the server does.
+
+```
+Current (no daemon):
+  tsx watch → Server → Agent subprocesses
+  Server dies → ALL children die
+
+Full daemon:
+  tsx watch → Server ←→ [UDS/pipe] ←→ Daemon → Agent subprocesses
+  Server dies → Daemon + agents survive
+
+Process isolation (proposed):
+  tsx watch → Orchestrator ←→ [IPC] ←→ AgentHost → Agent subprocesses
+  Orchestrator dies → AgentHost + agents survive
+```
+
+**Concrete implementation:** `child_process.fork()` with a separate entry point.
+
+```typescript
+// scripts/dev.mjs — modified
+const agentHost = fork('./packages/server/src/agent-host.ts', {
+  detached: true,    // Survives parent exit
+  stdio: 'pipe',     // IPC channel auto-created by fork()
+});
+agentHost.unref();   // Don't keep parent alive
+
+// agent-host.ts — ~200 lines
+// Owns: AgentManager, AcpAdapter subprocesses, agent lifecycle
+// Exposes: spawn, terminate, prompt, list, subscribe via IPC messages
+// Does NOT own: Express, WebSocket, DAG, UI, governance, knowledge
+
+// Orchestrator (server) talks to AgentHost via Node IPC (process.send/on)
+```
+
+**Why this is simpler:**
+- Node's built-in IPC (`fork()` + `process.send()`) replaces: UDS socket, NDJSON parsing, JSON-RPC protocol, auth handshake, platform abstraction
+- `detached: true` replaces: the entire daemon lifecycle management, `dev.mjs` integration, auto-start/stop
+- Parent-child IPC is OS-handled — no socket paths, no stale socket cleanup, no platform differences
+- No auth needed — IPC channel is private between parent and child (kernel-enforced)
+
+### Feature-by-Feature Analysis
+
+| Feature | Full Daemon | Process Isolation | Verdict |
+|---------|-------------|-------------------|---------|
+| **Agent survival on restart** | ✅ UDS socket + orphaned mode | ✅ `detached: true` + Node IPC | **Both work.** Fork is simpler. |
+| **Event buffering** | ✅ EventBuffer (169 LOC) | ✅ Same logic, smaller (IPC auto-buffers) | **Keep.** Essential for gapless replay. |
+| **Reconnect + reconciliation** | ✅ ReconnectProtocol (449 LOC) | ✅ Simpler — just `fork()` reconnect | **Keep concept, simplify.** No exponential backoff needed (IPC is local). |
+| **Mass failure detection** | ✅ MassFailureDetector (252 LOC) | ✅ Same — lives in AgentHost | **Keep as-is.** Independent of transport. |
+| **UDS authentication** | ✅ Token + timingSafeEqual (200+ LOC) | ❌ Unnecessary — fork() IPC is private | **Drop.** Kernel-enforced isolation. |
+| **Cross-platform transport** | ✅ platform.ts (600 LOC) | ❌ Unnecessary — fork() IPC is cross-platform | **Drop.** Node handles it. |
+| **Named pipes (Windows)** | ✅ WindowsTransport | ❌ Unnecessary — fork() works on Windows | **Drop.** |
+| **Stale socket cleanup** | ✅ Probe + clean (100+ LOC) | ❌ Unnecessary — no socket files | **Drop.** |
+| **Socket dir permissions** | ✅ umask, chmod, icacls | ❌ Unnecessary — no filesystem artifacts | **Drop.** |
+| **Single-client enforcement** | ✅ Reject second connection | ❌ Unnecessary — parent-child is 1:1 | **Drop.** |
+| **Orphan detection + 12h timeout** | ✅ Timer + status file | ⚠️ Simpler — process.ppid check + SIGTERM | **Simplify.** Detached process checks if parent alive. |
+| **NDJSON protocol** | ✅ 266 LOC types + parsing | ❌ Unnecessary — `process.send()` is structured | **Drop.** Node serializes/deserializes automatically. |
+| **Daemon CLI commands** | ✅ `flightdeck daemon stop/status` | ⚠️ Simpler — `flightdeck agent-host stop/status` | **Keep concept, less plumbing.** |
+
+### What We'd Drop (~1,800 LOC)
+
+| Component | LOC | Why Unnecessary |
+|-----------|-----|-----------------|
+| platform.ts (entire file) | 600 | fork() IPC is cross-platform natively |
+| DaemonProcess.ts socket/auth sections | 400 | fork() IPC replaces UDS + token auth |
+| DaemonProtocol.ts | 266 | process.send() replaces JSON-RPC + NDJSON |
+| DaemonClient.ts connection/auth | 200 | Built-in IPC channel replaces socket management |
+| Stale socket cleanup | 100 | No socket files to clean up |
+| Single-client enforcement | 80 | Parent-child is inherently 1:1 |
+| Token file management | 80 | No auth needed |
+| **Total dropped** | **~1,800** | **48% of daemon codebase** |
+
+### What We'd Keep (~1,900 LOC)
+
+| Component | LOC | Why Essential |
+|-----------|-----|---------------|
+| Agent lifecycle management | 400 | Core: spawn, terminate, status tracking |
+| EventBuffer.ts | 169 | Gapless event replay on reconnect |
+| MassFailureDetector.ts | 252 | Systemic failure detection + pause |
+| ReconnectProtocol.ts (simplified) | 250 | Reconciliation logic (not transport) |
+| DaemonAdapter.ts (simplified) | 350 | AgentAdapter bridge (reuse interface) |
+| Agent host entry point | 200 | New: standalone process with IPC |
+| Orphan self-termination | 50 | Simplified: ppid check + timeout |
+| Lifecycle modes (prod/dev) | 100 | Keep: shutdown vs persist distinction |
+| **Total kept** | **~1,800** | **Reused or simplified** |
+
+### What We'd Lose
+
+Process isolation via `fork()` has real tradeoffs:
+
+1. **No independent daemon lifecycle.** The agent host is forked from `dev.mjs`, not independently started. You can't start it separately, can't connect from a different terminal, can't run `flightdeck daemon status` against it as a standalone service. For our dogfooding use case, this is fine — it's always started by the dev script.
+
+2. **No TCP fallback.** The daemon design includes a TCP transport for remote debugging / cloud deployment. Fork IPC is local-only. For a local dev tool, this doesn't matter.
+
+3. **No multi-server connection.** The daemon can theoretically accept connections from multiple server instances (we chose single-client, but the architecture supports it). Fork IPC is strictly 1:1. Again, not needed for our use case.
+
+4. **Less defense-in-depth.** UDS + token auth means even if someone gets local access, they can't hijack agents. Fork IPC relies solely on OS process isolation. For a dev tool running on the developer's own machine, this is adequate.
+
+### Honest Assessment: Did We Over-Engineer?
+
+**Yes, partially.** Here's the breakdown:
+
+| Category | Verdict | Reasoning |
+|----------|---------|-----------|
+| **Security model** (UDS + token + umask + icacls) | Over-engineered | Fork IPC provides kernel-enforced isolation for free. We designed enterprise-grade auth for a local dev tool. |
+| **Cross-platform transport** (4 adapters) | Over-engineered | `child_process.fork()` works identically on Linux, macOS, and Windows. 600 LOC for something Node does natively. |
+| **JSON-RPC + NDJSON protocol** | Over-engineered | `process.send()` handles serialization. We built a wire protocol we didn't need. |
+| **Event buffering** | Correctly engineered | Essential regardless of transport. Gapless replay is the core value proposition. |
+| **Mass failure detection** | Correctly engineered | Transport-independent. Valuable at any scale. |
+| **Reconnect + reconciliation** | Correctly engineered (transport overkill) | The reconciliation logic is essential; the exponential backoff over UDS is overkill for local IPC. |
+| **Lifecycle modes** (prod/dev) | Correctly engineered | Real user need. Ctrl+C should kill everything in prod, preserve in dev. |
+| **12h orphan timeout** | Correctly engineered | Safety net against forgotten processes. |
+
+**The ~1,800 LOC we'd drop (48%) is genuine over-engineering.** It solves problems that `fork()` eliminates at the OS level. The remaining ~1,800 LOC is real value — event buffering, failure detection, reconciliation, and lifecycle management.
+
+### Recommendation
+
+**Refactor to process isolation.** The migration is straightforward because the architecture is already modular:
+
+1. **Create `agent-host.ts`** (~200 LOC) — new entry point that owns AgentManager + adapters
+2. **Replace DaemonClient with IPC wrapper** (~100 LOC) — `process.send()` / `process.on('message')`
+3. **Simplify DaemonAdapter** — remove socket connection logic, keep event mapping
+4. **Delete:** platform.ts, DaemonProtocol.ts, socket/auth sections of DaemonProcess.ts
+5. **Keep unchanged:** EventBuffer, MassFailureDetector, lifecycle modes, reconnect reconciliation logic
+
+**Migration effort:** ~1-2 days for a developer familiar with the codebase. Most of it is deleting code and replacing the transport layer in DaemonProcess → AgentHost.
+
+**The existing daemon code isn't wasted.** The design thinking (event buffering, reconciliation, mass failure, lifecycle modes) is all correct and reusable. We just chose a transport layer that's 10x more complex than needed. The 230 tests for MassFailureDetector, EventBuffer, and reconciliation logic all transfer directly.
+
+### Pros and Cons Summary
+
+| | Full Daemon (Current) | Process Isolation (Proposed) |
+|---|---|---|
+| **LOC** | ~3,700 | ~1,800 (estimated) |
+| **Tests** | ~230 | ~150 (drop transport tests, keep logic tests) |
+| **Agent survival** | ✅ | ✅ |
+| **Cross-platform** | ✅ (custom per-platform) | ✅ (Node handles it) |
+| **Security** | ✅✅ Enterprise-grade | ✅ OS process isolation |
+| **Independent lifecycle** | ✅ Standalone daemon process | ⚠️ Forked from dev script only |
+| **Remote/cloud ready** | ✅ TCP fallback | ❌ Local only |
+| **Complexity** | High — 8 modules, custom protocol | Low — 3-4 modules, Node IPC |
+| **Time to production** | Mostly built | ~1-2 days refactor |
+| **Maintenance burden** | Higher (custom transport, auth, cleanup) | Lower (leverage Node builtins) |
+
+**Bottom line:** For a local dev tool where the primary use case is "agents survive tsx watch restarts," `fork({ detached: true })` + Node IPC gives us 95% of the daemon's value at 50% of the complexity. The daemon design is sound engineering — it's just solving a bigger problem than we have.
+
+---
+
 ## Implementation Timeline (AI-Assisted, 12 Agents)
 
 The original estimates (1-2 days for Phase 1, 2-3 weeks for Phase 2) assumed a single developer working sequentially. With 12 AI agents working in parallel, the critical path compresses significantly. Timeline revised based on group consensus (@e7f14c5e, @bb14c13b).
