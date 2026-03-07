@@ -353,6 +353,8 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
             content: `COMPLETE_TASK [${taskId}]: ${summary}`,
           });
         }
+        // Prevent duplicate report when agent goes idle after COMPLETE_TASK
+        ctx.reportedCompletions.add(`${agent.id}:idle`);
         ctx.emit('dag:updated', { leadId: agent.parentId });
         agent.sendMessage(`[System] Task "${taskId}" marked as done in DAG.${newlyReady && newlyReady.length > 0 ? ` ${newlyReady.length} task(s) now ready.` : ''}`);
       } else {
@@ -365,6 +367,8 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
             content: `COMPLETE_TASK: ${summary}`,
           });
         }
+        // Prevent duplicate report when agent goes idle after COMPLETE_TASK
+        ctx.reportedCompletions.add(`${agent.id}:idle`);
         agent.sendMessage(`[System] Task completion signaled to parent. (No DAG task ID — use dagTaskId for DAG integration.)`);
       }
       return;

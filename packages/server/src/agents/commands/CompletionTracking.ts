@@ -66,10 +66,12 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
 
   const rawOutput = agent.getTaskOutput(16000);
   const cleanPreview = rawOutput.replace(/⟦⟦[\s\S]*?⟧⟧/g, '').replace(/⟦⟦[\s\S]*$/g, '').trim().slice(-12000);
+  // Fall back to raw output when cleaning strips everything (e.g., agents whose work is mostly commands)
+  const outputPreview = cleanPreview || rawOutput.trim().slice(-4000) || '(no output)';
   const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
   const dagLabel = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
-  const summary = `[Agent Report]${dagLabel} ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput summary: ${cleanPreview || '(no output)'}`;
+  const summary = `[Agent Report]${dagLabel} ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput summary: ${outputPreview}`;
 
   logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
   parent.sendMessage(summary);
@@ -145,10 +147,12 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
   const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
   const rawOutput2 = agent.getTaskOutput(16000);
   const cleanPreview2 = rawOutput2.replace(/⟦⟦[\s\S]*?⟧⟧/g, '').replace(/⟦⟦[\s\S]*$/g, '').trim().slice(-12000);
+  // Fall back to raw output when cleaning strips everything (e.g., agents whose work is mostly commands)
+  const outputPreview2 = cleanPreview2 || rawOutput2.trim().slice(-4000) || '(no output)';
   const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief2 = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
   const dagLabel2 = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
-  const summary = `[Agent Report]${dagLabel2} ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput summary: ${cleanPreview2 || '(no output)'}`;
+  const summary = `[Agent Report]${dagLabel2} ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput summary: ${outputPreview2}`;
 
   logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
   parent.sendMessage(summary);
