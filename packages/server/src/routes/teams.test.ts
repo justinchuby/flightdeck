@@ -8,6 +8,13 @@ import { describe, it, expect, vi, afterAll } from 'vitest';
 import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
+import type { Request, Response, NextFunction } from 'express';
+
+// Bypass rate limiters in tests
+vi.mock('../middleware/rateLimit.js', () => ({
+  rateLimit: () => (_req: Request, _res: Response, next: NextFunction) => next(),
+}));
+
 import { teamsRoutes } from './teams.js';
 import type { AppContext } from './context.js';
 
@@ -432,7 +439,7 @@ describe('teamsRoutes', () => {
           getStatusCounts: vi.fn().mockReturnValue({ idle: 1, busy: 2 }),
         } as any,
         massFailureDetector: {
-          isTriggered: vi.fn().mockReturnValue(true),
+          get isPaused() { return true; },
         } as any,
       });
       const base = await srv.start();

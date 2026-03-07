@@ -2,7 +2,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import type { Database } from './database.js';
 import { agentRoster } from './schema.js';
 
-export type AgentStatus = 'idle' | 'busy' | 'terminated';
+export type AgentStatus = 'idle' | 'busy' | 'terminated' | 'retired';
 
 export interface AgentRecord {
   agentId: string;
@@ -141,6 +141,65 @@ export class AgentRosterRepository {
       .where(eq(agentRoster.agentId, agentId))
       .run();
     return result.changes > 0;
+  }
+
+  retireAgent(agentId: string, reason?: string): boolean {
+    const now = new Date().toISOString();
+    const existing = this.getAgent(agentId);
+    if (!existing) return false;
+
+    const meta = existing.metadata ?? {};
+    (meta as Record<string, unknown>).retiredAt = now;
+    if (reason) (meta as Record<string, unknown>).retiredReason = reason;
+
+    const result = this.db.drizzle
+      .update(agentRoster)
+      .set({
+        status: 'retired' as AgentStatus,
+        metadata: JSON.stringify(meta),
+        updatedAt: now,
+      })
+      .where(eq(agentRoster.agentId, agentId))
+      .run();
+    return result.changes > 0;
+  }
+
+  cloneAgent(sourceAgentId: string, newAgentId: string): AgentRecord | undefined {
+    const source = this.getAgent(sourceAgentId);
+    if (!source) return undefined;
+
+    const sourceMeta = source.metadata ?? {};
+    const cloneMeta: Record<string, unknown> = { clonedFromId: sourceAgentId };
+
+    // Track clone references on source
+    const cloneIds = (Array.isArray((sourceMeta as any).cloneIds) ? (sourceMeta as any).cloneIds : []) as string[];
+    cloneIds.push(newAgentId);
+    (sourceMeta as Record<string, unknown>).cloneIds = cloneIds;
+    this.db.drizzle
+      .update(agentRoster)
+      .set({ metadata: JSON.stringify(sourceMeta), updatedAt: new Date().toISOString() })
+      .where(eq(agentRoster.agentId, sourceAgentId))
+      .run();
+
+    return this.upsertAgent(
+      newAgentId,
+      source.role,
+      source.model,
+      'idle',
+      undefined,
+      source.projectId,
+      cloneMeta,
+      source.teamId,
+    );
+  }
+
+  getStatusCounts(teamId?: string): Record<string, number> {
+    const agents = this.getAllAgents(undefined, teamId);
+    const counts: Record<string, number> = { idle: 0, busy: 0, terminated: 0, retired: 0 };
+    for (const a of agents) {
+      counts[a.status] = (counts[a.status] ?? 0) + 1;
+    }
+    return counts;
   }
 
   private rowToRecord(row: typeof agentRoster.$inferSelect): AgentRecord {
