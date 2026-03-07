@@ -980,7 +980,7 @@ All three files are written with `mode: 0o600` — only the owning OS user can r
 
 ### Authentication Handshake
 
-When the orchestration server connects to the agent server's TCP port, the first message must be an `auth` message containing the token. The agent server validates before accepting any other commands.
+When the orchestration server connects to the agent server's TCP port, the first message must be an `auth` message containing the token **and the declared scope**. The agent server validates the token and **binds the connection to the declared `(projectId, teamId)` scope** — all subsequent messages on this connection are constrained to that scope.
 
 ```typescript
 // Agent server: handleReconnect()
@@ -1014,28 +1014,75 @@ function handleReconnect(conn: net.Socket, expectedToken: string): void {
         return;
       }
 
+      // Validate required scope declaration
+      if (!msg.projectId || !msg.teamId) {
+        conn.end(JSON.stringify({ type: 'error', code: 'scope_required',
+          message: 'Auth must include projectId and teamId' }) + '\n');
+        conn.destroy();
+        return;
+      }
+
       authenticated = true;
-      // Accept connection — wire up message handling
-      conn.write(JSON.stringify({ type: 'auth_ok', pid: process.pid, agentCount: agents.size }) + '\n');
-      this.acceptReconnection(conn);
+      // Bind connection to declared scope — immutable for this connection's lifetime
+      const connectionScope: ConnectionScope = {
+        projectId: msg.projectId,
+        teamId: msg.teamId,
+        permission: this.resolvePermission(msg.projectId, msg.teamId),
+      };
+
+      conn.write(JSON.stringify({
+        type: 'auth_ok',
+        pid: process.pid,
+        agentCount: this.getAgentsByScope(msg.projectId, msg.teamId).length,
+        scope: connectionScope,
+      }) + '\n');
+      this.acceptReconnection(conn, connectionScope);
     } catch {
       conn.end(JSON.stringify({ type: 'error', code: 'parse_error', message: 'Invalid JSON' }) + '\n');
       conn.destroy();
     }
   });
 }
+
+// Connection scope — bound at auth time, enforced on every subsequent message
+interface ConnectionScope {
+  projectId: string;
+  teamId: string;
+  permission: TeamPermission;
+}
+```
+
+**Scope enforcement:** After auth, every message on this connection is validated against the bound scope. The `projectId` and `teamId` fields in messages like `SpawnAgentMessage` are verified to match the connection scope — a client cannot operate outside its declared scope regardless of what it puts in message fields.
+
+```typescript
+// Agent server: enforceScope() — called before processing any message
+function enforceScope(msg: OrchestrationMessage, conn: ScopedConnection): void {
+  if ('projectId' in msg && msg.projectId !== conn.scope.projectId) {
+    throw new ScopeViolationError(
+      `Connection bound to project ${conn.scope.projectId}, message targets ${msg.projectId}`);
+  }
+  if ('teamId' in msg && msg.teamId !== conn.scope.teamId) {
+    throw new ScopeViolationError(
+      `Connection bound to team ${conn.scope.teamId}, message targets ${msg.teamId}`);
+  }
+}
 ```
 
 ```typescript
 // Orchestration server: ForkTransport.reconnectViaTcp()
-async reconnectViaTcp(port: number, tokenPath: string): Promise<void> {
+async reconnectViaTcp(port: number, tokenPath: string, scope: TeamContext): Promise<void> {
   const token = fs.readFileSync(tokenPath, 'utf8').trim();
   const conn = net.createConnection({ host: '127.0.0.1', port });
 
   await new Promise<void>((resolve, reject) => {
     conn.on('connect', () => {
-      // Send auth as first message
-      conn.write(JSON.stringify({ type: 'auth', token }) + '\n');
+      // Send auth with scope declaration as first message
+      conn.write(JSON.stringify({
+        type: 'auth',
+        token,
+        projectId: scope.projectId,
+        teamId: scope.teamId,
+      }) + '\n');
     });
 
     conn.once('data', (data) => {
@@ -1051,7 +1098,7 @@ async reconnectViaTcp(port: number, tokenPath: string): Promise<void> {
     setTimeout(() => reject(new Error('Connection timeout')), 5_000);
   });
 
-  // Authenticated — wire up message handling on this connection
+  // Authenticated + scope-bound — wire up message handling
   this.setupMessageHandler(conn);
   this.setState('connected');
 }
@@ -1064,12 +1111,14 @@ async reconnectViaTcp(port: number, tokenPath: string): Promise<void> {
 | Other OS user reads port/token files | `0o600` file permissions — only owning user can read |
 | Same-user rogue process connects without token | Connection rejected — `auth_required` error |
 | Same-user rogue process reads token file and connects | ⚠️ **Possible** — same security boundary as the daemon design. Token file is the sole barrier for same-user processes. This is acceptable for a local dev tool. |
+| **Impersonating another team** | **Connection scope bound at auth time.** The `(projectId, teamId)` declared in the auth message is immutable for the connection lifetime. All subsequent messages are validated against this scope. A valid token lets you authenticate, but you can only access your declared scope. |
 | Timing attack on token comparison | `crypto.timingSafeEqual()` prevents timing-based token extraction |
 | Slow/hanging connection | 5-second auth timeout — connection destroyed if no auth received |
 | Replay attack (stale token from previous session) | Token is regenerated on every agent server startup. Old tokens are invalid. |
 | Network sniffing (remote attacker) | TCP bound to `127.0.0.1` — not reachable from network |
+| **Global list leaking all team data** | `ListAgentsMessage` **requires** `(projectId, teamId)` — connection scope is enforced. No unscoped listing without `server_admin` permission (local-only, resolved at auth time). |
 
-**Security boundary:** Same as the daemon design — the token file (0o600) is the sole barrier against same-user attackers. For a local dev tool running on the developer's own machine, this is the appropriate security level. The WebSocketTransport (future) adds TLS for network scenarios.
+**Security boundary:** Same as the daemon design — the token file (0o600) is the sole barrier against same-user attackers. For a local dev tool running on the developer's own machine, this is the appropriate security level. The WebSocketTransport (future) adds TLS for network scenarios and per-team tokens for team isolation.
 
 ### Discovery Flow
 
@@ -1394,6 +1443,81 @@ A single shared SQLite database (WAL mode, already configured) with clear write 
 - Existing 25+ tables and migrations work unchanged
 - Single backup, single migration path
 
+### Multi-Orchestrator Write Contention (SQLITE_BUSY)
+
+**Problem:** The two-process model assumes exactly one agent server and one orchestration server. But in the multi-team scenario with WebSocketTransport, multiple orchestration servers connect simultaneously. If each opens its own SQLite connection and writes to "orchestration-owned" tables (dagTasks, knowledge, messageQueue, etc.), SQLite WAL mode only allows **one writer at a time** — concurrent writes cause `SQLITE_BUSY` errors.
+
+**This is a fundamental constraint.** SQLite is an embedded database designed for single-process or single-writer use. Our options:
+
+| Approach | Complexity | Latency | Correctness |
+|----------|-----------|---------|-------------|
+| **A. Agent server as DB write proxy** | Medium | +1 IPC hop per write | ✅ Single writer guaranteed |
+| **B. Separate DBs per team** | High | None | ✅ But loses shared reads |
+| **C. Write-ahead queue via agent server** | Medium | Async batched | ✅ Ordered, single writer |
+| **D. SQLite busy timeout + retry** | Low | Unpredictable | ⚠️ Works under low contention |
+
+**Chosen approach: A + D hybrid — Agent server as the sole DB writer, with busy timeout as a safety net.**
+
+**Rationale:**
+- The agent server is already a singleton shared process. It's the natural home for the single DB writer.
+- All orchestration servers send write requests to the agent server via IPC/WebSocket. The agent server executes writes sequentially.
+- This extends the existing "sole agent owner" invariant: the agent server is also the **sole DB writer**.
+- The orchestration server becomes a **read-only DB client** with writes proxied through the agent server.
+- The `busy_timeout` pragma (already set at 5000ms) handles the edge case where the agent server and a read query collide in WAL mode.
+
+```typescript
+// Updated architecture: agent server owns ALL DB writes
+
+// Orchestration → Agent Server (new message types for DB writes)
+type DbWriteMessage =
+  | { type: 'db_write'; requestId: string; table: string; operation: 'insert' | 'update' | 'delete'; data: unknown }
+  | { type: 'db_batch_write'; requestId: string; writes: DbWriteMessage[] };
+
+// Agent server processes writes sequentially — no SQLITE_BUSY possible
+class AgentServer {
+  private writeQueue = new AsyncQueue<DbWriteMessage>();
+
+  async processWrites(): Promise<void> {
+    for await (const msg of this.writeQueue) {
+      // Single-threaded write processing — no contention
+      await this.executeDbWrite(msg);
+      this.sendWriteResult(msg.requestId, { success: true });
+    }
+  }
+}
+
+// Orchestration server: read directly, write via agent server
+class OrchestrationDbClient {
+  private db: BetterSqlite3.Database;  // Read-only connection
+  private agentServer: AgentServerClient;
+
+  read<T>(query: () => T): T {
+    return query();  // Direct read — WAL mode allows concurrent readers
+  }
+
+  async write(table: string, operation: string, data: unknown): Promise<void> {
+    // Proxy write through agent server
+    await this.agentServer.sendAndWait({
+      type: 'db_write',
+      requestId: nanoid(),
+      table,
+      operation,
+      data,
+    });
+  }
+}
+```
+
+**Impact on the existing table ownership model:**
+- The "Agent Server Owns / Orchestration Server Owns" table split remains conceptually correct — it determines which process **initiates** writes.
+- But physically, ALL writes flow through the agent server's DB connection.
+- Orchestration-initiated writes (dagTasks, knowledge, etc.) are sent as messages to the agent server, which executes them.
+- This adds ~1ms latency per write (IPC round-trip) — negligible for a dev tool.
+
+**Phase 1 (ForkTransport, single orchestrator):** Both processes can write directly — there's only one orchestration server, so no contention. The busy timeout handles rare WAL collisions.
+
+**Phase 2 (WebSocketTransport, multi orchestrator):** All orchestration writes proxy through the agent server. This is a transport-layer concern — the application code uses the same `OrchestrationDbClient` interface regardless.
+
 > **Note:** Tables are scoped by `(projectId, teamId)` or `(projectId)` only. See the **Multi-Team, Multi-Project Model** section for full scoping rules, schema changes, and index strategy.
 
 #### Agent Server Owns (writes):
@@ -1487,20 +1611,26 @@ class AgentServer {
 
 ### Orchestration Server Reconciliation
 
-After the agent server restarts (or on initial connection), the orchestration server reconciles what SHOULD be running vs what IS running:
+After the agent server restarts (or on initial connection), the orchestration server reconciles what SHOULD be running vs what IS running. **Reconciliation is team-scoped** — each orchestration server only reconciles its own `(projectId, teamId)` scope:
 
 ```typescript
 async function reconcileAgents(
   agentServerClient: AgentServerClient,
+  scope: TeamContext,          // ← Team-scoped reconciliation
   dagTasks: DagTask[],
   roster: AgentRosterEntry[],
 ): Promise<ReconciliationPlan> {
-  // 1. Ask agent server what's alive
-  const liveAgents = await agentServerClient.list();
+  // 1. Ask agent server what's alive in OUR scope
+  const liveAgents = await agentServerClient.list();  // Already scope-enforced by connection
   const liveSet = new Set(liveAgents.map(a => a.agentId));
 
-  // 2. Compare with what DAG says should be running
-  const activeTasks = dagTasks.filter(t => t.status === 'in_progress' && t.assignedAgentId);
+  // 2. Compare with what OUR DAG says should be running
+  const activeTasks = dagTasks.filter(t =>
+    t.status === 'in_progress' &&
+    t.assignedAgentId &&
+    t.teamId === scope.teamId &&     // ← Only our team's tasks
+    t.projectId === scope.projectId  // ← Only our project
+  );
 
   const plan: ReconciliationPlan = {
     alive: [],       // Running and should be running ✅
@@ -1574,27 +1704,48 @@ The agent server supports a **many-to-many** relationship between teams and proj
 
 ### Team Identity
 
-A **team** is identified by its **lead** — the orchestration session that spawned the agents. The `teamId` is the lead's agent ID:
+A **team** has a **stable, persistent identity** that survives lead restarts and session changes:
 
 ```typescript
-type TeamId = string;  // e.g., "alice-lead-a1b2c3", or the agentId of the project lead
+type TeamId = string;  // e.g., "alice-team", "ci-pipeline", or auto-generated "team-a1b2c3d4"
 
 interface TeamContext {
-  teamId: TeamId;       // The lead that owns this team
+  teamId: TeamId;       // Stable identifier — persists across sessions
   projectId: string;    // The project being worked on
 }
 ```
 
-**Why teamId = leadId?**
-- A crew is defined by its lead. The lead spawns agents, manages the DAG, and coordinates work.
-- `dagTasks` already uses `leadId` as part of its compound primary key (`id + leadId`).
-- No new identity system needed — we reuse what exists.
-- Solo developers get `teamId = 'default'` (implicit single-team mode).
+**Why NOT teamId = leadId?** The critical reviewer identified that tying team identity to the lead's agentId creates a fragile coupling: if the lead process restarts (new agentId), the entire team identity changes. All team-scoped data (roster, DAG, delegations) becomes orphaned under the old teamId. This is unacceptable for persistent teams.
+
+**teamId is a stable, first-class identity:**
+
+| Property | leadId (rejected) | teamId (chosen) |
+|----------|-------------------|-----------------|
+| Lifespan | One session (ephemeral) | Persists across sessions |
+| Stability | Changes on lead restart | Survives restarts |
+| Storage | In-memory only | Stored in `teams` table + config |
+| Assignment | Implicit from process | Explicit (config or auto-generated) |
+| Relationship to lead | 1:1 (tightly coupled) | 1:many (team outlives any lead) |
 
 **How teamId is assigned:**
-1. **Session-based:** Each orchestration session gets a teamId from its lead agent. When a lead starts, its agentId becomes the teamId for all agents it spawns.
-2. **Explicit override:** A user can set `teamId` in config for persistent identity across sessions (e.g., for a CI pipeline that always uses the same teamId).
-3. **Default fallback:** If no lead is running (solo mode, direct CLI), `teamId = 'default'`.
+1. **Config-based (recommended for persistent teams):** User sets `teamId: 'alice-team'` in `flightdeck.config.yaml`. This is the primary mechanism for teams that persist across sessions.
+2. **Auto-generated on first session:** If no teamId is configured, one is generated on first run (`team-${nanoid(8)}`) and stored in the project's team registry. Subsequent sessions reuse it.
+3. **Default fallback:** Solo developers with no config get `teamId = 'default'` (implicit single-team mode). All existing code continues to work unchanged.
+
+**Relationship to leadId:** The `dagTasks.leadId` column records WHICH lead instance is running a DAG, not team identity. Multiple lead instances across sessions share the same `teamId` but have different `leadId` values. The compound key for DAG tasks is `(id, teamId)` — not `(id, leadId)`.
+
+```sql
+-- New: teams registry table
+CREATE TABLE teams (
+  team_id TEXT PRIMARY KEY,
+  name TEXT,                          -- Human-readable name (e.g., "Alice's crew")
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  config TEXT                         -- JSON: default model, provider prefs, etc.
+);
+
+-- dagTasks: rename leadId usage to teamId for scoping
+-- (leadId column retained for "which lead instance" tracking, but scoping uses teamId)
+```
 
 ### Scoping Hierarchy
 
@@ -1797,11 +1948,10 @@ interface TerminateAgentMessage {
 interface ListAgentsMessage {
   type: 'list';
   requestId: string;
-  projectId?: string;           // ← NEW: filter by project (optional)
-  teamId?: string;              // ← NEW: filter by team (optional)
-  // Both omitted → all agents (admin view)
-  // projectId only → all teams on this project
-  // Both specified → specific team's agents
+  projectId: string;            // ← REQUIRED: always scoped (enforced by connection scope)
+  teamId: string;               // ← REQUIRED: always scoped (enforced by connection scope)
+  // Connection scope is validated — clients cannot list outside their bound scope.
+  // Cross-team listing requires server_admin permission (resolved at auth time).
 }
 
 interface SubscribeMessage {
@@ -1868,27 +2018,24 @@ class AgentServer {
   private projectTeamIndex = new Map<string, Set<string>>();  // "projectId:teamId" → Set<agentId>
   private projectIndex = new Map<string, Set<string>>();       // "projectId" → Set<agentId>
 
-  handleList(msg: ListAgentsMessage): AgentDescriptor[] {
-    if (msg.projectId && msg.teamId) {
-      // Scoped to specific team
-      const key = `${msg.projectId}:${msg.teamId}`;
-      const ids = this.projectTeamIndex.get(key) ?? new Set();
-      return [...ids].map(id => this.toDescriptor(this.agents.get(id)!));
-    }
-    if (msg.projectId) {
-      // All teams on this project (admin/cross-team view)
-      const ids = this.projectIndex.get(msg.projectId) ?? new Set();
-      return [...ids].map(id => this.toDescriptor(this.agents.get(id)!));
-    }
-    // All agents (global admin view)
-    return [...this.agents.values()].map(this.toDescriptor);
+  handleList(msg: ListAgentsMessage, conn: ScopedConnection): AgentDescriptor[] {
+    // Enforce connection scope — always scoped to the authenticated (projectId, teamId)
+    this.enforceScope(msg, conn);
+
+    const key = `${conn.scope.projectId}:${conn.scope.teamId}`;
+    const ids = this.projectTeamIndex.get(key) ?? new Set();
+    return [...ids].map(id => this.toDescriptor(this.agents.get(id)!));
+
+    // Cross-team view (project admin) is a separate message type:
+    // ListAllProjectAgentsMessage — requires server_admin permission,
+    // validated at auth time. Never exposed through standard ListAgentsMessage.
   }
 
   routeEvent(event: AgentEventMessage): void {
     // Only send events to orchestration servers subscribed to the matching scope
     for (const subscriber of this.subscribers) {
-      if (subscriber.projectId === event.projectId &&
-          subscriber.teamId === event.teamId) {
+      if (subscriber.scope.projectId === event.projectId &&
+          subscriber.scope.teamId === event.teamId) {
         subscriber.transport.send(event);
       }
     }
@@ -2039,30 +2186,27 @@ CREATE INDEX idx_agent_roster_team ON agent_roster(team_id);
 
 #### Can Team A See Team B's Agents?
 
-**Default: No.** Each orchestration server connects with a `(projectId, teamId)` scope. The agent server filters all responses and events to that scope.
+**No.** Each connection is **scope-bound at auth time** to a `(projectId, teamId)` pair. The agent server enforces this on every query — there is no code path that returns agents outside the connection's scope through the standard `ListAgentsMessage`.
 
 ```typescript
-// Default behavior: team-scoped filtering
-handleList(msg: ListAgentsMessage): void {
-  // The orchestration server's teamId is set on connect
-  const scope = this.connectionScope;  // { projectId, teamId }
-  const agents = this.getAgentsByScope(scope.projectId, scope.teamId);
+// All queries are scope-enforced — no optional scoping
+handleList(msg: ListAgentsMessage, conn: ScopedConnection): void {
+  this.enforceScope(msg, conn);
+  const key = `${conn.scope.projectId}:${conn.scope.teamId}`;
+  const agents = this.getAgentsByKey(key);
   this.send({ type: 'list_result', requestId: msg.requestId, agents });
 }
 ```
 
-**Exception: Project admin view.** An orchestration server can request a cross-team view by sending `ListAgentsMessage` with `projectId` only (no `teamId`). This is gated by a permission check:
+**Cross-team visibility** (e.g., for a project dashboard) requires a separate `AdminListMessage` type that is only processed for connections with `server_admin` permission. This permission is resolved at auth time based on the token — the agent-server.token grants `server_admin` for local ForkTransport connections (single-user dev tool). The future WebSocketTransport can issue per-team tokens with `team_member` permission only.
 
 ```typescript
-// Permission levels
 type TeamPermission = 'team_member' | 'project_admin' | 'server_admin';
 
-// team_member: see/control own team's agents only
-// project_admin: see all teams' agents on a project, control own team only
-// server_admin: see/control everything (for the agent server operator)
+// team_member: see/control own team's agents only (default for WebSocket)
+// project_admin: see (not control) all teams' agents on a project
+// server_admin: see/control everything (default for ForkTransport / local)
 ```
-
-For local development (single user), this is academic — the user is implicitly `server_admin`. Permissions become meaningful with the WebSocketTransport when multiple users connect remotely.
 
 #### Can Team A Control Team B's Agents?
 
@@ -2083,16 +2227,65 @@ handleTerminate(msg: TerminateAgentMessage): void {
 
 #### Knowledge Sharing Boundaries
 
-Knowledge is project-scoped but writable by any team on that project:
+Knowledge is project-scoped for **reads** but team-scoped for **writes**. This prevents cross-team knowledge poisoning while preserving shared visibility.
+
+**Write isolation:** Each team writes to its own partition within the knowledge table. The `teamId` column (DB-enforced, not metadata JSON) determines ownership:
+
+```sql
+-- Knowledge table gains a non-nullable teamId column for write ownership
+ALTER TABLE knowledge ADD COLUMN team_id TEXT NOT NULL DEFAULT 'default';
+CREATE INDEX idx_knowledge_project_team ON knowledge(project_id, team_id);
+```
 
 | Operation | Scope | Rule |
 |-----------|-------|------|
-| Write knowledge | `(projectId, teamId)` | Any team can write; `metadata.source` records which team/agent wrote it |
-| Read knowledge | `(projectId)` | All teams on the project see all knowledge |
-| Delete knowledge | `(projectId, teamId)` | Teams can only delete entries they created (`metadata.source.teamId` match) |
-| Knowledge conflicts | `(projectId, key)` | Last-write-wins with `updatedAt` timestamp; conflicts are rare since keys are specific |
+| **Write** knowledge | `(projectId, teamId)` | Agent server enforces: writes carry the connection's bound `teamId`. DB column, not metadata. |
+| **Read** knowledge | `(projectId)` | All teams on the project see all knowledge entries |
+| **Update** own entries | `(projectId, teamId)` | Teams can only update entries where `team_id` matches |
+| **Delete** own entries | `(projectId, teamId)` | DB `WHERE team_id = ?` enforced — not bypassable via metadata mutation |
+| **Dispute** other's entry | `(projectId)` | Teams can flag (not delete) another team's entry for review |
 
-This models real-world team collaboration: shared wiki (read by all), authored entries (owned by the writer), conflict resolution by timestamp.
+**Why DB column, not metadata JSON?** The critical reviewer correctly identified that authorization based on mutable JSON metadata (`metadata.source.teamId`) is bypassable — any process with DB write access could modify the JSON to claim ownership. Moving `teamId` to a dedicated column with `CHECK` constraints or application-level enforcement makes ownership immutable.
+
+**Knowledge attribution is preserved in metadata** for informational purposes (which agent, which session, confidence level), but **authorization uses the DB column only.**
+
+```typescript
+// Knowledge write — agent server enforces team scope
+async writeKnowledge(entry: KnowledgeEntry, conn: ScopedConnection): Promise<void> {
+  // teamId comes from the connection scope, NOT from the entry payload
+  await db.insert(knowledge).values({
+    projectId: conn.scope.projectId,
+    teamId: conn.scope.teamId,            // DB column — immutable ownership
+    category: entry.category,
+    key: entry.key,
+    content: entry.content,
+    metadata: JSON.stringify({
+      source: {
+        agentId: entry.agentId,           // Informational — who wrote it
+        teamId: conn.scope.teamId,        // Informational duplicate
+        sessionId: entry.sessionId,
+        mechanism: entry.mechanism,
+      },
+      confidence: entry.confidence,
+      tags: entry.tags,
+    }),
+  });
+}
+
+// Knowledge delete — enforced by teamId column
+async deleteKnowledge(id: number, conn: ScopedConnection): Promise<boolean> {
+  const result = db.delete(knowledge)
+    .where(and(
+      eq(knowledge.id, id),
+      eq(knowledge.projectId, conn.scope.projectId),
+      eq(knowledge.teamId, conn.scope.teamId),  // Can only delete own team's entries
+    ))
+    .run();
+  return result.changes > 0;
+}
+```
+
+**Cross-team knowledge disputes:** If Team A believes Team B wrote incorrect knowledge, Team A can create a `dispute` entry (a special knowledge category) referencing the disputed entry. The orchestration server can surface disputes in the Knowledge Panel for human review. This models real-world disagreement without allowing destructive cross-team actions.
 
 ### Filesystem Mirroring with Multi-Team
 
@@ -2128,6 +2321,25 @@ Updated directory structure with team-scoping:
 **Ownership rules:**
 - `teams/<team-id>/agents/` → written by agent server
 - `teams/<team-id>/dag/` → written by orchestration server for that team
+
+**teamId validation (path traversal prevention):** The `teamId` is used in filesystem paths, so it MUST be validated before use. Reject any teamId containing path separators, dots, or other dangerous characters:
+
+```typescript
+const TEAM_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$/;
+
+function validateTeamId(teamId: string): void {
+  if (!TEAM_ID_PATTERN.test(teamId)) {
+    throw new Error(
+      `Invalid teamId "${teamId}": must be 1-63 alphanumeric/dash/underscore characters, ` +
+      `starting with alphanumeric. Path traversal characters (., /, \\) are forbidden.`
+    );
+  }
+}
+
+// Called at: auth handshake, team creation, config loading, any path construction
+```
+
+This prevents attacks like `teamId: '../../../etc/passwd'` or `teamId: '..\\..\\windows'`.
 - `knowledge/`, `locks/`, `memory/` → written by orchestration server (project-level)
 - No cross-team file writes — each team's directory is isolated
 
@@ -2170,6 +2382,172 @@ Multi-Team Architecture (WebSocketTransport, future):
 ```
 
 This is the natural evolution of the architecture. No redesign needed — only the WebSocketTransport implementation and multi-client support in the agent server listener.
+
+## Portable Teams (Export/Import)
+
+### Motivation
+
+Persistent teams accumulate valuable expertise: codebase knowledge, learned procedures, training corrections, and specialization. This expertise should be **portable** — teams should be exportable from one Flightdeck instance and importable into another, carrying all their accumulated intelligence.
+
+Use cases:
+- **Onboarding:** Export a senior team, import on a new developer's machine to bootstrap their crew
+- **CI/CD:** Export a trained team from dev, import into a CI environment with the same expertise
+- **Backup:** Export before a major change, import to roll back
+- **Sharing:** Publish team configs for common project types (React app team, Go API team)
+
+### Export: Team → Portable Bundle
+
+```
+flightdeck team export --team alice-team --project acme-app --output ./alice-team-export
+```
+
+**What's included (persistent, portable state):**
+
+```
+alice-team-export/
+  manifest.json                     # Bundle metadata + version
+  team.json                         # Team config: teamId, name, creation date
+  agents/
+    arch-alpha.json                 # Agent identity: name, role, model, specialization
+    dev-bravo.json                  # Agent identity + config
+    qa-charlie.json
+  knowledge/
+    core.json                       # Knowledge entries (category: core)
+    procedural.json                 # Learned procedures
+    semantic.json                   # Domain facts
+    episodic.json                   # Session summaries (sanitized)
+  training/
+    corrections.json                # Training corrections with tags
+    feedback.json                   # Positive/negative feedback history
+  dag-templates/
+    default-workflow.json           # Reusable DAG patterns / workflow templates
+  identity/
+    protection-hashes.json          # Identity protection hashes (prevents impersonation)
+  config/
+    team-config.yaml                # Provider preferences, model overrides, thresholds
+```
+
+**What's EXCLUDED (ephemeral, non-portable):**
+
+| Excluded | Reason |
+|----------|--------|
+| Active sessions, PIDs | Process-specific, meaningless on another machine |
+| Socket paths, ports, tokens | Infrastructure-specific |
+| Running agent state | Can't serialize a live process |
+| File locks | Transient coordination state |
+| Message queue contents | Ephemeral delivery state |
+| Absolute file paths in cwd | Machine-specific |
+
+### Bundle Format
+
+```typescript
+interface TeamBundle {
+  version: '1.0';                    // Bundle format version
+  exportedAt: string;                // ISO 8601 timestamp
+  flightdeckVersion: string;         // Flightdeck version that created the bundle
+  team: {
+    teamId: string;
+    name: string;
+    createdAt: string;
+    config: Record<string, unknown>;
+  };
+  agents: AgentExport[];
+  knowledge: KnowledgeExport[];
+  training: TrainingExport;
+  dagTemplates: DagTemplate[];
+  identityHashes: IdentityHash[];
+}
+
+interface AgentExport {
+  name: string;                      // Human-readable name
+  role: string;                      // Architect, Developer, etc.
+  model: string;                     // Default model preference
+  specialization: string[];          // Domain tags
+  totalSessions: number;             // Experience indicator
+  totalTasks: number;
+  taskSuccessRate: number;
+  feedbackScore?: number;
+  config: Record<string, unknown>;   // Agent-specific config overrides
+}
+
+interface KnowledgeExport {
+  category: 'core' | 'episodic' | 'procedural' | 'semantic';
+  key: string;
+  content: string;
+  confidence: number;
+  tags: string[];
+  source: { mechanism: string; agentName?: string };
+}
+
+interface TrainingExport {
+  corrections: Array<{ agentName: string; correction: string; tags: string[]; date: string }>;
+  feedback: Array<{ agentName: string; type: 'positive' | 'negative'; context: string; date: string }>;
+}
+```
+
+### Import: Portable Bundle → Team
+
+```
+flightdeck team import --from ./alice-team-export --project billing-svc
+```
+
+**Import process:**
+1. **Validate bundle:** Check `version` compatibility, required fields, schema integrity
+2. **Create team:** Register new team with imported config (or merge into existing team)
+3. **Create agents:** Populate agent roster from exported identities (new agentIds, same names/roles/specialization)
+4. **Load knowledge:** Import all knowledge entries, tagged with `mechanism: 'imported'` and source bundle reference
+5. **Load training:** Import corrections and feedback history
+6. **Load DAG templates:** Make templates available for the new project
+7. **Skip identity hashes:** Regenerate from imported agent configs (hashes are machine-specific)
+
+**Conflict handling on import:**
+- **Duplicate teamId:** Prompt user: merge (combine agents + knowledge) or rename
+- **Duplicate agent names:** Auto-suffix (e.g., "Arch-Alpha" → "Arch-Alpha-2")
+- **Duplicate knowledge keys:** Keep both with different `source.mechanism` tags, let the agent reconcile during use
+
+### Selective Export
+
+```
+# Export specific agents only
+flightdeck team export --team alice-team --agents arch-alpha,dev-bravo --output ./partial
+
+# Export knowledge only (no agents)
+flightdeck team export --team alice-team --knowledge-only --output ./knowledge-dump
+
+# Export without episodic knowledge (session-specific, less portable)
+flightdeck team export --team alice-team --exclude-episodic --output ./portable
+```
+
+### .flightdeck/ as Portable Format
+
+The filesystem mirror (`~/.flightdeck/projects/<id>/teams/<team-id>/`) is **structurally similar** to the export format. Could the existing filesystem mirror BE the portable format?
+
+**Partially yes:** The `agents/`, `knowledge/`, and `dag/` directories already contain the right data in JSON format. But:
+- The filesystem mirror includes **ephemeral state** (active sessions, running status) that shouldn't be exported
+- It lacks the **manifest** with version info and export metadata
+- It doesn't include **training history** (stored in separate DB tables, not mirrored to filesystem)
+
+**Recommendation:** The export command reads from the filesystem mirror + DB, filters out ephemeral state, adds the manifest, and produces the bundle. The import command reverses this. The filesystem mirror is a *source* for export, not the export format itself.
+
+### Version Compatibility
+
+```typescript
+// On import, validate bundle version against current Flightdeck
+function validateBundleVersion(bundle: TeamBundle): ValidationResult {
+  const current = parseVersion(FLIGHTDECK_VERSION);
+  const bundleVersion = bundle.version;
+
+  // Semantic: same major = compatible, different major = breaking
+  if (bundleVersion === '1.0') {
+    return { compatible: true };
+  }
+  return {
+    compatible: false,
+    reason: `Bundle version ${bundleVersion} is not compatible with current Flightdeck`,
+    suggestion: 'Upgrade Flightdeck or re-export from a compatible version',
+  };
+}
+```
 
 ## Migration from Daemon Code
 
