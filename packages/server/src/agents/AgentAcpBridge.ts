@@ -1,13 +1,10 @@
 /**
  * ACP connection management for Agent — extracted from Agent.ts to reduce file size.
- * Handles startAcp(), wireAcpEvents(), and ensureSharedWorkspace().
+ * Handles startAgent(), wireAcpEvents(), and ensureSharedWorkspace().
  */
 import { mkdirSync, existsSync, renameSync } from 'fs';
 import { join } from 'path';
-import { AcpAdapter } from '../adapters/AcpAdapter.js';
-import { getPreset } from '../adapters/presets.js';
-import { resolveModel } from '../adapters/ModelResolver.js';
-import type { ProviderId } from '../adapters/presets.js';
+import { createAdapterForProvider, buildStartOptions } from '../adapters/AdapterFactory.js';
 import type { AgentAdapter, ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -40,56 +37,64 @@ export function ensureSharedWorkspace(agent: Agent): void {
 }
 
 /**
- * Create and start an ACP connection for the agent.
+ * Create and start an adapter connection for the agent.
+ * Uses the unified AdapterFactory to pick the right backend (ACP or Claude SDK).
  * Wires all protocol events to the agent's state and listener arrays.
  */
 export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: string): void {
-  const conn = new AcpAdapter({ autopilot: agent.autopilot });
-  agent._setAcpConnection(conn);
-  agent.status = 'running';
-  wireAcpEvents(agent, conn);
-
-  // Resolve provider preset for CLI-specific spawn args
-  const providerId = (config.provider || 'copilot') as ProviderId;
-  const preset = getPreset(providerId);
-
-  // Resolve model through cross-CLI model resolver
   const rawModel = agent.model || agent.role.model;
-  const resolution = resolveModel(rawModel, providerId);
 
-  if (resolution?.translated && resolution.reason) {
-    logger.info({
-      module: 'agents',
-      msg: `Model resolved for ${agent.role.id}: ${resolution.reason}`,
+  const { adapter: conn, backend, fallback, fallbackReason } = createAdapterForProvider({
+    provider: config.provider || 'copilot',
+    sdkMode: config.sdkMode,
+    autopilot: agent.autopilot,
+    model: rawModel,
+    binaryOverride: config.providerBinaryOverride,
+    argsOverride: config.providerArgsOverride,
+    envOverride: config.providerEnvOverride,
+    cliArgs: config.cliArgs,
+    cliCommand: config.cliCommand,
+  });
+
+  if (fallback) {
+    logger.warn({
+      module: 'agent-bridge',
+      msg: `SDK fallback for ${agent.role.id}: ${fallbackReason}`,
       agentId: agent.id,
     });
   }
 
-  // Apply config overrides (binaryOverride, argsOverride, envOverride)
-  const binary = config.providerBinaryOverride || preset?.binary || config.cliCommand;
-  const baseArgs = config.providerArgsOverride || preset?.args;
+  logger.info({
+    module: 'agent-bridge',
+    msg: `Starting agent with ${backend} backend`,
+    agentId: agent.id,
+    role: agent.role.id,
+    provider: config.provider,
+  });
 
-  // Merge env: config overrides take precedence, filter out empty/falsy values
-  const rawEnv = { ...preset?.env, ...config.providerEnvOverride };
-  const env = Object.fromEntries(
-    Object.entries(rawEnv).filter(([, v]) => v),
+  agent._setAcpConnection(conn);
+  agent.status = 'running';
+  wireAcpEvents(agent, conn);
+
+  const startOpts = buildStartOptions(
+    {
+      provider: config.provider || 'copilot',
+      sdkMode: config.sdkMode,
+      model: rawModel,
+      binaryOverride: config.providerBinaryOverride,
+      argsOverride: config.providerArgsOverride,
+      envOverride: config.providerEnvOverride,
+      cliArgs: config.cliArgs,
+      cliCommand: config.cliCommand,
+    },
+    {
+      cwd: agent.cwd || process.cwd(),
+      sessionId: agent.resumeSessionId,
+      agentFlag: agentFlagForRole(agent.role.id),
+    },
   );
 
-  const cliArgs = [
-    ...config.cliArgs,
-    `--agent=${agentFlagForRole(agent.role.id)}`,
-    ...(resolution ? ['--model', resolution.model] : []),
-    ...(agent.resumeSessionId ? ['--resume', agent.resumeSessionId] : []),
-  ];
-
-  conn.start({
-    cliCommand: binary,
-    baseArgs,
-    cliArgs,
-    cwd: agent.cwd || process.cwd(),
-    env: Object.keys(env).length > 0 ? env : undefined,
-    sessionId: agent.resumeSessionId,
-  }).then((sessionId) => {
+  conn.start(startOpts).then((sessionId) => {
     agent.sessionId = sessionId;
     agent._notifySessionReady(sessionId);
     if (initialPrompt) {
@@ -97,7 +102,7 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
     }
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
-    logger.error({ module: 'acp', msg: 'ACP start failed', err: errorMsg, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
+    logger.error({ module: 'agent-bridge', msg: 'Adapter start failed', err: errorMsg, backend, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
 
     // Store error for exit event (text pipeline is buffered, races with immediate exit)
     agent.exitError = errorMsg;

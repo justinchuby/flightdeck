@@ -36,6 +36,17 @@ export type {
   CanUseToolCallback,
 } from './claude-sdk-types.js';
 export {
+  createAdapterForProvider,
+  buildStartOptions,
+  resolveBackend,
+} from './AdapterFactory.js';
+export type {
+  AdapterConfig,
+  AdapterResult,
+  BackendType,
+} from './AdapterFactory.js';
+
+export {
   PROVIDER_PRESETS,
   getPreset,
   listPresets,

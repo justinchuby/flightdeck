@@ -11,6 +11,8 @@ export interface ServerConfig {
   cliArgs: string[];
   /** Provider ID for the CLI adapter (e.g., 'copilot', 'gemini', 'claude') */
   provider: string;
+  /** Use in-process SDK instead of ACP subprocess (Claude only, default: false) */
+  sdkMode: boolean;
   /** Override the preset binary (from config YAML provider.binaryOverride) */
   providerBinaryOverride?: string;
   /** Override the preset args (from config YAML provider.argsOverride) */
@@ -54,6 +56,7 @@ const defaults: ServerConfig = {
   port: parseInt(process.env.PORT || '3001', 10),
   host: process.env.HOST || '127.0.0.1',
   provider: process.env.CLI_PROVIDER || 'copilot',
+  sdkMode: process.env.SDK_MODE === 'true',
   cliCommand: process.env.COPILOT_CLI_PATH || 'copilot',
   cliArgs: [],
   maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '50', 10),

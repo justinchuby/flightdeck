@@ -53,6 +53,8 @@ const VALID_PROVIDERS = ['copilot', 'gemini', 'opencode', 'cursor', 'codex', 'cl
 
 const providerSchema = z.object({
   id: z.enum(VALID_PROVIDERS).default('copilot'),
+  /** Use in-process SDK instead of ACP subprocess (Claude only, default: false) */
+  sdkMode: z.boolean().default(false),
   /** Override the preset's default binary path */
   binaryOverride: z.string().optional(),
   /** Override the preset's default spawn args */

@@ -67,6 +67,7 @@ budget:
 
 provider:
   id: copilot                         # 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude'
+  # sdkMode: false                    # true = use in-process SDK (Claude only), false = ACP subprocess
   # binaryOverride: /usr/local/bin/copilot  # Override binary path (optional)
   # argsOverride: ['--acp', '--stdio']      # Override spawn args (optional)
   # envOverride:                             # Extra env vars (optional)

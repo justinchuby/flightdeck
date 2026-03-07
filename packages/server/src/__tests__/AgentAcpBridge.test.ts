@@ -16,18 +16,35 @@ vi.mock('../agents/agentFiles.js', () => ({
   agentFlagForRole: (roleId: string) => roleId,
 }));
 
-// ── Mock AcpAdapter ───────────────────────────────────────────
+// ── Mock AdapterFactory ───────────────────────────────────────
 const mockStart = vi.fn();
 const mockOn = vi.fn();
 
-vi.mock('../adapters/AcpAdapter.js', () => {
-  return {
-    AcpAdapter: class MockAcpAdapter {
-      start = mockStart;
-      on = mockOn;
-    },
-  };
-});
+const mockAdapter = {
+  start: mockStart,
+  on: mockOn,
+  type: 'acp',
+};
+
+vi.mock('../adapters/AdapterFactory.js', () => ({
+  createAdapterForProvider: vi.fn(() => ({
+    adapter: mockAdapter,
+    backend: 'acp',
+    fallback: false,
+  })),
+  buildStartOptions: vi.fn((config: any, agentOpts: any) => ({
+    cliCommand: config.binaryOverride || config.cliCommand || 'copilot',
+    cliArgs: [
+      ...(config.cliArgs ?? []),
+      ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
+      ...(config.model ? ['--model', config.model] : []),
+      ...(agentOpts.sessionId ? ['--resume', agentOpts.sessionId] : []),
+    ],
+    cwd: agentOpts.cwd ?? process.cwd(),
+    sessionId: agentOpts.sessionId,
+    model: config.model,
+  })),
+}));
 
 // Import AFTER mocking
 import { startAcp } from '../agents/AgentAcpBridge.js';
@@ -59,6 +76,7 @@ const fakeConfig: ServerConfig = {
   cliCommand: 'copilot',
   cliArgs: [],
   provider: 'copilot',
+  sdkMode: false,
   maxConcurrentAgents: 50,
   dbPath: './test.db',
 };
@@ -87,8 +105,8 @@ describe('AgentAcpBridge — startAcp', () => {
     // The error should be logged with details, NOT swallowed
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        module: 'acp',
-        msg: 'ACP start failed',
+        module: 'agent-bridge',
+        msg: 'Adapter start failed',
         cliCommand: 'copilot',
         cwd: '/test/project',
         role: 'lead',
@@ -97,7 +115,7 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // Verify the actual error message is included in the log
     const errorCall = (logger.error as any).mock.calls.find(
-      (call: any[]) => call[0]?.msg === 'ACP start failed',
+      (call: any[]) => call[0]?.msg === 'Adapter start failed',
     );
     expect(errorCall[0].err).toContain('not found in PATH');
   });
@@ -128,8 +146,8 @@ describe('AgentAcpBridge — startAcp', () => {
     // Should not throw, should still log something
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        module: 'acp',
-        msg: 'ACP start failed',
+        module: 'agent-bridge',
+        msg: 'Adapter start failed',
       }),
     );
   });
@@ -146,8 +164,8 @@ describe('AgentAcpBridge — startAcp', () => {
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        module: 'acp',
-        msg: 'ACP start failed',
+        module: 'agent-bridge',
+        msg: 'Adapter start failed',
         err: 'timeout',
       }),
     );
