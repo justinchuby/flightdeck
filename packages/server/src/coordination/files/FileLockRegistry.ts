@@ -92,6 +92,7 @@ export class FileLockRegistry extends EventEmitter {
     // Wrap read-check-write in a transaction to prevent race conditions
     // where two agents could both read "no conflict" then both write.
     let result: { ok: boolean; holder?: string } = { ok: false };
+    let isRefresh = false;
 
     this.db.drizzle.transaction((tx) => {
       const activeLocks = tx
@@ -109,6 +110,7 @@ export class FileLockRegistry extends EventEmitter {
             .set({ expiresAt, reason, projectId })
             .where(eq(fileLocks.filePath, filePath))
             .run();
+          isRefresh = true;
           result = { ok: true };
           return;
         }
@@ -130,7 +132,7 @@ export class FileLockRegistry extends EventEmitter {
       result = { ok: true };
     });
 
-    if (result.ok) {
+    if (result.ok && !isRefresh) {
       this.emit('lock:acquired', { filePath, agentId, agentRole, reason, projectId });
     }
     return result;
