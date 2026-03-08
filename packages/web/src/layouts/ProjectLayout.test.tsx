@@ -24,6 +24,13 @@ vi.mock('../stores/appStore', () => ({
   useAppStore: () => [],
 }));
 
+vi.mock('../stores/leadStore', () => ({
+  useLeadStore: Object.assign(
+    () => null,
+    { getState: () => ({ selectedLeadId: null, addProject: vi.fn(), selectLead: vi.fn() }) },
+  ),
+}));
+
 vi.mock('../hooks/useProjects', () => ({
   useProjects: () => ({ projects: [], loading: false }),
 }));
@@ -115,10 +122,10 @@ describe('ProjectLayout', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-123/tasks');
   });
 
-  it('navigates to project root on overview tab click', () => {
+  it('navigates to overview tab on overview tab click', () => {
     renderLayout('/projects/proj-123/tasks');
     fireEvent.click(screen.getByTestId('tab-overview'));
-    expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-123');
+    expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-123/overview');
   });
 
   it('renders overflow menu button', () => {

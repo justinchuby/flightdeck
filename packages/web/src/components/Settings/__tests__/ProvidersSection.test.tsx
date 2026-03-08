@@ -16,62 +16,50 @@ const MOCK_PROVIDERS = [
   {
     id: 'copilot',
     name: 'GitHub Copilot',
-    status: 'configured',
-    maskedKey: null,
-    requiredEnvVars: [],
-    binary: 'copilot',
-    defaultModel: null,
-    supportsResume: true,
+    installed: true,
+    authenticated: true,
+    enabled: true,
+    binaryPath: '/usr/bin/copilot',
   },
   {
     id: 'claude',
     name: 'Claude Code',
-    status: 'configured',
-    maskedKey: 'sk-ant-a****',
-    requiredEnvVars: ['ANTHROPIC_API_KEY'],
-    binary: 'claude',
-    defaultModel: 'claude-sonnet-4',
-    supportsResume: true,
+    installed: true,
+    authenticated: true,
+    enabled: true,
+    binaryPath: '/usr/bin/claude',
   },
   {
     id: 'gemini',
     name: 'Google Gemini CLI',
-    status: 'not-configured',
-    maskedKey: null,
-    requiredEnvVars: ['GEMINI_API_KEY'],
-    binary: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
-    supportsResume: false,
+    installed: false,
+    authenticated: null,
+    enabled: true,
+    binaryPath: null,
   },
   {
     id: 'opencode',
     name: 'OpenCode',
-    status: 'configured',
-    maskedKey: null,
-    requiredEnvVars: [],
-    binary: 'opencode',
-    defaultModel: null,
-    supportsResume: false,
+    installed: false,
+    authenticated: null,
+    enabled: true,
+    binaryPath: null,
   },
   {
     id: 'cursor',
     name: 'Cursor',
-    status: 'not-configured',
-    maskedKey: null,
-    requiredEnvVars: ['CURSOR_API_KEY'],
-    binary: 'agent',
-    defaultModel: null,
-    supportsResume: true,
+    installed: false,
+    authenticated: null,
+    enabled: false,
+    binaryPath: null,
   },
   {
     id: 'codex',
     name: 'Codex CLI',
-    status: 'configured',
-    maskedKey: 'sk-proj-****',
-    requiredEnvVars: ['OPENAI_API_KEY'],
-    binary: 'codex',
-    defaultModel: 'gpt-5',
-    supportsResume: false,
+    installed: true,
+    authenticated: false,
+    enabled: true,
+    binaryPath: '/usr/bin/codex',
   },
 ];
 
@@ -102,67 +90,101 @@ describe('ProvidersSection', () => {
     expect(screen.getByText('Codex CLI')).toBeInTheDocument();
   });
 
-  it('shows configured count', async () => {
+  it('shows installed count', async () => {
     mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
     render(<ProvidersSection />);
     await waitFor(() => {
-      expect(screen.getByText('4/6 configured')).toBeInTheDocument();
+      expect(screen.getByText('3/6 installed')).toBeInTheDocument();
     });
   });
 
-  it('shows masked key for configured providers', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
-    render(<ProvidersSection />);
-    await waitFor(() => {
-      expect(screen.getByText('sk-ant-a****')).toBeInTheDocument();
-    });
-  });
-
-  it('shows env var instruction for unconfigured providers', async () => {
+  it('shows "Ready" badge for installed+authenticated providers', async () => {
     mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
-    // Gemini is not configured — should show its env var
-    expect(screen.getByText((content) => content.includes('GEMINI_API_KEY'))).toBeInTheDocument();
+    // Copilot and Claude are installed+authenticated → "Ready"
+    const readyBadges = screen.getAllByText('Ready');
+    expect(readyBadges.length).toBe(2);
   });
 
-  it('expands a card to show details on click', async () => {
+  it('shows "Not installed" for missing providers', async () => {
     mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
-    // Click Claude card header
+    const notInstalled = screen.getAllByText('Not installed');
+    expect(notInstalled.length).toBe(3); // gemini, opencode, cursor
+  });
+
+  it('shows "Not authenticated" for installed but unauthed providers', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Not authenticated')).toBeInTheDocument(); // codex
+  });
+
+  it('has enable/disable toggles for each provider', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('toggle-copilot')).toBeInTheDocument();
+    expect(screen.getByTestId('toggle-cursor')).toBeInTheDocument();
+  });
+
+  it('calls API when toggling a provider', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    mockApiFetch.mockResolvedValue({ ...MOCK_PROVIDERS[0], enabled: false });
+    fireEvent.click(screen.getByTestId('toggle-copilot'));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/settings/providers/copilot',
+        expect.objectContaining({ method: 'PUT' }),
+      );
+    });
+  });
+
+  it('expands a card and shows test connection button', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    // Expand Claude card
     const claudeCard = screen.getByTestId('provider-card-claude');
     fireEvent.click(claudeCard.querySelector('[role="button"]')!);
-    // Should now show details
-    expect(screen.getByText('claude')).toBeInTheDocument(); // binary name
     expect(screen.getByTestId('test-connection-claude')).toBeInTheDocument();
   });
 
   it('shows test connection result on click', async () => {
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_PROVIDERS) // initial load
-      .mockResolvedValueOnce({ success: true, message: 'Provider reachable', latency: 42 }); // test
+      .mockResolvedValueOnce(MOCK_PROVIDERS)
+      .mockResolvedValueOnce({ success: true, message: 'Provider is installed and responsive' });
 
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
 
-    // Expand Claude card
+    // Expand and test
     const claudeCard = screen.getByTestId('provider-card-claude');
     fireEvent.click(claudeCard.querySelector('[role="button"]')!);
-
-    // Click test connection
     fireEvent.click(screen.getByTestId('test-connection-claude'));
 
     await waitFor(() => {
       expect(screen.getByTestId('test-result-claude')).toBeInTheDocument();
     });
-    expect(screen.getByText(/Provider reachable/)).toBeInTheDocument();
+    expect(screen.getByText(/installed and responsive/)).toBeInTheDocument();
   });
 
   it('shows error state when API fails', async () => {
@@ -174,18 +196,16 @@ describe('ProvidersSection', () => {
     expect(screen.getByText(/Network error/)).toBeInTheDocument();
   });
 
-  it('never displays full API keys in the DOM', async () => {
+  it('does not render API key fields anywhere in the DOM', async () => {
     mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
     const { container } = render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
     const html = container.innerHTML;
-    // Ensure no full key patterns appear
-    expect(html).not.toContain('sk-ant-api03');
-    expect(html).not.toContain('sk-proj-real');
-    // Masked keys should be present
-    expect(html).toContain('sk-ant-a****');
-    expect(html).toContain('sk-proj-****');
+    expect(html).not.toContain('maskedKey');
+    expect(html).not.toContain('apiKey');
+    expect(html).not.toContain('API_KEY');
+    expect(html).not.toContain('requiredEnvVars');
   });
 });

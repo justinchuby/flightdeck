@@ -1,175 +1,92 @@
 /**
- * Settings routes — provider configuration and status.
+ * Settings routes — provider availability and configuration.
  *
- * Security: API keys are NEVER sent to the browser. Only masked previews
- * (first 8 chars) are returned. Keys live in env vars, not the database.
+ * Providers manage their own authentication. We only detect:
+ * 1. Is the CLI binary installed on PATH?
+ * 2. Is the provider authenticated/responsive? (quick health check)
+ * 3. Model preferences and enable/disable toggles.
+ *
+ * NO API keys are managed, stored, or displayed.
  */
 import { Router } from 'express';
-import { PROVIDER_PRESETS, isValidProviderId, listPresets } from '../adapters/presets.js';
-import type { ProviderId, ProviderPreset } from '../adapters/presets.js';
+import { isValidProviderId } from '../adapters/presets.js';
+import type { ProviderId } from '../adapters/presets.js';
+import { ProviderManager } from '../providers/ProviderManager.js';
 import type { AppContext } from './context.js';
-
-// ── Types ───────────────────────────────────────────────────────────
-
-export type ProviderStatus = 'configured' | 'not-configured' | 'error';
-
-export interface ProviderInfo {
-  id: ProviderId;
-  name: string;
-  status: ProviderStatus;
-  /** Masked key preview, e.g. "sk-ant-a...****". Null if not configured. */
-  maskedKey: string | null;
-  /** Which env var(s) this provider needs */
-  requiredEnvVars: string[];
-  /** Whether the CLI binary was specified (for Copilot which uses OAuth) */
-  binary: string;
-  defaultModel: string | null;
-  supportsResume: boolean;
-}
-
-export interface ConnectionTestResult {
-  success: boolean;
-  message: string;
-  /** Time in ms */
-  latency?: number;
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────
-
-/**
- * Mask an API key for safe display. Shows first 8 chars + "****".
- * Returns null for undefined/empty keys.
- */
-export function maskApiKey(key: string | undefined): string | null {
-  if (!key || key.length === 0) return null;
-  const visible = Math.min(8, key.length);
-  return key.slice(0, visible) + '****';
-}
-
-/**
- * Detect provider status by checking if required env vars are set.
- */
-export function detectProviderStatus(preset: ProviderPreset): ProviderStatus {
-  const envVars = preset.requiredEnvVars ?? [];
-  if (envVars.length === 0) {
-    // Providers without required env vars (e.g., Copilot uses OAuth)
-    return 'configured';
-  }
-  const allSet = envVars.every((v) => {
-    const val = process.env[v];
-    return val !== undefined && val.length > 0;
-  });
-  return allSet ? 'configured' : 'not-configured';
-}
-
-/**
- * Build the ProviderInfo for a single preset.
- */
-function buildProviderInfo(preset: ProviderPreset): ProviderInfo {
-  const status = detectProviderStatus(preset);
-  const envVars = preset.requiredEnvVars ?? [];
-  const firstKey = envVars.length > 0 ? process.env[envVars[0]] : undefined;
-
-  return {
-    id: preset.id as ProviderId,
-    name: preset.name,
-    status,
-    maskedKey: status === 'configured' ? maskApiKey(firstKey) : null,
-    requiredEnvVars: envVars,
-    binary: preset.binary,
-    defaultModel: preset.defaultModel ?? null,
-    supportsResume: preset.supportsResume ?? false,
-  };
-}
-
-/**
- * Test connection to a provider by checking if the CLI binary is accessible.
- * A real implementation would make a minimal API call; for now we verify
- * env vars are set and the binary resolves.
- */
-async function testProviderConnection(preset: ProviderPreset): Promise<ConnectionTestResult> {
-  const start = Date.now();
-
-  // Check env vars first
-  const envVars = preset.requiredEnvVars ?? [];
-  for (const envVar of envVars) {
-    const val = process.env[envVar];
-    if (!val || val.length === 0) {
-      return {
-        success: false,
-        message: `Missing environment variable: ${envVar}`,
-        latency: Date.now() - start,
-      };
-    }
-  }
-
-  // Check binary availability
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const execFileAsync = promisify(execFile);
-  const checkCmd = process.platform === 'win32' ? 'where' : 'which';
-
-  try {
-    await execFileAsync(checkCmd, [preset.binary], { timeout: 5000 });
-  } catch {
-    return {
-      success: false,
-      message: `CLI binary "${preset.binary}" not found on PATH`,
-      latency: Date.now() - start,
-    };
-  }
-
-  return {
-    success: true,
-    message: `Provider "${preset.name}" is reachable (binary found, env vars set)`,
-    latency: Date.now() - start,
-  };
-}
 
 // ── Routes ──────────────────────────────────────────────────────────
 
-export function settingsRoutes(_ctx: AppContext): Router {
+export function settingsRoutes(ctx: AppContext): Router {
   const router = Router();
+  const pm = new ProviderManager({ db: ctx.db });
 
   /**
-   * GET /settings/providers — list all providers with status.
+   * GET /settings/providers — list all providers with installed/auth status.
    */
   router.get('/settings/providers', (_req, res) => {
-    const providers = listPresets().map(buildProviderInfo);
-    res.json(providers);
+    const statuses = pm.getAllProviderStatuses();
+    res.json(statuses);
   });
 
   /**
-   * GET /settings/providers/:provider — get single provider details.
+   * GET /settings/providers/:provider — single provider status + model prefs.
    */
   router.get('/settings/providers/:provider', (req, res) => {
     const { provider } = req.params;
     if (!isValidProviderId(provider)) {
       return res.status(404).json({ error: `Unknown provider: ${provider}` });
     }
-    const preset = PROVIDER_PRESETS[provider];
-    res.json(buildProviderInfo(preset));
+    const status = pm.getProviderStatus(provider);
+    const modelPrefs = pm.getModelPreferences(provider);
+    res.json({ ...status, modelPreferences: modelPrefs });
   });
 
   /**
-   * POST /settings/providers/:provider/test — test provider connection.
+   * POST /settings/providers/:provider/test — run connection/auth health check.
    */
-  router.post('/settings/providers/:provider/test', async (req, res) => {
+  router.post('/settings/providers/:provider/test', (req, res) => {
     const { provider } = req.params;
     if (!isValidProviderId(provider)) {
       return res.status(404).json({ error: `Unknown provider: ${provider}` });
     }
-    const preset = PROVIDER_PRESETS[provider];
-    try {
-      const result = await testProviderConnection(preset);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({
-        success: false,
-        message: `Connection test failed: ${err.message}`,
-      });
+    const { installed } = pm.detectInstalled(provider);
+    if (!installed) {
+      return res.json({ success: false, message: `CLI binary not found on PATH` });
     }
+    const auth = pm.checkAuthenticated(provider);
+    res.json({
+      success: auth.authenticated,
+      message: auth.authenticated
+        ? 'Provider is installed and responsive'
+        : `Auth check failed: ${auth.error ?? 'unknown error'}`,
+    });
+  });
+
+  /**
+   * PUT /settings/providers/:provider — update provider config (enabled, model prefs).
+   */
+  router.put('/settings/providers/:provider', (req, res) => {
+    const { provider } = req.params;
+    if (!isValidProviderId(provider)) {
+      return res.status(404).json({ error: `Unknown provider: ${provider}` });
+    }
+    const { enabled, modelPreferences } = req.body as {
+      enabled?: boolean;
+      modelPreferences?: { defaultModel?: string; preferredModels?: string[] };
+    };
+
+    if (enabled !== undefined) {
+      pm.setProviderEnabled(provider, enabled);
+    }
+    if (modelPreferences) {
+      pm.setModelPreferences(provider, modelPreferences);
+    }
+
+    const status = pm.getProviderStatus(provider);
+    const prefs = pm.getModelPreferences(provider);
+    res.json({ ...status, modelPreferences: prefs });
   });
 
   return router;
 }
+

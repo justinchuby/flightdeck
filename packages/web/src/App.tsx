@@ -17,7 +17,7 @@ import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
-import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
@@ -31,16 +31,15 @@ import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
+import { ProjectLayout } from './layouts/ProjectLayout';
 
 // Lazy-loaded route components (~40-50% initial bundle reduction)
-const AgentDashboard = lazy(() => import('./components/AgentDashboard/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
 const TaskQueuePanel = lazy(() => import('./components/TaskQueue/TaskQueuePanel').then(m => ({ default: m.TaskQueuePanel })));
 const SettingsPanel = lazy(() => import('./components/Settings/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
 const OrgChart = lazy(() => import('./components/OrgChart/OrgChart').then(m => ({ default: m.OrgChart })));
 const OverviewPage = lazy(() => import('./components/OverviewPage/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m => ({ default: m.GroupChat })));
 const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
-const MissionControlPage = lazy(() => import('./components/MissionControl').then(m => ({ default: m.MissionControlPage })));
 const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
@@ -55,6 +54,57 @@ function RouteSpinner() {
       <div className="w-6 h-6 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
     </div>
   );
+}
+
+/**
+ * Redirects from old flat routes to project-scoped routes.
+ * Resolves the active project ID from leadStore + live agents.
+ */
+function ProjectRedirect({ page }: { page: string }) {
+  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const agents = useAppStore((s) => s.agents);
+
+  const projectId = useMemo(() => {
+    if (!selectedLeadId) {
+      // Fall back to first live lead's projectId
+      const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
+      return firstLead?.projectId ?? firstLead?.id ?? null;
+    }
+    // If selectedLeadId is a project: prefix, extract the ID
+    if (selectedLeadId.startsWith('project:')) {
+      return selectedLeadId.slice('project:'.length);
+    }
+    // Otherwise it's a lead agent ID — find its projectId
+    const lead = agents.find((a) => a.id === selectedLeadId);
+    return lead?.projectId ?? selectedLeadId;
+  }, [selectedLeadId, agents]);
+
+  if (!projectId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/projects/${projectId}/${page}`} replace />;
+}
+
+/**
+ * Home route: redirect to active project's session or projects list.
+ */
+function HomeRedirect() {
+  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const agents = useAppStore((s) => s.agents);
+
+  const projectId = useMemo(() => {
+    if (selectedLeadId) {
+      if (selectedLeadId.startsWith('project:')) {
+        return selectedLeadId.slice('project:'.length);
+      }
+      const lead = agents.find((a) => a.id === selectedLeadId);
+      return lead?.projectId ?? selectedLeadId;
+    }
+    // Fall back to first live lead
+    const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
+    return firstLead?.projectId ?? firstLead?.id ?? null;
+  }, [selectedLeadId, agents]);
+
+  if (!projectId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/projects/${projectId}/session`} replace />;
 }
 
 export function App() {
@@ -265,24 +315,44 @@ export function App() {
           <ErrorBoundary>
           <Suspense fallback={<RouteSpinner />}>
           <Routes>
-            <Route path="/" element={<LeadDashboard api={api} ws={ws} />} />
-            <Route path="/lead" element={<Navigate to="/" replace />} />
-            <Route path="/agents" element={<AgentDashboard api={api} ws={ws} />} />
-            <Route path="/overview" element={<OverviewPage api={api} ws={ws} />} />
-            <Route path="/groups" element={<GroupChat api={api} ws={ws} />} />
-            <Route path="/org" element={<OrgChart api={api} ws={ws} />} />
-            <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
-            <Route path="/settings" element={<SettingsPanel api={api} />} />
-            <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
-            <Route path="/timeline" element={<TimelinePage api={api} ws={ws} />} />
-            <Route path="/mission-control" element={<MissionControlPage />} />
-            <Route path="/canvas" element={<CanvasPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
+            {/* ── Project-scoped nested routes ─────────────────── */}
+            <Route path="/projects/:id" element={<ProjectLayout />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<OverviewPage api={api} ws={ws} />} />
+              <Route path="session" element={<LeadDashboard api={api} ws={ws} />} />
+              <Route path="tasks" element={<TaskQueuePanel api={api} />} />
+              <Route path="agents" element={<TeamPage />} />
+              <Route path="knowledge" element={<KnowledgePanel />} />
+              <Route path="timeline" element={<TimelinePage api={api} ws={ws} />} />
+              <Route path="groups" element={<GroupChat api={api} ws={ws} />} />
+              <Route path="org-chart" element={<OrgChart api={api} ws={ws} />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="canvas" element={<CanvasPage />} />
+            </Route>
+
+            {/* ── Global (non-project-scoped) routes ───────────── */}
             <Route path="/projects" element={<ProjectsPanel />} />
-            <Route path="/knowledge" element={<KnowledgePanel />} />
+            <Route path="/settings" element={<SettingsPanel api={api} />} />
             <Route path="/agent-server" element={<AgentServerPanel />} />
-            <Route path="/team" element={<TeamPage />} />
             <Route path="/shared/:token" element={<SharedReplayViewer />} />
+
+            {/* ── Backward-compat redirects from old flat routes ─ */}
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/lead" element={<ProjectRedirect page="session" />} />
+            <Route path="/overview" element={<ProjectRedirect page="overview" />} />
+            <Route path="/agents" element={<ProjectRedirect page="agents" />} />
+            <Route path="/team" element={<ProjectRedirect page="agents" />} />
+            <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
+            <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
+            <Route path="/timeline" element={<ProjectRedirect page="timeline" />} />
+            <Route path="/groups" element={<ProjectRedirect page="groups" />} />
+            <Route path="/org" element={<ProjectRedirect page="org-chart" />} />
+            <Route path="/analytics" element={<ProjectRedirect page="analytics" />} />
+            <Route path="/canvas" element={<ProjectRedirect page="canvas" />} />
+            <Route path="/mission-control" element={<ProjectRedirect page="overview" />} />
+            <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
+
+            {/* ── Catch-all ─────────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>

@@ -3,6 +3,8 @@ import { X, Info, ListChecks, MessageSquare, BarChart3, GitBranch } from 'lucide
 import { useFocusAgent } from '../../hooks/useFocusAgent';
 import { DiffPreview } from '../DiffPreview';
 import { EmptyState, SkeletonCard } from '../Shared';
+import { Tabs } from '../ui/Tabs';
+import type { TabItem } from '../ui/Tabs';
 
 /** Safely convert any API value to a human-readable string */
 function safeText(val: unknown): string {
@@ -31,12 +33,12 @@ interface FocusPanelProps {
 
 type Tab = 'overview' | 'tasks' | 'messages' | 'metrics' | 'diff';
 
-const TABS: { id: Tab; icon: typeof Info; label: string }[] = [
-  { id: 'overview', icon: Info, label: 'Overview' },
-  { id: 'tasks', icon: ListChecks, label: 'Tasks' },
-  { id: 'messages', icon: MessageSquare, label: 'Messages' },
-  { id: 'metrics', icon: BarChart3, label: 'Metrics' },
-  { id: 'diff', icon: GitBranch, label: 'Diff' },
+const TABS: TabItem[] = [
+  { id: 'overview', label: 'Overview', icon: <Info size={12} /> },
+  { id: 'tasks', label: 'Tasks', icon: <ListChecks size={12} /> },
+  { id: 'messages', label: 'Messages', icon: <MessageSquare size={12} /> },
+  { id: 'metrics', label: 'Metrics', icon: <BarChart3 size={12} /> },
+  { id: 'diff', label: 'Diff', icon: <GitBranch size={12} /> },
 ];
 
 export function FocusPanel({ agentId, onClose }: FocusPanelProps) {
@@ -77,22 +79,13 @@ export function FocusPanel({ agentId, onClose }: FocusPanelProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-th-border shrink-0">
-        {TABS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1 px-3 py-2 text-[11px] transition-colors border-b-2 ${
-              activeTab === id
-                ? 'border-accent text-accent'
-                : 'border-transparent text-th-text-muted hover:text-th-text'
-            }`}
-          >
-            <Icon size={12} />
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as Tab)}
+        size="sm"
+        className="shrink-0"
+      />
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">

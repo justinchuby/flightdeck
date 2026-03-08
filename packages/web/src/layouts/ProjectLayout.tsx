@@ -24,6 +24,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
+import { useLeadStore } from '../stores/leadStore';
 import { useProjects } from '../hooks/useProjects';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Tabs, type TabItem } from '../components/ui/Tabs';
@@ -149,6 +150,28 @@ export function ProjectLayout() {
 
   useEffect(() => { fetchDetails(); }, [fetchDetails]);
 
+  // Sync URL project ID → leadStore.selectedLeadId so child components
+  // (LeadDashboard, TaskQueuePanel, etc.) pick up the correct project
+  useEffect(() => {
+    if (!id) return;
+    const store = useLeadStore.getState();
+
+    // Find matching leadStore key: either a lead agent ID with this projectId,
+    // or the `project:${id}` key for persisted projects
+    const lead = agents.find(
+      (a) => a.role?.id === 'lead' && !a.parentId && (a.projectId === id || a.id === id),
+    );
+    const storeKey = lead?.id ?? `project:${id}`;
+
+    // Ensure the project exists in the store
+    store.addProject(storeKey);
+
+    // Select it if not already selected
+    if (store.selectedLeadId !== storeKey) {
+      store.selectLead(storeKey);
+    }
+  }, [id, agents]);
+
   // Close overflow on outside click
   useEffect(() => {
     if (!overflowOpen) return;
@@ -163,8 +186,7 @@ export function ProjectLayout() {
 
   // Navigation
   const handleTabChange = (tabId: string) => {
-    const base = `/projects/${id}`;
-    navigate(tabId === 'overview' ? base : `${base}/${tabId}`);
+    navigate(`/projects/${id}/${tabId}`);
   };
 
   const handleOverflowSelect = (itemId: string) => {
