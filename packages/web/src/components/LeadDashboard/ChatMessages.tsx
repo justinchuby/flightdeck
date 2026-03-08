@@ -4,7 +4,7 @@ import { MentionText, MarkdownContent } from '../../utils/markdown';
 import { CollapsibleReasoningBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
 import { PromptNav, hasUserMention } from '../PromptNav';
 import { useAppStore } from '../../stores/appStore';
-import type { AcpTextChunk } from '../../types';
+import type { AcpTextChunk, AgentInfo } from '../../types';
 
 export interface CatchUpSummary {
   tasksCompleted: number;
@@ -15,7 +15,7 @@ export interface CatchUpSummary {
 
 interface ChatMessagesProps {
   messages: AcpTextChunk[];
-  agents: any[];
+  agents: AgentInfo[];
   isActive: boolean;
   chatContainerRef: React.RefObject<HTMLDivElement | null>;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;

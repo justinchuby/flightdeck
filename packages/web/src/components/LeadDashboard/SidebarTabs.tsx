@@ -21,70 +21,57 @@ import { TaskDagPanelContent } from './TaskDagPanel';
 import { ModelConfigPanel } from './ModelConfigPanel';
 import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
-import type { DagStatus } from '../../types';
+import type { DagStatus, AgentInfo } from '../../types';
 import type { AgentComm } from '../../stores/leadStore';
 
-interface SidebarTabsProps {
-  // Sidebar state
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
-  sidebarWidth: number;
-  startResize: (e: React.MouseEvent) => void;
+export interface SidebarLayoutProps {
+  collapsed: boolean;
+  onToggle: () => void;
+  width: number;
+  onResize: (e: React.MouseEvent) => void;
+}
 
-  // Tab state
-  sidebarTab: string;
+export interface TabStateProps {
+  activeTab: string;
   onTabChange: (tab: string) => void;
   tabOrder: string[];
   onTabOrderChange: (order: string[]) => void;
   hiddenTabs: Set<string>;
   onToggleTabVisibility: (tabId: string) => void;
-  showTabConfig: boolean;
-  onToggleTabConfig: () => void;
+  showConfig: boolean;
+  onToggleConfig: () => void;
+  onResize: (e: React.MouseEvent) => void;
+}
 
-  // Decisions panel
+export interface DecisionProps {
   decisions: any[];
   pendingConfirmations: any[];
-  decisionsPanelHeight: number;
-  startDecisionsResize: (e: React.MouseEvent) => void;
-  onConfirmDecision: (id: string, reason?: string) => Promise<void>;
-  onRejectDecision: (id: string, reason?: string) => Promise<void>;
-  onDismissDecision: (id: string) => Promise<void>;
+  panelHeight: number;
+  onResize: (e: React.MouseEvent) => void;
+  onConfirm: (id: string, reason?: string) => Promise<void>;
+  onReject: (id: string, reason?: string) => Promise<void>;
+  onDismiss: (id: string) => Promise<void>;
+}
 
-  // Tab content
+interface SidebarTabsProps {
+  layout: SidebarLayoutProps;
+  tabs: TabStateProps;
+  decision: DecisionProps;
   teamTabContent: React.ReactNode;
   comms: AgentComm[];
   groups: any[];
   groupMessages: Record<string, any>;
   dagStatus: DagStatus | null;
-  leadAgent: any;
+  leadAgent: AgentInfo | undefined;
   selectedLeadId: string | null;
   activeTimerCount: number;
   teamAgentIds: Set<string>;
-
-  // Tab resize
-  startTabResize: (e: React.MouseEvent) => void;
 }
 
 export function SidebarTabs({
-  sidebarCollapsed,
-  onToggleSidebar,
-  sidebarWidth,
-  startResize,
-  sidebarTab,
-  onTabChange,
-  tabOrder,
-  onTabOrderChange,
-  hiddenTabs,
-  onToggleTabVisibility,
-  showTabConfig,
-  onToggleTabConfig,
-  decisions,
-  pendingConfirmations,
-  decisionsPanelHeight,
-  startDecisionsResize,
-  onConfirmDecision,
-  onRejectDecision,
-  onDismissDecision,
+  layout,
+  tabs,
+  decision,
   teamTabContent,
   comms,
   groups,
@@ -94,7 +81,6 @@ export function SidebarTabs({
   selectedLeadId,
   activeTimerCount,
   teamAgentIds,
-  startTabResize,
 }: SidebarTabsProps) {
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
 
@@ -114,13 +100,13 @@ export function SidebarTabs({
     setDragOverTab(null);
     const sourceTabId = e.dataTransfer.getData('text/plain');
     if (!sourceTabId || sourceTabId === targetTabId) return;
-    const newOrder = [...tabOrder];
+    const newOrder = [...tabs.tabOrder];
     const srcIdx = newOrder.indexOf(sourceTabId);
     const tgtIdx = newOrder.indexOf(targetTabId);
     if (srcIdx === -1 || tgtIdx === -1) return;
     [newOrder[srcIdx], newOrder[tgtIdx]] = [newOrder[tgtIdx], newOrder[srcIdx]];
-    onTabOrderChange(newOrder);
-  }, [tabOrder, onTabOrderChange]);
+    tabs.onTabOrderChange(newOrder);
+  }, [tabs]);
 
   const handleTabDragEnd = useCallback(() => {
     setDragOverTab(null);
@@ -136,20 +122,20 @@ export function SidebarTabs({
     timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
   };
 
-  if (sidebarCollapsed) {
+  if (layout.collapsed) {
     return (
       <div className="border-l border-th-border flex flex-col items-center py-2 w-10 shrink-0">
         <button
           type="button"
           aria-label="Expand sidebar"
-          onClick={() => onToggleSidebar()}
+          onClick={() => layout.onToggle()}
           className="p-1.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text relative"
           title="Expand sidebar"
         >
           <PanelRightOpen className="w-4 h-4" />
-          {pendingConfirmations.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-yellow-500 rounded-full text-[8px] font-bold text-black flex items-center justify-center" title={`${pendingConfirmations.length} decision(s) need confirmation`}>
-              {pendingConfirmations.length}
+          {decision.pendingConfirmations.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-yellow-500 rounded-full text-[8px] font-bold text-black flex items-center justify-center" title={`${decision.pendingConfirmations.length} decision(s) need confirmation`}>
+              {decision.pendingConfirmations.length}
             </span>
           )}
         </button>
@@ -157,17 +143,17 @@ export function SidebarTabs({
     );
   }
 
-  const orderedIds = tabOrder.filter((id) => id in allTabs && !hiddenTabs.has(id));
+  const orderedIds = tabs.tabOrder.filter((id) => id in allTabs && !tabs.hiddenTabs.has(id));
   // Append any missing visible tabs (safety net)
   for (const id of Object.keys(allTabs)) {
-    if (!orderedIds.includes(id) && !hiddenTabs.has(id)) orderedIds.push(id);
+    if (!orderedIds.includes(id) && !tabs.hiddenTabs.has(id)) orderedIds.push(id);
   }
 
   return (
-    <div className="flex shrink-0" style={{ width: sidebarWidth }}>
+    <div className="flex shrink-0" style={{ width: layout.width }}>
       {/* Drag handle */}
       <div
-        onMouseDown={startResize}
+        onMouseDown={layout.onResize}
         className="w-1 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
       />
       <div className="flex-1 border-l border-th-border flex flex-col overflow-hidden min-w-0">
@@ -175,7 +161,7 @@ export function SidebarTabs({
           <button
             type="button"
             aria-label="Collapse sidebar"
-            onClick={() => onToggleSidebar()}
+            onClick={() => layout.onToggle()}
             className="p-1 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text"
             title="Collapse sidebar"
           >
@@ -184,21 +170,21 @@ export function SidebarTabs({
         </div>
 
         {/* Decisions — always visible at top */}
-        <div className="shrink-0 flex flex-col relative" style={{ height: decisionsPanelHeight, maxHeight: '30%' }}>
+        <div className="shrink-0 flex flex-col relative" style={{ height: decision.panelHeight, maxHeight: '30%' }}>
           <div className="px-3 py-1.5 flex items-center gap-2 border-b border-th-border shrink-0">
             <Lightbulb className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
             <span className="text-xs font-semibold">Decisions</span>
-            {pendingConfirmations.length > 0 && (
-              <span className="w-2 h-2 bg-yellow-500 rounded-full" title={`${pendingConfirmations.length} pending`} />
+            {decision.pendingConfirmations.length > 0 && (
+              <span className="w-2 h-2 bg-yellow-500 rounded-full" title={`${decision.pendingConfirmations.length} pending`} />
             )}
-            <span className="text-[10px] text-th-text-muted ml-auto">{decisions.length}</span>
+            <span className="text-[10px] text-th-text-muted ml-auto">{decision.decisions.length}</span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <DecisionPanelContent decisions={decisions} onConfirm={onConfirmDecision} onReject={onRejectDecision} onDismiss={onDismissDecision} />
+            <DecisionPanelContent decisions={decision.decisions} onConfirm={decision.onConfirm} onReject={decision.onReject} onDismiss={decision.onDismiss} />
           </div>
           {/* Resize handle for decisions panel */}
           <div
-            onMouseDown={startDecisionsResize}
+            onMouseDown={decision.onResize}
             className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0 absolute bottom-0 left-0 right-0"
             style={{ transform: 'translateY(2px)', zIndex: 10 }}
           />
@@ -218,11 +204,11 @@ export function SidebarTabs({
                   onDrop={(e) => handleTabDrop(e, tabId)}
                   onDragEnd={handleTabDragEnd}
                   onDragLeave={() => setDragOverTab(null)}
-                  onClick={() => onTabChange(tabId)}
+                  onClick={() => tabs.onTabChange(tabId)}
                   className={`flex items-center gap-1 px-2 py-1.5 text-[11px] whitespace-nowrap border-b-2 transition-colors cursor-grab active:cursor-grabbing ${
                     dragOverTab === tabId
                       ? 'border-blue-400 bg-blue-500/10 text-blue-600 dark:text-blue-300'
-                      : sidebarTab === tabId
+                      : tabs.activeTab === tabId
                         ? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
                         : 'border-transparent text-th-text-muted hover:text-th-text-alt'
                   }`}
@@ -238,27 +224,27 @@ export function SidebarTabs({
             {/* Tab visibility settings */}
             <div className="relative ml-auto">
               <button
-                onClick={() => onToggleTabConfig()}
+                onClick={() => tabs.onToggleConfig()}
                 className="flex items-center px-1.5 py-1.5 text-th-text-muted hover:text-th-text-alt transition-colors"
                 title="Configure visible tabs"
               >
                 <Settings className="w-3 h-3" />
               </button>
-              {showTabConfig && (
+              {tabs.showConfig && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => onToggleTabConfig()} />
+                  <div className="fixed inset-0 z-40" onClick={() => tabs.onToggleConfig()} />
                   <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
                     {(['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
                       <button
                         key={tabId}
-                        onClick={() => onToggleTabVisibility(tabId)}
+                        onClick={() => tabs.onToggleTabVisibility(tabId)}
                         className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] hover:bg-th-bg-muted transition-colors"
                       >
-                        {hiddenTabs.has(tabId)
+                        {tabs.hiddenTabs.has(tabId)
                           ? <EyeOff className="w-3 h-3 text-th-text-muted" />
                           : <Eye className="w-3 h-3 text-blue-500" />
                         }
-                        <span className={hiddenTabs.has(tabId) ? 'text-th-text-muted' : ''}>{tabId.charAt(0).toUpperCase() + tabId.slice(1)}</span>
+                        <span className={tabs.hiddenTabs.has(tabId) ? 'text-th-text-muted' : ''}>{tabId.charAt(0).toUpperCase() + tabId.slice(1)}</span>
                       </button>
                     ))}
                   </div>
@@ -267,27 +253,27 @@ export function SidebarTabs({
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden">
-            {sidebarTab === 'team' && teamTabContent}
-            {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId ?? undefined} />}
+            {tabs.activeTab === 'team' && teamTabContent}
+            {tabs.activeTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId ?? undefined} />}
 
-            {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} projectId={leadAgent?.projectId ?? (selectedLeadId?.startsWith('project:') ? selectedLeadId.slice(8) : null)} />}
-            {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
-            {sidebarTab === 'models' && leadAgent?.projectId && (
+            {tabs.activeTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} projectId={leadAgent?.projectId ?? (selectedLeadId?.startsWith('project:') ? selectedLeadId.slice(8) : null)} />}
+            {tabs.activeTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
+            {tabs.activeTab === 'models' && leadAgent?.projectId && (
               <div className="h-full overflow-y-auto p-2">
                 <ModelConfigPanel projectId={leadAgent.projectId} compact />
               </div>
             )}
-            {sidebarTab === 'models' && !leadAgent?.projectId && (
+            {tabs.activeTab === 'models' && !leadAgent?.projectId && (
               <div className="flex items-center justify-center h-full text-th-text-muted text-xs">
                 No project selected
               </div>
             )}
-            {sidebarTab === 'costs' && <CostBreakdown />}
-            {sidebarTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
+            {tabs.activeTab === 'costs' && <CostBreakdown />}
+            {tabs.activeTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
           </div>
           {/* Resize handle for tabbed section */}
           <div
-            onMouseDown={startTabResize}
+            onMouseDown={tabs.onResize}
             className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0 absolute top-0 left-0 right-0"
             style={{ transform: 'translateY(-2px)' }}
           />
