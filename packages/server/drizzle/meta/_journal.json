@@ -134,6 +134,34 @@
       "when": 1772844025000,
       "tag": "0018_dag_task_project_id",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1772964000000,
+      "tag": "0019_message_queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1772964100000,
+      "tag": "0020_agent_roster_delegations",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1773094578000,
+      "tag": "0021_knowledge",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1773108000000,
+      "tag": "0022_team_id",
+      "breakpoints": true
     }
   ]
 }

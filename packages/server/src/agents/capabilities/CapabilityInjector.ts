@@ -6,7 +6,7 @@
  * unlocks gated commands (e.g. DELEGATE, COMMIT).
  */
 import type { Agent } from '../Agent.js';
-import type { ActivityLedger } from '../../coordination/ActivityLedger.js';
+import type { ActivityLedger } from '../../coordination/activity/ActivityLedger.js';
 import { logger } from '../../utils/logger.js';
 
 // ── Capability definition ────────────────────────────────────────────

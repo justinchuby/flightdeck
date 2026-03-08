@@ -1,33 +1,39 @@
 import { Agent, isTerminalStatus } from './Agent.js';
-import { randomUUID } from 'crypto';
+import { generateProjectId } from '../utils/projectId.js';
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
-import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import type { ActivityLedger } from '../coordination/ActivityLedger.js';
+import type { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
-import type { DecisionLog } from '../coordination/DecisionLog.js';
+import type { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 import type { AgentMemory } from './AgentMemory.js';
 import type { ChatGroupRegistry, ChatGroup, GroupMessage } from '../comms/ChatGroupRegistry.js';
 import type { Database } from '../db/database.js';
 import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
-import type { TimerRegistry } from '../coordination/TimerRegistry.js';
+import type { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
-import type { WorktreeManager } from '../coordination/WorktreeManager.js';
+import type { WorktreeManager } from '../coordination/files/WorktreeManager.js';
 import type { CostTracker } from './CostTracker.js';
+import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
+import type { AgentRosterRepository } from '../db/AgentRosterRepository.js';
+import type { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { HeartbeatMonitor } from './HeartbeatMonitor.js';
 import { TypedEmitter } from '../utils/TypedEmitter.js';
-import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
+import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { runWithAgentContext } from '../middleware/requestContext.js';
+import type { AgentServerClient } from './AgentServerClient.js';
+import { startRemoteBridge } from './ServerClientBridge.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -100,6 +106,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
   private worktreeManager?: WorktreeManager;
   private costTracker?: CostTracker;
+  private messageQueueStore?: MessageQueueStore;
+  private agentRosterRepository?: AgentRosterRepository;
+  private activeDelegationRepository?: ActiveDelegationRepository;
+  private agentServerClient?: AgentServerClient;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -113,7 +123,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, agentServerClient }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; agentServerClient?: AgentServerClient } = {},
   ) {
     super();
     this.config = config;
@@ -130,6 +140,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.capabilityInjector = capabilityInjector;
     this.worktreeManager = worktreeManager;
     this.costTracker = costTracker;
+    this.messageQueueStore = messageQueueStore;
+    this.agentRosterRepository = agentRosterRepository;
+    this.activeDelegationRepository = activeDelegationRepository;
+    this.agentServerClient = agentServerClient;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -162,6 +176,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       taskDecomposer,
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
+      governancePipeline,
+      activeDelegationRepository,
+      agentRosterRepository,
     });
 
     // Start heartbeat monitor to detect stalled teams
@@ -214,12 +231,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (target && (target.status === 'running' || target.status === 'idle')) {
         const fromAgent = this.agents.get(msg.from);
         const fromLabel = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
-        logger.info('message', `Delivering: ${fromLabel} → ${target.role.name} (${msg.to.slice(0, 8)})`, {
-          contentPreview: msg.content.slice(0, 80),
-        });
+        logger.info({ module: 'comms', msg: 'Delivering message', targetAgentId: msg.to, targetRole: target.role.name, fromAgentId: msg.from, contentPreview: msg.content.slice(0, 80) });
         target.sendMessage(`[Message from ${fromLabel}]: ${msg.content}`);
       } else {
-        logger.warn('message', `Delivery failed — target not found/running: ${msg.to.slice(0, 8)}`);
+        logger.warn({ module: 'comms', msg: 'Delivery failed — target not found/running', targetAgentId: msg.to });
       }
     });
   }
@@ -269,7 +284,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
-      logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
+      logger.error({ module: 'agent', msg: 'Concurrency limit reached', maxConcurrent: this.maxConcurrent, role: role.id });
       throw new Error(
         `Concurrency limit reached (${this.maxConcurrent}). Terminate an agent or increase the limit.`,
       );
@@ -286,9 +301,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const modelResolution = this.resolveModelForRole(role.id, model, effectiveProjectId);
     const effectiveModel = modelResolution.model;
     if (modelResolution.overridden && modelResolution.reason) {
-      logger.warn('model-config', modelResolution.reason);
+      logger.warn({ module: 'config', msg: modelResolution.reason! });
     } else if (modelResolution.reason) {
-      logger.info('model-config', modelResolution.reason);
+      logger.info({ module: 'config', msg: modelResolution.reason! });
     }
 
     // Filter initial peer list to same project to prevent cross-project visibility
@@ -326,6 +341,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (this._systemPaused) {
       agent.systemPaused = true;
     }
+    if (this.messageQueueStore) {
+      agent.setMessageQueueStore(this.messageQueueStore);
+    }
 
     // Track parent-child relationship (deduplicate for restart with same ID)
     if (parentId) {
@@ -346,11 +364,23 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // This prevents "untitled project" scenarios where activities are logged
     // with projectId: '' and become invisible to scoped queries.
     if (!parentId && !agent.projectId) {
-      agent.projectId = randomUUID();
-      logger.warn('agent', `Root agent ${agent.id.slice(0, 8)} spawned without projectId — generated ${agent.projectId.slice(0, 8)}`);
+      agent.projectId = generateProjectId(agent.task || 'untitled');
+      logger.warn({ module: 'agent', msg: 'Root agent spawned without projectId', generatedProjectId: agent.projectId });
     }
 
     this.agents.set(agent.id, agent);
+
+    // Persist agent to roster DB for crash recovery
+    if (this.agentRosterRepository) {
+      try {
+        this.agentRosterRepository.upsertAgent(
+          agent.id, role.id, effectiveModel || 'default', 'idle',
+          undefined, agent.projectId,
+        );
+      } catch (err: any) {
+        logger.warn({ module: 'agent', msg: 'Failed to persist agent to roster', agentId: agent.id, error: err.message });
+      }
+    }
 
     // Create a conversation thread for this agent (for persistent message history)
     if (this.conversationStore) {
@@ -360,16 +390,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     // Listen for data to detect sub-agent spawn requests and coordination commands
     agent.onData((data) => {
-      this.emit('agent:text', { agentId: agent.id, text: data });
-      // Buffer agent output — flush after 2s of silence or on status change
-      this.bufferAgentMessage(agent.id, data);
-      // Buffer ACP text and scan for complete command patterns
-      this.dispatcher.appendToBuffer(agent.id, data);
-      this.dispatcher.scanBuffer(agent);
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:text', { agentId: agent.id, text: data });
+        this.bufferAgentMessage(agent.id, data);
+        this.dispatcher.appendToBuffer(agent.id, data);
+        this.dispatcher.scanBuffer(agent);
+      });
     });
 
     agent.onToolCall((info) => {
-      this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+      });
     });
 
     agent.onResponseStart(() => {
@@ -438,7 +470,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
 
     agent.onContextCompacted((info) => {
-      logger.info('agent', `Context compacted for ${agent.role.name} (${agent.id.slice(0, 8)}): ${info.percentDrop}% reduction`);
+      logger.info({ module: 'agent', msg: 'Context compacted', percentDrop: info.percentDrop });
       this.emit('agent:context_compacted', { agentId: agent.id, ...info });
     });
 
@@ -453,41 +485,46 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     agent.onStatus((status) => {
-      this.emit('agent:status', { agentId: agent.id, status });
-      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
-      // Flush buffered messages on turn boundaries
-      if (status === 'idle' || isTerminalStatus(status)) {
-        this.flushAgentMessage(agent.id);
-      }
-
-      // Track lead idle timing for heartbeat
-      if (agent.role.id === 'lead') {
-        if (status === 'idle') {
-          this.heartbeat.trackIdle(agent.id);
-        } else if (status === 'running') {
-          this.heartbeat.trackActive(agent.id);
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:status', { agentId: agent.id, status });
+        this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
+        if (status === 'idle' || isTerminalStatus(status)) {
+          this.flushAgentMessage(agent.id);
         }
-      }
 
-      // When a child agent goes idle (prompt complete), notify its parent
-      if (status === 'idle' && agent.parentId) {
-        this.dispatcher.notifyParentOfIdle(agent);
-      }
+        // Persist status to roster DB
+        if (this.agentRosterRepository) {
+          const rosterStatus = status === 'running' ? 'busy' : status === 'idle' ? 'idle' : undefined;
+          if (rosterStatus) {
+            try { this.agentRosterRepository.updateStatus(agent.id, rosterStatus); } catch { /* non-critical */ }
+          }
+        }
+
+        if (agent.role.id === 'lead') {
+          if (status === 'idle') {
+            this.heartbeat.trackIdle(agent.id);
+          } else if (status === 'running') {
+            this.heartbeat.trackActive(agent.id);
+          }
+        }
+
+        if (status === 'idle' && agent.parentId) {
+          this.dispatcher.notifyParentOfIdle(agent);
+        }
+      });
     });
 
     agent.onExit((code) => {
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
       this.flushAgentMessage(agent.id);
       this.clearHungTimer(agent.id);
       this.dispatcher.clearBuffer(agent.id);
-      logger.info('agent', `Exited ${agent.role.name} (${agent.id.slice(0, 8)}) code=${code}`, {
-        role: agent.role.id,
-        status: agent.status,
-      });
+      logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
       // Release any file locks held by the exiting agent
       const releasedCount = this.lockRegistry.releaseAll(agent.id);
       if (releasedCount > 0) {
-        logger.info('lock', `Auto-released ${releasedCount} lock(s) for exiting agent ${agent.id.slice(0, 8)}`);
+        logger.info({ module: 'files', msg: 'Auto-released locks for exiting agent', count: releasedCount });
       }
 
       // Clear any pending timers for the exiting agent
@@ -515,7 +552,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.role.id === 'lead' && !agent.parentId && agent.projectId && this.projectRegistry) {
         const status = (code !== null && code !== 0) ? 'crashed' : 'completed';
         this.projectRegistry.endSession(agent.id, status);
-        logger.info('project', `Session ended for project ${agent.projectId.slice(0, 8)} — ${status}`);
+        logger.info({ module: 'project', msg: 'Session ended', status });
       }
 
       // Clean up dedup tracking after a delay
@@ -533,7 +570,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const agentRole = agent.role?.id ?? 'unknown';
         const crashKey = `${agentRole}:${agent.task ?? ''}`;
 
-        logger.error('agent', `Crashed ${agent.role.name} (${agent.id.slice(0, 8)}) exit=${code}`, { crashKey });
+        logger.error({ module: 'agent', msg: 'Agent crashed', exitCode: code, crashKey });
         this.activityLedger.log(agent.id, agentRole, 'error', `Agent crashed with exit code ${code}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         this.emit('agent:crashed', { agentId: agent.id, code });
 
@@ -541,25 +578,25 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.crashCounts.set(crashKey, count);
 
         if (this.autoRestart && count < this.maxRestarts) {
-          logger.warn('agent', `Auto-restarting ${agent.role.name} (attempt ${count + 1}/${this.maxRestarts})`);
+          logger.warn({ module: 'agent', msg: 'Auto-restarting agent', attempt: count + 1, maxRestarts: this.maxRestarts });
           setTimeout(() => {
             try {
               // Verify parent is still alive before restarting
               if (agent.parentId) {
                 const parent = this.agents.get(agent.parentId);
                 if (!parent || isTerminalStatus(parent.status)) {
-                  logger.warn('agent', `Skipping auto-restart: parent ${agent.parentId.slice(0, 8)} no longer active`);
+                  logger.warn({ module: 'agent', msg: 'Skipping auto-restart — parent no longer active', parentAgentId: agent.parentId });
                   return;
                 }
               }
               const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined, undefined, { projectName: agent.projectName, projectId: agent.projectId });
               this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
             } catch (err) {
-              logger.error('agent', `Auto-restart failed for ${agent.role.name}: ${(err as Error).message}`);
+              logger.error({ module: 'agent', msg: 'Auto-restart failed', err: (err as Error).message });
             }
           }, 2000);
         } else if (count >= this.maxRestarts) {
-          logger.error('agent', `Restart limit reached for ${agent.role.name} (${this.maxRestarts} restarts)`);
+          logger.error({ module: 'agent', msg: 'Restart limit reached', maxRestarts: this.maxRestarts });
           this.emit('agent:restart_limit', { agentId: agent.id });
         }
       } else {
@@ -567,30 +604,29 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const crashKey = `${agent.role?.id ?? 'unknown'}:${agent.task ?? ''}`;
         this.crashCounts.delete(crashKey);
       }
+      });
     });
 
     agent.onHung((elapsedMs) => {
-      this.emit('agent:hung', { agentId: agent.id, elapsedMs });
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:hung', { agentId: agent.id, elapsedMs });
 
-      if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
-        const timer = setTimeout(() => {
-          this.hungTimers.delete(agent.id);
-          if (agent.status === 'idle') {
-            this.terminate(agent.id);
-            this.emit('agent:hung_terminated', { agentId: agent.id });
-          }
-        }, this.autoTerminateTimeoutMs);
-        this.hungTimers.set(agent.id, timer);
-      }
+        if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
+          const timer = setTimeout(() => {
+            this.hungTimers.delete(agent.id);
+            if (agent.status === 'idle') {
+              this.terminate(agent.id);
+              this.emit('agent:hung_terminated', { agentId: agent.id });
+            }
+          }, this.autoTerminateTimeoutMs);
+          this.hungTimers.set(agent.id, timer);
+        }
+      });
     });
 
     // Helper: post-start actions (emit events after cwd is set)
     const postSpawn = () => {
-      logger.info('agent', `Spawned ${role.name} (${agent.id.slice(0, 8)})`, {
-        autopilot: agent.autopilot,
-        parentId: parentId?.slice(0, 8),
-        task,
-      });
+      logger.info({ module: 'agent', msg: 'Agent spawned', role: role.name, autopilot: agent.autopilot, parentAgentId: parentId, task });
       this.emit('agent:spawned', agent.toJSON());
       this.updateLeadBudgets();
       // Auto-add to groups with matching role criteria (B4: group auto-add)
@@ -599,22 +635,38 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     };
 
+    // Helper: start the agent via remote bridge or local ACP
+    const startAgent = () => {
+      if (this.agentServerClient) {
+        const isResume = !!agent.resumeSessionId;
+        let initialPrompt: string | undefined;
+        if (!isResume) {
+          const contextManifest = agent.buildContextManifest(peers, agent.budget);
+          const taskAssignment = `You are acting as the "${effectiveRole.name}" role. ${task ? `Your assigned task is: ${task}` : 'Awaiting task assignment.'}`;
+          initialPrompt = `${effectiveRole.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
+        }
+        startRemoteBridge(agent, this.agentServerClient, initialPrompt);
+      } else {
+        agent.start();
+      }
+    };
+
     // Create isolated worktree if manager is available (async — delays agent.start)
     if (this.worktreeManager && !cwd) {
       this.worktreeManager.create(agent.id)
         .then(worktreePath => {
           agent.cwd = worktreePath;
-          logger.info('worktree', `Agent ${agent.id.slice(0, 8)} using worktree at ${worktreePath}`);
+          logger.info({ module: 'files', msg: 'Using worktree', worktreePath });
         })
         .catch(err => {
-          logger.warn('worktree', `Worktree creation failed for ${agent.id.slice(0, 8)}, using shared cwd: ${err.message}`);
+          logger.warn({ module: 'files', msg: 'Worktree creation failed, using shared cwd', err: err.message });
         })
         .finally(() => {
-          agent.start();
+          startAgent();
           postSpawn();
         });
     } else {
-      agent.start();
+      startAgent();
       postSpawn();
     }
 
@@ -631,7 +683,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       });
       if (allTerminal) {
         this.chatGroupRegistry.archiveGroup(group.name, group.leadId);
-        logger.info('group', `Auto-archived group "${group.name}" — all members terminated`);
+        logger.info({ module: 'comms', msg: 'Auto-archived group — all members terminated', groupName: group.name });
       }
     }
   }
@@ -648,14 +700,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
     if (releasedCount > 0) {
-      logger.info('lock', `Auto-released ${releasedCount} lock(s) for terminated agent ${id.slice(0, 8)}`);
+      logger.info({ module: 'files', msg: 'Auto-released locks for terminated agent', targetAgentId: id, count: releasedCount });
     }
 
     // Cascade: terminate orphaned children recursively
     for (const childId of [...agent.childIds]) {
       const child = this.agents.get(childId);
       if (child && !isTerminalStatus(child.status)) {
-        logger.info('agent', `Cascade-terminating orphaned child ${child.role.name} (${childId.slice(0, 8)})`);
+        logger.info({ module: 'agent', msg: 'Cascade-terminating orphaned child', childAgentId: childId, childRole: child.role.name });
         this.terminate(childId, visited);
       }
     }
@@ -675,6 +727,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agent.terminate();
     this.emit('agent:terminated', id);
 
+    // Persist terminated status to roster DB
+    if (this.agentRosterRepository) {
+      try { this.agentRosterRepository.updateStatus(id, 'terminated'); } catch { /* non-critical */ }
+    }
+
     // Clean up agent timers
     if (this.timerRegistry) this.timerRegistry.clearAgent(id);
 
@@ -687,12 +744,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       this.worktreeManager.merge(id)
         .then(result => {
           if (!result.ok) {
-            logger.warn('worktree', `Merge failed for ${id.slice(0, 8)}: ${result.conflicts?.join(', ')}`);
+            logger.warn({ module: 'files', msg: 'Worktree merge failed', targetAgentId: id, conflicts: result.conflicts });
           }
         })
         .finally(() => {
           this.worktreeManager!.cleanup(id).catch(err => {
-            logger.warn('worktree', `Cleanup failed for ${id.slice(0, 8)}: ${err.message}`);
+            logger.warn({ module: 'files', msg: 'Worktree cleanup failed', targetAgentId: id, err: err.message });
           });
         });
     }
@@ -766,10 +823,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         { projectName: leadAgent.projectName, projectId: leadAgent.projectId },
       );
       secretary.isSystemAgent = true;
-      logger.info('agent', `Auto-spawned secretary (${secretary.id.slice(0, 8)}) for lead (${leadAgent.id.slice(0, 8)})`);
+      logger.info({ module: 'agent', msg: 'Auto-spawned secretary', secretaryId: secretary.id, leadAgentId: leadAgent.id });
       return secretary;
     } catch (err: any) {
-      logger.warn('agent', `Failed to auto-spawn secretary: ${err.message}`);
+      logger.warn({ module: 'agent', msg: 'Failed to auto-spawn secretary', err: err.message });
       setTimeout(() => {
         leadAgent.sendMessage(`[System] Auto-secretary spawn failed: ${err.message}. You can manually create one with CREATE_AGENT.`);
       }, 2000);
@@ -823,6 +880,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return this.roleRegistry;
   }
 
+  /** Get the optional AgentServerClient (for remote agent spawning). */
+  getAgentServerClient(): AgentServerClient | undefined {
+    return this.agentServerClient;
+  }
+
+  /** Set or replace the AgentServerClient (for remote agent spawning). */
+  setAgentServerClient(client: AgentServerClient | undefined): void {
+    this.agentServerClient = client;
+  }
+
   setAutoRestart(enabled: boolean): void {
     this.autoRestart = enabled;
   }
@@ -839,7 +906,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
     this.emit('system:paused', { paused: true });
-    logger.info('system', 'System paused by user');
+    logger.info({ module: 'agent', msg: 'System paused by user' });
   }
 
   /** Resume the system — deliver queued messages, notify agents */
@@ -854,7 +921,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
     this.emit('system:paused', { paused: false });
-    logger.info('system', 'System resumed by user');
+    logger.info({ module: 'agent', msg: 'System resumed by user' });
     // Drain pending messages on all idle agents
     for (const agent of this.agents.values()) {
       if (agent.status === 'idle' || agent.status === 'running') {
@@ -902,7 +969,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Clean up all worktrees (async, best-effort)
     // Individual terminate() calls skip merge when _shuttingDown is true
     this.worktreeManager?.cleanupAll().catch(err => {
-      logger.warn('worktree', `Shutdown worktree cleanup failed: ${err.message}`);
+      logger.warn({ module: 'files', msg: 'Shutdown worktree cleanup failed', err: err.message });
     });
   }
 
@@ -1026,12 +1093,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           const added = this.chatGroupRegistry.addMembers(leadId, group.name, [agent.id]);
           if (added.length > 0) {
             agent.queueMessage(`[System] You've been auto-added to group "${group.name}" (matches your role "${agent.role.id}"). Send messages: ⟦⟦ GROUP_MESSAGE {"group": "${group.name}", "content": "your message"} ⟧⟧`);
-            logger.info('groups', `Auto-added ${agent.role.name} (${agent.id.slice(0, 8)}) to group "${group.name}" via role criteria`);
+            logger.info({ module: 'comms', msg: 'Auto-added agent to group via role criteria', groupName: group.name, role: agent.role.name });
           }
         }
       }
     } catch (err) {
-      logger.warn('groups', `Failed to auto-add agent to role groups: ${(err as Error).message}`);
+      logger.warn({ module: 'comms', msg: 'Failed to auto-add agent to role groups', err: (err as Error).message });
     }
   }
 }

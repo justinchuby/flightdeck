@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { HandoffService, type HandoffRecord } from '../coordination/HandoffService.js';
+import { HandoffService, type HandoffRecord } from '../coordination/recovery/HandoffService.js';
 import { Database } from '../db/database.js';
-import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import { DecisionLog } from '../coordination/DecisionLog.js';
+import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 
 describe('HandoffService', () => {
   let db: Database;

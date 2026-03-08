@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Database } from '../db/database.js';
-import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import { CapabilityRegistry } from '../coordination/CapabilityRegistry.js';
-import type { CapabilityQuery } from '../coordination/CapabilityRegistry.js';
+import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import { CapabilityRegistry } from '../coordination/agents/CapabilityRegistry.js';
+import type { CapabilityQuery } from '../coordination/agents/CapabilityRegistry.js';
 
 const TEST_DB = ':memory:';
 

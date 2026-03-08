@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BudgetEnforcer, type BudgetConfig } from '../coordination/BudgetEnforcer.js';
+import { BudgetEnforcer, type BudgetConfig } from '../coordination/scheduling/BudgetEnforcer.js';
 
 // Minimal mocks
 function createMockDb() {

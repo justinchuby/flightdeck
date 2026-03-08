@@ -3,7 +3,8 @@ import { eq, and, desc, asc, sql, ne, inArray, lte } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { dagTasks, utcNow } from '../db/schema.js';
 
-export type DagTaskStatus = 'pending' | 'ready' | 'running' | 'done' | 'failed' | 'blocked' | 'paused' | 'skipped';
+import type { DagTaskStatus, DagTask } from '@flightdeck/shared';
+export type { DagTaskStatus, DagTask } from '@flightdeck/shared';
 
 /** Valid source states for each state transition method */
 export const VALID_TRANSITIONS: Record<string, DagTaskStatus[]> = {
@@ -26,23 +27,7 @@ export interface InvalidTransitionError {
   validStatuses: DagTaskStatus[];
 }
 
-export interface DagTask {
-  id: string;
-  leadId: string;
-  projectId?: string;
-  role: string;
-  title?: string;
-  description: string;
-  files: string[];
-  dependsOn: string[];
-  dagStatus: DagTaskStatus;
-  priority: number;
-  model?: string;
-  assignedAgentId?: string;
-  createdAt: string;
-  startedAt?: string;
-  completedAt?: string;
-}
+
 
 export interface DagTaskInput {
   taskId: string;

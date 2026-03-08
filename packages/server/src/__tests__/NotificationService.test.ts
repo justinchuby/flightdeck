@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NotificationService, type NotificationChannel, type NotificationPreference } from '../coordination/NotificationService.js';
+import { NotificationService, type NotificationChannel, type NotificationPreference } from '../coordination/alerts/NotificationService.js';
 import { Database } from '../db/database.js';
 
 describe('NotificationService', () => {

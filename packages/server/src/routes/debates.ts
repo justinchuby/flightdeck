@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { DebateDetector } from '../coordination/DebateDetector.js';
+import { DebateDetector } from '../coordination/decisions/DebateDetector.js';
 
 export function debateRoutes(ctx: AppContext): Router {
   const { agentManager } = ctx;

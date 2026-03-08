@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { ConflictDetectionEngine } from '../coordination/ConflictDetectionEngine.js';
+import { ConflictDetectionEngine } from '../coordination/decisions/ConflictDetectionEngine.js';
 
 export function conflictRoutes(ctx: AppContext): Router {
   const engine = new ConflictDetectionEngine(ctx.db);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { PlaybookService } from '../coordination/PlaybookService.js';
+import { PlaybookService } from '../coordination/playbooks/PlaybookService.js';
 
 export function playbookRoutes(ctx: AppContext): Router {
   const { db } = ctx;

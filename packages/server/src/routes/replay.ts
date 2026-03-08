@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { SessionReplay } from '../coordination/SessionReplay.js';
+import { SessionReplay } from '../coordination/sessions/SessionReplay.js';
 
 export function replayRoutes(ctx: AppContext): Router {
   const { agentManager, activityLedger, decisionLog, lockRegistry } = ctx;

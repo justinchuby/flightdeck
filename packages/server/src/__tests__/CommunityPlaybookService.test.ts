@@ -6,7 +6,7 @@ import {
   type PublishInput,
   type CommunityPlaybook,
   type PlaybookReview,
-} from '../coordination/CommunityPlaybookService.js';
+} from '../coordination/playbooks/CommunityPlaybookService.js';
 
 function createMockDb() {
   const settings = new Map<string, string>();

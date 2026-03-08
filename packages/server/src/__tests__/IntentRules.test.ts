@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DecisionLog, DECISION_CATEGORIES, TRUST_PRESETS, MIN_MATCHES_FOR_SCORE } from '../coordination/DecisionLog.js';
-import type { IntentRule, IntentCondition, TrustPreset, IntentAction } from '../coordination/DecisionLog.js';
+import { DecisionLog, DECISION_CATEGORIES, TRUST_PRESETS, MIN_MATCHES_FOR_SCORE } from '../coordination/decisions/DecisionLog.js';
+import type { IntentRule, IntentCondition, TrustPreset, IntentAction } from '../coordination/decisions/DecisionLog.js';
 import { Database } from '../db/database.js';
 
 describe('Intent Rules', () => {

@@ -2,7 +2,7 @@
  * Event listener registration and notification for Agent — extracted from Agent.ts.
  * Provides typed listener arrays and notification helpers used by AgentAcpBridge.
  */
-import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
+import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import type { AgentStatus } from './Agent.js';
 
 /** Typed usage info emitted by onUsage listeners */

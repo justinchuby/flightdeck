@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NLCommandService } from '../coordination/NLCommandService.js';
+import { NLCommandService } from '../coordination/commands/NLCommandService.js';
 
 // ── Mocks ─────────────────────────────────────────────────────────
 

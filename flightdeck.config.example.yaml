@@ -1,0 +1,74 @@
+# flightdeck.config.yaml — Example configuration
+# Copy this file to flightdeck.config.yaml (or wherever FLIGHTDECK_CONFIG points).
+#
+# This file is 100% optional. Without it, the system uses built-in defaults.
+# Hot-reloaded: changes take effect without server restart.
+# Section-specific notes on timing are inline.
+#
+# Precedence: hardcoded defaults ← this file ← env vars (startup-only) ← API PATCH
+
+server:
+  maxConcurrentAgents: 50    # immediate effect; min 1, max 200
+
+heartbeat:
+  idleThresholdMs: 60000           # immediate — how long before nudging idle lead
+  crewUpdateIntervalMs: 180000     # immediate — CREW_UPDATE push interval
+  staleTimerCleanupDays: 7         # next cleanup cycle
+
+models:
+  known:
+    - claude-opus-4.6
+    - claude-sonnet-4.6
+    - claude-sonnet-4.5
+    - claude-haiku-4.5
+    - claude-opus-4.5
+    - claude-sonnet-4
+    - gemini-3-pro-preview
+    - gpt-5.4
+    - gpt-5.3-codex
+    - gpt-5.2-codex
+    - gpt-5.2
+    - gpt-5.1-codex-max
+    - gpt-5.1-codex
+    - gpt-5.1
+    - gpt-5.1-codex-mini
+    - gpt-5-mini
+    - gpt-4.1
+  defaults:
+    developer: [claude-opus-4.6]
+    architect: [claude-opus-4.6]
+    code-reviewer: [gemini-3-pro-preview, claude-opus-4.6]
+    critical-reviewer: [gemini-3-pro-preview]
+    readability-reviewer: [gemini-3-pro-preview]
+    tech-writer: [claude-sonnet-4.6, gpt-5.2]
+    secretary: [gpt-4.1, gpt-5.2]
+    qa-tester: [claude-sonnet-4.6]
+    designer: [claude-opus-4.6]
+    product-manager: [gpt-5.3-codex]
+    generalist: [claude-opus-4.6]
+    radical-thinker: [gemini-3-pro-preview]
+    agent: [claude-sonnet-4.6]
+    lead: [claude-opus-4.6]
+
+roles:
+  # Override built-in role properties without code changes.
+  # Only specified fields are overridden — omitted fields keep built-in defaults.
+  # developer:
+  #   model: claude-sonnet-4.6        # override default model for developer role
+  # secretary:
+  #   model: gpt-4.1
+
+budget:
+  limit: null                         # null = unlimited, number = dollar cap
+  thresholds:
+    warning: 0.7
+    critical: 0.9
+    pause: 1.0
+
+provider:
+  id: copilot                         # 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude'
+  # sdkMode: false                    # true = use in-process SDK (Claude only), false = ACP subprocess
+  # binaryOverride: /usr/local/bin/copilot  # Override binary path (optional)
+  # argsOverride: ['--acp', '--stdio']      # Override spawn args (optional)
+  # envOverride:                             # Extra env vars (optional)
+  #   GEMINI_API_KEY: your-key-here

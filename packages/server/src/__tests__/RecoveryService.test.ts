@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RecoveryService, type RecoveryEvent, type RecoverySettings } from '../coordination/RecoveryService.js';
+import { RecoveryService, type RecoveryEvent, type RecoverySettings } from '../coordination/recovery/RecoveryService.js';
 import { Database } from '../db/database.js';
-import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import { ActivityLedger } from '../coordination/ActivityLedger.js';
-import { DecisionLog } from '../coordination/DecisionLog.js';
+import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
+import { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 
 describe('RecoveryService', () => {
   let db: Database;

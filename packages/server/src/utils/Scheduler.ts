@@ -17,11 +17,11 @@ export class Scheduler {
       try {
         await task.run();
       } catch (err) {
-        logger.debug('scheduler', `Task "${task.id}" failed`, { error: (err as Error).message });
+        logger.debug({ module: 'timer', msg: 'Task failed', taskId: task.id, err: (err as Error).message });
       }
     }, task.interval);
     this.tasks.set(task.id, { task, timer });
-    logger.info('scheduler', `Registered task "${task.id}" (every ${task.interval}ms)`);
+    logger.info({ module: 'timer', msg: 'Task registered', taskId: task.id, intervalMs: task.interval });
   }
 
   unregister(id: string): boolean {
@@ -35,7 +35,7 @@ export class Scheduler {
   stop(): void {
     for (const [id, entry] of this.tasks) {
       clearInterval(entry.timer);
-      logger.info('scheduler', `Stopped task "${id}"`);
+      logger.info({ module: 'timer', msg: 'Task stopped', taskId: id });
     }
     this.tasks.clear();
   }

@@ -45,7 +45,7 @@ function handleSpawnRequest(_ctx: CommandHandlerContext, agent: Agent, data: str
   const match = data.match(SPAWN_REQUEST_REGEX);
   if (!match) return;
 
-  logger.warn('agent', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted SPAWN_AGENT — rejected. Only the lead can create agents.`);
+  logger.warn({ module: 'agent', msg: 'SPAWN_AGENT rejected — only the lead can create agents', command: 'SPAWN_AGENT' });
   agent.sendMessage(`[System] SPAWN_AGENT is not available. Only the Project Lead can create agents using CREATE_AGENT. If you need help, ask the lead via AGENT_MESSAGE.`);
 }
 
@@ -61,7 +61,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
     const canCreate = agent.role.id === 'lead' || agent.role.id === 'architect'
       || ctx.capabilityInjector?.hasCommand(agent.id, 'CREATE_AGENT');
     if (!canCreate) {
-      logger.warn('agent', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CREATE_AGENT — only leads and architects can create agents.`);
+      logger.warn({ module: 'agent', msg: 'CREATE_AGENT rejected — only leads and architects can create agents', command: 'CREATE_AGENT' });
       agent.sendMessage(`[System] Only the Project Lead and Architects can create agents. Ask the lead if you need help from a specialist.`);
       return;
     }
@@ -83,7 +83,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
     if (role.id === 'lead') {
       child.hierarchyLevel = agent.hierarchyLevel + 1;
     }
-    logger.info('agent', `${agent.role.name} (${agent.id.slice(0, 8)}) created ${role.name}${req.model ? ` (model: ${req.model})` : ''}: ${child.id.slice(0, 8)}`);
+    logger.info({ module: 'agent', msg: 'Agent created', childAgentId: child.id, childRole: role.name, model: req.model });
 
     if (req.task) {
       const delegation: Delegation = {
@@ -157,7 +157,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       }
       const newLimit = Math.min(currentLimit + 10, MAX_CONCURRENCY_LIMIT);
       ctx.maxConcurrent = newLimit;
-      logger.info('agent', `Auto-scaled concurrency limit: ${currentLimit} → ${newLimit} (triggered by ${agent.role.name} ${agent.id.slice(0, 8)})`);
+      logger.info({ module: 'agent', msg: 'Auto-scaled concurrency limit', previousLimit: currentLimit, newLimit });
       agent.sendMessage(`[System] Concurrency limit auto-increased: ${currentLimit} → ${newLimit}. Retrying agent creation...`);
       ctx.emit('config:concurrency_changed', { old: currentLimit, new: newLimit, reason: 'auto-scale' });
 
@@ -188,7 +188,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect'
       || ctx.capabilityInjector?.hasCommand(agent.id, 'DELEGATE');
     if (!canDelegate) {
-      logger.warn('delegation', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted DELEGATE — only leads and architects can delegate.`);
+      logger.warn({ module: 'delegation', msg: 'DELEGATE rejected — only leads and architects can delegate', command: 'DELEGATE' });
       agent.sendMessage(`[System] Only the Project Lead and Architects can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
       return;
     }
@@ -225,6 +225,17 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       const dagLink = linkDelegationToDag(ctx, agent.id, child.role.id, req.task, child.id, 'DELEGATE', req.dagTaskId, req.dependsOn);
       dagNote = dagLink.dagNote;
       if (dagLink.dagTaskId) child.dagTaskId = dagLink.dagTaskId;
+    }
+
+    // Persist delegation to DB AFTER DAG linking so dagTaskId is resolved
+    if (ctx.activeDelegationRepository) {
+      try {
+        ctx.activeDelegationRepository.create(
+          delegation.id, child.id, req.task, req.context, child.dagTaskId,
+        );
+      } catch (err: any) {
+        logger.warn({ module: 'delegation', msg: 'Failed to persist delegation', delegationId: delegation.id, error: err.message });
+      }
     }
     ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
     if (req.context) ctx.agentMemory.store(agent.id, child.id, 'context', req.context.slice(0, 200));
@@ -310,9 +321,9 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
       sessionId: sessionId || null,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
-    logger.info('agent', `Lead ${agent.id.slice(0, 8)} terminated ${roleName} (${shortId})${req.reason ? ': ' + req.reason : ''}`);
+    logger.info({ module: 'agent', msg: 'Agent terminated', targetAgentId: target.id, targetRole: roleName, reason: req.reason });
   } catch (err) {
-    logger.debug('command', 'Failed to parse TERMINATE_AGENT command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'TERMINATE_AGENT', err: (err as Error).message });
   }
 }
 
@@ -325,7 +336,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
     if (!req) return;
 
     if (agent.role.id !== 'lead') {
-      logger.warn('delegation', `Non-lead agent ${agent.role.name} (${agent.id.slice(0, 8)}) attempted CANCEL_DELEGATION — rejected.`);
+      logger.warn({ module: 'delegation', msg: 'CANCEL_DELEGATION rejected — only leads can cancel', command: 'CANCEL_DELEGATION' });
       agent.sendMessage(`[System] Only the Project Lead can cancel delegations.`);
       return;
     }
@@ -349,6 +360,10 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
           del.status = 'cancelled';
           del.completedAt = new Date().toISOString();
           cancelledCount++;
+          // Persist cancellation to DB
+          if (ctx.activeDelegationRepository) {
+            try { ctx.activeDelegationRepository.cancel(del.id); } catch { /* non-critical */ }
+          }
         }
       }
 
@@ -364,7 +379,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
         clearedMessages: cleared.count,
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
-      logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${targetId.slice(0, 8)}), cleared ${cleared.count} queued message(s)`);
+      logger.info({ module: 'delegation', msg: 'Delegations cancelled', targetAgentId: targetId, targetRole: targetAgent.role.name, cancelledCount, clearedMessages: cleared.count });
 
     } else if (req.delegationId) {
       const del = ctx.delegations.get(req.delegationId);
@@ -384,6 +399,11 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
       del.status = 'cancelled';
       del.completedAt = new Date().toISOString();
 
+      // Persist cancellation to DB
+      if (ctx.activeDelegationRepository) {
+        try { ctx.activeDelegationRepository.cancel(req.delegationId); } catch { /* non-critical */ }
+      }
+
       const targetAgent = ctx.getAgent(del.toAgentId);
       const cleared = targetAgent ? targetAgent.clearPendingMessages() : { count: 0, previews: [] };
 
@@ -396,11 +416,11 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
         clearedMessages: cleared.count,
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
-      logger.info('delegation', `Lead ${agent.id.slice(0, 8)} cancelled delegation ${req.delegationId} to ${del.toRole} (${del.toAgentId.slice(0, 8)})`);
+      logger.info({ module: 'delegation', msg: 'Delegation cancelled by ID', delegationId: req.delegationId, targetAgentId: del.toAgentId, targetRole: del.toRole });
 
     }
   } catch (err) {
-    logger.debug('command', 'Failed to parse CANCEL_DELEGATION command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'CANCEL_DELEGATION', err: (err as Error).message });
   }
 }
 
@@ -483,7 +503,7 @@ function linkDelegationToDag(
     if (started) {
       dagNote = ` [DAG: "${dagTask.id}" → running]`;
       linkedTaskId = dagTask.id;
-      logger.info('delegation', `DAG linked: task "${dagTask.id}" → agent ${childId.slice(0, 8)}`);
+      logger.info({ module: 'delegation', msg: 'DAG linked', taskId: dagTask.id, childAgentId: childId });
     }
   } else if (dagTaskId) {
     dagNote = `\n⚠️ DAG task "${dagTaskId}" not found or not ready. Check TASK_STATUS.`;
@@ -492,18 +512,18 @@ function linkDelegationToDag(
     // Warn that auto-linking is fragile — explicit dagTaskId is preferred
     if (ctx.taskDAG.getTasks(leadId).length > 0) {
       const method = autoResult.linked ? 'fuzzy-matched' : autoResult.created ? 'auto-created' : 'not linked';
-      logger.warn('delegation', `${commandName} without dagTaskId — ${method} for "${task.slice(0, 80)}". Prefer explicit dagTaskId.`);
+      logger.warn({ module: 'delegation', msg: 'Command without dagTaskId', command: commandName, method, taskPreview: task.slice(0, 80) });
       dagNote += `\n⚠️ dagTaskId missing — task was ${method}. Include dagTaskId in ${commandName} to avoid mismatches.`;
     }
     if (autoResult.linked) {
       dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]` + dagNote;
       linkedTaskId = autoResult.taskId;
-      logger.info('delegation', `DAG linked: task "${autoResult.taskId}" → agent ${childId.slice(0, 8)}`);
+      logger.info({ module: 'delegation', msg: 'DAG auto-linked', taskId: autoResult.taskId, childAgentId: childId });
     } else if (autoResult.created) {
       dagNote = ` [DAG: auto-created "${autoResult.taskId}" → running]` + dagNote;
       if (autoResult.depNotes.length) dagNote += `\n  ${autoResult.depNotes.join('\n  ')}`;
       linkedTaskId = autoResult.taskId;
-      logger.info('delegation', `DAG auto-created: task "${autoResult.taskId}" → agent ${childId.slice(0, 8)}`);
+      logger.info({ module: 'delegation', msg: 'DAG auto-created', taskId: autoResult.taskId, childAgentId: childId });
     } else if (autoResult.duplicate) {
       dagNote = `\n⚠️ Similar DAG task exists: "${autoResult.duplicate}". Use dagTaskId: "${autoResult.duplicate}" to link explicitly.` + dagNote;
     }
@@ -567,7 +587,7 @@ function autoCreateDagTask(
         if (started) {
           const lead = ctx.getAgent(leadId);
           if (lead) lead.sendMessage(`[System] ℹ️ Linked delegation to existing task "${nearDuplicate.id}" (similarity: ${nearDuplicateScore.toFixed(2)}). If this is wrong, use ADD_TASK to create a separate entry.`);
-          logger.info('delegation', `DAG linked: delegation matched existing task "${nearDuplicate.id}" (was ${nearDuplicate.dagStatus})`);
+          logger.info({ module: 'delegation', msg: 'DAG linked to existing task', taskId: nearDuplicate.id, previousStatus: nearDuplicate.dagStatus, similarity: nearDuplicateScore });
           return { created: false, taskId: nearDuplicate.id, linked: true, depNotes };
         }
       }
@@ -589,7 +609,7 @@ function autoCreateDagTask(
       description: taskText,
     }, projectId);
   } catch (e: any) {
-    logger.warn('delegation', `Auto-DAG creation failed for "${autoId}": ${e.message}`);
+    logger.warn({ module: 'delegation', msg: 'Auto-DAG creation failed', taskId: autoId, err: e.message });
     return { created: false, taskId: autoId, depNotes };
   }
 
@@ -613,7 +633,7 @@ function autoCreateDagTask(
     if (added) {
       const source = tier1.includes(depId) ? 'explicit' : 'review';
       depNotes.push(`→ depends on "${depId}" (${source})`);
-      logger.info('delegation', `Auto-linked "${autoId}" → depends on "${depId}" (${source})`);
+      logger.info({ module: 'delegation', msg: 'Auto-linked dependency', taskId: autoId, dependsOn: depId, source });
     }
   }
 
@@ -747,7 +767,7 @@ export function requestSecretaryDependencyAnalysis(
     `If yes, reply with ⟦⟦ ADD_DEPENDENCY {"taskId": "${newTaskId}", "dependsOn": ["task-id-here"]} ⟧⟧. ` +
     `If no dependencies, ignore this message.`
   );
-  logger.info('delegation', `Requested Secretary dependency analysis for "${newTaskId}"`);
+  logger.info({ module: 'delegation', msg: 'Requested Secretary dependency analysis', taskId: newTaskId });
 }
 
 // ── DAG-aware group chat suggestions ──────────────────────────────────
@@ -849,7 +869,7 @@ export function maybeSuggestDagGroup(
       `⟦⟦ CREATE_GROUP {"name": "${groupName}", "members": ${memberIds}} ⟧⟧`
     );
     alreadySuggested.add(groupName);
-    logger.info('delegation', `Suggested group "${groupName}" for ${agentIds.size} agents on ${keyword} tasks`);
+    logger.info({ module: 'delegation', msg: 'Suggested group for task agents', groupName, agentCount: agentIds.size, keyword });
     break; // One suggestion per delegation event
   }
 }

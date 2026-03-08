@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DecisionRecordStore } from '../coordination/DecisionRecords.js';
-import { DecisionLog } from '../coordination/DecisionLog.js';
-import type { Decision } from '../coordination/DecisionLog.js';
+import { DecisionRecordStore } from '../coordination/decisions/DecisionRecords.js';
+import { DecisionLog } from '../coordination/decisions/DecisionLog.js';
+import type { Decision } from '../coordination/decisions/DecisionLog.js';
 import { Database } from '../db/database.js';
 
 function makeDecision(overrides: Partial<Decision> = {}): Decision {

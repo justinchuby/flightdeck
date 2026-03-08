@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { NotificationService } from '../coordination/NotificationService.js';
+import { NotificationService } from '../coordination/alerts/NotificationService.js';
 
 export function notificationRoutes(ctx: AppContext): Router {
   const { db } = ctx;

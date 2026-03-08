@@ -1,6 +1,6 @@
 {
   "name": "@flightdeck-ai/flightdeck",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Flightdeck - AI crew management platform",
   "license": "MIT",
   "repository": {
@@ -16,12 +16,14 @@
     "flightdeck": "./bin/flightdeck.mjs"
   },
   "workspaces": [
+    "packages/shared",
     "packages/server",
     "packages/web",
     "packages/docs"
   ],
   "files": [
     "bin/",
+    "packages/shared/dist/",
     "packages/server/dist/",
     "!packages/server/dist/__tests__/",
     "!**/*.map",
@@ -42,7 +44,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
-    "build": "npm run build --workspace=packages/server && npm run build --workspace=packages/web",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web",
     "lint": "eslint packages/*/src --ext .ts,.tsx",
     "test:e2e": "npm run test:e2e --workspace=packages/web",
     "test": "npm run test --workspace=packages/server",

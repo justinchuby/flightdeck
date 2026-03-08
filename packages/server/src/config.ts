@@ -1,4 +1,5 @@
 import { existsSync, renameSync } from 'fs';
+import { logger } from './utils/logger.js';
 
 /** Hard ceiling for auto-scaling concurrency. Prevents runaway agent spawning. */
 export const MAX_CONCURRENCY_LIMIT = 200;
@@ -8,6 +9,16 @@ export interface ServerConfig {
   host: string;
   cliCommand: string;
   cliArgs: string[];
+  /** Provider ID for the CLI adapter (e.g., 'copilot', 'gemini', 'claude') */
+  provider: string;
+  /** Use in-process SDK instead of ACP subprocess (Claude only, default: false) */
+  sdkMode: boolean;
+  /** Override the preset binary (from config YAML provider.binaryOverride) */
+  providerBinaryOverride?: string;
+  /** Override the preset args (from config YAML provider.argsOverride) */
+  providerArgsOverride?: string[];
+  /** Extra env vars for the CLI process (from config YAML provider.envOverride) */
+  providerEnvOverride?: Record<string, string>;
   maxConcurrentAgents: number;
   dbPath: string;
 }
@@ -31,7 +42,7 @@ function resolveDbPath(explicit: string | undefined): string {
           renameSync(legacyPath + suffix, newPath + suffix);
         }
       }
-      console.log(`📦 Migrated database: ${legacyPath} → ${newPath}`);
+      logger.info({ module: 'config', msg: 'Database migrated', legacyPath, newPath });
     } catch {
       // If rename fails (e.g. permissions), fall back to legacy path
       return legacyPath;
@@ -44,6 +55,8 @@ function resolveDbPath(explicit: string | undefined): string {
 const defaults: ServerConfig = {
   port: parseInt(process.env.PORT || '3001', 10),
   host: process.env.HOST || '127.0.0.1',
+  provider: process.env.CLI_PROVIDER || 'copilot',
+  sdkMode: process.env.SDK_MODE === 'true',
   cliCommand: process.env.COPILOT_CLI_PATH || 'copilot',
   cliArgs: [],
   maxConcurrentAgents: parseInt(process.env.MAX_AGENTS || '50', 10),

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AlertEngine } from '../coordination/AlertEngine.js';
-import type { Alert, AlertAction } from '../coordination/AlertEngine.js';
+import { AlertEngine } from '../coordination/alerts/AlertEngine.js';
+import type { Alert, AlertAction } from '../coordination/alerts/AlertEngine.js';
 
 describe('AlertEngine — Actionable Alerts', () => {
   it('Alert interface supports actions array', () => {

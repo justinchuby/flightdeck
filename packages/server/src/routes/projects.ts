@@ -6,7 +6,7 @@ import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateMod
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -14,7 +14,21 @@ export function projectsRoutes(ctx: AppContext): Router {
   router.get('/projects', (_req, res) => {
     if (!projectRegistry) return res.json([]);
     const status = typeof _req.query.status === 'string' ? _req.query.status : undefined;
-    res.json(projectRegistry.list(status));
+    const projects = projectRegistry.list(status);
+
+    // Enrich with storage info and active agent counts
+    const allAgents = agentManager.getAll();
+    const enriched = projects.map((p) => {
+      const activeAgents = allAgents.filter(
+        (a) => a.projectId === p.id && (a.status === 'running' || a.status === 'idle')
+      );
+      return {
+        ...p,
+        activeAgentCount: activeAgents.length,
+        storageMode: storageManager?.getStorageMode(p.id) ?? 'user',
+      };
+    });
+    res.json(enriched);
   });
 
   router.get('/projects/:id', (req, res) => {
@@ -24,7 +38,17 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     const sessions = projectRegistry.getSessions(project.id);
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
-    res.json({ ...project, sessions, activeLeadId });
+    const allAgents = agentManager.getAll();
+    const activeAgents = allAgents.filter(
+      (a) => a.projectId === project.id && (a.status === 'running' || a.status === 'idle')
+    );
+    res.json({
+      ...project,
+      sessions,
+      activeLeadId,
+      activeAgentCount: activeAgents.length,
+      storageMode: storageManager?.getStorageMode(project.id) ?? 'user',
+    });
   });
 
   // Historical DAG tasks for a project (from database)
@@ -185,7 +209,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     const { name, description, cwd } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
     const project = projectRegistry.create(name, description, cwd);
-    logger.info('project', `Created project "${name}" (${project.id.slice(0, 8)})`);
+    logger.info({ module: 'project', msg: 'Project created', projectId: project.id, name });
     res.status(201).json(project);
   });
 
@@ -196,7 +220,7 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     const { name, description, cwd, status } = req.body;
     projectRegistry.update(req.params.id, { name, description, cwd, status });
-    logger.info('project', `Updated project "${project.name}" (${project.id.slice(0, 8)})`);
+    logger.info({ module: 'project', msg: 'Project updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.get(req.params.id));
   });
 
@@ -263,14 +287,14 @@ export function projectsRoutes(ctx: AppContext): Router {
         }, 5000);
       }
 
-      logger.info('project', `Resumed project "${project.name}" with new lead (${agent.id.slice(0, 8)})`);
+      logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });
 
       // Auto-spawn Secretary for DAG tracking (skips if one exists)
       agentManager.autoSpawnSecretary(agent);
 
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
-      logger.error('project', `Failed to resume project: ${err.message}`);
+      logger.error({ module: 'project', msg: 'Failed to resume project', err: err.message });
       // Only expose rate-limit messages; sanitize all other errors
       const isRateLimit = err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('limit');
       res.status(isRateLimit ? 429 : 500).json({
@@ -284,7 +308,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const deleted = projectRegistry.delete(req.params.id as string);
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
-    logger.info('project', `Deleted project ${(req.params.id as string).slice(0, 8)}`);
+    logger.info({ module: 'project', msg: 'Project deleted', projectId: req.params.id });
     res.json({ ok: true });
   });
 
@@ -320,7 +344,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     }
 
     projectRegistry.setModelConfig(req.params.id, config);
-    logger.info('project', `Updated model config for project "${project.name}" (${project.id.slice(0, 8)})`);
+    logger.info({ module: 'project', msg: 'Model config updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.getModelConfig(req.params.id));
   });
 

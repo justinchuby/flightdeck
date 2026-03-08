@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import type { ContentBlock } from '@agentclientprotocol/sdk';
+import type { ContentBlock } from '../adapters/types.js';
 import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';

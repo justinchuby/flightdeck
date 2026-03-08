@@ -4,7 +4,9 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { eq } from 'drizzle-orm';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
 import * as schema from './schema.js';
+import { logger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.join(__dirname, '../../drizzle');
@@ -19,7 +21,7 @@ export class Database {
     this.db.pragma('foreign_keys = ON');
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('busy_timeout = 5000');
-    this.db.pragma('cache_size = -64000');
+    this.db.pragma('cache_size = -256000');
     this.db.pragma('wal_checkpoint(PASSIVE)');
     this.drizzle = drizzle(this.db, { schema });
     migrate(this.drizzle, { migrationsFolder });
@@ -45,6 +47,33 @@ export class Database {
 
   close(): void {
     this.db.close();
+  }
+
+  /** Check WAL file size and log a warning if it exceeds the threshold */
+  checkWalSize(thresholdBytes: number = 100 * 1024 * 1024): { walSizeBytes: number; warning: boolean } {
+    const dbPath = this.db.name;
+    if (!dbPath || dbPath === ':memory:') return { walSizeBytes: 0, warning: false };
+
+    const walPath = `${dbPath}-wal`;
+    try {
+      const stat = fs.statSync(walPath);
+      const walSizeBytes = stat.size;
+      const warning = walSizeBytes > thresholdBytes;
+      if (warning) {
+        const sizeMB = (walSizeBytes / (1024 * 1024)).toFixed(1);
+        const threshMB = (thresholdBytes / (1024 * 1024)).toFixed(0);
+        logger.warn('db', `WAL file is ${sizeMB}MB (threshold: ${threshMB}MB). Consider running PRAGMA wal_checkpoint(TRUNCATE).`);
+      }
+      return { walSizeBytes, warning };
+    } catch {
+      // WAL file may not exist yet (no writes since last checkpoint)
+      return { walSizeBytes: 0, warning: false };
+    }
+  }
+
+  /** Force a WAL checkpoint to reclaim space */
+  walCheckpoint(mode: 'PASSIVE' | 'FULL' | 'RESTART' | 'TRUNCATE' = 'PASSIVE'): void {
+    this.db.pragma(`wal_checkpoint(${mode})`);
   }
 
   /** Get a setting value from the settings table */

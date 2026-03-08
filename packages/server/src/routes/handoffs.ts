@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { HandoffService } from '../coordination/HandoffService.js';
+import { HandoffService } from '../coordination/recovery/HandoffService.js';
 
 export function handoffRoutes(ctx: AppContext): Router {
   const { db, lockRegistry, decisionLog } = ctx;

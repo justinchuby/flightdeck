@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ReportGenerator, escapeHtml, type ReportData } from '../coordination/ReportGenerator.js';
+import { ReportGenerator, escapeHtml, type ReportData } from '../coordination/reporting/ReportGenerator.js';
 
 // ── Fixtures ──────────────────────────────────────────────────────
 

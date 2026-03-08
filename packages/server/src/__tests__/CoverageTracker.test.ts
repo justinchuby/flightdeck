@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CoverageTracker } from '../coordination/CoverageTracker.js';
-import type { CoverageSnapshot } from '../coordination/CoverageTracker.js';
+import { CoverageTracker } from '../coordination/code-quality/CoverageTracker.js';
+import type { CoverageSnapshot } from '../coordination/code-quality/CoverageTracker.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 

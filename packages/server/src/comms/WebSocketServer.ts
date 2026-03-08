@@ -1,13 +1,16 @@
 import { Server as HttpServer } from 'http';
+import { v4 as uuid } from 'uuid';
 import { WebSocketServer as WsServer, WebSocket } from 'ws';
 import type { AgentManager } from '../agents/AgentManager.js';
-import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import type { ActivityLedger } from '../coordination/ActivityLedger.js';
-import type { DecisionLog, Decision } from '../coordination/DecisionLog.js';
+import type { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
+import type { DecisionLog, Decision } from '../coordination/decisions/DecisionLog.js';
 import type { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
 import { getAuthSecret } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
-import { v4 as uuid } from 'uuid';
+import { redactWsMessage } from '../utils/redaction.js';
+import { runWithWsContext } from '../middleware/requestContext.js';
+import type { AgentServerHealth, HealthStateChange } from '../agents/AgentServerHealth.js';
 
 interface ClientConnection {
   id: string;
@@ -48,7 +51,7 @@ export class WebSocketServer {
     // EADDRINUSE is handled by listenWithRetry in index.ts (auto-port-finding);
     // this handler catches any residual or runtime WSS errors.
     this.wss.on('error', (err: Error & { code?: string }) => {
-      logger.error('ws', `WebSocket server error: ${err.message}`);
+      logger.error({ module: 'comms', msg: 'WebSocket server error', err: err.message });
     });
 
     this.wss.on('connection', (ws, req) => {
@@ -370,6 +373,7 @@ export class WebSocketServer {
     client: ClientConnection,
     msg: any,
   ): void {
+    runWithWsContext(client.id, client.subscribedProject ?? undefined, () => {
     switch (msg.type) {
       case 'subscribe':
         // Subscribe to agent output (or '*' for all)
@@ -416,10 +420,10 @@ export class WebSocketServer {
         if (msg.agentId) {
           const agent = this.agentManager.get(msg.agentId);
           if (agent) {
-            logger.info('ws', `Input → ${agent.role.name} (${msg.agentId.slice(0, 8)}): "${(msg.text || '').slice(0, 80)}"`);
+            logger.info({ module: 'comms', msg: 'WS input', agentId: msg.agentId, roleName: agent.role.name, textPreview: (msg.text || '').slice(0, 80) });
             agent.write(msg.text, { priority: true });
           } else {
-            logger.warn('ws', `Input for unknown agent ${msg.agentId.slice(0, 8)}`);
+            logger.warn({ module: 'comms', msg: 'Input for unknown agent', agentId: msg.agentId });
           }
         }
         break;
@@ -444,10 +448,11 @@ export class WebSocketServer {
         this.decisionLog.resumeTimers();
         break;
     }
+    }); // end runWithWsContext
   }
 
   private broadcast(msg: any, filter: (c: ClientConnection) => boolean): void {
-    const payload = JSON.stringify(msg);
+    const payload = JSON.stringify(redactWsMessage(msg));
     for (const client of this.clients.values()) {
       if (client.ws.readyState === WebSocket.OPEN && filter(client)) {
         try {
@@ -479,6 +484,31 @@ export class WebSocketServer {
   /** Public broadcast for external event sources (e.g., AlertEngine, TimerRegistry) */
   broadcastEvent(msg: any, projectId?: string): void {
     this.broadcastToProject(msg, projectId);
+  }
+
+  /**
+   * Wire AgentServerHealth state changes → WS 'agentServerStatus' events.
+   * Broadcasts to all clients (global, not project-scoped) so the UI connection
+   * status banner (AS19) can show degraded/disconnected state.
+   */
+  wireAgentServerHealth(health: AgentServerHealth): () => void {
+    const unsub = health.onStateChange((change: HealthStateChange) => {
+      let detail: string | undefined;
+      if (change.current === 'degraded') {
+        detail = `${change.missedPongs} missed pong(s)`;
+      } else if (change.current === 'disconnected') {
+        detail = 'Agent server unreachable';
+      }
+
+      this.broadcastAll({
+        type: 'agentServerStatus',
+        state: change.current,
+        detail,
+      });
+    });
+
+    this.eventCleanups.push(unsub);
+    return unsub;
   }
 
   /** Flush buffered agent:text events — coalesces rapid text chunks into single WS messages */

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { CommunityPlaybookService } from '../coordination/CommunityPlaybookService.js';
-import type { PlaybookCategory } from '../coordination/CommunityPlaybookService.js';
+import { CommunityPlaybookService } from '../coordination/playbooks/CommunityPlaybookService.js';
+import type { PlaybookCategory } from '../coordination/playbooks/CommunityPlaybookService.js';
 
 export function communityRoutes(ctx: AppContext): Router {
   const service = new CommunityPlaybookService(ctx.db);

@@ -8,6 +8,7 @@ import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, Delegation } from './types.js';
 import type { DagTask } from '../../tasks/TaskDAG.js';
 import { logger } from '../../utils/logger.js';
+import { redact } from '../../utils/redaction.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -60,7 +61,11 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
     if (del.toAgentId === agent.id && del.status === 'active') {
       del.status = 'completed';
       del.completedAt = new Date().toISOString();
-      del.result = agent.getTaskOutput(16000);
+      del.result = redact(agent.getTaskOutput(16000)).text;
+      // Persist completion to DB
+      if (ctx.activeDelegationRepository) {
+        try { ctx.activeDelegationRepository.complete(del.id); } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -131,7 +136,13 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
       if (del.toAgentId === agent.id && del.status === 'active') {
         del.status = exitCode === 0 ? 'completed' : 'failed';
         del.completedAt = new Date().toISOString();
-        del.result = agent.getTaskOutput(16000);
+        del.result = redact(agent.getTaskOutput(16000)).text;
+        if (ctx.activeDelegationRepository) {
+          try {
+            if (del.status === 'completed') ctx.activeDelegationRepository.complete(del.id);
+            else ctx.activeDelegationRepository.fail(del.id);
+          } catch { /* non-critical */ }
+        }
       }
     }
     return;
@@ -141,7 +152,13 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
     if (del.toAgentId === agent.id && del.status === 'active') {
       del.status = exitCode === 0 ? 'completed' : 'failed';
       del.completedAt = new Date().toISOString();
-      del.result = agent.getTaskOutput(16000);
+      del.result = redact(agent.getTaskOutput(16000)).text;
+      if (ctx.activeDelegationRepository) {
+        try {
+          if (del.status === 'completed') ctx.activeDelegationRepository.complete(del.id);
+          else ctx.activeDelegationRepository.fail(del.id);
+        } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -223,6 +240,9 @@ export function completeDelegationsForAgent(ctx: CommandHandlerContext, agentId:
   for (const [, del] of ctx.delegations) {
     if (del.status === 'active' && del.toAgentId === agentId) {
       del.status = 'failed';
+      if (ctx.activeDelegationRepository) {
+        try { ctx.activeDelegationRepository.fail(del.id); } catch { /* non-critical */ }
+      }
     }
   }
 }

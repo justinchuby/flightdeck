@@ -1,71 +1,51 @@
-export interface DagTask {
-  id: string;
-  leadId: string;
-  role: string;
-  title?: string;
-  description: string;
-  files: string[];
-  dependsOn: string[];
-  dagStatus: 'pending' | 'ready' | 'running' | 'done' | 'failed' | 'blocked' | 'paused' | 'skipped';
-  priority: number;
-  model?: string;
-  assignedAgentId?: string;
-  createdAt: string;
-  startedAt?: string;
-  completedAt?: string;
-}
+// ── Shared domain types (single source of truth) ─────────────────
+// These types are defined in @flightdeck/shared and re-exported here
+// for backward compatibility. Fixes 3 drift bugs:
+//   1. Delegation.status now includes 'cancelled' | 'terminated'
+//   2. DagTask now includes projectId
+//   3. ChatGroup now includes archived
+export type {
+  AgentStatus,
+  DagTask,
+  DagTaskStatus,
+  ChatGroup,
+  GroupMessage,
+  Decision,
+  DecisionStatus,
+  DecisionCategory,
+  Delegation,
+  DelegationStatus,
+  Role,
+  ActionType,
+  FileLock,
+} from '@flightdeck/shared';
 
-// Persistent project (survives lead sessions)
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  cwd: string | null;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
+// Import shared types for use in local type extensions
+import type {
+  AgentStatus,
+  DagTask,
+  Delegation,
+  Role,
+  Project as SharedProject,
+  ProjectSession as SharedProjectSession,
+  Timer,
+} from '@flightdeck/shared';
+
+// ── Web extensions of shared types ────────────────────────────────
+
+// Project with web-specific fields (sessions list, active lead)
+export interface Project extends SharedProject {
   sessions?: ProjectSession[];
   activeLeadId?: string;
 }
 
-export interface ProjectSession {
-  id: number;
-  projectId: string;
-  leadId: string;
-  sessionId: string | null;
-  task: string | null;
-  status: string;
-  startedAt: string;
-  endedAt: string | null;
-}
+export interface ProjectSession extends SharedProjectSession {}
 
 export interface DagStatus {
   tasks: DagTask[];
   fileLockMap: Record<string, { taskId: string; agentId?: string }>;
   summary: { pending: number; ready: number; running: number; done: number; failed: number; blocked: number; paused: number; skipped: number };
 }
-
-export interface ChatGroup {
-  name: string;
-  leadId: string;
-  projectId?: string;
-  memberIds: string[];
-  createdAt: string;
-}
-
-export interface GroupMessage {
-  id: string;
-  groupName: string;
-  leadId: string;
-  projectId?: string;
-  fromAgentId: string;
-  fromRole: string;
-  content: string;
-  timestamp: string;
-  reactions?: Record<string, string[]>; // { emoji: [agentId, ...] }
-}
-
-export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
 
 // ACP Protocol Types
 
@@ -117,16 +97,7 @@ export interface AcpSessionInfo {
   isPrompting: boolean;
 }
 
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  systemPrompt: string;
-  color: string;
-  icon: string;
-  builtIn: boolean;
-  model?: string;
-}
+// Role is re-exported from shared above (includes receivesStatusUpdates)
 
 export interface AgentInfo {
   id: string;
@@ -184,33 +155,9 @@ export interface WsMessage {
   [key: string]: any;
 }
 
-export interface Decision {
-  id: string;
-  agentId: string;
-  agentRole: string;
-  projectId?: string;
-  title: string;
-  rationale: string;
-  needsConfirmation?: boolean;
-  status?: 'recorded' | 'confirmed' | 'rejected' | 'dismissed';
-  autoApproved?: boolean;
-  confirmedAt?: string | null;
-  category?: string;
-  timestamp: string;
-}
+// Decision is re-exported from shared above (with proper non-optional fields)
 
-export interface Delegation {
-  id: string;
-  fromAgentId: string;
-  toAgentId: string;
-  toRole: string;
-  task: string;
-  context?: string;
-  status: 'active' | 'completed' | 'failed';
-  createdAt: string;
-  completedAt?: string;
-  result?: string;
-}
+// Delegation is re-exported from shared above (now includes 'cancelled' | 'terminated' statuses)
 
 export interface LeadProgress {
   totalDelegations: number;
@@ -236,17 +183,7 @@ export interface LeadProgress {
 
 // ── Cost Tracking ─────────────────────────────────────────────────
 
-export interface TimerInfo {
-  id: string;
-  agentId: string;
-  agentRole?: string;
-  label: string;
-  message: string;
-  fireAt: number;
-  createdAt: string;
-  status: 'pending' | 'fired' | 'cancelled';
-  repeat: boolean;
-  delaySeconds: number;
+export interface TimerInfo extends Timer {
   remainingMs: number;
 }
 

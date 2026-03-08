@@ -5,7 +5,7 @@ import {
   OrphanManager,
   resolveLastSeenEventId,
   type CausalEvent,
-} from '../coordination/ProjectionUtils.js';
+} from '../coordination/events/ProjectionUtils.js';
 
 // ── walkCausalGraph ───────────────────────────────────────────────
 

@@ -205,15 +205,15 @@ beforeAll(async () => {
   const app = express();
   app.use(express.json());
 
-  const router = apiRouter(
-    mockAgentManager as any,
-    mockRoleRegistry as any,
-    mockConfig,
-    mockDb,
-    mockLockRegistry as any,
-    mockActivityLedger as any,
-    mockDecisionLog as any,
-  );
+  const router = apiRouter({
+    agentManager: mockAgentManager,
+    roleRegistry: mockRoleRegistry,
+    config: mockConfig,
+    db: mockDb,
+    lockRegistry: mockLockRegistry,
+    activityLedger: mockActivityLedger,
+    decisionLog: mockDecisionLog,
+  } as any);
   app.use('/api', router);
 
   await new Promise<void>((resolve) => {

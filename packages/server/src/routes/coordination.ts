@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import type { ActionType } from '../coordination/ActivityLedger.js';
+import type { ActionType } from '../coordination/activity/ActivityLedger.js';
 import { validateBody, acquireLockSchema } from '../validation/schemas.js';
-import { extractCommFromActivity } from '../coordination/CommEventExtractor.js';
+import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
 
 export function coordinationRoutes(ctx: AppContext): Router {

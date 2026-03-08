@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PlaybookService, type Playbook, type PlaybookInput } from '../coordination/PlaybookService.js';
+import { PlaybookService, type Playbook, type PlaybookInput } from '../coordination/playbooks/PlaybookService.js';
 
 function createMockDb() {
   const settings = new Map<string, string>();

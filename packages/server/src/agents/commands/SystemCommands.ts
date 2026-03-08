@@ -10,8 +10,8 @@ import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.js';
 import { deriveArgs } from './CommandHelp.js';
-import { formatQueryCrew } from '../../coordination/CrewFormatter.js';
-import type { CrewMember } from '../../coordination/CrewFormatter.js';
+import { formatQueryCrew } from '../../coordination/agents/CrewFormatter.js';
+import type { CrewMember } from '../../coordination/agents/CrewFormatter.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 

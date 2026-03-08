@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SearchEngine } from '../coordination/SearchEngine.js';
-import type { ActivityLedger, ActivityEntry } from '../coordination/ActivityLedger.js';
-import type { DecisionLog, Decision } from '../coordination/DecisionLog.js';
+import { SearchEngine } from '../coordination/knowledge/SearchEngine.js';
+import type { ActivityLedger, ActivityEntry } from '../coordination/activity/ActivityLedger.js';
+import type { DecisionLog, Decision } from '../coordination/decisions/DecisionLog.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

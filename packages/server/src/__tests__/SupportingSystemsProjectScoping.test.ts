@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Database } from '../db/database.js';
-import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import { ActivityLedger } from '../coordination/ActivityLedger.js';
-import { CollectiveMemory } from '../coordination/CollectiveMemory.js';
+import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
+import { CollectiveMemory } from '../coordination/knowledge/CollectiveMemory.js';
 
 // ── FileLockRegistry Project Scoping ─────────────────────────────────
 

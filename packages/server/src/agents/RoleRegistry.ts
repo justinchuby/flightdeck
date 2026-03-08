@@ -1,19 +1,8 @@
 import { eq, and } from 'drizzle-orm';
 import { roles as rolesTable } from '../db/schema.js';
 
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  systemPrompt: string;
-  color: string;
-  icon: string;
-  builtIn: boolean;
-  /** Default model to use for agents with this role (e.g. "claude-sonnet-4.6"). Undefined = CLI default. */
-  model?: string;
-  /** If true, this role receives periodic health headers in CREW_UPDATE (like the lead). */
-  receivesStatusUpdates?: boolean;
-}
+import type { Role } from '@flightdeck/shared';
+export type { Role } from '@flightdeck/shared';
 
 const BUILT_IN_ROLES: Role[] = [
   {

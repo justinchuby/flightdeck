@@ -37,7 +37,7 @@ export class EagerScheduler extends EventEmitter {
   start(intervalMs: number = 15_000): void {
     if (this.evaluateTimer) return;
     this.evaluateTimer = setInterval(() => this.evaluate(), intervalMs);
-    logger.info('eager-scheduler', 'Started eager task evaluation');
+    logger.info({ module: 'timer', msg: 'Started eager task evaluation' });
   }
 
   stop(): void {
@@ -92,8 +92,7 @@ export class EagerScheduler extends EventEmitter {
           this.preAssignments.set(task.id, assignment);
           newAssignments.push(assignment);
           this.emit('task:pre-assigned', assignment);
-          logger.info('eager-scheduler',
-            `Pre-assigned task "${task.description || task.id}" — waiting on ${unsatisfiedDeps[0].slice(0, 8)}`);
+          logger.info({ module: 'timer', msg: 'Task pre-assigned', taskId: task.id, description: task.description, waitingOn: unsatisfiedDeps[0] });
         }
       }
     }
@@ -123,8 +122,7 @@ export class EagerScheduler extends EventEmitter {
         readyTasks.push(taskId);
         this.preAssignments.delete(taskId);
         this.emit('task:ready', { taskId, preAssignedAt: assignment.assignedAt, delayMs: elapsedMs });
-        logger.info('eager-scheduler',
-          `Task "${taskId.slice(0, 8)}" is now ready (was pre-assigned ${Math.round(elapsedMs / 1000)}s ago)`);
+        logger.info({ module: 'timer', msg: 'Task ready', taskId, preAssignedSecs: Math.round(elapsedMs / 1000) });
       } else {
         assignment.readyCondition = remaining;
       }

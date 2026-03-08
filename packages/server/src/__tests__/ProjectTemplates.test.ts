@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProjectTemplateRegistry } from '../coordination/ProjectTemplates.js';
-import type { ProjectTemplate } from '../coordination/ProjectTemplates.js';
+import { ProjectTemplateRegistry } from '../coordination/playbooks/ProjectTemplates.js';
+import type { ProjectTemplate } from '../coordination/playbooks/ProjectTemplates.js';
 
 describe('ProjectTemplateRegistry', () => {
   let registry: ProjectTemplateRegistry;

@@ -3,8 +3,8 @@ import {
   formatCrewUpdate,
   formatQueryCrew,
   shortenModel,
-} from '../coordination/CrewFormatter.js';
-import type { CrewMember } from '../coordination/CrewFormatter.js';
+} from '../coordination/agents/CrewFormatter.js';
+import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
 
 function makeMember(overrides: Partial<CrewMember> = {}): CrewMember {
   return {

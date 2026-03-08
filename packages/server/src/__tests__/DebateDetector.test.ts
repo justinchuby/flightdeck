@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { DebateDetector, type Debate } from '../coordination/DebateDetector.js';
+import { DebateDetector, type Debate } from '../coordination/decisions/DebateDetector.js';
 import type { GroupMessage, ChatGroup } from '../comms/ChatGroupRegistry.js';
 
 function makeMsg(overrides: Partial<GroupMessage> & { content: string }): GroupMessage {

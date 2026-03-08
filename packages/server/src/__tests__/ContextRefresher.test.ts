@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ContextRefresher } from '../coordination/ContextRefresher.js';
+import { ContextRefresher } from '../coordination/agents/ContextRefresher.js';
 import { EventEmitter } from 'events';
 
 function makeAgent(overrides: Record<string, any> = {}) {

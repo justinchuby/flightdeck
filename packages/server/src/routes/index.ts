@@ -27,6 +27,8 @@ import { nlRoutes } from './nl.js';
 import { conflictRoutes } from './conflicts.js';
 import { communityRoutes } from './community.js';
 import { dataRoutes } from './data.js';
+import { knowledgeRoutes } from './knowledge.js';
+import { teamsRoutes } from './teams.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -56,4 +58,6 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(conflictRoutes(ctx));
   router.use(communityRoutes(ctx));
   router.use(dataRoutes(ctx));
+  router.use(knowledgeRoutes(ctx));
+  router.use(teamsRoutes(ctx));
 }

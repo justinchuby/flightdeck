@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { RecoveryService } from '../coordination/RecoveryService.js';
+import { RecoveryService } from '../coordination/recovery/RecoveryService.js';
 
 export function recoveryRoutes(ctx: AppContext): Router {
   const { db, lockRegistry, activityLedger, decisionLog } = ctx;

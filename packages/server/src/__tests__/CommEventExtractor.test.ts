@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractCommFromActivity } from '../coordination/CommEventExtractor.js';
-import type { ActivityEntry } from '../coordination/ActivityLedger.js';
+import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
+import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
 const BASE_TIMESTAMP = '2026-03-01T12:00:00.000Z';
 

@@ -1,16 +1,19 @@
 import { v4 as uuid } from 'uuid';
 import { createHash } from 'crypto';
-import type { AcpConnection, ToolCallInfo, PlanEntry, PromptContent } from '../acp/AcpConnection.js';
+import type { AgentAdapter, ToolCallInfo, PlanEntry, PromptContent } from '../adapters/types.js';
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
 import type { UsageInfo, CompactionInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
-import { formatCrewUpdate } from '../coordination/CrewFormatter.js';
-import type { CrewMember } from '../coordination/CrewFormatter.js';
+import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
+import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
 
-export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
+import type { AgentStatus } from '@flightdeck/shared';
+export type { AgentStatus } from '@flightdeck/shared';
+import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
 
 export function isTerminalStatus(status: AgentStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'terminated';
@@ -118,13 +121,16 @@ export class Agent {
   /** When true, message delivery is halted — messages stay queued */
   public systemPaused = false;
 
-  private acpConnection: AcpConnection | null = null;
+  private acpConnection: AgentAdapter | null = null;
   private config: ServerConfig;
-  private pendingMessages: PromptContent[] = [];
+  /** Each pending message tracks its optional DB row ID for crash-safe delivery */
+  private pendingMessages: Array<{ content: PromptContent; mqId?: number }> = [];
   private pendingPriorityCount = 0;
   private static readonly MAX_PENDING_MESSAGES = 200;
   private peers: AgentContextInfo[];
   private readonly events = new AgentEventEmitter();
+  /** Optional crash-safe message persistence (write-on-enqueue pattern) */
+  private messageQueueStore?: MessageQueueStore;
 
   /** Resume a previous session by its Copilot session ID */
   public resumeSessionId?: string;
@@ -160,7 +166,7 @@ export class Agent {
   }
 
   // ── Internal methods used by AgentAcpBridge ─────────────────────────────
-  /** @internal */ _setAcpConnection(conn: AcpConnection): void { this.acpConnection = conn; }
+  /** @internal */ _setAcpConnection(conn: AgentAdapter): void { this.acpConnection = conn; }
   /** @internal */ _notifyData(data: string): void { this.events.notifyData(data); }
   /** @internal */ _notifyContent(content: any): void { this.events.notifyContent(content); }
   /** @internal */ _notifyThinking(text: string): void { this.events.notifyThinking(text); }
@@ -178,7 +184,10 @@ export class Agent {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
       if (this.pendingPriorityCount > 0) this.pendingPriorityCount--;
-      this.write(next);
+      this.write(next.content);
+      if (next.mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -381,7 +390,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
     if (this.acpConnection?.isConnected) {
       this.acpConnection.prompt(update).catch((err) => {
-        logger.warn('agent', `Context update failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message}`);
+        logger.warn({ module: 'agent', msg: 'Context update failed', role: this.role.name, err: err?.message });
       });
     }
     return true;
@@ -393,7 +402,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       this.status = 'running';
       this.events.notifyStatus(this.status);
       this.acpConnection.prompt(data, opts).catch((err) => {
-        logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
+        logger.error({ module: 'agent', msg: 'Prompt failed', role: this.role.name, err: String(err?.message || err) });
         // Reset status so agent doesn't get stuck as 'running'
         if (this.status === 'running') {
           this.status = 'idle';
@@ -408,6 +417,11 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     this.write(message, opts);
   }
 
+  /** Inject the crash-safe message queue store (called by AgentManager after construction) */
+  setMessageQueueStore(store: MessageQueueStore): void {
+    this.messageQueueStore = store;
+  }
+
   /**
    * Queue a message for delivery after the agent finishes its current prompt.
    * If `opts.priority` is true, the message is inserted after existing priority
@@ -416,39 +430,65 @@ When you discover something important about the codebase, a pattern, a gotcha, o
    * Priority messages (e.g. user messages) are NEVER dropped.
    */
   queueMessage(message: PromptContent, opts?: { priority?: boolean }): void {
+    // Write to DB FIRST for crash safety (write-on-enqueue pattern)
+    let mqId: number | undefined;
+    if (this.messageQueueStore) {
+      try {
+        const payload = typeof message === 'string' ? message : JSON.stringify(message);
+        mqId = this.messageQueueStore.enqueue(this.id, 'agent_message', payload);
+      } catch (err: any) {
+        logger.warn({ module: 'comms', msg: 'Failed to persist message to queue', agentId: this.id, error: err.message });
+      }
+    }
+
     if (this.systemPaused) {
-      this.enqueueMessage(message, opts?.priority);
+      this.enqueueMessage(message, opts?.priority, mqId);
       return;
     }
     if (this.status === 'idle') {
       this.write(message, opts);
+      // Mark delivered immediately since we wrote directly
+      if (mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+      }
     } else {
-      this.enqueueMessage(message, opts?.priority);
+      this.enqueueMessage(message, opts?.priority, mqId);
     }
   }
 
   /** Internal: insert message into pendingMessages with FIFO priority ordering and rate limiting */
-  private enqueueMessage(message: PromptContent, priority?: boolean): void {
+  private enqueueMessage(message: PromptContent, priority?: boolean, mqId?: number): void {
     if (!priority && this.pendingMessages.length >= Agent.MAX_PENDING_MESSAGES) {
-      logger.warn('agent', `Message queue full (${Agent.MAX_PENDING_MESSAGES}) for ${this.role.name} (${this.id.slice(0, 8)}) — dropping non-priority message`);
+      logger.warn({ module: 'agent', msg: 'Message queue full — dropping non-priority message', role: this.role.name, maxMessages: Agent.MAX_PENDING_MESSAGES });
+      // Bug fix: mark the DB row as delivered so it doesn't replay on restart
+      if (mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+      }
       return;
     }
+    const entry = { content: message, mqId };
     if (priority) {
-      this.pendingMessages.splice(this.pendingPriorityCount, 0, message);
+      this.pendingMessages.splice(this.pendingPriorityCount, 0, entry);
       this.pendingPriorityCount++;
     } else {
-      this.pendingMessages.push(message);
+      this.pendingMessages.push(entry);
     }
   }
 
   /** Interrupt current work, then send message */
   async interruptWithMessage(message: PromptContent): Promise<void> {
     if (this.acpConnection && this.status === 'running') {
-      // Clear any queued messages — interrupt takes priority
+      // Mark cleared messages as delivered in DB before discarding
+      if (this.messageQueueStore) {
+        for (const { mqId } of this.pendingMessages) {
+          if (mqId) {
+            try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+          }
+        }
+      }
       this.pendingMessages.length = 0;
       this.pendingPriorityCount = 0;
       await this.acpConnection.cancel();
-      // Small delay to let cancellation settle before sending new prompt
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     this.write(message);
@@ -478,16 +518,28 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   drainPendingMessages(): void {
     if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
       const next = this.pendingMessages.shift()!;
-      this.write(next);
+      this.write(next.content);
+      // Mark delivered in DB after successful write
+      if (next.mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
     }
   }
 
   /** Clear all pending (queued, not yet started) messages. Returns the count and previews of cleared messages. */
   clearPendingMessages(): { count: number; previews: string[] } {
     const count = this.pendingMessages.length;
-    const previews = this.pendingMessages.map((msg) =>
-      typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
+    const previews = this.pendingMessages.map(({ content }) =>
+      typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
+    // Mark all DB rows as delivered so they don't replay on restart
+    if (this.messageQueueStore) {
+      for (const { mqId } of this.pendingMessages) {
+        if (mqId) {
+          try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+        }
+      }
+    }
     this.pendingMessages.length = 0;
     this.pendingPriorityCount = 0;
     return { count, previews };
@@ -495,8 +547,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
   /** Get summaries of pending messages for queue visibility (first 100 chars each) */
   getPendingMessageSummaries(): string[] {
-    return this.pendingMessages.map((msg) =>
-      typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
+    return this.pendingMessages.map(({ content }) =>
+      typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
   }
 
@@ -647,7 +699,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),
-      outputPreview: this.getRecentOutput(4000),
+      outputPreview: redact(this.getRecentOutput(4000)).text,
       plan: this.plan,
       toolCalls: this.toolCalls.slice(-50),
       sessionId: this.sessionId,

@@ -3,11 +3,11 @@ import { existsSync, readFileSync, readdirSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Database } from '../db/database.js';
-import { ActivityLedger } from '../coordination/ActivityLedger.js';
-import { DecisionLog } from '../coordination/DecisionLog.js';
+import { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
+import { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
-import { SessionExporter } from '../coordination/SessionExporter.js';
+import { SessionExporter } from '../coordination/sessions/SessionExporter.js';
 
 // Minimal mock for AgentManager
 function createMockAgentManager(agents: any[] = [], messageHistory: any[] = []) {

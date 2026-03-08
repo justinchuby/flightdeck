@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DecisionLog, classifyDecision } from '../coordination/DecisionLog.js';
-import type { DecisionCategory } from '../coordination/DecisionLog.js';
+import { DecisionLog, classifyDecision } from '../coordination/decisions/DecisionLog.js';
+import type { DecisionCategory } from '../coordination/decisions/DecisionLog.js';
 import { Database } from '../db/database.js';
 
 describe('DecisionLog — Batch Operations', () => {

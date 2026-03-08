@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SessionRetro, type SessionRetroData, type AgentScorecard, type BottleneckEntry } from '../coordination/SessionRetro.js';
+import { SessionRetro, type SessionRetroData, type AgentScorecard, type BottleneckEntry } from '../coordination/sessions/SessionRetro.js';
 
 // ── Mock helpers ──────────────────────────────────────────────────────────
 

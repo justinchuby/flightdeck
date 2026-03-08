@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { join } from 'node:path';
-import { SearchEngine, type SearchQuery } from '../coordination/SearchEngine.js';
-import { ReportGenerator } from '../coordination/ReportGenerator.js';
+import { SearchEngine, type SearchQuery } from '../coordination/knowledge/SearchEngine.js';
+import { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
 import { ParallelAnalyzer } from '../tasks/ParallelAnalyzer.js';
 import { getRecentCommits } from './context.js';
 import type { AppContext } from './context.js';
@@ -289,7 +289,7 @@ export function servicesRoutes(ctx: AppContext): Router {
   router.get('/notifications', (req, res) => {
     if (!notificationManager) { res.json({ notifications: [], unreadCount: 0 }); return; }
     const unreadOnly = req.query.unreadOnly === 'true';
-    const category = req.query.category as import('../coordination/NotificationManager.js').NotificationCategory | undefined;
+    const category = req.query.category as import('../coordination/alerts/NotificationManager.js').NotificationCategory | undefined;
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
     res.json({
       notifications: notificationManager.getNotifications({ unreadOnly, category, limit }),
@@ -489,7 +489,7 @@ export function servicesRoutes(ctx: AppContext): Router {
     if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
     const { projectId, category, tag } = req.query;
     if (typeof projectId === 'string') return res.json(knowledgeTransfer.getByProject(projectId));
-    if (typeof category === 'string') return res.json(knowledgeTransfer.getByCategory(category as import('../coordination/KnowledgeTransfer.js').KnowledgeCategory));
+    if (typeof category === 'string') return res.json(knowledgeTransfer.getByCategory(category as import('../coordination/knowledge/KnowledgeTransfer.js').KnowledgeCategory));
     if (typeof tag === 'string') return res.json(knowledgeTransfer.getByTag(tag));
     res.json(knowledgeTransfer.getAll());
   });
@@ -507,7 +507,7 @@ export function servicesRoutes(ctx: AppContext): Router {
     const entryTags = Array.isArray(tags) ? (tags as unknown[]).filter((t): t is string => typeof t === 'string') : [];
     const entry = knowledgeTransfer.capture({
       projectId,
-      category: category as import('../coordination/KnowledgeTransfer.js').KnowledgeCategory,
+      category: category as import('../coordination/knowledge/KnowledgeTransfer.js').KnowledgeCategory,
       title,
       content,
       tags: entryTags,

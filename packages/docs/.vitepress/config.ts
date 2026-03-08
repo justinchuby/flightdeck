@@ -98,6 +98,7 @@ export default defineConfig({
           text: 'Design Documents',
           items: [
             { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
+            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
           ],
         },
         {
@@ -131,6 +132,7 @@ export default defineConfig({
           text: 'Design Documents',
           items: [
             { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
+            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
           ],
         },
         {
