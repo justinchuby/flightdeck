@@ -8,21 +8,7 @@
 import { ChevronRight, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNavigationStore } from '../../stores/navigationStore';
-
-// Tab ID → display label mapping
-const TAB_LABELS: Record<string, string> = {
-  overview:   'Overview',
-  session:    'Session',
-  tasks:      'Tasks',
-  agents:     'Agents',
-  knowledge:  'Knowledge',
-  design:     'Design',
-  timeline:   'Timeline',
-  groups:     'Groups',
-  'org-chart': 'Org Chart',
-  analytics:  'Analytics',
-  canvas:     'Canvas',
-};
+import { TAB_LABELS } from '../../utils/tabLabels';
 
 interface BreadcrumbSegment {
   label: string;

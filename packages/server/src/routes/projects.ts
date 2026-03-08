@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { eq, inArray, desc } from 'drizzle-orm';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, normalize, sep, extname, relative } from 'node:path';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
@@ -575,6 +577,86 @@ export function projectsRoutes(ctx: AppContext): Router {
     projectRegistry.setModelConfig(req.params.id, config);
     logger.info({ module: 'project', msg: 'Model config updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.getModelConfig(req.params.id));
+  });
+
+  // ── Design tab: file tree + file contents ──────────────────────
+
+  /** Ensure a resolved path stays within the project root (prevent traversal) */
+  function isInsideRoot(root: string, target: string): boolean {
+    const normRoot = normalize(root) + sep;
+    const normTarget = normalize(target);
+    return normTarget === normalize(root) || normTarget.startsWith(normRoot);
+  }
+
+  /**
+   * GET /projects/:id/files?path=relative/dir
+   * Returns directory listing for the project's CWD.
+   */
+  router.get('/projects/:id/files', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project.cwd) return res.status(400).json({ error: 'Project has no working directory' });
+
+    const subPath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (subPath.includes('\0')) return res.status(400).json({ error: 'Invalid path' });
+
+    const resolved = normalize(join(project.cwd, subPath));
+    if (!isInsideRoot(project.cwd, resolved)) {
+      return res.status(403).json({ error: 'Path outside project directory' });
+    }
+
+    try {
+      const entries = readdirSync(resolved, { withFileTypes: true });
+      const items = entries
+        .filter((e) => !e.name.startsWith('.') || e.name === '.flightdeck')
+        .map((e) => ({
+          name: e.name,
+          path: relative(project.cwd!, join(resolved, e.name)),
+          type: e.isDirectory() ? 'directory' as const : 'file' as const,
+          ext: e.isFile() ? extname(e.name).slice(1) : undefined,
+        }))
+        .sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+      res.json({ path: subPath || '.', items });
+    } catch (err: any) {
+      res.status(400).json({ error: `Cannot read directory: ${err.message}` });
+    }
+  });
+
+  /**
+   * GET /projects/:id/file-contents?path=relative/file.md
+   * Returns file content (text only, max 512 KB).
+   */
+  router.get('/projects/:id/file-contents', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project.cwd) return res.status(400).json({ error: 'Project has no working directory' });
+
+    const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!filePath) return res.status(400).json({ error: 'path query parameter required' });
+    if (filePath.includes('\0')) return res.status(400).json({ error: 'Invalid path' });
+
+    const resolved = normalize(join(project.cwd, filePath));
+    if (!isInsideRoot(project.cwd, resolved)) {
+      return res.status(403).json({ error: 'Path outside project directory' });
+    }
+
+    try {
+      const stat = statSync(resolved);
+      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
+      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large (max 512 KB)' });
+
+      const content = readFileSync(resolved, 'utf-8');
+      const ext = extname(filePath).slice(1);
+      res.json({ path: filePath, content, size: stat.size, ext });
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
+      res.status(400).json({ error: `Cannot read file: ${err.message}` });
+    }
   });
 
   return router;
