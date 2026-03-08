@@ -46,9 +46,7 @@ const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ d
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
-const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
-const TeamHealthPage = lazy(() => import('./pages/TeamHealth').then(m => ({ default: m.TeamHealth })));
-const TeamRoster = lazy(() => import('./components/TeamRoster').then(m => ({ default: m.TeamRoster })));
+const TeamPage = lazy(() => import('./pages/TeamPage').then(m => ({ default: m.TeamPage })));
 
 function RouteSpinner() {
   return (
@@ -278,9 +276,7 @@ export function App() {
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/projects" element={<ProjectsPanel />} />
             <Route path="/knowledge" element={<KnowledgePanel />} />
-            <Route path="/agent-server" element={<AgentServerPanel />} />
-            <Route path="/team" element={<TeamRoster />} />
-            <Route path="/team/health" element={<TeamHealthPage />} />
+            <Route path="/team" element={<TeamPage />} />
             <Route path="/shared/:token" element={<SharedReplayViewer />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
