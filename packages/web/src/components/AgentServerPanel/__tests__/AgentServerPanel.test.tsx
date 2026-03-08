@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { DaemonPanel } from '../DaemonPanel';
+import { AgentServerPanel } from '../AgentServerPanel';
 
 // ── Mocks ─────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ vi.mock('../../Toast', () => ({
 function renderPanel() {
   return render(
     <MemoryRouter>
-      <DaemonPanel />
+      <AgentServerPanel />
     </MemoryRouter>,
   );
 }
@@ -69,7 +69,7 @@ function setupMocks(overrides: Partial<{
 
 // ── Tests ─────────────────────────────────────────────────
 
-describe('DaemonPanel', () => {
+describe('AgentServerPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

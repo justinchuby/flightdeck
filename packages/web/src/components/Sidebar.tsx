@@ -17,7 +17,7 @@ const moreLinks = [
   { to: '/projects', icon: FolderOpen, label: 'Projects' },
   { to: '/knowledge', icon: Brain, label: 'Knowledge' },
   { to: '/team', icon: UserCheck, label: 'Team' },
-  { to: '/daemon', icon: Server, label: 'Daemon' },
+  { to: '/agent-server', icon: Server, label: 'Agent Server' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/groups', icon: MessageSquare, label: 'Groups' },
   { to: '/org', icon: Network, label: 'Org Chart' },

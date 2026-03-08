@@ -196,7 +196,7 @@ function AgentRow({ agent, onTerminate }: { agent: DaemonAgent; onTerminate: (id
 
 // ── Main Panel ────────────────────────────────────────────
 
-export function DaemonPanel() {
+export function AgentServerPanel() {
   const addToast = useToastStore(s => s.add);
   const [status, setStatus] = useState<DaemonStatus | null>(null);
   const [agents, setAgents] = useState<DaemonAgent[]>([]);
