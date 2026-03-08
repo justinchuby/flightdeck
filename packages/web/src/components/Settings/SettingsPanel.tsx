@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import type { ThemeMode } from '../../stores/settingsStore';
-import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2 } from 'lucide-react';
+import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
+import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { DashboardCustomizer } from './DashboardCustomizer';
 import { ProvidersSection } from './ProvidersSection';
 import { PlaybookLibrary } from '../Playbooks';
@@ -13,6 +13,12 @@ import { ConflictSettingsPanel } from '../Conflicts';
 import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';
 
+const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
+  { level: 'detailed', label: 'Detailed', description: 'All notifications, expanded cards, yellow alerts at 1 exception' },
+  { level: 'standard', label: 'Standard', description: 'Exceptions only, balanced density, yellow at 2 exceptions (default)' },
+  { level: 'minimal', label: 'Minimal', description: 'Red alerts only, compact cards, failures only' },
+];
+
 interface Props {
   api: any;
 }
@@ -20,7 +26,7 @@ interface Props {
 export function SettingsPanel({ api }: Props) {
   const config = useAppStore((s) => s.config);
   const roles = useAppStore((s) => s.roles);
-  const { soundEnabled, toggleSound } = useSettingsStore();
+  const { soundEnabled, toggleSound, oversightLevel, setOversightLevel } = useSettingsStore();
   const [maxAgents, setMaxAgents] = useState(config?.maxConcurrentAgents || 10);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
 
@@ -159,6 +165,39 @@ export function SettingsPanel({ api }: Props) {
             />
           </button>
         </label>
+      </section>
+
+      {/* Oversight Level (Trust Dial) — AC-16.1 */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6" data-testid="oversight-section">
+        <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Eye className="w-3.5 h-3.5" /> Oversight Level
+        </h3>
+        <div className="space-y-2">
+          {OVERSIGHT_OPTIONS.map(({ level, label, description }) => (
+            <label
+              key={level}
+              className={`flex items-start gap-3 p-2.5 rounded-md cursor-pointer transition-colors ${
+                oversightLevel === level
+                  ? 'bg-accent/10 border border-accent/30'
+                  : 'bg-th-bg-alt border border-transparent hover:border-th-border'
+              }`}
+              data-testid={`oversight-${level}`}
+            >
+              <input
+                type="radio"
+                name="oversight-level"
+                value={level}
+                checked={oversightLevel === level}
+                onChange={() => setOversightLevel(level)}
+                className="mt-0.5 accent-accent"
+              />
+              <div>
+                <div className="text-sm font-medium text-th-text">{label}</div>
+                <p className="text-xs text-th-text-muted mt-0.5">{description}</p>
+              </div>
+            </label>
+          ))}
+        </div>
       </section>
 
       {/* CLI Config */}

@@ -1,8 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, XCircle, Clock, MessageSquareWarning, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle, Clock, MessageSquareWarning, Users, Eye } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useSettingsStore, type OversightLevel } from '../../stores/settingsStore';
 import { useAttentionItems, type AttentionItem, type EscalationLevel } from './useAttentionItems';
+
+const LEVEL_LABELS: Record<OversightLevel, string> = {
+  detailed: 'Detailed',
+  standard: 'Standard',
+  minimal: 'Minimal',
+};
 
 // ── Escalation Styles ───────────────────────────────────────────────
 
@@ -52,6 +59,8 @@ export function AttentionBar() {
   const state = useAttentionItems();
   const navigate = useNavigate();
   const openApprovalQueue = useAppStore((s) => s.setApprovalQueueOpen);
+  const oversightLevel = useSettingsStore((s) => s.oversightLevel);
+  const cycleOversightLevel = useSettingsStore((s) => s.cycleOversightLevel);
   const [dismissed, setDismissed] = useState(false);
   const [dismissedVersion, setDismissedVersion] = useState(0);
 
@@ -187,6 +196,17 @@ export function AttentionBar() {
           ×
         </button>
       )}
+
+      {/* Trust Dial quick toggle (AC-16.6) */}
+      <button
+        data-testid="trust-dial-toggle"
+        onClick={cycleOversightLevel}
+        className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded bg-th-bg-alt text-th-text-muted hover:text-th-text hover:bg-th-border transition-colors shrink-0"
+        title={`Oversight: ${LEVEL_LABELS[oversightLevel]} (click to cycle)`}
+      >
+        <Eye size={10} />
+        {LEVEL_LABELS[oversightLevel]}
+      </button>
     </div>
   );
 }
