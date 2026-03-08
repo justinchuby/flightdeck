@@ -382,6 +382,10 @@ export function useWebSocket() {
           }
           break;
         }
+        case 'attention:changed': {
+          window.dispatchEvent(new CustomEvent('attention:changed'));
+          break;
+        }
       }
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);

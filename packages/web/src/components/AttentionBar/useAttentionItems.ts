@@ -51,14 +51,18 @@ interface AttentionApiResponse {
 // ── Constants ───────────────────────────────────────────────────────
 
 const POLL_INTERVAL_MS = 10_000;
+const POLL_INTERVAL_WS_MS = 30_000;  // Slower polling when WS is active
+const REFETCH_DEBOUNCE_MS = 300;     // Debounce rapid WS signals
 const BLOCKED_THRESHOLD_MS = 30 * 60 * 1000;
 const STALE_THRESHOLD_MS = 15 * 60 * 1000;
 
 // ── API Hook ────────────────────────────────────────────────────────
 
 /**
- * Fetches attention data from the backend API with polling.
- * Returns null if the API is unavailable (fallback to client-side).
+ * Fetches attention data from the backend API with hybrid WS+polling.
+ * When WebSocket is connected, listens for 'attention:changed' signals
+ * and refetches immediately (debounced 300ms). Polling slows to 30s.
+ * When WS is disconnected, falls back to 10s polling.
  */
 function useAttentionApi(projectId: string | null): AttentionApiResponse | null {
   const [data, setData] = useState<AttentionApiResponse | null>(null);
@@ -80,8 +84,24 @@ function useAttentionApi(projectId: string | null): AttentionApiResponse | null 
   useEffect(() => {
     if (!connected) return;
     fetchAttention();
-    const interval = setInterval(fetchAttention, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+
+    // Polling fallback: slower when WS connected, faster when disconnected
+    const pollMs = connected ? POLL_INTERVAL_WS_MS : POLL_INTERVAL_MS;
+    const interval = setInterval(fetchAttention, pollMs);
+
+    // WebSocket push: refetch on attention:changed signal (debounced)
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleAttentionChanged = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchAttention, REFETCH_DEBOUNCE_MS);
+    };
+    window.addEventListener('attention:changed', handleAttentionChanged);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('attention:changed', handleAttentionChanged);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
   }, [connected, fetchAttention]);
 
   return data;

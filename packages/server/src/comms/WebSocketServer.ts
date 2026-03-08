@@ -111,6 +111,7 @@ export class WebSocketServer {
     this.wireCoordinationEvents(lockRegistry, activityLedger);
     this.wireDecisionEvents(decisionLog);
     this.wireGroupEvents(chatGroupRegistry);
+    this.wireAttentionEvents(agentManager, decisionLog);
 
     // Ping/pong heartbeat every 30s to detect dead connections
     this.heartbeatTimer = setInterval(() => {
@@ -366,6 +367,41 @@ export class WebSocketServer {
     this.track(chatGroupRegistry, 'group:reaction', (data: any) => {
       const projectId = data.projectId ?? this.resolveAgentProjectId(data.leadId);
       this.broadcastToProject({ type: 'group:reaction', ...data }, projectId);
+    });
+  }
+
+  /**
+   * Broadcast lightweight 'attention:changed' signal when attention-affecting
+   * state changes. Client receives this and refetches GET /attention.
+   * No debounce server-side — client debounces at 300ms.
+   */
+  private wireAttentionEvents(agentManager: AgentManager, decisionLog: DecisionLog): void {
+    this.track(agentManager, 'dag:updated', (data: any) => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'dag', leadId: data.leadId });
+    });
+    this.track(agentManager, 'agent:crashed', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'agent_crashed' });
+    });
+    this.track(decisionLog, 'intent:alert', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_new' });
+    });
+    this.track(decisionLog, 'decision:confirmed', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_resolved' });
+    });
+    this.track(decisionLog, 'decision:rejected', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_resolved' });
+    });
+    this.track(decisionLog, 'decision:dismissed', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_resolved' });
+    });
+    this.track(decisionLog, 'decisions:batch_confirmed', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_batch' });
+    });
+    this.track(decisionLog, 'decisions:batch_rejected', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_batch' });
+    });
+    this.track(decisionLog, 'decisions:batch_dismissed', () => {
+      this.broadcastAll({ type: 'attention:changed', trigger: 'decision_batch' });
     });
   }
 

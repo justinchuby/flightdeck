@@ -302,4 +302,94 @@ describe('useAttentionItems', () => {
       expect(result.current.items).toHaveLength(2);
     });
   });
+
+  describe('WebSocket push (hybrid WS+polling)', () => {
+    it('refetches attention data when attention:changed event fires', async () => {
+      const apiResponse = makeApiResponse();
+      mockApiFetch.mockResolvedValue(apiResponse);
+      mockAppState.agents = [makeAgent('a1', 'running')];
+
+      const { result } = renderHook(() => useAttentionItems());
+
+      await waitFor(() => {
+        expect(result.current.escalation).toBe('yellow');
+      });
+
+      // Reset and prepare updated response
+      mockApiFetch.mockClear();
+      const updatedResponse = makeApiResponse({ escalation: 'red' });
+      mockApiFetch.mockResolvedValue(updatedResponse);
+
+      // Fire attention:changed event (simulating WS push)
+      window.dispatchEvent(new CustomEvent('attention:changed'));
+
+      await waitFor(() => {
+        expect(result.current.escalation).toBe('red');
+      });
+      // Should have refetched after the event
+      expect(mockApiFetch).toHaveBeenCalled();
+    });
+
+    it('debounces rapid attention:changed events into a single refetch', async () => {
+      const apiResponse = makeApiResponse();
+      mockApiFetch.mockResolvedValue(apiResponse);
+      mockAppState.agents = [makeAgent('a1', 'running')];
+
+      renderHook(() => useAttentionItems());
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledTimes(1); // initial fetch
+      });
+
+      mockApiFetch.mockClear();
+
+      // Fire 5 rapid events (simulating burst of dag:updated)
+      for (let i = 0; i < 5; i++) {
+        window.dispatchEvent(new CustomEvent('attention:changed'));
+      }
+
+      // Wait for debounce (300ms) + a bit extra
+      await new Promise(r => setTimeout(r, 500));
+
+      // Should debounce to ~1 refetch, not 5
+      expect(mockApiFetch.mock.calls.length).toBeLessThanOrEqual(2);
+    });
+
+    it('does not refetch on attention:changed when disconnected', async () => {
+      mockAppState.connected = false;
+      mockApiFetch.mockResolvedValue(makeApiResponse());
+      mockAppState.agents = [makeAgent('a1', 'running')];
+
+      renderHook(() => useAttentionItems());
+
+      // No fetch when disconnected
+      expect(mockApiFetch).not.toHaveBeenCalled();
+
+      // Fire event — should not trigger fetch
+      window.dispatchEvent(new CustomEvent('attention:changed'));
+      await new Promise(r => setTimeout(r, 500));
+
+      expect(mockApiFetch).not.toHaveBeenCalled();
+    });
+
+    it('cleans up event listener on unmount', async () => {
+      mockApiFetch.mockResolvedValue(makeApiResponse());
+      mockAppState.agents = [makeAgent('a1', 'running')];
+
+      const { unmount } = renderHook(() => useAttentionItems());
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledTimes(1);
+      });
+
+      unmount();
+      mockApiFetch.mockClear();
+
+      // Fire event after unmount — should NOT trigger fetch
+      window.dispatchEvent(new CustomEvent('attention:changed'));
+      await new Promise(r => setTimeout(r, 500));
+
+      expect(mockApiFetch).not.toHaveBeenCalled();
+    });
+  });
 });
