@@ -73,72 +73,77 @@ describe('AdapterFactory', () => {
       expect(resolveBackend('unknown-cli')).toBe('acp');
     });
 
-    it('ignores sdkMode for non-claude providers', () => {
-      expect(resolveBackend('copilot', true)).toBe('acp');
+    it('ignores sdkMode for non-claude/copilot providers', () => {
       expect(resolveBackend('gemini', true)).toBe('acp');
+      expect(resolveBackend('cursor', true)).toBe('acp');
+      expect(resolveBackend('opencode', true)).toBe('acp');
+    });
+
+    it('resolves copilot-sdk for copilot with sdkMode', () => {
+      expect(resolveBackend('copilot', true)).toBe('copilot-sdk');
     });
   });
 
   // ── createAdapterForProvider() ───────────────────────────
 
   describe('createAdapterForProvider()', () => {
-    it('creates AcpAdapter for copilot', () => {
-      const result = createAdapterForProvider({ provider: 'copilot' });
+    it('creates AcpAdapter for copilot', async () => {
+      const result = await createAdapterForProvider({ provider: 'copilot' });
       expect(result.adapter.type).toBe('acp');
       expect(result.backend).toBe('acp');
       expect(result.fallback).toBe(false);
     });
 
-    it('creates AcpAdapter for gemini', () => {
-      const result = createAdapterForProvider({ provider: 'gemini' });
+    it('creates AcpAdapter for gemini', async () => {
+      const result = await createAdapterForProvider({ provider: 'gemini' });
       expect(result.adapter.type).toBe('acp');
       expect(result.backend).toBe('acp');
     });
 
-    it('creates AcpAdapter for opencode', () => {
-      const result = createAdapterForProvider({ provider: 'opencode' });
+    it('creates AcpAdapter for opencode', async () => {
+      const result = await createAdapterForProvider({ provider: 'opencode' });
       expect(result.backend).toBe('acp');
     });
 
-    it('creates AcpAdapter for cursor', () => {
-      const result = createAdapterForProvider({ provider: 'cursor' });
+    it('creates AcpAdapter for cursor', async () => {
+      const result = await createAdapterForProvider({ provider: 'cursor' });
       expect(result.backend).toBe('acp');
     });
 
-    it('creates AcpAdapter for codex', () => {
-      const result = createAdapterForProvider({ provider: 'codex' });
+    it('creates AcpAdapter for codex', async () => {
+      const result = await createAdapterForProvider({ provider: 'codex' });
       expect(result.backend).toBe('acp');
     });
 
-    it('creates AcpAdapter for claude without sdkMode', () => {
-      const result = createAdapterForProvider({ provider: 'claude' });
+    it('creates AcpAdapter for claude without sdkMode', async () => {
+      const result = await createAdapterForProvider({ provider: 'claude' });
       expect(result.adapter.type).toBe('acp');
       expect(result.backend).toBe('acp');
     });
 
-    it('creates ClaudeSdkAdapter for claude with sdkMode=true', () => {
-      const result = createAdapterForProvider({ provider: 'claude', sdkMode: true });
+    it('creates ClaudeSdkAdapter for claude with sdkMode=true', async () => {
+      const result = await createAdapterForProvider({ provider: 'claude', sdkMode: true });
       expect(result.adapter.type).toBe('claude-sdk');
       expect(result.backend).toBe('claude-sdk');
       expect(result.fallback).toBe(false);
     });
 
-    it('creates MockAdapter for mock provider', () => {
-      const result = createAdapterForProvider({ provider: 'mock' });
+    it('creates MockAdapter for mock provider', async () => {
+      const result = await createAdapterForProvider({ provider: 'mock' });
       expect(result.adapter.type).toBe('mock');
       expect(result.backend).toBe('mock');
     });
 
-    it('passes autopilot to AcpAdapter', () => {
-      const result = createAdapterForProvider({
+    it('passes autopilot to AcpAdapter', async () => {
+      const result = await createAdapterForProvider({
         provider: 'copilot',
         autopilot: true,
       });
       expect(result.adapter.type).toBe('acp');
     });
 
-    it('passes autopilot and model to ClaudeSdkAdapter', () => {
-      const result = createAdapterForProvider({
+    it('passes autopilot and model to ClaudeSdkAdapter', async () => {
+      const result = await createAdapterForProvider({
         provider: 'claude',
         sdkMode: true,
         autopilot: true,
@@ -168,7 +173,7 @@ describe('AdapterFactory', () => {
 
       // Re-import factory to pick up the mock
       const { createAdapterForProvider: createWithBrokenSdk } = await import('./AdapterFactory.js');
-      const result = createWithBrokenSdk({
+      const result = await createWithBrokenSdk({
         provider: 'claude',
         sdkMode: true,
       });
@@ -177,10 +182,15 @@ describe('AdapterFactory', () => {
       expect(result.fallback).toBe(true);
       expect(result.fallbackReason).toContain('SDK package not installed');
       expect(result.adapter.type).toBe('acp');
+
+      // Clean up: reset modules and remove doMock so subsequent dynamic imports get real modules
+      vi.resetModules();
+      vi.unmock('./ClaudeSdkAdapter.js');
+      vi.unmock('../utils/logger.js');
     });
 
-    it('handles unknown provider gracefully (defaults to ACP)', () => {
-      const result = createAdapterForProvider({ provider: 'unknown-new-cli' });
+    it('handles unknown provider gracefully (defaults to ACP)', async () => {
+      const result = await createAdapterForProvider({ provider: 'unknown-new-cli' });
       expect(result.backend).toBe('acp');
       expect(result.adapter.type).toBe('acp');
     });
@@ -318,14 +328,14 @@ describe('AdapterFactory', () => {
   // ── Integration: Factory + Start Options ──────────────────
 
   describe('integration', () => {
-    it('copilot: creates ACP adapter with correct preset args', () => {
+    it('copilot: creates ACP adapter with correct preset args', async () => {
       const config: AdapterConfig = {
         provider: 'copilot',
         cliCommand: 'copilot',
         cliArgs: [],
       };
 
-      const { adapter, backend } = createAdapterForProvider(config);
+      const { adapter, backend } = await createAdapterForProvider(config);
       const startOpts = buildStartOptions(config, {
         cwd: '/project',
         agentFlag: 'developer',
@@ -337,19 +347,32 @@ describe('AdapterFactory', () => {
       expect(startOpts.baseArgs).toContain('--acp');
     });
 
-    it('claude SDK mode: creates SDK adapter', () => {
+    it('claude SDK mode: creates SDK adapter', async () => {
+      // Reset and re-import to ensure clean module state after fallback test's doMock
+      vi.resetModules();
+      vi.doMock('../utils/logger.js', () => ({
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+      }));
+      vi.doMock('@anthropic-ai/claude-agent-sdk', () => ({
+        query: vi.fn(),
+        listSessions: vi.fn(),
+      }));
+      // Restore real ClaudeSdkAdapter (overrides the broken mock from fallback test)
+      vi.doMock('./ClaudeSdkAdapter.js', () => vi.importActual('./ClaudeSdkAdapter.js'));
+      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
+
       const config: AdapterConfig = {
         provider: 'claude',
         sdkMode: true,
         model: 'claude-opus-4',
       };
 
-      const { adapter, backend } = createAdapterForProvider(config);
-      expect(backend).toBe('claude-sdk');
-      expect(adapter.type).toBe('claude-sdk');
+      const result = await freshFactory(config);
+      expect(result.backend).toBe('claude-sdk');
+      expect(result.adapter.type).toBe('claude-sdk');
     });
 
-    it('claude ACP mode: creates ACP adapter with claude preset', () => {
+    it('claude ACP mode: creates ACP adapter with claude preset', async () => {
       const config: AdapterConfig = {
         provider: 'claude',
         sdkMode: false,
@@ -357,7 +380,7 @@ describe('AdapterFactory', () => {
         cliArgs: [],
       };
 
-      const { adapter, backend } = createAdapterForProvider(config);
+      const { adapter, backend } = await createAdapterForProvider(config);
       const startOpts = buildStartOptions(config, { cwd: '/project' });
 
       expect(backend).toBe('acp');

@@ -147,7 +147,7 @@ describe('AgentServer', () => {
     runtimeDir = mkdtempSync(join(tmpdir(), 'agent-server-test-'));
 
     const adapter = createMockAdapter();
-    mockCreateAdapter.mockReturnValue({
+    mockCreateAdapter.mockResolvedValue({
       adapter: adapter as any,
       backend: 'acp',
       fallback: false,
@@ -205,7 +205,7 @@ describe('AgentServer', () => {
       listener.simulateConnection(conn);
 
       const adapter = createMockAdapter();
-      mockCreateAdapter.mockReturnValue({ adapter: adapter as any, backend: 'acp', fallback: false });
+      mockCreateAdapter.mockResolvedValue({ adapter: adapter as any, backend: 'acp', fallback: false });
       conn.simulateMessage(SPAWN_MSG);
       await vi.advanceTimersByTimeAsync(0); // flush start promise
 
@@ -309,12 +309,13 @@ describe('AgentServer', () => {
       expect(agents[0].sessionId).toBe('session-123');
     });
 
-    it('returns error when adapter creation fails', () => {
+    it('returns error when adapter creation fails', async () => {
       server.start();
       listener.simulateConnection(conn);
 
-      mockCreateAdapter.mockImplementation(() => { throw new Error('no binary'); });
+      mockCreateAdapter.mockRejectedValue(new Error('no binary'));
       conn.simulateMessage(SPAWN_MSG);
+      await vi.advanceTimersByTimeAsync(0);
 
       const error = conn._sentMessages.find((m) => m.type === 'error');
       expect(error).toBeDefined();
@@ -325,7 +326,7 @@ describe('AgentServer', () => {
     it('returns error when adapter start fails', async () => {
       const adapter = createMockAdapter();
       adapter.start.mockRejectedValue(new Error('connection refused'));
-      mockCreateAdapter.mockReturnValue({ adapter: adapter as any, backend: 'acp', fallback: false });
+      mockCreateAdapter.mockResolvedValue({ adapter: adapter as any, backend: 'acp', fallback: false });
 
       server.start();
       listener.simulateConnection(conn);
@@ -685,7 +686,7 @@ describe('AgentServer', () => {
 
     beforeEach(() => {
       adapter = createMockAdapter();
-      mockCreateAdapter.mockReturnValue({ adapter: adapter as any, backend: 'mock', fallback: false });
+      mockCreateAdapter.mockResolvedValue({ adapter: adapter as any, backend: 'mock', fallback: false });
       server.start();
       conn = createMockConnection();
       listener.simulateConnection(conn);
@@ -848,7 +849,7 @@ describe('AgentServer', () => {
 
     beforeEach(() => {
       adapter = createMockAdapter();
-      mockCreateAdapter.mockReturnValue({ adapter: adapter as any, backend: 'mock', fallback: false });
+      mockCreateAdapter.mockResolvedValue({ adapter: adapter as any, backend: 'mock', fallback: false });
       server.start();
       listener.simulateConnection(conn);
     });

@@ -1,9 +1,12 @@
 /**
- * Ambient module declaration for the Claude Agent SDK.
+ * Ambient module declaration for the Claude Agent SDK (v0.2.71).
  *
  * Provides type-level declarations so TypeScript compiles without
  * the actual SDK package installed. At runtime the SDK is loaded
  * dynamically and will throw a clear error if missing.
+ *
+ * If the real @anthropic-ai/claude-agent-sdk is installed (via
+ * optionalDependencies), its types take precedence over these stubs.
  */
 declare module '@anthropic-ai/claude-agent-sdk' {
   interface QueryOptions {

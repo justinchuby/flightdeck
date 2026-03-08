@@ -15,6 +15,7 @@ import { MassFailureDetector } from './transport/MassFailureDetector.js';
 import { createAdapterForProvider, buildStartOptions } from './adapters/AdapterFactory.js';
 import type { AdapterConfig } from './adapters/AdapterFactory.js';
 import type { AgentAdapter } from './adapters/types.js';
+import { logger } from './utils/logger.js';
 
 // ── Re-export adapter APIs ──────────────────────────────────────────
 // AgentServer is the sole owner of adapter code. All adapter imports
@@ -342,7 +343,7 @@ export class AgentServer {
     }
 
     switch (msg.type) {
-      case 'spawn_agent':     return this.handleSpawn(msg, conn);
+      case 'spawn_agent':     this.handleSpawn(msg, conn).catch(err => logger.error({ module: 'agent-server', msg: 'handleSpawn failed', err: (err as Error).message })); return;
       case 'send_message':    return this.handleSendMessage(msg, conn);
       case 'terminate_agent': return this.handleTerminate(msg, conn);
       case 'list_agents':     return this.handleListAgents(msg, conn);
@@ -356,7 +357,7 @@ export class AgentServer {
 
   // ── Handlers ──────────────────────────────────────────────────
 
-  private handleSpawn(msg: SpawnAgentMessage, conn: TransportConnection): void {
+  private async handleSpawn(msg: SpawnAgentMessage, conn: TransportConnection): Promise<void> {
     if (this.massFailure.isPaused) {
       this.sendError(conn, 'SPAWN_FAILED', 'Spawning paused due to mass failure', msg.requestId);
       return;
@@ -371,7 +372,7 @@ export class AgentServer {
 
     let adapter: AgentAdapter;
     try {
-      const result = createAdapterForProvider(config);
+      const result = await createAdapterForProvider(config);
       adapter = result.adapter;
     } catch (err) {
       this.sendError(conn, 'SPAWN_FAILED', `Adapter creation failed: ${(err as Error).message}`, msg.requestId);

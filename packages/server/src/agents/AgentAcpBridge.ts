@@ -41,7 +41,7 @@ export function ensureSharedWorkspace(agent: Agent): void {
  * Uses the unified AdapterFactory to pick the right backend (ACP or Claude SDK).
  * Wires all protocol events to the agent's state and listener arrays.
  */
-export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: string): void {
+export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: string): Promise<void> {
   const rawModel = agent.model || agent.role.model;
 
   const adapterConfig = {
@@ -56,7 +56,7 @@ export function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: str
     cliCommand: config.cliCommand,
   };
 
-  const { adapter: conn, backend, fallback, fallbackReason } = createAdapterForProvider(adapterConfig);
+  const { adapter: conn, backend, fallback, fallbackReason } = await createAdapterForProvider(adapterConfig);
 
   if (fallback) {
     logger.warn({

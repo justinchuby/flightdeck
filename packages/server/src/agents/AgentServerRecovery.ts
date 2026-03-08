@@ -147,7 +147,7 @@ export class AgentServerRecovery {
         model,
       };
 
-      const { adapter } = createAdapterForProvider(config);
+      const { adapter } = await createAdapterForProvider(config);
       const startOpts = buildStartOptions(config, { cwd: this.cwd, sessionId });
 
       const newSessionId = await adapter.start(startOpts);

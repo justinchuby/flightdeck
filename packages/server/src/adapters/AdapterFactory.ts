@@ -9,10 +9,9 @@
  *   provider='claude' AND sdkMode=true → ClaudeSdkAdapter (in-process)
  *   provider='claude' AND sdkMode=false → AcpAdapter with Claude preset (subprocess)
  *   all other providers → AcpAdapter with provider preset (subprocess)
+ *
+ * Adapter classes are dynamically imported to avoid eagerly loading SDKs.
  */
-import { AcpAdapter } from './AcpAdapter.js';
-import { ClaudeSdkAdapter } from './ClaudeSdkAdapter.js';
-import { MockAdapter } from './MockAdapter.js';
 import { getPreset } from './presets.js';
 import { resolveModel } from './ModelResolver.js';
 import type { ProviderId } from './presets.js';
@@ -61,7 +60,7 @@ export interface AdapterResult {
 
 // ── Backend Resolution ──────────────────────────────────────
 
-export type BackendType = 'acp' | 'claude-sdk' | 'mock';
+export type BackendType = 'acp' | 'claude-sdk' | 'copilot-sdk' | 'mock';
 
 /**
  * Determine which backend to use based on provider and config.
@@ -70,6 +69,7 @@ export type BackendType = 'acp' | 'claude-sdk' | 'mock';
 export function resolveBackend(provider: string, sdkMode?: boolean): BackendType {
   if (provider === 'mock') return 'mock';
   if (provider === 'claude' && sdkMode) return 'claude-sdk';
+  if (provider === 'copilot' && sdkMode) return 'copilot-sdk';
   return 'acp';
 }
 
@@ -143,15 +143,17 @@ export function buildStartOptions(
  * - Graceful fallback when SDK is unavailable
  * - Logging of backend decisions
  */
-export function createAdapterForProvider(config: AdapterConfig): AdapterResult {
+export async function createAdapterForProvider(config: AdapterConfig): Promise<AdapterResult> {
   const preferredBackend = resolveBackend(config.provider, config.sdkMode);
 
   if (preferredBackend === 'mock') {
+    const { MockAdapter } = await import('./MockAdapter.js');
     return { adapter: new MockAdapter(), backend: 'mock', fallback: false };
   }
 
   if (preferredBackend === 'claude-sdk') {
     try {
+      const { ClaudeSdkAdapter } = await import('./ClaudeSdkAdapter.js');
       const adapter = new ClaudeSdkAdapter({
         autopilot: config.autopilot,
         model: config.model,
@@ -170,12 +172,41 @@ export function createAdapterForProvider(config: AdapterConfig): AdapterResult {
         msg: `SDK fallback: ${reason}. Using ACP adapter instead.`,
         provider: config.provider,
       });
+      const { AcpAdapter } = await import('./AcpAdapter.js');
+      const adapter = new AcpAdapter({ autopilot: config.autopilot });
+      return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
+    }
+  }
+
+  if (preferredBackend === 'copilot-sdk') {
+    try {
+      const { CopilotSdkAdapter } = await import('./CopilotSdkAdapter.js');
+      const adapter = new CopilotSdkAdapter({
+        autopilot: config.autopilot,
+        model: config.model,
+      });
+      logger.info({
+        module: 'adapter-factory',
+        msg: 'Created CopilotSdkAdapter (in-process SDK mode)',
+        provider: config.provider,
+      });
+      return { adapter, backend: 'copilot-sdk', fallback: false };
+    } catch (err) {
+      // SDK unavailable — fall back to ACP
+      const reason = `Copilot SDK unavailable: ${(err as Error)?.message || String(err)}`;
+      logger.warn({
+        module: 'adapter-factory',
+        msg: `SDK fallback: ${reason}. Using ACP adapter instead.`,
+        provider: config.provider,
+      });
+      const { AcpAdapter } = await import('./AcpAdapter.js');
       const adapter = new AcpAdapter({ autopilot: config.autopilot });
       return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
     }
   }
 
   // Default: ACP adapter for all subprocess-based CLIs
+  const { AcpAdapter } = await import('./AcpAdapter.js');
   const adapter = new AcpAdapter({ autopilot: config.autopilot });
   return { adapter, backend: 'acp', fallback: false };
 }
