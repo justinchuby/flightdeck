@@ -37,8 +37,10 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { EmptyState } from '../ui/EmptyState';
 import { StatusBadge } from '../ui/StatusBadge';
+import { useAttentionItems } from '../AttentionBar';
 import type { AgentInfo, Decision, DagStatus } from '../../types';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -75,21 +77,6 @@ interface ProjectProgress {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
-
-function formatRelativeTime(iso: string): string {
-  try {
-    const diff = Date.now() - new Date(iso).getTime();
-    const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  } catch {
-    return iso;
-  }
-}
 
 function getProjectStatusVariant(
   agentCount: number,
@@ -305,6 +292,7 @@ export function HomeDashboard() {
   const agents = useAppStore((s) => s.agents);
   const connected = useAppStore((s) => s.connected);
   const pendingDecisions = useAppStore((s) => s.pendingDecisions);
+  const attention = useAttentionItems();
 
   const [projects, setProjects] = useState<EnrichedProject[]>([]);
   const [allDecisions, setAllDecisions] = useState<Decision[]>([]);
@@ -505,13 +493,19 @@ export function HomeDashboard() {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="flex items-center gap-2 text-xs text-th-text-muted mb-6 px-1" data-testid="home-stats">
+      {/* Compact Stat Strip — ambient context, lowest visual weight */}
+      <div className="flex items-center gap-2 text-sm text-th-text-muted/70 mb-6 px-1" data-testid="home-stats">
         <span>📁 {projects.length} project{projects.length !== 1 ? 's' : ''}</span>
-        <span className="text-th-text-muted/40">·</span>
+        <span className="text-th-text-muted/30">·</span>
         <span>🤖 {totalRunningAgents} agent{totalRunningAgents !== 1 ? 's' : ''} running</span>
-        <span className="text-th-text-muted/40">·</span>
-        <span>📊 {avgProgress}% avg progress</span>
+        <span className="text-th-text-muted/30">·</span>
+        <span>📊 {avgProgress}% progress</span>
+        {attention.failedTaskCount > 0 && (
+          <>
+            <span className="text-th-text-muted/30">·</span>
+            <span className="text-red-400">⚠ {attention.failedTaskCount} failed</span>
+          </>
+        )}
       </div>
 
       {/* ── Section 1: User Action Required ──────────────────── */}

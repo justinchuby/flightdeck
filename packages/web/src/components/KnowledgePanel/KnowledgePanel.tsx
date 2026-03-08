@@ -23,6 +23,7 @@ import {
   ThumbsDown,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { useToastStore } from '../Toast';
 
 const MemoryBrowser = lazy(() => import('./MemoryBrowser').then(m => ({ default: m.MemoryBrowser })));
@@ -74,21 +75,6 @@ const CATEGORY_META: Record<KnowledgeCategory, { icon: typeof Brain; label: stri
   procedural: { icon: Wrench, label: 'Procedural', color: 'text-emerald-500', description: 'Patterns, corrections, how-to' },
   semantic: { icon: Database, label: 'Semantic', color: 'text-purple-500', description: 'Facts, relationships, context' },
 };
-
-function formatRelativeTime(iso: string): string {
-  try {
-    const diff = Date.now() - new Date(iso).getTime();
-    const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  } catch {
-    return iso;
-  }
-}
 
 // ── Sub-components ────────────────────────────────────────
 
