@@ -51,7 +51,7 @@ export function notificationRoutes(ctx: AppContext): Router {
   router.post('/notifications/channels', (req, res) => {
     try {
       const { type, config, tiers } = req.body ?? {};
-      const validTypes = ['desktop', 'slack', 'discord', 'webhook', 'telegram'];
+      const validTypes = ['desktop', 'slack', 'discord', 'telegram'];
       if (!validTypes.includes(type)) {
         return res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` });
       }

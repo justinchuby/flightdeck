@@ -1,6 +1,6 @@
 // Notification Channel types — aligned with P3 C5 designer spec
 
-export type ChannelType = 'desktop' | 'slack' | 'discord' | 'webhook' | 'telegram';
+export type ChannelType = 'desktop' | 'slack' | 'discord' | 'telegram';
 export type NotificationTier = 'interrupt' | 'summon';
 export type NotifiableEvent =
   | 'decision_pending'
@@ -42,12 +42,8 @@ export const CHANNEL_DISPLAY: Record<ChannelType, { icon: string; label: string;
   desktop: { icon: '🖥', label: 'Desktop Notifications', description: 'Browser push notifications' },
   slack: { icon: '💬', label: 'Slack', description: 'Post alerts to a Slack channel' },
   discord: { icon: '🎮', label: 'Discord', description: 'Post alerts to Discord' },
-  webhook: { icon: '🔗', label: 'Webhook', description: 'POST events to a custom URL — coming soon' },
   telegram: { icon: '📱', label: 'Telegram', description: 'Send alerts to a Telegram chat' },
 };
-
-/** Channels disabled in the UI (not yet production-ready). */
-export const DISABLED_CHANNELS: ReadonlySet<ChannelType> = new Set(['webhook']);
 
 export const EVENT_LABELS: Record<NotifiableEvent, string> = {
   decision_pending: 'Decision pending',

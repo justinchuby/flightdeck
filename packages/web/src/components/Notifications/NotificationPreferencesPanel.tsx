@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../../hooks/useApi';
 import {
-  CHANNEL_DISPLAY, EVENT_LABELS, PRESET_DEFAULTS, DISABLED_CHANNELS,
+  CHANNEL_DISPLAY, EVENT_LABELS, PRESET_DEFAULTS,
   type NotificationChannel, type ChannelType, type NotifiableEvent, type PresetName,
 } from './types';
 
