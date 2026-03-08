@@ -39,6 +39,18 @@ import type {
 
 // ── SDK Import ──────────────────────────────────────────────
 
+/** Wraps a promise with a timeout. Rejects with a descriptive error if exceeded. */
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+const SDK_TIMEOUT_MS = 30_000;
+
 // The Copilot SDK is loaded dynamically so the adapter compiles even
 // when the SDK is not installed. At runtime, start() will throw a
 // clear error if the SDK is missing.
@@ -115,7 +127,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
   // ── Start / Resume ─────────────────────────────────────────
 
   async start(opts: AdapterStartOptions): Promise<string> {
-    const { CopilotClient, approveAll } = await loadSdk();
+    const { CopilotClient, approveAll } = await withTimeout(loadSdk(), SDK_TIMEOUT_MS, 'loadSdk');
     if (!CopilotClient) throw new Error('Copilot SDK not available');
 
     this.cwd = opts.cwd ?? process.cwd();
@@ -169,9 +181,9 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       // Resume existing session
       this.flightdeckSessionId = opts.sessionId;
       try {
-        this.session = await this.client.resumeSession(
-          opts.sessionId,
-          sessionConfig as CopilotResumeSessionConfig,
+        this.session = await withTimeout(
+          this.client.resumeSession(opts.sessionId, sessionConfig as CopilotResumeSessionConfig),
+          SDK_TIMEOUT_MS, 'resumeSession',
         );
         this.sdkSessionId = this.session.sessionId;
         logger.info({
@@ -187,13 +199,17 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
           msg: `Resume failed, creating new session: ${(err as Error)?.message || String(err)}`,
           sessionId: opts.sessionId,
         });
-        this.session = await this.client.createSession(sessionConfig);
+        this.session = await withTimeout(
+          this.client.createSession(sessionConfig), SDK_TIMEOUT_MS, 'createSession (fallback)',
+        );
         this.sdkSessionId = this.session.sessionId;
       }
     } else {
       // New session: generate Flightdeck UUID immediately.
       this.flightdeckSessionId = randomUUID();
-      this.session = await this.client.createSession(sessionConfig);
+      this.session = await withTimeout(
+        this.client.createSession(sessionConfig), SDK_TIMEOUT_MS, 'createSession',
+      );
       this.sdkSessionId = this.session.sessionId;
     }
 

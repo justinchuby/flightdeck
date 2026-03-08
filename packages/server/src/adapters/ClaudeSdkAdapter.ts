@@ -41,6 +41,18 @@ import type {
 
 // ── SDK Import ──────────────────────────────────────────────
 
+/** Wraps a promise with a timeout. Rejects with a descriptive error if exceeded. */
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+const SDK_TIMEOUT_MS = 30_000;
+
 // The Claude Agent SDK is loaded dynamically so the adapter compiles
 // even when the SDK is not installed. At runtime, start() will throw
 // a clear error if the SDK is missing.
@@ -111,7 +123,7 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   // ── Start / Resume ─────────────────────────────────────────
 
   async start(opts: AdapterStartOptions): Promise<string> {
-    await loadSdk();
+    await withTimeout(loadSdk(), SDK_TIMEOUT_MS, 'loadSdk');
 
     this.cwd = opts.cwd ?? process.cwd();
     this.abortController = new AbortController();

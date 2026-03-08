@@ -29,6 +29,18 @@ import type {
 // The ACP SDK is loaded dynamically so the adapter module can be imported
 // without triggering SDK loading. The SDK is loaded on first start().
 
+/** Wraps a promise with a timeout. Rejects with a descriptive error if exceeded. */
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+const SDK_TIMEOUT_MS = 30_000;
+
 let acpSdk: typeof import('@agentclientprotocol/sdk') | null = null;
 
 async function loadAcpSdk(): Promise<typeof import('@agentclientprotocol/sdk')> {
@@ -120,28 +132,37 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   get supportsImages(): boolean { return this.agentCapabilities?.promptCapabilities?.image ?? false; }
 
   async start(opts: AdapterStartOptions): Promise<string> {
-    await this.spawnAndConnect(opts);
+    await withTimeout(this.spawnAndConnect(opts), SDK_TIMEOUT_MS, 'spawnAndConnect');
 
     let sessionId: string;
 
     if (opts.sessionId) {
       // Try to resume an existing session (supported by some providers)
       try {
-        const loadResult = await this.connection!.loadSession({ sessionId: opts.sessionId });
+        const loadResult = await withTimeout(
+          this.connection!.loadSession({ sessionId: opts.sessionId }),
+          SDK_TIMEOUT_MS, 'loadSession',
+        );
         sessionId = loadResult.sessionId;
       } catch {
         // Fallback to new session if session/load is not supported
-        const newResult = await this.connection!.newSession({
-          cwd: opts.cwd || process.cwd(),
-          mcpServers: [],
-        });
+        const newResult = await withTimeout(
+          this.connection!.newSession({
+            cwd: opts.cwd || process.cwd(),
+            mcpServers: [],
+          }),
+          SDK_TIMEOUT_MS, 'newSession (fallback)',
+        );
         sessionId = newResult.sessionId;
       }
     } else {
-      const sessionResult = await this.connection!.newSession({
-        cwd: opts.cwd || process.cwd(),
-        mcpServers: [],
-      });
+      const sessionResult = await withTimeout(
+        this.connection!.newSession({
+          cwd: opts.cwd || process.cwd(),
+          mcpServers: [],
+        }),
+        SDK_TIMEOUT_MS, 'newSession',
+      );
       sessionId = sessionResult.sessionId;
     }
 
@@ -176,6 +197,8 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     });
 
     if (!this.process.stdin || !this.process.stdout) {
+      this.process.kill();
+      this.process = null;
       throw new Error('Failed to start ACP process — stdin/stdout not available');
     }
 
