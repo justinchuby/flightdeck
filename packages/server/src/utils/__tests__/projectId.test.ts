@@ -76,19 +76,19 @@ describe('slugify', () => {
 });
 
 describe('generateProjectId', () => {
-  it('produces slug-xxxx format', () => {
+  it('produces slug-xxxxxx format (6 hex chars)', () => {
     const id = generateProjectId('My Project');
-    expect(id).toMatch(/^my-project-[a-f0-9]{4}$/);
+    expect(id).toMatch(/^my-project-[a-f0-9]{6}$/);
   });
 
   it('handles empty title', () => {
     const id = generateProjectId('');
-    expect(id).toMatch(/^project-[a-f0-9]{4}$/);
+    expect(id).toMatch(/^project-[a-f0-9]{6}$/);
   });
 
   it('handles whitespace-only title', () => {
     const id = generateProjectId('   ');
-    expect(id).toMatch(/^project-[a-f0-9]{4}$/);
+    expect(id).toMatch(/^project-[a-f0-9]{6}$/);
   });
 
   it('generates unique IDs', () => {
@@ -96,28 +96,28 @@ describe('generateProjectId', () => {
     for (let i = 0; i < 100; i++) {
       ids.add(generateProjectId('Test'));
     }
-    // With 2 bytes of randomness (65536 possibilities), 100 should be unique
+    // With 3 bytes of randomness (16.7M possibilities), 100 should always be unique
     expect(ids.size).toBe(100);
   });
 
   it('avoids collisions with existing IDs', () => {
-    const existing = new Set(['test-aaaa', 'test-bbbb']);
+    const existing = new Set(['test-aabbcc', 'test-ddeeff']);
     const id = generateProjectId('Test', existing);
     expect(existing.has(id)).toBe(false);
-    expect(id).toMatch(/^test-[a-f0-9]{4}$/);
+    expect(id).toMatch(/^test-[a-f0-9]{6}$/);
   });
 
-  it('falls back to 8 hex chars after maxRetries collisions', () => {
-    // Collision function that always returns true for 4-char suffixes
+  it('falls back to 12 hex chars after maxRetries collisions', () => {
+    // Collision function that always returns true for 6-char suffixes
     let callCount = 0;
     const alwaysCollides = (id: string) => {
       callCount++;
-      // Allow the final 8-char attempt through
-      return id.match(/^test-[a-f0-9]{4}$/) !== null;
+      // Allow the final 12-char attempt through
+      return id.match(/^test-[a-f0-9]{6}$/) !== null;
     };
     const id = generateProjectId('Test', alwaysCollides, 3);
     expect(callCount).toBe(3); // 3 retries (fallback doesn't check)
-    expect(id).toMatch(/^test-[a-f0-9]{8}$/);
+    expect(id).toMatch(/^test-[a-f0-9]{12}$/);
   });
 
   it('accepts function-based collision checker', () => {
@@ -128,28 +128,32 @@ describe('generateProjectId', () => {
 
   it('handles unicode titles', () => {
     const id = generateProjectId('Café Résumé');
-    expect(id).toMatch(/^cafe-resume-[a-f0-9]{4}$/);
+    expect(id).toMatch(/^cafe-resume-[a-f0-9]{6}$/);
   });
 
   it('handles very long titles', () => {
     const longTitle = 'This is a very long project title that exceeds the maximum slug length limit';
     const id = generateProjectId(longTitle);
-    // slug portion (before last -xxxx) should be ≤ 40 chars
+    // slug portion (before last -xxxxxx) should be ≤ 40 chars
     const parts = id.split('-');
     const suffix = parts.pop()!;
     const slugPortion = parts.join('-');
-    expect(suffix).toMatch(/^[a-f0-9]{4}$/);
+    expect(suffix).toMatch(/^[a-f0-9]{6}$/);
     expect(slugPortion.length).toBeLessThanOrEqual(40);
   });
 });
 
 describe('isValidProjectId', () => {
-  it('accepts new slug format with 4 hex chars', () => {
-    expect(isValidProjectId('my-project-a3f7')).toBe(true);
+  it('accepts new slug format with 6 hex chars', () => {
+    expect(isValidProjectId('my-project-a3f7b2')).toBe(true);
   });
 
-  it('accepts new slug format with 8 hex chars', () => {
-    expect(isValidProjectId('my-project-a3f7b2e1')).toBe(true);
+  it('accepts fallback slug format with 12 hex chars', () => {
+    expect(isValidProjectId('my-project-a3f7b2e1c4d5')).toBe(true);
+  });
+
+  it('still accepts legacy 4 hex char format', () => {
+    expect(isValidProjectId('my-project-a3f7')).toBe(true);
   });
 
   it('accepts legacy UUID format', () => {

@@ -50,11 +50,11 @@ function randomHexSuffix(bytes: number): string {
 
 /**
  * Generate a human-readable project ID from a title.
- * Format: `slugified-title-xxxx` where xxxx is 4 random hex chars.
+ * Format: `slugified-title-xxxxxx` where xxxxxx is 6 random hex chars.
  *
  * @param title - Project title (can be empty, unicode, special chars, etc.)
  * @param existingIds - Set of existing project IDs to check for collisions
- * @param maxRetries - Maximum collision retries before using 8 hex chars (default: 5)
+ * @param maxRetries - Maximum collision retries before using 12 hex chars (default: 5)
  * @returns A unique, human-readable project ID
  */
 export function generateProjectId(
@@ -69,14 +69,14 @@ export function generateProjectId(
       ? (id: string) => existingIds.has(id)
       : () => false;
 
-  // Try with 4 hex chars (2 bytes)
+  // Try with 6 hex chars (3 bytes = 16.7M possibilities)
   for (let i = 0; i < maxRetries; i++) {
-    const id = `${slug}-${randomHexSuffix(2)}`;
+    const id = `${slug}-${randomHexSuffix(3)}`;
     if (!isCollision(id)) return id;
   }
 
-  // Fallback: 8 hex chars (4 bytes) — practically collision-free
-  const id = `${slug}-${randomHexSuffix(4)}`;
+  // Fallback: 12 hex chars (6 bytes) — practically collision-free
+  const id = `${slug}-${randomHexSuffix(6)}`;
   return id;
 }
 
@@ -88,7 +88,7 @@ export function isValidProjectId(id: string): boolean {
   if (!id || typeof id !== 'string') return false;
   // Legacy UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return true;
-  // New slug format: slug-xxxx or slug-xxxxxxxx
-  if (/^[a-z0-9][a-z0-9-]*-[a-f0-9]{4,8}$/.test(id)) return true;
+  // New slug format: slug-xxxxxx (6 hex) or slug-xxxxxxxxxxxx (12 hex fallback)
+  if (/^[a-z0-9][a-z0-9-]*-[a-f0-9]{4,12}$/.test(id)) return true;
   return false;
 }
