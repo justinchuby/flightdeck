@@ -1,7 +1,7 @@
 import type { Database } from '../../db/database.js';
 import { projectSessions, taskCostRecords, sessionRetros } from '../../db/schema.js';
 import { eq, sql, desc, and, inArray } from 'drizzle-orm';
-import { activityLog } from '../../db/schema.js';
+import { activityLog, dagTasks } from '../../db/schema.js';
 // ── Types ─────────────────────────────────────────────────────────
 
 export interface SessionListItem {
@@ -77,7 +77,7 @@ export class AnalyticsService {
       .all();
     const costByLead = new Map(costRows.map(r => [r.leadId, r]));
 
-    // Batch-fetch agent counts
+    // Batch-fetch agent counts — keyed by projectId (activity_log.project_id holds the project ID)
     const agentCountRows = this.db.drizzle
       .select({
         projectId: activityLog.projectId,
@@ -88,12 +88,25 @@ export class AnalyticsService {
       .all();
     const agentCountByProject = new Map(agentCountRows.map(r => [r.projectId, r.agentCount ?? 0]));
 
+    // Batch-fetch task counts from dag_tasks (per lead)
+    const dagTaskRows = this.db.drizzle
+      .select({
+        leadId: dagTasks.leadId,
+        taskCount: sql<number>`count(*)`,
+      })
+      .from(dagTasks)
+      .groupBy(dagTasks.leadId)
+      .all();
+    const dagTasksByLead = new Map(dagTaskRows.map(r => [r.leadId, r.taskCount ?? 0]));
+
     return sessions.map(s => {
       const cost = costByLead.get(s.leadId);
       const inputTokens = cost?.totalInput ?? 0;
       const outputTokens = cost?.totalOutput ?? 0;
       const startMs = s.startedAt ? new Date(s.startedAt).getTime() : 0;
       const endMs = s.endedAt ? new Date(s.endedAt).getTime() : null;
+      // Use dag_tasks count, fall back to cost records count
+      const taskCount = dagTasksByLead.get(s.leadId) ?? cost?.taskCount ?? 0;
 
       return {
         id: s.leadId,
@@ -105,8 +118,8 @@ export class AnalyticsService {
         durationMs: endMs && startMs ? endMs - startMs : null,
         totalInputTokens: inputTokens,
         totalOutputTokens: outputTokens,
-        taskCount: cost?.taskCount ?? 0,
-        agentCount: agentCountByProject.get(s.leadId) ?? 0,
+        taskCount,
+        agentCount: agentCountByProject.get(s.projectId ?? '') ?? 0,
       };
     });
   }
@@ -139,7 +152,7 @@ export class AnalyticsService {
 
     const costByLead = new Map(costRows.map(r => [r.leadId, r]));
 
-    // Get agent counts per lead from activity log
+    // Get agent counts per project from activity log
     const agentCountRows = this.db.drizzle
       .select({
         projectId: activityLog.projectId,
@@ -151,19 +164,31 @@ export class AnalyticsService {
 
     const agentCountByProject = new Map(agentCountRows.map(r => [r.projectId, r.agentCount ?? 0]));
 
+    // Get task counts from dag_tasks per lead
+    const dagTaskRows = this.db.drizzle
+      .select({
+        leadId: dagTasks.leadId,
+        taskCount: sql<number>`count(*)`,
+      })
+      .from(dagTasks)
+      .groupBy(dagTasks.leadId)
+      .all();
+    const dagTasksByLead = new Map(dagTaskRows.map(r => [r.leadId, r.taskCount ?? 0]));
+
     // Build session summaries
     const summaries: SessionSummary[] = sessions.map(s => {
       const cost = costByLead.get(s.leadId);
       const inputTokens = cost?.totalInput ?? 0;
       const outputTokens = cost?.totalOutput ?? 0;
+      const taskCount = dagTasksByLead.get(s.leadId) ?? cost?.taskCount ?? 0;
       return {
         leadId: s.leadId,
         projectId: s.projectId,
         status: s.status ?? 'unknown',
         startedAt: s.startedAt ?? '',
         endedAt: s.endedAt ?? null,
-        agentCount: agentCountByProject.get(s.leadId) ?? 0,
-        taskCount: cost?.taskCount ?? 0,
+        agentCount: agentCountByProject.get(s.projectId ?? '') ?? 0,
+        taskCount,
         totalInputTokens: inputTokens,
         totalOutputTokens: outputTokens,
       };
@@ -213,16 +238,24 @@ export class AnalyticsService {
         .select({
           totalInput: sql<number>`sum(${taskCostRecords.inputTokens})`,
           totalOutput: sql<number>`sum(${taskCostRecords.outputTokens})`,
-          taskCount: sql<number>`count(distinct ${taskCostRecords.dagTaskId})`,
         })
         .from(taskCostRecords)
         .where(eq(taskCostRecords.leadId, leadId))
         .get();
 
+      // Task count from dag_tasks (more reliable than cost records)
+      const dagTaskCount = this.db.drizzle
+        .select({ count: sql<number>`count(*)` })
+        .from(dagTasks)
+        .where(eq(dagTasks.leadId, leadId))
+        .get();
+
+      // Agent count — match on projectId, not leadId
+      const projectId = session?.projectId ?? '';
       const agentCount = this.db.drizzle
         .select({ count: sql<number>`count(distinct ${activityLog.agentId})` })
         .from(activityLog)
-        .where(eq(activityLog.projectId, leadId))
+        .where(eq(activityLog.projectId, projectId))
         .get();
 
       const inputTokens = cost?.totalInput ?? 0;
@@ -235,7 +268,7 @@ export class AnalyticsService {
         startedAt: session?.startedAt ?? '',
         endedAt: session?.endedAt ?? null,
         agentCount: agentCount?.count ?? 0,
-        taskCount: cost?.taskCount ?? 0,
+        taskCount: dagTaskCount?.count ?? 0,
         totalInputTokens: inputTokens,
         totalOutputTokens: outputTokens,
       });
