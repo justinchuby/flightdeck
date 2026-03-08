@@ -161,7 +161,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Infrastructure
 
 - **Telegram rate limiting** — Challenge verification endpoint rate-limited to 5 requests per minute per chatId.
-- **Locale-aware dates** — `Intl.RelativeTimeFormat` for localized relative timestamps throughout the UI.
 - **Token usage chart** — Restored token economics visualization on the project overview.
 
 ### Changed
@@ -173,7 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IntegrationAgent → IntegrationRouter** — Renamed to reflect its routing responsibility (not an agent).
 - **`formatRelativeTime` extraction** — Moved from inline implementations to a shared utility used across all timestamp displays.
 - **PulseStrip cleanup** — Removed pending decisions badge (moved to AttentionBar).
-- **LeadDashboard decomposition** — Extracted 5 modules from 1,965-line monolith (→795 LOC): `ChatRenderers`, `InputComposer`, `SidebarTabs`, `DecisionPanel`, `ChatMessages`.
+- **LeadDashboard decomposition** — Two rounds of extraction reduced 1,965→795 LOC across 10 modules: `InputComposer`, `ChatMessages`, `SidebarTabs`, `DecisionPanel`, `ChatRenderers`, `TeamStatusContent`, `NewProjectModal`, `ProgressDetailModal`, `useLeadWebSocket`, `useDragResize`.
 - **Locale-aware relative dates** — Replaced manual relative time strings with `Intl.RelativeTimeFormat` for proper localization.
 - **0 TypeScript errors** — Both `packages/server` and `packages/web` compile cleanly with `tsc --noEmit`.
 
