@@ -46,6 +46,7 @@ const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
 const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
+const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const TeamPage = lazy(() => import('./pages/TeamPage').then(m => ({ default: m.TeamPage })));
 
 function RouteSpinner() {
@@ -337,7 +338,7 @@ export function App() {
             <Route path="/shared/:token" element={<SharedReplayViewer />} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}
-            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/" element={<HomeDashboard />} />
             <Route path="/lead" element={<ProjectRedirect page="session" />} />
             <Route path="/overview" element={<ProjectRedirect page="overview" />} />
             <Route path="/agents" element={<ProjectRedirect page="agents" />} />
