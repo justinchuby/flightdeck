@@ -1164,6 +1164,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         messages: sessionMessages,
         completionSummary: agent.completionSummary,
         startedAt: agent.createdAt.toISOString(),
+        endedAt: new Date().toISOString(),
       };
 
       const result = this.sessionKnowledgeExtractor.extractFromSession(sessionData);
