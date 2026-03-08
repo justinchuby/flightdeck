@@ -91,6 +91,8 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; body: 
  * followed by a markdown body with the skill content.
  */
 export class SkillsLoader {
+  private static readonly RELOAD_DEBOUNCE_MS = 500;
+
   private skills: LoadedSkill[] = [];
   private loaded = false;
   private watcher: FSWatcher | null = null;
@@ -242,10 +244,10 @@ export class SkillsLoader {
           this.reloadTimer = null;
           const result = this.loadAll();
           this.onReload?.(result);
-        }, 500);
+        }, SkillsLoader.RELOAD_DEBOUNCE_MS);
       });
     } catch {
-      // fs.watch can fail on some platforms/filesystems — degrade gracefully
+      // fs.watch can throw on unsupported platforms (e.g. some NFS mounts, Docker volumes)
       this.watcher = null;
     }
   }

@@ -162,6 +162,8 @@ async function gracefulShutdown(signal: string) {
     console.log('Server closed.');
     process.exit(0);
   });
+  // Force exit after 15s — enough for in-flight agent messages to drain
+  // but prevents zombie process if httpServer.close() callback never fires
   setTimeout(() => process.exit(1), 15000);
 }
 
