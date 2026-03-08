@@ -104,6 +104,9 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
             method: 'PATCH', body: JSON.stringify({ status: 'ready' }),
           });
           break;
+        case 'restore':
+          await apiFetch(`/tasks/${task.leadId}/${task.id}/unarchive`, { method: 'PATCH' });
+          break;
       }
       onTaskUpdated?.();
     } catch (err: any) {
@@ -113,7 +116,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
 
   // Build context menu items based on current status
   const contextMenuItems = useMemo(() => {
-    if (isArchived) return []; // no actions on archived tasks
+    if (isArchived) return [{ label: 'Restore', action: 'restore', icon: <RotateCcw size={12} /> }];
     const items: Array<{ label: string; action: string; icon: React.ReactNode }> = [];
     const s = task.dagStatus;
     if (s === 'failed') items.push({ label: 'Retry', action: 'retry', icon: <RotateCcw size={12} /> });

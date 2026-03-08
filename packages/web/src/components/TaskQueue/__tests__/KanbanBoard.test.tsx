@@ -871,7 +871,7 @@ describe('KanbanBoard', () => {
       expect(card.className).toContain('opacity-50');
     });
 
-    it('does not show context menu actions for archived tasks', () => {
+    it('shows only Restore context menu action for archived tasks', () => {
       const archivedTask = makeTask({
         id: 'archived-fail',
         dagStatus: 'ready',
@@ -880,8 +880,14 @@ describe('KanbanBoard', () => {
       const tasks = [archivedTask];
       const status = makeDagStatus(tasks);
       render(<KanbanBoard dagStatus={status} projectId="proj-1" showArchived={true} onShowArchivedChange={vi.fn()} />);
-      // Archived task should NOT show the "..." context menu trigger
-      expect(screen.queryByTestId('context-menu-trigger')).toBeNull();
+      // Archived task should show only the Restore action via context menu
+      const card = screen.getByTestId('kanban-card-archived-fail');
+      fireEvent.contextMenu(card);
+      expect(screen.getByText('Restore')).toBeTruthy();
+      // Should NOT have other actions like Retry, Skip, etc.
+      expect(screen.queryByText('Retry')).toBeNull();
+      expect(screen.queryByText('Skip')).toBeNull();
+      expect(screen.queryByText('Force Ready')).toBeNull();
     });
   });
 });
