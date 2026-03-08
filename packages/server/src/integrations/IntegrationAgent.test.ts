@@ -309,4 +309,97 @@ describe('IntegrationAgent', () => {
     const active = agent.getAllSessions();
     expect(active).toHaveLength(0);
   });
+
+  // ── Regression: C1 — bind command was unreachable ─────
+
+  it('processes bind command even without an active session', async () => {
+    configStore = createMockConfigStore(true);
+    agent = new IntegrationAgent(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+
+    const adapter = agent.getAdapter('telegram') as any;
+    expect(adapter.onMessage).toHaveBeenCalled();
+
+    // Get the message handler
+    const msgHandler = adapter._messageHandlers[0];
+    expect(msgHandler).toBeDefined();
+
+    // Send bind command without any existing session
+    msgHandler({
+      platform: 'telegram',
+      chatId: 'new-chat',
+      userId: 'user-1',
+      displayName: 'Alice',
+      text: 'bind project-1',
+      receivedAt: Date.now(),
+    });
+
+    // Session should have been created
+    const session = agent.getSession('new-chat');
+    expect(session).toBeDefined();
+    expect(session!.projectId).toBe('project-1');
+  });
+
+  // ── Regression: M6 — role renders as [object Object] ──
+
+  it('/agents renders role.id not [object Object]', async () => {
+    configStore = createMockConfigStore(true);
+    agentManager._addAgent({
+      id: 'abc12345',
+      role: { id: 'developer', name: 'Developer' }, // Role object, not string
+      status: 'running',
+      projectId: 'project-1',
+    });
+
+    agent = new IntegrationAgent(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+
+    const adapter = agent.getAdapter('telegram') as any;
+    const agentsHandler = adapter._commandHandlers.get('agents');
+    const result = await agentsHandler!('chat-1', '');
+    expect(result).toContain('developer');
+    expect(result).not.toContain('[object Object]');
+  });
+
+  // ── Regression: M3 — input sanitization ───────────────
+
+  it('sanitizes control characters in inbound messages', async () => {
+    configStore = createMockConfigStore(true);
+    agentManager._addAgent({
+      id: 'lead-1',
+      role: { id: 'lead' },
+      status: 'running',
+      projectId: 'project-1',
+      sendMessage: vi.fn(),
+    });
+
+    agent = new IntegrationAgent(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+
+    // Bind a session first
+    agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+
+    const adapter = agent.getAdapter('telegram') as any;
+    const msgHandler = adapter._messageHandlers[0];
+
+    // Send message with control characters
+    msgHandler({
+      platform: 'telegram',
+      chatId: 'chat-1',
+      userId: 'user-1',
+      displayName: 'Alice',
+      text: 'Hello\x00\x01\x02World\u200B',
+      receivedAt: Date.now(),
+    });
+
+    // The lead agent should receive sanitized text
+    const leadAgent = agentManager.getByProject('project-1')
+      .find((a: any) => a.role.id === 'lead');
+    expect(leadAgent?.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('HelloWorld'),
+    );
+    expect(leadAgent?.sendMessage).toHaveBeenCalledWith(
+      expect.not.stringContaining('\x00'),
+    );
+  });
 });

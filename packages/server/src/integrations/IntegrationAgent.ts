@@ -194,6 +194,34 @@ export class IntegrationAgent {
 
   /** Handle inbound messages — route to project lead if session exists. */
   private handleInboundMessage(msg: InboundMessage): void {
+    // Sanitize inbound text — strip control characters and limit length
+    const sanitizedText = sanitizeInput(msg.text);
+    const sanitizedMsg = { ...msg, text: sanitizedText };
+
+    // Check bind command FIRST — it works even without an existing session
+    if (sanitizedText.startsWith('bind ')) {
+      const projectId = sanitizedText.slice(5).trim();
+      if (!projectId) {
+        const adapter = this.adapters.get(msg.platform);
+        adapter?.sendMessage({
+          platform: msg.platform,
+          chatId: msg.chatId,
+          text: '⚠️ Usage: bind <project-id>',
+        }).catch(() => {});
+        return;
+      }
+      this.bindSession(msg.chatId, msg.platform, projectId, msg.userId);
+      const adapter = this.adapters.get(msg.platform);
+      if (adapter) {
+        adapter.sendMessage({
+          platform: msg.platform,
+          chatId: msg.chatId,
+          text: `✅ Chat bound to project: ${projectId}`,
+        }).catch(() => {});
+      }
+      return;
+    }
+
     const session = this.getSession(msg.chatId);
 
     if (!session) {
@@ -209,28 +237,13 @@ export class IntegrationAgent {
       return;
     }
 
-    // Check if this is a bind command
-    if (msg.text.startsWith('bind ')) {
-      const projectId = msg.text.slice(5).trim();
-      this.bindSession(msg.chatId, msg.platform, projectId, msg.userId);
-      const adapter = this.adapters.get(msg.platform);
-      if (adapter) {
-        adapter.sendMessage({
-          platform: msg.platform,
-          chatId: msg.chatId,
-          text: `✅ Chat bound to project: ${projectId}`,
-        }).catch(() => {});
-      }
-      return;
-    }
-
     // Route to project lead via AgentManager
     try {
       const leadAgent = this.agentManager.getByProject(session.projectId)
         .find(a => a.role.id === 'lead' && (a.status === 'running' || a.status === 'idle'));
 
       if (leadAgent) {
-        leadAgent.sendMessage(`[Telegram from ${msg.displayName}]: ${msg.text}`);
+        leadAgent.sendMessage(`[Telegram from ${sanitizedMsg.displayName}]: ${sanitizedMsg.text}`);
       } else {
         const adapter = this.adapters.get(msg.platform);
         adapter?.sendMessage({
@@ -307,7 +320,7 @@ export class IntegrationAgent {
 
     const lines = ['🤖 *Active Agents*', ''];
     for (const a of agents.slice(0, 30)) {
-      const roleStr = a.role ?? 'unknown';
+      const roleStr = typeof a.role === 'string' ? a.role : a.role?.id ?? 'unknown';
       const statusEmoji = a.status === 'running' ? '🟢' : a.status === 'idle' ? '🟡' : '⚪';
       lines.push(`${statusEmoji} \`${a.id.slice(0, 8)}\` — ${roleStr} (${a.status})`);
     }
@@ -350,4 +363,18 @@ export class IntegrationAgent {
       }
     }
   }
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+const MAX_INPUT_LENGTH = 4000;
+
+/** Sanitize user input: strip control chars, trim, limit length. */
+function sanitizeInput(text: string): string {
+  // Remove control characters (except newline/tab) and zero-width chars
+  const cleaned = text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '')
+    .trim();
+  return cleaned.slice(0, MAX_INPUT_LENGTH);
 }

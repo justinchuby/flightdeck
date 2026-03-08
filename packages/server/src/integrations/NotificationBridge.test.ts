@@ -323,4 +323,63 @@ describe('NotificationBridge', () => {
     expect(bridge.pendingCount()).toBe(0);
     expect(bridge.getAllSubscriptions()).toHaveLength(0);
   });
+
+  // ── Regression: C2 — lead:decision used leadId as projectId ──
+
+  it('resolves projectId from agentManager for lead:decision events', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    // Subscribe to the REAL project ID, not the agent ID
+    bridge.subscribe('chat-1', 'real-project-id');
+
+    const manager = createMockAgentManager();
+    // Simulate: leadId is an agent ID, getProjectIdForAgent resolves to real project
+    manager.getProjectIdForAgent.mockReturnValue('real-project-id');
+    bridge.wire(manager);
+
+    // Emit lead:decision with leadId = agent ID (NOT project ID)
+    manager.emit('lead:decision', {
+      id: 1,
+      agentId: 'agent-1',
+      agentRole: 'developer',
+      leadId: 'lead-agent-abc123', // This is an agent ID, not a project ID
+      title: 'Use React',
+      rationale: 'Better ecosystem',
+      needsConfirmation: false,
+      status: 'approved',
+    });
+
+    vi.advanceTimersByTime(NotificationBridge.BATCH_WINDOW_MS + 100);
+
+    // Should have resolved to 'real-project-id' and delivered to subscriber
+    expect(manager.getProjectIdForAgent).toHaveBeenCalledWith('lead-agent-abc123');
+    expect(adapter.sentMessages).toHaveLength(1);
+    expect(adapter.sentMessages[0].text).toContain('Decision recorded');
+  });
+
+  it('falls back to leadId when getProjectIdForAgent returns undefined', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'lead-agent-id');
+
+    const manager = createMockAgentManager();
+    manager.getProjectIdForAgent.mockReturnValue(undefined);
+    bridge.wire(manager);
+
+    manager.emit('lead:decision', {
+      id: 2,
+      agentId: 'agent-2',
+      agentRole: 'developer',
+      leadId: 'lead-agent-id',
+      title: 'Fallback test',
+      rationale: 'Testing fallback',
+      needsConfirmation: true,
+      status: 'pending',
+    });
+
+    vi.advanceTimersByTime(NotificationBridge.BATCH_WINDOW_MS + 100);
+
+    // Falls back to leadId since getProjectIdForAgent returned undefined
+    expect(adapter.sentMessages).toHaveLength(1);
+  });
 });

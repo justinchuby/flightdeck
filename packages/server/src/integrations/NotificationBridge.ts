@@ -126,12 +126,14 @@ export class NotificationBridge extends TypedEmitter<NotificationBridgeEvents> {
     });
 
     agentManager.on('lead:decision', (data) => {
+      // leadId is the lead agent's ID, not the project ID — resolve it
+      const projectId = agentManager.getProjectIdForAgent(data.leadId) ?? data.leadId;
       const category: NotificationCategory = data.needsConfirmation
         ? 'decision_needs_approval'
         : 'decision_recorded';
       this.queueEvent({
         category,
-        projectId: data.leadId,
+        projectId,
         title: data.needsConfirmation
           ? `🔔 Decision needs approval: ${data.title}`
           : `Decision recorded: ${data.title}`,

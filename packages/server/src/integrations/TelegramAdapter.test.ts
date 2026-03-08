@@ -189,7 +189,10 @@ describe('TelegramAdapter', () => {
 
     // Handler should NOT have been called since chat 123 is not in allowlist
     expect(handler).not.toHaveBeenCalled();
-    expect(ctx.reply).not.toHaveBeenCalled();
+    // But should reply with a rejection message (M7 fix)
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining('not authorized'),
+    );
   });
 
   // ── Message Handling ──────────────────────────────────────
@@ -393,5 +396,87 @@ describe('TelegramAdapter', () => {
     await adapter.stop();
 
     expect(stoppedHandler).toHaveBeenCalledOnce();
+  });
+
+  // ── Regression: M7 — allowlist now sends rejection message ──
+
+  it('sends rejection message to non-allowlisted chats', async () => {
+    adapter = new TelegramAdapter(createConfig({ allowedChatIds: ['999'] }));
+    const msgHandler = vi.fn();
+    adapter.onMessage(msgHandler);
+
+    await adapter.start();
+    // onStart called synchronously in mock;
+
+    const textHandler = mockOnHandlers.get('message:text');
+    const ctx = {
+      chat: { id: 456 },
+      from: { id: 789, first_name: 'Eve' },
+      message: { text: 'hello' },
+      reply: vi.fn(),
+    };
+    await textHandler!(ctx);
+
+    // Should NOT route the message
+    expect(msgHandler).not.toHaveBeenCalled();
+    // Should INFORM the user they're blocked (not silent)
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining('not authorized'),
+    );
+  });
+
+  it('sends rejection message on /help from non-allowlisted chat', async () => {
+    adapter = new TelegramAdapter(createConfig({ allowedChatIds: ['999'] }));
+
+    await adapter.start();
+    // onStart called synchronously in mock;
+
+    const helpHandler = mockCommandHandlers.get('help');
+    const ctx = {
+      chat: { id: 456 },
+      from: { id: 789 },
+      reply: vi.fn(),
+    };
+    await helpHandler!(ctx);
+
+    expect(ctx.reply).toHaveBeenCalledWith(
+      expect.stringContaining('not authorized'),
+    );
+  });
+
+  // ── Regression: M5 — rate limit by userId, not chatId ──
+
+  it('rate-limits by userId, not chatId (group chat support)', async () => {
+    adapter = new TelegramAdapter(createConfig({ rateLimitPerMinute: 2 }));
+    const msgHandler = vi.fn();
+    adapter.onMessage(msgHandler);
+
+    await adapter.start();
+    // onStart called synchronously in mock;
+
+    const textHandler = mockOnHandlers.get('message:text');
+
+    // Two different users in the same group chat should each get their own rate bucket
+    const makeCtx = (userId: number, text: string) => ({
+      chat: { id: 100 }, // same chatId (group)
+      from: { id: userId, first_name: 'User' },
+      message: { text },
+      reply: vi.fn(),
+    });
+
+    // User A: 2 messages (hits limit)
+    await textHandler!(makeCtx(1, 'msg1'));
+    await textHandler!(makeCtx(1, 'msg2'));
+    expect(msgHandler).toHaveBeenCalledTimes(2);
+
+    // User A: 3rd message should be rate limited
+    const ctx3 = makeCtx(1, 'msg3');
+    await textHandler!(ctx3);
+    expect(msgHandler).toHaveBeenCalledTimes(2);
+    expect(ctx3.reply).toHaveBeenCalledWith(expect.stringContaining('Rate limit'));
+
+    // User B: should NOT be rate limited (different userId)
+    await textHandler!(makeCtx(2, 'msg1'));
+    expect(msgHandler).toHaveBeenCalledTimes(3);
   });
 });

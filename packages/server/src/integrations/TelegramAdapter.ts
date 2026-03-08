@@ -183,7 +183,11 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     // Built-in /help command
     this.bot.command('help', async (ctx) => {
       const chatId = String(ctx.chat.id);
-      if (!this.isChatAllowed(chatId)) return;
+      if (!this.isChatAllowed(chatId)) {
+        await ctx.reply('🚫 This chat is not authorized to use Flightdeck. Contact your admin to add this chat ID to the allowlist.');
+        logger.info({ module: 'telegram', msg: 'Blocked non-allowlisted help request', chatId });
+        return;
+      }
 
       const helpText = [
         '🛩️ *Flightdeck Bot Commands*',
@@ -203,8 +207,13 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     for (const [command, handler] of this.commandHandlers) {
       this.bot.command(command, async (ctx) => {
         const chatId = String(ctx.chat.id);
-        if (!this.isChatAllowed(chatId)) return;
-        if (!this.checkRateLimit(chatId)) {
+        const userId = String(ctx.from?.id ?? ctx.chat.id);
+        if (!this.isChatAllowed(chatId)) {
+          await ctx.reply('🚫 This chat is not authorized to use Flightdeck. Contact your admin to add this chat ID to the allowlist.');
+          logger.info({ module: 'telegram', msg: 'Blocked non-allowlisted chat', chatId });
+          return;
+        }
+        if (!this.checkRateLimit(userId)) {
           await ctx.reply('⏳ Rate limit exceeded. Please wait a moment.');
           return;
         }
@@ -226,8 +235,13 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
 
     this.bot.on('message:text', async (ctx) => {
       const chatId = String(ctx.chat.id);
-      if (!this.isChatAllowed(chatId)) return;
-      if (!this.checkRateLimit(chatId)) {
+      const userId = String(ctx.from.id);
+      if (!this.isChatAllowed(chatId)) {
+        await ctx.reply('🚫 This chat is not authorized to use Flightdeck. Contact your admin to add this chat ID to the allowlist.');
+        logger.info({ module: 'telegram', msg: 'Blocked non-allowlisted message', chatId, userId });
+        return;
+      }
+      if (!this.checkRateLimit(userId)) {
         await ctx.reply('⏳ Rate limit exceeded. Please wait a moment.');
         return;
       }
@@ -262,14 +276,14 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   }
 
   /** Per-user rate limiting. Returns true if within limit. */
-  private checkRateLimit(chatId: string): boolean {
+  private checkRateLimit(userId: string): boolean {
     const now = Date.now();
     const windowMs = 60_000;
-    let bucket = this.rateBuckets.get(chatId);
+    let bucket = this.rateBuckets.get(userId);
 
     if (!bucket || bucket.resetAt <= now) {
       bucket = { count: 0, resetAt: now + windowMs };
-      this.rateBuckets.set(chatId, bucket);
+      this.rateBuckets.set(userId, bucket);
     }
 
     bucket.count++;

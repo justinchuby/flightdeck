@@ -3,9 +3,15 @@
 
 import { Router } from 'express';
 import type { AppContext } from './context.js';
+import { rateLimit } from '../middleware/rateLimit.js';
+
+const integrationLimiter = rateLimit({ windowMs: 60_000, max: 60, message: 'Too many integration requests' });
 
 export function integrationRoutes(ctx: AppContext): Router {
   const router = Router();
+
+  // Apply rate limiting to all integration routes
+  router.use('/integrations', integrationLimiter);
 
   // ── Status ────────────────────────────────────────────────
 
