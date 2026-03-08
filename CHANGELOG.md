@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **6 provider presets** — Built-in configurations for Copilot, Gemini CLI, OpenCode, Cursor, Codex, and Claude. Each preset defines binary path, transport mode, ACP version, environment variables, and capability flags.
 - **Cross-CLI model resolver** — 4-step resolution: tier alias → native passthrough → cross-provider equivalence mapping → fallback. Standard/fast/premium tier aliases work across all providers.
 - **Claude SDK adapter** — Direct in-process adapter via `@anthropic-ai/claude-code` SDK with native session resume. Two-layer session ID (Flightdeck UUID immediate, SDK session ID async). Dynamic SDK loading with graceful fallback.
-- **Unified adapter factory** — `createAdapterForProvider()` with `resolveBackend()` (fork/sdk/daemon) and `buildStartOptions()`. Single entry point for all agent spawning regardless of CLI provider.
+- **Unified adapter factory** — `createAdapterForProvider()` with `resolveBackend()` (acp/claude-sdk/copilot-sdk) and `buildStartOptions()`. Single entry point for all agent spawning regardless of CLI provider.
 - **Role file writers** — Per-provider role file generation for agent identity injection.
 
 #### Agent Server Architecture (Two-Process Model)
@@ -157,7 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **C-2: REST API authentication** — Challenge-response flow for session binding on all Telegram endpoints. Unauthenticated requests rejected.
 - **C-3: Async shutdown data loss** — All shutdown handlers now awaited in sequence; prevents data loss from premature process exit.
 - **C-4: Task pagination** — `GET /tasks` now requires `limit`/`offset` parameters; unbounded queries blocked.
-- **C-5: Default-deny allowlist** — Empty allowlist now denies all (previously allowed all). Prevents accidental open access.
+- **C-5: Default-deny allowlist** — Changed from default-allow to default-deny when allowlist is empty. Prevents accidental open access.
 - **C-6: Permission handler race condition** — Fixed in all 3 SDK adapters (Claude, Copilot, ACP). Concurrent permission requests no longer corrupt handler state.
 
 #### Bug Fixes

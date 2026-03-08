@@ -95,3 +95,7 @@ useEffect(() => {
 - **Pushing full payloads** — Creates tight coupling between WS event schema and client expectations
 - **Polling as fallback without cleanup** — If you add WS push, remove the polling timer
 - **No debounce on burst signals** — Can cause 10+ simultaneous fetches
+
+## Related Skills
+
+- **[deterministic-ws-signals](../deterministic-ws-signals/SKILL.md)** — Complementary skill covering *when* to use server-side WebSocket signals (deterministic events vs. client heuristics). This skill covers *how* to implement the signal+refetch pattern on the client side.

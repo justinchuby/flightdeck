@@ -102,3 +102,7 @@ class NotificationBatcher {
 - **Shared batcher across channels** — Each channel has different rate limits and formatting; use separate instances
 - **Forgetting to call `stop()`** — Causes event listener leaks and orphaned timers
 - **Batching without a max batch size** — If the server accumulates 1000+ events before flush, the batch message will be too large. Consider a max batch size cap.
+
+## Related Skills
+
+- **[messaging-integration-pattern](../messaging-integration-pattern/SKILL.md)** — Covers the broader architecture for adding external messaging platforms (Telegram, Slack, Discord) including routing, event pipeline, and implementation template. This skill focuses specifically on the batching layer within that architecture.
