@@ -474,6 +474,14 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   // ── Wire cross-service events ──────────────────────────
   wireEvents(container);
 
+  // Register reconciliation listener cleanup for shutdown (H-12)
+  if (container.agentServerClient) {
+    const unsubReconciliation = wireReconciliationOnReconnect(
+      container.agentServerClient, container.agentManager, container.internal.wsServer,
+    );
+    onShutdown('reconciliationListener', unsubReconciliation);
+  }
+
   return container;
 }
 
@@ -589,12 +597,6 @@ function wireEvents(c: ServiceContainer): void {
 
   // Start the watcher (safe to call here — watcher uses polling + fs.watch)
   configStore.start();
-
-  // ── Agent reconciliation on reconnect ─────────────────
-  if (agentServerClient) {
-    const unsubReconciliation = wireReconciliationOnReconnect(agentServerClient, agentManager, c.internal.wsServer);
-    onShutdown('reconciliationListener', unsubReconciliation);
-  }
 
   // Alert engine → WS broadcast is wired in wireHttpLayer() after HTTP server creation
 }
