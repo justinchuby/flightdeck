@@ -20,9 +20,19 @@ export function formatRelativeTime(timestamp: string): string {
     const diffMs = Date.now() - then;
     if (diffMs < 0) return 'just now';
     if (diffMs < 60_000) return 'just now';
-    if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
-    if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)}h ago`;
-    return `${Math.floor(diffMs / 86_400_000)}d ago`;
+
+    // Use Intl.RelativeTimeFormat for locale-aware output
+    try {
+      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'always', style: 'narrow' });
+      if (diffMs < 3_600_000) return rtf.format(-Math.floor(diffMs / 60_000), 'minute');
+      if (diffMs < 86_400_000) return rtf.format(-Math.floor(diffMs / 3_600_000), 'hour');
+      return rtf.format(-Math.floor(diffMs / 86_400_000), 'day');
+    } catch {
+      // Fallback for environments without Intl.RelativeTimeFormat
+      if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
+      if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)}h ago`;
+      return `${Math.floor(diffMs / 86_400_000)}d ago`;
+    }
   } catch {
     return timestamp;
   }
