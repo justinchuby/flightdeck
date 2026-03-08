@@ -38,6 +38,7 @@ import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExt
 import type { SessionData, SessionMessage } from '../knowledge/types.js';
 import type { KnowledgeInjector, InjectionContext } from '../knowledge/KnowledgeInjector.js';
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
+import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -117,6 +118,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private knowledgeInjector?: KnowledgeInjector;
   private skillsLoader?: SkillsLoader;
   private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
+  private collectiveMemory?: CollectiveMemory;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -259,6 +261,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.skillsLoader = loader;
   }
 
+  setCollectiveMemory(memory: CollectiveMemory): void {
+    this.collectiveMemory = memory;
+  }
+
   /**
    * Resolve the effective model for a role based on project model config.
    *
@@ -381,6 +387,31 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           msg: 'Injected skills into agent prompt',
           role: role.id,
           skillCount: this.skillsLoader.count,
+        });
+      }
+    }
+
+    // Recall collective memories (cross-session patterns, decisions, gotchas)
+    if (this.collectiveMemory && effectiveProjectId) {
+      const categories: MemoryCategory[] = ['pattern', 'decision', 'gotcha'];
+      const memories = categories.flatMap((cat) =>
+        this.collectiveMemory!.recall(cat, undefined, effectiveProjectId),
+      );
+      if (memories.length > 0) {
+        const memoriesBlock = memories
+          .slice(0, 20) // cap to avoid prompt bloat
+          .map((m) => `- [${m.category}] ${m.key}: ${m.value}`)
+          .join('\n');
+        effectiveRole = {
+          ...effectiveRole,
+          systemPrompt: `${effectiveRole.systemPrompt}\n\n<collective_memory>\n${memoriesBlock}\n</collective_memory>`,
+        };
+        logger.info({
+          module: 'knowledge',
+          msg: 'Injected collective memories into agent prompt',
+          projectId: effectiveProjectId,
+          role: role.id,
+          memoriesIncluded: Math.min(memories.length, 20),
         });
       }
     }
@@ -1215,6 +1246,26 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           `Extracted ${result.entriesStored} knowledge entries (${result.decisions.length} decisions, ${result.patterns.length} patterns, ${result.errors.length} errors)`,
           { entriesStored: result.entriesStored }, agent.projectId,
         );
+      }
+
+      // Persist extracted knowledge into collective memory for cross-session recall
+      if (this.collectiveMemory) {
+        const categoryMap: Record<string, MemoryCategory> = {
+          semantic: 'decision', procedural: 'pattern', episodic: 'expertise',
+        };
+        const entries = [...result.decisions, ...result.patterns, ...result.errors];
+        for (const entry of entries) {
+          const memCat = categoryMap[entry.category] ?? 'pattern';
+          this.collectiveMemory.remember(memCat, entry.key, entry.content, agent.id, agent.projectId!);
+        }
+        if (entries.length > 0) {
+          logger.info({
+            module: 'knowledge',
+            msg: 'Stored entries in collective memory',
+            agentId: agent.id,
+            count: entries.length,
+          });
+        }
       }
     } catch (err) {
       logger.warn({
