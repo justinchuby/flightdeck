@@ -1327,25 +1327,32 @@ export function LeadDashboard({ api, ws }: Props) {
           </div>
 
           <SidebarTabs
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
-            sidebarWidth={sidebarWidth}
-            startResize={startResize}
-            sidebarTab={sidebarTab}
-            onTabChange={setSidebarTab}
-            tabOrder={tabOrder}
-            onTabOrderChange={handleTabOrderChange}
-            hiddenTabs={hiddenTabs}
-            onToggleTabVisibility={toggleTabVisibility}
-            showTabConfig={showTabConfig}
-            onToggleTabConfig={() => setShowTabConfig((v) => !v)}
-            decisions={decisions}
-            pendingConfirmations={pendingConfirmations}
-            decisionsPanelHeight={decisionsPanelHeight}
-            startDecisionsResize={startDecisionsResize}
-            onConfirmDecision={handleConfirmDecision}
-            onRejectDecision={handleRejectDecision}
-            onDismissDecision={handleDismissDecision}
+            layout={{
+              collapsed: sidebarCollapsed,
+              onToggle: () => setSidebarCollapsed((v) => !v),
+              width: sidebarWidth,
+              onResize: startResize,
+            }}
+            tabs={{
+              activeTab: sidebarTab,
+              onTabChange: setSidebarTab,
+              tabOrder,
+              onTabOrderChange: handleTabOrderChange,
+              hiddenTabs,
+              onToggleTabVisibility: toggleTabVisibility,
+              showConfig: showTabConfig,
+              onToggleConfig: () => setShowTabConfig((v) => !v),
+              onResize: startTabResize,
+            }}
+            decision={{
+              decisions,
+              pendingConfirmations,
+              panelHeight: decisionsPanelHeight,
+              onResize: startDecisionsResize,
+              onConfirm: handleConfirmDecision,
+              onReject: handleRejectDecision,
+              onDismiss: handleDismissDecision,
+            }}
             teamTabContent={
               <TeamStatusContent
                 agents={teamAgents}
@@ -1364,7 +1371,6 @@ export function LeadDashboard({ api, ws }: Props) {
             selectedLeadId={selectedLeadId}
             activeTimerCount={activeTimerCount}
             teamAgentIds={teamAgentIds}
-            startTabResize={startTabResize}
           />
         </>
       )}

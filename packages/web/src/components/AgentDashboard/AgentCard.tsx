@@ -45,9 +45,20 @@ export function AgentCard({ agent, api }: Props) {
           <span className="text-lg">{agent.role.icon}</span>
           <div>
             <h3 className="text-sm font-medium">{agent.role.name} <span className="text-th-text-muted font-mono text-xs">({agent.id.slice(0, 8)})</span></h3>
-            <span className={`text-xs ${agentStatusText(agent.status)}`}>
-              {agent.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs ${agentStatusText(agent.status)}`}>
+                {agent.status}
+              </span>
+              {agent.sessionId && (
+                <button
+                  className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors"
+                  title={`Session: ${agent.sessionId} — click to copy`}
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+                >
+                  sess:{agent.sessionId.slice(0, 8)}
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">

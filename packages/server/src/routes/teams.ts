@@ -296,6 +296,7 @@ export function teamsRoutes(ctx: AppContext): Router {
         outputPreview: liveJson.outputPreview ?? null,
         autopilot: liveJson.autopilot ?? false,
         model: liveJson.model ?? null,
+        sessionId: liveJson.sessionId ?? null,
       } : null,
     });
   });

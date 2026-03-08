@@ -61,6 +61,7 @@ interface AgentProfile {
     outputPreview: string | null;
     autopilot: boolean;
     model: string | null;
+    sessionId: string | null;
   } | null;
 }
 
@@ -195,6 +196,18 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
               <div><span className="text-th-text-alt">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
               <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleDateString()}</span></div>
               <div><span className="text-th-text-alt">Last Active:</span> <span className="text-th-text">{new Date(profile.updatedAt).toLocaleDateString()}</span></div>
+              {profile.live?.sessionId && (
+                <div className="col-span-2">
+                  <span className="text-th-text-alt">Session:</span>{' '}
+                  <button
+                    className="font-mono text-xs text-th-text bg-th-bg-alt/60 px-1.5 py-0.5 rounded hover:bg-th-bg-alt transition-colors"
+                    title="Click to copy session ID"
+                    onClick={() => { navigator.clipboard.writeText(profile.live!.sessionId!); }}
+                  >
+                    {profile.live.sessionId.slice(0, 12)}…
+                  </button>
+                </div>
+              )}
             </div>
             {profile.lastTaskSummary && (
               <div>
