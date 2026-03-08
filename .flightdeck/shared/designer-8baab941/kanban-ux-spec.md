@@ -854,3 +854,109 @@ Should the Kanban support a **"Team view"** mode (all tasks assigned to agents i
 ---
 
 *Updated 2026-03-08 with sections 9-11 based on Lead requirements for global/project views and creative alternatives.*
+
+---
+
+## 12. Converged Design Decisions (Designer + PM Agreement)
+
+After reviewing the PM's scenarios doc (`.flightdeck/shared/product-manager-4b5c4761/kanban-scenarios.md`) and debating in the kanban-ux group, the following decisions are **agreed** between Designer and PM.
+
+### Decision Log
+
+| # | Topic | Decision | Rationale |
+|---|-------|----------|-----------|
+| D1 | Column order | **Lifecycle order** (pending→ready→running→blocked→done→failed→paused→skipped) | PM's Casey onboarding scenario wins — lifecycle is a universal mental model. Attention strip already handles the "what needs me?" scanning. |
+| D2 | Auto-collapse Done | **Conditional**: collapse only when `done > (running + ready + blocked + failed)` | Preserves the "reward signal" for Alex/River personas during active sprints, but de-clutters when the board is mostly complete (Jordan's need). |
+| D3 | Failed column | **Never hide with "Hide empty columns"** | PM's AC-12.5 is correct — failures must always be visible. Collapsed is OK (user choice), hidden is not. |
+| D4 | DnD vs Context menu | **Context menu first (Phase 2a), within-column DnD same phase, cross-column DnD later (Phase 2b)** | Context menu covers more actions (retry, reassign, pause, logs). Within-column DnD (reorder=priority) is simple and safe. Cross-column DnD needs transition guards. |
+| D5 | Swimlanes vs Filters | **Filters first, swimlanes Phase 3** | Filters are O(1) complexity. Swimlanes at 3 teams × 8 columns = 24 zones = cognitive overload. Global view's "group by project" within columns is a lighter alternative. |
+| D6 | Card density | **Two modes: Standard (~80px) and Compact (~36px)** | Toggle in toolbar. Auto-engage compact when any column has >15 cards. Manual override available. |
+| D7 | Done column at scale | **"Show recent 5" pattern** | Show 5 most recent Done cards + "Show N more" button. Older cards dimmed. Don't auto-archive — users need Done cards for review (PM Scenario 5). |
+| D8 | Command Center | **Expandable attention strip** — click to expand into triage dashboard overlay (top 40% viewport), Kanban compressed below | Unifies Designer Section 10.1 + PM's expandable Command Center concept. NOT a separate page. Surfaces decisions + action items + progress in one place. |
+| D9 | Agent display | **Role name + 4-char ID** (e.g., "Developer • 903d") | PM's AC-12.13. Full UUID on hover tooltip. Raw IDs are cryptic for onboarding (Casey scenario). |
+| D10 | Filter persistence | **URL query params** | Shareable, bookmarkable, respects browser back/forward. Reset on project scope change. Format: `?role=developer&priority=2+` |
+| D11 | Stale threshold | **Default 15 min, configurable per project** | PM's answer: adaptive option (2× median task duration) is ideal but Phase 3. Start with configurable static threshold. |
+| D12 | Color for Done | **Muted emerald** (not purple) | Agreed: eye should go to problems (red/amber), not victories. Purple is too attention-grabbing for completed work. |
+| D13 | Color accessibility | **Icons (primary) + border patterns (secondary)** | Solid=active, dashed=pending/skipped, double=failed, dotted=paused. Plus high-contrast mode support. |
+
+### Revised Phase Roadmap
+
+**Phase 1 — Immediate (this sprint):**
+- R1: Attention summary strip ⭐
+- R2: Agent assignment on card face (role + 4-char ID)
+- R3: Time-in-status display
+- R4: Filter bar (role, agent, priority, text search)
+- R5: Better empty state with onboarding CTA
+- R6 (revised): Conditional auto-collapse Done
+- R7: Stale task indicator
+- R8: Color semantics (done→emerald, strengthen failed red)
+- NEW: Failed column never hidden by "Hide empty columns"
+- NEW: Column header tooltips (status explanations)
+- NEW: Persistent view state (collapse, filters, hide-empty via URL/localStorage)
+
+**Phase 2a — Core Interactivity (next sprint):**
+- R10 (promoted): Right-click context menu (Retry, Reassign, Pause, View Logs, Change Priority)
+- R9a: Within-column drag-and-drop (reorder = priority change)
+- NEW: Scope switcher (global vs project-specific)
+- NEW: Team filter chip (for multi-team projects)
+- NEW: Compact card mode toggle
+- NEW: "Show recent 5" for Done column overflow
+- NEW: `failureReason` display on failed cards
+
+**Phase 2b — Advanced Interactions:**
+- R9b: Cross-column drag-and-drop with transition matrix + confirmation guards
+- NEW: Quick-add task from Kanban toolbar
+- NEW: "Request Rework" action on Done cards
+- NEW: "Retry All" batch action on Failed column header
+- NEW: Cascading block detection ("3 tasks blocked by 1 root cause")
+
+**Phase 3 — Polish & Scale:**
+- R11: 3-lane compact view (Queue | Active | Complete) — useful for global view
+- R12: Mobile responsive stacked layout
+- R13: Virtual scrolling for 50+ tasks
+- NEW: Sprint summary modal (PM Scenario 9)
+- NEW: Swimlanes by team (if PM validates user need)
+- NEW: Keyboard shortcuts (J/K navigation, M to move, Enter to expand)
+- NEW: Command Center expandable mode (triage dashboard overlay)
+- NEW: Velocity indicator in toolbar
+
+### New Acceptance Criteria Alignment
+
+The PM published AC-12.1 through AC-12.20. My recommendations map to them:
+
+| PM AC | Designer Rec | Phase |
+|-------|-------------|-------|
+| AC-12.1 (correct columns) | Existing ✓ | — |
+| AC-12.2 (card details) | R2 + completion summary | Phase 1 |
+| AC-12.3 (collapse persists) | Persistent view state | Phase 1 |
+| AC-12.4 (hide empty persists) | Persistent view state | Phase 1 |
+| AC-12.5 (failed never hidden) | NEW: Failed column rule | Phase 1 |
+| AC-12.6 (real-time updates) | Existing ✓ (needs animation) | Phase 2a |
+| AC-12.7 (filter by role) | R4 filter bar | Phase 1 |
+| AC-12.8 (filter by agent) | R4 filter bar | Phase 1 |
+| AC-12.9 (filter by team) | Team filter chip | Phase 2a |
+| AC-12.10 (keyboard nav) | Keyboard shortcuts | Phase 3 |
+| AC-12.11 (column tooltips) | Column header tooltips | Phase 1 |
+| AC-12.12 (empty state) | R5 onboarding empty state | Phase 1 |
+| AC-12.13 (agent display) | R2 + role+short-ID format | Phase 1 |
+| AC-12.14 (time-in-column) | R3 + R7 stale indicator | Phase 1 |
+| AC-12.15 (priority edit) | Context menu | Phase 2a |
+| AC-12.16 (dependency chain) | Cascading block detection | Phase 2b |
+| AC-12.17 (responsive layout) | R12 mobile layout | Phase 3 |
+| AC-12.18 (performance 50+) | R13 virtual scrolling | Phase 3 |
+| AC-12.19 (team badges) | Team badge (multi-team only) | Phase 2a |
+| AC-12.20 (DnD reorder) | R9a within-column DnD | Phase 2a |
+
+### Backend Requirements for Developer (@b04c9b12)
+
+These API changes are needed for the Kanban improvements:
+
+1. **`failureReason` field on DagTask** — Capture last error message from agent. Store in DB. Return in task query.
+2. **`PATCH /api/projects/:projectId/tasks/:taskId`** — Mutation endpoint for: status change, priority change, assignment change. Include validation against transition matrix.
+3. **`GET /api/tasks?scope=global`** — Global task query across all projects. Support existing filters (role, agent, priority, status).
+4. **`completionSummary` field on DagTask** — From COMPLETE_TASK command. Essential for Done card richness (PM Scenario 5).
+5. **Stale threshold in project settings** — `staleThresholdMinutes` field, default 15.
+
+---
+
+*Converged design direction agreed 2026-03-08 between Designer @8baab941 and PM @4b5c4761. Pending Lead greenlight.*
