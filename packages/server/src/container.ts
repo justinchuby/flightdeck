@@ -179,7 +179,8 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   // ── Agent Server Transport & Client ─────────────────────
   // In dev mode (tsx), fork the TypeScript source directly using tsx loader.
   // In production, fork the compiled JS entry point.
-  const isTsx = process.argv[1]?.includes('tsx') || !!process.env.TSX;
+  // Detection: tsx sets its loader in process.execArgv, not process.argv.
+  const isTsx = process.execArgv.some(a => a.includes('tsx')) || !!process.env.TSX;
   const agentServerScript = isTsx
     ? `${repoRoot}/packages/server/src/agent-server-entry.ts`
     : `${repoRoot}/packages/server/dist/agent-server-entry.js`;
