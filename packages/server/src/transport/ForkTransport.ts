@@ -220,15 +220,37 @@ export class ForkTransport implements AgentServerTransport {
     this.cancelReconnect();
     this.stopHealthCheck();
 
+    // Send explicit shutdown to agent server before disconnecting.
+    // The agent server is detached and won't receive SIGINT from the
+    // terminal — this is the only way to tell it to stop on Ctrl+C.
+    try {
+      if (this.child?.connected) {
+        this.child.send({ type: 'shutdown' });
+      } else if (this.tcpSocket && !this.tcpSocket.destroyed) {
+        this.tcpSocket.write(JSON.stringify({ type: 'shutdown' }) + '\n');
+      }
+    } catch {
+      // Best effort — proceed to kill
+    }
+
+    // Save PID before detaching (detachChild nulls this.child)
+    const pid = this.child?.pid ?? this.readPidFile();
+
+    // Detach first to prevent exit handler from triggering reconnect
     if (this.tcpSocket) {
       this.cleanupTcpSocket();
     }
-
     if (this.child) {
-      // Disconnect the IPC channel but leave the child running (detached)
       this.detachChild();
     }
 
+    // Kill the agent server process. SIGTERM gives it time to persist
+    // state before exiting. If it doesn't exit in 3s, SIGKILL.
+    if (pid && this.isProcessAlive(pid)) {
+      await this.killStaleProcess(pid);
+    }
+
+    this.cleanupPidFile();
     this.setState('disconnected');
   }
 
