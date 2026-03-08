@@ -347,7 +347,7 @@ function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdated, sho
 
   return (
     <div
-      className={`bg-th-bg rounded-md border ${
+      className={`group/card bg-th-bg rounded-md border ${
         stale ? 'border-l-2 border-l-amber-400 border-t-th-border border-r-th-border border-b-th-border' : 'border-th-border'
       } p-2.5 shadow-sm transition-colors ${
         isDragOverlay ? 'opacity-80 shadow-lg ring-2 ring-blue-500/30' : 'hover:border-th-text-muted/30 cursor-pointer'
@@ -382,6 +382,20 @@ function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdated, sho
             </span>
           )}
           {priorityBadge(task.priority)}
+          {!isDragOverlay && contextMenuItems.length > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                setContextMenu({ x: rect.right, y: rect.bottom });
+              }}
+              className="opacity-0 group-hover/card:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text transition-opacity"
+              aria-label="Task actions"
+              data-testid="context-menu-trigger"
+            >
+              <MoreHorizontal size={12} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -534,8 +548,17 @@ interface KanbanColumnProps {
 
 function KanbanColumn({ column, tasks, allTasks, collapsed, onToggleCollapse, isDropTarget, isInvalidTarget, projectId, onTaskUpdated, showProjectName, projectNameMap }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column-${column.status}` });
+  const [showAll, setShowAll] = useState(false);
 
-  const taskIds = useMemo(() => tasks.map(t => t.id), [tasks]);
+  // Done/Skipped columns show only 5 most recent by default
+  const isCompletedColumn = column.status === 'done' || column.status === 'skipped';
+  const DEFAULT_VISIBLE = 5;
+  const visibleTasks = isCompletedColumn && !showAll && tasks.length > DEFAULT_VISIBLE
+    ? tasks.slice(0, DEFAULT_VISIBLE)
+    : tasks;
+  const hiddenCount = tasks.length - visibleTasks.length;
+
+  const taskIds = useMemo(() => visibleTasks.map(t => t.id), [visibleTasks]);
 
   const highlightClass = isInvalidTarget
     ? 'ring-2 ring-red-500/40'
@@ -574,17 +597,37 @@ function KanbanColumn({ column, tasks, allTasks, collapsed, onToggleCollapse, is
                 No tasks
               </div>
             ) : (
-              tasks.map(task => (
-                <SortableTaskCard
-                  key={task.id}
-                  task={task}
-                  allTasks={allTasks}
-                  projectId={projectId}
-                  onTaskUpdated={onTaskUpdated}
-                  showProjectName={showProjectName}
-                  projectName={projectNameMap?.get(task.projectId ?? '') ?? task.projectId}
-                />
-              ))
+              <>
+                {visibleTasks.map(task => (
+                  <SortableTaskCard
+                    key={task.id}
+                    task={task}
+                    allTasks={allTasks}
+                    projectId={projectId}
+                    onTaskUpdated={onTaskUpdated}
+                    showProjectName={showProjectName}
+                    projectName={projectNameMap?.get(task.projectId ?? '') ?? task.projectId}
+                  />
+                ))}
+                {hiddenCount > 0 && (
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="w-full text-[10px] text-th-text-muted hover:text-th-text py-1.5 text-center"
+                    data-testid="show-all-toggle"
+                  >
+                    Show all {tasks.length} tasks
+                  </button>
+                )}
+                {showAll && isCompletedColumn && tasks.length > DEFAULT_VISIBLE && (
+                  <button
+                    onClick={() => setShowAll(false)}
+                    className="w-full text-[10px] text-th-text-muted hover:text-th-text py-1.5 text-center"
+                    data-testid="show-less-toggle"
+                  >
+                    Show recent {DEFAULT_VISIBLE}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </SortableContext>

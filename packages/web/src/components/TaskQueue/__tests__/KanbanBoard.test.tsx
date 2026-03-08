@@ -759,4 +759,73 @@ describe('KanbanBoard', () => {
       expect(screen.getByTestId('add-task-form')).toBeTruthy();
     });
   });
+
+  describe('done column show-all toggle (D2)', () => {
+    it('shows only 5 tasks in done column by default with "Show all" button', () => {
+      const doneTasks = Array.from({ length: 8 }, (_, i) =>
+        makeTask({ id: `done-${i}`, dagStatus: 'done', title: `Done task ${i}` })
+      );
+      // Add enough active tasks so auto-collapse won't trigger (active >= done)
+      const activeTasks = Array.from({ length: 10 }, (_, i) =>
+        makeTask({ id: `active-${i}`, dagStatus: 'running', title: `Active task ${i}` })
+      );
+      const status = makeDagStatus([...activeTasks, ...doneTasks]);
+
+      render(<KanbanBoard dagStatus={status} projectId="proj-1" />);
+
+      const doneColumn = screen.getByTestId('kanban-column-done');
+      const cards = within(doneColumn).getAllByTestId(/^kanban-card-/);
+      expect(cards).toHaveLength(5);
+      expect(within(doneColumn).getByTestId('show-all-toggle')).toBeTruthy();
+      expect(within(doneColumn).getByText('Show all 8 tasks')).toBeTruthy();
+    });
+
+    it('expands to show all done tasks when "Show all" is clicked', () => {
+      const doneTasks = Array.from({ length: 8 }, (_, i) =>
+        makeTask({ id: `done-${i}`, dagStatus: 'done', title: `Done task ${i}` })
+      );
+      const activeTasks = Array.from({ length: 10 }, (_, i) =>
+        makeTask({ id: `active-${i}`, dagStatus: 'running', title: `Active task ${i}` })
+      );
+      const status = makeDagStatus([...activeTasks, ...doneTasks]);
+
+      render(<KanbanBoard dagStatus={status} projectId="proj-1" />);
+
+      const doneColumn = screen.getByTestId('kanban-column-done');
+      fireEvent.click(within(doneColumn).getByTestId('show-all-toggle'));
+
+      const cards = within(doneColumn).getAllByTestId(/^kanban-card-/);
+      expect(cards).toHaveLength(8);
+      expect(within(doneColumn).getByTestId('show-less-toggle')).toBeTruthy();
+    });
+
+    it('does not show toggle for done columns with ≤5 tasks', () => {
+      const doneTasks = Array.from({ length: 3 }, (_, i) =>
+        makeTask({ id: `done-${i}`, dagStatus: 'done', title: `Done task ${i}` })
+      );
+      const status = makeDagStatus(doneTasks);
+
+      render(<KanbanBoard dagStatus={status} projectId="proj-1" />);
+
+      const doneColumn = screen.getByTestId('kanban-column-done');
+      expect(within(doneColumn).queryByTestId('show-all-toggle')).toBeNull();
+    });
+  });
+
+  describe('keyboard context menu trigger (D3)', () => {
+    it('shows context menu trigger button on card that opens menu on click', async () => {
+      const status = makeDagStatus([
+        makeTask({ dagStatus: 'failed', title: 'Failed task' }),
+      ]);
+
+      render(<KanbanBoard dagStatus={status} projectId="proj-1" />);
+
+      const trigger = screen.getByTestId('context-menu-trigger');
+      expect(trigger).toBeTruthy();
+      expect(trigger.getAttribute('aria-label')).toBe('Task actions');
+
+      fireEvent.click(trigger);
+      expect(screen.getByText('Retry')).toBeTruthy();
+    });
+  });
 });
