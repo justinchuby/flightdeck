@@ -1440,13 +1440,13 @@ export function LeadDashboard({ api, ws }: Props) {
                   );
                 }
                 return (
-                  <div key={i} className="py-0.5" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
+                  <div key={i} className="flex items-start gap-2 py-1" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
+                    <div className="max-w-[90%] rounded-lg px-3 py-2 bg-amber-500/[0.04] dark:bg-amber-900/20 border border-amber-400/15 dark:border-amber-600/20">
+                      <div className="font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
                         <AgentTextBlock text={mergedText} />
                       </div>
-                      {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
                     </div>
+                    {agentTs && <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{agentTs}</span>}
                   </div>
                 );
               })}

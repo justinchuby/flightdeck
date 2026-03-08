@@ -103,17 +103,28 @@ export function CollapsibleCommandBlock({ text }: { text: string }) {
       preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
     }
   }
+  if (!expanded) {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 mx-0.5 px-1.5 py-0.5 bg-amber-500/15 dark:bg-amber-600/20 border border-amber-400/25 dark:border-amber-600/30 rounded text-[10px] font-mono text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-500/25 transition-colors align-middle"
+        onClick={() => setExpanded(true)}
+        title={preview || label}
+      >
+        <ChevronRight className="w-2.5 h-2.5 shrink-0" />
+        {label}
+      </span>
+    );
+  }
   return (
     <div
-      className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
-      onClick={() => setExpanded((e) => !e)}
+      className="my-1 px-2 py-1.5 bg-amber-500/10 dark:bg-amber-900/20 border border-amber-400/20 dark:border-amber-600/25 rounded text-[11px] text-th-text-alt cursor-pointer hover:border-amber-400/40 transition-colors"
+      onClick={() => setExpanded(false)}
     >
-      <div className="flex items-center gap-1 min-w-0">
-        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="font-mono text-th-text-alt shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
+      <div className="flex items-center gap-1 min-w-0 text-amber-700 dark:text-amber-400">
+        <ChevronDown className="w-3 h-3 shrink-0" />
+        <span className="font-mono font-medium shrink-0">{label}</span>
       </div>
-      {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
+      <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted text-[10px]">{text}</pre>
     </div>
   );
 }
