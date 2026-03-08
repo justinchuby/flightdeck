@@ -21,6 +21,20 @@ vi.mock('react-router-dom', async (importOriginal) => {
   };
 });
 
+// Mock useAttentionItems (shared hook from AttentionBar)
+const mockAttentionState = {
+  items: [],
+  escalation: 'green' as const,
+  progressText: '',
+  agentCount: 0,
+  runningCount: 0,
+  failedTaskCount: 0,
+  pendingDecisionCount: 0,
+};
+vi.mock('../../AttentionBar', () => ({
+  useAttentionItems: () => mockAttentionState,
+}));
+
 // Mock appStore
 const mockAppState = {
   agents: [] as any[],
@@ -157,6 +171,14 @@ describe('HomeDashboard', () => {
     mockAppState.agents = [];
     mockAppState.connected = true;
     mockAppState.pendingDecisions = [];
+    // Reset attention mock to default green state
+    mockAttentionState.items = [];
+    mockAttentionState.escalation = 'green';
+    mockAttentionState.progressText = '';
+    mockAttentionState.agentCount = 0;
+    mockAttentionState.runningCount = 0;
+    mockAttentionState.failedTaskCount = 0;
+    mockAttentionState.pendingDecisionCount = 0;
   });
 
   describe('loading state', () => {
@@ -470,6 +492,29 @@ describe('HomeDashboard', () => {
       });
       fireEvent.click(screen.getByText('Manage Projects'));
       expect(mockNavigate).toHaveBeenCalledWith('/projects');
+    });
+  });
+
+  describe('attention hook integration', () => {
+    it('shows failed count in stat strip when attention reports failures', async () => {
+      setupDefaultMocks();
+      mockAttentionState.failedTaskCount = 3;
+      mockAttentionState.escalation = 'red';
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const stats = screen.getByTestId('home-stats');
+        expect(stats.textContent).toContain('3 failed');
+      });
+    });
+
+    it('does not show failed indicator when no failures', async () => {
+      setupDefaultMocks();
+      mockAttentionState.failedTaskCount = 0;
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        const stats = screen.getByTestId('home-stats');
+        expect(stats.textContent).not.toContain('failed');
+      });
     });
   });
 });
