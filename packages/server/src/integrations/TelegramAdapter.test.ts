@@ -61,7 +61,9 @@ function createConfig(overrides: Partial<TelegramConfig> = {}): TelegramConfig {
   return {
     enabled: true,
     botToken: 'test-bot-token-12345',
-    allowedChatIds: [],
+    // Default test allowlist includes common test chat IDs.
+    // Empty allowlist = deny-all (secure default), so tests must be explicit.
+    allowedChatIds: ['123', '456', '100'],
     rateLimitPerMinute: 20,
     ...overrides,
   };
@@ -344,9 +346,9 @@ describe('TelegramAdapter', () => {
 
   // ── Chat Allowlist ────────────────────────────────────────
 
-  it('allows all chats when allowlist is empty', () => {
+  it('denies all chats when allowlist is empty (secure default)', () => {
     adapter = new TelegramAdapter(createConfig({ allowedChatIds: [] }));
-    expect(adapter.isChatAllowed('any-id')).toBe(true);
+    expect(adapter.isChatAllowed('any-id')).toBe(false);
   });
 
   it('rejects chats not in allowlist', () => {

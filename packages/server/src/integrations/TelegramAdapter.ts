@@ -180,7 +180,8 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
 
   /** Check if a chat ID is in the allowlist. Empty list = allow all. */
   isChatAllowed(chatId: string): boolean {
-    if (this.config.allowedChatIds.length === 0) return true;
+    // Empty allowlist = deny all (secure default). Configure allowed chat IDs in settings.
+    if (this.config.allowedChatIds.length === 0) return false;
     return this.config.allowedChatIds.includes(chatId);
   }
 

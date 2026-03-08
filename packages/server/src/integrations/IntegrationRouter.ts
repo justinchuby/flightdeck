@@ -197,9 +197,11 @@ export class IntegrationRouter {
 
   /** Handle inbound messages — route to project lead if session exists. */
   private handleInboundMessage(msg: InboundMessage): void {
-    // Sanitize inbound text — strip control characters and limit length
+    // Sanitize ALL user-controlled fields — text AND displayName
+    // (displayName comes from Telegram profile, attacker-controlled)
     const sanitizedText = sanitizeInput(msg.text);
-    const sanitizedMsg = { ...msg, text: sanitizedText };
+    const sanitizedDisplayName = sanitizeInput(msg.displayName ?? 'Unknown');
+    const sanitizedMsg = { ...msg, text: sanitizedText, displayName: sanitizedDisplayName };
 
     // Check bind command FIRST — it works even without an existing session
     if (sanitizedText.startsWith('bind ')) {
