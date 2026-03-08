@@ -3,12 +3,10 @@ import { NavLink } from 'react-router-dom';
 import { Users, Settings, Crown, ListChecks, LayoutDashboard, GanttChart, Activity, MessageSquare, Network, MoreHorizontal, ChevronDown, Workflow, BarChart3, FolderOpen, Brain } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 
-// ── Grouped sidebar sections ─────────────────────────────
-
-const homeLink = { to: '/', icon: Crown, label: 'Lead' };
+// ── Grouped sidebar sections (8 items, 3 groups) ─────────
 
 const sessionLinks = [
-  { to: '/mission-control', icon: Activity, label: 'Mission' },
+  { to: '/', icon: Crown, label: 'Lead', end: true },
   { to: '/team', icon: Users, label: 'Agents' },
   { to: '/tasks', icon: ListChecks, label: 'Tasks' },
 ];
@@ -18,18 +16,19 @@ const teamLinks = [
   { to: '/knowledge', icon: Brain, label: 'Knowledge' },
 ];
 
-const systemLinks = [
+const insightsLinks = [
+  { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 const moreLinks = [
-  { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
   { to: '/agents', icon: Users, label: 'Dashboard' },
+  { to: '/mission-control', icon: Activity, label: 'Mission' },
   { to: '/timeline', icon: GanttChart, label: 'Timeline' },
   { to: '/canvas', icon: Workflow, label: 'Canvas' },
   { to: '/groups', icon: MessageSquare, label: 'Groups' },
   { to: '/org', icon: Network, label: 'Org Chart' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 const SIDEBAR_MORE_KEY = 'sidebar-more-expanded';
@@ -87,17 +86,15 @@ export function Sidebar() {
 
   return (
     <nav data-tour="sidebar" className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-0.5 shrink-0">
-      {/* Home */}
-      <NavItem to={homeLink.to} icon={homeLink.icon} label={homeLink.label} end />
-
       {/* Session */}
       <SectionLabel label="Session" />
-      {sessionLinks.map(({ to, icon, label }) => (
+      {sessionLinks.map(({ to, icon, label, end }) => (
         <NavItem
           key={to}
           to={to}
           icon={icon}
           label={label}
+          end={end}
           badge={to === '/tasks' ? (pendingCount > 0 ? pendingCount : null) : null}
         />
       ))}
@@ -108,9 +105,9 @@ export function Sidebar() {
         <NavItem key={to} to={to} icon={icon} label={label} />
       ))}
 
-      {/* System */}
-      <SectionLabel label="System" />
-      {systemLinks.map(({ to, icon, label }) => (
+      {/* Insights */}
+      <SectionLabel label="Insights" />
+      {insightsLinks.map(({ to, icon, label }) => (
         <NavItem key={to} to={to} icon={icon} label={label} />
       ))}
 

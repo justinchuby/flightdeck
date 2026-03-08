@@ -25,11 +25,11 @@ import {
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 
-const DataBrowser = lazy(() => import('../DataBrowser/DataBrowser').then(m => ({ default: m.DataBrowser })));
+const MemoryBrowser = lazy(() => import('./MemoryBrowser').then(m => ({ default: m.MemoryBrowser })));
 
 // ── Types ─────────────────────────────────────────────────
 
-type PageTab = 'browse' | 'training' | 'data';
+type PageTab = 'browse' | 'training' | 'memory';
 type KnowledgeCategory = 'core' | 'episodic' | 'procedural' | 'semantic';
 
 interface KnowledgeEntry {
@@ -405,7 +405,7 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const addToast = useToastStore((s) => s.add);
   const [searchParams] = useSearchParams();
-  const initialTab = (['browse', 'training', 'data'] as PageTab[]).includes(searchParams.get('tab') as PageTab)
+  const initialTab = (['browse', 'training', 'memory'] as PageTab[]).includes(searchParams.get('tab') as PageTab)
     ? (searchParams.get('tab') as PageTab)
     : 'browse';
   const [pageTab, setPageTab] = useState<PageTab>(initialTab);
@@ -542,12 +542,12 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
         </div>
       </div>
 
-      {/* Page tabs: Browse / Training / Raw Data */}
+      {/* Page tabs: Browse / Training / Memory */}
       <div className="flex gap-1 mb-6 border-b border-th-border" data-testid="knowledge-page-tabs">
         {([
           { id: 'browse' as const, label: 'Browse', icon: BookOpen },
           { id: 'training' as const, label: 'Training', icon: Lightbulb },
-          { id: 'data' as const, label: 'Raw Data', icon: Database },
+          { id: 'memory' as const, label: 'Memory', icon: Database },
         ]).map(tab => (
           <button
             key={tab.id}
@@ -577,14 +577,14 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
         )
       )}
 
-      {/* ── Raw Data page tab ───────────────────────────────── */}
-      {pageTab === 'data' && (
+      {/* ── Memory page tab ───────────────────────────────── */}
+      {pageTab === 'memory' && (
         <Suspense fallback={
           <div className="flex items-center justify-center h-64">
             <div className="w-6 h-6 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
           </div>
         }>
-          <DataBrowser />
+          <MemoryBrowser />
         </Suspense>
       )}
 

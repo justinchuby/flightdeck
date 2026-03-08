@@ -273,7 +273,7 @@ export function App() {
             <Route path="/org" element={<OrgChart api={api} ws={ws} />} />
             <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
             <Route path="/settings" element={<SettingsPanel api={api} />} />
-            <Route path="/data" element={<Navigate to="/knowledge?tab=data" replace />} />
+            <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
             <Route path="/timeline" element={<TimelinePage api={api} ws={ws} />} />
             <Route path="/mission-control" element={<MissionControlPage />} />
             <Route path="/canvas" element={<CanvasPage />} />

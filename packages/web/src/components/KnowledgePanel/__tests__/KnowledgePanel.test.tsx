@@ -285,7 +285,7 @@ describe('KnowledgePanel', () => {
 
   // ── Page tab navigation ──────────────────────────────
 
-  it('renders page tabs: Browse, Training, Raw Data', async () => {
+  it('renders page tabs: Browse, Training, Memory', async () => {
     setupMocks();
     render(<MemoryRouter><KnowledgePanel projectId="proj-1" /></MemoryRouter>);
     await waitFor(() => {
@@ -293,7 +293,7 @@ describe('KnowledgePanel', () => {
     });
     expect(screen.getByTestId('page-tab-browse')).toBeInTheDocument();
     expect(screen.getByTestId('page-tab-training')).toBeInTheDocument();
-    expect(screen.getByTestId('page-tab-data')).toBeInTheDocument();
+    expect(screen.getByTestId('page-tab-memory')).toBeInTheDocument();
   });
 
   it('switches to Training tab', async () => {
@@ -309,14 +309,14 @@ describe('KnowledgePanel', () => {
     expect(screen.queryByText('All')).not.toBeInTheDocument();
   });
 
-  it('switches to Raw Data tab', async () => {
+  it('switches to Memory tab', async () => {
     setupMocks();
     render(<MemoryRouter><KnowledgePanel projectId="proj-1" /></MemoryRouter>);
     await waitFor(() => {
-      expect(screen.getByTestId('page-tab-data')).toBeInTheDocument();
+      expect(screen.getByTestId('page-tab-memory')).toBeInTheDocument();
     });
     expect(screen.getByText('All')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('page-tab-data'));
+    fireEvent.click(screen.getByTestId('page-tab-memory'));
     // Browse content gone, category filter tabs hidden
     expect(screen.queryByText('All')).not.toBeInTheDocument();
   });
