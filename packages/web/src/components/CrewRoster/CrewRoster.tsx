@@ -11,8 +11,6 @@ import {
   ArrowUpDown,
   User,
   Cpu,
-  BookOpen,
-  Wrench,
   Settings,
   Activity,
   X,
@@ -31,7 +29,7 @@ import type { TabItem } from '../ui/Tabs';
 
 type RosterStatus = 'idle' | 'busy' | 'terminated' | 'retired';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
-type ProfileTab = 'overview' | 'history' | 'knowledge' | 'skills' | 'settings';
+type ProfileTab = 'overview' | 'history' | 'settings';
 type SortField = 'role' | 'status' | 'updatedAt';
 type SortDir = 'asc' | 'desc';
 
@@ -215,8 +213,6 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
   const tabs: TabItem[] = [
     { id: 'overview', label: 'Overview', icon: <User className="w-3.5 h-3.5" /> },
     { id: 'history', label: 'History', icon: <Clock className="w-3.5 h-3.5" /> },
-    { id: 'knowledge', label: 'Knowledge', icon: <BookOpen className="w-3.5 h-3.5" /> },
-    { id: 'skills', label: 'Skills', icon: <Wrench className="w-3.5 h-3.5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-3.5 h-3.5" /> },
   ];
 
@@ -375,22 +371,6 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
           <div className="text-sm text-th-text-alt text-center py-6">
             <Clock className="w-6 h-6 mx-auto mb-2 opacity-50" />
             Task history will be available when AS23 migration completes
-          </div>
-        )}
-
-        {activeTab === 'knowledge' && (
-          <div className="text-sm text-th-text-alt text-center py-6">
-            <BookOpen className="w-6 h-6 mx-auto mb-2 opacity-50" />
-            {profile.knowledgeCount > 0
-              ? `${profile.knowledgeCount} knowledge entries — use Knowledge panel for details`
-              : 'No knowledge entries yet'}
-          </div>
-        )}
-
-        {activeTab === 'skills' && (
-          <div className="text-sm text-th-text-alt text-center py-6">
-            <Wrench className="w-6 h-6 mx-auto mb-2 opacity-50" />
-            Skills and training data will be available when AS23 migration completes
           </div>
         )}
 

@@ -202,8 +202,6 @@ describe('CrewRoster', () => {
       expect(screen.getByText('Overview')).toBeInTheDocument();
     });
     expect(screen.getByText('History')).toBeInTheDocument();
-    expect(screen.getByText('Knowledge')).toBeInTheDocument();
-    expect(screen.getByText('Skills')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
@@ -275,10 +273,10 @@ describe('CrewRoster', () => {
       expect(screen.getByText('Overview')).toBeInTheDocument();
     });
 
-    // Click Knowledge tab
-    fireEvent.click(screen.getByText('Knowledge'));
+    // Click Settings tab
+    fireEvent.click(screen.getByText('Settings'));
     await waitFor(() => {
-      expect(screen.getByText(/12 knowledge entries/i)).toBeInTheDocument();
+      expect(screen.getByText('Autopilot:')).toBeInTheDocument();
     });
   });
 
