@@ -302,7 +302,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
     // older than resumeStartedAt are from the previous session.
     if (this._resumeStartedAt && event.type.startsWith('assistant.')) {
       const eventTime = event.timestamp ? new Date(event.timestamp).getTime() : Date.now();
-      if (eventTime < this._resumeStartedAt) {
+      if (isNaN(eventTime) || eventTime < this._resumeStartedAt) {
         return; // historical replay — suppress
       }
       // First current event received — hydration complete
