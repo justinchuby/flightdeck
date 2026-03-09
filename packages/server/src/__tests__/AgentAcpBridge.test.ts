@@ -38,7 +38,6 @@ vi.mock('../adapters/AdapterFactory.js', () => ({
       ...(config.cliArgs ?? []),
       ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
       ...(config.model ? ['--model', config.model] : []),
-      ...(agentOpts.sessionId ? ['--resume', agentOpts.sessionId] : []),
     ],
     cwd: agentOpts.cwd ?? process.cwd(),
     sessionId: agentOpts.sessionId,

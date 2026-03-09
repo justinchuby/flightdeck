@@ -239,14 +239,14 @@ describe('AdapterFactory', () => {
       expect(opts.cliArgs).toContain('claude-sonnet-4');
     });
 
-    it('includes --resume flag when sessionId provided', () => {
+    it('passes sessionId through opts without --resume CLI flag', () => {
       const opts = buildStartOptions(
         baseConfig,
         { cwd: '/test', sessionId: 'session-abc-123' },
       );
-      expect(opts.cliArgs).toContain('--resume');
-      expect(opts.cliArgs).toContain('session-abc-123');
+      // sessionId is passed via opts for ACP's session/load protocol, not as a CLI flag
       expect(opts.sessionId).toBe('session-abc-123');
+      expect(opts.cliArgs).not.toContain('--resume');
     });
 
     it('uses argsOverride when provided', () => {

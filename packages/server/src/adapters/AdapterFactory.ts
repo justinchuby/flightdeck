@@ -2,13 +2,19 @@
  * Unified adapter factory for multi-backend support.
  *
  * Single entry point for creating agent adapters. Resolves the correct
- * adapter type (AcpAdapter or ClaudeSdkAdapter) based on provider config,
- * SDK mode preference, and graceful fallback when SDK is unavailable.
+ * adapter type based on provider config, SDK mode preference, and graceful
+ * fallback when SDK is unavailable.
  *
  * Decision logic:
- *   provider='claude' AND sdkMode=true → ClaudeSdkAdapter (in-process)
- *   provider='claude' AND sdkMode=false → AcpAdapter with Claude preset (subprocess)
+ *   provider='copilot' AND sdkMode=true → CopilotSdkAdapter (in-process SDK)
+ *   provider='claude'  AND sdkMode=true → ClaudeSdkAdapter  (in-process SDK)
+ *   provider='copilot' AND sdkMode=false → AcpAdapter with Copilot preset (subprocess, fallback only)
  *   all other providers → AcpAdapter with provider preset (subprocess)
+ *
+ * Session resume is handled at the adapter level:
+ *   - AcpAdapter: uses ACP protocol's session/load RPC (standard ACP)
+ *   - CopilotSdkAdapter: uses SDK's resumeSession() method
+ *   - ClaudeSdkAdapter: uses SDK's resume mechanism
  *
  * Adapter classes are dynamically imported to avoid eagerly loading SDKs.
  */
@@ -113,11 +119,14 @@ export function buildStartOptions(
     Object.entries(rawEnv).filter(([, v]) => v),
   );
 
+  // NOTE: Session resume is NOT handled via CLI flags. AcpAdapter uses the
+  // ACP protocol's session/load RPC (opts.sessionId below). The --resume CLI
+  // flag was a Copilot CLI-specific mechanism that doesn't apply to generic
+  // ACP adapters. Copilot now uses CopilotSdkAdapter exclusively.
   const cliArgs = [
     ...(config.cliArgs ?? []),
     ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
     ...(resolution ? ['--model', resolution.model] : []),
-    ...(agentOpts.sessionId ? ['--resume', agentOpts.sessionId] : []),
   ];
 
   return {
