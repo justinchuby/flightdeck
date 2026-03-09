@@ -211,20 +211,14 @@ function ActiveAgentRow({ agent, projectName }: { agent: AgentInfo; projectName:
 const ACTIVITY_ICONS: Record<string, string> = {
   task_completed: '✅',
   task_started: '▶️',
-  sub_agent_spawned: '🤖',
-  agent_terminated: '⏹️',
   decision_made: '⚖️',
   delegated: '📋',
-  file_edit: '📝',
-  error: '❌',
-  status_change: '🔄',
   deferred_issue: '📌',
 };
 
+/** Only lead-emitted progress events — no agent lifecycle noise */
 const PROGRESS_ACTION_TYPES = new Set([
-  'task_completed', 'task_started', 'sub_agent_spawned',
-  'agent_terminated', 'decision_made', 'delegated', 'error',
-  'deferred_issue', 'status_change',
+  'task_completed', 'task_started', 'decision_made', 'delegated', 'deferred_issue',
 ]);
 
 function ActivityFeedItem({ entry, projectName }: { entry: ActivityEntry; projectName: string }) {
@@ -365,9 +359,9 @@ export function HomeDashboard() {
       setProjects(activeProjects);
       setAllDecisions(Array.isArray(decisionsData) ? decisionsData : []);
 
-      // Filter activity to progress-relevant types (task completions, spawns, etc.)
+      // Filter to lead-emitted progress events only (no agent lifecycle noise)
       const progressActivity = (Array.isArray(activityData) ? activityData : [])
-        .filter((a) => PROGRESS_ACTION_TYPES.has(a.actionType))
+        .filter((a) => PROGRESS_ACTION_TYPES.has(a.actionType) && a.agentRole === 'lead')
         .slice(0, 15);
       setRecentActivity(progressActivity);
 
@@ -540,7 +534,7 @@ export function HomeDashboard() {
         <EmptyState
           icon={<Zap className="w-12 h-12" />}
           title="Welcome to Flightdeck!"
-          description="Start your first AI crew. Each project gets its own team, knowledge base, and task board."
+          description="Start your first AI crew. Each project gets its own crew, knowledge base, and task board."
           action={{ label: 'Create Project', onClick: handleNavigateToProjects }}
         >
           <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-lg text-left text-xs text-th-text-muted">
