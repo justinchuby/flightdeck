@@ -5,6 +5,7 @@ import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
 import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
 import { FilterTabs } from '../FilterTabs';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -113,6 +114,7 @@ function ReactionBadges({
 /* ------------------------------------------------------------------ */
 
 export function GroupChat(_props: { api: any; ws: any }) {
+  const contextProjectId = useOptionalProjectId();
   const agents = useAppStore((s) => s.agents);
   const {
     groups,
@@ -133,7 +135,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
   const [newGroupMembers, setNewGroupMembers] = useState<Set<string>>(new Set());
   const [newGroupLeadId, setNewGroupLeadId] = useState('');
   const [creating, setCreating] = useState(false);
-  const [selectedProjectLeadId, setSelectedProjectLeadId] = useState<string | null>(null);
+  const [selectedProjectLeadId, setSelectedProjectLeadId] = useState<string | null>(contextProjectId);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -176,12 +178,12 @@ export function GroupChat(_props: { api: any; ws: any }) {
     textareaRef.current?.focus();
   };
 
-  // Auto-select first lead as project filter
+  // Auto-select first lead as project filter (skip if context provides project)
   useEffect(() => {
-    if (!selectedProjectLeadId && leads.length > 0) {
+    if (!contextProjectId && !selectedProjectLeadId && leads.length > 0) {
       setSelectedProjectLeadId(leads[0].id);
     }
-  }, [leads, selectedProjectLeadId]);
+  }, [contextProjectId, leads, selectedProjectLeadId]);
 
   // Filtered groups/tabs by selected project
   const filteredGroups = selectedProjectLeadId
@@ -445,7 +447,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
   return (
     <div className="flex flex-col h-full bg-th-bg text-th-text-alt">
       {/* ---- Project tabs (first level) ---- */}
-      {leads.length > 0 && (
+      {!contextProjectId && leads.length > 0 && (
         <FilterTabs
           className="px-3 py-1.5 border-b border-th-border/50 shrink-0 bg-th-bg/50"
           items={leads.map((lead) => ({
