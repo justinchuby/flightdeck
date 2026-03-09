@@ -125,6 +125,7 @@ export function useAttentionItems(): AttentionState {
   const pendingDecisions = useAppStore((s) => s.pendingDecisions);
   const projects = useLeadStore((s) => s.projects);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const oversightLevel = useSettingsStore((s) => s.oversightLevel);
 
   const apiData = useAttentionApi(selectedLeadId);
 
@@ -132,7 +133,9 @@ export function useAttentionItems(): AttentionState {
   const apiState = useMemo((): AttentionState | null => {
     if (!apiData) return null;
 
-    const items: AttentionItem[] = apiData.items.map((item, i) => {
+    const items: AttentionItem[] = apiData.items
+      .filter((item) => !(item.type === 'decision' && oversightLevel === 'minimal'))
+      .map((item, i) => {
       const projectRoute = item.task?.projectId || item.decision?.projectId || selectedLeadId;
       if (item.type === 'decision') {
         return {
@@ -178,9 +181,9 @@ export function useAttentionItems(): AttentionState {
       agentCount: agents.length,
       runningCount,
       failedTaskCount: apiData.summary.failedCount,
-      pendingDecisionCount: apiData.summary.decisionCount,
+      pendingDecisionCount: oversightLevel === 'minimal' ? 0 : apiData.summary.decisionCount,
     };
-  }, [apiData, agents, projects, selectedLeadId]);
+  }, [apiData, agents, projects, selectedLeadId, oversightLevel]);
 
   // Client-side fallback (used when API is unavailable)
   const fallbackState = useMemo((): AttentionState => {
@@ -240,6 +243,8 @@ export function useAttentionItems(): AttentionState {
     }
 
     for (const decision of pendingDecisions) {
+      // Minimal oversight: decisions are auto-approved at WS layer; skip any that slipped through
+      if (oversightLevel === 'minimal') continue;
       items.push({
         id: `decision-${decision.id}`,
         kind: 'decision',
@@ -265,9 +270,9 @@ export function useAttentionItems(): AttentionState {
       agentCount: agents.length,
       runningCount,
       failedTaskCount,
-      pendingDecisionCount: pendingDecisions.length,
+      pendingDecisionCount: oversightLevel === 'minimal' ? 0 : pendingDecisions.length,
     };
-  }, [agents, pendingDecisions, projects, selectedLeadId]);
+  }, [agents, pendingDecisions, projects, selectedLeadId, oversightLevel]);
 
   return apiState ?? fallbackState;
 }

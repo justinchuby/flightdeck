@@ -5,7 +5,8 @@ import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
 import { hasUnclosedCommandBlock } from '../utils/commandParser';
 import type { WsMessage } from '../types';
-import { getAuthToken } from './useApi';
+import { getAuthToken, apiFetch } from './useApi';
+import { useSettingsStore } from '../stores/settingsStore';
 
 // Module-level WS ref for global access (e.g., timer pause from ApprovalSlideOver)
 let globalWs: WebSocket | null = null;
@@ -347,6 +348,12 @@ export function useWebSocket() {
         // Track pending decisions globally for the approval queue badge
         case 'lead:decision': {
           if (msg.needsConfirmation && msg.id) {
+            // Minimal oversight: auto-approve all decisions without user prompts
+            const oversight = useSettingsStore.getState().oversightLevel;
+            if (oversight === 'minimal') {
+              apiFetch(`/decisions/${msg.id}/confirm`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
+              break;
+            }
             useAppStore.getState().addPendingDecision({
               id: msg.id,
               agentId: msg.agentId,
