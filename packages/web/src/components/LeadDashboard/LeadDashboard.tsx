@@ -594,17 +594,17 @@ export function LeadDashboard({ api, ws }: Props) {
             )}
 
             {/* Session info bar — cwd + session ID merged into one line */}
-            <div className="border-b border-th-border px-4 py-0.5 flex items-center gap-3 text-[11px] font-mono text-th-text-muted bg-th-bg-alt/20">
+            <div className="border-b border-th-border px-4 py-0.5 flex items-center gap-3 text-[11px] font-mono text-th-text-muted bg-th-bg-alt/20 overflow-x-auto">
               {leadAgent?.cwd && (
-                <span className="flex items-center gap-1 truncate" title={leadAgent.cwd}>
+                <span className="flex items-center gap-1 shrink-0">
                   <FolderOpen className="w-3 h-3 shrink-0" />
-                  <span className="truncate max-w-[200px]">{leadAgent.cwd}</span>
+                  {leadAgent.cwd}
                 </span>
               )}
               {leadAgent?.sessionId && (
-                <span className="flex items-center gap-1 truncate ml-auto" title={leadAgent.sessionId}>
+                <span className="flex items-center gap-1 shrink-0 ml-auto">
                   <GitBranch className="w-3 h-3 shrink-0" />
-                  <span className="truncate max-w-[180px]">{leadAgent.sessionId}</span>
+                  {leadAgent.sessionId}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
