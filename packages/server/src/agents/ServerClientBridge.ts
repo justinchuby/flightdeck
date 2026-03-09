@@ -293,6 +293,10 @@ export async function startRemoteBridge(
     // Send initial prompt (always provided — includes context manifest on resume, full system prompt on fresh start)
     if (initialPrompt) {
       await adapter.prompt(initialPrompt);
+    } else {
+      // Resumed agents with no initial prompt are waiting for input — set idle.
+      agent.status = 'idle';
+      agent._notifyStatusChange(agent.status);
     }
   } catch (err) {
     const errorMsg = (err as Error)?.message || String(err);

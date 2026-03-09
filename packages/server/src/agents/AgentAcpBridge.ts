@@ -121,6 +121,10 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     if (initialPrompt) {
       return conn.prompt(initialPrompt);
     }
+    // Resumed agents have no initial prompt — they're waiting for input.
+    // Transition to idle so the UI shows the correct state.
+    agent.status = 'idle';
+    agent._notifyStatusChange(agent.status);
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
     logger.error({ module: 'agent-bridge', msg: 'Adapter start failed', err: errorMsg, backend, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
