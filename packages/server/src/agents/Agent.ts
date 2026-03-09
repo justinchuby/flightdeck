@@ -147,6 +147,9 @@ export class Agent {
   /** Resume a previous session by its Copilot session ID */
   public resumeSessionId?: string;
 
+  /** @internal True while agent is still in resume initialization — suppresses parent notifications */
+  _isResuming = false;
+
   // ── Internal constants exposed for AgentAcpBridge ───────────────────────
   /** @internal */ readonly _maxMessages = 500;
   /** @internal */ readonly _maxToolCalls = 200;

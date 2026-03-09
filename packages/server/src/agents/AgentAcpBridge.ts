@@ -248,9 +248,13 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
 
   conn.on('prompting', (active: boolean) => withCtx(() => {
     if (agent._isTerminated) return;
-    if (active && agent.status !== 'running') {
-      agent.status = 'running';
-      agent._notifyStatusChange(agent.status);
+    if (active) {
+      // Resume initialization is complete — agent is now doing real work.
+      agent._isResuming = false;
+      if (agent.status !== 'running') {
+        agent.status = 'running';
+        agent._notifyStatusChange(agent.status);
+      }
     }
   }));
 

@@ -430,6 +430,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (effectiveModel) agent.model = effectiveModel;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
+    if (resumeSessionId) agent._isResuming = true;
     if (options?.projectName) agent.projectName = options.projectName;
     if (options?.projectId) agent.projectId = options.projectId;
     if (role.id === 'lead') {
@@ -560,17 +561,20 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       // Also report to parent lead so it can resume this agent later
       if (agent.parentId) {
         this.agentMemory.store(agent.parentId, agent.id, 'sessionId', sessionId);
-        const parent = this.agents.get(agent.parentId);
-        if (parent && (parent.status === 'running' || parent.status === 'idle')) {
-          const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
-          parent.sendMessage(msg);
-          this.emit('agent:message_sent', {
-            from: agent.id,
-            fromRole: agent.role.name,
-            to: parent.id,
-            toRole: parent.role.name,
-            content: msg,
-          });
+        // Suppress notification during resume — the lead already knows about this agent.
+        if (!agent._isResuming) {
+          const parent = this.agents.get(agent.parentId);
+          if (parent && (parent.status === 'running' || parent.status === 'idle')) {
+            const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
+            parent.sendMessage(msg);
+            this.emit('agent:message_sent', {
+              from: agent.id,
+              fromRole: agent.role.name,
+              to: parent.id,
+              toRole: parent.role.name,
+              content: msg,
+            });
+          }
         }
       }
     });
@@ -630,7 +634,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           }
         }
 
-        if (status === 'idle' && agent.parentId) {
+        if (status === 'idle' && agent.parentId && !agent._isResuming) {
           this.dispatcher.notifyParentOfIdle(agent);
         }
       });
