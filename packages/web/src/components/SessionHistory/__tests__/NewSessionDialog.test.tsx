@@ -202,6 +202,12 @@ describe('NewSessionDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('closes on Escape key', () => {
+    renderDialog();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it('disables start button while starting', async () => {
     let resolveResume: (v: any) => void;
     mockApiFetch.mockImplementation((path: string) => {

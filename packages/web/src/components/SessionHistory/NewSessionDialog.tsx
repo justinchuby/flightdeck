@@ -59,6 +59,12 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
       .catch(() => { /* model fetch failure is non-critical */ });
   }, []);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   const toggleRole = useCallback((roleId: string) => {
     setSelectedRoles((prev) => {
       const next = new Set(prev);
@@ -86,8 +92,8 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
         }),
       });
       onStarted();
-    } catch (err: any) {
-      setError(err.message || 'Failed to start session');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to start session');
     } finally {
       setStarting(false);
     }
