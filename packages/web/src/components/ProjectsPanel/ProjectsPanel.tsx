@@ -20,6 +20,7 @@ import {
 import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { useToastStore } from '../Toast';
+import { NewProjectModal } from '../LeadDashboard/NewProjectModal';
 
 /** Extended project type with storage and agent count info from the enriched API */
 interface EnrichedProject {
@@ -282,14 +283,15 @@ export function ProjectsPanel() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const addToast = useToastStore((s) => s.add);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showNewProject, setShowNewProject] = useState(false);
 
-  // Consume ?action=new param — show toast prompting user to start a session
+  // Consume ?action=new param — auto-open the new project modal
   useEffect(() => {
     if (searchParams.get('action') === 'new') {
-      addToast('info', 'Start a new session from any project to create agents.');
+      setShowNewProject(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams, addToast]);
+  }, [searchParams, setSearchParams]);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -484,6 +486,7 @@ export function ProjectsPanel() {
         </div>
       )}
     </div>
+    {showNewProject && <NewProjectModal onClose={() => { setShowNewProject(false); fetchProjects(); }} />}
     </div>
   );
 }

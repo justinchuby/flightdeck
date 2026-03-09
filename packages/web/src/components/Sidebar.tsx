@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, useMatch, useNavigate } from 'react-router-dom';
 import { Home, FolderOpen, Users, Settings, ArrowLeft, Plus } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useProjects } from '../hooks/useProjects';
+import { NewProjectModal } from './LeadDashboard/NewProjectModal';
 
 function NavItem({ to, icon: Icon, label, badge, end }: {
   to: string; icon: any; label: string; badge?: number | null; end?: boolean;
@@ -38,6 +39,7 @@ export function Sidebar() {
   const agents = useAppStore((s) => s.agents);
   const { projects } = useProjects();
   const navigate = useNavigate();
+  const [showNewProject, setShowNewProject] = useState(false);
 
   // Detect project context from URL
   const projectMatch = useMatch('/projects/:id/*');
@@ -115,7 +117,7 @@ export function Sidebar() {
 
       {/* 4. + New Project */}
       <button
-        onClick={() => navigate('/projects?action=new')}
+        onClick={() => setShowNewProject(true)}
         className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg w-[58px] transition-colors text-th-text-muted hover:text-accent hover:bg-accent/10"
         title="New Project"
         data-testid="sidebar-new-project"
@@ -132,6 +134,8 @@ export function Sidebar() {
 
       {/* 6. Settings — pinned to bottom */}
       <NavItem to="/settings" icon={Settings} label="Settings" />
+
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
     </nav>
   );
 }
