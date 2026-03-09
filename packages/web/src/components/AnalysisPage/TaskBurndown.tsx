@@ -20,8 +20,13 @@ interface CumulativeFlowProps {
 
 const MARGIN = { top: 12, right: 12, bottom: 28, left: 36 };
 
+const SERIES = [
+  { key: 'created' as const, color: 'rgb(239, 68, 68)', label: 'Created' },
+  { key: 'inProgress' as const, color: 'rgb(234, 179, 8)', label: 'Active' },
+  { key: 'completed' as const, color: 'rgb(168, 85, 247)', label: 'Done' },
+];
+
 export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFlowProps) {
-  // SVG sits below the card header (~40px for padding + title)
   const svgH = height - 40;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = svgH - MARGIN.top - MARGIN.bottom;
@@ -34,7 +39,10 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
       };
     }
     const times = data.map((d) => d.time);
-    const maxVal = Math.max(...data.map((d) => d.created), 1);
+    const maxVal = Math.max(
+      ...data.map((d) => Math.max(d.created, d.inProgress, d.completed)),
+      1,
+    );
 
     return {
       xScale: scaleTime({ domain: [new Date(Math.min(...times)), new Date(Math.max(...times))], range: [0, innerW] }),
@@ -57,50 +65,38 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
           Task Flow
         </h3>
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1 text-[9px] text-th-text-muted">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(239, 68, 68, 0.5)' }} /> Created
-          </span>
-          <span className="flex items-center gap-1 text-[9px] text-th-text-muted">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(234, 179, 8, 0.5)' }} /> Active
-          </span>
-          <span className="flex items-center gap-1 text-[9px] text-th-text-muted">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(168, 85, 247, 0.5)' }} /> Done
-          </span>
+          {SERIES.map((s) => (
+            <span key={s.key} className="flex items-center gap-1 text-[9px] text-th-text-muted">
+              <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: s.color }} /> {s.label}
+            </span>
+          ))}
         </div>
       </div>
       <svg width={width} height={svgH}>
         <Group left={MARGIN.left} top={MARGIN.top}>
-          {/* Stacked areas: created (top) → in-progress (middle) → completed (bottom) */}
+          {/* Subtle fill under the "created" line for context */}
           <AreaClosed
             data={data}
             x={(d) => xScale(new Date(d.time)) ?? 0}
             y={(d) => yScale(d.created) ?? 0}
             yScale={yScale}
-            fill="rgba(239, 68, 68, 0.25)"
-            stroke="rgba(239, 68, 68, 0.8)"
-            strokeWidth={1.5}
+            fill="rgba(239, 68, 68, 0.08)"
+            strokeWidth={0}
             curve={curveMonotoneX}
           />
-          <AreaClosed
-            data={data}
-            x={(d) => xScale(new Date(d.time)) ?? 0}
-            y={(d) => yScale(d.inProgress + d.completed) ?? 0}
-            yScale={yScale}
-            fill="rgba(234, 179, 8, 0.3)"
-            stroke="rgba(234, 179, 8, 0.8)"
-            strokeWidth={1.5}
-            curve={curveMonotoneX}
-          />
-          <AreaClosed
-            data={data}
-            x={(d) => xScale(new Date(d.time)) ?? 0}
-            y={(d) => yScale(d.completed) ?? 0}
-            yScale={yScale}
-            fill="rgba(168, 85, 247, 0.35)"
-            stroke="rgba(168, 85, 247, 0.9)"
-            strokeWidth={1.5}
-            curve={curveMonotoneX}
-          />
+
+          {/* Three distinct lines for each series */}
+          {SERIES.map((s) => (
+            <LinePath
+              key={s.key}
+              data={data}
+              x={(d) => xScale(new Date(d.time)) ?? 0}
+              y={(d) => yScale(d[s.key]) ?? 0}
+              stroke={s.color}
+              strokeWidth={2}
+              curve={curveMonotoneX}
+            />
+          ))}
 
           <AxisBottom
             top={innerH}

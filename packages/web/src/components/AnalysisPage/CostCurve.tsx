@@ -54,6 +54,15 @@ export function CostCurve({ data, width = 260, height = 180 }: CostCurveProps) {
     );
   }
 
+  const maxVal = Math.max(...data.map((d) => d.cumulativeCost));
+  if (maxVal === 0) {
+    return (
+      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px] flex items-center justify-center" data-testid="cost-curve">
+        <p className="text-xs text-th-text-muted opacity-60">Waiting for token data…</p>
+      </div>
+    );
+  }
+
   const areaColor = 'rgb(var(--chart-success))';
 
   const formatTokenAxis = (v: number | { valueOf(): number }) => {
