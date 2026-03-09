@@ -75,12 +75,9 @@ export function NotificationPreferencesPanel() {
   }
 
   return (
-    <div className="space-y-6 opacity-60 pointer-events-none select-none" data-testid="notification-preferences">
+    <div className="space-y-6" data-testid="notification-preferences">
       <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
         🔔 Notification Settings
-        <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-          In Development
-        </span>
       </h3>
 
       {/* Channels section */}

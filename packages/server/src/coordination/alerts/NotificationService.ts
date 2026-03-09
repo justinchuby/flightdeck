@@ -91,7 +91,7 @@ const DEFAULT_PREFERENCES: NotificationPreference[] = ALL_EVENTS.map(event => ({
   event,
   tier: ['agent_crashed', 'budget_exceeded'].includes(event) ? 'interrupt' : 'summon',
   channels: [],
-  enabled: true,
+  enabled: false,
 }));
 
 // ── NotificationService ───────────────────────────────────────────

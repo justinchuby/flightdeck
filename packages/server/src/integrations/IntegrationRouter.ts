@@ -66,6 +66,8 @@ export class IntegrationRouter {
   private sessions: Map<string, ChatSession> = new Map(); // chatId → session
   private pendingChallenges: Map<string, PendingChallenge> = new Map(); // chatId → challenge
   private verifyAttempts: Map<string, number[]> = new Map(); // chatId → timestamps
+  /** Tracks inbound message IDs awaiting replies. Key: messageId, Value: { chatId, platform }. */
+  private pendingReplies: Map<string, { chatId: string; platform: string }> = new Map();
   private notificationBatcher: NotificationBatcher;
   private agentManager: AgentManager;
   private projectRegistry: ProjectRegistry | undefined;
@@ -157,9 +159,7 @@ export class IntegrationRouter {
     };
     this.sessions.set(chatId, session);
 
-    // Also subscribe to notifications for this project
-    this.notificationBatcher.subscribe(chatId, projectId);
-
+    // User must explicitly opt in to notifications via preferences UI
     logger.info({ module: 'integration-router', msg: 'Chat session bound', chatId, projectId });
     return session;
   }
@@ -385,10 +385,18 @@ export class IntegrationRouter {
         .find(a => a.role.id === 'lead' && (a.status === 'running' || a.status === 'idle'));
 
       if (leadAgent) {
+        // Track this message for reply routing
+        if (sanitizedMsg.messageId) {
+          this.pendingReplies.set(sanitizedMsg.messageId, {
+            chatId: sanitizedMsg.chatId,
+            platform: sanitizedMsg.platform,
+          });
+        }
         // Use structured JSON — never interpolate user input into prompt strings
         leadAgent.sendMessage(JSON.stringify({
           source: 'telegram',
           chatId: sanitizedMsg.chatId,
+          messageId: sanitizedMsg.messageId ?? null,
           userId: sanitizedMsg.userId,
           displayName: sanitizedMsg.displayName,
           text: sanitizedMsg.text,
@@ -410,6 +418,37 @@ export class IntegrationRouter {
         error: (err as Error).message,
       });
     }
+  }
+
+  /**
+   * Send a reply to a specific inbound Telegram message.
+   * Only sends if the messageId matches a pending inbound message (no unsolicited push).
+   */
+  sendReply(messageId: string, text: string): boolean {
+    const pending = this.pendingReplies.get(messageId);
+    if (!pending) {
+      logger.warn({ module: 'integration-router', msg: 'No pending reply for messageId', messageId });
+      return false;
+    }
+
+    const adapter = this.adapters.get(pending.platform);
+    if (!adapter) {
+      logger.warn({ module: 'integration-router', msg: 'No adapter for platform', platform: pending.platform });
+      return false;
+    }
+
+    adapter.sendMessage({
+      platform: pending.platform as 'telegram' | 'slack',
+      chatId: pending.chatId,
+      text,
+      replyToMessageId: messageId,
+    }).catch((err) => {
+      logger.warn({ module: 'integration-router', msg: 'Reply delivery failed', messageId, error: (err as Error).message });
+    });
+
+    // Consume the pending reply
+    this.pendingReplies.delete(messageId);
+    return true;
   }
 
   private handleStatusCommand(): string {

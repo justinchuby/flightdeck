@@ -7,6 +7,16 @@ import { TypedEmitter } from '../utils/TypedEmitter.js';
 import { logger } from '../utils/logger.js';
 import type { AgentManager, AgentManagerEvents } from '../agents/AgentManager.js';
 import type { NotificationEvent, NotificationCategory, MessagingAdapter, OutboundMessage } from './types.js';
+import type { NotificationService, NotifiableEvent } from '../coordination/alerts/NotificationService.js';
+
+/** Map batcher categories to NotificationService events for preference filtering. */
+const CATEGORY_TO_NOTIFIABLE: Partial<Record<NotificationCategory, NotifiableEvent>> = {
+  agent_crashed: 'agent_crashed',
+  agent_completed: 'agent_recovered',
+  task_completed: 'task_completed',
+  decision_needs_approval: 'decision_pending',
+  system_alert: 'budget_warning',
+};
 
 interface NotificationBatcherEvents {
   'notification:batched': NotificationEvent[];
@@ -51,12 +61,18 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
   // H-3: Track wired listeners for cleanup
   private wiredAgentManager: AgentManager | null = null;
   private wiredHandlers: Array<{ event: string; handler: (...args: any[]) => void }> = [];
+  private notificationService: NotificationService | null = null;
 
   static readonly BATCH_WINDOW_MS = 5_000;
 
   /** Register a messaging adapter for outbound delivery. */
   addAdapter(adapter: MessagingAdapter): void {
     this.adapters.push(adapter);
+  }
+
+  /** Set the NotificationService for preference-based filtering. */
+  setNotificationService(ns: NotificationService): void {
+    this.notificationService = ns;
   }
 
   /** Subscribe a chat to receive notifications for a project. */
@@ -245,9 +261,20 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
     if (!pending || pending.length === 0) return;
 
     this.pendingEvents.delete(projectId);
-    const events = pending.map(p => p.event);
+    let events = pending.map(p => p.event);
 
     this.emit('notification:batched', events);
+
+    // Filter through NotificationService preferences if available
+    if (this.notificationService) {
+      events = events.filter(e => {
+        const notifiable = CATEGORY_TO_NOTIFIABLE[e.category];
+        if (!notifiable) return true; // No mapping → allow through
+        const entries = this.notificationService!.routeEvent(notifiable, projectId, e.title);
+        return entries.length > 0; // Only send if preference allows it
+      });
+      if (events.length === 0) return;
+    }
 
     // Find subscriptions for this project
     const subs = this.subscriptions.filter(s => s.projectId === projectId);

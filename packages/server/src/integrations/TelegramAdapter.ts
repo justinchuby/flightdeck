@@ -164,7 +164,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     logger.info({ module: 'telegram', msg: 'Telegram bot stopped' });
   }
 
-  /** Send a message to a Telegram chat. */
+  /** Send a message to a Telegram chat. Supports reply threading via replyToMessageId. */
   async sendMessage(message: OutboundMessage): Promise<void> {
     if (!this.bot) {
       logger.warn({ module: 'telegram', msg: 'Cannot send message — bot not running' });
@@ -172,10 +172,15 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     }
 
     try {
+      const opts: Record<string, unknown> = {};
+      if (message.parseMode) opts.parse_mode = message.parseMode;
+      if (message.replyToMessageId) {
+        opts.reply_parameters = { message_id: Number(message.replyToMessageId) };
+      }
       await this.bot.api.sendMessage(
         message.chatId,
         message.text,
-        message.parseMode ? { parse_mode: message.parseMode as 'MarkdownV2' | 'HTML' } : undefined,
+        Object.keys(opts).length > 0 ? opts : undefined,
       );
     } catch (err) {
       logger.warn({
@@ -278,6 +283,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
         displayName: ctx.from.first_name + (ctx.from.last_name ? ` ${ctx.from.last_name}` : ''),
         text: ctx.message.text,
         receivedAt: Date.now(),
+        messageId: String(ctx.message.message_id),
       };
 
       // Notify all registered handlers

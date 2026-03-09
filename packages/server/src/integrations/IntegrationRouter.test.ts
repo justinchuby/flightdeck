@@ -177,15 +177,14 @@ describe('IntegrationRouter', () => {
     expect(agent.getAllSessions()).toHaveLength(2);
   });
 
-  it('subscribes chat to notifications when binding session', async () => {
+  it('does NOT auto-subscribe chat to notifications when binding session', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
 
     agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
 
     const subs = bridge.getSubscriptions('chat-1');
-    expect(subs).toHaveLength(1);
-    expect(subs[0].projectId).toBe('project-1');
+    expect(subs).toHaveLength(0); // User must explicitly opt in
   });
 
   // ── Command Handlers ──────────────────────────────────────

@@ -17,6 +17,8 @@ export interface InboundMessage {
   text: string;
   /** Timestamp when the message was received. */
   receivedAt: number;
+  /** Platform-specific message ID (for reply threading). */
+  messageId?: string;
 }
 
 /** Outbound message to send to a messaging platform. */
@@ -26,6 +28,8 @@ export interface OutboundMessage {
   text: string;
   /** Optional parse mode (e.g. 'MarkdownV2', 'HTML'). */
   parseMode?: string;
+  /** Reply to a specific message ID (enables threading). */
+  replyToMessageId?: string;
 }
 
 /** Session binding: maps a messaging chat to a Flightdeck project. */
