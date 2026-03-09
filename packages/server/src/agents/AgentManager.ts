@@ -59,6 +59,7 @@ export interface AgentManagerEvents {
   'agent:plan': { agentId: string; plan: PlanEntry[] };
   'agent:permission_request': { agentId: string; request: any };
   'agent:session_ready': { agentId: string; sessionId: string };
+  'agent:session_resume_failed': { agentId: string; requestedSessionId: string; newSessionId: string; error: string };
   'agent:message_sent': { from: string; fromRole: string; to: string; toRole: string; content: string };
   'agent:context_compacted': { agentId: string; previousUsed: number; currentUsed: number; percentDrop: number };
   'agent:status': { agentId: string; status: string };
@@ -570,6 +571,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           });
         }
       }
+    });
+
+    agent.onSessionResumeFailed((info) => {
+      this.emit('agent:session_resume_failed', { agentId: agent.id, ...info });
     });
 
     agent.onContextCompacted((info) => {

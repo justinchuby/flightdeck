@@ -188,6 +188,10 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     agent._notifyPermissionRequest(request);
   }));
 
+  conn.on('session_resume_failed', (info: { requestedSessionId: string; newSessionId: string; error: string }) => withCtx(() => {
+    agent._notifySessionResumeFailed(info);
+  }));
+
   conn.on('usage', (usage: { inputTokens: number; outputTokens: number }) => withCtx(() => {
     agent.inputTokens = usage.inputTokens;
     agent.outputTokens = usage.outputTokens;

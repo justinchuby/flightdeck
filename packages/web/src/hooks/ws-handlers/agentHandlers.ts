@@ -174,6 +174,13 @@ export function handleAgentSessionReady(msg: any, ctx: HandlerContext): void {
   ctx.updateAgent(msg.agentId, { sessionId: msg.sessionId });
 }
 
+export function handleAgentSessionResumeFailed(msg: any, _ctx: HandlerContext): void {
+  const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+  const roleName = agent?.role?.name ?? msg.agentId?.slice(0, 8) ?? 'Agent';
+  const errorDetail = msg.error ? ` (${msg.error})` : '';
+  useToastStore.getState().add('error', `⚠️ ${roleName}: Session resume failed — started new session${errorDetail}`);
+}
+
 export function handleAgentMessageSent(msg: any, ctx: HandlerContext): void {
   // Show incoming messages in the recipient agent's chat panel
   const toId = msg.to;

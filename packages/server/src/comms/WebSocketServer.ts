@@ -265,6 +265,11 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:session_ready', ...data }, projectId);
     });
 
+    this.track(agentManager, 'agent:session_resume_failed', (data: any) => {
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:session_resume_failed', ...data }, projectId);
+    });
+
     this.track(agentManager, 'agent:context_compacted', (data: any) => {
       const projectId = this.resolveAgentProjectId(data.agentId);
       this.broadcastToProject({ type: 'agent:context_compacted', ...data }, projectId);

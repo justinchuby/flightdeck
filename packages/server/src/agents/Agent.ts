@@ -193,6 +193,7 @@ export class Agent {
   /** @internal */ _notifyPlan(entries: PlanEntry[]): void { this.events.notifyPlan(entries); }
   /** @internal */ _notifyPermissionRequest(request: any): void { this.events.notifyPermissionRequest(request); }
   /** @internal */ _notifySessionReady(sessionId: string): void { this.events.notifySessionReady(sessionId); }
+  /** @internal */ _notifySessionResumeFailed(info: { requestedSessionId: string; newSessionId: string; error: string }): void { this.events.notifySessionResumeFailed(info); }
   /** @internal */ _notifyContextCompacted(info: CompactionInfo): void { this.events.notifyContextCompacted(info); }
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
   /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
@@ -628,6 +629,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.events.onPlan(listener); }
   onPermissionRequest(listener: (request: any) => void): void { this.events.onPermissionRequest(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.events.onSessionReady(listener); }
+  onSessionResumeFailed(listener: (info: { requestedSessionId: string; newSessionId: string; error: string }) => void): void { this.events.onSessionResumeFailed(listener); }
   onContextCompacted(listener: (info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void): void { this.events.onContextCompacted(listener); }
   /** Register a listener for token usage updates (for cost tracking). */
   onUsage(listener: (info: { agentId: string; inputTokens: number; outputTokens: number; dagTaskId?: string }) => void): void { this.events.onUsage(listener); }

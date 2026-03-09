@@ -13,6 +13,7 @@ import {
   handleAgentPlan,
   handleAgentPermissionRequest,
   handleAgentSessionReady,
+  handleAgentSessionResumeFailed,
   handleAgentMessageSent,
 } from './agentHandlers';
 
@@ -59,6 +60,7 @@ const handlerMap: Record<string, MessageHandler> = {
   'agent:plan': handleAgentPlan,
   'agent:permission_request': handleAgentPermissionRequest,
   'agent:session_ready': handleAgentSessionReady,
+  'agent:session_resume_failed': handleAgentSessionResumeFailed,
   'agent:message_sent': handleAgentMessageSent,
   'group:created': handleGroupCreated,
   'group:message': handleGroupMessage,
