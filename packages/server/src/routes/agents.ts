@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { agentPlans } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { agentPlans, dagTasks } from '../db/schema.js';
+import { eq, desc } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import { validateBody, spawnAgentSchema, sendMessageSchema, agentInputSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
@@ -229,6 +229,37 @@ export function agentsRoutes(ctx: AppContext): Router {
       fileLocks,
       diff,
     });
+  });
+
+  // ── GET /agents/:id/tasks — Task history for an agent ─────────────
+
+  router.get('/agents/:id/tasks', (req, res) => {
+    const agentId = req.params.id as string;
+    try {
+      const tasks = _db.drizzle
+        .select()
+        .from(dagTasks)
+        .where(eq(dagTasks.assignedAgentId, agentId))
+        .orderBy(desc(dagTasks.createdAt))
+        .all();
+
+      res.json(tasks.map(t => ({
+        id: t.id,
+        leadId: t.leadId,
+        title: t.title,
+        description: t.description,
+        dagStatus: t.dagStatus,
+        role: t.role,
+        priority: t.priority,
+        createdAt: t.createdAt,
+        startedAt: t.startedAt,
+        completedAt: t.completedAt,
+        failureReason: t.failureReason,
+      })));
+    } catch (err: any) {
+      logger.error({ module: 'agents', msg: 'Failed to get agent tasks', agentId, err: err.message });
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return router;

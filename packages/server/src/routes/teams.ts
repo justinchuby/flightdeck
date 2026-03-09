@@ -30,7 +30,7 @@ function paramStr(val: string | string[] | undefined): string {
 // ── Routes ──────────────────────────────────────────────────────────
 
 export function teamsRoutes(ctx: AppContext): Router {
-  const { teamExporter, teamImporter, knowledgeStore, trainingCapture, agentRoster, agentManager } = ctx;
+  const { teamExporter, teamImporter, knowledgeStore, trainingCapture, agentRoster, agentManager, projectRegistry } = ctx;
   const router = Router();
 
   // ── POST /teams/:teamId/export ──────────────────────────────────
@@ -235,6 +235,8 @@ export function teamsRoutes(ctx: AppContext): Router {
           liveStatus: live?.status ?? null,
           teamId: a.teamId,
           projectId: a.projectId ?? null,
+          parentId: (a.metadata as Record<string, unknown> | undefined)?.parentId as string ?? live?.parentId ?? null,
+          sessionId: a.sessionId ?? null,
           lastTaskSummary: a.lastTaskSummary ?? null,
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
@@ -411,6 +413,76 @@ export function teamsRoutes(ctx: AppContext): Router {
       res.status(201).json({ ok: true, clone });
     } catch (err: any) {
       logger.error({ module: 'teams', msg: 'Failed to clone agent', agentId, err: err.message });
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /crews/summary — Crew groups with stats ──────────────────
+
+  router.get('/crews/summary', readLimiter, (_req, res) => {
+    if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
+
+    try {
+      const allAgents = agentRoster.getAllAgents();
+      const liveAgents = agentManager.getAll();
+
+      // Group agents by their lead (parentId from metadata, or self if role is lead)
+      const crewMap = new Map<string, typeof allAgents>();
+      for (const agent of allAgents) {
+        const meta = agent.metadata as Record<string, unknown> | undefined;
+        const parentId = (meta?.parentId as string) ?? null;
+        // If this agent has a parentId, group under that lead. If it IS a lead, group under itself.
+        const leadId = agent.role === 'lead' ? agent.agentId : parentId;
+        if (!leadId) continue; // orphan agent, skip
+        const crew = crewMap.get(leadId) ?? [];
+        crew.push(agent);
+        crewMap.set(leadId, crew);
+      }
+
+      const crews = Array.from(crewMap.entries()).map(([leadId, agents]) => {
+        const lead = agents.find(a => a.agentId === leadId);
+        const activeCount = agents.filter(a => a.status !== 'terminated' && a.status !== 'retired').length;
+        const lastActivity = agents.reduce((max, a) => a.updatedAt > max ? a.updatedAt : max, '');
+
+        // Get project info from lead's live agent or roster
+        const liveLeadAgent = liveAgents.find(l => l.id === leadId);
+        const projectId = lead?.projectId ?? liveLeadAgent?.projectId ?? null;
+        const projectName = liveLeadAgent?.projectName ?? null;
+        const project = projectId && projectRegistry ? projectRegistry.get(projectId) : null;
+
+        // Session count from projectRegistry
+        const sessionCount = projectId && projectRegistry
+          ? projectRegistry.getSessions(projectId).filter(s => s.leadId === leadId).length
+          : 0;
+
+        return {
+          leadId,
+          projectId,
+          projectName: projectName ?? project?.name ?? null,
+          agentCount: agents.length,
+          activeAgentCount: activeCount,
+          sessionCount,
+          lastActivity,
+          agents: agents.map(a => ({
+            agentId: a.agentId,
+            role: a.role,
+            model: a.model,
+            status: a.status,
+            liveStatus: liveAgents.find(l => l.id === a.agentId)?.status ?? null,
+          })),
+        };
+      });
+
+      // Sort: active crews first, then by last activity
+      crews.sort((a, b) => {
+        if (a.activeAgentCount > 0 && b.activeAgentCount === 0) return -1;
+        if (a.activeAgentCount === 0 && b.activeAgentCount > 0) return 1;
+        return b.lastActivity.localeCompare(a.lastActivity);
+      });
+
+      res.json(crews);
+    } catch (err: any) {
+      logger.error({ module: 'teams', msg: 'Failed to get crew summary', err: err.message });
       res.status(500).json({ error: err.message });
     }
   });
