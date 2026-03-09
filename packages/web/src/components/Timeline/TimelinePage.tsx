@@ -16,6 +16,7 @@ import { ReplayScrubber } from '../SessionReplay';
 import { useSessionReplay } from '../../hooks/useSessionReplay';
 import { useProjects } from '../../hooks/useProjects';
 import { ProjectTabs } from '../ProjectTabs';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import './timeline-a11y.css';
 
 interface Props {
@@ -102,6 +103,7 @@ function applyFilters(
 
 /** Timeline visualization page — shows agent activity over time using visx. */
 export function TimelinePage({ api, ws }: Props) {
+  const contextProjectId = useOptionalProjectId();
   const storeAgents = useAppStore((s) => s.agents);
   const announcements = useAccessibilityAnnouncements();
   const prevErrorRef = useRef<string | null>(null);
@@ -131,12 +133,13 @@ export function TimelinePage({ api, ws }: Props) {
   // Fetch historical projects from shared hook
   const { projects } = useProjects();
 
-  // Effective lead: live agents take priority, then project IDs
+  // Effective lead: context project (from ProjectLayout) > user selection > live agents > historical projects
   const effectiveLeadId = useMemo(() => {
+    if (contextProjectId) return contextProjectId;
     if (selectedLead) return selectedLead;
     if (leads.length > 0) return leads[0].id;
     return projects.length > 0 ? projects[0].id : null;
-  }, [selectedLead, leads, projects]);
+  }, [contextProjectId, selectedLead, leads, projects]);
 
   // Auto-select first lead when agents arrive
   useEffect(() => {
@@ -314,11 +317,13 @@ export function TimelinePage({ api, ws }: Props) {
       <AccessibilityAnnouncer announcements={announcements} />
 
       {/* Project tabs — select project before viewing project-specific status */}
-      <ProjectTabs
-        activeId={effectiveLeadId}
-        onChange={setSelectedLead}
-        className="px-6 pt-2 border-b border-th-border-muted timeline-lead-selector"
-      />
+      {!contextProjectId && (
+        <ProjectTabs
+          activeId={effectiveLeadId}
+          onChange={setSelectedLead}
+          className="px-6 pt-2 border-b border-th-border-muted timeline-lead-selector"
+        />
+      )}
 
       {/* StatusBar — shows UNFILTERED crew health for selected project */}
       <StatusBar
