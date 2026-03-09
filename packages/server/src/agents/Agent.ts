@@ -167,15 +167,14 @@ export class Agent {
     ensureSharedWorkspace(this);
     const isResume = !!this.resumeSessionId;
 
-    // On resume, skip role.systemPrompt — the restored conversation already has
-    // it. Send only the fresh context manifest + resume preamble so the agent
-    // sees current crew state without doubling its system prompt tokens.
-    const contextManifest = this.buildContextManifest(this.peers, this.budget);
-    const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
+    // On resume, the SDK restores conversation history which already contains
+    // system prompt, context manifest, and task. Only send the resume notice.
     let initialPrompt: string;
     if (isResume) {
-      initialPrompt = `${contextManifest}\n\n${taskAssignment}${RESUME_PREAMBLE}`;
+      initialPrompt = RESUME_PREAMBLE;
     } else {
+      const contextManifest = this.buildContextManifest(this.peers, this.budget);
+      const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
       initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
     }
     // Errors are handled internally by the bridge (sets agent status to 'failed').
