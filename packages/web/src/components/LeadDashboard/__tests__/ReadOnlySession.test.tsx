@@ -27,7 +27,7 @@ vi.mock('../../../stores/leadStore', () => ({
     {
       getState: () => ({
         projects: {},
-        selectedLeadId: null,
+        selectedLeadId: 'prev-lead-id',
         selectLead: mockSelectLead,
         addProject: mockAddProject,
         setMessages: mockSetMessages,
@@ -40,9 +40,11 @@ vi.mock('../../../stores/leadStore', () => ({
   ),
 }));
 
-// Mock fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock apiFetch
+const mockApiFetch = vi.fn();
+vi.mock('../../../hooks/useApi', () => ({
+  apiFetch: (...args: any[]) => mockApiFetch(...args),
+}));
 
 describe('ReadOnlySession', () => {
   const mockApi = {};
@@ -50,9 +52,7 @@ describe('ReadOnlySession', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ messages: [] }),
-    });
+    mockApiFetch.mockResolvedValue({ messages: [] });
   });
 
   function renderWithRoute(leadId: string) {
@@ -82,37 +82,24 @@ describe('ReadOnlySession', () => {
     expect(mockSelectLead).toHaveBeenCalledWith('lead-abc-123');
   });
 
-  it('fetches historical messages', async () => {
-    mockFetch.mockResolvedValue({
-      json: () =>
-        Promise.resolve({
-          messages: [
-            { content: 'Hello', sender: 'user', timestamp: '2026-03-08T10:00:00Z' },
-            { content: 'Hi back', sender: 'agent', timestamp: '2026-03-08T10:00:01Z' },
-          ],
-        }),
-    });
-
+  it('fetches historical data via apiFetch', async () => {
     renderWithRoute('lead-abc-123');
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/agents/lead-abc-123/messages?limit=1000&includeSystem=true',
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
+      const urls = mockApiFetch.mock.calls.map((c: any[]) => c[0]);
+      expect(urls).toContain('/agents/lead-abc-123/messages?limit=1000&includeSystem=true');
+      expect(urls).toContain('/lead/lead-abc-123/decisions');
+      expect(urls).toContain('/lead/lead-abc-123/groups');
+      expect(urls).toContain('/lead/lead-abc-123/dag');
+      expect(urls).toContain('/lead/lead-abc-123/progress');
     });
   });
 
-  it('fetches historical decisions, groups, DAG, and progress', async () => {
-    renderWithRoute('lead-abc-123');
-
-    await waitFor(() => {
-      const urls = mockFetch.mock.calls.map((c: any[]) => c[0]);
-      expect(urls).toContain('/api/agents/lead-abc-123/messages?limit=1000&includeSystem=true');
-      expect(urls).toContain('/api/lead/lead-abc-123/decisions');
-      expect(urls).toContain('/api/lead/lead-abc-123/groups');
-      expect(urls).toContain('/api/lead/lead-abc-123/dag');
-      expect(urls).toContain('/api/lead/lead-abc-123/progress');
-    });
+  it('restores previous lead selection on unmount', () => {
+    const { unmount } = renderWithRoute('lead-abc-123');
+    unmount();
+    // Should restore the previous lead
+    const lastCall = mockSelectLead.mock.calls[mockSelectLead.mock.calls.length - 1];
+    expect(lastCall[0]).toBe('prev-lead-id');
   });
 });

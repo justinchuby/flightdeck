@@ -104,7 +104,7 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
       )}
 
       {!loading && sessions.length > 0 && (
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
         {sessions.map(session => {
           const isExpanded = expandedId === session.id;
           return (

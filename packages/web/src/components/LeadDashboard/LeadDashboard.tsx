@@ -218,7 +218,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
       }
     }).catch(() => { /* initial fetch — will retry */ });
     return () => controller.abort();
-  }, []);
+  }, [readOnly]);
 
   // Subscribe to selected lead agent WS stream and load message history
   useEffect(() => {
@@ -351,7 +351,9 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   }, [selectedLeadId, historicalProjectId, isActiveAgent]);
 
   // Listen for lead-specific WebSocket events (skip in read-only mode)
-  useLeadWebSocket(readOnly ? [] : agents, readOnly ? null : historicalProjectId);
+  const wsAgents = readOnly ? [] : agents;
+  const wsProjectId = readOnly ? null : historicalProjectId;
+  useLeadWebSocket(wsAgents, wsProjectId);
 
   // Sidebar resize handlers
   const startResize = useDragResize('x', sidebarWidth, setSidebarWidth, 200, 600, true);
@@ -778,9 +780,10 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
               pendingConfirmations: readOnly ? [] : pendingConfirmations,
               panelHeight: decisionsPanelHeight,
               onResize: startDecisionsResize,
-              onConfirm: handleConfirmDecision,
-              onReject: handleRejectDecision,
-              onDismiss: handleDismissDecision,
+              ...(readOnly
+                ? { onConfirm: async () => {}, onReject: async () => {}, onDismiss: async () => {} }
+                : { onConfirm: handleConfirmDecision, onReject: handleRejectDecision, onDismiss: handleDismissDecision }
+              ),
             }}
             crewTabContent={
               <CrewStatusContent

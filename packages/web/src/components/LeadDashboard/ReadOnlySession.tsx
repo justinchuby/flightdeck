@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLeadStore } from '../../stores/leadStore';
+import { apiFetch } from '../../hooks/useApi';
 import { LeadDashboard } from './LeadDashboard';
 import type { AcpTextChunk, DagStatus } from '../../types';
 
@@ -31,71 +32,53 @@ export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
     }
     store.selectLead(leadId);
 
-    const controller = new AbortController();
+    let cancelled = false;
 
-    // Fetch historical messages (include system messages for full context)
-    fetch(`/api/agents/${leadId}/messages?limit=1000&includeSystem=true`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data: any) => {
-        if (controller.signal.aborted) return;
-        if (Array.isArray(data?.messages) && data.messages.length > 0) {
-          const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
-            type: 'text' as const,
-            text: m.content,
-            sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
-            timestamp: new Date(m.timestamp).getTime(),
-          }));
-          useLeadStore.getState().setMessages(leadId, msgs);
-        }
-      })
-      .catch(() => {});
-
-    // Fetch historical decisions
-    fetch(`/api/lead/${leadId}/decisions`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data: any) => {
-        if (controller.signal.aborted) return;
-        if (Array.isArray(data)) {
+    // Fire-and-forget historical data fetches.
+    // Endpoints may 404 for old sessions — allSettled ignores individual failures.
+    Promise.allSettled([
+      apiFetch<{ messages: any[] }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`)
+        .then((data) => {
+          if (cancelled) return;
+          if (Array.isArray(data?.messages) && data.messages.length > 0) {
+            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+              type: 'text' as const,
+              text: m.content,
+              sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
+              timestamp: new Date(m.timestamp).getTime(),
+            }));
+            useLeadStore.getState().setMessages(leadId, msgs);
+          }
+        }),
+      apiFetch<any[]>(`/lead/${leadId}/decisions`)
+        .then((data) => {
+          if (cancelled || !Array.isArray(data)) return;
           useLeadStore.getState().setDecisions(leadId, data);
-        }
-      })
-      .catch(() => {});
-
-    // Fetch historical groups
-    fetch(`/api/lead/${leadId}/groups`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data: any) => {
-        if (controller.signal.aborted) return;
-        if (Array.isArray(data)) {
+        }),
+      apiFetch<any[]>(`/lead/${leadId}/groups`)
+        .then((data) => {
+          if (cancelled || !Array.isArray(data)) return;
           useLeadStore.getState().setGroups(leadId, data);
-        }
-      })
-      .catch(() => {});
-
-    // Fetch historical DAG
-    fetch(`/api/lead/${leadId}/dag`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data: any) => {
-        if (controller.signal.aborted) return;
-        if (data && data.tasks) {
+        }),
+      apiFetch<any>(`/lead/${leadId}/dag`)
+        .then((data) => {
+          if (cancelled || !data?.tasks) return;
           useLeadStore.getState().setDagStatus(leadId, data as DagStatus);
-        }
-      })
-      .catch(() => {});
-
-    // Fetch historical progress
-    fetch(`/api/lead/${leadId}/progress`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data: any) => {
-        if (controller.signal.aborted) return;
-        if (data && !data.error) {
+        }),
+      apiFetch<any>(`/lead/${leadId}/progress`)
+        .then((data) => {
+          if (cancelled || !data || data.error) return;
           useLeadStore.getState().setProgress(leadId, data);
-        }
-      })
-      .catch(() => {});
+        }),
+    ]);
 
     return () => {
-      controller.abort();
+      cancelled = true;
+      // Restore previous lead selection when navigating away
+      const prev = previousLeadRef.current;
+      if (prev) {
+        useLeadStore.getState().selectLead(prev);
+      }
     };
   }, [leadId]);
 
