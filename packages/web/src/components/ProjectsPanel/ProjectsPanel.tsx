@@ -17,6 +17,8 @@ import {
   Archive,
   AlertTriangle,
   ListChecks,
+  Pencil,
+  Square,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
@@ -84,23 +86,41 @@ function StorageBadge({ mode }: { mode: 'user' | 'local' }) {
 function ProjectCard({
   project,
   isExpanded,
+  isSelected,
   onToggle,
+  onSelect,
   onResume,
   onArchive,
+  onStop,
   onDelete,
   confirmingDeleteId,
   onConfirmDelete,
   onCancelDelete,
+  editingCwdId,
+  cwdValue,
+  onEditCwd,
+  onCwdChange,
+  onSaveCwd,
+  onCancelCwdEdit,
 }: {
   project: EnrichedProject;
   isExpanded: boolean;
+  isSelected: boolean;
   onToggle: () => void;
+  onSelect: () => void;
   onResume: (id: string) => void;
   onArchive: (id: string) => void;
+  onStop: (id: string) => void;
   onDelete: (id: string) => void;
   confirmingDeleteId: string | null;
   onConfirmDelete: (id: string) => void;
   onCancelDelete: () => void;
+  editingCwdId: string | null;
+  cwdValue: string;
+  onEditCwd: (id: string, currentCwd: string) => void;
+  onCwdChange: (value: string) => void;
+  onSaveCwd: (id: string) => void;
+  onCancelCwdEdit: () => void;
 }) {
   const isConfirmingDelete = confirmingDeleteId === project.id;
   return (
@@ -111,6 +131,15 @@ function ProjectCard({
         className="flex items-center gap-3 p-3 no-underline text-inherit"
         aria-label={`Open ${project.name}`}
       >
+        {/* Batch selection checkbox */}
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => { e.stopPropagation(); onSelect(); }}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          className="w-3.5 h-3.5 rounded border-th-border shrink-0 accent-accent"
+        />
         <FolderOpen className="w-5 h-5 text-accent shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -176,14 +205,39 @@ function ProjectCard({
                 {formatDate(project.createdAt)}
               </div>
             </div>
-            {project.cwd && (
-              <div className="col-span-2">
-                <span className="text-th-text-muted">Working directory</span>
-                <div className="font-mono text-th-text-alt truncate" title={project.cwd}>
-                  {project.cwd}
+            {/* Working directory — inline editable */}
+            <div className="col-span-2">
+              <span className="text-th-text-muted">Working directory</span>
+              {editingCwdId === project.id ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <input
+                    value={cwdValue}
+                    onChange={(e) => onCwdChange(e.target.value)}
+                    className="flex-1 text-xs font-mono bg-th-bg border border-th-border rounded px-2 py-1 text-th-text-alt focus:outline-none focus:border-accent"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') onSaveCwd(project.id);
+                      if (e.key === 'Escape') onCancelCwdEdit();
+                    }}
+                  />
+                  <button onClick={() => onSaveCwd(project.id)} className="text-xs text-green-500 hover:text-green-400 font-medium">Save</button>
+                  <button onClick={onCancelCwdEdit} className="text-xs text-th-text-muted hover:text-th-text">Cancel</button>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="font-mono text-th-text-alt truncate" title={project.cwd || 'Not set'}>
+                    {project.cwd || 'Not set'}
+                  </span>
+                  <button
+                    onClick={() => onEditCwd(project.id, project.cwd || '')}
+                    className="text-th-text-muted hover:text-th-text transition-colors p-0.5 rounded"
+                    title="Edit working directory"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
             <div>
               <span className="text-th-text-muted">Storage mode</span>
               <div className="flex items-center gap-1.5 text-th-text-alt">
@@ -192,11 +246,24 @@ function ProjectCard({
               </div>
             </div>
             <div>
-              <span className="text-th-text-muted">Active agents</span>
+              <span className="text-th-text-muted">Crew</span>
               <div className="text-th-text-alt flex items-center gap-1">
                 <Users className="w-3 h-3" />
-                {project.activeAgentCount}
+                {project.activeAgentCount} total
+                {(project.runningAgentCount || project.idleAgentCount || project.failedAgentCount) ? (
+                  <span className="text-th-text-muted ml-1">
+                    ({[
+                      project.runningAgentCount ? `${project.runningAgentCount} running` : '',
+                      project.idleAgentCount ? `${project.idleAgentCount} idle` : '',
+                      project.failedAgentCount ? `${project.failedAgentCount} failed` : '',
+                    ].filter(Boolean).join(', ')})
+                  </span>
+                ) : null}
               </div>
+            </div>
+            <div>
+              <span className="text-th-text-muted">Sessions</span>
+              <div className="text-th-text-alt">{project.sessions?.length ?? 0}</div>
             </div>
             <div>
               <span className="text-th-text-muted">Updated</span>
@@ -255,6 +322,15 @@ function ProjectCard({
                 Archive
               </button>
             )}
+            {(project.runningAgentCount ?? 0) > 0 && (
+              <button
+                onClick={() => onStop(project.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-orange-500 rounded-md hover:bg-orange-500/10 transition-colors"
+              >
+                <Square className="w-3 h-3" />
+                Stop All Agents
+              </button>
+            )}
             {isConfirmingDelete ? (
               <div className="flex items-center gap-2 w-full bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2">
                 <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
@@ -274,7 +350,7 @@ function ProjectCard({
                   Cancel
                 </button>
               </div>
-            ) : (
+            ) : project.status === 'archived' && (
               <button
                 onClick={() => onDelete(project.id)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-500/80 rounded-md hover:bg-red-500/10 transition-colors ml-auto"
@@ -294,9 +370,12 @@ export function ProjectsPanel() {
   const [projects, setProjects] = useState<EnrichedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('active');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editingCwdId, setEditingCwdId] = useState<string | null>(null);
+  const [cwdValue, setCwdValue] = useState('');
   const addToast = useToastStore((s) => s.add);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -394,6 +473,19 @@ export function ProjectsPanel() {
     [addToast, fetchProjects],
   );
 
+  const handleStop = useCallback(
+    async (id: string) => {
+      try {
+        const data = await apiFetch<{ terminated: number }>(`/projects/${id}/stop`, { method: 'POST' });
+        addToast('success', `Stopped ${data.terminated ?? 0} agent(s)`);
+        await fetchProjects();
+      } catch (err: any) {
+        addToast('error', `Failed to stop agents: ${err.message}`);
+      }
+    },
+    [addToast, fetchProjects],
+  );
+
   // Step 1: Show confirmation UI
   const handleRequestDelete = useCallback((id: string) => {
     setConfirmingDeleteId(id);
@@ -417,6 +509,79 @@ export function ProjectsPanel() {
 
   const handleCancelDelete = useCallback(() => {
     setConfirmingDeleteId(null);
+  }, []);
+
+  // ── Batch operations ──────────────────────────────────────
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    const visible = projects.filter(p => {
+      if (filter === 'active') return p.status === 'active';
+      if (filter === 'archived') return p.status === 'archived';
+      return true;
+    });
+    setSelectedIds(new Set(visible.map(p => p.id)));
+  }, [projects, filter]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleBatchArchive = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map(id => apiFetch(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'archived' }) })),
+    );
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    addToast('success', `Archived ${succeeded} project(s)`);
+    clearSelection();
+    await fetchProjects();
+  }, [selectedIds, addToast, clearSelection, fetchProjects]);
+
+  const handleBatchDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    // Only delete projects that are archived
+    const archiveOnly = ids.filter(id => projects.find(p => p.id === id)?.status === 'archived');
+    if (archiveOnly.length === 0) {
+      addToast('error', 'Only archived projects can be batch-deleted');
+      return;
+    }
+    const results = await Promise.allSettled(
+      archiveOnly.map(id => apiFetch(`/projects/${id}`, { method: 'DELETE' })),
+    );
+    const succeeded = results.filter(r => r.status === 'fulfilled').length;
+    addToast('success', `Deleted ${succeeded} project(s)`);
+    clearSelection();
+    await fetchProjects();
+  }, [selectedIds, projects, addToast, clearSelection, fetchProjects]);
+
+  const allSelectedArchived = Array.from(selectedIds).every(
+    id => projects.find(p => p.id === id)?.status === 'archived',
+  );
+
+  // ── Edit CWD ──────────────────────────────────────────────
+  const handleEditCwd = useCallback((id: string, currentCwd: string) => {
+    setEditingCwdId(id);
+    setCwdValue(currentCwd);
+  }, []);
+
+  const handleSaveCwd = useCallback(async (id: string) => {
+    try {
+      await apiFetch(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ cwd: cwdValue }) });
+      setProjects(prev => prev.map(p => p.id === id ? { ...p, cwd: cwdValue } : p));
+      setEditingCwdId(null);
+      addToast('success', 'Working directory updated');
+    } catch (err: any) {
+      addToast('error', `Failed to update path: ${err.message}`);
+    }
+  }, [cwdValue, addToast]);
+
+  const handleCancelCwdEdit = useCallback(() => {
+    setEditingCwdId(null);
   }, []);
 
   useEffect(() => {
@@ -528,18 +693,52 @@ export function ProjectsPanel() {
         </div>
       ) : (
         <div className="space-y-2">
+          {/* Batch action bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <span className="text-xs font-medium text-th-text-alt">{selectedIds.size} selected</span>
+              <button onClick={selectAllVisible} className="text-xs text-blue-400 hover:underline">Select all</button>
+              <div className="flex-1" />
+              <button
+                onClick={handleBatchArchive}
+                className="text-xs px-2 py-1 rounded bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors"
+              >
+                Archive selected
+              </button>
+              <button
+                onClick={handleBatchDelete}
+                disabled={!allSelectedArchived}
+                className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title={allSelectedArchived ? 'Delete selected projects' : 'Only archived projects can be deleted'}
+              >
+                Delete selected
+              </button>
+              <button onClick={clearSelection} className="text-xs text-th-text-muted hover:text-th-text transition-colors">
+                ✕
+              </button>
+            </div>
+          )}
           {filtered.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
               isExpanded={expandedId === project.id}
+              isSelected={selectedIds.has(project.id)}
               onToggle={() => handleToggle(project.id)}
+              onSelect={() => toggleSelect(project.id)}
               onResume={handleResume}
               onArchive={handleArchive}
+              onStop={handleStop}
               onDelete={handleRequestDelete}
               confirmingDeleteId={confirmingDeleteId}
               onConfirmDelete={handleConfirmDelete}
               onCancelDelete={handleCancelDelete}
+              editingCwdId={editingCwdId}
+              cwdValue={cwdValue}
+              onEditCwd={handleEditCwd}
+              onCwdChange={setCwdValue}
+              onSaveCwd={handleSaveCwd}
+              onCancelCwdEdit={handleCancelCwdEdit}
             />
           ))}
         </div>
