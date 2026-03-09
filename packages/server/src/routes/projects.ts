@@ -793,7 +793,7 @@ export function projectsRoutes(ctx: AppContext): Router {
                   prev.model,
                   project.cwd ?? undefined,
                   prev.sessionId || undefined,
-                  undefined,
+                  prev.agentId,
                   { projectId: project.id, projectName: project.name },
                 );
                 logger.info({ module: 'project', msg: 'Respawned agent', role: prev.role, model: prev.model, parentId: agent.id });
