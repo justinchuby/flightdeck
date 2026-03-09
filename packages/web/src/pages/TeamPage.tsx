@@ -152,8 +152,9 @@ function formatUptime(ms: number): string {
 }
 
 function serverStateBadge(running: boolean, state: string): { variant: 'success' | 'warning' | 'error'; label: string } {
-  if (!running) return { variant: 'error', label: 'Stopped' };
-  return connectionStatusProps(state) as { variant: 'success' | 'warning' | 'error'; label: string };
+  if (!running) return { variant: 'error', label: 'Agent Server: Stopped' };
+  const base = connectionStatusProps(state) as { variant: 'success' | 'warning' | 'error'; label: string };
+  return { ...base, label: `Agent Server: ${base.label}` };
 }
 
 // ── Sub-components ────────────────────────────────────────
@@ -182,7 +183,7 @@ function ServerCard({ status, onStop }: { status: ServerStatus | null; onStop: (
 
   return (
     <div className="bg-th-bg-alt border border-th-border rounded-lg p-4" data-testid="card-server">
-      <div className="flex items-center gap-2 text-th-text mb-1">
+      <div className="flex items-center gap-2 text-th-text mb-1" title="The agent daemon process that manages agent lifecycles">
         <Server className="w-4 h-4" />
         <StatusBadge variant={badge.variant} label={badge.label} dot pulse={badge.variant === 'success'} />
       </div>

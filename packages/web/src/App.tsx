@@ -314,9 +314,10 @@ export function App() {
               </button>
               <span
                 className={`inline-block w-2 h-2 rounded-full ${connected ? (systemPaused ? 'bg-yellow-400' : 'bg-green-400') : 'bg-red-400'}`}
+                title="WebSocket connection to flightdeck server"
               />
-              <span className="text-sm text-th-text-muted">
-                {!connected ? 'Reconnecting...' : systemPaused ? 'Paused' : 'Connected'}
+              <span className="text-sm text-th-text-muted" title="WebSocket connection to flightdeck server">
+                {!connected ? 'Server: Reconnecting...' : systemPaused ? 'Server: Paused' : 'Server: Connected'}
               </span>
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>

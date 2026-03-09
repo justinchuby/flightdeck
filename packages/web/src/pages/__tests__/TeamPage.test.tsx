@@ -219,7 +219,7 @@ describe('TeamPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('card-server')).toBeInTheDocument();
     });
-    expect(screen.getByText('Online')).toBeInTheDocument();
+    expect(screen.getByText('Agent Server: Online')).toBeInTheDocument();
     expect(screen.getByText('2 agents')).toBeInTheDocument();
     expect(screen.getByText('12ms')).toBeInTheDocument();
   });
@@ -487,7 +487,7 @@ describe('TeamPage', () => {
     // Switch to Health tab
     switchTab('Health');
     await waitFor(() => {
-      expect(screen.getByText('Stopped')).toBeInTheDocument();
+      expect(screen.getByText('Agent Server: Stopped')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('stop-server-btn')).not.toBeInTheDocument();
   });
