@@ -1,7 +1,5 @@
 import { useAppStore } from '../../stores/appStore';
 import { useTimerStore } from '../../stores/timerStore';
-import { useSettingsStore } from '../../stores/settingsStore';
-import { apiFetch } from '../useApi';
 import type { HandlerContext } from './index';
 
 export function handleInit(msg: any, ctx: HandlerContext): void {
@@ -37,14 +35,10 @@ export function handleTimerCancelled(msg: any, _ctx: HandlerContext): void {
 }
 
 // Track pending decisions globally for the approval queue badge
+// NOTE: This handler is currently unused — useWebSocket.ts handles lead:decision inline.
+// Kept for future ws-handlers migration. The active oversight check is in useWebSocket.ts.
 export function handleLeadDecision(msg: any, _ctx: HandlerContext): void {
   if (msg.needsConfirmation && msg.id) {
-    // Minimal oversight: auto-approve all decisions without user prompts
-    const oversight = useSettingsStore.getState().oversightLevel;
-    if (oversight === 'minimal') {
-      apiFetch(`/decisions/${msg.id}/confirm`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
-      return;
-    }
     useAppStore.getState().addPendingDecision({
       id: msg.id,
       agentId: msg.agentId,
