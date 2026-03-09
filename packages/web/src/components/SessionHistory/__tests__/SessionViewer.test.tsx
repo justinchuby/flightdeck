@@ -65,10 +65,12 @@ describe('SessionViewer', () => {
     expect(screen.getByText(/1 failed/)).toBeInTheDocument();
   });
 
-  it('fetches message count on mount', async () => {
+  it('fetches message count with limit=200 on mount', async () => {
     renderViewer();
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/agents/lead-abc123/messages?limit=1');
+      const call = mockApiFetch.mock.calls[0];
+      expect(call[0]).toBe('/agents/lead-abc123/messages?limit=200');
+      expect(call[1]).toHaveProperty('signal');
     });
   });
 

@@ -82,16 +82,22 @@ describe('ReadOnlySession', () => {
     expect(mockSelectLead).toHaveBeenCalledWith('lead-abc-123');
   });
 
-  it('fetches historical data via apiFetch', async () => {
+  it('fetches historical data via apiFetch with abort signal', async () => {
     renderWithRoute('lead-abc-123');
 
     await waitFor(() => {
-      const urls = mockApiFetch.mock.calls.map((c: any[]) => c[0]);
+      const calls = mockApiFetch.mock.calls;
+      const urls = calls.map((c: any[]) => c[0]);
       expect(urls).toContain('/agents/lead-abc-123/messages?limit=1000&includeSystem=true');
       expect(urls).toContain('/lead/lead-abc-123/decisions');
       expect(urls).toContain('/lead/lead-abc-123/groups');
       expect(urls).toContain('/lead/lead-abc-123/dag');
       expect(urls).toContain('/lead/lead-abc-123/progress');
+      // Each call should receive an options object with a signal
+      calls.forEach((c: any[]) => {
+        expect(c[1]).toHaveProperty('signal');
+        expect(c[1].signal).toBeInstanceOf(AbortSignal);
+      });
     });
   });
 

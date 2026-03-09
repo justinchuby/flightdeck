@@ -53,21 +53,23 @@ export function SessionViewer({ session, onClose, onResume }: SessionViewerProps
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Fetch message count only (lightweight)
+  // Fetch message count (use moderate limit for a useful count)
   useEffect(() => {
-    let cancelled = false;
-    apiFetch<{ messages: unknown[] }>(`/agents/${session.leadId}/messages?limit=1`)
+    const controller = new AbortController();
+    const MESSAGE_COUNT_LIMIT = 200;
+    apiFetch<{ messages: unknown[] }>(`/agents/${session.leadId}/messages?limit=${MESSAGE_COUNT_LIMIT}`, { signal: controller.signal })
       .then((data) => {
-        if (!cancelled) {
-          // The API returns up to limit messages; we use the array length as a minimum indicator
-          setMessageCount(data.messages?.length ?? 0);
-          setLoading(false);
-        }
+        if (controller.signal.aborted) return;
+        const count = data.messages?.length ?? 0;
+        // Show exact count when below limit, "N+" when we hit the cap
+        setMessageCount(count);
+        setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setLoading(false);
+        if (controller.signal.aborted) return;
+        setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   }, [session.leadId]);
 
   const projectId = session.projectId;
@@ -180,7 +182,7 @@ export function SessionViewer({ session, onClose, onResume }: SessionViewerProps
                 Messages
               </div>
               <div className="text-xs font-mono text-th-text">
-                {loading ? '…' : messageCount != null ? `${messageCount}+` : '—'}
+                {loading ? '…' : messageCount != null ? (messageCount >= 200 ? `${messageCount}+` : `${messageCount}`) : '—'}
               </div>
             </div>
           </div>

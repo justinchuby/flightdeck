@@ -780,6 +780,9 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
               pendingConfirmations: readOnly ? [] : pendingConfirmations,
               panelHeight: decisionsPanelHeight,
               onResize: startDecisionsResize,
+              // In read-only mode, pass noop handlers to prevent accidental POSTs
+              // to /api/decisions/:id — historical sessions may have unresolved decisions
+              // whose action buttons would otherwise be live.
               ...(readOnly
                 ? { onConfirm: async () => {}, onReject: async () => {}, onDismiss: async () => {} }
                 : { onConfirm: handleConfirmDecision, onReject: handleRejectDecision, onDismiss: handleDismissDecision }

@@ -32,14 +32,15 @@ export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
     }
     store.selectLead(leadId);
 
-    let cancelled = false;
+    const controller = new AbortController();
+    const opts = { signal: controller.signal };
 
     // Fire-and-forget historical data fetches.
     // Endpoints may 404 for old sessions — allSettled ignores individual failures.
     Promise.allSettled([
-      apiFetch<{ messages: any[] }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`)
+      apiFetch<{ messages: any[] }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`, opts)
         .then((data) => {
-          if (cancelled) return;
+          if (controller.signal.aborted) return;
           if (Array.isArray(data?.messages) && data.messages.length > 0) {
             const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
               type: 'text' as const,
@@ -50,30 +51,30 @@ export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
             useLeadStore.getState().setMessages(leadId, msgs);
           }
         }),
-      apiFetch<any[]>(`/lead/${leadId}/decisions`)
+      apiFetch<any[]>(`/lead/${leadId}/decisions`, opts)
         .then((data) => {
-          if (cancelled || !Array.isArray(data)) return;
+          if (controller.signal.aborted || !Array.isArray(data)) return;
           useLeadStore.getState().setDecisions(leadId, data);
         }),
-      apiFetch<any[]>(`/lead/${leadId}/groups`)
+      apiFetch<any[]>(`/lead/${leadId}/groups`, opts)
         .then((data) => {
-          if (cancelled || !Array.isArray(data)) return;
+          if (controller.signal.aborted || !Array.isArray(data)) return;
           useLeadStore.getState().setGroups(leadId, data);
         }),
-      apiFetch<any>(`/lead/${leadId}/dag`)
+      apiFetch<any>(`/lead/${leadId}/dag`, opts)
         .then((data) => {
-          if (cancelled || !data?.tasks) return;
+          if (controller.signal.aborted || !data?.tasks) return;
           useLeadStore.getState().setDagStatus(leadId, data as DagStatus);
         }),
-      apiFetch<any>(`/lead/${leadId}/progress`)
+      apiFetch<any>(`/lead/${leadId}/progress`, opts)
         .then((data) => {
-          if (cancelled || !data || data.error) return;
+          if (controller.signal.aborted || !data || data.error) return;
           useLeadStore.getState().setProgress(leadId, data);
         }),
     ]);
 
     return () => {
-      cancelled = true;
+      controller.abort();
       // Restore previous lead selection when navigating away
       const prev = previousLeadRef.current;
       if (prev) {
