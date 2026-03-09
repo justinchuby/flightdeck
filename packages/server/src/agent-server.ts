@@ -263,19 +263,18 @@ export class AgentServer {
     this.massFailure.dispose();
 
     // Terminate all agents
-    const terminatePromises = [...this.agents.values()].map((agent) => {
-      return new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => resolve(), opts?.timeoutMs ?? 5000);
-        try {
-          agent.adapter.terminate();
-        } catch {
-          // Agent may already be dead
-        }
-        agent.cleanups.forEach((fn) => fn());
-        agent.status = 'exited';
-        clearTimeout(timeout);
-        resolve();
-      });
+    const terminatePromises = [...this.agents.values()].map(async (agent) => {
+      const timeout = opts?.timeoutMs ?? 5000;
+      try {
+        await Promise.race([
+          Promise.resolve(agent.adapter.terminate()),
+          new Promise<void>((resolve) => setTimeout(resolve, timeout)),
+        ]);
+      } catch {
+        // Agent may already be dead
+      }
+      agent.cleanups.forEach((fn) => fn());
+      agent.status = 'exited';
     });
     // Persist shutdown state for all agents before clearing
     this.persistence?.onServerStop?.([...this.agents.values()]);
@@ -452,10 +451,10 @@ export class AgentServer {
     // Try graceful cancel first, then force terminate
     if (agent.adapter.isPrompting) {
       agent.adapter.cancel().catch(() => {}).finally(() => {
-        agent.adapter.terminate();
+        Promise.resolve(agent.adapter.terminate()).catch(() => {});
       });
     } else {
-      agent.adapter.terminate();
+      Promise.resolve(agent.adapter.terminate()).catch(() => {});
     }
 
     this.persistence?.onAgentTerminated?.(msg.agentId);

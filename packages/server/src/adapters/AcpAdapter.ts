@@ -25,6 +25,9 @@ import type {
   ContentBlock,
 } from './types.js';
 
+/** Timeout for graceful process shutdown before force-killing */
+const TERMINATE_TIMEOUT_MS = 5000;
+
 // ── Lazy SDK Loading ────────────────────────────────────────────────
 // The ACP SDK is loaded dynamically so the adapter module can be imported
 // without triggering SDK loading. The SDK is loaded on first start().
@@ -481,22 +484,27 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       this.process = null;
 
       if (this._exited) {
-        // Process already exited (error or normal exit) — just clean up
-        try { proc.kill(); } catch { /* already exited */ }
+        // Process already exited (error or normal exit) — no cleanup needed
       } else {
         // Close stdin so the CLI can flush session state to disk
         proc.stdin?.end();
-        // Wait for process to exit naturally, with a 5s timeout before force-killing
+        // Wait for process to exit naturally, with a timeout before force-killing
+        let killTimer: ReturnType<typeof setTimeout> | null = null;
         await Promise.race([
           new Promise<void>((resolve) => {
-            proc.once('exit', () => resolve());
-            if (proc.exitCode !== null || proc.signalCode !== null) resolve();
+            proc.once('exit', () => {
+              if (killTimer) clearTimeout(killTimer);
+              resolve();
+            });
+            if (proc.exitCode !== null || proc.signalCode !== null) {
+              resolve();
+            }
           }),
           new Promise<void>((resolve) => {
-            setTimeout(() => {
+            killTimer = setTimeout(() => {
               try { proc.kill(); } catch { /* already exited */ }
               resolve();
-            }, 5000);
+            }, TERMINATE_TIMEOUT_MS);
           }),
         ]);
       }

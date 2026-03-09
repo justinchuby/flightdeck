@@ -773,8 +773,7 @@ export function projectsRoutes(ctx: AppContext): Router {
             return (
               a.projectId === project.id &&
               meta?.parentId === lastSession.leadId &&
-              a.role !== 'lead' &&
-              a.role !== 'secretary'
+              a.role !== 'lead'
             );
           });
 
@@ -822,7 +821,7 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   // Stop all running agents for a project
-  router.post('/projects/:id/stop', (req, res) => {
+  router.post('/projects/:id/stop', async (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const project = projectRegistry.get(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -832,7 +831,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     for (const agent of agents) {
       if (agent.status === 'running' || agent.status === 'idle') {
         try {
-          agentManager.terminate(agent.id);
+          await agentManager.terminate(agent.id);
           terminated++;
           // Belt-and-suspenders: explicitly end session for lead agents.
           // The terminate → exit event chain should handle this, but if the

@@ -604,14 +604,15 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     }
   }
 
-  terminate(): void {
+  async terminate(): Promise<void> {
     if (this.terminated) return;
     this.terminated = true;
     this.status = 'terminated';
     this.events.notifyStatus(this.status);
     if (this.acpConnection) {
-      this.acpConnection.terminate();
+      const conn = this.acpConnection;
       this.acpConnection = null;
+      await conn.terminate();
     }
   }
 

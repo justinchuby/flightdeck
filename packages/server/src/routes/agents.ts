@@ -65,8 +65,8 @@ export function agentsRoutes(ctx: AppContext): Router {
     }
   });
 
-  router.delete('/agents/:id', (req, res) => {
-    const ok = agentManager.terminate(req.params.id);
+  router.delete('/agents/:id', async (req, res) => {
+    const ok = await agentManager.terminate(req.params.id);
     res.json({ ok });
   });
 
@@ -83,17 +83,17 @@ export function agentsRoutes(ctx: AppContext): Router {
     }
   });
 
-  router.post('/agents/:id/restart', (req, res) => {
-    const newAgent = agentManager.restart(req.params.id);
+  router.post('/agents/:id/restart', async (req, res) => {
+    const newAgent = await agentManager.restart(req.params.id);
     if (!newAgent) return res.status(404).json({ error: 'Agent not found' });
     res.status(201).json(newAgent.toJSON());
   });
 
-  router.post('/agents/:id/compact', (req, res) => {
+  router.post('/agents/:id/compact', async (req, res) => {
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     // Compact = restart with context handoff (same as restart but semantically different)
-    const newAgent = agentManager.restart(req.params.id);
+    const newAgent = await agentManager.restart(req.params.id);
     if (!newAgent) return res.status(500).json({ error: 'Failed to compact agent context' });
     res.status(201).json({ compacted: true, agent: newAgent.toJSON() });
   });

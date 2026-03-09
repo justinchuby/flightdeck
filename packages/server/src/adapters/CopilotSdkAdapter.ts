@@ -50,6 +50,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Pro
 }
 
 const SDK_TIMEOUT_MS = 30_000;
+/** Timeout for graceful shutdown operations (stop/disconnect) */
+const TERMINATE_TIMEOUT_MS = 5_000;
 
 // The Copilot SDK is loaded dynamically so the adapter compiles even
 // when the SDK is not installed. At runtime, start() will throw a
@@ -326,8 +328,15 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
     }
     if (event.id) {
       this._seenEventIds.add(event.id);
-      // Cap set size to prevent unbounded growth if session.idle never fires
-      if (this._seenEventIds.size > 2000) this._seenEventIds.clear();
+      // Evict oldest half when set grows too large (Set preserves insertion order)
+      if (this._seenEventIds.size > 2000) {
+        const half = Math.floor(this._seenEventIds.size / 2);
+        let count = 0;
+        for (const id of this._seenEventIds) {
+          if (count++ >= half) break;
+          this._seenEventIds.delete(id);
+        }
+      }
     }
 
     // Suppress historical event replay after resume: events with timestamps
@@ -421,8 +430,10 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       }
 
       case 'session.idle': {
-        // Session has finished processing — safe to clear dedup set between turns
-        this._seenEventIds.clear();
+        // Session has finished processing current turn.
+        // DO NOT clear _seenEventIds here — SDK bug #567 can deliver duplicate
+        // events from a stale subscription AFTER idle fires. The set is bounded
+        // to 2000 entries (cleared on overflow) so growth is controlled.
         break;
       }
 
@@ -622,7 +633,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
         await Promise.race([
           clientRef.stop(),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('client.stop() timed out')), 5000),
+            setTimeout(() => reject(new Error('client.stop() timed out')), TERMINATE_TIMEOUT_MS),
           ),
         ]);
       } catch (err: any) {
@@ -638,7 +649,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
         await Promise.race([
           sessionRef.disconnect(),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('session.disconnect() timed out')), 5000),
+            setTimeout(() => reject(new Error('session.disconnect() timed out')), TERMINATE_TIMEOUT_MS),
           ),
         ]);
       } catch (err: any) {
