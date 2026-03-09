@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { KeyStats } from '../OverviewPage/KeyStats';
+import { KeyStats } from '../AnalysisPage/KeyStats';
 import { MilestoneTimeline } from '../OverviewPage/MilestoneTimeline';
-import { AgentHeatmap } from '../OverviewPage/AgentHeatmap';
+import { AgentHeatmap } from '../AnalysisPage/AgentHeatmap';
 import type { AgentInfo } from '../../types';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
 
