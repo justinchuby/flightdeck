@@ -226,6 +226,14 @@ export function useWebSocket() {
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;
+        case 'agent:usage':
+          updateAgent(msg.agentId, {
+            inputTokens: msg.inputTokens,
+            outputTokens: msg.outputTokens,
+            ...(msg.cacheReadTokens != null ? { cacheReadTokens: msg.cacheReadTokens } : {}),
+            ...(msg.cacheWriteTokens != null ? { cacheWriteTokens: msg.cacheWriteTokens } : {}),
+          });
+          break;
         case 'agent:message_sent': {
           // Show incoming messages in the recipient agent's chat panel
           const toId = msg.to;
