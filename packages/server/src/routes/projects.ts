@@ -708,19 +708,19 @@ export function projectsRoutes(ctx: AppContext): Router {
 
       const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
 
-      // leadId is preserved — the spawn uses the same agent ID as the previous lead
-      const previousLeadId = lastSession?.leadId;
+      // Verify the invariant: spawn must reuse the same agent ID on resume
+      if (lastSession && agent.id !== lastSession.leadId) {
+        logger.warn({ module: 'project', msg: 'Agent ID mismatch after resume spawn — invariant violation', expected: lastSession.leadId, actual: agent.id, sessionId: lastSession.id });
+      }
 
       // Reactivate existing session row when resuming; only INSERT for fresh/new sessions.
-      // Don't check lastSession.status — after a stop the session may still show 'active'
-      // if the exit event didn't fire (e.g. ServerClientAdapter bug).
       if (lastSession) {
         projectRegistry.reactivateSession(lastSession.id, task, role.id);
       } else {
         projectRegistry.startSession(project.id, agent.id, task);
       }
 
-      // Gather context from previous session (use saved previousLeadId, not DB which is now overwritten)
+      // Gather context from previous session
       const briefing = projectRegistry.buildBriefing(project.id);
 
       // Send project briefing
@@ -731,9 +731,11 @@ export function projectsRoutes(ctx: AppContext): Router {
         }, 3000);
       }
 
-      // Send condensed message history from previous lead so the new lead has conversation context
-      if (previousLeadId && previousLeadId !== agent.id) {
-        const prevMessages = agentManager.getMessageHistory(previousLeadId, 100);
+      // Send condensed message history from previous lead so the new lead has conversation context.
+      // Since agent ID is preserved on resume (agent.id === lastSession.leadId), look up
+      // the agent's own history from a previous run.
+      if (lastSession) {
+        const prevMessages = agentManager.getMessageHistory(agent.id, 100);
         if (prevMessages.length > 0) {
           const historyLines = prevMessages.map((m) => {
             const role = m.sender === 'human' ? 'Human' : m.sender === 'agent' ? 'Lead' : 'System';
@@ -755,15 +757,16 @@ export function projectsRoutes(ctx: AppContext): Router {
 
       logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });
 
-      // Team respawn: bring back agents from last session (unless freshStart)
+      // Team respawn: bring back agents from last session (unless freshStart).
+      // Since agent.id === lastSession.leadId (invariant), use agent.id to find children.
       let respawnedCount = 0;
       let secretaryResumed = false;
-      if (!freshStart && agentRoster && previousLeadId && (resumeAll || agentIds)) {
+      if (!freshStart && agentRoster && lastSession && (resumeAll || agentIds)) {
         const allRosterAgents = agentRoster.getByProject(project.id);
         const previousAgents = allRosterAgents.filter((a) => {
           const meta = a.metadata as Record<string, unknown> | undefined;
           return (
-            meta?.parentId === previousLeadId &&
+            meta?.parentId === agent.id &&
             a.role !== 'lead'
           );
         });

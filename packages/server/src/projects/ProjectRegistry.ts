@@ -59,7 +59,11 @@ export class ProjectRegistry {
     }).where(eq(projects.id, id)).run();
   }
 
-  /** Record that a lead session started for this project */
+  /**
+   * Record that a lead session started for this project.
+   * INVARIANT: leadId is immutable after this insert — it permanently identifies this session.
+   * On resume, the same agent ID must be reused via spawn(id:).
+   */
   startSession(projectId: string, leadId: string, task?: string, role?: string): void {
     this.db.drizzle.insert(projectSessions).values({
       projectId,
@@ -281,8 +285,11 @@ export class ProjectRegistry {
     return result.changes > 0;
   }
 
-  /** Reactivate a previously-claimed session row instead of inserting a new one.
-   *  The leadId is NOT updated — session ID + agent ID are a permanent pair. */
+  /**
+   * Reactivate a previously-claimed session row instead of inserting a new one.
+   * INVARIANT: leadId is NEVER updated — session ID + agent ID are a permanent pair.
+   * The caller must spawn the new agent with the same ID as the original lead.
+   */
   reactivateSession(sessionRowId: number, task?: string, role?: string): void {
     this.db.drizzle.update(projectSessions).set({
       task: task ?? null,

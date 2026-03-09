@@ -14,10 +14,13 @@ export const ProjectSchema = z.object({
 export type Project = z.infer<typeof ProjectSchema>;
 
 // ── Project Session ───────────────────────────────────────────────
+// INVARIANT: leadId is immutable after creation — session ID + agent ID
+// are a permanent pair. On resume, the same agent ID is reused.
 
 export const ProjectSessionSchema = z.object({
   id: z.number(),
   projectId: z.string(),
+  /** Immutable after creation — the agent ID that owns this session */
   leadId: z.string(),
   sessionId: z.string().nullable(),
   role: z.string().nullable(),

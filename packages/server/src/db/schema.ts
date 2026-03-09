@@ -222,14 +222,16 @@ export const projects = sqliteTable('projects', {
   index('idx_projects_status').on(table.status),
 ]);
 
+// INVARIANT: leadId is immutable after creation — session ID + agent ID are a permanent pair.
+// On resume, the same agent ID is reused via spawn(). Never update leadId on an existing row.
 export const projectSessions = sqliteTable('project_sessions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   projectId: text('project_id').notNull().references(() => projects.id),
-  leadId: text('lead_id').notNull(),
-  sessionId: text('session_id'),
+  leadId: text('lead_id').notNull(),             // immutable after insert — identity of the lead agent
+  sessionId: text('session_id'),                 // Copilot SDK session ID, set after session creation
   role: text('role').default('lead'),               // role id used for this session
   task: text('task'),
-  status: text('status').default('active'),        // active | completed | crashed
+  status: text('status').default('active'),        // active | completed | crashed | resuming | stopped
   startedAt: text('started_at').default(utcNow),
   endedAt: text('ended_at'),
 }, (table) => [

@@ -244,16 +244,20 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
   const mockGetAllAgents = vi.fn().mockReturnValue([]);
   const mockGetMessageHistory = vi.fn().mockReturnValue([]);
 
-  const fakeAgent = {
-    id: 'new-lead-1', status: 'running', sendMessage: vi.fn(),
-    toJSON: () => ({ id: 'new-lead-1', status: 'running', role: { id: 'lead' } }),
-  };
+  // Mock spawn returns an agent with the requested ID (8th arg) to honor the invariant
+  const makeFakeAgent = (id: string) => ({
+    id, status: 'running', sendMessage: vi.fn(),
+    toJSON: () => ({ id, status: 'running', role: { id: 'lead' } }),
+  });
 
   let baseUrl: string;
   let stop: () => Promise<void>;
 
   beforeAll(async () => {
-    mockSpawn.mockReturnValue(fakeAgent);
+    mockSpawn.mockImplementation(
+      (_role: any, _task: any, _parentId: any, _auto: any, _model: any, _cwd: any, _resumeSession: any, id?: string) =>
+        makeFakeAgent(id ?? 'new-lead-1'),
+    );
     mockGet.mockReturnValue({ id: 'proj-1', name: 'Test', cwd: '/tmp/test' });
 
     const srv = createTestServer({
@@ -336,7 +340,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     // Verify respawned agents got correct params
     const secondCall = mockSpawn.mock.calls[1];
     expect(secondCall[0].id).toBe('developer'); // role
-    expect(secondCall[2]).toBe('new-lead-1');    // parentId = new lead
+    expect(secondCall[2]).toBe('old-lead');    // parentId = resumed lead (same ID as original)
     expect(secondCall[6]).toBe('ses-dev1');       // resumeSessionId
 
     // Verify secretary resumed with session ID
