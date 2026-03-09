@@ -5,6 +5,7 @@ import { join, normalize, sep, extname, relative } from 'node:path';
 import { homedir } from 'node:os';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
+import { spawnLimiter } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
@@ -667,7 +668,7 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   // Resume a project — starts a new lead session with project context + message history
-  router.post('/projects/:id/resume', (req, res) => {
+  router.post('/projects/:id/resume', spawnLimiter, (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const project = projectRegistry.get(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
