@@ -81,6 +81,7 @@ export function RoleBuilder({ initial, onSave, onCancel, onDelete }: Props) {
   const [saving, setSaving] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const wordCount = systemPrompt
     .trim()
@@ -132,8 +133,13 @@ export function RoleBuilder({ initial, onSave, onCancel, onDelete }: Props) {
 
   const handleDelete = useCallback(async () => {
     if (!initial?.id || !onDelete) return;
-    await apiFetch(`/roles/${initial.id}`, { method: 'DELETE' });
-    onDelete();
+    setDeleting(true);
+    try {
+      await apiFetch(`/roles/${initial.id}`, { method: 'DELETE' });
+      onDelete();
+    } finally {
+      setDeleting(false);
+    }
   }, [initial, onDelete]);
 
   return (
@@ -318,9 +324,10 @@ export function RoleBuilder({ initial, onSave, onCancel, onDelete }: Props) {
           {initial?.id && onDelete && (
             <button
               onClick={handleDelete}
-              className="text-xs px-3 py-1.5 text-red-400 hover:text-red-300 transition-colors"
+              disabled={deleting}
+              className="text-xs px-3 py-1.5 text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
             >
-              Delete
+              {deleting ? 'Deleting…' : 'Delete'}
             </button>
           )}
         </div>

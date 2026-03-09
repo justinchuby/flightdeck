@@ -4,6 +4,14 @@ import { useAppStore } from '../stores/appStore';
 
 const API_BASE = '/api';
 
+/** Default request timeout in milliseconds */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+export interface ApiFetchOptions extends RequestInit {
+  /** Per-request timeout in ms (default: 30 000). Set to 0 to disable. */
+  timeoutMs?: number;
+}
+
 export function getAuthToken(): string | null {
   // URL param or localStorage — for cross-machine access or manual token entry.
   // In production, the server sets an HttpOnly cookie that handles auth automatically
@@ -19,16 +27,46 @@ function authHeaders(): Record<string, string> {
 }
 
 /** Standalone authenticated fetch — usable outside React hooks */
-export async function apiFetch<T = any>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts?.headers },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || `HTTP ${res.status}`);
+export async function apiFetch<T = any>(path: string, opts?: ApiFetchOptions): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOpts } = opts ?? {};
+
+  // Wire up abort controller for timeout (and caller-provided signals)
+  const controller = new AbortController();
+  const callerSignal = fetchOpts.signal;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  if (timeoutMs > 0) {
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   }
-  return res.json();
+  // If the caller already passed a signal, forward its abort
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      controller.abort();
+    } else {
+      callerSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...fetchOpts,
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', ...authHeaders(), ...fetchOpts.headers },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      if (callerSignal?.aborted) throw err; // caller-initiated abort — rethrow as-is
+      throw new Error(`Request to ${path} timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
 }
 
 export function useApi() {
@@ -104,8 +142,8 @@ export function useApi() {
 
   // Load initial data
   useEffect(() => {
-    loadRoles().catch(() => {});
-    loadConfig().catch(() => {});
+    loadRoles().catch(() => { /* initial fetch — will retry */ });
+    loadConfig().catch(() => { /* initial fetch — will retry */ });
   }, [loadRoles, loadConfig]);
 
   const updateAgent = useCallback(async (id: string, patch: { model?: string }) => {

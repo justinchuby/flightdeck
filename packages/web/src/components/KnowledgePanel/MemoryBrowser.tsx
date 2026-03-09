@@ -46,12 +46,16 @@ export function MemoryBrowser() {
 
   useEffect(() => { load(); }, [load]);
 
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   const handleDelete = async (id: number) => {
+    setDeletingId(id);
     try {
       await dbFetch(`/memory/${id}`, { method: 'DELETE' });
       setEntries(prev => prev.filter(e => e.id !== id));
       setCount(prev => prev != null ? prev - 1 : null);
     } catch { /* ignore */ }
+    setDeletingId(null);
   };
 
   if (loading) {
@@ -104,7 +108,8 @@ export function MemoryBrowser() {
               </div>
               <button
                 onClick={() => handleDelete(entry.id)}
-                className="p-1 text-th-text-muted hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                disabled={deletingId === entry.id}
+                className="p-1 text-th-text-muted hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0 disabled:opacity-50"
                 title="Delete"
               >
                 <Trash2 size={13} />
