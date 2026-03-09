@@ -66,8 +66,10 @@ export class IntegrationRouter {
   private sessions: Map<string, ChatSession> = new Map(); // chatId → session
   private pendingChallenges: Map<string, PendingChallenge> = new Map(); // chatId → challenge
   private verifyAttempts: Map<string, number[]> = new Map(); // chatId → timestamps
-  /** Tracks inbound message IDs awaiting replies. Key: messageId, Value: { chatId, platform }. */
-  private pendingReplies: Map<string, { chatId: string; platform: string }> = new Map();
+  /** Tracks inbound message IDs awaiting replies. Key: messageId, Value: { chatId, platform, createdAt }. */
+  private pendingReplies: Map<string, { chatId: string; platform: string; createdAt: number }> = new Map();
+  private static readonly PENDING_REPLY_TTL_MS = 30 * 60 * 1000; // 30 minutes
+  private static readonly PENDING_REPLY_MAX_SIZE = 100;
   private notificationBatcher: NotificationBatcher;
   private agentManager: AgentManager;
   private projectRegistry: ProjectRegistry | undefined;
@@ -390,7 +392,9 @@ export class IntegrationRouter {
           this.pendingReplies.set(sanitizedMsg.messageId, {
             chatId: sanitizedMsg.chatId,
             platform: sanitizedMsg.platform,
+            createdAt: Date.now(),
           });
+          this.pruneExpiredReplies();
         }
         // Use structured JSON — never interpolate user input into prompt strings
         leadAgent.sendMessage(JSON.stringify({
@@ -449,6 +453,21 @@ export class IntegrationRouter {
     // Consume the pending reply
     this.pendingReplies.delete(messageId);
     return true;
+  }
+
+  /** Remove expired entries and enforce max size (FIFO eviction). */
+  private pruneExpiredReplies(): void {
+    const now = Date.now();
+    for (const [id, entry] of this.pendingReplies) {
+      if (now - entry.createdAt > IntegrationRouter.PENDING_REPLY_TTL_MS) {
+        this.pendingReplies.delete(id);
+      }
+    }
+    // FIFO eviction if over max size
+    while (this.pendingReplies.size > IntegrationRouter.PENDING_REPLY_MAX_SIZE) {
+      const oldest = this.pendingReplies.keys().next().value;
+      if (oldest !== undefined) this.pendingReplies.delete(oldest);
+    }
   }
 
   private handleStatusCommand(): string {

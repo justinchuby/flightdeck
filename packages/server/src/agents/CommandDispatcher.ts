@@ -86,6 +86,11 @@ export class CommandDispatcher {
     this.governance = ctx.governancePipeline ?? null;
   }
 
+  /** Late-inject IntegrationRouter to break circular dependency. */
+  setIntegrationRouter(router: import('../integrations/IntegrationRouter.js').IntegrationRouter): void {
+    this.handlerCtx.integrationRouter = router;
+  }
+
   // ── Buffer management ──────────────────────────────────────────────
 
   appendToBuffer(agentId: string, data: string): void {

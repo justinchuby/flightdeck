@@ -27,6 +27,7 @@ const LIST_GROUPS_REGEX = /⟦⟦\s*LIST_GROUPS\s*⟧⟧/s;
 const QUERY_GROUPS_REGEX = /⟦⟦\s*QUERY_GROUPS\s*⟧⟧/s;
 const INTERRUPT_REGEX = /⟦⟦\s*INTERRUPT\s*(\{.*?\})\s*⟧⟧/s;
 const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
+const TELEGRAM_REPLY_REGEX = /⟦⟦\s*TELEGRAM_REPLY\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Exported: command entry list ─────────────────────────────────────
 
@@ -42,6 +43,7 @@ export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a), help: { description: 'List all groups you belong to', example: 'QUERY_GROUPS {}', category: 'Groups' } },
     { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication', args: deriveArgs(interruptSchema) } },
     { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
+    { regex: TELEGRAM_REPLY_REGEX, name: 'TELEGRAM_REPLY', handler: (a, d) => handleTelegramReply(ctx, a, d), help: { description: 'Reply to a Telegram message', example: 'TELEGRAM_REPLY {"messageId": "12345", "content": "response text"}', category: 'Communication' } },
   ];
 }
 
@@ -514,5 +516,34 @@ function handleReact(ctx: CommandHandlerContext, agent: Agent, data: string): vo
     }
   } catch (err) {
     logger.debug({ module: 'command', msg: 'Parse failed', command: 'REACT', err: (err as Error).message });
+  }
+}
+
+// ── TELEGRAM_REPLY ──────────────────────────────────────────────────
+
+function handleTelegramReply(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  try {
+    const parsed = JSON.parse(data);
+    const messageId = parsed.messageId ?? parsed.message_id;
+    const content = parsed.content ?? parsed.text;
+
+    if (!messageId || !content) {
+      agent.sendMessage('[System] TELEGRAM_REPLY requires "messageId" and "content" fields.');
+      return;
+    }
+
+    if (!ctx.integrationRouter) {
+      agent.sendMessage('[System] Telegram integration is not configured.');
+      return;
+    }
+
+    const sent = ctx.integrationRouter.sendReply(String(messageId), String(content));
+    if (sent) {
+      logger.info({ module: 'comms', msg: 'Telegram reply sent', messageId, agentId: agent.id });
+    } else {
+      agent.sendMessage(`[System] No pending Telegram message with ID ${messageId}. The message may have expired (30-min TTL).`);
+    }
+  } catch (err) {
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'TELEGRAM_REPLY', err: (err as Error).message });
   }
 }

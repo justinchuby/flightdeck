@@ -58,6 +58,7 @@ export interface CommandContext {
   governancePipeline?: GovernancePipeline;
   activeDelegationRepository?: ActiveDelegationRepository;
   agentRosterRepository?: AgentRosterRepository;
+  integrationRouter?: import('../../integrations/IntegrationRouter.js').IntegrationRouter;
 }
 
 // ── CommandHandlerContext — CommandContext + shared mutable state ──────

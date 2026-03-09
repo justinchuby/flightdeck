@@ -268,6 +268,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.collectiveMemory = memory;
   }
 
+  /** Late-inject IntegrationRouter to break circular dependency. */
+  setIntegrationRouter(router: import('../integrations/IntegrationRouter.js').IntegrationRouter): void {
+    this.dispatcher.setIntegrationRouter(router);
+  }
+
   /**
    * Resolve the effective model for a role based on project model config.
    *

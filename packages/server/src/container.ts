@@ -343,6 +343,8 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   integrationRouter.start().catch(err => {
     logger.warn({ module: 'container', msg: 'IntegrationRouter failed to start', error: (err as Error).message });
   });
+  // Wire IntegrationRouter into CommandDispatcher for TELEGRAM_REPLY
+  agentManager.setIntegrationRouter(integrationRouter);
   onShutdown('integrationRouter', () => integrationRouter.stop());
 
   // ── Timers & Scheduler ─────────────────────────────────
