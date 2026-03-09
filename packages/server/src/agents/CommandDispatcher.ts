@@ -272,11 +272,12 @@ export class CommandDispatcher {
   // ── Static helpers ─────────────────────────────────────────────────
 
   /**
-   * Check if a position in the buffer is nested inside a ⟦⟦ ⟧⟧ command block
-   * OR inside a JSON string literal. This prevents:
+   * Check if a position in the buffer is nested inside a ⟦⟦ ⟧⟧ command block.
+   * Only tracks JSON string state inside command blocks (depth > 0) to prevent:
    * - Command injection via task text containing ⟦⟦ delimiters (#26)
-   * - Parsing ⟦⟦ inside JSON string values (e.g. task descriptions)
-   * - Parsing ⟦⟦ inside quoted examples in agent output
+   * - Parsing ⟦⟦ inside JSON string values within command payloads
+   * Quote characters in freeform agent text are ignored to avoid false positives
+   * when agents use unmatched quotes in natural language output.
    */
   static isInsideCommandBlock(buf: string, pos: number): boolean {
     let depth = 0;
@@ -296,12 +297,14 @@ export class CommandDispatcher {
         continue;
       }
 
-      if (ch === '"') {
-        inString = !inString;
-        continue;
+      // Only track string state inside command blocks
+      if (depth > 0) {
+        if (ch === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (inString) continue;
       }
-
-      if (inString) continue;
 
       // Doubled brackets are the command delimiters
       if (buf[i] === '⟦' && buf[i + 1] === '⟦') {
@@ -309,10 +312,11 @@ export class CommandDispatcher {
         i++; // skip the second bracket
       } else if (buf[i] === '⟧' && buf[i + 1] === '⟧') {
         depth = Math.max(0, depth - 1);
+        inString = false; // reset string state when exiting a block
         i++; // skip the second bracket
       }
     }
-    return depth > 0 || inString;
+    return depth > 0;
   }
 
   /**
