@@ -141,7 +141,8 @@ export interface ServerConfig {
   cliArgs: string[];
   maxConcurrentAgents: number;
   dbPath: string;
-  provider?: { id?: string };
+  /** CLI provider ID (e.g. 'copilot', 'claude', 'gemini') */
+  provider?: string;
 }
 
 export interface WsMessage {

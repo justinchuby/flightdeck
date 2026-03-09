@@ -59,8 +59,8 @@ const PROVIDER_DOCS: Record<string, string> = {
 
 /** Default CLI arguments per provider (mirrors server presets.ts). */
 const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
-  copilot: ['--acp', '--stdio'],
-  claude: ['--acp', '--stdio'],
+  copilot: [],  // Copilot uses in-process SDK — no CLI args needed
+  claude: [],   // Claude uses in-process SDK — no CLI args needed
   gemini: ['--experimental-acp'],
   cursor: ['acp'],
   codex: ['--acp'],
@@ -225,9 +225,9 @@ function ProviderCard({
               <span className="text-th-text-muted">Features:</span>{' '}
               <span className="text-th-text-alt">
                 {[
-                  sdkCapable && 'SDK mode',
+                  sdkCapable && 'In-process SDK',
                   supportsResume && 'Resume',
-                ].filter(Boolean).join(', ') || 'Standard ACP'}
+                ].filter(Boolean).join(', ') || 'CLI mode'}
               </span>
             </div>
           </div>
