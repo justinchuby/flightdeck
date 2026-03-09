@@ -16,6 +16,10 @@ vi.mock('lucide-react', () => ({
   UserPlus: (p: any) => <span data-testid="icon-userplus" {...p} />,
   Sparkles: (p: any) => <span data-testid="icon-sparkles" {...p} />,
   CheckCircle2: (p: any) => <span data-testid="icon-check" {...p} />,
+  AlertTriangle: (p: any) => <span data-testid="icon-alert" {...p} />,
+  Plus: (p: any) => <span data-testid="icon-plus" {...p} />,
+  Bug: (p: any) => <span data-testid="icon-bug" {...p} />,
+  ExternalLink: (p: any) => <span data-testid="icon-external" {...p} />,
 }));
 
 const MOCK_SESSION: SessionDetail = {
