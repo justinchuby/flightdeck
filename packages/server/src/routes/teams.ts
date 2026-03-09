@@ -430,10 +430,13 @@ export function teamsRoutes(ctx: AppContext): Router {
       const crewMap = new Map<string, typeof allAgents>();
       for (const agent of allAgents) {
         const meta = agent.metadata as Record<string, unknown> | undefined;
-        const parentId = (meta?.parentId as string) ?? null;
+        const metaParentId = (meta?.parentId as string) ?? null;
+        // Fall back to live agent's parentId when metadata is missing (older roster entries)
+        const liveAgent = liveAgents.find(l => l.id === agent.agentId);
+        const parentId = metaParentId ?? liveAgent?.parentId ?? null;
         // If this agent has a parentId, group under that lead. If it IS a lead, group under itself.
         const leadId = agent.role === 'lead' ? agent.agentId : parentId;
-        if (!leadId) continue; // orphan agent, skip
+        if (!leadId) continue; // orphan agent with no known parent, skip
         const crew = crewMap.get(leadId) ?? [];
         crew.push(agent);
         crewMap.set(leadId, crew);

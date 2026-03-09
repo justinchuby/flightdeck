@@ -628,4 +628,66 @@ describe('teamsRoutes', () => {
       }
     });
   });
+
+  // ── GET /crews/summary — parentId fallback ──────────────────────
+
+  describe('GET /crews/summary', () => {
+    it('groups crew members under their lead using live parentId fallback', async () => {
+      const leadId = 'lead-1';
+      const devId = 'dev-1';
+      // Roster entries: lead has no metadata, dev has no metadata (simulates pre-fix data)
+      const rosterAgents = [
+        { agentId: leadId, role: 'lead', model: 'gpt-4', status: 'idle', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+        { agentId: devId, role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+      ];
+      // Live agents have parentId set
+      const liveAgents = [
+        { id: leadId, parentId: undefined, status: 'running', projectId: 'proj-1', projectName: 'Test', toJSON: () => ({}) },
+        { id: devId, parentId: leadId, status: 'running', projectId: 'proj-1', toJSON: () => ({}) },
+      ];
+
+      const srv = createTestServer({
+        agentRoster: { getAllAgents: vi.fn().mockReturnValue(rosterAgents) } as any,
+        agentManager: { getAll: vi.fn().mockReturnValue(liveAgents) } as any,
+        projectRegistry: { get: vi.fn().mockReturnValue(null), getSessions: vi.fn().mockReturnValue([]) } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/crews/summary`);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        // Both agents should be grouped under lead-1
+        expect(data).toHaveLength(1);
+        expect(data[0].leadId).toBe(leadId);
+        expect(data[0].agentCount).toBe(2);
+      } finally {
+        await srv.stop();
+      }
+    });
+
+    it('groups crew members using metadata parentId when available', async () => {
+      const rosterAgents = [
+        { agentId: 'lead-2', role: 'lead', model: 'gpt-4', status: 'idle', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+        { agentId: 'dev-2', role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1', projectId: 'proj-1', metadata: { parentId: 'lead-2' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+      ];
+
+      const srv = createTestServer({
+        agentRoster: { getAllAgents: vi.fn().mockReturnValue(rosterAgents) } as any,
+        agentManager: { getAll: vi.fn().mockReturnValue([]) } as any,
+        projectRegistry: { get: vi.fn().mockReturnValue(null), getSessions: vi.fn().mockReturnValue([]) } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/crews/summary`);
+        const data = await res.json();
+        expect(data).toHaveLength(1);
+        expect(data[0].leadId).toBe('lead-2');
+        expect(data[0].agentCount).toBe(2);
+      } finally {
+        await srv.stop();
+      }
+    });
+  });
 });
