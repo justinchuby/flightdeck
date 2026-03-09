@@ -610,8 +610,12 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!projectName) {
       // Fall back to directory basename
       const parts = normalizedCwd.replace(/[/\\]+$/, '').split(/[/\\]/);
-      projectName = parts[parts.length - 1] || 'Imported Project';
+      projectName = parts[parts.length - 1] || null;
     }
+
+    // Validate final project name — no blank titles allowed
+    const titleError = validateProjectTitle(projectName);
+    if (titleError) return res.status(400).json({ error: `Could not derive project name: ${titleError}. Provide an explicit name.` });
 
     // Gather metadata about what's in .flightdeck/
     const hasShared = existsSync(join(flightdeckDir, 'shared'));
@@ -623,7 +627,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       } catch { /* ignore */ }
     }
 
-    const project = projectRegistry.create(projectName, `Imported from ${normalizedCwd}`, normalizedCwd);
+    const project = projectRegistry.create(projectName!, `Imported from ${normalizedCwd}`, normalizedCwd);
     logger.info({
       module: 'project',
       msg: 'Project imported from directory',
