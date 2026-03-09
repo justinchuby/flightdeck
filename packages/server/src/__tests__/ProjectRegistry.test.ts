@@ -248,12 +248,13 @@ describe('ProjectRegistry', () => {
       const claimed = registry.claimSessionForResume(sessionId);
       expect(claimed).toBe(true);
 
-      registry.reactivateSession(sessionId, 'lead-new', 'resumed task', 'lead');
+      registry.reactivateSession(sessionId, 'resumed task', 'lead');
 
       // Should still be 1 session, not 2
       const after = registry.getSessions(project.id);
       expect(after).toHaveLength(1);
-      expect(after[0].leadId).toBe('lead-new');
+      // leadId is preserved — not overwritten by reactivation
+      expect(after[0].leadId).toBe('lead-old');
       expect(after[0].task).toBe('resumed task');
       expect(after[0].status).toBe('active');
       expect(after[0].endedAt).toBeNull();
@@ -269,12 +270,14 @@ describe('ProjectRegistry', () => {
       expect(sessions[0].endedAt).not.toBeNull();
 
       registry.claimSessionForResume(sessions[0].id);
-      registry.reactivateSession(sessions[0].id, 'lead-2', 'new task');
+      registry.reactivateSession(sessions[0].id, 'new task');
 
       const updated = registry.getSessions(project.id);
       expect(updated[0].endedAt).toBeNull();
       // startedAt should be refreshed (may be same if fast, but at least set)
       expect(updated[0].startedAt).toBeTruthy();
+      // leadId preserved
+      expect(updated[0].leadId).toBe('lead-1');
     });
 
     it('preserves session count when resuming multiple times', () => {
@@ -284,18 +287,19 @@ describe('ProjectRegistry', () => {
 
       const sessions = registry.getSessions(project.id);
       registry.claimSessionForResume(sessions[0].id);
-      registry.reactivateSession(sessions[0].id, 'lead-b', 'task 2');
-      registry.endSession('lead-b', 'completed');
+      registry.reactivateSession(sessions[0].id, 'task 2');
+      registry.endSession('lead-a', 'completed');
 
       // Resume again
       const sessions2 = registry.getSessions(project.id);
       registry.claimSessionForResume(sessions2[0].id);
-      registry.reactivateSession(sessions2[0].id, 'lead-c', 'task 3');
+      registry.reactivateSession(sessions2[0].id, 'task 3');
 
       // Still just 1 session row
       const final = registry.getSessions(project.id);
       expect(final).toHaveLength(1);
-      expect(final[0].leadId).toBe('lead-c');
+      // leadId stays as original — never overwritten
+      expect(final[0].leadId).toBe('lead-a');
       expect(final[0].status).toBe('active');
     });
   });

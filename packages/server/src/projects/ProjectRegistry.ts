@@ -281,10 +281,10 @@ export class ProjectRegistry {
     return result.changes > 0;
   }
 
-  /** Reactivate a previously-claimed session row instead of inserting a new one */
-  reactivateSession(sessionRowId: number, leadId: string, task?: string, role?: string): void {
+  /** Reactivate a previously-claimed session row instead of inserting a new one.
+   *  The leadId is NOT updated — session ID + agent ID are a permanent pair. */
+  reactivateSession(sessionRowId: number, task?: string, role?: string): void {
     this.db.drizzle.update(projectSessions).set({
-      leadId,
       task: task ?? null,
       role: role ?? 'lead',
       status: 'active',

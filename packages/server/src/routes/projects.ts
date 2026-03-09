@@ -706,16 +706,16 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Preserve task from previous session if none provided
       const task = requestTask || (lastSession ? lastSession.task : undefined);
 
-      const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, undefined, { projectName: project.name, projectId: project.id });
+      const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
 
-      // Capture previous lead ID BEFORE reactivation overwrites it
+      // leadId is preserved — the spawn uses the same agent ID as the previous lead
       const previousLeadId = lastSession?.leadId;
 
       // Reactivate existing session row when resuming; only INSERT for fresh/new sessions.
       // Don't check lastSession.status — after a stop the session may still show 'active'
       // if the exit event didn't fire (e.g. ServerClientAdapter bug).
       if (lastSession) {
-        projectRegistry.reactivateSession(lastSession.id, agent.id, task, role.id);
+        projectRegistry.reactivateSession(lastSession.id, task, role.id);
       } else {
         projectRegistry.startSession(project.id, agent.id, task);
       }
