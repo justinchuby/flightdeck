@@ -33,6 +33,7 @@ export interface CopilotClientOptions {
 // ── Session Config ──────────────────────────────────────────
 
 export interface CopilotSessionConfig {
+  sessionId?: string;
   model?: string;
   systemMessage?: { mode?: 'append'; content?: string } | { mode: 'replace'; content: string };
   tools?: CopilotTool[];

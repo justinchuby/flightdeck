@@ -194,21 +194,27 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
         });
       } catch (err) {
         // Resume failed — create new session instead
+        const message = (err as Error)?.message || String(err);
         logger.warn({
           module: 'copilot-sdk',
-          msg: `Resume failed, creating new session: ${(err as Error)?.message || String(err)}`,
+          msg: `Resume failed, creating new session: ${message}`,
           sessionId: opts.sessionId,
         });
         this.session = await withTimeout(
-          this.client.createSession(sessionConfig), SDK_TIMEOUT_MS, 'createSession (fallback)',
+          this.client.createSession({ ...sessionConfig, sessionId: this.flightdeckSessionId }), SDK_TIMEOUT_MS, 'createSession (fallback)',
         );
         this.sdkSessionId = this.session.sessionId;
+        this.emit('session_resume_failed', {
+          requestedSessionId: opts.sessionId,
+          newSessionId: this.flightdeckSessionId,
+          error: message,
+        });
       }
     } else {
       // New session: generate Flightdeck UUID immediately.
       this.flightdeckSessionId = randomUUID();
       this.session = await withTimeout(
-        this.client.createSession(sessionConfig), SDK_TIMEOUT_MS, 'createSession',
+        this.client.createSession({ ...sessionConfig, sessionId: this.flightdeckSessionId }), SDK_TIMEOUT_MS, 'createSession',
       );
       this.sdkSessionId = this.session.sessionId;
     }

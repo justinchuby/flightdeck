@@ -151,6 +151,14 @@ describe('CopilotSdkAdapter', () => {
       expect(mockClient.createSession).toHaveBeenCalledOnce();
     });
 
+    it('should pass flightdeck sessionId to createSession', async () => {
+      const sessionId = await adapter.start(defaultStartOpts());
+
+      expect(mockClient.createSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId }),
+      );
+    });
+
     it('should emit connected event', async () => {
       const connected = vi.fn();
       adapter.on('connected', connected);
