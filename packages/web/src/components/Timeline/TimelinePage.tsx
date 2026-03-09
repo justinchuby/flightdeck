@@ -307,7 +307,7 @@ export function TimelinePage({ api, ws }: Props) {
   }, [errorEntries, handleScrollToError]);
 
   return (
-    <div className="space-y-0 h-full flex flex-col timeline-container" role="region" aria-label="Team Collaboration Timeline">
+    <div className="space-y-0 h-full flex flex-col timeline-container" role="region" aria-label="Crew Collaboration Timeline">
       {/* Skip link for keyboard users */}
       <a href="#timeline-main" className="timeline-skip-link">
         Skip to timeline
@@ -335,7 +335,7 @@ export function TimelinePage({ api, ws }: Props) {
       <div className="p-6 space-y-4 flex-1 flex flex-col min-h-0">
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-th-text">Team Collaboration Timeline</h1>
+        <h1 className="text-2xl font-bold text-th-text">Crew Collaboration Timeline</h1>
         <div className="flex items-center gap-2 timeline-toolbar" role="toolbar" aria-label="Timeline page controls">
           <button
             onClick={() => setShowFilters(!showFilters)}

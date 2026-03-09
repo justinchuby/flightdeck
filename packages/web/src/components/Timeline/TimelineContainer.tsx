@@ -652,7 +652,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`}>
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Crew collaboration timeline showing ${sortedAgents.length} agents over time`}>
             {/* Idle hatch pattern */}
             <defs>
               <pattern id="idle-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

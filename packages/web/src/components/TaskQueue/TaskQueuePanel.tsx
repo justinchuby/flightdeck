@@ -85,12 +85,12 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
         </div>
       )}
 
-      {/* Team agents */}
+      {/* Crew agents */}
       {progress && progress.teamAgents.length > 0 && (
         <div>
           <div className="flex items-center gap-1 mb-1">
             <Users size={12} className="text-th-text-muted" />
-            <span className="text-xs text-th-text-muted font-medium">Team ({progress.teamSize})</span>
+            <span className="text-xs text-th-text-muted font-medium">Crew ({progress.teamSize})</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {progress.teamAgents.map((a) => (

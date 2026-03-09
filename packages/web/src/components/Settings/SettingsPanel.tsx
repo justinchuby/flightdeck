@@ -433,7 +433,7 @@ export function SettingsPanel({ api }: Props) {
         <a href="https://github.com/justinchuby" target="_blank" rel="noopener noreferrer" className="underline hover:text-th-text-alt transition-colors">
           @justinchuby
         </a>{' '}
-        and a team of AIs
+        and a crew of AIs
       </footer>
     </div>
     </div>

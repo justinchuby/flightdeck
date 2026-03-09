@@ -39,7 +39,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
       const task = newProjectTask.trim() || undefined;
       let fullTask = task;
       if (selectedRoles.size > 0) {
-        const teamHint = `\n\n[Initial Team] The user has pre-selected these roles for the initial team: ${Array.from(selectedRoles).join(', ')}. Please create these agents as your first action.`;
+        const teamHint = `\n\n[Initial Crew] The user has pre-selected these roles for the initial crew: ${Array.from(selectedRoles).join(', ')}. Please create these agents as your first action.`;
         fullTask = (task || '') + teamHint;
       }
       const data = await apiFetch<{ id?: string; projectId?: string }>('/lead/start', {
@@ -109,7 +109,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
               <textarea
                 value={newProjectTask}
                 onChange={(e) => setNewProjectTask(e.target.value)}
-                placeholder="Describe what you want the team to work on..."
+                placeholder="Describe what you want the crew to work on..."
                 rows={6}
                 className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500 resize-y"
               />
@@ -165,10 +165,10 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
                 />
               </div>
             </div>
-            {/* Initial Team Selection */}
+            {/* Initial Crew Selection */}
             {availableRoles.length > 0 && (
               <div>
-                <label className="block text-xs text-th-text-muted mb-1.5 font-medium">Initial Team <span className="text-th-text-muted">(optional — pre-select roles to auto-create)</span></label>
+                <label className="block text-xs text-th-text-muted mb-1.5 font-medium">Initial Crew <span className="text-th-text-muted">(optional — pre-select roles to auto-create)</span></label>
                 <div className="flex flex-wrap gap-1.5">
                   {availableRoles.map((role) => {
                     const isSelected = selectedRoles.has(role.id);

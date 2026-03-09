@@ -54,10 +54,10 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
             </div>
           )}
 
-          {/* Agent team roster */}
+          {/* Agent crew roster */}
           {progress && progress.teamAgents && progress.teamAgents.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-th-text-muted mb-2">Team Roster</p>
+              <p className="text-xs font-semibold text-th-text-muted mb-2">Crew Roster</p>
               <div className="space-y-1">
                 {progress.teamAgents.map((ta: LeadProgress['teamAgents'][number]) => (
                   <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-th-bg-muted/50 text-xs font-mono">
