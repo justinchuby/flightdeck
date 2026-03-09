@@ -83,3 +83,11 @@ export function relativeTime(iso: string): string {
     return iso;
   }
 }
+
+/** Format token count in compact form: 1.2k, 45.3k, 1.2M */
+export function formatTokens(count: number | undefined | null): string {
+  if (count == null || count === 0) return '0';
+  if (count < 1_000) return String(count);
+  if (count < 1_000_000) return `${(count / 1_000).toFixed(1)}k`;
+  return `${(count / 1_000_000).toFixed(1)}M`;
+}

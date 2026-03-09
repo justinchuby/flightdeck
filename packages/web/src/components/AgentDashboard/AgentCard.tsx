@@ -4,6 +4,7 @@ import type { AgentInfo } from '../../types';
 import { RefreshCw, Square, Terminal, Zap, Check, Play } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { formatTokens } from '../../utils/format';
 import { DiffBadge } from '../DiffPreview';
 
 interface Props {
@@ -205,6 +206,33 @@ export function AgentCard({ agent, api }: Props) {
           </div>
         );
       })()}
+
+      {/* Token metrics & context window bar */}
+      {(agent.inputTokens || agent.outputTokens || agent.contextWindowUsed) ? (
+        <div className="mt-1.5 space-y-1">
+          {(agent.inputTokens || agent.outputTokens) ? (
+            <div className="flex items-center gap-2 text-[10px] text-th-text-muted">
+              <span title="Input tokens">↓{formatTokens(agent.inputTokens)}</span>
+              <span title="Output tokens">↑{formatTokens(agent.outputTokens)}</span>
+              {(agent.cacheReadTokens != null && agent.cacheReadTokens > 0) && (
+                <span title="Cache read tokens" className="text-green-500/70">⚡{formatTokens(agent.cacheReadTokens)}</span>
+              )}
+            </div>
+          ) : null}
+          {agent.contextWindowSize && agent.contextWindowUsed ? (() => {
+            const pct = Math.min(100, Math.round((agent.contextWindowUsed / agent.contextWindowSize) * 100));
+            const color = pct > 85 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : 'bg-blue-500';
+            return (
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 bg-th-bg-muted rounded-full h-1">
+                  <div className={`${color} h-1 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[10px] text-th-text-muted">{pct}%</span>
+              </div>
+            );
+          })() : null}
+        </div>
+      ) : null}
 
       {agent.outputPreview && (
         <div className="relative mt-2">
