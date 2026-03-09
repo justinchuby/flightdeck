@@ -307,7 +307,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-dev1', lastTaskSummary: 'build UI', metadata: { parentId: 'old-lead' } },
       { agentId: 'rev-1', role: 'code-reviewer', model: 'gpt-4', projectId: 'proj-1', sessionId: null, lastTaskSummary: null, metadata: { parentId: 'old-lead' } },
-      { agentId: 'sec-1', role: 'secretary', model: 'claude', projectId: 'proj-1', sessionId: null, metadata: { parentId: 'old-lead' } },
+      { agentId: 'sec-1', role: 'secretary', model: 'claude', projectId: 'proj-1', sessionId: 'ses-sec1', metadata: { parentId: 'old-lead' } },
     ]);
 
     const res = await fetch(`${baseUrl}/projects/proj-1/resume`, {
@@ -317,8 +317,8 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    // Secretary excluded, so 2 agents to respawn
-    expect(body.respawning).toBe(2);
+    // Secretary now included in resume list
+    expect(body.respawning).toBe(3);
 
     // Lead spawned immediately
     expect(mockSpawn).toHaveBeenCalledTimes(1);
@@ -328,12 +328,19 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     expect(mockSpawn).toHaveBeenCalledTimes(2);
     vi.advanceTimersByTime(2000); // second at 8s
     expect(mockSpawn).toHaveBeenCalledTimes(3);
+    vi.advanceTimersByTime(2000); // third (secretary) at 10s
+    expect(mockSpawn).toHaveBeenCalledTimes(4);
 
     // Verify respawned agents got correct params
     const secondCall = mockSpawn.mock.calls[1];
     expect(secondCall[0].id).toBe('developer'); // role
     expect(secondCall[2]).toBe('new-lead-1');    // parentId = new lead
     expect(secondCall[6]).toBe('ses-dev1');       // resumeSessionId
+
+    // Verify secretary resumed with session ID
+    const secretaryCall = mockSpawn.mock.calls[3];
+    expect(secretaryCall[0].id).toBe('secretary');
+    expect(secretaryCall[6]).toBe('ses-sec1');    // resumeSessionId
 
     vi.useRealTimers();
   });

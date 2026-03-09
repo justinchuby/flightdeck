@@ -757,11 +757,9 @@ export function projectsRoutes(ctx: AppContext): Router {
 
       logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });
 
-      // Auto-spawn Secretary for DAG tracking (skips if one exists)
-      agentManager.autoSpawnSecretary(agent);
-
       // Team respawn: bring back agents from last session (unless freshStart)
       let respawnedCount = 0;
+      let secretaryResumed = false;
       if (!freshStart && agentRoster) {
         const sessions = projectRegistry.getSessions(project.id);
         // Find last completed session (skip current active one we just created)
@@ -806,7 +804,13 @@ export function projectsRoutes(ctx: AppContext): Router {
             }, 6000 + i * 2000);
           }
           respawnedCount = toResume.length;
+          secretaryResumed = toResume.some((a) => a.role === 'secretary');
         }
+      }
+
+      // Auto-spawn Secretary for DAG tracking — only if not already resumed from previous session
+      if (!secretaryResumed) {
+        agentManager.autoSpawnSecretary(agent);
       }
 
       res.status(201).json({ ...agent.toJSON(), respawning: respawnedCount });
