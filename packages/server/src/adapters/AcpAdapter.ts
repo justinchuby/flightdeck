@@ -144,8 +144,17 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           SDK_TIMEOUT_MS, 'loadSession',
         );
         sessionId = loadResult.sessionId;
-      } catch {
-        // Fallback to new session if session/load is not supported
+      } catch (err) {
+        // Intentional fallback: if resume fails for any reason (provider doesn't
+        // support it, session expired, network error), start a fresh session.
+        // Log the failure so operators can diagnose resume issues.
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn({
+          module: 'acp',
+          msg: 'Session resume failed, falling back to new session',
+          requestedSessionId: opts.sessionId,
+          error: message,
+        });
         const newResult = await withTimeout(
           this.connection!.newSession({
             cwd: opts.cwd || process.cwd(),
@@ -154,6 +163,11 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           SDK_TIMEOUT_MS, 'newSession (fallback)',
         );
         sessionId = newResult.sessionId;
+        this.emit('session_resume_failed', {
+          requestedSessionId: opts.sessionId,
+          newSessionId: sessionId,
+          error: message,
+        });
       }
     } else {
       const sessionResult = await withTimeout(

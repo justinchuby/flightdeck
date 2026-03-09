@@ -230,6 +230,9 @@ describe('AcpAdapter', () => {
       mockLoadSession.mockRejectedValue(new Error('session/load not supported'));
 
       const adapter = new AcpAdapter();
+      const resumeFailedHandler = vi.fn();
+      adapter.on('session_resume_failed', resumeFailedHandler);
+
       const sessionId = await adapter.start({
         ...DEFAULT_START_OPTS,
         sessionId: 'dead-session',
@@ -237,6 +240,17 @@ describe('AcpAdapter', () => {
 
       expect(mockNewSession).toHaveBeenCalled();
       expect(sessionId).toBe('fallback-session');
+      expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({
+        module: 'acp',
+        msg: 'Session resume failed, falling back to new session',
+        requestedSessionId: 'dead-session',
+        error: 'session/load not supported',
+      }));
+      expect(resumeFailedHandler).toHaveBeenCalledWith({
+        requestedSessionId: 'dead-session',
+        newSessionId: 'fallback-session',
+        error: 'session/load not supported',
+      });
     });
 
     it('reads agent capabilities from initialize result', async () => {
