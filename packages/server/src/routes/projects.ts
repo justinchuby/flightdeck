@@ -674,7 +674,7 @@ export function projectsRoutes(ctx: AppContext): Router {
   // Resume a project — starts a new lead session with project context + message history
   router.post('/projects/:id/resume', spawnLimiter, (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
-    const project = projectRegistry.get(req.params.id);
+    const project = projectRegistry.get(String(req.params.id));
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
