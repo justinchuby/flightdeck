@@ -10,7 +10,7 @@ Flightdeck ships with 13 specialist roles. The Project Lead automatically select
 | Developer | 💻 | Code implementation, tests | Claude Opus 4.6 |
 | Architect | 🏗️ | System design, challenges problem framing | Claude Opus 4.6 |
 | Code Reviewer | 📖 | Readability, maintainability, patterns | Gemini 3 Pro |
-| Critical Reviewer | 🛡️ | Security, performance, edge cases | Gemini 3 Pro |
+| Critical Reviewer | 🛡️ | Secure-by-design review, performance, edge cases | Gemini 3 Pro |
 | Product Manager | 🎯 | User needs, product quality, UX | GPT-5.3 Codex |
 | Technical Writer | 📝 | Documentation, API design review | GPT-5.2 |
 | Designer | 🎨 | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
@@ -25,7 +25,7 @@ Flightdeck ships with 13 specialist roles. The Project Lead automatically select
 - **Developer** — The workhorse. Use for any coding task: implementing features, writing tests, fixing bugs, refactoring.
 - **Architect** — Use early in a project for system design, or when a Developer is stuck on a structural decision. Architects challenge problem framing and propose alternatives.
 - **Code Reviewer** — Automatically assigned after code changes. Focuses on readability and patterns — catches the "this works but is hard to maintain" issues.
-- **Critical Reviewer** — The skeptic. Use for security-sensitive code, performance-critical paths, or when you need someone to find edge cases others missed.
+- **Critical Reviewer** — The skeptic. Operates with a **secure-by-design** principle: security is a structural requirement, not an afterthought. Use for security-sensitive code, performance-critical paths, or when you need someone to find edge cases others missed.
 - **Product Manager** — Use when the team needs to prioritize features or think about user experience. Good for reviewing API designs from a consumer's perspective.
 - **Technical Writer** — Ensures documentation stays accurate. Also reviews API design — if something is hard to document, it's probably too complex.
 - **Designer** — Use for UI/UX work, accessibility reviews, or interaction design. Thinks about the human experience.
@@ -34,6 +34,8 @@ Flightdeck ships with 13 specialist roles. The Project Lead automatically select
 - **Radical Thinker** — Deliberately challenges conventional approaches. Useful when the team is stuck or when you want fresh perspectives.
 - **Secretary** — Tracks progress, maintains checklists, provides status reports. Created automatically for projects using the task DAG.
 - **Agent** — A blank-slate role with no specialized instructions. Use when you want an agent that just follows the system prompt you provide.
+
+> **AI-Aware Estimation:** A crew of AI agents compresses timelines dramatically — weeks of work become hours. Plan in sessions (30 min – 2 hours), not sprints. A 10-agent session resolved 8 sub-issues across 6 GitHub issues in ~15 minutes. The bottleneck is coordination (lock contention, review cycles), not implementation speed.
 
 ## Model Diversity
 

@@ -7,6 +7,15 @@ description: Proven collaboration patterns for flightdeck-based multi-agent crew
 
 Extracted from a 10-agent session that resolved 8 sub-issues across 6 GitHub issues in ~15 minutes with 966+ tests passing (retrospective #36).
 
+## AI-Aware Estimation
+
+Traditional human estimates don't apply to AI agent crews. Calibrate accordingly:
+- A task a single developer estimates at **2 weeks** may take a 10-agent crew **2–4 hours**.
+- Most issues can be resolved in a **single session** with proper architect-first mapping and parallel execution.
+- The bottleneck is usually **coordination overhead** (lock contention, review cycles), not raw implementation time.
+- When planning, think in **sessions** (30 min – 2 hours), not sprints or weeks.
+- A 10-agent session resolved 8 sub-issues across 6 GitHub issues in ~15 minutes (retrospective #36).
+
 ## When This Doesn't Apply
 
 - Solo agent tasks or 2-agent sessions — these patterns add overhead that isn't justified.
@@ -47,7 +56,7 @@ Be aware of these constraints when applying the patterns below:
 
 **What:** Use three reviewers with different focuses:
 - **Code Reviewer:** "Does it work? Does it match the requirements? Are patterns and conventions followed? Are there DRY violations or hardcoded lists that duplicate a registry?"
-- **Critical Reviewer:** "What breaks? What are the edge cases, security implications, and failure modes? Are there maintainability risks like data defined in two places that could drift?"
+- **Critical Reviewer:** "What breaks? What are the edge cases, security implications, and failure modes? Are there maintainability risks like data defined in two places that could drift?" Operates with a **secure-by-design** principle — security is not an afterthought but a structural requirement reviewed in every change.
 - **Readability Reviewer:** "Is the code clear and self-documenting? Are names descriptive? Are error messages helpful? Is reference data (help text, command lists) co-located with its definition?"
 
 **Why it works:** In the retro, the code reviewer approved both initial implementations. The critical reviewer then found a **P0 blocker** the code reviewer missed: the frontend `AgentStatus` type didn't include `'terminated'`, meaning the server would emit a status the frontend couldn't handle. Adding a readability reviewer catches a third class of issues — code that works correctly and securely but is hard to maintain, poorly named, or lacking helpful error messages.

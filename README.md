@@ -225,7 +225,7 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 | **Developer** | 💻 | Code implementation, tests, bug fixes | Claude Opus 4.6 |
 | **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | Claude Opus 4.6 |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
-| **Critical Reviewer** | 🛡️ | Security, performance, edge cases | Gemini 3 Pro |
+| **Critical Reviewer** | 🛡️ | Secure-by-design review, performance, edge cases | Gemini 3 Pro |
 | **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.3 Codex |
 | **Technical Writer** | 📝 | Documentation, API design review, developer experience | GPT-5.2 |
 | **Designer** | 🎨 | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
@@ -236,6 +236,8 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 | **Agent** | ⚙️ | Neutral general-purpose agent, no role-specific instructions | CLI default |
 
 Custom roles can be created via the Settings UI with your own system prompts, colors, and icons.
+
+> **AI-Aware Estimation:** Traditional human timelines don't apply. A crew of AI agents can compress weeks of work into hours. Plan in sessions (30 min – 2 hours), not sprints. See the [agent-collaboration-patterns](.github/skills/agent-collaboration-patterns/SKILL.md) skill for calibration data.
 
 ## ACP Command Reference
 
