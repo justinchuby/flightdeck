@@ -19,7 +19,12 @@ import { formatDateTime } from '../../utils/format';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
 import { SessionHistory, NewSessionDialog } from '../SessionHistory';
-import { detectAlerts, type Alert, type AlertSeverity } from '../MissionControl/AlertsPanel';
+import { detectAlerts, type AlertSeverity } from '../MissionControl/AlertsPanel';
+import {
+  DecisionFeedItem,
+  DecisionDetailModal,
+} from '../Shared';
+import type { ActivityEntry } from '../Shared';
 import {
   Square,
   Plus,
@@ -28,39 +33,17 @@ import {
   Crown,
   Loader2,
   AlertTriangle,
-  ChevronRight,
-  CheckCircle2,
-  XCircle,
 } from 'lucide-react';
 import type { Decision, DagStatus } from '../../types';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const DECISION_CATEGORY_ICONS: Record<string, string> = {
-  architecture: '🏗️',
-  dependency: '📦',
-  style: '🎨',
-  tool_access: '🔧',
-  testing: '🧪',
-  general: '💡',
-};
-
 const SEVERITY_BG: Record<AlertSeverity, string> = {
   critical: 'bg-red-500/10 border border-red-500/20',
   warning: 'bg-amber-500/10 border border-amber-500/20',
   info: 'bg-blue-500/10 border border-blue-500/20',
 };
-
-interface ActivityEntry {
-  id: number;
-  agentId: string;
-  agentRole: string;
-  actionType: string;
-  summary: string;
-  timestamp: string;
-  projectId: string;
-}
 
 /** Unified progress item — merges activity feed with milestone keyframes */
 interface ProgressItem {
@@ -95,6 +78,14 @@ export function OverviewPage(_props: Props) {
     if (lead) return lead.projectId || lead.id;
     return projects.length > 0 ? projects[0].id : null;
   }, [selectedLeadId, agents, projects]);
+
+  const projectName = useMemo(() => {
+    if (!effectiveId) return '';
+    const proj = projects.find(p => p.id === effectiveId);
+    if (proj) return proj.name;
+    const lead = agents.find(a => a.projectId === effectiveId && a.role?.id === 'lead');
+    return lead?.projectName ?? effectiveId.slice(0, 12);
+  }, [effectiveId, projects, agents]);
 
   const hasActiveLead = useMemo(() => {
     return agents.some(a => a.role?.id === 'lead' && a.projectId === effectiveId &&
@@ -351,34 +342,14 @@ export function OverviewPage(_props: Props) {
             <p className="text-zinc-500 text-sm px-4 py-6 text-center">No decisions yet</p>
           ) : (
             <div className="divide-y divide-th-border/30">
-              {(actionableDecisions.length > 0 ? actionableDecisions : decisions).slice(0, 6).map(d => {
-                const icon = DECISION_CATEGORY_ICONS[d.category] ?? '💡';
-                const statusIcon = d.status === 'confirmed'
-                  ? <CheckCircle2 className="w-3 h-3 text-green-400" />
-                  : d.status === 'rejected'
-                    ? <XCircle className="w-3 h-3 text-red-400" />
-                    : <Clock className="w-3 h-3 text-th-text-muted" />;
-                return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    className="flex items-start gap-2.5 px-3 py-2 w-full text-left hover:bg-th-bg-hover/30 transition-colors cursor-pointer"
-                    onClick={() => setSelectedDecision(d)}
-                  >
-                    <span className="text-sm shrink-0 mt-0.5">{icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {statusIcon}
-                        <span className="text-xs text-th-text-alt truncate">{d.title}</span>
-                      </div>
-                      <div className="text-[10px] text-th-text-muted mt-0.5">
-                        {d.agentRole} · {formatRelativeTime(d.timestamp)}
-                      </div>
-                    </div>
-                    <ChevronRight className="w-3 h-3 text-th-text-muted/50 shrink-0 mt-1" />
-                  </button>
-                );
-              })}
+              {(actionableDecisions.length > 0 ? actionableDecisions : decisions).slice(0, 6).map(d => (
+                <DecisionFeedItem
+                  key={d.id}
+                  decision={d}
+                  projectName={projectName}
+                  onClick={() => setSelectedDecision(d)}
+                />
+              ))}
               {(actionableDecisions.length > 6 || decisions.length > 6) && (
                 <div className="px-4 py-2 text-center">
                   <span className="text-[10px] text-zinc-500">
@@ -434,7 +405,11 @@ export function OverviewPage(_props: Props) {
 
       {/* Decision Detail Modal */}
       {selectedDecision && (
-        <DecisionDetailInline decision={selectedDecision} onClose={() => setSelectedDecision(null)} />
+        <DecisionDetailModal
+          decision={selectedDecision}
+          projectName={projectName}
+          onClose={() => setSelectedDecision(null)}
+        />
       )}
 
       {/* New Session Dialog */}
@@ -445,71 +420,6 @@ export function OverviewPage(_props: Props) {
           onStarted={() => setShowNewSessionDialog(false)}
         />
       )}
-    </div>
-  );
-}
-
-// ── Inline Decision Detail (lightweight, no shared component dependency) ──
-
-function DecisionDetailInline({ decision, onClose }: { decision: Decision; onClose: () => void }) {
-  const icon = DECISION_CATEGORY_ICONS[decision.category] ?? '💡';
-  const statusLabels: Record<string, { label: string; color: string }> = {
-    confirmed: { label: 'Confirmed', color: 'text-green-400' },
-    rejected: { label: 'Rejected', color: 'text-red-400' },
-    recorded: { label: 'Recorded', color: 'text-th-text-muted' },
-    dismissed: { label: 'Dismissed', color: 'text-yellow-400' },
-  };
-  const statusInfo = statusLabels[decision.status] ?? statusLabels.recorded;
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
-      data-testid="decision-detail-modal"
-    >
-      <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-md">
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-th-border">
-          <span className="text-base">{icon}</span>
-          <h2 className="text-sm font-semibold text-th-text flex-1">Decision Detail</h2>
-          <button type="button" onClick={onClose} className="text-th-text-muted hover:text-th-text text-sm">✕</button>
-        </div>
-        <div className="px-5 py-4 space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
-          <div>
-            <div className="text-xs text-th-text-muted mb-0.5">Title</div>
-            <div className="text-sm text-th-text">{decision.title}</div>
-          </div>
-          {decision.rationale && (
-            <div>
-              <div className="text-xs text-th-text-muted mb-0.5">Rationale</div>
-              <div className="text-sm text-th-text whitespace-pre-wrap">{decision.rationale}</div>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-th-text-muted mb-0.5">Status</div>
-              <span className={`text-sm font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
-            </div>
-            <div>
-              <div className="text-xs text-th-text-muted mb-0.5">Made by</div>
-              <span className="text-sm text-th-text">{decision.agentRole}</span>
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-th-text-muted mb-0.5">Timestamp</div>
-            <span className="text-xs text-th-text">{new Date(decision.timestamp).toLocaleString()}</span>
-          </div>
-          <div className="flex gap-3 text-xs text-th-text-muted pt-1 border-t border-th-border/50">
-            {decision.autoApproved && <span>✓ Auto-approved</span>}
-            {decision.needsConfirmation && <span>⚠ Requires confirmation</span>}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
