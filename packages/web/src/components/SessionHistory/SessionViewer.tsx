@@ -1,8 +1,8 @@
 /**
  * SessionViewer — read-only slide-over panel showing a past session's
- * full conversation log. Fetched from GET /api/sessions/:leadId/messages.
+ * full conversation log. Fetched from GET /api/agents/:leadId/messages.
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Clock, MessageSquare, User, Bot, Terminal } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { formatDateTime } from '../../utils/format';
@@ -61,18 +61,30 @@ function senderBubbleClass(sender: string): string {
   }
 }
 
+const MESSAGE_FETCH_LIMIT = 1000;
+
 export function SessionViewer({ session, onClose }: SessionViewerProps) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Close on Escape key
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         const data = await apiFetch<{ messages: ThreadMessage[] }>(
-          `/sessions/${session.leadId}/messages?limit=1000`,
+          `/agents/${session.leadId}/messages?limit=${MESSAGE_FETCH_LIMIT}`,
         );
         if (!cancelled) {
           setMessages(data.messages);
@@ -81,9 +93,9 @@ export function SessionViewer({ session, onClose }: SessionViewerProps) {
             if (!cancelled) scrollRef.current?.scrollTo?.({ top: scrollRef.current.scrollHeight });
           });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(err.message || 'Failed to load messages');
+          setError(err instanceof Error ? err.message : 'Failed to load messages');
           setLoading(false);
         }
       }

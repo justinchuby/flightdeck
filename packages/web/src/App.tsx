@@ -12,7 +12,7 @@ import { InstallPrompt } from './components/Mobile';
 import { OfflineBanner } from './components/Mobile';
 
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
-import { LeadDashboard } from './components/LeadDashboard';
+import { LeadDashboard, ReadOnlySession } from './components/LeadDashboard';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
@@ -349,6 +349,7 @@ export function App() {
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<RouteErrorBoundary name="Overview"><OverviewPage api={api} ws={ws} /></RouteErrorBoundary>} />
               <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession api={api} ws={ws} /></RouteErrorBoundary>} />
               <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel api={api} /></RouteErrorBoundary>} />
               <Route path="agents" element={<RouteErrorBoundary name="Agents"><CrewPage /></RouteErrorBoundary>} />
               <Route path="knowledge" element={<RouteErrorBoundary name="Knowledge"><KnowledgePanel /></RouteErrorBoundary>} />

@@ -1,4 +1,5 @@
 export { LeadDashboard } from './LeadDashboard';
+export { ReadOnlySession } from './ReadOnlySession';
 export { InputComposer } from './InputComposer';
 export { ChatMessages } from './ChatMessages';
 export { SidebarTabs } from './SidebarTabs';

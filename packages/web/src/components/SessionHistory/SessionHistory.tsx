@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
 import { formatDateTime } from '../../utils/format';
 import {
@@ -10,6 +11,7 @@ import {
   AlertCircle,
   Play,
   ListChecks,
+  Eye,
 } from 'lucide-react';
 import { ResumeSessionDialog } from './ResumeSessionDialog';
 
@@ -66,6 +68,7 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [resumeSession, setResumeSession] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -175,17 +178,27 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
                     )}
                   </div>
 
-                  {/* Resume button */}
-                  {session.status !== 'active' && !hasActiveLead && (
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setResumeSession(session)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium"
+                      onClick={() => navigate(`/projects/${projectId}/sessions/${session.leadId}`)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-th-bg-muted/50 text-th-text-muted rounded-md hover:bg-th-bg-muted hover:text-th-text transition-colors font-medium"
                     >
-                      <Play size={12} />
-                      Resume from this session
+                      <Eye size={12} />
+                      View full session
                     </button>
-                  )}
+                    {session.status !== 'active' && !hasActiveLead && (
+                      <button
+                        type="button"
+                        onClick={() => setResumeSession(session)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-md hover:bg-accent/30 transition-colors font-medium"
+                      >
+                        <Play size={12} />
+                        Resume from this session
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

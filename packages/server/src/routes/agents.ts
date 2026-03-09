@@ -117,10 +117,12 @@ export function agentsRoutes(ctx: AppContext): Router {
   // Get message history for an agent (persisted across refreshes)
   router.get('/agents/:id/messages', (req, res) => {
     const limit = Math.min(parseInt(String(req.query.limit) || '200', 10) || 200, 1000);
+    const includeSystem = req.query.includeSystem === 'true';
     const agentId = req.params.id as string;
 
     // Get messages for this agent
     let messages = agentManager.getMessageHistory(agentId, limit);
+    let fromPriorSession = false;
 
     // For resumed sessions: also include messages from prior sessions of the same project
     if (messages.length === 0 && ctx.projectRegistry) {
@@ -128,21 +130,27 @@ export function agentsRoutes(ctx: AppContext): Router {
       const projectId = agent?.projectId;
       if (projectId) {
         const sessions = ctx.projectRegistry.getSessions(projectId);
-        // Find prior session lead IDs (excluding current agent)
+        // Sessions are ordered by recency (newest first from getSessions)
         const priorLeadIds = sessions
           .map(s => s.leadId)
           .filter(id => id !== agentId);
         for (const leadId of priorLeadIds) {
           const prior = agentManager.getMessageHistory(leadId, limit);
           if (prior.length > 0) {
-            messages = [...prior, ...messages];
-            break; // most recent prior session is enough
+            messages = prior;
+            fromPriorSession = true;
+            break;
           }
         }
       }
     }
 
-    res.json({ agentId, messages });
+    // Filter out system messages by default (they contain internal prompts/context)
+    if (!includeSystem) {
+      messages = messages.filter(m => m.sender !== 'system');
+    }
+
+    res.json({ agentId, messages, fromPriorSession });
   });
 
   router.post('/agents/:id/input', validateBody(agentInputSchema), (req, res) => {

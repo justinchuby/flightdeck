@@ -97,7 +97,7 @@ describe('ReadOnlySession', () => {
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/agents/lead-abc-123/messages?limit=1000',
+        '/api/agents/lead-abc-123/messages?limit=1000&includeSystem=true',
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
     });
@@ -108,7 +108,7 @@ describe('ReadOnlySession', () => {
 
     await waitFor(() => {
       const urls = mockFetch.mock.calls.map((c: any[]) => c[0]);
-      expect(urls).toContain('/api/agents/lead-abc-123/messages?limit=1000');
+      expect(urls).toContain('/api/agents/lead-abc-123/messages?limit=1000&includeSystem=true');
       expect(urls).toContain('/api/lead/lead-abc-123/decisions');
       expect(urls).toContain('/api/lead/lead-abc-123/groups');
       expect(urls).toContain('/api/lead/lead-abc-123/dag');

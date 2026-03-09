@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, MessageSquare, GitBranch, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, Download, FolderOpen } from 'lucide-react';
+import { Crown, MessageSquare, GitBranch, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, Download, FolderOpen, Eye } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
@@ -36,9 +36,10 @@ const EMPTY_CREW_AGENTS: LeadProgress['crewAgents'] = [];
 interface Props {
   api: any;
   ws: any;
+  readOnly?: boolean;
 }
 
-export function LeadDashboard({ api, ws }: Props) {
+export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   const { projects, selectedLeadId, drafts } = useLeadStore(
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
@@ -178,8 +179,9 @@ export function LeadDashboard({ api, ws }: Props) {
   const leadAgent = agents.find((a) => a.id === selectedLeadId);
   const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
-  // On mount, load existing leads from server
+  // On mount, load existing leads from server (skip in read-only mode — data pre-loaded)
   useEffect(() => {
+    if (readOnly) return;
     const controller = new AbortController();
     // Load active leads
     fetch('/api/lead', { signal: controller.signal }).then((r) => r.json()).then((leads: any[]) => {
@@ -188,7 +190,7 @@ export function LeadDashboard({ api, ws }: Props) {
         leads.forEach((l) => {
           useLeadStore.getState().addProject(l.id);
           // Pre-load message history for each lead
-          fetch(`/api/agents/${l.id}/messages?limit=200`, { signal: controller.signal })
+          fetch(`/api/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
             .then((r) => r.json())
             .then((data: any) => {
               if (controller.signal.aborted) return;
@@ -223,8 +225,10 @@ export function LeadDashboard({ api, ws }: Props) {
     if (!selectedLeadId) return;
     chatInitialScroll.current = false; // reset so we scroll to bottom on lead change
 
-    // Subscribe to WS first — live data takes priority over HTTP
-    ws.subscribe(selectedLeadId);
+    // In read-only mode, skip WS — data is pre-loaded by ReadOnlySession wrapper
+    if (!readOnly) {
+      ws.subscribe(selectedLeadId);
+    }
 
     const controller = new AbortController();
     // Load persisted message history if we don't have any messages yet
@@ -234,7 +238,7 @@ export function LeadDashboard({ api, ws }: Props) {
       const isHistorical = selectedLeadId.startsWith('project:');
       const url = isHistorical
         ? `/api/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-        : `/api/agents/${selectedLeadId}/messages?limit=200`;
+        : `/api/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
       fetch(url, { signal: controller.signal })
         .then((r) => r.json())
         .then((data: any) => {
@@ -257,9 +261,9 @@ export function LeadDashboard({ api, ws }: Props) {
     }
     return () => {
       controller.abort();
-      ws.unsubscribe(selectedLeadId);
+      if (!readOnly) ws.unsubscribe(selectedLeadId);
     };
-  }, [selectedLeadId, ws]);
+  }, [selectedLeadId, ws, readOnly]);
 
   // Auto-scroll on new messages only if near bottom
   const chatInitialScroll = useRef(false);
@@ -286,8 +290,8 @@ export function LeadDashboard({ api, ws }: Props) {
     }
   }, [currentProject?.agentReports?.length, reportsExpanded]);
 
-  // Poll progress for selected lead (skip for project: prefixed IDs — those are persisted projects, not running agents)
-  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:');
+  // Poll progress for selected lead (skip for project: prefixed IDs and read-only mode)
+  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:') && !readOnly;
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const controller = new AbortController();
@@ -346,8 +350,8 @@ export function LeadDashboard({ api, ws }: Props) {
     return () => { controller.abort(); clearInterval(interval); };
   }, [selectedLeadId, historicalProjectId, isActiveAgent]);
 
-  // Listen for lead-specific WebSocket events
-  useLeadWebSocket(agents, historicalProjectId);
+  // Listen for lead-specific WebSocket events (skip in read-only mode)
+  useLeadWebSocket(readOnly ? [] : agents, readOnly ? null : historicalProjectId);
 
   // Sidebar resize handlers
   const startResize = useDragResize('x', sidebarWidth, setSidebarWidth, 200, 600, true);
@@ -679,7 +683,7 @@ export function LeadDashboard({ api, ws }: Props) {
             )}
 
             {/* Pending decisions banner */}
-            {pendingConfirmations.length > 0 && (
+            {pendingConfirmations.length > 0 && !readOnly && (
               <div className="border-b border-amber-700/50 bg-amber-900/30">
                 <button
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-600 dark:text-amber-200 hover:bg-amber-900/40 transition-colors"
@@ -730,18 +734,25 @@ export function LeadDashboard({ api, ws }: Props) {
               onScrollToBottom={handleScrollToBottom}
             />
 
-            <InputComposer
-              input={input}
-              onInputChange={setInput}
-              isActive={!!isActive}
-              selectedLeadId={selectedLeadId}
-              messages={messages}
-              attachments={attachments}
-              onRemoveAttachment={removeAttachment}
-              onSendMessage={sendMessage}
-              onRemoveQueuedMessage={removeQueuedMessage}
-              onReorderQueuedMessage={reorderQueuedMessage}
-            />
+            {readOnly ? (
+              <div className="border-t border-th-border px-4 py-2 bg-th-bg-alt/50 flex items-center gap-2 text-xs font-mono text-th-text-muted">
+                <Eye className="w-3.5 h-3.5 shrink-0" />
+                <span>Viewing past session — read-only</span>
+              </div>
+            ) : (
+              <InputComposer
+                input={input}
+                onInputChange={setInput}
+                isActive={!!isActive}
+                selectedLeadId={selectedLeadId}
+                messages={messages}
+                attachments={attachments}
+                onRemoveAttachment={removeAttachment}
+                onSendMessage={sendMessage}
+                onRemoveQueuedMessage={removeQueuedMessage}
+                onReorderQueuedMessage={reorderQueuedMessage}
+              />
+            )}
           </div>
 
           <SidebarTabs
@@ -764,7 +775,7 @@ export function LeadDashboard({ api, ws }: Props) {
             }}
             decision={{
               decisions,
-              pendingConfirmations,
+              pendingConfirmations: readOnly ? [] : pendingConfirmations,
               panelHeight: decisionsPanelHeight,
               onResize: startDecisionsResize,
               onConfirm: handleConfirmDecision,
