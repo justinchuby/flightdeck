@@ -403,6 +403,12 @@ export function useWebSocket() {
           window.dispatchEvent(new CustomEvent('attention:changed'));
           break;
         }
+        case 'agent:session_resume_failed': {
+          const agentId = (msg.agentId ?? '').slice(0, 8);
+          const error = msg.error ?? 'Unknown error';
+          useToastStore.getState().add('error', `Session resume failed (agent ${agentId}): ${error}`);
+          break;
+        }
       }
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);
