@@ -85,7 +85,7 @@ export class ProjectRegistry {
   }
 
   /** Mark a lead session as ended */
-  endSession(leadId: string, status: 'completed' | 'crashed' = 'completed'): void {
+  endSession(leadId: string, status: 'completed' | 'crashed' | 'stopped' = 'completed'): void {
     this.db.drizzle.update(projectSessions).set({
       status,
       endedAt: new Date().toISOString(),

@@ -47,7 +47,7 @@ Review for:
 - Doc freshness: When deliverables change, flag if related documentation wasn't updated to match. This applies to any project type — not just code.
 - Agent-friendliness: Searchable names, self-documenting code, predictable file structure
 
-For every piece of code you review, ask: does this need to exist, or does it exist because nobody questioned it?
+Design-level thinking: Don't just verify the implementation is correct — question whether the design is correct. For every piece of code you review, ask: does this need to exist, or does it exist because nobody questioned it?
 - When reviewing a fix, check call sites — is this solving the actual problem, or compensating for a wrong assumption elsewhere?
 - When a function accepts a value that could cause corruption if wrong, ask: could the function derive this value itself instead of trusting the caller?
 
@@ -83,7 +83,7 @@ Review for:
 - Code health: Does this change improve or degrade the overall system? Don't accept changes that make the system worse, even small ones — complexity accumulates.
 - Failure modes: What happens when dependencies are down? What if the input is 10x larger than expected? What about race conditions?
 
-For every piece of code you review, ask: does this need to exist, or does it exist because nobody questioned it?
+Design-level thinking: Don't just verify the implementation is correct — question whether the design is correct. For every piece of code you review, ask: does this need to exist, or does it exist because nobody questioned it?
 - When a fix requires callers to coordinate carefully (do X before Y), ask: could the interface make the wrong order impossible?
 - When a parameter has the same value at every call site, ask: should this be a parameter at all, or a fixed design decision disguised as flexibility?
 - When code works only because callers follow an unwritten rule, ask: is this invariant enforced structurally, or one careless caller away from breaking?
@@ -121,7 +121,7 @@ Review for:
 - Consistency: Does this code follow the patterns and conventions of the existing codebase? Naming style, error handling patterns, file organization, API design — new code should look like it belongs.
 - Co-location: Is reference data (help text, command lists, enum descriptions) co-located with its definition? Flag data maintained separately from its source of truth.
 
-For every piece of code you review, ask: does this need to exist, or does it exist because nobody questioned it?
+Design-level thinking: Don't just verify the implementation is correct — question whether the design is correct. For every piece of code you review, ask: does this need to exist, or does it exist because nobody questioned it?
 - When a name needs qualifiers (newX vs currentX vs originalX), ask: should the concept be mutable at all? Multiple adjectives on the same noun suggest the noun is doing too much.
 - When understanding a function requires reading its implementation, ask: what would a new team member assume from just the signature? If the signature implies something the design forbids, the signature is misleading.
 
