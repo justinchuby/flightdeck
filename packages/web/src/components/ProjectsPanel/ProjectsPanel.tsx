@@ -465,8 +465,9 @@ export function ProjectsPanel() {
         } else {
           await fetchProjects();
         }
-      } catch (err: any) {
-        addToast('error', `Failed to resume: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        addToast('error', `Failed to resume: ${msg}`);
       }
     },
     [addToast, fetchProjects, navigate],

@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
-import { Play, Loader2, Users, UserPlus, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Play, Loader2, Users, UserPlus, Sparkles, CheckCircle2, AlertTriangle, Plus } from 'lucide-react';
+import { ProvideFeedback } from '../ProvideFeedback';
 import type { SessionDetail, SessionAgent } from './SessionHistory';
 
 type ResumeMode = 'resume-all' | 'select' | 'fresh';
@@ -101,8 +102,8 @@ export function ResumeSessionDialog({ projectId, lastSession, onClose, onResume 
       if (response?.id) {
         navigate(`/projects/${projectId}`);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to resume project');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to resume project');
     } finally {
       setResuming(false);
     }
@@ -205,8 +206,23 @@ export function ResumeSessionDialog({ projectId, lastSession, onClose, onResume 
 
           {/* Error */}
           {error && (
-            <div className="text-xs text-red-400 bg-red-500/10 rounded-md px-3 py-2">
-              {error}
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-3 space-y-2" data-testid="resume-error">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={14} className="text-red-400 mt-0.5 shrink-0" />
+                <div className="text-xs text-red-400">
+                  <span className="font-medium">Unable to resume session.</span>{' '}
+                  {error}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pl-5">
+                <ProvideFeedback
+                  context={{
+                    title: 'Session resume failed',
+                    errorMessage: error,
+                    sessionId: lastSession.leadId,
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>

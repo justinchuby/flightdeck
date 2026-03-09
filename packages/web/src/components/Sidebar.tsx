@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, FolderOpen, Users, Bot, Settings, Plus } from 'lucide-react';
 import { NewProjectModal } from './LeadDashboard/NewProjectModal';
+import { SubmitIssueButton } from './ProvideFeedback';
 
 function NavItem({ to, icon: Icon, label, badge, end }: {
   to: string; icon: any; label: string; badge?: number | null; end?: boolean;
@@ -54,6 +55,7 @@ export function Sidebar() {
       </button>
 
       <div className="flex-1" />
+      <SubmitIssueButton />
       <NavItem to="/settings" icon={Settings} label="Settings" />
 
       {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}

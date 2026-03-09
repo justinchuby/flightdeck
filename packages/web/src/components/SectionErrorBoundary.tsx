@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
+import { ProvideFeedback } from './ProvideFeedback';
 
 interface Props {
   children: ReactNode;
@@ -56,14 +57,23 @@ export class SectionErrorBoundary extends Component<Props, State> {
           <p className="text-sm text-th-text-muted">
             {this.props.name ? `${this.props.name} encountered an error.` : 'This section encountered an error.'}
           </p>
-          <button
-            type="button"
-            onClick={this.handleRetry}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors"
-          >
-            <RefreshCw size={12} />
-            Retry
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={this.handleRetry}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors"
+            >
+              <RefreshCw size={12} />
+              Retry
+            </button>
+            <ProvideFeedback
+              variant="button"
+              context={{
+                title: `Error in ${this.props.name ?? 'section'}`,
+                errorMessage: this.state.error?.message,
+              }}
+            />
+          </div>
         </div>
       );
     }
