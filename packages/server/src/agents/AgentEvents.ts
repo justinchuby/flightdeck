@@ -5,8 +5,7 @@
 import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 
 /** Preamble appended to the system prompt when resuming a previous session */
-export const RESUME_PREAMBLE =
-  '[System] You are resuming from a previous session. Your conversation history has been restored, but the system prompt and crew roster above reflect the current state — agents, tasks, and files may have changed since your last session. When your history conflicts with the current system prompt, trust the system prompt.';
+export const RESUME_PREAMBLE = '[System] Session resumed.';
 import type { AgentStatus } from './Agent.js';
 
 /** Typed usage info emitted by onUsage listeners */
