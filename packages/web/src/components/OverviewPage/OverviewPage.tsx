@@ -26,6 +26,7 @@ import {
   DecisionDetailModal,
 } from '../Shared';
 import type { ActivityEntry } from '../Shared';
+import { SectionErrorBoundary } from '../SectionErrorBoundary';
 import {
   Square,
   Plus,
@@ -437,6 +438,7 @@ export function OverviewPage(_props: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Decisions Feed */}
+        <SectionErrorBoundary name="Decisions feed">
         <section className="bg-surface-raised border border-th-border rounded-lg" data-testid="decisions-feed">
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider px-4 py-2 border-b border-th-border">
             Decisions
@@ -463,8 +465,10 @@ export function OverviewPage(_props: Props) {
             </div>
           )}
         </section>
+        </SectionErrorBoundary>
 
         {/* Progress Feed */}
+        <SectionErrorBoundary name="Progress feed">
         <section className="bg-surface-raised border border-th-border rounded-lg" data-testid="progress-feed">
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider px-4 py-2 border-b border-th-border">
             Recent Progress
@@ -490,6 +494,7 @@ export function OverviewPage(_props: Props) {
             </div>
           )}
         </section>
+        </SectionErrorBoundary>
       </div>
 
       {/* ── Session History (collapsible, always visible) ──────── */}
@@ -504,9 +509,11 @@ export function OverviewPage(_props: Props) {
             Session History
           </button>
           {historyOpen && (
+            <SectionErrorBoundary name="Session history">
             <div className="mt-2">
               <SessionHistory projectId={effectiveId} hasActiveLead={hasActiveLead} />
             </div>
+            </SectionErrorBoundary>
           )}
         </div>
       )}

@@ -22,6 +22,7 @@ import { playAttentionSound, playCompletionSound } from './utils/notificationSou
 import { Search, Pause, Play } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SectionErrorBoundary } from './components/SectionErrorBoundary';
 import { VersionBadge } from './components/VersionBadge';
 import { PulseStrip } from './components/Pulse';
 import { AttentionBar } from './components/AttentionBar';
@@ -287,9 +288,12 @@ export function App() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm">
         Skip to content
       </a>
+      <SectionErrorBoundary name="Sidebar">
       <Sidebar />
+      </SectionErrorBoundary>
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
+          <SectionErrorBoundary name="Header">
           <header className="h-12 border-b border-th-border flex items-center px-4 justify-between shrink-0">
             <div className="flex items-center gap-2">
               {/* Flightdeck logo */}
@@ -329,6 +333,7 @@ export function App() {
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
           </header>
+          </SectionErrorBoundary>
 
           <AttentionBar />
           <div data-tour="pulse-strip"><PulseStrip /></div>
@@ -342,32 +347,32 @@ export function App() {
             {/* ── Project-scoped nested routes ─────────────────── */}
             <Route path="/projects/:id" element={<ProjectLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
-              <Route path="overview" element={<OverviewPage api={api} ws={ws} />} />
-              <Route path="session" element={<LeadDashboard api={api} ws={ws} />} />
-              <Route path="tasks" element={<TaskQueuePanel api={api} />} />
-              <Route path="agents" element={<CrewPage />} />
-              <Route path="knowledge" element={<KnowledgePanel />} />
-              <Route path="artifacts" element={<ArtifactsPanel />} />
-              <Route path="timeline" element={<TimelinePage api={api} ws={ws} />} />
-              <Route path="groups" element={<GroupChat api={api} ws={ws} />} />
-              <Route path="org-chart" element={<OrgChart api={api} ws={ws} />} />
-              <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="analysis" element={<AnalysisPage />} />
-              <Route path="canvas" element={<CanvasPage />} />
+              <Route path="overview" element={<SectionErrorBoundary name="Overview"><OverviewPage api={api} ws={ws} /></SectionErrorBoundary>} />
+              <Route path="session" element={<SectionErrorBoundary name="Session"><LeadDashboard api={api} ws={ws} /></SectionErrorBoundary>} />
+              <Route path="tasks" element={<SectionErrorBoundary name="Tasks"><TaskQueuePanel api={api} /></SectionErrorBoundary>} />
+              <Route path="agents" element={<SectionErrorBoundary name="Agents"><CrewPage /></SectionErrorBoundary>} />
+              <Route path="knowledge" element={<SectionErrorBoundary name="Knowledge"><KnowledgePanel /></SectionErrorBoundary>} />
+              <Route path="artifacts" element={<SectionErrorBoundary name="Artifacts"><ArtifactsPanel /></SectionErrorBoundary>} />
+              <Route path="timeline" element={<SectionErrorBoundary name="Timeline"><TimelinePage api={api} ws={ws} /></SectionErrorBoundary>} />
+              <Route path="groups" element={<SectionErrorBoundary name="Groups"><GroupChat api={api} ws={ws} /></SectionErrorBoundary>} />
+              <Route path="org-chart" element={<SectionErrorBoundary name="Org Chart"><OrgChart api={api} ws={ws} /></SectionErrorBoundary>} />
+              <Route path="analytics" element={<SectionErrorBoundary name="Analytics"><AnalyticsPage /></SectionErrorBoundary>} />
+              <Route path="analysis" element={<SectionErrorBoundary name="Analysis"><AnalysisPage /></SectionErrorBoundary>} />
+              <Route path="canvas" element={<SectionErrorBoundary name="Canvas"><CanvasPage /></SectionErrorBoundary>} />
             </Route>
 
             {/* ── Global (non-project-scoped) routes ───────────── */}
-            <Route path="/projects" element={<ProjectsPanel />} />
-            <Route path="/settings" element={<SettingsPanel api={api} />} />
-            <Route path="/agent-server" element={<AgentServerPanel />} />
-            <Route path="/shared/:token" element={<SharedReplayViewer />} />
+            <Route path="/projects" element={<SectionErrorBoundary name="Projects"><ProjectsPanel /></SectionErrorBoundary>} />
+            <Route path="/settings" element={<SectionErrorBoundary name="Settings"><SettingsPanel api={api} /></SectionErrorBoundary>} />
+            <Route path="/agent-server" element={<SectionErrorBoundary name="Agent Server"><AgentServerPanel /></SectionErrorBoundary>} />
+            <Route path="/shared/:token" element={<SectionErrorBoundary name="Shared Replay"><SharedReplayViewer /></SectionErrorBoundary>} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}
-            <Route path="/" element={<HomeDashboard />} />
+            <Route path="/" element={<SectionErrorBoundary name="Home"><HomeDashboard /></SectionErrorBoundary>} />
             <Route path="/lead" element={<ProjectRedirect page="session" />} />
             <Route path="/overview" element={<ProjectRedirect page="overview" />} />
-            <Route path="/agents" element={<Suspense fallback={<RouteSpinner />}><GlobalAgentsPage /></Suspense>} />
-            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><CrewRoster /></Suspense>} />
+            <Route path="/agents" element={<Suspense fallback={<RouteSpinner />}><SectionErrorBoundary name="Global Agents"><GlobalAgentsPage /></SectionErrorBoundary></Suspense>} />
+            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><SectionErrorBoundary name="Crews"><CrewRoster /></SectionErrorBoundary></Suspense>} />
             <Route path="/team" element={<Navigate to="/crews" replace />} />
             <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
             <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
