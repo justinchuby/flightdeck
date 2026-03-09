@@ -1,0 +1,64 @@
+name: User Feedback / Bug Report
+description: Report a bug, suggest an improvement, or share feedback about Flightdeck
+labels: ["user-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! Fill in what you can — only Description is required.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What's the issue or suggestion?
+      placeholder: "e.g., The Kanban board doesn't update when I drag a task to Done"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: If this is a bug, how can we reproduce it?
+      placeholder: |
+        1. Open a project with running agents
+        2. Go to the Tasks tab
+        3. Drag a task card from "Running" to "Done"
+        4. Card snaps back to original position
+    validations:
+      required: false
+
+  - type: textarea
+    id: error-message
+    attributes:
+      label: Error Message
+      description: Paste any error messages from the UI or browser console
+      render: shell
+    validations:
+      required: false
+
+  - type: input
+    id: session-id
+    attributes:
+      label: Session ID
+      description: If applicable, paste your session ID (from the session header or URL)
+      placeholder: "e.g., proj-auth-refactor-1709912345"
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag and drop screenshots here if they help explain the issue
+    validations:
+      required: false
