@@ -167,12 +167,16 @@ export class Agent {
     ensureSharedWorkspace(this);
     const isResume = !!this.resumeSessionId;
 
-    // Always send the system prompt — even on resume, the agent needs role
-    // instructions and context manifest. The CLI's loadSession() restores
-    // conversation history, but the LLM still needs its system prompt.
-    let initialPrompt = `${this.role.systemPrompt}\n\n${this.buildContextManifest(this.peers, this.budget)}\n\nYou are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
+    // On resume, skip role.systemPrompt — the restored conversation already has
+    // it. Send only the fresh context manifest + resume preamble so the agent
+    // sees current crew state without doubling its system prompt tokens.
+    const contextManifest = this.buildContextManifest(this.peers, this.budget);
+    const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
+    let initialPrompt: string;
     if (isResume) {
-      initialPrompt += RESUME_PREAMBLE;
+      initialPrompt = `${contextManifest}\n\n${taskAssignment}${RESUME_PREAMBLE}`;
+    } else {
+      initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
     }
     // Errors are handled internally by the bridge (sets agent status to 'failed').
     const bridgePromise = startAcpBridge(this, this.config, initialPrompt);

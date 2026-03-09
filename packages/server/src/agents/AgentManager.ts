@@ -773,9 +773,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         // instructions and context manifest for the LLM to function correctly.
         const contextManifest = agent.buildContextManifest(peers, agent.budget);
         const taskAssignment = `You are acting as the "${effectiveRole.name}" role. ${task ? `Your assigned task is: ${task}` : 'Awaiting task assignment.'}`;
-        let initialPrompt = `${effectiveRole.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
+        let initialPrompt: string;
         if (isResume) {
-          initialPrompt += RESUME_PREAMBLE;
+          // Skip role.systemPrompt — restored conversation already has it.
+          // Send only fresh context manifest + resume preamble.
+          initialPrompt = `${contextManifest}\n\n${taskAssignment}${RESUME_PREAMBLE}`;
+        } else {
+          initialPrompt = `${effectiveRole.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
         }
         startRemoteBridge(agent, this.agentServerClient, initialPrompt);
       } else {

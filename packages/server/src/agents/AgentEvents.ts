@@ -6,7 +6,7 @@ import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 
 /** Preamble appended to the system prompt when resuming a previous session */
 export const RESUME_PREAMBLE =
-  '\n\n[System] You are resuming from a previous session. Your conversation history has been restored. Continue from where you left off.';
+  '\n\n[System] Your conversation history has been restored from a previous session. The crew context above reflects the CURRENT state, which may differ from your conversation history. Prioritize current state.';
 import type { AgentStatus } from './Agent.js';
 
 /** Typed usage info emitted by onUsage listeners */
