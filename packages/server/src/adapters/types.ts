@@ -135,7 +135,7 @@ export interface AgentAdapter extends EventEmitter {
   start(opts: AdapterStartOptions): Promise<string>;
   prompt(content: PromptContent, opts?: PromptOptions): Promise<PromptResult>;
   cancel(): Promise<void>;
-  terminate(): void;
+  terminate(): void | Promise<void>;
   resolvePermission(approved: boolean): void;
 }
 

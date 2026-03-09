@@ -881,7 +881,7 @@ describe('CopilotSdkAdapter', () => {
       );
 
       // Terminate clears timeout and resolves with deny
-      adapter.terminate();
+      await adapter.terminate();
       expect(await result).toBe('deny');
 
       // Advancing past timeout should NOT cause double-resolve
@@ -919,7 +919,7 @@ describe('CopilotSdkAdapter', () => {
   describe('terminate()', () => {
     it('should clean up all resources', async () => {
       await adapter.start(defaultStartOpts());
-      adapter.terminate();
+      await adapter.terminate();
 
       expect(adapter.isConnected).toBe(false);
       expect(adapter.isPrompting).toBe(false);
@@ -933,7 +933,7 @@ describe('CopilotSdkAdapter', () => {
 
       const exit = vi.fn();
       adapter.on('exit', exit);
-      adapter.terminate();
+      await adapter.terminate();
 
       expect(exit).toHaveBeenCalledWith(0);
     });
@@ -944,7 +944,7 @@ describe('CopilotSdkAdapter', () => {
       // Event handler should be set
       expect(mockSessionEventHandler).toBeDefined();
 
-      adapter.terminate();
+      await adapter.terminate();
 
       // Event handler should be cleared by unsubscribe
       expect(mockSessionEventHandler).toBeNull();
@@ -959,7 +959,7 @@ describe('CopilotSdkAdapter', () => {
         { sessionId: 'sdk-session-123' },
       );
 
-      adapter.terminate();
+      await adapter.terminate();
 
       // Permission promise should resolve with 'deny' (not hang forever)
       expect(await resultPromise).toBe('deny');
@@ -970,7 +970,7 @@ describe('CopilotSdkAdapter', () => {
       await adapter.start(defaultStartOpts());
 
       // Should not throw
-      adapter.terminate();
+      await adapter.terminate();
     });
 
     it('should handle client stop errors gracefully', async () => {
@@ -978,13 +978,13 @@ describe('CopilotSdkAdapter', () => {
       await adapter.start(defaultStartOpts());
 
       // Should not throw
-      adapter.terminate();
+      await adapter.terminate();
     });
 
     it('should be safe to call multiple times', async () => {
       await adapter.start(defaultStartOpts());
-      adapter.terminate();
-      adapter.terminate(); // Should not throw
+      await adapter.terminate();
+      await adapter.terminate(); // Should not throw
     });
   });
 

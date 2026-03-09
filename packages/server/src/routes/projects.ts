@@ -692,12 +692,15 @@ export function projectsRoutes(ctx: AppContext): Router {
     try {
       // Find the last session's Copilot sessionId for resume continuity
       const lastSessions = projectRegistry.getSessions(project.id);
-      const resumeSessionId = !freshStart && lastSessions.length > 0
-        ? lastSessions[0].sessionId ?? undefined
+      const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
+
+      // Don't attempt SDK resume for crashed sessions — the SDK won't have the data
+      const resumeSessionId = lastSession && lastSession.status !== 'crashed'
+        ? lastSession.sessionId ?? undefined
         : undefined;
 
       // Preserve task from previous session if none provided
-      const task = requestTask || (!freshStart && lastSessions.length > 0 ? lastSessions[0].task : undefined);
+      const task = requestTask || (lastSession ? lastSession.task : undefined);
 
       const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, undefined, { projectName: project.name, projectId: project.id });
 
@@ -705,7 +708,6 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Don't check lastSession.status — after a stop the session may still show 'active'
       // if the exit event didn't fire (e.g. ServerClientAdapter bug). The 409 guard above
       // already ensures no agent is actually running.
-      const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
       if (lastSession) {
         projectRegistry.reactivateSession(lastSession.id, agent.id, task, role.id);
       } else {

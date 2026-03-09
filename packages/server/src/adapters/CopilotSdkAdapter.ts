@@ -585,7 +585,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
     }
   }
 
-  terminate(): void {
+  async terminate(): Promise<void> {
     this.abortController?.abort();
     this._resumeStartedAt = null;
     this._seenEventIds.clear();
@@ -596,22 +596,36 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       this.unsubscribeEvents = null;
     }
 
-    // Disconnect session
-    if (this.session) {
-      this.session.disconnect().catch((err: Error) => {
-        logger.warn({ module: 'copilot-sdk', msg: `Session disconnect error: ${err?.message}` });
-      });
-      this.session = null;
+    // Stop client first — flushes/saves session data to disk
+    const clientRef = this.client;
+    this.client = null;
+    if (clientRef) {
+      try {
+        await Promise.race([
+          clientRef.stop(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('client.stop() timed out')), 5000),
+          ),
+        ]);
+      } catch (err: any) {
+        logger.warn({ module: 'copilot-sdk', msg: `Client stop error: ${err?.message}` });
+      }
     }
 
-    // Stop client
-    if (this.client) {
-      this.client.stop().catch((errs: Error[]) => {
-        if (errs.length > 0) {
-          logger.warn({ module: 'copilot-sdk', msg: `Client stop errors: ${errs.map(e => e.message).join(', ')}` });
-        }
-      });
-      this.client = null;
+    // Disconnect session after client has flushed
+    const sessionRef = this.session;
+    this.session = null;
+    if (sessionRef) {
+      try {
+        await Promise.race([
+          sessionRef.disconnect(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('session.disconnect() timed out')), 5000),
+          ),
+        ]);
+      } catch (err: any) {
+        logger.warn({ module: 'copilot-sdk', msg: `Session disconnect error: ${err?.message}` });
+      }
     }
 
     // Resolve all pending permissions as denied and clear timeouts
