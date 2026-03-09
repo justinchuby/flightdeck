@@ -33,18 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **KnowledgeStore with FTS5** — Full-text search backed by SQLite FTS5 with 4-tier memory categories (core, procedural, semantic, episodic).
 - **Hybrid search with RRF fusion** — Reciprocal Rank Fusion combining FTS5 and semantic similarity for best-of-both retrieval.
 - **Token-budgeted injection** — Knowledge injected into agent prompts within configurable token budgets, with prompt injection defense at the write boundary.
-- **Training capture** — Records agent corrections and learning events for team knowledge accumulation.
+- **Training capture** — Records agent corrections and learning events for crew knowledge accumulation.
 - **Session knowledge extraction** — Automatic extraction of reusable knowledge from session transcripts.
 - **Identity protection** — Shared memory with access controls preventing cross-agent identity leakage.
 
-#### Portable Teams
+#### Portable Crews
 
-- **Team export bundles** — Versioned `.flightdeck-team/` directory with manifest, per-agent configs, knowledge by category, and training history. SHA-256 integrity checksums. Selective export by agents or knowledge categories.
-- **Team import with validation** — 5-phase validation (format, version, integrity, size, conflicts). Conflict strategies: agent (rename/skip/overwrite), knowledge (keep_both/prefer_import/prefer_existing/skip). Dry-run mode.
-- **Team REST API** — POST export, POST import, GET list, GET team details. Rate-limited write endpoints.
-- **Team management UI** — Consolidated Team page with roster, agent profiles, health dashboard, and lifecycle controls (retire/clone/retrain with confirmations).
+- **Crew export bundles** — Versioned `.flightdeck-team/` directory with manifest, per-agent configs, knowledge by category, and training history. SHA-256 integrity checksums. Selective export by agents or knowledge categories.
+- **Crew import with validation** — 5-phase validation (format, version, integrity, size, conflicts). Conflict strategies: agent (rename/skip/overwrite), knowledge (keep_both/prefer_import/prefer_existing/skip). Dry-run mode.
+- **Crew REST API** — POST export, POST import, GET list, GET crew details. Rate-limited write endpoints.
+- **Crew management UI** — Consolidated Crew page with roster, agent profiles, health dashboard, and lifecycle controls (retire/clone/retrain with confirmations).
 
-#### Multi-Team / Multi-Project
+#### Multi-Crew / Multi-Project
 
 - **`(projectId, teamId)` scoping** — Human-readable project IDs with collision-resistant generation. DB migration adds `team_id` to agent_roster, active_delegations, and dag_tasks with backward-compatible defaults.
 - **Storage architecture** — `SyncEngine` for cross-device state synchronization, `StorageManager` for structured persistence.
@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Projects panel** — Project management and selection interface.
 - **Knowledge panel** — Browse, search, and manage knowledge entries across categories.
 - **Agent Server panel** — Real-time status, agent list with expand/collapse, lifecycle controls (stop server, terminate agents) with confirmation dialogs. Renamed from DaemonPanel to AgentServerPanel.
-- **Team Health page** — Status cards, mass failure alerts, polling-based live updates.
+- **Crew Health page** — Status cards, mass failure alerts, polling-based live updates.
 - **Agent Lifecycle modal** — Retire, clone, and retrain agents with confirmation workflows.
 
 #### Research & Design Documents
@@ -209,7 +209,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AcpConnection stale mocks** — Fixed test mocks that referenced removed API surface.
 - **SkillsLoader token budget** — `formatForInjection()` now truncates skills that exceed the token budget.
 - **Responsive panel overflow** — Fixed sidebar and panel overflow on narrow viewports with `min-h-0` constraints.
-- **Team route** — `/team` now renders standalone TeamRoster instead of redirecting to a project.
+- **Crew route** — `/team` now renders standalone TeamRoster instead of redirecting to a project.
 - **Session tab height** — Chat and sidebar now use full viewport height in the session view.
 - **Async graceful shutdown** — Server shutdown awaits all handlers in sequence to prevent data loss.
 
@@ -308,7 +308,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Token display** — Removed monetary cost estimates. Token counts shown as estimates with `~` prefix and `(est.)` suffix.
 - **Default replay speed** — Changed from 1× to 4× for faster session review.
 - **Milestone curation** — Filtered from all system events to meaningful progress markers only.
-- **Sidebar nav cleanup** — Removed agent count badge from Team sidebar tab (distracting)
+- **Sidebar nav cleanup** — Removed agent count badge from Crew sidebar tab (distracting)
 - Vite proxy target is now configurable via `SERVER_PORT` env var instead of hardcoded `:3001`
 
 ### Fixed
@@ -477,7 +477,7 @@ Ten features transforming Flightdeck into a full automation platform.
 - Prevent DM notifications from fragmenting streaming agent responses
 - MentionText null guard and sidebar tab visibility toggle
 - Show all 8 sidebar tabs by default; improve model config tab visibility
-- Right-align model name in sidebar Team tab when no activity text
+- Right-align model name in sidebar Crew tab when no activity text
 - Prevent agent mention tooltip from being occluded by sidebar
 - @user mention styling: brighter highlights in dark mode, font-medium and light-mode text refinements
 - @mentions now render inline instead of block-level

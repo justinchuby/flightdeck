@@ -17,8 +17,8 @@ import type { AppContext } from './context.js';
 
 // ── Rate Limiters ───────────────────────────────────────────────────
 
-const readLimiter = rateLimit({ windowMs: 60_000, max: 60, message: 'Too many team read requests' });
-const writeLimiter = rateLimit({ windowMs: 60_000, max: 10, message: 'Too many team write requests' });
+const readLimiter = rateLimit({ windowMs: 60_000, max: 60, message: 'Too many crew read requests' });
+const writeLimiter = rateLimit({ windowMs: 60_000, max: 10, message: 'Too many crew write requests' });
 
 const AGENT_ID_RE = /^[a-f0-9\-]{8,64}$/i;
 
@@ -58,7 +58,7 @@ export function teamsRoutes(ctx: AppContext): Router {
           excludeEpisodic,
         });
 
-        logger.info({ module: 'teams', msg: 'Team exported to directory', teamId, outputDir: result.outputDir });
+        logger.info({ module: 'teams', msg: 'Crew exported to directory', teamId, outputDir: result.outputDir });
         res.json({
           success: true,
           bundlePath: result.outputDir,
@@ -75,14 +75,14 @@ export function teamsRoutes(ctx: AppContext): Router {
           excludeEpisodic,
         });
 
-        logger.info({ module: 'teams', msg: 'Team exported as JSON', teamId, stats: bundle.manifest.stats });
+        logger.info({ module: 'teams', msg: 'Crew exported as JSON', teamId, stats: bundle.manifest.stats });
         res.json({
           success: true,
           bundle,
         });
       }
     } catch (err: any) {
-      logger.error({ module: 'teams', msg: 'Team export failed', teamId, err: err.message });
+      logger.error({ module: 'teams', msg: 'Crew export failed', teamId, err: err.message });
       res.status(500).json({ error: `Export failed: ${err.message}` });
     }
   });
@@ -113,14 +113,14 @@ export function teamsRoutes(ctx: AppContext): Router {
       });
 
       if (!report.success) {
-        logger.warn({ module: 'teams', msg: 'Team import validation failed', projectId, issues: report.validation.issues.length });
+        logger.warn({ module: 'teams', msg: 'Crew import validation failed', projectId, issues: report.validation.issues.length });
         return res.status(422).json({ success: false, report });
       }
 
-      logger.info({ module: 'teams', msg: 'Team imported', projectId, teamId: report.teamId, dryRun });
+      logger.info({ module: 'teams', msg: 'Crew imported', projectId, teamId: report.teamId, dryRun });
       res.json({ success: true, report });
     } catch (err: any) {
-      logger.error({ module: 'teams', msg: 'Team import failed', projectId, err: err.message });
+      logger.error({ module: 'teams', msg: 'Crew import failed', projectId, err: err.message });
       res.status(500).json({ error: `Import failed: ${err.message}` });
     }
   });

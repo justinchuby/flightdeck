@@ -5,9 +5,9 @@
 > [!WARNING]
 > This is purely AI generated code. Use the project with this understanding in mind.
 
-**One command. A whole engineering team.**
+**One command. A whole engineering crew.**
 
-Flightdeck orchestrates teams of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
+Flightdeck orchestrates crews of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
 
 ```bash
 npm install -g @flightdeck-ai/flightdeck
@@ -19,7 +19,7 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 ### Screenshots
 
 <p align="center">
-  <img src="packages/docs/public/screenshots/lead-dashboard.png" alt="Lead Dashboard — active projects, team status, and real-time progress" width="720" />
+  <img src="packages/docs/public/screenshots/lead-dashboard.png" alt="Lead Dashboard — active projects, crew status, and real-time progress" width="720" />
   <br /><em>Lead Dashboard — your home screen for tracking projects, agents, and progress</em>
 </p>
 
@@ -61,7 +61,7 @@ That's it. This installs Flightdeck globally and starts the server, opening the 
 ### What Happens Next
 
 1. **Create a project** — Click **Create Project**, describe what you want built, and point it at your repo
-2. **Watch the lead plan** — The Project Lead agent analyzes your task, breaks it into a task DAG, and assembles a team
+2. **Watch the lead plan** — The Project Lead agent analyzes your task, breaks it into a task DAG, and assembles a crew
 3. **Agents get to work** — Developers, reviewers, architects spin up in parallel — each in their own Copilot CLI session
 4. **Stay in the loop** — Message any agent directly, approve decisions, and watch progress in real time
 
@@ -91,9 +91,9 @@ npm run dev
 
 ## Features
 
-### 🎯 Team Orchestration
-- **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
-- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
+### 🎯 Crew Orchestration
+- **Project Lead** — Breaks down tasks, assembles a crew, creates a task DAG, delegates work, and synthesizes results
+- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical crew structures
 - **13 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
 - **Task DAG** — Declarative task scheduling with dependencies; auto-links agents via `DELEGATE`/`CREATE_AGENT`
 - **Human-in-the-Loop** — Message any agent directly; queue, reorder, or remove messages before delivery
@@ -221,7 +221,7 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 
 | Role | Icon | Focus | Default Model |
 |------|------|-------|---------------|
-| **Project Lead** | 👑 | Orchestration, delegation, team coordination | Claude Opus 4.6 |
+| **Project Lead** | 👑 | Orchestration, delegation, crew coordination | Claude Opus 4.6 |
 | **Developer** | 💻 | Code implementation, tests, bug fixes | Claude Opus 4.6 |
 | **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | Claude Opus 4.6 |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
@@ -243,7 +243,7 @@ Custom roles can be created via the Settings UI with your own system prompts, co
 
 Agents communicate via structured commands wrapped in doubled Unicode brackets (`⟦⟦ COMMAND {...} ⟧⟧`, U+27E6/U+27E7) detected in their output stream. Commands are parsed by the `CommandDispatcher` and routed to the appropriate subsystem.
 
-### Team Management (Lead + Architect)
+### Crew Management (Lead + Architect)
 
 | Command | Description |
 |---------|-------------|
@@ -327,7 +327,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 | View | Description |
 |------|-------------|
-| **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), team/comms/groups/DAG/tokens tabs, three-tier message hierarchy, catch-up banner |
+| **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), crew/comms/groups/DAG/tokens tabs, three-tier message hierarchy, catch-up banner |
 | **Mission Control** | Single-screen project overview: health summary, agent fleet, token economics, proactive alerts, activity feed, DAG minimap, comm heatmap, performance scorecards. Drag-and-drop panel reorder. |
 | **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls, project grouping |
 | **Tasks** | Per-project task tabs with DAG status, progress badges, project grouping, duplicate detection |
