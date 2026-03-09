@@ -752,7 +752,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           const timer = setTimeout(() => {
             this.hungTimers.delete(agent.id);
             if (agent.status === 'idle') {
-              this.terminate(agent.id);
+              this.terminate(agent.id).catch(() => {});
               this.emit('agent:hung_terminated', { agentId: agent.id });
             }
           }, this.autoTerminateTimeoutMs);
@@ -821,7 +821,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
-  terminate(id: string, visited: Set<string> = new Set()): boolean {
+  async terminate(id: string, visited: Set<string> = new Set()): Promise<boolean> {
     if (visited.has(id)) return false;
     visited.add(id);
 
@@ -850,7 +850,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       const child = this.agents.get(childId);
       if (child && !isTerminalStatus(child.status)) {
         logger.info({ module: 'agent', msg: 'Cascade-terminating orphaned child', childAgentId: childId, childRole: child.role.name });
-        this.terminate(childId, visited);
+        await this.terminate(childId, visited);
       }
     }
 
@@ -869,7 +869,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
 
-    agent.terminate();
+    await agent.terminate();
     this.emit('agent:terminated', id);
 
     // Persist terminated status to roster DB
@@ -956,6 +956,22 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (!secretaryRole) return null;
 
     try {
+      // Look up previous secretary's sessionId for resume
+      let resumeSessionId: string | undefined;
+      if (this.agentRosterRepository && leadAgent.projectId) {
+        const allRoster = this.agentRosterRepository.getAllAgents();
+        const prevSecretary = allRoster.find(a =>
+          a.projectId === leadAgent.projectId &&
+          a.role === 'secretary' &&
+          a.sessionId &&
+          a.agentId !== leadAgent.id
+        );
+        if (prevSecretary?.sessionId) {
+          resumeSessionId = prevSecretary.sessionId;
+          logger.info({ module: 'agent', msg: 'Resuming secretary session', sessionId: resumeSessionId, projectId: leadAgent.projectId });
+        }
+      }
+
       const secretary = this.spawn(
         secretaryRole,
         'You are the auto-created project secretary. Track DAG progress, provide status reports when asked, and assist with dependency inference for auto-DAG tasks.',
@@ -963,7 +979,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         true,
         'gpt-4.1',
         leadAgent.cwd,
-        undefined,
+        resumeSessionId,
         undefined,
         { projectName: leadAgent.projectName, projectId: leadAgent.projectId },
       );
@@ -991,11 +1007,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     ).length;
   }
 
-  restart(id: string): Agent | null {
+  async restart(id: string): Promise<Agent | null> {
     const agent = this.agents.get(id);
     if (!agent) return null;
     const { role, task, sessionId, parentId, model, cwd, projectName, projectId } = agent;
-    agent.terminate();
+    await agent.terminate();
     this.agents.delete(id);
     // Re-spawn with same ID and resume the session if available
     const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id, { projectName, projectId });
@@ -1103,13 +1119,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
-  shutdownAll(): void {
+  async shutdownAll(): Promise<void> {
     this._shuttingDown = true;
     this.heartbeat.stop();
-    for (const agent of this.agents.values()) {
-      if (!isTerminalStatus(agent.status)) {
-        agent.terminate();
-      }
+    const active = [...this.agents.values()]
+      .filter(agent => !isTerminalStatus(agent.status));
+    logger.info({ module: 'agent', msg: `Terminating ${active.length} active agent(s)...` });
+    const results = await Promise.allSettled(active.map(agent => agent.terminate()));
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length > 0) {
+      logger.warn({ module: 'agent', msg: `${failed.length} agent(s) failed to terminate cleanly` });
     }
     // Clean up all worktrees (async, best-effort)
     // Individual terminate() calls skip merge when _shuttingDown is true

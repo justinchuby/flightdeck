@@ -136,10 +136,13 @@ async function main(): Promise<void> {
   let shuttingDown = false;
 
   async function shutdown(reason: string): Promise<void> {
-    if (shuttingDown) return;
+    if (shuttingDown) {
+      logger.warn({ module: 'agent-server-entry', msg: `Second signal (${reason}), forcing exit`, pid: process.pid });
+      process.exit(1);
+    }
     shuttingDown = true;
 
-    logger.info({ module: 'agent-server-entry', msg: `Shutting down: ${reason}`, pid: process.pid });
+    logger.info({ module: 'agent-server-entry', msg: `Graceful shutdown started (${reason})`, pid: process.pid });
 
     try {
       await server.stop({ reason, timeoutMs: 10_000 });

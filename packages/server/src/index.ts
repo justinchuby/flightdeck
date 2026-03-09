@@ -174,23 +174,31 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
 // ── Graceful shutdown ──────────────────────────────────────
 let shuttingDown = false;
 async function gracefulShutdown(signal: string) {
-  if (shuttingDown) return; // guard against double SIGINT
+  if (shuttingDown) {
+    // Second signal — force exit immediately
+    console.log(`\n${signal} received again. Forcing exit.`);
+    process.exit(1);
+  }
   shuttingDown = true;
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  console.log(`\n[shutdown] Graceful shutdown started (${signal})`);
   container.internal.contextRefresher.stop();
   wsServer.close();
   try {
     await container.shutdown();
+    console.log('[shutdown] All agents terminated, services stopped.');
   } catch (err) {
     console.warn('[shutdown] Container shutdown error:', err);
   }
   httpServer.close(() => {
-    console.log('Server closed.');
+    console.log('[shutdown] Server closed. Exiting.');
     process.exit(0);
   });
   // Force exit after 15s — enough for in-flight agent messages to drain
   // but prevents zombie process if httpServer.close() callback never fires
-  setTimeout(() => process.exit(1), 15000);
+  setTimeout(() => {
+    console.warn('[shutdown] Timed out after 15s, forcing exit.');
+    process.exit(1);
+  }, 15000).unref();
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
