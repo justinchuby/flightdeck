@@ -688,7 +688,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     const role = roleRegistry.get('lead');
     if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
 
-    const { task, model, freshStart, resumeAll, agents: agentIds } = req.body;
+    const { task: requestTask, model, freshStart, resumeAll, agents: agentIds } = req.body;
     try {
       // Find the last session's Copilot sessionId for resume continuity
       const lastSessions = projectRegistry.getSessions(project.id);
@@ -696,11 +696,17 @@ export function projectsRoutes(ctx: AppContext): Router {
         ? lastSessions[0].sessionId ?? undefined
         : undefined;
 
+      // Preserve task from previous session if none provided
+      const task = requestTask || (!freshStart && lastSessions.length > 0 ? lastSessions[0].task : undefined);
+
       const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, undefined, { projectName: project.name, projectId: project.id });
 
-      // Reactivate existing session row when resuming; only INSERT for fresh/new sessions
+      // Reactivate existing session row when resuming; only INSERT for fresh/new sessions.
+      // Don't check lastSession.status — after a stop the session may still show 'active'
+      // if the exit event didn't fire (e.g. ServerClientAdapter bug). The 409 guard above
+      // already ensures no agent is actually running.
       const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
-      if (lastSession && lastSession.status !== 'active') {
+      if (lastSession) {
         projectRegistry.reactivateSession(lastSession.id, agent.id, task, role.id);
       } else {
         projectRegistry.startSession(project.id, agent.id, task);
@@ -819,6 +825,12 @@ export function projectsRoutes(ctx: AppContext): Router {
         try {
           agentManager.terminate(agent.id);
           terminated++;
+          // Belt-and-suspenders: explicitly end session for lead agents.
+          // The terminate → exit event chain should handle this, but if the
+          // adapter doesn't emit 'exit' the session stays 'active' forever.
+          if (agent.role.id === 'lead' && !agent.parentId) {
+            projectRegistry.endSession(agent.id, 'completed');
+          }
         } catch (err: any) {
           logger.warn({ module: 'project', msg: 'Failed to terminate agent', agentId: agent.id, err: err.message });
         }

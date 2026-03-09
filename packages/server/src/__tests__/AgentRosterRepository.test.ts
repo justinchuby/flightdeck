@@ -291,4 +291,39 @@ describe('AgentRosterRepository', () => {
       expect(repo.getAllAgents().length).toBe(2);
     });
   });
+
+  describe('reconcileStaleAgents', () => {
+    it('marks busy/idle agents as terminated when not alive', () => {
+      repo.upsertAgent('alive-1', 'lead', 'model', 'busy');
+      repo.upsertAgent('dead-1', 'dev', 'model', 'busy');
+      repo.upsertAgent('dead-2', 'dev', 'model', 'idle');
+      repo.upsertAgent('done-1', 'dev', 'model', 'terminated');
+
+      const reconciled = repo.reconcileStaleAgents(
+        (id) => id === 'alive-1',
+      );
+
+      expect(reconciled).toBe(2);
+      expect(repo.getAgent('alive-1')!.status).toBe('busy');
+      expect(repo.getAgent('dead-1')!.status).toBe('terminated');
+      expect(repo.getAgent('dead-2')!.status).toBe('terminated');
+      expect(repo.getAgent('done-1')!.status).toBe('terminated');
+    });
+
+    it('returns 0 when all agents are alive', () => {
+      repo.upsertAgent('a1', 'lead', 'model', 'busy');
+      repo.upsertAgent('a2', 'dev', 'model', 'idle');
+
+      const reconciled = repo.reconcileStaleAgents(() => true);
+      expect(reconciled).toBe(0);
+    });
+
+    it('returns 0 when no busy/idle agents exist', () => {
+      repo.upsertAgent('a1', 'dev', 'model', 'terminated');
+      repo.upsertAgent('a2', 'dev', 'model', 'retired');
+
+      const reconciled = repo.reconcileStaleAgents(() => false);
+      expect(reconciled).toBe(0);
+    });
+  });
 });

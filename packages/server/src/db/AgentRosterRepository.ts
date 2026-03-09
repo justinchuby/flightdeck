@@ -217,4 +217,32 @@ export class AgentRosterRepository {
       metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
     };
   }
+
+  /**
+   * Reconcile stale roster entries on server startup.
+   * Marks agents showing as 'busy' or 'idle' as 'terminated' when they
+   * have no live process (e.g. after a server crash).
+   *
+   * @param isAgentAlive - callback to check if an agent actually has a live process
+   * @returns count of agents reconciled
+   */
+  reconcileStaleAgents(isAgentAlive: (agentId: string) => boolean): number {
+    const busy = this.getAllAgents('busy');
+    const idle = this.getAllAgents('idle');
+    const candidates = [...busy, ...idle];
+
+    let reconciled = 0;
+    const now = new Date().toISOString();
+    for (const agent of candidates) {
+      if (!isAgentAlive(agent.agentId)) {
+        this.db.drizzle
+          .update(agentRoster)
+          .set({ status: 'terminated', updatedAt: now })
+          .where(eq(agentRoster.agentId, agent.agentId))
+          .run();
+        reconciled++;
+      }
+    }
+    return reconciled;
+  }
 }

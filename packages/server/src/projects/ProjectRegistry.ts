@@ -348,4 +348,32 @@ export class ProjectRegistry {
     const sessions = this.getSessions(projectId);
     return sessions[0]?.leadId;
   }
+
+  /**
+   * Reconcile stale session states on server startup.
+   * After a crash/restart, sessions may be stuck as 'active' or 'resuming'
+   * with no running agent. This marks them as 'stopped' so resume works.
+   *
+   * @param isAgentAlive - callback to check if an agent is actually running
+   * @returns count of sessions reconciled
+   */
+  reconcileStaleSessions(isAgentAlive: (leadId: string) => boolean): number {
+    const now = new Date().toISOString();
+    // Find all sessions that claim to be active or resuming
+    const staleCandidates = this.db.drizzle.select().from(projectSessions)
+      .where(sql`${projectSessions.status} IN ('active', 'resuming')`)
+      .all() as ProjectSession[];
+
+    let reconciled = 0;
+    for (const session of staleCandidates) {
+      if (!isAgentAlive(session.leadId)) {
+        this.db.drizzle.update(projectSessions).set({
+          status: 'stopped',
+          endedAt: now,
+        }).where(eq(projectSessions.id, session.id)).run();
+        reconciled++;
+      }
+    }
+    return reconciled;
+  }
 }

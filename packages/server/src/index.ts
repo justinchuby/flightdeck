@@ -26,17 +26,28 @@ const config = getConfig();
 const container = await createContainer({ config, repoRoot });
 
 // ── Startup reconciliation ──────────────────────────────────
-// After a crash/restart, sessions may be stuck as 'active' or 'resuming'
-// with no running agent. Mark them as 'stopped' so resume works correctly.
-if (container.projectRegistry) {
-  const reconciled = container.projectRegistry.reconcileStaleSessions(
-    (leadId) => {
-      const agent = container.agentManager.get(leadId);
-      return !!agent && (agent.status === 'running' || agent.status === 'idle');
-    },
-  );
-  if (reconciled > 0) {
-    console.log(`🔧 Reconciled ${reconciled} stale session(s) from previous run`);
+// After a crash/restart, sessions and roster entries may be stuck in
+// stale states. Reconcile before accepting requests.
+// Important: don't assume agents are dead — the agent daemon is separate.
+// Check for live processes before marking anything as stopped/terminated.
+{
+  const isAgentAlive = (agentId: string) => {
+    const agent = container.agentManager.get(agentId);
+    return !!agent && (agent.status === 'running' || agent.status === 'idle');
+  };
+
+  let staleSessions = 0;
+  let staleAgents = 0;
+
+  if (container.projectRegistry) {
+    staleSessions = container.projectRegistry.reconcileStaleSessions(isAgentAlive);
+  }
+  if (container.agentRoster) {
+    staleAgents = container.agentRoster.reconcileStaleAgents(isAgentAlive);
+  }
+
+  if (staleSessions > 0 || staleAgents > 0) {
+    console.log(`🔧 Reconciled ${staleSessions} stale session(s), ${staleAgents} stale agent(s) on startup`);
   }
 }
 
