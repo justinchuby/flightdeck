@@ -527,4 +527,103 @@ describe('HomeDashboard', () => {
       });
     });
   });
+
+  describe('clickable detail modals', () => {
+    beforeEach(setupDefaultMocks);
+
+    it('opens DecisionDetailModal when clicking a decision', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('decisions-feed-section')).toBeTruthy();
+      });
+
+      const items = screen.getAllByTestId('decision-feed-item');
+      fireEvent.click(items[0]);
+
+      expect(screen.getByTestId('decision-detail-modal')).toBeTruthy();
+      expect(screen.getByText('Decision Detail')).toBeTruthy();
+      expect(screen.getByText('Rationale')).toBeTruthy();
+    });
+
+    it('shows full decision info in the modal', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('decisions-feed-section')).toBeTruthy();
+      });
+
+      // Click the "Use TypeScript strict mode" decision
+      const items = screen.getAllByTestId('decision-feed-item');
+      fireEvent.click(items[1]); // second decision
+
+      const modal = screen.getByTestId('decision-detail-modal');
+      expect(within(modal).getByText('Better type safety')).toBeTruthy(); // rationale
+      expect(within(modal).getByText('Architecture')).toBeTruthy(); // category label
+      expect(within(modal).getByText('Confirmed')).toBeTruthy(); // status
+    });
+
+    it('closes DecisionDetailModal when clicking outside', async () => {
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('decisions-feed-section')).toBeTruthy();
+      });
+
+      const items = screen.getAllByTestId('decision-feed-item');
+      fireEvent.click(items[0]);
+      expect(screen.getByTestId('decision-detail-modal')).toBeTruthy();
+
+      // Click the overlay (outside the dialog)
+      fireEvent.mouseDown(screen.getByTestId('decision-detail-modal'));
+      expect(screen.queryByTestId('decision-detail-modal')).toBeNull();
+    });
+
+    it('opens ActivityDetailModal when clicking a progress item', async () => {
+      // Setup activity data
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
+        if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
+        if (path.includes('/coordination/activity')) return Promise.resolve([
+          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'task_completed', summary: 'Implemented auth module', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
+        ]);
+        return Promise.resolve([]);
+      });
+
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('activity-feed-section')).toBeTruthy();
+      });
+
+      const items = screen.getAllByTestId('activity-feed-item');
+      fireEvent.click(items[0]);
+
+      const modal = screen.getByTestId('activity-detail-modal');
+      expect(modal).toBeTruthy();
+      expect(within(modal).getByText('Activity Detail')).toBeTruthy();
+      expect(within(modal).getByText('Implemented auth module')).toBeTruthy();
+      expect(within(modal).getByText('Task Completed')).toBeTruthy();
+    });
+
+    it('closes ActivityDetailModal when clicking outside', async () => {
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
+        if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
+        if (path.includes('/coordination/activity')) return Promise.resolve([
+          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'task_completed', summary: 'Done', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
+        ]);
+        return Promise.resolve([]);
+      });
+
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('activity-feed-section')).toBeTruthy();
+      });
+
+      fireEvent.click(screen.getAllByTestId('activity-feed-item')[0]);
+      expect(screen.getByTestId('activity-detail-modal')).toBeTruthy();
+
+      fireEvent.mouseDown(screen.getByTestId('activity-detail-modal'));
+      expect(screen.queryByTestId('activity-detail-modal')).toBeNull();
+    });
+  });
 });

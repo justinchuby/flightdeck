@@ -11,7 +11,7 @@
  *
  * Supports many-to-many Teams ↔ Projects relationship by design.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -36,6 +36,7 @@ import {
   Gavel,
   ListChecks,
   Loader2,
+  X,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
@@ -159,7 +160,7 @@ function ActionRequiredItem({
   );
 }
 
-function DecisionFeedItem({ decision, projectName }: { decision: Decision; projectName: string }) {
+function DecisionFeedItem({ decision, projectName, onClick }: { decision: Decision; projectName: string; onClick?: () => void }) {
   const icon = DECISION_CATEGORY_ICONS[decision.category] ?? '💡';
   const statusIcon = decision.status === 'confirmed'
     ? <CheckCircle2 className="w-3 h-3 text-green-400" />
@@ -168,7 +169,12 @@ function DecisionFeedItem({ decision, projectName }: { decision: Decision; proje
       : <Clock className="w-3 h-3 text-th-text-muted" />;
 
   return (
-    <div className="flex items-start gap-2.5 px-3 py-2" data-testid="decision-feed-item">
+    <button
+      type="button"
+      className="flex items-start gap-2.5 px-3 py-2 w-full text-left hover:bg-th-bg-hover/30 transition-colors cursor-pointer"
+      data-testid="decision-feed-item"
+      onClick={onClick}
+    >
       <span className="text-sm shrink-0 mt-0.5">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -179,7 +185,8 @@ function DecisionFeedItem({ decision, projectName }: { decision: Decision; proje
           {decision.agentRole} · {projectName} · {formatRelativeTime(decision.timestamp)}
         </div>
       </div>
-    </div>
+      <ChevronRight className="w-3 h-3 text-th-text-muted/50 shrink-0 mt-1" />
+    </button>
   );
 }
 
@@ -221,15 +228,199 @@ const PROGRESS_ACTION_TYPES = new Set([
   'task_completed', 'task_started', 'decision_made', 'delegated', 'deferred_issue',
 ]);
 
-function ActivityFeedItem({ entry, projectName }: { entry: ActivityEntry; projectName: string }) {
+function ActivityFeedItem({ entry, projectName, onClick }: { entry: ActivityEntry; projectName: string; onClick?: () => void }) {
   const icon = ACTIVITY_ICONS[entry.actionType] ?? '📎';
   return (
-    <div className="flex items-start gap-2.5 px-3 py-2" data-testid="activity-feed-item">
+    <button
+      type="button"
+      className="flex items-start gap-2.5 px-3 py-2 w-full text-left hover:bg-th-bg-hover/30 transition-colors cursor-pointer"
+      data-testid="activity-feed-item"
+      onClick={onClick}
+    >
       <span className="text-sm shrink-0 mt-0.5">{icon}</span>
       <div className="flex-1 min-w-0">
         <span className="text-xs text-th-text-alt truncate block">{entry.summary}</span>
         <div className="text-[10px] text-th-text-muted mt-0.5">
           {entry.agentRole} · {projectName} · {formatRelativeTime(entry.timestamp)}
+        </div>
+      </div>
+      <ChevronRight className="w-3 h-3 text-th-text-muted/50 shrink-0 mt-1" />
+    </button>
+  );
+}
+
+// ── Detail Modals ───────────────────────────────────────────────────
+
+const DECISION_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  confirmed: { label: 'Confirmed', color: 'text-green-400' },
+  rejected: { label: 'Rejected', color: 'text-red-400' },
+  recorded: { label: 'Recorded', color: 'text-th-text-muted' },
+  dismissed: { label: 'Dismissed', color: 'text-yellow-400' },
+};
+
+const DECISION_CATEGORY_LABELS: Record<string, string> = {
+  style: 'Code Style',
+  architecture: 'Architecture',
+  tool_access: 'Tool Access',
+  dependency: 'Dependency',
+  testing: 'Testing',
+  general: 'General',
+};
+
+function DecisionDetailModal({
+  decision,
+  projectName,
+  onClose,
+}: {
+  decision: Decision;
+  projectName: string;
+  onClose: () => void;
+}) {
+  const icon = DECISION_CATEGORY_ICONS[decision.category] ?? '💡';
+  const statusInfo = DECISION_STATUS_LABELS[decision.status] ?? DECISION_STATUS_LABELS.recorded;
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      data-testid="decision-detail-modal"
+    >
+      <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-md flex flex-col">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-th-border">
+          <span className="text-base">{icon}</span>
+          <h2 className="text-sm font-semibold text-th-text flex-1">Decision Detail</h2>
+          <button type="button" onClick={onClose} className="text-th-text-muted hover:text-th-text">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div>
+            <div className="text-xs text-th-text-muted mb-0.5">Title</div>
+            <div className="text-sm text-th-text">{decision.title}</div>
+          </div>
+          {decision.rationale && (
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Rationale</div>
+              <div className="text-sm text-th-text whitespace-pre-wrap">{decision.rationale}</div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Status</div>
+              <span className={`text-sm font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
+            </div>
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Category</div>
+              <span className="text-sm text-th-text">{DECISION_CATEGORY_LABELS[decision.category] ?? decision.category}</span>
+            </div>
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Made by</div>
+              <span className="text-sm text-th-text">{decision.agentRole}</span>
+            </div>
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Project</div>
+              <span className="text-sm text-th-text">{projectName}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Timestamp</div>
+              <span className="text-xs text-th-text">
+                {new Date(decision.timestamp).toLocaleString()}
+              </span>
+            </div>
+            {decision.confirmedAt && (
+              <div>
+                <div className="text-xs text-th-text-muted mb-0.5">Confirmed At</div>
+                <span className="text-xs text-th-text">
+                  {new Date(decision.confirmedAt).toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3 text-xs text-th-text-muted pt-1 border-t border-th-border/50">
+            {decision.autoApproved && <span>✓ Auto-approved</span>}
+            {decision.needsConfirmation && <span>⚠ Requires confirmation</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  task_completed: 'Task Completed',
+  task_started: 'Task Started',
+  decision_made: 'Decision Made',
+  delegated: 'Delegated',
+  deferred_issue: 'Deferred Issue',
+};
+
+function ActivityDetailModal({
+  entry,
+  projectName,
+  onClose,
+}: {
+  entry: ActivityEntry;
+  projectName: string;
+  onClose: () => void;
+}) {
+  const icon = ACTIVITY_ICONS[entry.actionType] ?? '📎';
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      data-testid="activity-detail-modal"
+    >
+      <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-md flex flex-col">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-th-border">
+          <span className="text-base">{icon}</span>
+          <h2 className="text-sm font-semibold text-th-text flex-1">Activity Detail</h2>
+          <button type="button" onClick={onClose} className="text-th-text-muted hover:text-th-text">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div>
+            <div className="text-xs text-th-text-muted mb-0.5">Type</div>
+            <div className="text-sm text-th-text flex items-center gap-1.5">
+              <span>{icon}</span>
+              {ACTIVITY_TYPE_LABELS[entry.actionType] ?? entry.actionType}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-th-text-muted mb-0.5">Summary</div>
+            <div className="text-sm text-th-text whitespace-pre-wrap">{entry.summary}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Reported by</div>
+              <span className="text-sm text-th-text">{entry.agentRole}</span>
+            </div>
+            <div>
+              <div className="text-xs text-th-text-muted mb-0.5">Project</div>
+              <span className="text-sm text-th-text">{projectName}</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-th-text-muted mb-0.5">Timestamp</div>
+            <span className="text-xs text-th-text">
+              {new Date(entry.timestamp).toLocaleString()}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -341,6 +532,8 @@ export function HomeDashboard() {
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<{ decision: Decision; projectName: string } | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<{ entry: ActivityEntry; projectName: string } | null>(null);
 
   // Fetch projects + decisions + progress + activity
   const fetchData = useCallback(async () => {
@@ -696,13 +889,17 @@ export function HomeDashboard() {
               <h2 className="text-sm font-medium text-th-text-alt">Recent Decisions</h2>
             </div>
             <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border max-h-64 overflow-y-auto">
-              {recentDecisions.map((d) => (
-                <DecisionFeedItem
-                  key={d.id}
-                  decision={d}
-                  projectName={resolveProjectName(d.projectId, projects, agents)}
-                />
-              ))}
+              {recentDecisions.map((d) => {
+                const pName = resolveProjectName(d.projectId, projects, agents);
+                return (
+                  <DecisionFeedItem
+                    key={d.id}
+                    decision={d}
+                    projectName={pName}
+                    onClick={() => setSelectedDecision({ decision: d, projectName: pName })}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -715,13 +912,17 @@ export function HomeDashboard() {
               <h2 className="text-sm font-medium text-th-text-alt">Recent Progress</h2>
             </div>
             <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border max-h-64 overflow-y-auto">
-              {recentActivity.map((a) => (
-                <ActivityFeedItem
-                  key={a.id}
-                  entry={a}
-                  projectName={resolveProjectName(a.projectId, projects, agents)}
-                />
-              ))}
+              {recentActivity.map((a) => {
+                const pName = resolveProjectName(a.projectId, projects, agents);
+                return (
+                  <ActivityFeedItem
+                    key={a.id}
+                    entry={a}
+                    projectName={pName}
+                    onClick={() => setSelectedActivity({ entry: a, projectName: pName })}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
@@ -791,6 +992,22 @@ export function HomeDashboard() {
           Start New Session
         </button>
       </div>
+
+      {/* Detail Modals */}
+      {selectedDecision && (
+        <DecisionDetailModal
+          decision={selectedDecision.decision}
+          projectName={selectedDecision.projectName}
+          onClose={() => setSelectedDecision(null)}
+        />
+      )}
+      {selectedActivity && (
+        <ActivityDetailModal
+          entry={selectedActivity.entry}
+          projectName={selectedActivity.projectName}
+          onClose={() => setSelectedActivity(null)}
+        />
+      )}
     </div>
     </div>
   );
