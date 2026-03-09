@@ -16,7 +16,7 @@ import {
   ListChecks,
   Users,
   Brain,
-  Paintbrush,
+  ScrollText,
   GanttChart,
   MessageSquare,
   Network,
@@ -47,12 +47,14 @@ interface ProjectDetails {
 // ── Tab definitions ───────────────────────────────────────────────
 
 const PRIMARY_TABS: TabItem[] = [
-  { id: 'overview',  label: 'Overview',   icon: <LayoutDashboard size={14} /> },
-  { id: 'session',   label: 'Session',    icon: <Crown size={14} /> },
-  { id: 'tasks',     label: 'Tasks',      icon: <ListChecks size={14} /> },
-  { id: 'agents',    label: 'Agents',     icon: <Users size={14} /> },
-  { id: 'knowledge', label: 'Knowledge',  icon: <Brain size={14} /> },
-  { id: 'design',    label: 'Design',     icon: <Paintbrush size={14} /> },
+  { id: 'overview',   label: 'Overview',   icon: <LayoutDashboard size={14} /> },
+  { id: 'session',    label: 'Session',    icon: <Crown size={14} /> },
+  { id: 'tasks',      label: 'Tasks',      icon: <ListChecks size={14} /> },
+  { id: 'artifacts',  label: 'Artifacts',  icon: <ScrollText size={14} /> },
+  { id: 'knowledge',  label: 'Knowledge',  icon: <Brain size={14} /> },
+  { id: 'timeline',   label: 'Timeline',   icon: <GanttChart size={14} /> },
+  { id: 'groups',     label: 'Groups',     icon: <MessageSquare size={14} /> },
+  { id: 'org-chart',  label: 'Org Chart',  icon: <Network size={14} /> },
 ];
 
 interface OverflowItem {
@@ -62,9 +64,7 @@ interface OverflowItem {
 }
 
 const OVERFLOW_ITEMS: OverflowItem[] = [
-  { id: 'timeline',  label: 'Timeline',  icon: <GanttChart size={14} /> },
-  { id: 'groups',    label: 'Groups',    icon: <MessageSquare size={14} /> },
-  { id: 'org-chart', label: 'Org Chart', icon: <Network size={14} /> },
+  { id: 'agents',    label: 'Agents',    icon: <Users size={14} /> },
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={14} /> },
   { id: 'canvas',    label: 'Canvas',    icon: <Workflow size={14} /> },
 ];

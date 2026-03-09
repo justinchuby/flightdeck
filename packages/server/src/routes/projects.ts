@@ -676,5 +676,70 @@ export function projectsRoutes(ctx: AppContext): Router {
     }
   });
 
+  /**
+   * GET /projects/:id/artifacts
+   * Returns markdown files from .flightdeck/shared/ grouped by agent directory.
+   * Each file includes its title (first # heading) and last-modified timestamp.
+   */
+  router.get('/projects/:id/artifacts', (req, res) => {
+    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    const project = projectRegistry.get(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project.cwd) return res.status(400).json({ error: 'Project has no working directory' });
+
+    const sharedDir = join(project.cwd, '.flightdeck', 'shared');
+    const result = resolveAndValidate(project.cwd, '.flightdeck/shared');
+    if (!result) {
+      return res.json({ groups: [] }); // No .flightdeck/shared — not an error
+    }
+
+    try {
+      const agentDirs = readdirSync(result.resolved, { withFileTypes: true })
+        .filter(e => e.isDirectory());
+
+      const groups = agentDirs.map(dir => {
+        // Agent dirs follow pattern: role-agentIdPrefix (e.g. "architect-3973583e")
+        const parts = dir.name.split('-');
+        const agentId = parts.pop() || '';
+        const role = parts.join('-') || 'agent';
+
+        const dirPath = join(result.resolved, dir.name);
+        let files: { name: string; path: string; ext: string; title: string; modifiedAt: string }[] = [];
+        try {
+          const entries = readdirSync(dirPath, { withFileTypes: true })
+            .filter(e => e.isFile() && (e.name.endsWith('.md') || e.name.endsWith('.mdx')));
+
+          files = entries.map(e => {
+            const filePath = join(dirPath, e.name);
+            const relPath = relative(realpathSync(project.cwd!), filePath);
+            const stat = statSync(filePath);
+            let title = e.name.replace(/\.(md|mdx)$/, '');
+            try {
+              const content = readFileSync(filePath, 'utf-8');
+              const headingMatch = content.match(/^#\s+(.+)$/m);
+              if (headingMatch) title = headingMatch[1];
+            } catch { /* use filename as title */ }
+
+            return {
+              name: e.name,
+              path: relPath,
+              ext: extname(e.name).slice(1),
+              title,
+              modifiedAt: stat.mtime.toISOString(),
+            };
+          }).sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
+        } catch { /* skip unreadable directories */ }
+
+        return { agentDir: dir.name, role, agentId, files };
+      }).filter(g => g.files.length > 0) // Only groups with artifacts
+        .sort((a, b) => a.role.localeCompare(b.role));
+
+      res.json({ groups });
+    } catch (err: any) {
+      logger.warn({ module: 'project-artifacts', msg: 'Cannot read artifacts', error: err.message, projectId: project.id });
+      res.json({ groups: [] });
+    }
+  });
+
   return router;
 }

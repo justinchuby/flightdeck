@@ -10,7 +10,7 @@ export const TAB_LABELS: Record<string, string> = {
   tasks:       'Tasks',
   agents:      'Agents',
   knowledge:   'Knowledge',
-  design:      'Design',
+  artifacts:   'Artifacts',
   timeline:    'Timeline',
   groups:      'Groups',
   'org-chart': 'Org Chart',

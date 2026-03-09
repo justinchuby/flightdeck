@@ -113,8 +113,11 @@ describe('ProjectLayout', () => {
     expect(screen.getByTestId('tab-overview')).toBeInTheDocument();
     expect(screen.getByTestId('tab-session')).toBeInTheDocument();
     expect(screen.getByTestId('tab-tasks')).toBeInTheDocument();
-    expect(screen.getByTestId('tab-agents')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-artifacts')).toBeInTheDocument();
     expect(screen.getByTestId('tab-knowledge')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-timeline')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-groups')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-org-chart')).toBeInTheDocument();
   });
 
   it('renders child content via Outlet', () => {
@@ -155,9 +158,7 @@ describe('ProjectLayout', () => {
   it('shows all overflow items', () => {
     renderLayout();
     fireEvent.click(screen.getByTestId('overflow-menu'));
-    expect(screen.getByTestId('overflow-item-timeline')).toBeInTheDocument();
-    expect(screen.getByTestId('overflow-item-groups')).toBeInTheDocument();
-    expect(screen.getByTestId('overflow-item-org-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('overflow-item-agents')).toBeInTheDocument();
     expect(screen.getByTestId('overflow-item-analytics')).toBeInTheDocument();
     expect(screen.getByTestId('overflow-item-canvas')).toBeInTheDocument();
   });
