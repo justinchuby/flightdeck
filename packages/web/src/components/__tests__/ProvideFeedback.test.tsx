@@ -5,7 +5,7 @@ import { ProvideFeedback, SubmitIssueButton, buildFeedbackUrl } from '../Provide
 describe('buildFeedbackUrl', () => {
   it('returns base URL with template and labels', () => {
     const url = buildFeedbackUrl();
-    expect(url).toContain('https://github.com/justinclarkxyz/ai-crew/issues/new');
+    expect(url).toContain('https://github.com/justinchuby/flightdeck/issues/new');
     expect(url).toContain('template=user-feedback.yml');
     expect(url).toContain('labels=user-feedback');
   });

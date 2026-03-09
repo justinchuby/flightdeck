@@ -4,7 +4,7 @@
  */
 import { Bug, ExternalLink } from 'lucide-react';
 
-const GITHUB_ISSUE_URL = 'https://github.com/justinclarkxyz/ai-crew/issues/new';
+const GITHUB_ISSUE_URL = 'https://github.com/justinchuby/flightdeck/issues/new';
 const ISSUE_TEMPLATE = 'user-feedback.yml';
 const ISSUE_LABELS = 'user-feedback';
 
