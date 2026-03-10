@@ -62,11 +62,10 @@ Type natural language directly into ⌘K to control your crew:
 | Open dashboard | "go home" |
 | Open timeline | "show timeline" |
 
-### Create Commands (3)
+### Create Commands (2)
 | Command | Example |
 |---------|---------|
 | New session | "start a new session" |
-| New playbook | "create a playbook" |
 | New rule | "create a workflow rule" |
 
 > [!TIP]

@@ -32,7 +32,13 @@ This starts both the orchestration server and agent server as a single unit. The
 
 ### Config File
 
-Create `flightdeck.config.yaml` in your project root (or set `FLIGHTDECK_CONFIG` env var):
+Flightdeck looks for configuration in this order (later overrides earlier):
+
+1. `~/.flightdeck/config.yaml` — User-level defaults (auto-created on first run)
+2. `flightdeck.config.yaml` — Project-level overrides in your repo root
+3. `FLIGHTDECK_CONFIG` env var — Explicit path to a specific config file
+
+Create `flightdeck.config.yaml` in your project root to override defaults:
 
 ```yaml
 server:
@@ -63,7 +69,27 @@ heartbeat:
   crewUpdateIntervalMs: 180000
 ```
 
-See `flightdeck.config.example.yaml` for the full annotated config.
+See `flightdeck.config.example.yaml` for the full annotated config. The directory and default config file are auto-created on first run.
+
+### Runtime Files
+
+All runtime files are stored in `~/.flightdeck/` (or `FLIGHTDECK_STATE_DIR`):
+
+```
+~/.flightdeck/
+  config.yaml                 # User-level config (auto-created)
+  flightdeck.db               # SQLite database
+  agent-server.pid            # PID of running agent server
+  agent-server.port           # TCP port for reconnection
+  agent-server.token          # 256-bit hex auth token
+  artifacts/                  # Agent work artifacts
+    {projectId}/
+      sessions/
+        {leadId}/
+          {role}-{shortId}/   # Per-agent artifact directory
+```
+
+All paths use `path.join()` and `os.homedir()` for cross-platform compatibility. Temporary files use `os.tmpdir()`.
 
 ### Environment Variables
 
@@ -73,7 +99,7 @@ See `flightdeck.config.example.yaml` for the full annotated config.
 | `FLIGHTDECK_HOST` | `127.0.0.1` | Bind address (`0.0.0.0` for all interfaces) |
 | `FLIGHTDECK_CONFIG` | `./flightdeck.config.yaml` | Path to config file |
 | `FLIGHTDECK_STATE_DIR` | `~/.flightdeck` | State directory (PID files, agent server state) |
-| `FLIGHTDECK_DB_PATH` | `./flightdeck.db` | SQLite database path |
+| `FLIGHTDECK_DB_PATH` | `~/.flightdeck/flightdeck.db` | SQLite database path |
 | `AUTH` | (auto-generated) | Auth mode: `'none'` to disable, or env var name containing token |
 | `SERVER_SECRET` | (auto-generated) | Fixed auth token (overrides random generation) |
 | `LOG_ALL_HTTP` | `false` | Set to `true` to log all HTTP requests including successful GETs |
@@ -192,12 +218,13 @@ AUTH=none flightdeck
 
 ### Database
 
-Flightdeck uses SQLite with WAL mode. The database file (`flightdeck.db`) is created in the current working directory by default.
+Flightdeck uses SQLite with WAL mode. The database file defaults to `~/.flightdeck/flightdeck.db`.
 
 For production:
 - Place the database on fast local storage (SSD). SQLite is I/O-sensitive.
 - Back up the database file periodically. SQLite WAL mode is safe for file-level backup when using `PRAGMA wal_checkpoint(PASSIVE)`.
 - Set `FLIGHTDECK_DB_PATH` to control the database location.
+- The database and all runtime files are stored in `~/.flightdeck/` by default — not in the repo root.
 
 ### Process Management
 

@@ -114,7 +114,7 @@ Services are initialized in dependency order (Tier 0 → Tier 5):
 
 35 route modules provide ~279 REST endpoints:
 
-`agents`, `agent-server`, `analytics`, `browse`, `comms`, `community`, `config`, `conflicts`, `context`, `coordination`, `data`, `db`, `debates`, `decisions`, `diff`, `handoffs`, `integrations`, `knowledge`, `lead`, `nl`, `notifications`, `playbooks`, `predictions`, `projects`, `recovery`, `replay`, `roles`, `search`, `services`, `sessions`, `settings`, `shared`, `summary`, `tasks`, `teams`
+`agents`, `agent-server`, `analytics`, `browse`, `comms`, `config`, `conflicts`, `context`, `coordination`, `data`, `db`, `decisions`, `diff`, `integrations`, `knowledge`, `lead`, `nl`, `notifications`, `oversight`, `projects`, `replay`, `roles`, `search`, `services`, `sessions`, `settings`, `shared`, `summary`, `tasks`, `teams`
 
 All routes receive the full `AppContext` (service container) for dependency injection.
 
@@ -221,11 +221,15 @@ See [Database Schema](/reference/database) for table definitions.
 
 ## Configuration
 
-Flightdeck loads configuration from three sources (later overrides earlier):
+Flightdeck loads configuration from multiple sources (later overrides earlier):
 
 1. **Built-in defaults** — sensible defaults for all settings
-2. **YAML config file** — `flightdeck.config.yaml` in project root (hot-reloadable)
-3. **Environment variables** — startup-only overrides
+2. **User config** — `~/.flightdeck/config.yaml` (auto-created on first run)
+3. **Repo-level config** — `flightdeck.config.yaml` in the project root
+4. **Environment variable override** — `FLIGHTDECK_CONFIG` points to a specific file
+5. **Environment variables** — startup-only overrides for individual settings
+
+Config is hot-reloadable via chokidar file watcher — changes to the YAML file take effect without restarting the server.
 
 Key environment variables:
 

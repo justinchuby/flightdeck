@@ -47,22 +47,13 @@ Chronological view of all inter-agent events: messages sent, tasks delegated, fi
 
 These features let you automate agent behavior and build trust in autonomous operation.
 
-### Playbook System
-Reusable session templates that define goals, roles, and starter tasks. Select a playbook to launch a pre-configured crew. Create custom playbooks from successful sessions.
+### Oversight System
+Three-tier autonomy control (Supervised / Balanced / Autonomous) with optional natural language custom instructions. The oversight tier injects behavioral instructions into agent system prompts, controlling how independently agents work. Per-project scope with a global default.
 
-→ [Community Playbooks Guide](/guide/playbooks)
-
-### Intent Rules
-'When agent wants to X, automatically Y' rules. Define trust levels per action type: auto-approve, require confirmation, or block. Comes with presets (Cautious, Balanced, Autonomous).
+→ [Oversight Guide](/guide/oversight)
 
 ### Notification Channels
-Configure how and when you receive alerts: in-app notifications, desktop notifications, sound alerts. Set per-event-type preferences (e.g., only alert on errors, not routine progress).
-
-### Recovery System
-Automatic agent crash recovery with configurable strategies. When an agent fails, the system can auto-restart, reassign tasks, or alert you. Includes handoff briefings so replacement agents have full context.
-
-### Handoff Briefings
-When a crashed agent is replaced, the new agent receives a structured briefing: what the previous agent was doing, files it had locked, progress made, and remaining work.
+Configure how and when you receive alerts: in-app notifications, desktop notifications, sound alerts. Set per-event-type preferences (e.g., only alert on errors, not routine progress). External channels (Telegram, Slack) use separate routing preferences and fire regardless of oversight level.
 
 ### Data Management
 Purge old session data from the database. Preview shows exact record counts before deletion. Configurable retention period (7 days to 1 year). Transactional cleanup ensures consistency.
@@ -84,7 +75,7 @@ The ⌘K command palette is the brain of the product. Fuzzy search (Fuse.js) acr
 → [Command Palette Guide](/guide/command-palette)
 
 ### Smart Onboarding
-Three-layer onboarding system. QuickStart: playbook selection as first-run experience (productive in <60 seconds). SpotlightTour: 6-step overlay highlighting real UI elements. Progressive Route Disclosure: sidebar starts with 4 items, grows to 11 as mastery develops. Contextual Coach: behavior-triggered tips.
+Three-layer onboarding system. QuickStart: guided project creation as first-run experience (productive in <60 seconds). SpotlightTour: 6-step overlay highlighting real UI elements. Progressive Route Disclosure: sidebar starts with 4 items, grows to 11 as mastery develops. Contextual Coach: behavior-triggered tips.
 
 → [Onboarding Guide](/guide/onboarding)
 
@@ -101,17 +92,8 @@ Four detection levels: same directory, import overlap, lock contention, branch d
 
 → [GitHub Integration Guide](/guide/github-integration)
 
-### Mobile PWA
-Progressive Web App with offline support. Bottom tab navigation (Home, Tasks, Agents, Timeline, More). Swipe-to-approve cards with haptic feedback. Mobile-optimized agent cards. Bottom-sheet command palette. Install prompt and offline banner.
-
-→ [Mobile PWA Guide](/guide/mobile)
+### Mobile PWA (Removed)
+> Mobile-specific layouts have been removed. See [Mobile Support](/guide/mobile) for details.
 
 ### Custom Role Builder
 Create custom agent roles with visual editor. Emoji and color picker. Model selection with comparison cards. Prompt templates across 6 categories. Live preview card. Test role with dry-run before deploying.
-
-→ [Community Playbooks & Roles Guide](/guide/playbooks)
-
-### Community Playbooks
-Browse, search, and fork community-shared playbooks. Star ratings and reviews. Publish your own with privacy guardrails (no system prompts or secrets). Version tracking with update notifications and diff view.
-
-→ [Community Playbooks Guide](/guide/playbooks)

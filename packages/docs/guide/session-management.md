@@ -38,9 +38,11 @@ Sessions are the unit of work in Flightdeck. A session represents one run of a p
 When you create a project and start a session:
 
 1. The orchestrator creates a session record in the database
-2. A Project Lead agent is spawned with the project briefing
+2. A Project Lead agent is spawned with the project briefing and project context
 3. The lead analyzes the task and spawns sub-agents (developers, reviewers, etc.)
-4. Each agent gets a unique agent ID and an optional SDK session ID
+4. Each agent gets a unique, **immutable** agent ID and an optional SDK session ID
+
+Agent IDs are preserved across restart and resume — they never change for the lifetime of the agent.
 
 ### Stopping a Session
 
@@ -211,8 +213,9 @@ User clicks "Resume" on a stopped session
 4. Filter agents based on resume mode (all / specific / fresh)
     │
     ▼
-5. For each agent to resume:
+5. For each agent to resume (in parallel batches of 3):
     ├── Read agent_roster.session_id (the CLI session ID)
+    ├── Agent ID is immutable — same ID is reused from before
     ├── Check if adapter supports resume (preset.supportsResume)
     ├── Pass session_id to adapter.start(opts) via AdapterStartOptions
     ├── Adapter calls its resume mechanism:
@@ -254,6 +257,7 @@ Explicit and reliable. The SDK re-establishes the JSON-RPC connection.
 
 | Data | Preserved? | How |
 |------|-----------|-----|
+| Agent IDs | ✅ Yes | Immutable — same ID across restarts |
 | Agent roles and models | ✅ Yes | Stored in `agent_roster` table |
 | SDK conversation history | ✅ Yes | Via SDK session ID resume |
 | File locks | ✅ Yes | Stored in `file_locks` table |
