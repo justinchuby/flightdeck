@@ -28,6 +28,7 @@ import {
 import { useAppStore } from '../stores/appStore';
 import { useLeadStore } from '../stores/leadStore';
 import { useNavigationStore } from '../stores/navigationStore';
+import { ProjectOversightPicker } from '../components/ProjectOversightPicker/ProjectOversightPicker';
 import { useProjects } from '../hooks/useProjects';
 import { ProjectContext } from '../contexts/ProjectContext';
 import { Tabs, type TabItem } from '../components/ui/Tabs';
@@ -50,6 +51,7 @@ const PRIMARY_TABS: TabItem[] = [
   { id: 'overview',   label: 'Overview',   icon: <LayoutDashboard size={14} /> },
   { id: 'session',    label: 'Session',    icon: <Crown size={14} /> },
   { id: 'tasks',      label: 'Tasks',      icon: <ListChecks size={14} /> },
+  { id: 'crew',       label: 'Crew',       icon: <Users size={14} /> },
   { id: 'artifacts',  label: 'Artifacts',  icon: <ScrollText size={14} /> },
   { id: 'knowledge',  label: 'Knowledge',  icon: <Brain size={14} /> },
   { id: 'timeline',   label: 'Timeline',   icon: <GanttChart size={14} /> },
@@ -65,7 +67,6 @@ interface OverflowItem {
 }
 
 const OVERFLOW_ITEMS: OverflowItem[] = [
-  { id: 'agents',    label: 'Agents',    icon: <Users size={14} /> },
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={14} /> },
   { id: 'canvas',    label: 'Canvas',    icon: <Workflow size={14} /> },
 ];
@@ -320,6 +321,7 @@ export function ProjectLayout() {
             </h2>
 
             <div className="ml-auto flex items-center gap-2 shrink-0">
+              <ProjectOversightPicker projectId={id} />
               <StatusBadge
                 variant={projectStatusVariant(projectStatus)}
                 label={projectStatus}
