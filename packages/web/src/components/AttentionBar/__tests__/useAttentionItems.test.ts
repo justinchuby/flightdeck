@@ -384,7 +384,5 @@ describe('useAttentionItems', () => {
 
       expect(mockApiFetch).not.toHaveBeenCalled();
     });
-
-    });
   });
 });
