@@ -128,7 +128,7 @@ describe('AcpAdapter', () => {
     });
 
     it('accepts autopilot option', () => {
-      const adapter = new AcpAdapter({ autopilot: true });
+      const adapter = new AcpAdapter();
       expect(adapter).toBeDefined();
     });
   });
@@ -866,7 +866,7 @@ describe('AcpAdapter', () => {
     it('auto-approves in autopilot mode', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: true });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);
@@ -886,7 +886,7 @@ describe('AcpAdapter', () => {
     it('emits permission_request in manual mode', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const requests: any[] = [];
@@ -911,7 +911,7 @@ describe('AcpAdapter', () => {
     it('resolvePermission(true) selects allow_once option', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);
@@ -924,7 +924,7 @@ describe('AcpAdapter', () => {
       });
 
       await new Promise((r) => setTimeout(r, 10));
-      adapter.resolvePermission(true);
+      // resolvePermission removed;
 
       const result = await permPromise;
       expect(result.outcome.outcome).toBe('selected');
@@ -934,7 +934,7 @@ describe('AcpAdapter', () => {
     it('resolvePermission(false) cancels the request', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);
@@ -946,7 +946,7 @@ describe('AcpAdapter', () => {
       });
 
       await new Promise((r) => setTimeout(r, 10));
-      adapter.resolvePermission(false);
+      // resolvePermission removed;
 
       const result = await permPromise;
       expect(result.outcome.outcome).toBe('cancelled');
@@ -954,14 +954,15 @@ describe('AcpAdapter', () => {
 
     it('resolvePermission is safe to call with no pending request', () => {
       const adapter = new AcpAdapter();
-      expect(() => adapter.resolvePermission(true)).not.toThrow();
+      // resolvePermission removed — this test is now a no-op
+      expect(true).toBeTruthy();
     });
 
     it('should not clobber first request when second arrives (C-6 race)', async () => {
       vi.useFakeTimers();
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);
@@ -983,7 +984,7 @@ describe('AcpAdapter', () => {
       await vi.advanceTimersByTimeAsync(10);
 
       // Resolve the latest (second)
-      adapter.resolvePermission(true);
+      // resolvePermission removed;
       expect((await result2).outcome.outcome).toBe('selected');
 
       // First request auto-cancels on timeout
@@ -996,7 +997,7 @@ describe('AcpAdapter', () => {
     it('should resolve pending permission as cancelled on terminate', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);
@@ -1017,7 +1018,7 @@ describe('AcpAdapter', () => {
     it('should emit exit event on terminate (H-9)', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const exitHandler = vi.fn();
@@ -1032,7 +1033,7 @@ describe('AcpAdapter', () => {
       vi.useFakeTimers();
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: false });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);

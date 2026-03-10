@@ -121,12 +121,6 @@ describe('CopilotSdkAdapter', () => {
       a.terminate();
     });
 
-    it('should accept autopilot option', () => {
-      const a = new CopilotSdkAdapter({ autopilot: true });
-      expect(a.type).toBe('copilot-sdk');
-      a.terminate();
-    });
-
     it('should have correct initial state', () => {
       expect(adapter.isConnected).toBe(false);
       expect(adapter.isPrompting).toBe(false);
@@ -885,141 +879,16 @@ describe('CopilotSdkAdapter', () => {
   });
 
   describe('permission handling', () => {
-    it('should use approveAll in autopilot mode', async () => {
-      const a = new CopilotSdkAdapter({ autopilot: true });
-      await a.start(defaultStartOpts());
-
-      expect(mockClient.createSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          onPermissionRequest: mockApproveAll,
-        }),
-      );
-      a.terminate();
-    });
-
-    it('should emit permission_request and resolve on resolvePermission(true)', async () => {
+    it('should auto-approve all permissions (oversight is prompt-only)', async () => {
       await adapter.start(defaultStartOpts());
 
-      const permRequest = vi.fn();
-      adapter.on('permission_request', permRequest);
-
-      // Simulate SDK calling the permission handler
+      // Permission handler should auto-approve
       const result = mockPermissionHandler!(
         { kind: 'shell', toolCallId: 'perm-1' },
         { sessionId: 'sdk-session-123' },
       );
 
-      // Should have emitted permission_request
-      expect(permRequest).toHaveBeenCalledWith({
-        id: 'perm-1',
-        toolName: 'shell',
-        arguments: expect.objectContaining({ kind: 'shell' }),
-        timestamp: expect.any(String),
-      });
-
-      // Resolve permission
-      adapter.resolvePermission(true);
-
       expect(await result).toBe('allow');
-    });
-
-    it('should resolve deny on resolvePermission(false)', async () => {
-      await adapter.start(defaultStartOpts());
-
-      const result = mockPermissionHandler!(
-        { kind: 'write', toolCallId: 'perm-2' },
-        { sessionId: 'sdk-session-123' },
-      );
-
-      adapter.resolvePermission(false);
-      expect(await result).toBe('deny');
-    });
-
-    it('should auto-deny after timeout', async () => {
-      vi.useFakeTimers();
-
-      await adapter.start(defaultStartOpts());
-
-      const resultPromise = mockPermissionHandler!(
-        { kind: 'shell', toolCallId: 'perm-3' },
-        { sessionId: 'sdk-session-123' },
-      );
-
-      // Advance past 60s timeout
-      vi.advanceTimersByTime(60_001);
-
-      expect(await resultPromise).toBe('deny');
-      vi.useRealTimers();
-    });
-
-    it('should clear timeout when resolvePermission is called', async () => {
-      vi.useFakeTimers();
-
-      await adapter.start(defaultStartOpts());
-
-      const resultPromise = mockPermissionHandler!(
-        { kind: 'read', toolCallId: 'perm-4' },
-        { sessionId: 'sdk-session-123' },
-      );
-
-      adapter.resolvePermission(true);
-      expect(await resultPromise).toBe('allow');
-
-      // Advancing timers should not cause issues
-      vi.advanceTimersByTime(60_001);
-
-      vi.useRealTimers();
-    });
-
-    it('should be no-op to resolvePermission without pending request', () => {
-      // Should not throw
-      adapter.resolvePermission(true);
-      adapter.resolvePermission(false);
-    });
-
-    it('should not clobber first request when second arrives (C-6 race)', async () => {
-      vi.useFakeTimers();
-      await adapter.start(defaultStartOpts());
-
-      // First permission request
-      const result1 = mockPermissionHandler!(
-        { kind: 'shell', toolCallId: 'perm-first' },
-        { sessionId: 'sdk-session-123' },
-      );
-
-      // Second permission request overwrites — first should still get resolved by timeout
-      const result2 = mockPermissionHandler!(
-        { kind: 'write', toolCallId: 'perm-second' },
-        { sessionId: 'sdk-session-123' },
-      );
-
-      // Resolve the latest (second) — first stays pending for timeout
-      adapter.resolvePermission(true);
-      expect(await result2).toBe('allow');
-
-      // First request's timeout fires — should auto-deny (not hang)
-      vi.advanceTimersByTime(60_001);
-      expect(await result1).toBe('deny');
-
-      vi.useRealTimers();
-    });
-
-    it('should not double-resolve on terminate during timeout window (C-6 race)', async () => {
-      vi.useFakeTimers();
-      await adapter.start(defaultStartOpts());
-
-      const result = mockPermissionHandler!(
-        { kind: 'shell', toolCallId: 'perm-race' },
-        { sessionId: 'sdk-session-123' },
-      );
-
-      // Terminate clears timeout and resolves with deny
-      await adapter.terminate();
-      expect(await result).toBe('deny');
-
-      // Advancing past timeout should NOT cause double-resolve
-      vi.advanceTimersByTime(60_001);
-      vi.useRealTimers();
     });
   });
 
@@ -1172,7 +1041,6 @@ describe('CopilotSdkAdapter', () => {
 
       const result = await createAdapterForProvider({
         provider: 'copilot',
-        autopilot: false,
       });
 
       expect(result.backend).toBe('copilot-sdk');

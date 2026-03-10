@@ -43,7 +43,7 @@ describe('CREW_UPDATE content hashing', () => {
 
   beforeEach(() => {
     const role = makeRole();
-    agent = new Agent(role, makeConfig() as any, 'test task', undefined, [], false);
+    agent = new Agent(role, makeConfig() as any, 'test task', undefined, []);
     // Don't call start() — we test injectContextUpdate directly without ACP
   });
 
@@ -143,7 +143,7 @@ describe('CREW_UPDATE content hashing', () => {
 
   it('handles lead agent with children correctly', () => {
     const leadRole = makeRole({ id: 'lead', name: 'Project Lead' });
-    const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, [], false);
+    const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, []);
 
     const peers = makePeers(
       { id: 'child-1', task: 'task A', parentId: lead.id },
@@ -165,7 +165,7 @@ describe('CREW_UPDATE content hashing', () => {
 
   it('handles budget changes for lead agents', () => {
     const leadRole = makeRole({ id: 'lead', name: 'Project Lead' });
-    const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, [], false);
+    const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, []);
     lead.budget = { maxConcurrent: 10, runningCount: 3 };
 
     const peers = makePeers({ id: 'child-1', task: 'task', parentId: lead.id });

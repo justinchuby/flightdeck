@@ -114,19 +114,9 @@ describe('AdapterFactory', () => {
       expect(result.backend).toBe('mock');
     });
 
-    it('passes autopilot to CopilotSdkAdapter', async () => {
-      const result = await createAdapterForProvider({
-        provider: 'copilot',
-        autopilot: true,
-      });
-      expect(result.adapter.type).toBe('copilot-sdk');
-      expect(result.backend).toBe('copilot-sdk');
-    });
-
-    it('passes autopilot and model to ClaudeSdkAdapter', async () => {
+    it('passes model to ClaudeSdkAdapter', async () => {
       const result = await createAdapterForProvider({
         provider: 'claude',
-        autopilot: true,
         model: 'claude-opus-4',
       });
       expect(result.adapter.type).toBe('claude-sdk');

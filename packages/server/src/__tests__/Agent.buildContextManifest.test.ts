@@ -44,7 +44,7 @@ describe('Agent.buildContextManifest', () => {
 
   function makeLeadAgent(overrides: Record<string, any> = {}) {
     const role = makeRole(overrides);
-    const agent = new Agent(role, makeConfig() as any, 'manage the team', undefined, [], false);
+    const agent = new Agent(role, makeConfig() as any, 'manage the team', undefined, []);
     // Override the auto-generated ID so we can assert on parent filtering
     (agent as any).id = LEAD_ID;
     return agent;
@@ -105,7 +105,7 @@ describe('Agent.buildContextManifest', () => {
 
   it('non-leads see all peers under ACTIVE CREW MEMBERS (no sibling section)', () => {
     const devRole = makeRole({ id: 'developer', name: 'Developer' });
-    const dev = new Agent(devRole, makeConfig() as any, 'code task', undefined, [], false);
+    const dev = new Agent(devRole, makeConfig() as any, 'code task', undefined, []);
     const peer1 = makePeer({ id: 'peer-aaa', task: 'task A' });
     const peer2 = makePeer({ id: 'peer-bbb', task: 'task B' });
     const result = dev.buildContextManifest([peer1, peer2]);

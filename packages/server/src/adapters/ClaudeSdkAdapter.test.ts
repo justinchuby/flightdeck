@@ -98,7 +98,7 @@ describe('ClaudeSdkAdapter', () => {
   let adapter: ClaudeSdkAdapter;
 
   beforeEach(() => {
-    adapter = new ClaudeSdkAdapter({ model: 'claude-sonnet-4-6', autopilot: true });
+    adapter = new ClaudeSdkAdapter({ model: 'claude-sonnet-4-6' });
     mockQuery.mockReset();
     mockListSessions.mockReset();
   });
@@ -268,7 +268,7 @@ describe('ClaudeSdkAdapter', () => {
       );
     });
 
-    it('uses acceptEdits permission mode in autopilot', async () => {
+    it('uses acceptEdits permission mode', async () => {
       mockQuery.mockReturnValue(createMockQuery([
         makeResultMessage('success'),
       ]));
@@ -279,21 +279,6 @@ describe('ClaudeSdkAdapter', () => {
       expect(mockQuery).toHaveBeenCalledWith(
         'test',
         expect.objectContaining({ permissionMode: 'acceptEdits' }),
-      );
-    });
-
-    it('uses default permission mode when not autopilot', async () => {
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      mockQuery.mockReturnValue(createMockQuery([
-        makeResultMessage('success'),
-      ]));
-
-      await adapter.start({ cliCommand: 'claude' });
-      await adapter.prompt('test');
-
-      expect(mockQuery).toHaveBeenCalledWith(
-        'test',
-        expect.objectContaining({ permissionMode: 'default' }),
       );
     });
   });
@@ -514,142 +499,16 @@ describe('ClaudeSdkAdapter', () => {
   // ── Permission Handling ────────────────────────────────────
 
   describe('permission handling', () => {
-    it('resolvePermission resolves pending permission', async () => {
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      await adapter.start({ cliCommand: 'claude' });
-
-      const permissionResult = adapter.handlePermission(
-        { tool_name: 'bash', tool_input: { command: 'rm -rf' } },
-        'perm-1',
-        { signal: { aborted: false, addEventListener: () => {} } },
-      );
-
-      adapter.resolvePermission(true);
-      const result = await permissionResult;
-      expect(result).toEqual({ result: 'allow' });
-    });
-
-    it('resolvePermission denies when false', async () => {
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      await adapter.start({ cliCommand: 'claude' });
-
-      const permissionResult = adapter.handlePermission(
-        { tool_name: 'bash', tool_input: {} },
-        'perm-2',
-        { signal: { aborted: false, addEventListener: () => {} } },
-      );
-
-      adapter.resolvePermission(false);
-      const result = await permissionResult;
-      expect(result).toEqual({ result: 'deny', reason: 'User denied' });
-    });
-
-    it('emits permission_request event', async () => {
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      await adapter.start({ cliCommand: 'claude' });
-
-      const requests: unknown[] = [];
-      adapter.on('permission_request', (r: unknown) => requests.push(r));
-
-      const promise = adapter.handlePermission(
-        { tool_name: 'write_file', tool_input: { path: '/tmp/x' } },
-        'perm-3',
-        { signal: { aborted: false, addEventListener: () => {} } },
-      );
-
-      // Should have emitted before resolving
-      expect(requests).toHaveLength(1);
-      expect(requests[0]).toEqual(expect.objectContaining({
-        id: 'perm-3',
-        toolName: 'write_file',
-        arguments: { path: '/tmp/x' },
-      }));
-
-      adapter.resolvePermission(true);
-      await promise;
-    });
-
-    it('auto-allows in autopilot mode', async () => {
-      adapter = new ClaudeSdkAdapter({ autopilot: true });
+    it('auto-allows all permissions (oversight is prompt-only)', async () => {
       await adapter.start({ cliCommand: 'claude' });
 
       const result = await adapter.handlePermission(
         { tool_name: 'bash', tool_input: {} },
-        'perm-4',
+        'perm-1',
         { signal: { aborted: false, addEventListener: () => {} } },
       );
 
       expect(result).toEqual({ result: 'allow' });
-    });
-
-    it('resolvePermission is no-op when no pending permission', () => {
-      // Should not throw
-      adapter.resolvePermission(true);
-    });
-
-    it('should not clobber first request when second arrives (C-6 race)', async () => {
-      vi.useFakeTimers();
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      await adapter.start({ cliCommand: 'claude' });
-
-      const abortSignal = { aborted: false, addEventListener: () => {} };
-
-      // First permission request
-      const result1 = adapter.handlePermission(
-        { tool_name: 'bash', tool_input: { command: 'first' } },
-        'perm-first',
-        { signal: abortSignal },
-      );
-
-      // Second permission request
-      const result2 = adapter.handlePermission(
-        { tool_name: 'write', tool_input: { path: 'second' } },
-        'perm-second',
-        { signal: abortSignal },
-      );
-
-      // Resolve the latest (second)
-      adapter.resolvePermission(true);
-      expect(await result2).toEqual({ result: 'allow' });
-
-      // First request auto-denies on timeout
-      vi.advanceTimersByTime(60_001);
-      expect(await result1).toEqual({ result: 'deny', reason: 'Permission timeout' });
-
-      vi.useRealTimers();
-    });
-
-    it('should resolve pending permission as deny on terminate', async () => {
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      await adapter.start({ cliCommand: 'claude' });
-
-      const result = adapter.handlePermission(
-        { tool_name: 'bash', tool_input: {} },
-        'perm-term',
-        { signal: { aborted: false, addEventListener: () => {} } },
-      );
-
-      adapter.terminate();
-      expect(await result).toEqual({ result: 'deny', reason: 'User denied' });
-    });
-
-    it('should not double-resolve on terminate during timeout window (C-6 race)', async () => {
-      vi.useFakeTimers();
-      adapter = new ClaudeSdkAdapter({ autopilot: false });
-      await adapter.start({ cliCommand: 'claude' });
-
-      const result = adapter.handlePermission(
-        { tool_name: 'shell', tool_input: {} },
-        'perm-race',
-        { signal: { aborted: false, addEventListener: () => {} } },
-      );
-
-      adapter.terminate();
-      expect(await result).toEqual({ result: 'deny', reason: 'User denied' });
-
-      // Timeout fires but permission already resolved — should not double-resolve
-      vi.advanceTimersByTime(60_001);
-      vi.useRealTimers();
     });
   });
 

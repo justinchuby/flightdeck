@@ -64,7 +64,7 @@ function createMockAgent(overrides: Partial<{
   projectId: string;
   projectName: string;
   cwd: string;
-  autopilot: boolean;
+
   resumeSessionId: string;
   status: string;
   sessionId: string | null;
@@ -80,7 +80,6 @@ function createMockAgent(overrides: Partial<{
     projectId: overrides.projectId ?? 'proj-1',
     projectName: overrides.projectName ?? 'test-project',
     cwd: overrides.cwd ?? '/test',
-    autopilot: overrides.autopilot ?? true,
     resumeSessionId: overrides.resumeSessionId,
     status: overrides.status ?? 'creating',
     sessionId: overrides.sessionId ?? null,
@@ -94,7 +93,6 @@ function createMockAgent(overrides: Partial<{
     _notifyThinking: vi.fn(),
     _notifyToolCall: vi.fn(),
     _notifyPlan: vi.fn(),
-    _notifyPermissionRequest: vi.fn(),
     _notifyUsage: vi.fn(),
     _notifyContextCompacted: vi.fn(),
     _notifyResponseStart: vi.fn(),
@@ -479,24 +477,7 @@ describe('ServerClientAdapter', () => {
       expect(handler).toHaveBeenCalledWith(entries);
     });
 
-    it('translates permission_request events', async () => {
-      const adapter = new ServerClientAdapter(client, 'agent-001');
-      await adapter.start({ cliCommand: '' });
 
-      const handler = vi.fn();
-      adapter.on('permission_request', handler);
-
-      const reqData = { id: 'perm-1', toolName: 'write_file', arguments: {} };
-      transport.receiveMessage({
-        type: 'agent_event',
-        agentId: 'agent-001',
-        eventId: 'ev-10',
-        eventType: 'permission_request',
-        data: reqData,
-      });
-
-      expect(handler).toHaveBeenCalledWith(reqData);
-    });
 
     it('ignores events for other agents', async () => {
       const adapter = new ServerClientAdapter(client, 'agent-001');
@@ -593,30 +574,13 @@ describe('ServerClientAdapter', () => {
     });
   });
 
-  describe('resolvePermission', () => {
-    it('sends permission response as a message', async () => {
+  describe('resolvePermission (no-op)', () => {
+    it('does not throw when called', async () => {
       const adapter = new ServerClientAdapter(client, 'agent-001');
       await adapter.start({ cliCommand: '' });
 
-      adapter.resolvePermission(true);
-
-      // Wait for async send
-      await new Promise(r => setTimeout(r, 10));
-
-      const sends = transport.sent.filter(m => m.type === 'send_message');
-      expect(sends.length).toBe(1);
-      expect((sends[0] as any).content).toContain('Permission approved');
-    });
-
-    it('sends denial message', async () => {
-      const adapter = new ServerClientAdapter(client, 'agent-001');
-      await adapter.start({ cliCommand: '' });
-
-      adapter.resolvePermission(false);
-      await new Promise(r => setTimeout(r, 10));
-
-      const sends = transport.sent.filter(m => m.type === 'send_message');
-      expect((sends[0] as any).content).toContain('Permission denied');
+      // resolvePermission was removed; verify no crash if not present
+      expect(typeof (adapter as any).resolvePermission).not.toBe('function');
     });
   });
 });

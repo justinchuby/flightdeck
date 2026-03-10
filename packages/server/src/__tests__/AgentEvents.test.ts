@@ -67,13 +67,6 @@ describe('AgentEventEmitter', () => {
     expect(listener).toHaveBeenCalledWith(entries);
   });
 
-  it('notifies permission request listeners', () => {
-    const listener = vi.fn();
-    emitter.onPermissionRequest(listener);
-    emitter.notifyPermissionRequest({ tool: 'bash', action: 'run' });
-    expect(listener).toHaveBeenCalledWith({ tool: 'bash', action: 'run' });
-  });
-
   it('notifies session ready listeners', () => {
     const listener = vi.fn();
     emitter.onSessionReady(listener);
