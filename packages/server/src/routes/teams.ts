@@ -442,6 +442,25 @@ export function teamsRoutes(ctx: AppContext): Router {
       return res.status(409).json({ error: 'Cannot delete an active agent. Stop the agent first.' });
     }
 
+    // Don't allow deleting lead agents that have children (defense in depth)
+    if (agent.role === 'lead' || !agent.metadata?.parentId) {
+      // Check if this agent has any children in the roster
+      const allAgents = agent.projectId 
+        ? agentRoster.getByProject(agent.projectId)
+        : agentRoster.getAllAgents();
+      
+      const hasChildren = allAgents.some(a => {
+        const meta = a.metadata as Record<string, unknown> | undefined;
+        return meta?.parentId === agentId && a.agentId !== agentId;
+      });
+
+      if (hasChildren) {
+        return res.status(409).json({ 
+          error: 'Cannot delete a lead agent that has children. Delete the crew instead to remove the lead and all descendants.' 
+        });
+      }
+    }
+
     const deleted = agentRoster.deleteAgent(agentId);
     if (!deleted) {
       return res.status(500).json({ error: 'Failed to delete agent from roster' });
