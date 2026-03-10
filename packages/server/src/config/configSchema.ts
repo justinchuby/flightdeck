@@ -131,10 +131,20 @@ const telegramSchema = z.object({
 });
 
 // ── Oversight section (Trust Dial) ─────────────────────────
-const oversightSchema = z.object({
-  level: z.enum(['supervised', 'balanced', 'autonomous']).default('balanced'),
-  customInstructions: z.string().max(500).optional(),
-});
+// Preprocess migrates old tier names (detailed/standard/minimal) to new names
+const oversightSchema = z.preprocess(
+  (val: unknown) => {
+    const v = val as Record<string, unknown> | undefined;
+    if (v?.level === 'detailed') v.level = 'supervised';
+    if (v?.level === 'standard') v.level = 'balanced';
+    if (v?.level === 'minimal') v.level = 'autonomous';
+    return val;
+  },
+  z.object({
+    level: z.enum(['supervised', 'balanced', 'autonomous']).default('balanced'),
+    customInstructions: z.string().max(500).optional(),
+  }),
+);
 
 // ── Conflicts section ──────────────────────────────────────
 const conflictsSchema = z.object({
