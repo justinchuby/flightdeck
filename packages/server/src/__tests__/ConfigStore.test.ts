@@ -183,7 +183,7 @@ describe('ConfigStore', () => {
 
     // Fire 3 concurrent writes — without serialization, some would be lost
     const p1 = store.writePartial({ server: { maxConcurrentAgents: 10 } });
-    const p2 = store.writePartial({ oversight: { level: 'detailed' } });
+    const p2 = store.writePartial({ oversight: { level: 'supervised' } });
     const p3 = store.writePartial({ conflicts: { enabled: false } });
 
     await Promise.all([p1, p2, p3]);
@@ -195,7 +195,7 @@ describe('ConfigStore', () => {
     const parsed = parseYaml(content) as Record<string, any>;
 
     expect(parsed.server.maxConcurrentAgents).toBe(10);
-    expect(parsed.oversight.level).toBe('detailed');
+    expect(parsed.oversight.level).toBe('supervised');
     expect(parsed.conflicts.enabled).toBe(false);
   });
 

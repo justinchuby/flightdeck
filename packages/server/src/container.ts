@@ -303,6 +303,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   agentManager.setProjectRegistry(projectRegistry);
   agentManager.setSessionKnowledgeExtractor(sessionKnowledgeExtractor);
   agentManager.setCollectiveMemory(collectiveMemory);
+  agentManager.setConfigStore(configStore);
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
   skillsLoader.loadAll();
   skillsLoader.startWatching();

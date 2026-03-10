@@ -6,7 +6,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 describe('ProjectOversightPicker', () => {
   beforeEach(() => {
     useSettingsStore.setState({
-      oversightLevel: 'standard',
+      oversightLevel: 'balanced',
       projectOverrides: {},
     });
   });
@@ -14,15 +14,15 @@ describe('ProjectOversightPicker', () => {
   it('shows inherited global level with arrow indicator', () => {
     render(<ProjectOversightPicker projectId="proj-1" />);
     const toggle = screen.getByTestId('project-oversight-toggle');
-    expect(toggle).toHaveTextContent('standard');
+    expect(toggle).toHaveTextContent('balanced');
     expect(toggle).toHaveTextContent('↑'); // inherited indicator
   });
 
   it('shows project override without inherited indicator', () => {
-    useSettingsStore.setState({ projectOverrides: { 'proj-1': 'minimal' } });
+    useSettingsStore.setState({ projectOverrides: { 'proj-1': 'autonomous' } });
     render(<ProjectOversightPicker projectId="proj-1" />);
     const toggle = screen.getByTestId('project-oversight-toggle');
-    expect(toggle).toHaveTextContent('minimal');
+    expect(toggle).toHaveTextContent('autonomous');
     expect(toggle.textContent).not.toContain('↑');
   });
 
@@ -33,11 +33,11 @@ describe('ProjectOversightPicker', () => {
     expect(screen.getByTestId('project-oversight-picker')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('project-oversight-detailed'));
-    expect(useSettingsStore.getState().projectOverrides['proj-1']).toBe('detailed');
+    expect(useSettingsStore.getState().projectOverrides['proj-1']).toBe('supervised');
   });
 
   it('shows clear option when project has override', () => {
-    useSettingsStore.setState({ projectOverrides: { 'proj-1': 'detailed' } });
+    useSettingsStore.setState({ projectOverrides: { 'proj-1': 'supervised' } });
     render(<ProjectOversightPicker projectId="proj-1" />);
 
     fireEvent.click(screen.getByTestId('project-oversight-toggle'));

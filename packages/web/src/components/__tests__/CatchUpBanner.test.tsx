@@ -32,7 +32,7 @@ vi.mock('../../stores/leadStore', () => ({
 
 vi.mock('../../stores/settingsStore', () => ({
   useSettingsStore: (sel: any) => {
-    const state = { oversightLevel: 'standard' };
+    const state = { oversightLevel: 'balanced' };
     return sel(state);
   },
 }));

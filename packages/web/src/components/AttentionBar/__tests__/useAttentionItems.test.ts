@@ -22,7 +22,7 @@ vi.mock('../../../stores/leadStore', () => ({
 }));
 
 const mockSettingsState = {
-  oversightLevel: 'standard' as string,
+  oversightLevel: 'balanced' as string,
 };
 vi.mock('../../../stores/settingsStore', () => ({
   useSettingsStore: (selector: (s: typeof mockSettingsState) => any) => selector(mockSettingsState),
@@ -103,7 +103,7 @@ beforeEach(async () => {
   mockAppState.connected = true;
   mockLeadState.projects = {};
   mockLeadState.selectedLeadId = null;
-  mockSettingsState.oversightLevel = 'standard';
+  mockSettingsState.oversightLevel = 'balanced';
 
   vi.resetModules();
   const mod = await import('../useAttentionItems');

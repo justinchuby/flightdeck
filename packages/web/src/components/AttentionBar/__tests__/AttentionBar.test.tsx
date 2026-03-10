@@ -33,7 +33,7 @@ vi.mock('../../../stores/leadStore', () => ({
 }));
 
 vi.mock('../../../stores/settingsStore', () => ({
-  useSettingsStore: (sel: any) => sel({ oversightLevel: 'standard' }),
+  useSettingsStore: (sel: any) => sel({ oversightLevel: 'balanced' }),
 }));
 
 // Mock apiFetch — defaults to rejecting (triggers fallback to client-side)

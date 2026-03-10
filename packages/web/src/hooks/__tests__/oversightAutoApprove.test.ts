@@ -23,7 +23,7 @@ function simulateDecisionArrival(msg: {
 }) {
   if (msg.needsConfirmation && msg.id) {
     const effectiveLevel = useSettingsStore.getState().getEffectiveLevel(msg.projectId ?? undefined);
-    if (effectiveLevel === 'minimal') {
+    if (effectiveLevel === 'autonomous') {
       mockApiFetch(`/decisions/${msg.id}/confirm`, { method: 'POST', body: JSON.stringify({}) });
       return;
     }
@@ -49,11 +49,12 @@ describe('oversight auto-approve', () => {
   beforeEach(() => {
     mockApiFetch.mockClear();
     useAppStore.setState({ pendingDecisions: [] });
-    useSettingsStore.getState().setOversightLevel('standard');
+    useSettingsStore.getState().setOversightLevel('balanced');
   });
 
   it('adds decision to pendingDecisions when oversight is standard', () => {
-    useSettingsStore.getState().setOversightLevel('standard');
+    useSettingsStore.getState().setOversightLevel('balanced');
+    mockApiFetch.mockClear(); // Clear sync call from setOversightLevel
     simulateDecisionArrival({ id: 'dec-1', needsConfirmation: true });
 
     expect(useAppStore.getState().pendingDecisions).toHaveLength(1);
@@ -62,7 +63,8 @@ describe('oversight auto-approve', () => {
   });
 
   it('adds decision to pendingDecisions when oversight is detailed', () => {
-    useSettingsStore.getState().setOversightLevel('detailed');
+    useSettingsStore.getState().setOversightLevel('supervised');
+    mockApiFetch.mockClear(); // Clear sync call from setOversightLevel
     simulateDecisionArrival({ id: 'dec-2', needsConfirmation: true });
 
     expect(useAppStore.getState().pendingDecisions).toHaveLength(1);
@@ -70,7 +72,7 @@ describe('oversight auto-approve', () => {
   });
 
   it('auto-approves via API when oversight is minimal', () => {
-    useSettingsStore.getState().setOversightLevel('minimal');
+    useSettingsStore.getState().setOversightLevel('autonomous');
     simulateDecisionArrival({ id: 'dec-3', needsConfirmation: true });
 
     expect(useAppStore.getState().pendingDecisions).toHaveLength(0);
@@ -81,8 +83,8 @@ describe('oversight auto-approve', () => {
   });
 
   it('respects per-project oversight override', () => {
-    useSettingsStore.getState().setOversightLevel('detailed');
-    useSettingsStore.getState().setProjectOversight('project-abc', 'minimal');
+    useSettingsStore.getState().setOversightLevel('supervised');
+    useSettingsStore.getState().setProjectOversight('project-abc', 'autonomous');
 
     simulateDecisionArrival({ id: 'dec-4', needsConfirmation: true, projectId: 'project-abc' });
 
@@ -94,7 +96,7 @@ describe('oversight auto-approve', () => {
   });
 
   it('uses global level when project has no override', () => {
-    useSettingsStore.getState().setOversightLevel('minimal');
+    useSettingsStore.getState().setOversightLevel('autonomous');
 
     simulateDecisionArrival({ id: 'dec-5', needsConfirmation: true, projectId: 'project-xyz' });
 
@@ -103,7 +105,8 @@ describe('oversight auto-approve', () => {
   });
 
   it('skips decisions without needsConfirmation', () => {
-    useSettingsStore.getState().setOversightLevel('standard');
+    useSettingsStore.getState().setOversightLevel('balanced');
+    mockApiFetch.mockClear(); // Clear sync call from setOversightLevel
     simulateDecisionArrival({ id: 'dec-6', needsConfirmation: false });
 
     expect(useAppStore.getState().pendingDecisions).toHaveLength(0);
