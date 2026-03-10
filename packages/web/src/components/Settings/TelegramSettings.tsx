@@ -152,18 +152,16 @@ export function TelegramSettings() {
     setSaving(true);
     setSaveSuccess(false);
     try {
-      await apiFetch('/config', {
+      await apiFetch('/integrations/telegram', {
         method: 'PATCH',
         body: JSON.stringify({
-          telegram: {
-            enabled,
-            botToken,
-            allowedChatIds,
-            rateLimitPerMinute,
-            notifications: {
-              enabledCategories: Array.from(enabledCategories),
-              quietHours: quietHours.enabled ? quietHours : null,
-            },
+          enabled,
+          botToken,
+          allowedChatIds,
+          rateLimitPerMinute,
+          notifications: {
+            enabledCategories: Array.from(enabledCategories),
+            quietHours: quietHours.enabled ? quietHours : null,
           },
         }),
       });
@@ -205,9 +203,9 @@ export function TelegramSettings() {
   const handleToggleEnabled = useCallback(async (newEnabled: boolean) => {
     setEnabled(newEnabled);
     try {
-      await apiFetch('/config', {
+      await apiFetch('/integrations/telegram', {
         method: 'PATCH',
-        body: JSON.stringify({ telegram: { enabled: newEnabled } }),
+        body: JSON.stringify({ enabled: newEnabled }),
       });
       setTimeout(loadStatus, 1000);
     } catch {

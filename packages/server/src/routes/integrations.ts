@@ -220,5 +220,35 @@ export function integrationRoutes(ctx: AppContext): Router {
     }
   });
 
+  // ── Telegram Config ────────────────────────────────────────
+
+  // PATCH /api/integrations/telegram — update telegram config in flightdeck.config.yaml
+  router.patch('/integrations/telegram', async (req, res) => {
+    const { configStore } = ctx;
+    if (!configStore) {
+      return res.status(503).json({ error: 'Config store not available' });
+    }
+
+    try {
+      const { enabled, botToken, allowedChatIds, rateLimitPerMinute, notifications } = req.body;
+      const patch: Record<string, unknown> = {};
+
+      if (enabled !== undefined) patch.enabled = Boolean(enabled);
+      if (botToken !== undefined) patch.botToken = String(botToken);
+      if (allowedChatIds !== undefined) patch.allowedChatIds = Array.isArray(allowedChatIds) ? allowedChatIds : [];
+      if (rateLimitPerMinute !== undefined) patch.rateLimitPerMinute = Number(rateLimitPerMinute);
+      if (notifications !== undefined) patch.notifications = notifications;
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+
+      await configStore.writePartial({ telegram: patch });
+      res.json({ ok: true, updated: Object.keys(patch) });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to update telegram config', detail: (err as Error).message });
+    }
+  });
+
   return router;
 }

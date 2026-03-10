@@ -444,6 +444,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     teamExporter,
     teamImporter,
     integrationRouter,
+    configStore,
 
     // Lifecycle
     async shutdown() {
