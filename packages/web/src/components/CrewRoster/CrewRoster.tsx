@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Square,
   Send,
+  Trash2,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { getRoleIcon } from '../../utils/getRoleIcon';
@@ -108,12 +109,18 @@ function formatDuration(ms: number): string {
 }
 
 function statusBadge(status: RosterStatus, liveStatus: LiveStatus): { bg: string; label: string } {
+  // Live agent states take priority — these come from AgentManager (in-memory)
   if (liveStatus === 'running') return { bg: 'bg-green-500/20 text-green-400', label: 'Running' };
   if (liveStatus === 'creating') return { bg: 'bg-yellow-500/20 text-yellow-400', label: 'Starting' };
-  if (status === 'busy') return { bg: 'bg-blue-500/20 text-blue-400', label: 'Busy' };
+  if (liveStatus === 'idle') return { bg: 'bg-cyan-500/20 text-cyan-400', label: 'Idle' };
+  if (liveStatus === 'completed') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Completed' };
+  if (liveStatus === 'failed') return { bg: 'bg-red-500/20 text-red-400', label: 'Failed' };
+  if (liveStatus === 'terminated') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Terminated' };
+  // liveStatus is null — agent not in memory. Fall back to DB status.
   if (status === 'terminated') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Terminated' };
-  if (status === 'idle') return { bg: 'bg-cyan-500/20 text-cyan-400', label: 'Idle' };
-  return { bg: 'bg-gray-500/20 text-gray-400', label: status };
+  if (status === 'retired') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Retired' };
+  // DB says idle/busy but agent not found in live manager → offline
+  return { bg: 'bg-gray-500/20 text-gray-400', label: 'Offline' };
 }
 
 // ── Crew Group (collapsible) ──────────────────────────────
@@ -125,12 +132,15 @@ interface CrewGroupProps {
   defaultExpanded?: boolean;
   onSelectAgent: (id: string) => void;
   selectedAgentId: string | null;
+  onDeleteCrew: (leadId: string) => Promise<void>;
 }
 
-function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId }: CrewGroupProps) {
+function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAgent, selectedAgentId, onDeleteCrew }: CrewGroupProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [sessions, setSessions] = useState<SessionDetail[]>([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Lazy-load session details when expanded and project is known
   useEffect(() => {
@@ -161,38 +171,84 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
   const activeCount = summary?.activeAgentCount ?? agents.filter(a =>
     a.liveStatus === 'running' || a.liveStatus === 'idle'
   ).length;
+  const isActive = activeCount > 0;
   const latestActivity = summary?.lastActivity ??
     agents.reduce((latest, a) => a.updatedAt > latest ? a.updatedAt : latest, '');
   const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${lead.projectId.slice(0, 8)}` : `Crew ${leadId.slice(0, 8)}`);
 
+  const handleDeleteCrew = async () => {
+    setDeleting(true);
+    try {
+      await onDeleteCrew(leadId);
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  };
+
   return (
     <div className="border border-th-border rounded-lg overflow-hidden bg-surface-raised md:min-w-[280px]">
       {/* Group header */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-th-bg-alt/30 transition-colors"
-      >
-        <ChevronRight className={`w-4 h-4 text-th-text-muted shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-th-text text-sm">{displayName}</span>
-            {activeCount > 0 ? (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">
-                {activeCount}/{agents.length} active
-              </span>
-            ) : (
-              <span className="text-[10px] text-th-text-muted">
-                {agents.length} agent{agents.length !== 1 ? 's' : ''}
-              </span>
-            )}
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-th-bg-alt/30 transition-colors">
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
+          <ChevronRight className={`w-4 h-4 text-th-text-muted shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-th-text text-sm">{displayName}</span>
+              {activeCount > 0 ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">
+                  {activeCount}/{agents.length} active
+                </span>
+              ) : (
+                <span className="text-[10px] text-th-text-muted">
+                  {agents.length} agent{agents.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-th-text-muted mt-0.5">
+              {lead && <span>🎖️ Lead: {lead.agentId.slice(0, 8)} · {lead.model}</span>}
+              {summary?.sessionCount ? <span>📋 {summary.sessionCount} session{summary.sessionCount !== 1 ? 's' : ''}</span> : null}
+              {latestActivity && <span>{formatRelativeTime(latestActivity)}</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-[10px] text-th-text-muted mt-0.5">
-            {lead && <span>🎖️ Lead: {lead.agentId.slice(0, 8)} · {lead.model}</span>}
-            {summary?.sessionCount ? <span>📋 {summary.sessionCount} session{summary.sessionCount !== 1 ? 's' : ''}</span> : null}
-            {latestActivity && <span>{formatRelativeTime(latestActivity)}</span>}
-          </div>
+        </button>
+        {!isActive && (
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            title="Delete crew"
+            className="p-1.5 rounded text-th-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Delete confirmation */}
+      {confirmingDelete && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-t border-red-500/20">
+          <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+          <span className="text-xs text-red-600 dark:text-red-400 flex-1">
+            Delete <strong>{displayName}</strong> and all {agents.length} agents? This cannot be undone.
+          </span>
+          <button
+            onClick={handleDeleteCrew}
+            disabled={deleting}
+            className="px-2.5 py-1 text-xs bg-red-500 text-white rounded font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+          <button
+            onClick={() => setConfirmingDelete(false)}
+            disabled={deleting}
+            className="px-2.5 py-1 text-xs text-th-text-muted rounded hover:bg-th-bg-muted transition-colors"
+          >
+            Cancel
+          </button>
         </div>
-      </button>
+      )}
 
       {/* Agent rows */}
       {expanded && (
@@ -611,6 +667,31 @@ export function CrewRoster() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const handleDeleteCrew = useCallback(async (leadId: string) => {
+    try {
+      await apiFetch(`/crews/${leadId}`, { method: 'DELETE' });
+      addToast('success', 'Crew deleted');
+      // Remove deleted agents from local state and deselect if needed
+      setAgents(prev => {
+        const remaining = prev.filter(a => {
+          if (a.agentId === leadId) return false;
+          const meta = a.parentId;
+          return meta !== leadId;
+        });
+        return remaining;
+      });
+      if (selectedAgent) {
+        const deletedAgent = agents.find(a => a.agentId === selectedAgent);
+        if (deletedAgent && (deletedAgent.agentId === leadId || deletedAgent.parentId === leadId)) {
+          setSelectedAgent(null);
+        }
+      }
+      setCrewSummaries(prev => prev.filter(s => s.leadId !== leadId));
+    } catch (err: any) {
+      addToast('error', `Failed to delete crew: ${err.message}`);
+    }
+  }, [addToast, agents, selectedAgent]);
+
   // Filter agents
   const filtered = agents.filter(a => {
     if (!search) return true;
@@ -729,6 +810,7 @@ export function CrewRoster() {
                 defaultExpanded
                 onSelectAgent={setSelectedAgent}
                 selectedAgentId={selectedAgent}
+                onDeleteCrew={handleDeleteCrew}
               />
             ))
           )}

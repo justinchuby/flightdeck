@@ -4,6 +4,8 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { CrewRoster } from '../CrewRoster';
 
+type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
+
 // ── Mocks ─────────────────────────────────────────────────
 
 const mockApiFetch = vi.fn();
@@ -175,7 +177,8 @@ describe('CrewRoster', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Running').length).toBeGreaterThan(0);
     });
-    expect(screen.getByText('Idle')).toBeInTheDocument();
+    // developer: status=idle, liveStatus=null → Offline (not live in memory)
+    expect(screen.getByText('Offline')).toBeInTheDocument();
     expect(screen.getByText('Terminated')).toBeInTheDocument();
   });
 
@@ -591,5 +594,146 @@ describe('CrewRoster', () => {
     // Task counts shown
     expect(screen.getByText(/4\/5 tasks/)).toBeInTheDocument();
     expect(screen.getByText(/1 failed/)).toBeInTheDocument();
+  });
+
+  // ── Delete Crew tests ─────────────────────────────────────
+
+  it('shows delete button for inactive crews', async () => {
+    // All agents terminated/offline → delete button visible
+    const inactiveAgents = rosterAgents.map(a => ({ ...a, liveStatus: null as LiveStatus, status: 'terminated' as const }));
+    const inactiveSummary = [{ ...crewSummaryData[0], activeAgentCount: 0, agents: inactiveAgents.map(a => ({ agentId: a.agentId, role: a.role, model: a.model, status: a.status, liveStatus: a.liveStatus })) }];
+    setupMocks({ agents: inactiveAgents, crewSummary: inactiveSummary });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete crew')).toBeInTheDocument();
+    });
+  });
+
+  it('hides delete button for active crews', async () => {
+    // activeAgentCount > 0 → no delete button
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    expect(screen.queryByTitle('Delete crew')).not.toBeInTheDocument();
+  });
+
+  it('shows confirmation dialog before deleting crew', async () => {
+    const inactiveAgents = rosterAgents.map(a => ({ ...a, liveStatus: null as LiveStatus, status: 'terminated' as const }));
+    const inactiveSummary = [{ ...crewSummaryData[0], activeAgentCount: 0 }];
+    setupMocks({ agents: inactiveAgents, crewSummary: inactiveSummary });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete crew')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Delete crew'));
+    // Confirmation dialog appears with action buttons
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('cancels crew deletion', async () => {
+    const inactiveAgents = rosterAgents.map(a => ({ ...a, liveStatus: null as LiveStatus, status: 'terminated' as const }));
+    const inactiveSummary = [{ ...crewSummaryData[0], activeAgentCount: 0 }];
+    setupMocks({ agents: inactiveAgents, crewSummary: inactiveSummary });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete crew')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Delete crew'));
+    await waitFor(() => {
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => {
+      expect(screen.queryByText(/This cannot be undone/)).not.toBeInTheDocument();
+    });
+  });
+
+  it('deletes crew and removes from list', async () => {
+    const inactiveAgents = rosterAgents.map(a => ({ ...a, liveStatus: null as LiveStatus, status: 'terminated' as const }));
+    const inactiveSummary = [{ ...crewSummaryData[0], activeAgentCount: 0 }];
+    setupMocks({ agents: inactiveAgents, crewSummary: inactiveSummary });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete crew')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Delete crew'));
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument();
+    });
+
+    // Confirm deletion
+    fireEvent.click(screen.getByText('Delete'));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        `/crews/${crewSummaryData[0].leadId}`,
+        { method: 'DELETE' },
+      );
+    });
+    // Agents removed from the list
+    await waitFor(() => {
+      expect(screen.queryByText('architect')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows error toast on delete failure', async () => {
+    const inactiveAgents = rosterAgents.map(a => ({ ...a, liveStatus: null as LiveStatus, status: 'terminated' as const }));
+    const inactiveSummary = [{ ...crewSummaryData[0], activeAgentCount: 0 }];
+
+    const addToastMock = vi.fn();
+    vi.mocked(vi.fn()).mockReturnValue(addToastMock);
+
+    mockApiFetch.mockImplementation((path: string, opts?: any) => {
+      if (opts?.method === 'DELETE') return Promise.reject(new Error('Cannot delete active crew'));
+      if (path === '/crews/summary') return Promise.resolve(inactiveSummary);
+      if (path === '/teams') return Promise.resolve(teamsData);
+      if (path.includes('/agents')) return Promise.resolve(inactiveAgents);
+      return Promise.resolve({});
+    });
+
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete crew')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Delete crew'));
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Delete'));
+    // Confirmation should remain visible after error
+    await waitFor(() => {
+      expect(screen.getByTitle('Delete crew')).toBeInTheDocument();
+    });
+  });
+
+  // ── Offline status tests ──────────────────────────────────
+
+  it('shows Offline for agents with idle DB status but no live agent', async () => {
+    // Developer has status=idle, liveStatus=null → should show Offline
+    setupMocks();
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('Offline')).toBeInTheDocument();
+    });
+  });
+
+  it('shows Idle only for agents with live idle status', async () => {
+    const liveIdleAgents = rosterAgents.map(a => a.role === 'developer' ? { ...a, liveStatus: 'idle' as LiveStatus } : a);
+    const summary = [{ ...crewSummaryData[0], activeAgentCount: 2 }];
+    setupMocks({ agents: liveIdleAgents, crewSummary: summary });
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText('Idle')).toBeInTheDocument();
+    });
   });
 });

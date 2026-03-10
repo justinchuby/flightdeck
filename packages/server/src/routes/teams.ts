@@ -444,7 +444,11 @@ export function teamsRoutes(ctx: AppContext): Router {
 
       const crews = Array.from(crewMap.entries()).map(([leadId, agents]) => {
         const lead = agents.find(a => a.agentId === leadId);
-        const activeCount = agents.filter(a => a.status !== 'terminated' && a.status !== 'retired').length;
+        // Count agents that are actually alive in the agent manager (not just DB status)
+        const activeCount = agents.filter(a => {
+          const live = liveAgents.find(l => l.id === a.agentId);
+          return live != null && (live.status === 'running' || live.status === 'idle' || live.status === 'creating');
+        }).length;
         const lastActivity = agents.reduce((max, a) => a.updatedAt > max ? a.updatedAt : max, '');
 
         // Get project info from lead's live agent or roster
