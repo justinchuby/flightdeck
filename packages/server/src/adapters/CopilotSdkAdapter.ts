@@ -26,6 +26,7 @@ import type {
   ToolCallInfo,
   ToolUpdateInfo,
   PermissionRequest,
+  UserInputRequest,
   ContentBlock,
 } from './types.js';
 import type {
@@ -36,6 +37,7 @@ import type {
   CopilotResumeSessionConfig,
   CopilotSessionEvent,
   CopilotPermissionHandler,
+  CopilotUserInputHandler,
 } from './copilot-sdk-types.js';
 
 // ── SDK Import ──────────────────────────────────────────────
@@ -100,6 +102,11 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
     timeout: ReturnType<typeof setTimeout>;
   }>();
   private latestPermissionId: string | null = null;
+  private pendingUserInputs = new Map<string, {
+    resolve: (result: { response: string }) => void;
+    timeout: ReturnType<typeof setTimeout> | null;
+  }>();
+  private latestUserInputId: string | null = null;
   private abortController: AbortController | null = null;
   private sendTimeout: number;
 
@@ -183,10 +190,16 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       return this.handlePermissionRequest(request, invocation);
     };
 
+    // User input handler — called when the agent uses ask_user tool
+    const userInputHandler: CopilotUserInputHandler = (request) => {
+      return this.handleUserInputRequest(request);
+    };
+
     // Build session config
     const sessionConfig: CopilotSessionConfig = {
       model: this.model,
       onPermissionRequest: permissionHandler,
+      onUserInput: userInputHandler,
       ...(this.systemPrompt ? {
         systemMessage: { mode: 'append' as const, content: this.systemPrompt },
       } : {}),
@@ -610,6 +623,37 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
         timestamp: new Date().toISOString(),
       };
       this.emit('permission_request', permReq);
+    });
+  }
+
+  // ── User Input Handling ─────────────────────────────────────
+
+  resolveUserInput(response: string): void {
+    const id = this.latestUserInputId;
+    if (!id) return;
+    const entry = this.pendingUserInputs.get(id);
+    if (!entry) return;
+    this.pendingUserInputs.delete(id);
+    this.latestUserInputId = null;
+    if (entry.timeout) clearTimeout(entry.timeout);
+    entry.resolve({ response });
+  }
+
+  private handleUserInputRequest(
+    request: { question: string },
+  ): Promise<{ response: string }> {
+    return new Promise<{ response: string }>((resolve) => {
+      const reqId = `uinput-${Date.now()}-${randomUUID().slice(0, 8)}`;
+
+      this.pendingUserInputs.set(reqId, { resolve, timeout: null });
+      this.latestUserInputId = reqId;
+
+      const uiReq: UserInputRequest = {
+        id: reqId,
+        question: request.question,
+        timestamp: new Date().toISOString(),
+      };
+      this.emit('user_input_request', uiReq);
     });
   }
 

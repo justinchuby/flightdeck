@@ -83,6 +83,12 @@ export interface PermissionRequest {
   timestamp: string;
 }
 
+export interface UserInputRequest {
+  id: string;
+  question: string;
+  timestamp: string;
+}
+
 // ── Start Options ───────────────────────────────────────────────────
 
 export interface AdapterStartOptions {
@@ -121,6 +127,7 @@ export interface AdapterStartOptions {
  *   'prompt_complete'  (reason: string)
  *   'response_start'  ()
  *   'permission_request' (req: PermissionRequest)
+ *   'user_input_request' (req: UserInputRequest)
  *   'exit'            (code: number)
  *   'usage'           (usage: UsageInfo)
  */
@@ -137,6 +144,7 @@ export interface AgentAdapter extends EventEmitter {
   cancel(): Promise<void>;
   terminate(): void | Promise<void>;
   resolvePermission(approved: boolean): void;
+  resolveUserInput(response: string): void;
   setAutopilot(enabled: boolean): void;
 }
 

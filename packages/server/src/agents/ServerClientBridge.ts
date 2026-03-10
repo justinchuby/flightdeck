@@ -143,6 +143,13 @@ export class ServerClientAdapter extends EventEmitter implements AgentAdapter {
     });
   }
 
+  resolveUserInput(response: string): void {
+    if (this._disposed) return;
+    this.client.prompt(this.agentId, `[User Response] ${response}`).catch((err) => {
+      logger.warn({ module: 'server-client-bridge', msg: 'resolveUserInput send failed', err: String(err) });
+    });
+  }
+
   setAutopilot(_enabled: boolean): void {
     // No-op for server-client bridge — remote agents manage their own autopilot
   }

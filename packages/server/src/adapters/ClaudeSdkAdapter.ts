@@ -331,6 +331,10 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
     entry.resolve({ allow: approved });
   }
 
+  resolveUserInput(_response: string): void {
+    // Not yet supported by Claude SDK adapter
+  }
+
   /**
    * SDK permission callback — called by the SDK when a tool needs approval.
    * Emits 'permission_request' event and waits for resolvePermission().

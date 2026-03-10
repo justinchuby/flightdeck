@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { createHash } from 'crypto';
-import type { AgentAdapter, ToolCallInfo, PlanEntry, PromptContent } from '../adapters/types.js';
+import type { AgentAdapter, ToolCallInfo, PlanEntry, PromptContent, UserInputRequest } from '../adapters/types.js';
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -193,6 +193,7 @@ export class Agent {
   /** @internal */ _notifyToolCall(info: ToolCallInfo): void { this.events.notifyToolCall(info); }
   /** @internal */ _notifyPlan(entries: PlanEntry[]): void { this.events.notifyPlan(entries); }
   /** @internal */ _notifyPermissionRequest(request: any): void { this.events.notifyPermissionRequest(request); }
+  /** @internal */ _notifyUserInputRequest(request: UserInputRequest): void { this.events.notifyUserInputRequest(request); }
   /** @internal */ _notifySessionReady(sessionId: string): void { this.events.notifySessionReady(sessionId); }
   /** @internal */ _notifySessionResumeFailed(info: { requestedSessionId: string; error: string }): void { this.events.notifySessionResumeFailed(info); }
   /** @internal */ _notifyContextCompacted(info: CompactionInfo): void { this.events.notifyContextCompacted(info); }
@@ -607,6 +608,12 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     }
   }
 
+  resolveUserInput(response: string): void {
+    if (this.acpConnection) {
+      this.acpConnection.resolveUserInput(response);
+    }
+  }
+
   setAutopilot(enabled: boolean): void {
     this.autopilot = enabled;
     if (this.acpConnection) {
@@ -644,6 +651,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onToolCall(listener: (info: ToolCallInfo) => void): void { this.events.onToolCall(listener); }
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.events.onPlan(listener); }
   onPermissionRequest(listener: (request: any) => void): void { this.events.onPermissionRequest(listener); }
+  onUserInputRequest(listener: (request: UserInputRequest) => void): void { this.events.onUserInputRequest(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.events.onSessionReady(listener); }
   onSessionResumeFailed(listener: (info: { requestedSessionId: string; error: string }) => void): void { this.events.onSessionResumeFailed(listener); }
   onContextCompacted(listener: (info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void): void { this.events.onContextCompacted(listener); }

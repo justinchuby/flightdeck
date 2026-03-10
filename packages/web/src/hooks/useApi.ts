@@ -162,6 +162,13 @@ export function useApi() {
     });
   }, []);
 
+  const resolveUserInput = useCallback(async (agentId: string, response: string) => {
+    return apiFetch(`/agents/${agentId}/user-input`, {
+      method: 'POST',
+      body: JSON.stringify({ response }),
+    });
+  }, []);
+
   const fetchGroups = useCallback(async (leadId: string) => {
     return apiFetch(`/lead/${leadId}/groups`);
   }, []);
@@ -185,6 +192,7 @@ export function useApi() {
     createRole,
     deleteRole,
     resolvePermission,
+    resolveUserInput,
     fetchGroups,
     fetchGroupMessages,
     fetchDagStatus,

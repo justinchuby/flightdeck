@@ -13,6 +13,7 @@ import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
+import { UserInputDialog } from './components/UserInputDialog';
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play, Bug } from 'lucide-react';
@@ -411,6 +412,7 @@ export function App() {
       </div>
       <ToastContainer />
       <PermissionDialog />
+      <UserInputDialog />
       <ApprovalSlideOver />
       <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />

@@ -192,6 +192,10 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     agent._notifyPermissionRequest(request);
   }));
 
+  conn.on('user_input_request', (request: any) => withCtx(() => {
+    agent._notifyUserInputRequest(request);
+  }));
+
   conn.on('session_resume_failed', (info: { requestedSessionId: string; error: string }) => withCtx(() => {
     agent._notifySessionResumeFailed(info);
   }));

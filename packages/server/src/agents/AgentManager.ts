@@ -67,6 +67,7 @@ export interface AgentManagerEvents {
   'agent:thinking': { agentId: string; text: string };
   'agent:plan': { agentId: string; plan: PlanEntry[] };
   'agent:permission_request': { agentId: string; request: any; dangerous?: boolean };
+  'agent:user_input_request': { agentId: string; request: any };
   'agent:session_ready': { agentId: string; sessionId: string };
   'agent:session_resume_failed': { agentId: string; requestedSessionId: string; error: string };
   'agent:message_sent': { from: string; fromRole: string; to: string; toRole: string; content: string };
@@ -647,6 +648,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       this.emit('agent:permission_request', { agentId: agent.id, request, dangerous });
     });
 
+    agent.onUserInputRequest((request) => {
+      this.emit('agent:user_input_request', { agentId: agent.id, request });
+    });
+
     // When an agent's session is established, broadcast session ID
     agent.onSessionReady((sessionId) => {
       this.emit('agent:session_ready', { agentId: agent.id, sessionId });
@@ -1196,6 +1201,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(agentId);
     if (!agent) return false;
     agent.resolvePermission(approved);
+    return true;
+  }
+
+  resolveUserInput(agentId: string, response: string): boolean {
+    const agent = this.agents.get(agentId);
+    if (!agent) return false;
+    agent.resolveUserInput(response);
     return true;
   }
 

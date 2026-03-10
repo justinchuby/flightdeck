@@ -89,6 +89,13 @@ export interface AcpPermissionRequest {
   dangerous?: boolean;
 }
 
+export interface AcpUserInputRequest {
+  id: string;
+  agentId: string;
+  question: string;
+  timestamp: string;
+}
+
 export interface AcpSessionInfo {
   sessionId: string;
   isPrompting: boolean;
@@ -113,6 +120,7 @@ export interface AgentInfo {
   toolCalls?: AcpToolCall[];
   messages?: AcpTextChunk[];
   pendingPermission?: AcpPermissionRequest;
+  pendingUserInput?: AcpUserInputRequest;
   projectName?: string;
   projectId?: string;
   model?: string;

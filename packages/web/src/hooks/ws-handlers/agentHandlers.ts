@@ -172,6 +172,15 @@ export function handleAgentPermissionRequest(msg: any, ctx: HandlerContext): voi
   }
 }
 
+export function handleAgentUserInputRequest(msg: any, ctx: HandlerContext): void {
+  ctx.updateAgent(msg.agentId, { pendingUserInput: msg.request });
+  if (shouldNotify('exception')) {
+    const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+    const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
+    useToastStore.getState().add('info', `💬 Agent ${roleName} is asking you a question`);
+  }
+}
+
 export function handleAgentSessionReady(msg: any, ctx: HandlerContext): void {
   ctx.updateAgent(msg.agentId, { sessionId: msg.sessionId });
 }

@@ -235,6 +235,14 @@ export function agentsRoutes(ctx: AppContext): Router {
     res.json({ ok: true });
   });
 
+  router.post('/agents/:id/user-input', (req, res) => {
+    const { response } = req.body;
+    if (typeof response !== 'string') return res.status(400).json({ error: 'response is required' });
+    const ok = agentManager.resolveUserInput(req.params.id, response);
+    if (!ok) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ ok: true });
+  });
+
   // --- Focus Mode: aggregated single-agent view ---
 
   router.get('/agents/:id/focus', async (req, res) => {
