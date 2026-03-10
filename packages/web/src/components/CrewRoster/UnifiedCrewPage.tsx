@@ -328,19 +328,19 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
-  
+
   // Check if this is a lead with children
   const hasChildren = isLead && crewAgents && crewAgents.some(a => a.parentId === agent.agentId && a.agentId !== agent.agentId);
-  
+
   // Only show remove button for terminated/retired agents that aren't leads with children
   const canRemove = !hasChildren &&
-                    (agent.status === 'terminated' || agent.status === 'retired') && 
+                    (agent.status === 'terminated' || agent.status === 'retired') &&
                     (!agent.liveStatus || agent.liveStatus === 'terminated' || agent.liveStatus === 'failed' || agent.liveStatus === 'completed');
 
   const handleRemove = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onRemove) return;
-    
+
     if (!confirmingRemove) {
       setConfirmingRemove(true);
       return;
@@ -401,8 +401,8 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
             disabled={removing}
             title={confirmingRemove ? "Confirm removal" : "Remove agent from roster"}
             className={`p-1 rounded transition-colors shrink-0 ${
-              confirmingRemove 
-                ? 'bg-red-500 text-white hover:bg-red-600' 
+              confirmingRemove
+                ? 'bg-red-500 text-white hover:bg-red-600'
                 : 'text-th-text-muted hover:text-red-400 hover:bg-red-500/10'
             } ${removing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
