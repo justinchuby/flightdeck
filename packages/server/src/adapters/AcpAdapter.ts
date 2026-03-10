@@ -128,6 +128,10 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     this.autopilot = opts?.autopilot ?? false;
   }
 
+  setAutopilot(enabled: boolean): void {
+    this.autopilot = enabled;
+  }
+
   get isConnected(): boolean { return this._isConnected; }
   get isPrompting(): boolean { return this._isPrompting; }
   get promptingStartedAt(): number | null { return this._promptingStartedAt; }

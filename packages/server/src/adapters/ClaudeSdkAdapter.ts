@@ -110,6 +110,10 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
     this.autopilot = opts?.autopilot ?? false;
   }
 
+  setAutopilot(enabled: boolean): void {
+    this.autopilot = enabled;
+  }
+
   // ── Getters ────────────────────────────────────────────────
 
   get isConnected(): boolean { return this._isConnected; }

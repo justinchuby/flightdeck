@@ -8,6 +8,7 @@ export const ProjectSchema = z.object({
   description: z.string(),
   cwd: z.string().nullable(),
   status: z.string(),
+  oversightLevel: z.enum(['supervised', 'balanced', 'autonomous']).nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

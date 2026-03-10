@@ -107,6 +107,10 @@ export class MockAdapter extends EventEmitter implements AgentAdapter {
     // No-op for mock
   }
 
+  setAutopilot(_enabled: boolean): void {
+    // No-op for mock
+  }
+
   // ── Test Helpers ────────────────────────────────────────────────
 
   /** Queue a response for the next prompt() call. */

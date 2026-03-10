@@ -143,6 +143,10 @@ export class ServerClientAdapter extends EventEmitter implements AgentAdapter {
     });
   }
 
+  setAutopilot(_enabled: boolean): void {
+    // No-op for server-client bridge — remote agents manage their own autopilot
+  }
+
   // ── Event Translation ─────────────────────────────────────────
 
   /**

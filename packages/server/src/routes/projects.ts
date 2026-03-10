@@ -654,13 +654,25 @@ export function projectsRoutes(ctx: AppContext): Router {
     const project = projectRegistry.get(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    const { name, description, cwd, status } = req.body;
+    const { name, description, cwd, status, oversightLevel } = req.body;
 
     // Validate CWD if provided
     const cwdError = validateCwd(cwd);
     if (cwdError) return res.status(400).json({ error: cwdError });
 
+    // Validate oversight level if provided
+    if (oversightLevel !== undefined && oversightLevel !== null &&
+        !['supervised', 'balanced', 'autonomous'].includes(oversightLevel)) {
+      return res.status(400).json({ error: 'Invalid oversight level. Must be supervised, balanced, or autonomous.' });
+    }
+
     projectRegistry.update(req.params.id, { name, description, cwd, status });
+
+    // Set per-project oversight level separately (null clears override)
+    if (oversightLevel !== undefined) {
+      projectRegistry.setOversightLevel(req.params.id, oversightLevel);
+    }
+
     logger.info({ module: 'project', msg: 'Project updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.get(req.params.id));
   });

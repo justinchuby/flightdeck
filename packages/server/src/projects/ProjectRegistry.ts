@@ -349,6 +349,29 @@ export class ProjectRegistry {
     this.modelConfigCache.clear();
   }
 
+  /**
+   * Get the per-project oversight level override.
+   * Returns null if no override is set (inherit global).
+   */
+  getOversightLevel(projectId: string): string | null {
+    const row = this.db.drizzle.select({ oversightLevel: projects.oversightLevel })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .get();
+    return row?.oversightLevel ?? null;
+  }
+
+  /**
+   * Set the per-project oversight level override.
+   * Pass null to clear the override (inherit global).
+   */
+  setOversightLevel(projectId: string, level: string | null): void {
+    this.db.drizzle.update(projects).set({
+      oversightLevel: level,
+      updatedAt: new Date().toISOString(),
+    }).where(eq(projects.id, projectId)).run();
+  }
+
   /** Delete a project and all associated sessions */
   delete(id: string): boolean {
     const project = this.get(id);

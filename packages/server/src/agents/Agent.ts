@@ -73,7 +73,7 @@ export class Agent {
   public readonly id: string;
   public readonly role: Role;
   public readonly createdAt: Date;
-  public readonly autopilot: boolean;
+  public autopilot: boolean;
   public status: AgentStatus = 'creating';
   public task?: string;
   public dagTaskId?: string;
@@ -604,6 +604,13 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   resolvePermission(approved: boolean): void {
     if (this.acpConnection) {
       this.acpConnection.resolvePermission(approved);
+    }
+  }
+
+  setAutopilot(enabled: boolean): void {
+    this.autopilot = enabled;
+    if (this.acpConnection) {
+      this.acpConnection.setAutopilot(enabled);
     }
   }
 

@@ -141,7 +141,7 @@ const oversightSchema = z.preprocess(
     return val;
   },
   z.object({
-    level: z.enum(['supervised', 'balanced', 'autonomous']).default('balanced'),
+    level: z.enum(['supervised', 'balanced', 'autonomous']).default('autonomous'),
     customInstructions: z.string().max(500).optional(),
   }),
 );

@@ -137,6 +137,7 @@ export interface AgentAdapter extends EventEmitter {
   cancel(): Promise<void>;
   terminate(): void | Promise<void>;
   resolvePermission(approved: boolean): void;
+  setAutopilot(enabled: boolean): void;
 }
 
 // ── Factory Types ───────────────────────────────────────────────────

@@ -57,18 +57,15 @@ const TERMINATE_TIMEOUT_MS = 5_000;
 // when the SDK is not installed. At runtime, start() will throw a
 // clear error if the SDK is missing.
 let CopilotClientClass: (new (opts?: CopilotClientOptions) => CopilotClientStub) | null = null;
-let approveAllFn: CopilotPermissionHandler | null = null;
 
 async function loadSdk(): Promise<{
   CopilotClient: typeof CopilotClientClass;
-  approveAll: CopilotPermissionHandler;
 }> {
-  if (CopilotClientClass) return { CopilotClient: CopilotClientClass, approveAll: approveAllFn! };
+  if (CopilotClientClass) return { CopilotClient: CopilotClientClass };
   try {
     const mod = await import('@github/copilot-sdk');
     CopilotClientClass = mod.CopilotClient as unknown as typeof CopilotClientClass;
-    approveAllFn = mod.approveAll as unknown as CopilotPermissionHandler;
-    return { CopilotClient: CopilotClientClass, approveAll: approveAllFn! };
+    return { CopilotClient: CopilotClientClass };
   } catch {
     throw new Error(
       'Copilot SDK not installed. Run: npm install @github/copilot-sdk',
@@ -121,6 +118,10 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
     this.sendTimeout = opts?.sendTimeout ?? 300_000; // 5 min default
   }
 
+  setAutopilot(enabled: boolean): void {
+    this.autopilot = enabled;
+  }
+
   // ── Getters ────────────────────────────────────────────────
 
   get isConnected(): boolean { return this._isConnected; }
@@ -135,7 +136,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
   // ── Start / Resume ─────────────────────────────────────────
 
   async start(opts: AdapterStartOptions): Promise<string> {
-    const { CopilotClient, approveAll } = await withTimeout(loadSdk(), SDK_TIMEOUT_MS, 'loadSdk');
+    const { CopilotClient } = await withTimeout(loadSdk(), SDK_TIMEOUT_MS, 'loadSdk');
     if (!CopilotClient) throw new Error('Copilot SDK not available');
 
     this.cwd = opts.cwd ?? process.cwd();
@@ -171,10 +172,12 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
 
     this.client = new CopilotClient(clientOpts);
 
-    // Build permission handler
-    const permissionHandler: CopilotPermissionHandler = this.autopilot
-      ? approveAll
-      : (request, invocation) => this.handlePermissionRequest(request, invocation);
+    // Always use dynamic handler — checks this.autopilot at call time
+    // so mid-session autopilot toggles take effect immediately.
+    const permissionHandler: CopilotPermissionHandler = (request, invocation) => {
+      if (this.autopilot) return Promise.resolve('allow' as const);
+      return this.handlePermissionRequest(request, invocation);
+    };
 
     // Build session config
     const sessionConfig: CopilotSessionConfig = {

@@ -280,6 +280,45 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setConfigStore(store: import('../config/ConfigStore.js').ConfigStore): void {
     this.configStore = store;
+
+    // Listen for oversight level changes and propagate to all running agents
+    store.on('config:oversight:changed', ({ config: oversightConfig }: { config: { level: string; customInstructions?: string } }) => {
+      const level = oversightConfig.level;
+      const newAutopilot = level === 'autonomous';
+      const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[level] ?? '';
+
+      for (const agent of this.agents.values()) {
+        if (isTerminalStatus(agent.status)) continue;
+
+        // Skip agents with project-level oversight override
+        if (agent.projectId && this.projectRegistry) {
+          const projectOverride = this.projectRegistry.getOversightLevel(agent.projectId);
+          if (projectOverride) continue;
+        }
+
+        agent.setAutopilot(newAutopilot);
+
+        // Send system message with new oversight instructions
+        const parts: string[] = [];
+        if (tierInstructions) parts.push(tierInstructions);
+        const custom = oversightConfig.customInstructions ?? '';
+        if (custom) parts.push(`Additional user instructions: ${custom}`);
+        if (parts.length > 0) {
+          const msg = `[Oversight level changed to "${level}"]\n\n<oversight_instructions>\n${parts.join('\n\n')}\n</oversight_instructions>`;
+          agent.sendMessage(msg);
+        }
+      }
+
+      logger.info({
+        module: 'agent-manager',
+        msg: 'Oversight level changed — updated all running agents',
+        level,
+        autopilot: newAutopilot,
+        agentCount: [...this.agents.values()].filter(a => !isTerminalStatus(a.status)).length,
+      });
+
+      this.emit('oversight:changed' as any, { level });
+    });
   }
 
   /** Late-inject IntegrationRouter to break circular dependency. */
@@ -439,9 +478,24 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     // Inject oversight tier behavioral instructions into agent prompt
+    // Resolve effective oversight level: project override → global config → default
+    let effectiveOversightLevel = 'autonomous';
+    if (this.configStore) {
+      effectiveOversightLevel = this.configStore.current.oversight.level;
+    }
+    if (effectiveProjectId && this.projectRegistry) {
+      const projectOverride = this.projectRegistry.getOversightLevel(effectiveProjectId);
+      if (projectOverride) effectiveOversightLevel = projectOverride;
+    }
+
+    // Override autopilot based on effective oversight level (if not explicitly set by caller)
+    if (autopilot === undefined) {
+      autopilot = effectiveOversightLevel === 'autonomous';
+    }
+
     if (this.configStore) {
       const oversightConfig = this.configStore.current.oversight;
-      const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[oversightConfig.level] ?? '';
+      const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[effectiveOversightLevel] ?? '';
       const customInstructions = oversightConfig.customInstructions ?? '';
       const parts: string[] = [];
       if (tierInstructions) parts.push(tierInstructions);

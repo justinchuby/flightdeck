@@ -216,6 +216,7 @@ export const projects = sqliteTable('projects', {
   cwd: text('cwd'),
   status: text('status').default('active'),       // active | archived | completed
   modelConfig: text('model_config').default('{}'),  // JSON: role → allowed model IDs
+  oversightLevel: text('oversight_level'),           // null = inherit global; 'supervised' | 'balanced' | 'autonomous'
   createdAt: text('created_at').default(utcNow),
   updatedAt: text('updated_at').default(utcNow),
 }, (table) => [
