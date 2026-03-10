@@ -27,6 +27,8 @@ export class ConfigStore extends EventEmitter {
   private _config: FlightdeckConfig;
   private watcher: ConfigWatcher | null = null;
   private readonly filePath: string;
+  /** Serializes concurrent writePartial calls to prevent read-modify-write races. */
+  private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(filePath: string) {
     super();
@@ -79,9 +81,18 @@ export class ConfigStore extends EventEmitter {
   /**
    * Writes a partial config update to the YAML file.
    * The watcher will detect the change and reload, keeping everything consistent.
-   * Used by PATCH /api/config for round-trip consistency.
+   * Serialized via writeQueue to prevent concurrent read-modify-write races.
    */
   async writePartial(patch: Record<string, unknown>): Promise<void> {
+    // Chain onto the write queue so concurrent calls are serialized.
+    // Each call waits for the previous one to finish before reading the file,
+    // ensuring it always merges into the latest on-disk state.
+    const op = this.writeQueue.then(() => this.doWritePartial(patch));
+    this.writeQueue = op.catch(() => {}); // keep queue moving even on failure
+    return op; // propagate the actual error to the caller
+  }
+
+  private async doWritePartial(patch: Record<string, unknown>): Promise<void> {
     let existing: Record<string, unknown> = {};
     try {
       const content = await readFile(this.filePath, 'utf-8');

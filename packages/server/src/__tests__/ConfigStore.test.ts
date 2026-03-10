@@ -176,4 +176,36 @@ describe('ConfigStore', () => {
     expect(reloaded).toHaveBeenCalled();
     expect(store.current.server.maxConcurrentAgents).toBe(75);
   });
+
+  it('concurrent writePartial calls are serialized (no lost writes)', async () => {
+    const path = writeConfig(dir, 'server:\n  maxConcurrentAgents: 25\n');
+    store = new ConfigStore(path);
+
+    // Fire 3 concurrent writes — without serialization, some would be lost
+    const p1 = store.writePartial({ server: { maxConcurrentAgents: 10 } });
+    const p2 = store.writePartial({ oversight: { level: 'detailed' } });
+    const p3 = store.writePartial({ conflicts: { enabled: false } });
+
+    await Promise.all([p1, p2, p3]);
+
+    // Read the file back and verify ALL three writes are present
+    const { readFileSync } = await import('fs');
+    const content = readFileSync(path, 'utf-8');
+    const { parse: parseYaml } = await import('yaml');
+    const parsed = parseYaml(content) as Record<string, any>;
+
+    expect(parsed.server.maxConcurrentAgents).toBe(10);
+    expect(parsed.oversight.level).toBe('detailed');
+    expect(parsed.conflicts.enabled).toBe(false);
+  });
+
+  it('writePartial propagates validation errors', async () => {
+    const path = writeConfig(dir, 'server:\n  maxConcurrentAgents: 25\n');
+    store = new ConfigStore(path);
+
+    // maxConcurrentAgents must be a positive integer
+    await expect(
+      store.writePartial({ server: { maxConcurrentAgents: -1 } }),
+    ).rejects.toThrow('Config validation failed');
+  });
 });

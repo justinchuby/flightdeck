@@ -5,6 +5,7 @@ import { validateBody, configPatchSchema } from '../validation/schemas.js';
 import type { AppContext } from './context.js';
 import { BudgetEnforcer } from '../coordination/scheduling/BudgetEnforcer.js';
 import { CostTracker } from '../agents/CostTracker.js';
+import { logger } from '../utils/logger.js';
 
 export function configRoutes(ctx: AppContext): Router {
   const { agentManager, db: _db } = ctx;
@@ -38,7 +39,9 @@ export function configRoutes(ctx: AppContext): Router {
         yamlPatch.oversight = { level: req.body.oversightLevel };
       }
       if (Object.keys(yamlPatch).length > 0) {
-        ctx.configStore.writePartial(yamlPatch).catch(() => {});
+        ctx.configStore.writePartial(yamlPatch).catch(err => {
+          logger.warn({ module: 'config', msg: 'Failed to persist config to YAML', error: (err as Error).message });
+        });
       }
     }
     res.json(updated);
