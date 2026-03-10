@@ -65,7 +65,7 @@ export interface AgentManagerEvents {
   'agent:usage': { agentId: string; inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; contextWindowUsed?: number; contextWindowSize?: number };
   'agent:status': { agentId: string; status: string };
   'agent:crashed': { agentId: string; code: number };
-  'agent:auto_restarted': { agentId: string; previousAgentId: string; crashCount: number };
+  'agent:auto_restarted': { agentId: string; crashCount: number };
   'agent:restart_limit': { agentId: string };
   'agent:hung': { agentId: string; elapsedMs: number };
   'agent:hung_terminated': { agentId: string };
@@ -731,7 +731,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
                 }
               }
               const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined, agent.id, { projectName: agent.projectName, projectId: agent.projectId });
-              this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
+              this.emit('agent:auto_restarted', { agentId: newAgent.id, crashCount: count });
             } catch (err) {
               logger.error({ module: 'agent', msg: 'Auto-restart failed', err: (err as Error).message });
             }
