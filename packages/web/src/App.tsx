@@ -56,7 +56,6 @@ const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => 
 const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
 const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
 const UnifiedCrewPage = lazy(() => import('./components/CrewRoster/UnifiedCrewPage').then(m => ({ default: m.UnifiedCrewPage })));
-const GlobalAgentsPage = lazy(() => import('./components/GlobalAgentsPage').then(m => ({ default: m.GlobalAgentsPage })));
 
 function RouteSpinner() {
   return (

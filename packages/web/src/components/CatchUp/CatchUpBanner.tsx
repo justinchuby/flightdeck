@@ -50,11 +50,11 @@ interface SummaryCategory {
 const CATEGORIES: SummaryCategory[] = [
   { key: 'decisionsPending', icon: '⚠', label: (n) => `${n} decision${n !== 1 ? 's' : ''} pending`, linkTo: '/tasks' },
   { key: 'tasksFailed', icon: '❌', label: (n) => `${n} task${n !== 1 ? 's' : ''} failed`, linkTo: '/tasks?status=failed' },
-  { key: 'agentsCrashed', icon: '🔴', label: (n) => `${n} agent${n !== 1 ? 's' : ''} crashed`, linkTo: '/agents' },
+  { key: 'agentsCrashed', icon: '🔴', label: (n) => `${n} agent${n !== 1 ? 's' : ''} crashed`, linkTo: '/crews' },
   { key: 'tasksCompleted', icon: '✅', label: (n) => `${n} task${n !== 1 ? 's' : ''} completed`, linkTo: '/tasks' },
   { key: 'decisionsAutoApproved', icon: '✓', label: (n) => `${n} auto-approved`, linkTo: '/settings' },
   { key: 'commits', icon: '📦', label: (n) => `${n} commit${n !== 1 ? 's' : ''}`, linkTo: '/timeline' },
-  { key: 'agentsSpawned', icon: '🟢', label: (n) => `${n} agent${n !== 1 ? 's' : ''} spawned`, linkTo: '/agents' },
+  { key: 'agentsSpawned', icon: '🟢', label: (n) => `${n} agent${n !== 1 ? 's' : ''} spawned`, linkTo: '/crews' },
   { key: 'contextCompactions', icon: '🧠', label: (n) => `${n} compaction${n !== 1 ? 's' : ''}`, linkTo: '/mission-control' },
   { key: 'messageCount', icon: '💬', label: (n) => `${n} messages`, linkTo: '/mission-control', minCount: 5 },
 ];

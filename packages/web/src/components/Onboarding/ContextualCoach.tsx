@@ -112,7 +112,7 @@ export function ContextualCoach({ onNavigate }: Props) {
         onNavigate(`/projects/${pressured.projectId}/session?agent=${pressured.id}`);
       } else if (onNavigate) {
         // No pressured agent found — navigate to agents view as fallback
-        onNavigate('/agents');
+        onNavigate('/crews');
       }
     }
   };

@@ -20,7 +20,7 @@ const links = [
   { to: '/', icon: Crown, label: 'Project Lead' },
   { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
   { to: '/tasks', icon: ListChecks, label: 'Tasks' },
-  { to: '/agents', icon: Users, label: 'Agents' },
+  { to: '/crews', icon: Users, label: 'Crews' },
   { to: '/groups', icon: MessageSquare, label: 'Group Chats' },
   { to: '/org', icon: Network, label: 'Org Chart' },
   { to: '/data', icon: Database, label: 'Database' },
@@ -92,7 +92,7 @@ export function MobileNav() {
             <li key={to}>
               <NavLink
                 to={to}
-                end={to === '/' || to === '/agents'}
+                end={to === '/' || to === '/crews'}
                 onClick={close}
                 className={({ isActive }: { isActive: boolean }) =>
                   [

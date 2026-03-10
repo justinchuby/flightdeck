@@ -23,7 +23,7 @@ export function BottomTabBar() {
   const tabs: Tab[] = [
     { icon: '🏠', label: 'Home', route: '/overview' },
     { icon: '📋', label: 'Tasks', route: '/tasks' },
-    { icon: '👥', label: 'Agents', route: '/agents' },
+    { icon: '👥', label: 'Crews', route: '/crews' },
     { icon: '📊', label: 'Timeline', route: '/timeline' },
   ];
 

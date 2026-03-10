@@ -155,25 +155,25 @@ describe('BottomTabBar', () => {
     renderBar();
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('Tasks')).toBeInTheDocument();
-    expect(screen.getByText('Agents')).toBeInTheDocument();
+    expect(screen.getByText('Crews')).toBeInTheDocument();
     expect(screen.getByText('Timeline')).toBeInTheDocument();
     expect(screen.getByText('More')).toBeInTheDocument();
   });
 
   it('marks active tab with aria-current="page"', () => {
-    renderBar('/agents');
-    const agentBtn = screen.getByText('Agents').closest('button')!;
-    expect(agentBtn).toHaveAttribute('aria-current', 'page');
+    renderBar('/crews');
+    const crewBtn = screen.getByText('Crews').closest('button')!;
+    expect(crewBtn).toHaveAttribute('aria-current', 'page');
     // Home should NOT be active
     const homeBtn = screen.getByText('Home').closest('button')!;
     expect(homeBtn).not.toHaveAttribute('aria-current');
   });
 
-  it('renders Agents tab without badge (badges only on More for pending decisions)', () => {
+  it('renders Crews tab without badge (badges only on More for pending decisions)', () => {
     mockAgents = [makeAgent({ status: 'failed' }), makeAgent({ id: 'a2', status: 'running' })];
     renderBar();
-    const agentBtn = screen.getByText('Agents').closest('button')!;
-    expect(agentBtn).toBeInTheDocument();
+    const crewBtn = screen.getByText('Crews').closest('button')!;
+    expect(crewBtn).toBeInTheDocument();
   });
 
   it('renders Tasks tab without badge (badges only on More for pending decisions)', () => {

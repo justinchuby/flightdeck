@@ -23,7 +23,7 @@ const ALL_ROUTES: ProgressiveRoute[] = [
   // Starter (always visible)
   { path: '/', label: 'Lead', icon: '👑', tier: 'starter' },
   { path: '/overview', label: 'Overview', icon: '📊', tier: 'starter' },
-  { path: '/agents', label: 'Agents', icon: '🤖', tier: 'starter' },
+  { path: '/crews', label: 'Crews', icon: '👥', tier: 'starter' },
   { path: '/settings', label: 'Settings', icon: '⚙️', tier: 'starter' },
   // Active session
   { path: '/tasks', label: 'Tasks', icon: '📋', tier: 'active' },

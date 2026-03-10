@@ -31,7 +31,7 @@ function buildNavigationItems(
   const routes = [
     { path: '/', label: 'Go to Project Lead', icon: '👑', shortcut: 'G L', keywords: ['lead', 'chat', 'home'] },
     { path: '/overview', label: 'Go to Overview', icon: '📊', shortcut: 'G O', keywords: ['overview', 'dashboard', 'summary'] },
-    { path: '/agents', label: 'Go to Agents', icon: '🤖', shortcut: 'G A', keywords: ['agents', 'fleet', 'crew'] },
+    { path: '/crews', label: 'Go to Crews', icon: '👥', shortcut: 'G A', keywords: ['agents', 'fleet', 'crew', 'crews'] },
     { path: '/groups', label: 'Go to Group Chats', icon: '💬', shortcut: 'G G', keywords: ['groups', 'chat', 'collaboration'] },
     { path: '/org', label: 'Go to Org Chart', icon: '🌐', shortcut: 'G C', keywords: ['org', 'hierarchy', 'chart'] },
     { path: '/tasks', label: 'Go to Task Queue', icon: '📋', shortcut: 'G T', keywords: ['tasks', 'dag', 'queue'] },
@@ -71,7 +71,7 @@ function buildAgentItems(
     icon: a.role?.name === 'Lead' ? '👑' : '🤖',
     keywords: [a.role?.name ?? '', a.role?.id ?? '', a.id.slice(0, 6), a.status],
     action: () => {
-      navigate(`/agents?focus=${a.id}`);
+      navigate(`/crews?focus=${a.id}`);
       onClose();
     },
     badge: a.status === 'running' ? '● running' : undefined,
@@ -254,7 +254,7 @@ export function CommandPalette({ onClose, onOpenSearch }: Props) {
       score: s.score,
       action: () => {
         if (s.actionType === 'open-approvals') setApprovalQueueOpen(true);
-        else if (s.actionType === 'view-agents') navigate('/agents');
+        else if (s.actionType === 'view-agents') navigate('/crews');
         else if (s.actionType === 'export') navigate('/settings');
         onClose();
       },
