@@ -182,6 +182,7 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       model: this.model,
       onPermissionRequest: permissionHandler,
       onUserInput: userInputHandler,
+      infiniteSessions: true,
       ...(this.systemPrompt ? {
         systemMessage: { mode: 'append' as const, content: this.systemPrompt },
       } : {}),

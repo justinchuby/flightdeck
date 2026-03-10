@@ -39,6 +39,7 @@ export interface CopilotSessionConfig {
   tools?: CopilotTool[];
   onPermissionRequest?: CopilotPermissionHandler;
   onUserInput?: CopilotUserInputHandler;
+  infiniteSessions?: boolean | { enabled: boolean };
 }
 
 export interface CopilotResumeSessionConfig {
@@ -47,6 +48,7 @@ export interface CopilotResumeSessionConfig {
   tools?: CopilotTool[];
   onPermissionRequest?: CopilotPermissionHandler;
   onUserInput?: CopilotUserInputHandler;
+  infiniteSessions?: boolean | { enabled: boolean };
 }
 
 // ── Permission Handling ─────────────────────────────────────
