@@ -14,6 +14,8 @@
 import { createServer, type Server, type Socket } from 'node:net';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { logger } from '../utils/logger.js';
 import type {
   AgentServerListener,
@@ -52,7 +54,7 @@ export interface ForkProcess {
 }
 
 const DEFAULTS = {
-  portFileDir: process.cwd(),
+  portFileDir: join(homedir(), '.flightdeck'),
   portFileName: 'agent-server.port',
   tokenFileName: 'agent-server.token',
   tcpHost: '127.0.0.1',

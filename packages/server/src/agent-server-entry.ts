@@ -31,11 +31,16 @@ import { Database } from './db/database.js';
 import { AgentRosterRepository } from './db/AgentRosterRepository.js';
 import { ActiveDelegationRepository } from './db/ActiveDelegationRepository.js';
 import { logger } from './utils/logger.js';
+import { join } from 'path';
+import { homedir } from 'os';
+import { mkdirSync } from 'fs';
 
 // ── Configuration from environment ──────────────────────────────────
 
-const stateDir = process.env.FLIGHTDECK_STATE_DIR ?? process.cwd();
-const dbPath = process.env.FLIGHTDECK_DB_PATH ?? 'flightdeck.db';
+const defaultStateDir = join(homedir(), '.flightdeck');
+const stateDir = process.env.FLIGHTDECK_STATE_DIR ?? defaultStateDir;
+mkdirSync(stateDir, { recursive: true });
+const dbPath = process.env.FLIGHTDECK_DB_PATH ?? join(stateDir, 'flightdeck.db');
 
 // ── Persistence bridge ──────────────────────────────────────────────
 // AgentServer's interface uses simple (agentId, role, model) params,
