@@ -216,4 +216,97 @@ describe('CostTracker', () => {
     // Same task ID, different leads
     expect(allTaskCosts.map(t => t.leadId).sort()).toEqual(['lead-1', 'lead-2']);
   });
+
+  // ── project_id tracking ──────────────────────────────────────────────
+
+  it('persists project_id when provided in extras', () => {
+    tracker.recordUsage('agent-1', 'task-a', 'lead-1', 1000, 500, { projectId: 'proj-1' });
+
+    const costs = tracker.getAgentTaskCosts('agent-1');
+    expect(costs).toHaveLength(1);
+    expect(costs[0].projectId).toBe('proj-1');
+  });
+
+  it('uses _session sentinel when dagTaskId is not assigned', () => {
+    tracker.recordUsage('lead-1', '_session', 'lead-1', 5000, 2000, { projectId: 'proj-1' });
+
+    const costs = tracker.getAgentTaskCosts('lead-1');
+    expect(costs).toHaveLength(1);
+    expect(costs[0].dagTaskId).toBe('_session');
+    expect(costs[0].inputTokens).toBe(5000);
+  });
+
+  // ── getProjectCosts ──────────────────────────────────────────────────
+
+  it('aggregates costs by project', () => {
+    tracker.recordUsage('agent-1', 'task-a', 'lead-1', 1000, 500, { projectId: 'proj-1' });
+    tracker.recordUsage('agent-2', 'task-b', 'lead-1', 2000, 800, { projectId: 'proj-1' });
+    tracker.recordUsage('agent-3', 'task-c', 'lead-2', 3000, 1200, { projectId: 'proj-2' });
+
+    const projectCosts = tracker.getProjectCosts();
+    expect(projectCosts).toHaveLength(2);
+
+    const proj1 = projectCosts.find(p => p.projectId === 'proj-1')!;
+    expect(proj1.totalInputTokens).toBe(3000);
+    expect(proj1.totalOutputTokens).toBe(1300);
+    expect(proj1.agentCount).toBe(2);
+    expect(proj1.sessionCount).toBe(1);
+
+    const proj2 = projectCosts.find(p => p.projectId === 'proj-2')!;
+    expect(proj2.totalInputTokens).toBe(3000);
+    expect(proj2.totalOutputTokens).toBe(1200);
+    expect(proj2.agentCount).toBe(1);
+  });
+
+  it('excludes records without project_id from getProjectCosts', () => {
+    tracker.recordUsage('agent-1', 'task-a', 'lead-1', 1000, 500); // no projectId
+    tracker.recordUsage('agent-2', 'task-b', 'lead-2', 2000, 800, { projectId: 'proj-1' });
+
+    const projectCosts = tracker.getProjectCosts();
+    expect(projectCosts).toHaveLength(1);
+    expect(projectCosts[0].projectId).toBe('proj-1');
+  });
+
+  // ── getSessionCosts ──────────────────────────────────────────────────
+
+  it('aggregates costs by session within a project', () => {
+    tracker.recordUsage('agent-1', 'task-a', 'lead-1', 1000, 500, { projectId: 'proj-1' });
+    tracker.recordUsage('agent-2', 'task-b', 'lead-1', 2000, 800, { projectId: 'proj-1' });
+    tracker.recordUsage('agent-3', 'task-c', 'lead-2', 3000, 1200, { projectId: 'proj-1' });
+    tracker.recordUsage('agent-4', 'task-d', 'lead-3', 4000, 1600, { projectId: 'proj-2' });
+
+    const sessionCosts = tracker.getSessionCosts('proj-1');
+    expect(sessionCosts).toHaveLength(2);
+
+    const session1 = sessionCosts.find(s => s.leadId === 'lead-1')!;
+    expect(session1.totalInputTokens).toBe(3000);
+    expect(session1.totalOutputTokens).toBe(1300);
+    expect(session1.agentCount).toBe(2);
+
+    const session2 = sessionCosts.find(s => s.leadId === 'lead-2')!;
+    expect(session2.totalInputTokens).toBe(3000);
+    expect(session2.totalOutputTokens).toBe(1200);
+    expect(session2.agentCount).toBe(1);
+  });
+
+  it('returns empty array for unknown project', () => {
+    tracker.recordUsage('agent-1', 'task-a', 'lead-1', 1000, 500, { projectId: 'proj-1' });
+
+    const sessionCosts = tracker.getSessionCosts('unknown-project');
+    expect(sessionCosts).toHaveLength(0);
+  });
+
+  // ── project costs across multiple sessions ───────────────────────────
+
+  it('counts sessions correctly in project costs', () => {
+    // Two sessions (lead-1 and lead-2) for same project
+    tracker.recordUsage('agent-1', 'task-a', 'lead-1', 1000, 500, { projectId: 'proj-1' });
+    tracker.recordUsage('agent-2', 'task-b', 'lead-2', 2000, 800, { projectId: 'proj-1' });
+
+    const projectCosts = tracker.getProjectCosts();
+    expect(projectCosts).toHaveLength(1);
+    expect(projectCosts[0].sessionCount).toBe(2);
+    expect(projectCosts[0].agentCount).toBe(2);
+    expect(projectCosts[0].totalInputTokens).toBe(3000);
+  });
 });
