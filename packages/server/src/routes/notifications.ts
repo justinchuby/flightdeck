@@ -142,6 +142,12 @@ export function notificationRoutes(ctx: AppContext): Router {
   });
 
   // ── Composite Settings (used by NotificationPreferencesPanel) ──
+  //
+  // NOTE: Notification routing respects user preferences and quiet hours,
+  // but does NOT check oversight level. External channels (Telegram/Slack)
+  // represent explicit opt-ins and fire regardless of Trust Dial setting.
+  // Oversight level only gates client-side in-app toast notifications
+  // (see settingsStore.ts → shouldNotify()).
 
   // GET /api/notifications/routing — returns event→channelType routing matrix
   router.get('/notifications/routing', (_req, res) => {
