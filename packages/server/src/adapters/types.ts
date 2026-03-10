@@ -74,7 +74,7 @@ export interface AdapterCapabilities {
   supportsPlans: boolean;
 }
 
-// ── Permission Types ────────────────────────────────────────────────
+// ── Permission Types (deprecated — kept for interface compat) ───────
 
 export interface PermissionRequest {
   id: string;

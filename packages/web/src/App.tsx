@@ -12,7 +12,6 @@ import { LeadDashboard, ReadOnlySession } from './components/LeadDashboard';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
-import { PermissionDialog } from './components/PermissionDialog';
 import { UserInputDialog } from './components/UserInputDialog';
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
@@ -132,7 +131,6 @@ export function App() {
   const systemPaused = useAppStore((s) => s.systemPaused);
   const setSystemPaused = useAppStore((s) => s.setSystemPaused);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
-  const oversightLevel = useSettingsStore((s) => s.oversightLevel);
   const addToast = useToastStore((s) => s.add);
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map());
 
@@ -190,8 +188,6 @@ export function App() {
         }
       } else if (msg.type === 'agent:sub_spawned') {
         if (shouldNotify('info')) addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
-      } else if (msg.type === 'agent:permission_request' && soundEnabled && oversightLevel === 'supervised') {
-        playAttentionSound();
       } else if (msg.type === 'agent:context_compacted') {
         if (shouldNotify('info')) {
           const pct = msg.percentDrop ? ` (${msg.percentDrop}% reduction)` : '';
@@ -208,7 +204,7 @@ export function App() {
     };
     window.addEventListener('ws-message', handler);
     return () => window.removeEventListener('ws-message', handler);
-  }, [addToast, soundEnabled, oversightLevel]);
+  }, [addToast, soundEnabled]);
 
   // Detect all-agents-idle and play completion sound
   useEffect(() => {
@@ -411,7 +407,6 @@ export function App() {
         )}
       </div>
       <ToastContainer />
-      <PermissionDialog />
       <UserInputDialog />
       <ApprovalSlideOver />
       <CatchUpBanner />

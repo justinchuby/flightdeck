@@ -76,7 +76,6 @@ export interface AppContext {
   agentRoster?: AgentRosterRepository;
   integrationRouter?: import('../integrations/IntegrationRouter.js').IntegrationRouter;
   configStore?: import('../config/ConfigStore.js').ConfigStore;
-  toolAutoAllowStore?: import('../governance/ToolAutoAllowStore.js').ToolAutoAllowStore;
 }
 
 // Rate limiters for expensive operations

@@ -42,17 +42,15 @@ import type { KnowledgeInjector, InjectionContext } from '../knowledge/Knowledge
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
 import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
-import type { ToolAutoAllowStore } from '../governance/ToolAutoAllowStore.js';
-import { isDangerousTool } from '../governance/dangerousToolDetector.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
 
 // ── Oversight tier behavioral instructions injected into agent prompts ──
 const OVERSIGHT_TIER_INSTRUCTIONS: Record<string, string> = {
-  supervised: 'Be cautious about what you do. When you modify files, always acquire user approval until the oversight level is changed.',
-  balanced: 'Use good judgment. Ask for approval on significant changes like architecture decisions, file deletions, or system-level changes. Proceed with routine work.',
-  autonomous: 'You can detail your reasoning, but there is no need to ask for user approval.',
+  supervised: 'The user has set oversight to supervised mode. Be cautious and deliberate. Explain your reasoning before making changes. Show diffs and plans before executing. Prefer smaller, incremental steps.',
+  balanced: 'The user has set oversight to balanced mode. Use good judgment. Explain significant decisions like architecture changes or file deletions, but proceed efficiently with routine work.',
+  autonomous: 'The user has set oversight to autonomous mode. Work efficiently and independently. Focus on results over explanations. Move fast and make decisions confidently.',
 };
 
 // ── Typed event map for AgentManager ────────────────────────────────
@@ -135,7 +133,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
   private collectiveMemory?: CollectiveMemory;
   private configStore?: import('../config/ConfigStore.js').ConfigStore;
-  private toolAutoAllowStore?: ToolAutoAllowStore;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -282,17 +279,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.collectiveMemory = memory;
   }
 
-  setToolAutoAllowStore(store: ToolAutoAllowStore): void {
-    this.toolAutoAllowStore = store;
-  }
-
   setConfigStore(store: import('../config/ConfigStore.js').ConfigStore): void {
     this.configStore = store;
 
-    // Listen for oversight level changes and propagate to all running agents
+    // Listen for oversight level changes and propagate prompt instructions to all running agents
     store.on('config:oversight:changed', ({ config: oversightConfig }: { config: { level: string; customInstructions?: string } }) => {
       const level = oversightConfig.level;
-      const newAutopilot = level === 'autonomous';
       const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[level] ?? '';
 
       for (const agent of this.agents.values()) {
@@ -304,9 +296,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           if (projectOverride) continue;
         }
 
-        agent.setAutopilot(newAutopilot);
-
-        // Send system message with new oversight instructions
+        // Send system message with new oversight instructions (prompt-only)
         const parts: string[] = [];
         if (tierInstructions) parts.push(tierInstructions);
         const custom = oversightConfig.customInstructions ?? '';
@@ -319,9 +309,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
       logger.info({
         module: 'agent-manager',
-        msg: 'Oversight level changed — updated all running agents',
+        msg: 'Oversight level changed — sent new instructions to all running agents',
         level,
-        autopilot: newAutopilot,
         agentCount: [...this.agents.values()].filter(a => !isTerminalStatus(a.status)).length,
       });
 
@@ -497,8 +486,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     // Override autopilot based on effective oversight level (if not explicitly set by caller)
+    // Always use autopilot=true — oversight is prompt-only, not permission-gated
     if (autopilot === undefined) {
-      autopilot = effectiveOversightLevel === 'autonomous';
+      autopilot = true;
     }
 
     if (this.configStore) {
@@ -635,17 +625,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     });
 
-    agent.onPermissionRequest((request) => {
-      // Server-side auto-allow: approve if tool is on auto-allow list and not dangerous
-      if (this.toolAutoAllowStore && request.toolName) {
-        const autoAllowed = this.toolAutoAllowStore.isAutoAllowed(request.toolName);
-        if (autoAllowed && !isDangerousTool(request.toolName, request.arguments ?? {})) {
-          agent.resolvePermission(true);
-          return;
-        }
-      }
-      const dangerous = request.toolName ? isDangerousTool(request.toolName, request.arguments ?? {}) : false;
-      this.emit('agent:permission_request', { agentId: agent.id, request, dangerous });
+    agent.onPermissionRequest(() => {
+      // No-op — permissions auto-approved at adapter level
     });
 
     agent.onUserInputRequest((request) => {
@@ -1197,10 +1178,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.autoTerminateTimeoutMs = ms;
   }
 
-  resolvePermission(agentId: string, approved: boolean): boolean {
-    const agent = this.agents.get(agentId);
-    if (!agent) return false;
-    agent.resolvePermission(approved);
+  resolvePermission(_agentId: string, _approved: boolean): boolean {
+    // No-op — all permissions auto-approved at adapter level
     return true;
   }
 

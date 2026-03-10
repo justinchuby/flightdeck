@@ -14,7 +14,6 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
-import { isDangerousTool } from '../governance/dangerousToolDetector.js';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -94,14 +93,8 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
   private unsubscribeEvents: (() => void) | null = null;
   private cwd: string = process.cwd();
   private model: string;
-  private autopilot: boolean;
   private maxTurns?: number;
   private systemPrompt?: string;
-  private pendingPermissions = new Map<string, {
-    resolve: (result: { allow: boolean }) => void;
-    timeout: ReturnType<typeof setTimeout>;
-  }>();
-  private latestPermissionId: string | null = null;
   private pendingUserInputs = new Map<string, {
     resolve: (result: { response: string }) => void;
     timeout: ReturnType<typeof setTimeout> | null;
@@ -122,12 +115,11 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
   constructor(opts?: { model?: string; autopilot?: boolean; sendTimeout?: number }) {
     super();
     this.model = opts?.model ?? 'gpt-4.1';
-    this.autopilot = opts?.autopilot ?? false;
     this.sendTimeout = opts?.sendTimeout ?? 300_000; // 5 min default
   }
 
-  setAutopilot(enabled: boolean): void {
-    this.autopilot = enabled;
+  setAutopilot(_enabled: boolean): void {
+    // No-op — oversight is prompt-only
   }
 
   // ── Getters ────────────────────────────────────────────────
@@ -180,14 +172,9 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
 
     this.client = new CopilotClient(clientOpts);
 
-    // Always use dynamic handler — checks this.autopilot at call time
-    // so mid-session autopilot toggles take effect immediately.
-    // Dangerous tools bypass autopilot and always require explicit approval.
-    const permissionHandler: CopilotPermissionHandler = (request, invocation) => {
-      if (this.autopilot && !isDangerousTool(request.kind, request as Record<string, unknown>)) {
-        return Promise.resolve('allow' as const);
-      }
-      return this.handlePermissionRequest(request, invocation);
+    // Always auto-approve — oversight is prompt-only, not permission-gated.
+    const permissionHandler: CopilotPermissionHandler = () => {
+      return Promise.resolve('allow' as const);
     };
 
     // User input handler — called when the agent uses ask_user tool
@@ -578,52 +565,8 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
 
   // ── Permission Handling ────────────────────────────────────
 
-  resolvePermission(approved: boolean): void {
-    const id = this.latestPermissionId;
-    if (!id) return;
-    const entry = this.pendingPermissions.get(id);
-    if (!entry) return;
-    this.pendingPermissions.delete(id);
-    this.latestPermissionId = null;
-    clearTimeout(entry.timeout);
-    entry.resolve({ allow: approved });
-  }
-
-  /**
-   * SDK permission callback — called by the SDK when a tool needs approval.
-   * Emits 'permission_request' event and waits for resolvePermission().
-   */
-  private handlePermissionRequest(
-    request: { kind: string; toolCallId?: string; [key: string]: unknown },
-    invocation: { sessionId: string },
-  ): Promise<'allow' | 'deny' | 'allow-always'> {
-    return new Promise<'allow' | 'deny' | 'allow-always'>((resolve) => {
-      const permId = request.toolCallId ?? `perm-${Date.now()}-${randomUUID().slice(0, 8)}`;
-
-      const wrappedResolve = ({ allow }: { allow: boolean }) => {
-        resolve(allow ? 'allow' : 'deny');
-      };
-
-      // Auto-deny after 60s timeout
-      const timeout = setTimeout(() => {
-        if (this.pendingPermissions.has(permId)) {
-          this.pendingPermissions.delete(permId);
-          if (this.latestPermissionId === permId) this.latestPermissionId = null;
-          resolve('deny');
-        }
-      }, 60_000);
-
-      this.pendingPermissions.set(permId, { resolve: wrappedResolve, timeout });
-      this.latestPermissionId = permId;
-
-      const permReq: PermissionRequest = {
-        id: permId,
-        toolName: request.kind,
-        arguments: request as Record<string, unknown>,
-        timestamp: new Date().toISOString(),
-      };
-      this.emit('permission_request', permReq);
-    });
+  resolvePermission(_approved: boolean): void {
+    // No-op — all permissions auto-approved
   }
 
   // ── User Input Handling ─────────────────────────────────────
@@ -716,13 +659,13 @@ export class CopilotSdkAdapter extends EventEmitter implements AgentAdapter {
       }
     }
 
-    // Resolve all pending permissions as denied and clear timeouts
-    for (const [id, entry] of this.pendingPermissions) {
-      clearTimeout(entry.timeout);
-      entry.resolve({ allow: false });
+    // Resolve all pending user inputs
+    for (const [id, entry] of this.pendingUserInputs) {
+      if (entry.timeout) clearTimeout(entry.timeout);
+      entry.resolve({ response: 'Agent terminated.' });
     }
-    this.pendingPermissions.clear();
-    this.latestPermissionId = null;
+    this.pendingUserInputs.clear();
+    this.latestUserInputId = null;
     this._isConnected = false;
     this._isPrompting = false;
     this._promptingStartedAt = null;

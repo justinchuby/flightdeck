@@ -238,11 +238,6 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:usage', ...data }, projectId);
     });
 
-    this.track(agentManager, 'agent:permission_request', (data: AgentManagerEvents['agent:permission_request']) => {
-      const projectId = this.resolveAgentProjectId(data.agentId);
-      this.broadcastToProject({ type: 'agent:permission_request', ...data }, projectId);
-    });
-
     this.track(agentManager, 'agent:user_input_request', (data: AgentManagerEvents['agent:user_input_request']) => {
       const projectId = this.resolveAgentProjectId(data.agentId);
       this.broadcastToProject({ type: 'agent:user_input_request', ...data }, projectId);
@@ -476,12 +471,6 @@ export class WebSocketServer {
 
       case 'resize':
         // resize is no longer supported (PTY mode removed)
-        break;
-
-      case 'permission_response':
-        if (msg.agentId) {
-          this.agentManager.resolvePermission(msg.agentId, msg.approved);
-        }
         break;
 
       case 'queue_open':

@@ -16,7 +16,6 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
-import { isDangerousTool } from '../governance/dangerousToolDetector.js';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -92,15 +91,9 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   private abortController: AbortController | null = null;
   private cwd: string = process.cwd();
   private model: string;
-  private autopilot: boolean;
   private maxTurns?: number;
   private systemPrompt?: string;
   private providerEnv?: Record<string, string>;
-  private pendingPermissions = new Map<string, {
-    resolve: (result: { allow: boolean }) => void;
-    timeout: ReturnType<typeof setTimeout>;
-  }>();
-  private latestPermissionId: string | null = null;
 
   private promptQueue: PromptContent[] = [];
   private promptQueuePriorityCount = 0;
@@ -108,11 +101,10 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
   constructor(opts?: { model?: string; autopilot?: boolean }) {
     super();
     this.model = opts?.model ?? 'claude-sonnet-4-6';
-    this.autopilot = opts?.autopilot ?? false;
   }
 
-  setAutopilot(enabled: boolean): void {
-    this.autopilot = enabled;
+  setAutopilot(_enabled: boolean): void {
+    // No-op — oversight is prompt-only
   }
 
   // ── Getters ────────────────────────────────────────────────
@@ -199,7 +191,7 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
       cwd: this.cwd,
       model: this.model,
       abortController: this.abortController!,
-      permissionMode: this.autopilot ? 'acceptEdits' : 'default',
+      permissionMode: 'acceptEdits',
       ...(this.sdkSessionId ? { resume: this.sdkSessionId } : {}),
       ...(this.maxTurns ? { maxTurns: this.maxTurns } : {}),
       ...(this.systemPrompt ? { systemPrompt: this.systemPrompt } : {}),
@@ -320,59 +312,17 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
 
   // ── Permission Handling ────────────────────────────────────
 
-  resolvePermission(approved: boolean): void {
-    const id = this.latestPermissionId;
-    if (!id) return;
-    const entry = this.pendingPermissions.get(id);
-    if (!entry) return;
-    this.pendingPermissions.delete(id);
-    this.latestPermissionId = null;
-    clearTimeout(entry.timeout);
-    entry.resolve({ allow: approved });
+  resolvePermission(_approved: boolean): void {
+    // No-op — all permissions auto-approved
   }
 
   resolveUserInput(_response: string): void {
     // Not yet supported by Claude SDK adapter
   }
 
-  /**
-   * SDK permission callback — called by the SDK when a tool needs approval.
-   * Emits 'permission_request' event and waits for resolvePermission().
-   */
-  readonly handlePermission: CanUseToolCallback = async (input, toolUseId) => {
-    if (this.autopilot && !isDangerousTool(input.tool_name, (input.tool_input ?? {}) as Record<string, unknown>)) {
-      return { result: 'allow' };
-    }
-
-    return new Promise<{ result: 'allow' | 'deny'; reason?: string }>((resolve) => {
-      const permId = toolUseId ?? `perm-${Date.now()}-${randomUUID().slice(0, 8)}`;
-
-      const wrappedResolve = ({ allow }: { allow: boolean }) => {
-        resolve({
-          result: allow ? 'allow' : 'deny',
-          reason: allow ? undefined : 'User denied',
-        });
-      };
-
-      // Auto-deny after 60s timeout (ref stored for cleanup on terminate)
-      const timeout = setTimeout(() => {
-        if (this.pendingPermissions.has(permId)) {
-          this.pendingPermissions.delete(permId);
-          if (this.latestPermissionId === permId) this.latestPermissionId = null;
-          resolve({ result: 'deny', reason: 'Permission timeout' });
-        }
-      }, 60_000);
-
-      this.pendingPermissions.set(permId, { resolve: wrappedResolve, timeout });
-      this.latestPermissionId = permId;
-
-      this.emit('permission_request', {
-        id: permId,
-        toolName: input.tool_name,
-        arguments: input.tool_input,
-        timestamp: new Date().toISOString(),
-      } satisfies PermissionRequest);
-    });
+  /** Always auto-approve — oversight is prompt-only. */
+  readonly handlePermission: CanUseToolCallback = async () => {
+    return { result: 'allow' };
   };
 
   // ── Lifecycle ──────────────────────────────────────────────
@@ -389,13 +339,6 @@ export class ClaudeSdkAdapter extends EventEmitter implements AgentAdapter {
       this.activeQuery.close();
       this.activeQuery = null;
     }
-    // Resolve all pending permissions as denied and clear timeouts
-    for (const [id, entry] of this.pendingPermissions) {
-      clearTimeout(entry.timeout);
-      entry.resolve({ allow: false });
-    }
-    this.pendingPermissions.clear();
-    this.latestPermissionId = null;
     this._isConnected = false;
     this._isPrompting = false;
     this._promptingStartedAt = null;

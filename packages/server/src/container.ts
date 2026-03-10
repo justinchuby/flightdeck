@@ -74,10 +74,8 @@ import { FileDependencyGraph } from './coordination/files/FileDependencyGraph.js
 import { WorktreeManager } from './coordination/files/WorktreeManager.js';
 import { EscalationManager } from './coordination/alerts/EscalationManager.js';
 import { GovernancePipeline } from './governance/GovernancePipeline.js';
-import { createPermissionHook, createRateLimitHook, createCommitMessageValidationHook, createFileWriteGuardHook, createShellCommandBlocklistHook, createApprovalGateHook } from './governance/hooks/index.js';
 import { EagerScheduler } from './tasks/EagerScheduler.js';
 import { SearchEngine } from './coordination/knowledge/SearchEngine.js';
-import { ToolAutoAllowStore } from './governance/ToolAutoAllowStore.js';
 
 // ── Imports: Tier 4-5 (AgentManager + dependents) ──────────
 import { AgentManager } from './agents/AgentManager.js';
@@ -190,7 +188,6 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const knowledgeInjector = new KnowledgeInjector(memoryCategoryManager, hybridSearchEngine);
   const sessionKnowledgeExtractor = new SessionKnowledgeExtractor(knowledgeStore);
   const collectiveMemory = new CollectiveMemory(db);
-  const toolAutoAllowStore = new ToolAutoAllowStore(db);
 
   // ── Agent Server Transport & Client ─────────────────────
   // In dev mode (tsx), fork the TypeScript source directly using tsx loader.
@@ -269,27 +266,8 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
 
   const searchEngine = new SearchEngine(activityLedger, decisionLog);
 
-  // GovernancePipeline (Tier 3 — depends on config, not on AgentManager)
-  const governancePipeline = new GovernancePipeline({ enabled: true });
-  // Register built-in hooks with sensible defaults
-  governancePipeline.registerPreHook(createShellCommandBlocklistHook());
-  governancePipeline.registerPreHook(createPermissionHook({
-    hasCapability: (agentId, cmd) => capabilityInjector.hasCommand(agentId, cmd),
-  }));
-  governancePipeline.registerPreHook(createCommitMessageValidationHook());
-  governancePipeline.registerPreHook(createRateLimitHook());
-  governancePipeline.registerPreHook(createFileWriteGuardHook());
-  governancePipeline.registerPreHook(createApprovalGateHook({
-    onGate: (action, reason) => {
-      decisionLog.add(
-        action.agent.id,
-        action.agent.roleName,
-        `Governance gate: ${action.commandName}`,
-        reason,
-        true, // needsConfirmation
-      );
-    },
-  }));
+  // GovernancePipeline (Tier 3 — kept as empty skeleton, hooks removed for prompt-only oversight)
+  const governancePipeline = new GovernancePipeline({ enabled: false });
 
   // ── Tier 4: AgentManager ───────────────────────────────
   const agentManager = new AgentManager(
@@ -306,7 +284,6 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   agentManager.setSessionKnowledgeExtractor(sessionKnowledgeExtractor);
   agentManager.setCollectiveMemory(collectiveMemory);
   agentManager.setConfigStore(configStore);
-  agentManager.setToolAutoAllowStore(toolAutoAllowStore);
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
   skillsLoader.loadAll();
   skillsLoader.startWatching();
@@ -442,7 +419,6 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     agentRoster: agentRosterRepository,
     integrationRouter,
     configStore,
-    toolAutoAllowStore,
 
     // Lifecycle
     async shutdown() {

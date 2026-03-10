@@ -155,13 +155,6 @@ export function useApi() {
     });
   }, []);
 
-  const resolvePermission = useCallback(async (agentId: string, approved: boolean) => {
-    return apiFetch(`/agents/${agentId}/permission`, {
-      method: 'POST',
-      body: JSON.stringify({ approved }),
-    });
-  }, []);
-
   const resolveUserInput = useCallback(async (agentId: string, response: string) => {
     return apiFetch(`/agents/${agentId}/user-input`, {
       method: 'POST',
@@ -191,7 +184,6 @@ export function useApi() {
     updateConfig,
     createRole,
     deleteRole,
-    resolvePermission,
     resolveUserInput,
     fetchGroups,
     fetchGroupMessages,

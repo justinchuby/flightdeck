@@ -116,12 +116,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   private promptQueuePriorityCount = 0;
   private autopilot: boolean;
   private agentCapabilities: acp.AgentCapabilities | null = null;
-  private pendingPermissions = new Map<string, {
-    resolve: (result: acp.RequestPermissionResponse) => void;
-    options: acp.PermissionOption[];
-    timeout: ReturnType<typeof setTimeout>;
-  }>();
-  private latestPermissionId: string | null = null;
 
   constructor(opts?: { autopilot?: boolean }) {
     super();
@@ -248,38 +242,15 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
 
     const client: acp.Client = {
       requestPermission: async (params) => {
-        if (this.autopilot) {
-          const allowOption = params.options.find(
-            (o: acp.PermissionOption) => o.kind === 'allow_once'
-          );
-          return {
-            outcome: allowOption
-              ? { outcome: 'selected', optionId: allowOption.optionId }
-              : { outcome: 'cancelled' },
-          };
-        }
-
-        return new Promise<acp.RequestPermissionResponse>((resolve) => {
-          const permId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-          const timeout = setTimeout(() => {
-            if (this.pendingPermissions.has(permId)) {
-              this.pendingPermissions.delete(permId);
-              if (this.latestPermissionId === permId) this.latestPermissionId = null;
-              resolve({ outcome: { outcome: 'cancelled' } });
-            }
-          }, 60_000);
-
-          this.pendingPermissions.set(permId, { resolve, options: params.options, timeout });
-          this.latestPermissionId = permId;
-
-          this.emit('permission_request', {
-            id: permId,
-            toolName: params.title ?? params.description ?? 'Tool action',
-            arguments: params.metadata ?? {},
-            timestamp: new Date().toISOString(),
-          });
-        });
+        // Always auto-approve — oversight is prompt-only
+        const allowOption = params.options.find(
+          (o: acp.PermissionOption) => o.kind === 'allow_once'
+        );
+        return {
+          outcome: allowOption
+            ? { outcome: 'selected', optionId: allowOption.optionId }
+            : { outcome: 'cancelled' },
+        };
       },
 
       sessionUpdate: async (params) => {
@@ -447,25 +418,8 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     }
   }
 
-  resolvePermission(approved: boolean): void {
-    const id = this.latestPermissionId;
-    if (!id) return;
-    const entry = this.pendingPermissions.get(id);
-    if (!entry) return;
-    this.pendingPermissions.delete(id);
-    this.latestPermissionId = null;
-    clearTimeout(entry.timeout);
-
-    if (approved) {
-      const allowOption = entry.options.find((o) => o.kind === 'allow_once');
-      entry.resolve({
-        outcome: allowOption
-          ? { outcome: 'selected', optionId: allowOption.optionId }
-          : { outcome: 'cancelled' },
-      });
-    } else {
-      entry.resolve({ outcome: { outcome: 'cancelled' } });
-    }
+  resolvePermission(_approved: boolean): void {
+    // No-op — all permissions auto-approved
   }
 
   resolveUserInput(_response: string): void {
@@ -479,14 +433,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   }
 
   async terminate(): Promise<void> {
-    // Resolve all pending permissions as cancelled and clear timeouts
-    for (const [id, entry] of this.pendingPermissions) {
-      clearTimeout(entry.timeout);
-      entry.resolve({ outcome: { outcome: 'cancelled' } });
-    }
-    this.pendingPermissions.clear();
-    this.latestPermissionId = null;
-
     if (this.process) {
       const proc = this.process;
       this.process = null;
