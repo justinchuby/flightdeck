@@ -78,6 +78,61 @@ describe('leadStore', () => {
     });
   });
 
+  describe('unclosed command block detection', () => {
+    it('appends to agent message when command has nested ⟦⟦ ⟧⟧ inside JSON', () => {
+      // Start streaming a DELEGATE command with nested bracket examples
+      useLeadStore.getState().appendToLastAgentMessage(
+        LEAD_ID,
+        '⟦⟦ DELEGATE {"task": "Fix bug.\\nUse ⟦⟦ COMPLETE_TASK {} ⟧⟧'
+      );
+      // Thinking interleaves (sets pendingNewline=true)
+      useLeadStore.getState().appendToThinkingMessage(LEAD_ID, 'reasoning about task...');
+      // Rest of the DELEGATE command arrives — should NOT create a new message
+      useLeadStore.getState().appendToLastAgentMessage(
+        LEAD_ID,
+        ' when done."} ⟧⟧'
+      );
+
+      const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
+      const agentMsgs = msgs.filter((m) => m.sender === 'agent');
+      // Should be ONE agent message, not two
+      expect(agentMsgs).toHaveLength(1);
+      expect(agentMsgs[0].text).toContain('⟦⟦ DELEGATE');
+      expect(agentMsgs[0].text).toContain('⟧⟧');
+    });
+
+    it('old heuristic would fail: nested ⟧⟧ fools lastIndexOf check', () => {
+      // This is the exact scenario that was broken:
+      // The inner ⟧⟧ makes lastIndexOf('⟧⟧') > lastIndexOf('⟦⟦') even though the outer command is unclosed
+      const partialCommand = '⟦⟦ DELEGATE {"task": "Use ⟦⟦ COMMIT {} ⟧⟧ when done';
+      // Verify the old heuristic would say "closed" (wrong)
+      expect(partialCommand.lastIndexOf('⟦⟦') < partialCommand.lastIndexOf('⟧⟧')).toBe(true);
+
+      useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, partialCommand);
+      useLeadStore.getState().appendToThinkingMessage(LEAD_ID, 'reasoning...');
+      // Continuation should append, not create new message
+      useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, '"} ⟧⟧');
+
+      const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
+      const agentMsgs = msgs.filter((m) => m.sender === 'agent');
+      expect(agentMsgs).toHaveLength(1);
+      expect(agentMsgs[0].text).toBe(partialCommand + '"} ⟧⟧');
+    });
+
+    it('still creates new message after thinking when command IS closed', () => {
+      useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, '⟦⟦ CMD {} ⟧⟧ done');
+      useLeadStore.getState().appendToThinkingMessage(LEAD_ID, 'reasoning...');
+      useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'new response');
+
+      const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
+      const agentMsgs = msgs.filter((m) => m.sender === 'agent');
+      // Should be TWO agent messages — the command was closed so pendingNewline takes effect
+      expect(agentMsgs).toHaveLength(2);
+      expect(agentMsgs[0].text).toBe('⟦⟦ CMD {} ⟧⟧ done');
+      expect(agentMsgs[1].text).toBe('new response');
+    });
+  });
+
   describe('interrupt separator', () => {
     it('addMessage inserts a system separator correctly', () => {
       // Simulate: agent sends a response, then interrupt adds separator + user message

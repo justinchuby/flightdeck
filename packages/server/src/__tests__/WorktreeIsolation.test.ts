@@ -8,8 +8,8 @@
  * 4. File lock enforcement works across worktrees (shared DB)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WorktreeManager } from '../coordination/WorktreeManager.js';
-import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
+import { WorktreeManager } from '../coordination/files/WorktreeManager.js';
+import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
 import { Database } from '../db/database.js';
 
 // ── Mock child_process ────────────────────────────────────────────

@@ -17,6 +17,7 @@ import type {
   TimelineLock,
   TimelineData,
 } from './useTimelineData';
+import { getRoleIcon } from '../../utils/getRoleIcon';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -36,11 +37,6 @@ const STATUS_COLORS: Record<string, { fill: string; border: string }> = {
   completed:  { fill: 'var(--st-completed-fill)', border: 'var(--st-completed)' },
   failed:     { fill: 'var(--st-failed-fill)',     border: 'var(--st-failed)' },
   terminated: { fill: 'var(--st-terminated-fill)', border: 'var(--st-terminated)' },
-};
-
-const ROLE_ICONS: Record<string, string> = {
-  lead: '👑', architect: '🏗', developer: '👨‍💻', 'code-reviewer': '🔍',
-  'critical-reviewer': '🛡', designer: '🎨', secretary: '📋', qa: '🧪',
 };
 
 const ROLE_ORDER: Record<string, number> = {
@@ -90,12 +86,12 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick, fullRange }
       onClick={onClick}
       role="button"
       tabIndex={0}
-      aria-label={`${ROLE_ICONS[agent.role] ?? ''} ${agent.role} agent ${agent.shortId}${isExpanded ? ', expanded' : ', collapsed'}. Press Enter to ${isExpanded ? 'collapse' : 'expand'}.`}
+      aria-label={`${getRoleIcon(agent.role)} ${agent.role} agent ${agent.shortId}${isExpanded ? ', expanded' : ', collapsed'}. Press Enter to ${isExpanded ? 'collapse' : 'expand'}.`}
       aria-expanded={isExpanded}
       aria-roledescription="agent lane toggle"
     >
       <span className="text-sm font-medium text-th-text-alt truncate">
-        {ROLE_ICONS[agent.role] ?? '🤖'} {agent.role}
+        {getRoleIcon(agent.role)} {agent.role}
       </span>
       <span className="text-xs font-mono text-th-text-muted">{agent.shortId}</span>
       {isExpanded && (
@@ -656,7 +652,7 @@ function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChan
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         >
-          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Team collaboration timeline showing ${sortedAgents.length} agents over time`}>
+          <svg width={chartWidth} height={AXIS_HEIGHT + totalHeight} role="img" aria-label={`Crew collaboration timeline showing ${sortedAgents.length} agents over time`}>
             {/* Idle hatch pattern */}
             <defs>
               <pattern id="idle-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

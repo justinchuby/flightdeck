@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { eq, desc, asc } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { conversations, messages } from '../db/schema.js';
+import { redact } from '../utils/redaction.js';
 
 export interface ConversationThread {
   id: string;
@@ -34,7 +35,7 @@ export class ConversationStore {
   addMessage(conversationId: string, sender: string, content: string): ThreadMessage {
     const result = this.db.drizzle
       .insert(messages)
-      .values({ conversationId, sender, content })
+      .values({ conversationId, sender, content: redact(content).text })
       .run();
     return {
       id: Number(result.lastInsertRowid),

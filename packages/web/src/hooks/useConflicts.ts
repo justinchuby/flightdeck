@@ -9,7 +9,7 @@ export function useConflicts() {
   useEffect(() => {
     apiFetch<ConflictAlert[]>('/conflicts')
       .then(data => setConflicts(Array.isArray(data) ? data : []))
-      .catch(() => {})
+      .catch(() => { /* initial fetch — will retry */ })
       .finally(() => setLoading(false));
   }, []);
 
@@ -37,7 +37,7 @@ export function useConflictConfig() {
   useEffect(() => {
     apiFetch<ConflictDetectionConfig>('/conflicts/config')
       .then(setConfig)
-      .catch(() => {});
+      .catch(() => { /* initial fetch — will retry */ });
   }, []);
 
   const saveConfig = useCallback(async (updates: Partial<ConflictDetectionConfig>) => {

@@ -30,6 +30,13 @@ vi.mock('../../stores/leadStore', () => ({
   },
 }));
 
+vi.mock('../../stores/settingsStore', () => ({
+  useSettingsStore: (sel: any) => {
+    const state = { oversightLevel: 'balanced' };
+    return sel(state);
+  },
+}));
+
 let capturedOnIdle: (() => void) | undefined;
 let capturedOnReturn: (() => void) | undefined;
 
@@ -53,6 +60,7 @@ function makeResponse(overrides: Partial<CatchUpResponse['summary']> = {}, durat
     awayDuration: duration,
     summary: {
       tasksCompleted: 0,
+      tasksFailed: 0,
       decisionsPending: 0,
       decisionsAutoApproved: 0,
       commits: 0,
@@ -97,10 +105,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('shows banner after idle → return with meaningful events', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ tasksCompleted: 3, commits: 5, decisionsPending: 1 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ tasksCompleted: 3, commits: 5, decisionsPending: 1 }));
 
     renderBanner();
 
@@ -119,10 +124,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('does not show banner when no meaningful events', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse()),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse());
 
     renderBanner();
 
@@ -135,10 +137,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('dismisses on X button click', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ tasksCompleted: 2 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ tasksCompleted: 5, commits: 1 }));
 
     renderBanner();
     await act(async () => {
@@ -153,10 +152,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('dismisses on Escape key', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ commits: 1 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ commits: 3, tasksCompleted: 3 }));
 
     renderBanner();
     await act(async () => {
@@ -171,10 +167,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('shows attention severity when decisions pending', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ decisionsPending: 2, tasksCompleted: 1 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ decisionsPending: 2, tasksCompleted: 3, commits: 1 }));
 
     renderBanner();
     await act(async () => {
@@ -187,10 +180,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('shows critical severity with budget warning', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ budgetWarning: true, agentsCrashed: 2 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ budgetWarning: true, agentsCrashed: 2, tasksCompleted: 3 }));
 
     renderBanner();
     await act(async () => {
@@ -203,10 +193,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('shows compact all-good state for only positive events', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ tasksCompleted: 5, commits: 8 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ tasksCompleted: 5, commits: 8 }));
 
     renderBanner();
     await act(async () => {
@@ -220,10 +207,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('auto-dismisses after 20 seconds', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ decisionsPending: 1 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ decisionsPending: 1, tasksCompleted: 4, commits: 1 }));
 
     renderBanner();
     await act(async () => {
@@ -241,10 +225,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('navigates to timeline on replay button click', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ decisionsPending: 1 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ decisionsPending: 1, tasksCompleted: 4, commits: 1 }));
 
     renderBanner();
     await act(async () => {
@@ -257,10 +238,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('opens approval queue on pending decisions click', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ decisionsPending: 3 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ decisionsPending: 3, tasksCompleted: 2, commits: 1 }));
 
     renderBanner();
     await act(async () => {
@@ -273,10 +251,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('formats duration correctly', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ tasksCompleted: 1 }, 263)),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ tasksCompleted: 5 }, 263));
 
     renderBanner();
     await act(async () => {
@@ -288,10 +263,7 @@ describe('CatchUpBanner', () => {
   });
 
   it('skips messages under threshold of 5', async () => {
-    mockApiFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(makeResponse({ tasksCompleted: 1, messageCount: 3 })),
-    });
+    mockApiFetch.mockResolvedValue(makeResponse({ tasksCompleted: 5, messageCount: 3 }));
 
     renderBanner();
     await act(async () => {

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SessionReplay } from '../coordination/SessionReplay.js';
-import type { WorldState, Keyframe, ReplayAgentSource } from '../coordination/SessionReplay.js';
-import type { ActivityLedger, ActivityEntry } from '../coordination/ActivityLedger.js';
+import { SessionReplay } from '../coordination/sessions/SessionReplay.js';
+import type { WorldState, Keyframe, ReplayAgentSource } from '../coordination/sessions/SessionReplay.js';
+import type { ActivityLedger, ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 import type { TaskDAG, DagTask } from '../tasks/TaskDAG.js';
-import type { DecisionLog, Decision } from '../coordination/DecisionLog.js';
-import type { FileLockRegistry, FileLock } from '../coordination/FileLockRegistry.js';
+import type { DecisionLog, Decision } from '../coordination/decisions/DecisionLog.js';
+import type { FileLockRegistry, FileLock } from '../coordination/files/FileLockRegistry.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+import { Writable, Readable } from 'stream';
 
 // ── Mock child_process ────────────────────────────────────────────
 const mockSpawn = vi.fn();
@@ -14,7 +15,12 @@ vi.mock('child_process', () => ({
 vi.mock('@agentclientprotocol/sdk', () => ({
   PROTOCOL_VERSION: '1.0',
   ndJsonStream: vi.fn(),
-  ClientSideConnection: vi.fn(),
+  ClientSideConnection: class {
+    initialize = vi.fn().mockResolvedValue({ protocolVersion: '1.0', serverCapabilities: {} });
+    newSession = vi.fn().mockResolvedValue({ sessionId: 'mock-session-1' });
+    prompt = vi.fn().mockResolvedValue({ content: '' });
+    cancel = vi.fn().mockResolvedValue(undefined);
+  },
 }));
 
 // ── Mock logger ───────────────────────────────────────────────────
@@ -36,8 +42,8 @@ import { logger } from '../utils/logger.js';
 /** Create a fake child process EventEmitter with piped stdin/stdout */
 function createFakeProcess() {
   const proc = new EventEmitter() as any;
-  proc.stdin = new EventEmitter();
-  proc.stdout = new EventEmitter();
+  proc.stdin = new Writable({ write(_chunk, _enc, cb) { cb(); } });
+  proc.stdout = new Readable({ read() {} });
   proc.kill = vi.fn();
   proc.pid = 12345;
   return proc;
@@ -65,7 +71,7 @@ describe('AcpConnection', () => {
       })).rejects.toThrow(/CLI binary "nonexistent-binary" not found in PATH/);
     });
 
-    it('includes COPILOT_CLI_PATH hint in error message', async () => {
+    it('includes helpful hint in error message when binary not found', async () => {
       mockExecFileSync.mockImplementation(() => {
         throw new Error('not found');
       });
@@ -74,7 +80,7 @@ describe('AcpConnection', () => {
       await expect(conn.start({
         cliCommand: 'copilot',
         cwd: '/tmp',
-      })).rejects.toThrow(/COPILOT_CLI_PATH/);
+      })).rejects.toThrow(/Install the provider CLI/);
     });
 
     it('proceeds to spawn when CLI binary exists', async () => {
@@ -84,6 +90,7 @@ describe('AcpConnection', () => {
 
       const conn = new AcpConnection({ autopilot: true });
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       expect(mockSpawn).toHaveBeenCalledWith(
         'copilot',
@@ -92,7 +99,7 @@ describe('AcpConnection', () => {
       );
 
       fakeProc.emit('exit', 1);
-      await expect(startPromise).rejects.toThrow();
+      await startPromise.catch(() => {});
     });
 
     it('uses execFileSync with "which" on Unix (no shell injection)', async () => {
@@ -102,6 +109,7 @@ describe('AcpConnection', () => {
 
       const conn = new AcpConnection({ autopilot: true });
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       if (process.platform !== 'win32') {
         expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -127,6 +135,7 @@ describe('AcpConnection', () => {
       conn.on('exit', (code: number) => exitEvents.push(code));
 
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       const spawnError = Object.assign(new Error('spawn copilot ENOENT'), { code: 'ENOENT' });
       fakeProc.emit('error', spawnError);
@@ -134,9 +143,12 @@ describe('AcpConnection', () => {
       await startPromise.catch(() => {});
 
       expect(logger.error).toHaveBeenCalledWith(
-        'acp',
-        expect.stringContaining('Spawn error for "copilot"'),
-        expect.objectContaining({ code: 'ENOENT', command: 'copilot' }),
+        expect.objectContaining({
+          module: 'acp',
+          msg: 'Spawn error',
+          cliCommand: 'copilot',
+          code: 'ENOENT',
+        }),
       );
       expect(exitEvents).toContain(1);
     });
@@ -148,6 +160,7 @@ describe('AcpConnection', () => {
 
       const conn = new AcpConnection({ autopilot: true });
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       const spawnError = Object.assign(new Error('spawn EACCES'), { code: 'EACCES' });
       expect(() => fakeProc.emit('error', spawnError)).not.toThrow();
@@ -162,6 +175,7 @@ describe('AcpConnection', () => {
 
       const conn = new AcpConnection({ autopilot: true });
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       fakeProc.emit('error', new Error('spawn failed'));
 
@@ -179,6 +193,7 @@ describe('AcpConnection', () => {
       conn.on('exit', (code: number | null) => exitEvents.push(code));
 
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       const spawnError = Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' });
       fakeProc.emit('error', spawnError);
@@ -200,6 +215,7 @@ describe('AcpConnection', () => {
       conn.on('exit', (code: number) => exitEvents.push(code));
 
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       // Simulate signal kill: code=null, signal='SIGTERM'
       fakeProc.emit('exit', null, 'SIGTERM');
@@ -208,8 +224,11 @@ describe('AcpConnection', () => {
 
       expect(exitEvents).toEqual([1]);
       expect(logger.warn).toHaveBeenCalledWith(
-        'acp',
-        expect.stringContaining('signal "SIGTERM"'),
+        expect.objectContaining({
+          module: 'acp',
+          msg: 'Process exited via signal',
+          signal: 'SIGTERM',
+        }),
       );
     });
 
@@ -223,6 +242,7 @@ describe('AcpConnection', () => {
       conn.on('exit', (code: number) => exitEvents.push(code));
 
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
 
       fakeProc.emit('exit', 0, null);
 

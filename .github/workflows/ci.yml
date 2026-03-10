@@ -20,11 +20,32 @@ jobs:
 
       - run: npm ci
 
+      - name: Build shared types
+        run: npm run build --workspace=packages/shared
+
       - name: Typecheck server
         run: npx --workspace=packages/server tsc --noEmit
 
       - name: Typecheck web
         run: npx --workspace=packages/web tsc --noEmit
+
+      - name: Check for type drift
+        run: |
+          # Ensure no server/web file re-defines types that should come from @flightdeck/shared
+          DRIFT=0
+          for TYPE in AgentStatus DagTaskStatus DelegationStatus DecisionStatus DecisionCategory TimerStatus AlertSeverity ActionType; do
+            if grep -rn "export type $TYPE = " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "from '@flightdeck/shared'" | grep -v "node_modules"; then
+              echo "ERROR: $TYPE defined outside @flightdeck/shared"
+              DRIFT=1
+            fi
+          done
+          for IFACE in Role DagTask Delegation ChatGroup GroupMessage Decision Timer Project ProjectSession ActivityEntry Alert FileLock; do
+            if grep -rn "export interface $IFACE " packages/server/src/ packages/web/src/ --include="*.ts" | grep -v "node_modules" | grep -v "extends"; then
+              echo "ERROR: $IFACE interface defined outside @flightdeck/shared"
+              DRIFT=1
+            fi
+          done
+          exit $DRIFT
 
       - name: Unit tests with coverage
         run: npm run test:coverage --workspace=packages/server

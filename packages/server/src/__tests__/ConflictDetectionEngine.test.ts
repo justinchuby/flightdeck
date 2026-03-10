@@ -7,7 +7,7 @@ import {
   type ConflictAlert,
   type ConflictDetectionConfig,
   type ConflictResolution,
-} from '../coordination/ConflictDetectionEngine.js';
+} from '../coordination/decisions/ConflictDetectionEngine.js';
 
 // ── Mock DB ───────────────────────────────────────────────────────
 

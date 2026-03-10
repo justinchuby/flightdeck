@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { PredictionService } from '../coordination/PredictionService.js';
+import { PredictionService } from '../coordination/predictions/PredictionService.js';
 
 export function predictionRoutes(ctx: AppContext): Router {
-  const service = new PredictionService(ctx.db);
+  const service = new PredictionService(ctx.db, ctx.configStore);
   const router = Router();
 
   // GET /predictions — active predictions

@@ -62,12 +62,10 @@ Type natural language directly into ⌘K to control your crew:
 | Open dashboard | "go home" |
 | Open timeline | "show timeline" |
 
-### Create Commands (3)
+### Create Commands (1)
 | Command | Example |
 |---------|---------|
 | New session | "start a new session" |
-| New playbook | "create a playbook" |
-| New rule | "create a workflow rule" |
 
 > [!TIP]
 > Commands use pattern matching — no LLM needed. You don't need to type the exact phrase; the system matches intent from natural variations.

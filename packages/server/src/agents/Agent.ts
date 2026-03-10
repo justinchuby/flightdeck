@@ -1,16 +1,19 @@
 import { v4 as uuid } from 'uuid';
 import { createHash } from 'crypto';
-import type { AcpConnection, ToolCallInfo, PlanEntry, PromptContent } from '../acp/AcpConnection.js';
+import type { AgentAdapter, ToolCallInfo, PlanEntry, PromptContent } from '../adapters/types.js';
 import type { Role } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
 import type { UsageInfo, CompactionInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
-import { formatCrewUpdate } from '../coordination/CrewFormatter.js';
-import type { CrewMember } from '../coordination/CrewFormatter.js';
+import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
+import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
 
-export type AgentStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated';
+import type { AgentStatus } from '@flightdeck/shared';
+export type { AgentStatus } from '@flightdeck/shared';
+import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
 
 export function isTerminalStatus(status: AgentStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'terminated';
@@ -60,6 +63,10 @@ export interface AgentJSON {
   isSubLead: boolean;
   hierarchyLevel: number;
   isSystemAgent?: boolean;
+  /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
+  provider?: string;
+  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  backend?: string;
 }
 
 export class Agent {
@@ -86,6 +93,8 @@ export class Agent {
   public cwd?: string;
   /** Error message if agent failed to start (e.g., CLI binary not found) */
   public exitError?: string;
+  /** Summary from COMPLETE_TASK command, used for knowledge extraction */
+  public completionSummary?: string;
   /** Tracks when the last human message was received (for leads) */
   public lastHumanMessageAt: Date | null = null;
   public lastHumanMessageText: string | null = null;
@@ -96,6 +105,12 @@ export class Agent {
   public hierarchyLevel: number = 0;
   /** Whether this agent was auto-created by the system (e.g., auto-secretary) */
   public isSystemAgent: boolean = false;
+  /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
+  public provider?: string;
+  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  public backend?: string;
+  /** Organized artifact storage path (~/.flightdeck/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
+  public artifactDir?: string;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
@@ -118,16 +133,22 @@ export class Agent {
   /** When true, message delivery is halted — messages stay queued */
   public systemPaused = false;
 
-  private acpConnection: AcpConnection | null = null;
+  private acpConnection: AgentAdapter | null = null;
   private config: ServerConfig;
-  private pendingMessages: PromptContent[] = [];
+  /** Each pending message tracks its optional DB row ID for crash-safe delivery */
+  private pendingMessages: Array<{ content: PromptContent; mqId?: number }> = [];
   private pendingPriorityCount = 0;
   private static readonly MAX_PENDING_MESSAGES = 200;
   private peers: AgentContextInfo[];
   private readonly events = new AgentEventEmitter();
+  /** Optional crash-safe message persistence (write-on-enqueue pattern) */
+  private messageQueueStore?: MessageQueueStore;
 
   /** Resume a previous session by its Copilot session ID */
   public resumeSessionId?: string;
+
+  /** @internal True while agent is still in resume initialization — suppresses parent notifications */
+  _isResuming = false;
 
   // ── Internal constants exposed for AgentAcpBridge ───────────────────────
   /** @internal */ readonly _maxMessages = 500;
@@ -149,18 +170,20 @@ export class Agent {
     ensureSharedWorkspace(this);
     const isResume = !!this.resumeSessionId;
 
-    if (isResume) {
-      startAcpBridge(this, this.config, undefined);
-    } else {
-      const contextManifest = this.buildContextManifest(this.peers, this.budget);
-      const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
-      const initialPrompt = `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
-      startAcpBridge(this, this.config, initialPrompt);
-    }
+    // On resume, send nothing — the SDK restores conversation history and the
+    // agent is ready. The user decides when to send the next message.
+    const initialPrompt = isResume ? undefined : this.buildFullPrompt();
+    // Errors are handled internally by the bridge (sets agent status to 'failed').
+    const bridgePromise = startAcpBridge(this, this.config, initialPrompt);
+    bridgePromise.catch((err) => {
+      logger.error({ module: 'agent', msg: 'Bridge startup failed', agentId: this.id, err: (err as Error).message });
+      this.exitError = (err as Error).message;
+      this.status = 'failed';
+    });
   }
 
   // ── Internal methods used by AgentAcpBridge ─────────────────────────────
-  /** @internal */ _setAcpConnection(conn: AcpConnection): void { this.acpConnection = conn; }
+  /** @internal */ _setAcpConnection(conn: AgentAdapter): void { this.acpConnection = conn; }
   /** @internal */ _notifyData(data: string): void { this.events.notifyData(data); }
   /** @internal */ _notifyContent(content: any): void { this.events.notifyContent(content); }
   /** @internal */ _notifyThinking(text: string): void { this.events.notifyThinking(text); }
@@ -171,6 +194,7 @@ export class Agent {
   /** @internal */ _notifyPlan(entries: PlanEntry[]): void { this.events.notifyPlan(entries); }
   /** @internal */ _notifyPermissionRequest(request: any): void { this.events.notifyPermissionRequest(request); }
   /** @internal */ _notifySessionReady(sessionId: string): void { this.events.notifySessionReady(sessionId); }
+  /** @internal */ _notifySessionResumeFailed(info: { requestedSessionId: string; error: string }): void { this.events.notifySessionResumeFailed(info); }
   /** @internal */ _notifyContextCompacted(info: CompactionInfo): void { this.events.notifyContextCompacted(info); }
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
   /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
@@ -178,7 +202,10 @@ export class Agent {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
       if (this.pendingPriorityCount > 0) this.pendingPriorityCount--;
-      this.write(next);
+      this.write(next.content);
+      if (next.mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
     }
   }
 
@@ -253,8 +280,8 @@ ${crewSection}
 ${budgetSection}
 
 == SHARED WORKSPACE ==
-Path: .flightdeck/shared/ (inside your working directory)
-Use this directory for documents, reports, or artifacts that other agents need to read.
+Your artifact directory: .flightdeck/shared/${this.role.id}-${this.id.slice(0, 8)}/
+Write reports, designs, and analysis files here. All crew members can read this directory.${this.artifactDir ? `\nOrganized storage: ${this.artifactDir}` : ''}
 Convention: .flightdeck/shared/<your-role>-<short-id>/<filename>
 Example: .flightdeck/shared/architect-a1b2c3d4/design-doc.md
 All team members have access to this directory. Create your subdirectory before writing files.
@@ -354,6 +381,13 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 [/CREW CONTEXT]`;
   }
 
+  /** Build the full initial prompt (system prompt + context manifest + task assignment). */
+  buildFullPrompt(): string {
+    const contextManifest = this.buildContextManifest(this.peers, this.budget);
+    const taskAssignment = `You are acting as the "${this.role.name}" role. ${this.task ? `Your assigned task is: ${this.task}` : 'Awaiting task assignment.'}`;
+    return `${this.role.systemPrompt}\n\n${contextManifest}\n\n${taskAssignment}`;
+  }
+
   injectContextUpdate(peers: AgentContextInfo[], _recentActivity: string[], healthHeader?: string, alerts?: string[]): boolean {
     // Convert AgentContextInfo to CrewMember (compatible interfaces)
     const members: CrewMember[] = peers;
@@ -381,7 +415,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
     if (this.acpConnection?.isConnected) {
       this.acpConnection.prompt(update).catch((err) => {
-        logger.warn('agent', `Context update failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message}`);
+        logger.warn({ module: 'agent', msg: 'Context update failed', role: this.role.name, err: err?.message });
       });
     }
     return true;
@@ -393,7 +427,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       this.status = 'running';
       this.events.notifyStatus(this.status);
       this.acpConnection.prompt(data, opts).catch((err) => {
-        logger.error('agent', `Prompt failed for ${this.role.name} (${this.id.slice(0, 8)}): ${err?.message || err}`);
+        logger.error({ module: 'agent', msg: 'Prompt failed', role: this.role.name, err: String(err?.message || err) });
         // Reset status so agent doesn't get stuck as 'running'
         if (this.status === 'running') {
           this.status = 'idle';
@@ -408,6 +442,11 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     this.write(message, opts);
   }
 
+  /** Inject the crash-safe message queue store (called by AgentManager after construction) */
+  setMessageQueueStore(store: MessageQueueStore): void {
+    this.messageQueueStore = store;
+  }
+
   /**
    * Queue a message for delivery after the agent finishes its current prompt.
    * If `opts.priority` is true, the message is inserted after existing priority
@@ -416,39 +455,65 @@ When you discover something important about the codebase, a pattern, a gotcha, o
    * Priority messages (e.g. user messages) are NEVER dropped.
    */
   queueMessage(message: PromptContent, opts?: { priority?: boolean }): void {
+    // Write to DB FIRST for crash safety (write-on-enqueue pattern)
+    let mqId: number | undefined;
+    if (this.messageQueueStore) {
+      try {
+        const payload = typeof message === 'string' ? message : JSON.stringify(message);
+        mqId = this.messageQueueStore.enqueue(this.id, 'agent_message', payload);
+      } catch (err: any) {
+        logger.warn({ module: 'comms', msg: 'Failed to persist message to queue', agentId: this.id, error: err.message });
+      }
+    }
+
     if (this.systemPaused) {
-      this.enqueueMessage(message, opts?.priority);
+      this.enqueueMessage(message, opts?.priority, mqId);
       return;
     }
     if (this.status === 'idle') {
       this.write(message, opts);
+      // Mark delivered immediately since we wrote directly
+      if (mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+      }
     } else {
-      this.enqueueMessage(message, opts?.priority);
+      this.enqueueMessage(message, opts?.priority, mqId);
     }
   }
 
   /** Internal: insert message into pendingMessages with FIFO priority ordering and rate limiting */
-  private enqueueMessage(message: PromptContent, priority?: boolean): void {
+  private enqueueMessage(message: PromptContent, priority?: boolean, mqId?: number): void {
     if (!priority && this.pendingMessages.length >= Agent.MAX_PENDING_MESSAGES) {
-      logger.warn('agent', `Message queue full (${Agent.MAX_PENDING_MESSAGES}) for ${this.role.name} (${this.id.slice(0, 8)}) — dropping non-priority message`);
+      logger.warn({ module: 'agent', msg: 'Message queue full — dropping non-priority message', role: this.role.name, maxMessages: Agent.MAX_PENDING_MESSAGES });
+      // Bug fix: mark the DB row as delivered so it doesn't replay on restart
+      if (mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+      }
       return;
     }
+    const entry = { content: message, mqId };
     if (priority) {
-      this.pendingMessages.splice(this.pendingPriorityCount, 0, message);
+      this.pendingMessages.splice(this.pendingPriorityCount, 0, entry);
       this.pendingPriorityCount++;
     } else {
-      this.pendingMessages.push(message);
+      this.pendingMessages.push(entry);
     }
   }
 
   /** Interrupt current work, then send message */
   async interruptWithMessage(message: PromptContent): Promise<void> {
     if (this.acpConnection && this.status === 'running') {
-      // Clear any queued messages — interrupt takes priority
+      // Mark cleared messages as delivered in DB before discarding
+      if (this.messageQueueStore) {
+        for (const { mqId } of this.pendingMessages) {
+          if (mqId) {
+            try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+          }
+        }
+      }
       this.pendingMessages.length = 0;
       this.pendingPriorityCount = 0;
       await this.acpConnection.cancel();
-      // Small delay to let cancellation settle before sending new prompt
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     this.write(message);
@@ -478,16 +543,28 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   drainPendingMessages(): void {
     if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
       const next = this.pendingMessages.shift()!;
-      this.write(next);
+      this.write(next.content);
+      // Mark delivered in DB after successful write
+      if (next.mqId && this.messageQueueStore) {
+        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
     }
   }
 
   /** Clear all pending (queued, not yet started) messages. Returns the count and previews of cleared messages. */
   clearPendingMessages(): { count: number; previews: string[] } {
     const count = this.pendingMessages.length;
-    const previews = this.pendingMessages.map((msg) =>
-      typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
+    const previews = this.pendingMessages.map(({ content }) =>
+      typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
+    // Mark all DB rows as delivered so they don't replay on restart
+    if (this.messageQueueStore) {
+      for (const { mqId } of this.pendingMessages) {
+        if (mqId) {
+          try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
+        }
+      }
+    }
     this.pendingMessages.length = 0;
     this.pendingPriorityCount = 0;
     return { count, previews };
@@ -495,8 +572,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
   /** Get summaries of pending messages for queue visibility (first 100 chars each) */
   getPendingMessageSummaries(): string[] {
-    return this.pendingMessages.map((msg) =>
-      typeof msg === 'string' ? msg.slice(0, 100) : `[${msg.length} content block(s)]`,
+    return this.pendingMessages.map(({ content }) =>
+      typeof content === 'string' ? content.slice(0, 100) : `[${(content as any[]).length} content block(s)]`,
     );
   }
 
@@ -530,14 +607,15 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     }
   }
 
-  terminate(): void {
+  async terminate(): Promise<void> {
     if (this.terminated) return;
     this.terminated = true;
     this.status = 'terminated';
     this.events.notifyStatus(this.status);
     if (this.acpConnection) {
-      this.acpConnection.terminate();
+      const conn = this.acpConnection;
       this.acpConnection = null;
+      await conn.terminate();
     }
   }
 
@@ -560,9 +638,10 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.events.onPlan(listener); }
   onPermissionRequest(listener: (request: any) => void): void { this.events.onPermissionRequest(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.events.onSessionReady(listener); }
+  onSessionResumeFailed(listener: (info: { requestedSessionId: string; error: string }) => void): void { this.events.onSessionResumeFailed(listener); }
   onContextCompacted(listener: (info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void): void { this.events.onContextCompacted(listener); }
   /** Register a listener for token usage updates (for cost tracking). */
-  onUsage(listener: (info: { agentId: string; inputTokens: number; outputTokens: number; dagTaskId?: string }) => void): void { this.events.onUsage(listener); }
+  onUsage(listener: (info: UsageInfo) => void): void { this.events.onUsage(listener); }
   onThinking(listener: (text: string) => void): void { this.events.onThinking(listener); }
   onResponseStart(listener: () => void): void { this.events.onResponseStart(listener); }
 
@@ -647,7 +726,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       parentId: this.parentId,
       childIds: this.childIds,
       createdAt: this.createdAt.toISOString(),
-      outputPreview: this.getRecentOutput(4000),
+      outputPreview: redact(this.getRecentOutput(4000)).text,
       plan: this.plan,
       toolCalls: this.toolCalls.slice(-50),
       sessionId: this.sessionId,
@@ -665,6 +744,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       isSubLead: this.role.id === 'lead' && !!this.parentId,
       hierarchyLevel: this.hierarchyLevel,
       isSystemAgent: this.isSystemAgent || undefined,
+      provider: this.provider,
+      backend: this.backend,
     };
   }
 }

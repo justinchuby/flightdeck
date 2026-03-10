@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ScaleTime } from '@visx/vendor/d3-scale';
 import type { TimelineAgent } from './useTimelineData';
+import { getRoleIcon } from '../../utils/getRoleIcon';
 
 /** Status → Tailwind color map matching the existing app palette */
 const STATUS_STYLES: Record<string, { bg: string; border: string; fill: string }> = {
@@ -19,18 +20,6 @@ const STATUS_STROKE: Record<string, string> = {
   completed:  'rgb(5 150 105)',
   failed:     'rgb(239 68 68)',
   terminated: 'rgb(249 115 22)',
-};
-
-const ROLE_ICONS: Record<string, string> = {
-  lead: '👑',
-  architect: '🏗',
-  developer: '👨‍💻',
-  'code-reviewer': '🔍',
-  'critical-reviewer': '⚠️',
-  designer: '🎨',
-  secretary: '📋',
-  'qa-tester': '🧪',
-  'tech-writer': '📝',
 };
 
 export interface AgentLaneProps {
@@ -108,15 +97,15 @@ export function AgentLane({ agent, xScale, y, width, height = DEFAULT_HEIGHT, on
         <div
           className="flex items-center gap-1.5 h-full px-2 cursor-pointer select-none hover:bg-white/5 rounded-l"
           onClick={() => onExpand?.(agent.id)}
-          title={`${agent.role} (${agent.id})`}
+          title={`${agent.role} (${agent.id.slice(0, 4)})`}
         >
-          <span className="text-sm">{ROLE_ICONS[agent.role] ?? '🤖'}</span>
+          <span className="text-sm">{getRoleIcon(agent.role)}</span>
           <div className="flex flex-col min-w-0 leading-tight">
             <span className="text-xs font-medium text-th-text-alt truncate">{agent.role}</span>
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-mono text-th-text-muted">{agent.shortId}</span>
               {agent.model && (
-                <span className="text-[9px] text-th-text-muted truncate">{agent.model}</span>
+                <span className="text-[11px] text-th-text-muted truncate">{agent.model}</span>
               )}
             </div>
           </div>

@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Users, AlertCircle, Brain } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Users, Brain } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
-import { PulseRecoveryIndicator } from '../Recovery';
 import { PulseConflictIndicator } from '../Conflicts';
 
 // ── Token pressure helpers ───────────────────────────────────────────
@@ -29,8 +28,10 @@ function pressureDotColor(pct: number): string {
 
 export function PulseStrip() {
   const agents = useAppStore((s) => s.agents);
-  const pendingDecisionCount = useAppStore((s) => s.pendingDecisions.length);
-  const openApprovalQueue = useAppStore((s) => s.setApprovalQueueOpen);
+  const location = useLocation();
+
+  // Hide on project pages — ProjectLayout shows agent status inline in its header
+  const isProjectRoute = /^\/projects\/[^/]+/.test(location.pathname);
 
   const stats = useMemo(() => {
     let totalInput = 0;
@@ -63,10 +64,6 @@ export function PulseStrip() {
 
     const totalTokens = totalInput + totalOutput;
 
-    // Pending decisions: from appStore (tracked via WebSocket events)
-    // Also count agents with pendingPermission as a fallback
-    const permissionCount = agents.filter((a) => a.pendingPermission).length;
-
     // Token pressure: agents with context data, sorted by pressure descending
     const agentsWithContext = agents
       .filter((a) => a.contextWindowSize && a.contextWindowSize > 0 && a.status !== 'completed')
@@ -88,18 +85,14 @@ export function PulseStrip() {
       idle,
       failed,
       stuck,
-      permissionCount,
       agentsWithContext,
       maxPressure,
       agentCount: agents.length,
     };
   }, [agents]);
 
-  // Combine appStore pending decisions + permission requests for total count
-  const totalPending = pendingDecisionCount + (stats.permissionCount ?? 0);
-
-  // Don't render if no agents are active
-  if (stats.agentCount === 0) return null;
+  // Don't render if no agents are active or on project pages
+  if (stats.agentCount === 0 || isProjectRoute) return null;
 
   return (
     <div className="h-10 border-b border-th-border bg-th-bg-alt/40 flex items-center px-4 gap-6 text-xs shrink-0 overflow-x-auto">
@@ -130,27 +123,6 @@ export function PulseStrip() {
         </div>
       </Link>
 
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
-
-      {/* Pending Decisions — click opens Approval Queue */}
-      <button
-        onClick={() => openApprovalQueue(true)}
-        className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${
-          totalPending > 0
-            ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 cursor-pointer'
-            : 'text-th-text-muted hover:text-th-text-alt cursor-pointer'
-        }`}
-        title={totalPending > 0 ? `${totalPending} decisions awaiting approval — click to review` : 'No pending decisions — click to open approval queue'}
-      >
-        <AlertCircle className="w-3.5 h-3.5" />
-        <span className="font-mono font-medium">{totalPending}</span>
-        <span className="hidden sm:inline">pending</span>
-        {totalPending > 0 && (
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        )}
-      </button>
-
       {/* Token Pressure Mini-Indicators — only show when context data exists */}
       {stats.agentsWithContext.length > 0 && (
         <>
@@ -179,15 +151,6 @@ export function PulseStrip() {
           </div>
         </>
       )}
-
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
-
-      {/* Recovery Status */}
-      <PulseRecoveryIndicator />
-
-      {/* Separator */}
-      <div className="w-px h-4 bg-th-border/50" />
 
       {/* Separator */}
       <div className="w-px h-4 bg-th-border/50" />

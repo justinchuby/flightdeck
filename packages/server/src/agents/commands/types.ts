@@ -8,33 +8,26 @@
 import type { Agent } from '../Agent.js';
 import type { Role, RoleRegistry } from '../RoleRegistry.js';
 import type { ServerConfig } from '../../config.js';
-import type { FileLockRegistry } from '../../coordination/FileLockRegistry.js';
-import type { ActivityLedger } from '../../coordination/ActivityLedger.js';
+import type { FileLockRegistry } from '../../coordination/files/FileLockRegistry.js';
+import type { ActivityLedger } from '../../coordination/activity/ActivityLedger.js';
 import type { MessageBus } from '../../comms/MessageBus.js';
-import type { DecisionLog } from '../../coordination/DecisionLog.js';
+import type { DecisionLog } from '../../coordination/decisions/DecisionLog.js';
 import type { AgentMemory } from '../AgentMemory.js';
 import type { ChatGroupRegistry } from '../../comms/ChatGroupRegistry.js';
 import type { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../../tasks/DeferredIssueRegistry.js';
-import type { TimerRegistry } from '../../coordination/TimerRegistry.js';
+import type { TimerRegistry } from '../../coordination/scheduling/TimerRegistry.js';
 import type { CapabilityInjector } from '../capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../../tasks/TaskDecomposer.js';
+import type { GovernancePipeline } from '../../governance/GovernancePipeline.js';
+import type { ActiveDelegationRepository } from '../../db/ActiveDelegationRepository.js';
+import type { AgentRosterRepository } from '../../db/AgentRosterRepository.js';
 
 // ── Delegation record ────────────────────────────────────────────────
 
-export interface Delegation {
-  id: string;
-  fromAgentId: string;
-  toAgentId: string;
-  toRole: string;
-  task: string;
-  context?: string;
-  status: 'active' | 'completed' | 'failed' | 'cancelled' | 'terminated';
-  createdAt: string;
-  completedAt?: string;
-  result?: string;
-}
+import type { Delegation } from '@flightdeck/shared';
+export type { Delegation, DelegationStatus } from '@flightdeck/shared';
 
 // ── CommandContext — bridge from AgentManager ─────────────────────────
 
@@ -44,7 +37,7 @@ export interface CommandContext {
   getProjectIdForAgent(agentId: string): string | undefined;
   getRunningCount(): number;
   spawnAgent(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string }): Agent;
-  terminateAgent(id: string): boolean;
+  terminateAgent(id: string): boolean | Promise<boolean>;
   emit(event: string, ...args: any[]): boolean;
   roleRegistry: RoleRegistry;
   config: ServerConfig;
@@ -62,6 +55,10 @@ export interface CommandContext {
   taskDecomposer?: TaskDecomposer;
   maxConcurrent: number;
   markHumanInterrupt(agentId: string): void;
+  governancePipeline?: GovernancePipeline;
+  activeDelegationRepository?: ActiveDelegationRepository;
+  agentRosterRepository?: AgentRosterRepository;
+  integrationRouter?: import('../../integrations/IntegrationRouter.js').IntegrationRouter;
 }
 
 // ── CommandHandlerContext — CommandContext + shared mutable state ──────

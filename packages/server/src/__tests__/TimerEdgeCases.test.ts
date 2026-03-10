@@ -6,8 +6,8 @@
  * TimerApi.test.ts (API response shapes).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TimerRegistry } from '../coordination/TimerRegistry.js';
-import type { Timer, TimerInput } from '../coordination/TimerRegistry.js';
+import { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
+import type { Timer, TimerInput } from '../coordination/scheduling/TimerRegistry.js';
 import {
   setTimerSchema,
   cancelTimerSchema,

@@ -43,7 +43,7 @@ export function usePredictionAccuracy() {
   useEffect(() => {
     apiFetch<PredictionAccuracy>('/predictions/accuracy')
       .then(setAccuracy)
-      .catch(() => {});
+      .catch(() => { /* initial fetch — will retry */ });
   }, []);
   return accuracy;
 }
@@ -54,7 +54,7 @@ export function usePredictionConfig() {
   useEffect(() => {
     apiFetch<PredictionConfig>('/predictions/config')
       .then(setConfig)
-      .catch(() => {});
+      .catch(() => { /* initial fetch — will retry */ });
   }, []);
 
   const saveConfig = useCallback(async (updates: Partial<PredictionConfig>) => {

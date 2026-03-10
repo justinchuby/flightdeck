@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SmartActivityFilter, getActivityPriority } from '../coordination/SmartActivityFilter.js';
-import type { ActivityEntry, ActionType } from '../coordination/ActivityLedger.js';
+import { SmartActivityFilter, getActivityPriority } from '../coordination/activity/SmartActivityFilter.js';
+import type { ActivityEntry, ActionType } from '../coordination/activity/ActivityLedger.js';
 
 function makeEntry(overrides: Partial<ActivityEntry> & { id: number; actionType: ActionType }): ActivityEntry {
   return {

@@ -24,7 +24,7 @@ export function ActivityFeedContent({ activity, agents }: { activity: ActivityEv
   };
 
   return (
-    <div ref={feedRef} className="h-full overflow-y-auto">
+    <div ref={feedRef} className="h-full min-h-0 overflow-y-auto">
       {recent.length === 0 ? (
         <EmptyState icon="📡" title="No activity yet" compact />
       ) : (

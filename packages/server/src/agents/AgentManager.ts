@@ -1,36 +1,57 @@
 import { Agent, isTerminalStatus } from './Agent.js';
-import { randomUUID } from 'crypto';
+import { generateProjectId } from '../utils/projectId.js';
+import { join } from 'path';
+import { homedir } from 'os';
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
-import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import type { ActivityLedger } from '../coordination/ActivityLedger.js';
+import type { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
 import type { MessageBus } from '../comms/MessageBus.js';
-import type { DecisionLog } from '../coordination/DecisionLog.js';
+import type { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 import type { AgentMemory } from './AgentMemory.js';
 import type { ChatGroupRegistry, ChatGroup, GroupMessage } from '../comms/ChatGroupRegistry.js';
 import type { Database } from '../db/database.js';
 import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
-import type { TimerRegistry } from '../coordination/TimerRegistry.js';
+import type { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
 import type { TaskDecomposer } from '../tasks/TaskDecomposer.js';
-import type { WorktreeManager } from '../coordination/WorktreeManager.js';
+import type { WorktreeManager } from '../coordination/files/WorktreeManager.js';
 import type { CostTracker } from './CostTracker.js';
+import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
+import type { AgentRosterRepository } from '../db/AgentRosterRepository.js';
+import type { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
 import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { HeartbeatMonitor } from './HeartbeatMonitor.js';
 import { TypedEmitter } from '../utils/TypedEmitter.js';
-import type { ToolCallInfo, PlanEntry } from '../acp/AcpConnection.js';
+import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { runWithAgentContext } from '../middleware/requestContext.js';
+import type { AgentServerClient } from './AgentServerClient.js';
+import { startRemoteBridge } from './ServerClientBridge.js';
+import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExtractor.js';
+import type { SessionData, SessionMessage } from '../knowledge/types.js';
+import type { KnowledgeInjector, InjectionContext } from '../knowledge/KnowledgeInjector.js';
+import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
+import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
+import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
+
+// ── Oversight tier behavioral instructions injected into agent prompts ──
+const OVERSIGHT_TIER_INSTRUCTIONS: Record<string, string> = {
+  supervised: 'Be cautious about what you do. When you modify files, always acquire user approval until the oversight level is changed.',
+  balanced: 'Use good judgment. Ask for approval on significant changes like architecture decisions, file deletions, or system-level changes. Proceed with routine work.',
+  autonomous: 'You can detail your reasoning, but there is no need to ask for user approval.',
+};
 
 // ── Typed event map for AgentManager ────────────────────────────────
 export interface AgentManagerEvents {
@@ -45,11 +66,13 @@ export interface AgentManagerEvents {
   'agent:plan': { agentId: string; plan: PlanEntry[] };
   'agent:permission_request': { agentId: string; request: any };
   'agent:session_ready': { agentId: string; sessionId: string };
+  'agent:session_resume_failed': { agentId: string; requestedSessionId: string; error: string };
   'agent:message_sent': { from: string; fromRole: string; to: string; toRole: string; content: string };
   'agent:context_compacted': { agentId: string; previousUsed: number; currentUsed: number; percentDrop: number };
+  'agent:usage': { agentId: string; inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; contextWindowUsed?: number; contextWindowSize?: number };
   'agent:status': { agentId: string; status: string };
   'agent:crashed': { agentId: string; code: number };
-  'agent:auto_restarted': { agentId: string; previousAgentId: string; crashCount: number };
+  'agent:auto_restarted': { agentId: string; crashCount: number };
   'agent:restart_limit': { agentId: string };
   'agent:hung': { agentId: string; elapsedMs: number };
   'agent:hung_terminated': { agentId: string };
@@ -100,6 +123,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
   private worktreeManager?: WorktreeManager;
   private costTracker?: CostTracker;
+  private messageQueueStore?: MessageQueueStore;
+  private agentRosterRepository?: AgentRosterRepository;
+  private activeDelegationRepository?: ActiveDelegationRepository;
+  private agentServerClient?: AgentServerClient;
+  private knowledgeInjector?: KnowledgeInjector;
+  private skillsLoader?: SkillsLoader;
+  private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
+  private collectiveMemory?: CollectiveMemory;
+  private configStore?: import('../config/ConfigStore.js').ConfigStore;
   private _systemPaused = false;
   private _shuttingDown = false;
 
@@ -113,7 +145,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, agentServerClient, knowledgeInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; agentServerClient?: AgentServerClient; knowledgeInjector?: KnowledgeInjector } = {},
   ) {
     super();
     this.config = config;
@@ -130,6 +162,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.capabilityInjector = capabilityInjector;
     this.worktreeManager = worktreeManager;
     this.costTracker = costTracker;
+    this.messageQueueStore = messageQueueStore;
+    this.agentRosterRepository = agentRosterRepository;
+    this.activeDelegationRepository = activeDelegationRepository;
+    this.agentServerClient = agentServerClient;
+    this.knowledgeInjector = knowledgeInjector;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
@@ -162,6 +199,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       taskDecomposer,
       maxConcurrent: this.maxConcurrent,
       markHumanInterrupt: (id) => this.markHumanInterrupt(id),
+      governancePipeline,
+      activeDelegationRepository,
+      agentRosterRepository,
     });
 
     // Start heartbeat monitor to detect stalled teams
@@ -214,18 +254,37 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (target && (target.status === 'running' || target.status === 'idle')) {
         const fromAgent = this.agents.get(msg.from);
         const fromLabel = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
-        logger.info('message', `Delivering: ${fromLabel} → ${target.role.name} (${msg.to.slice(0, 8)})`, {
-          contentPreview: msg.content.slice(0, 80),
-        });
+        logger.info({ module: 'comms', msg: 'Delivering message', targetAgentId: msg.to, targetRole: target.role.name, fromAgentId: msg.from, contentPreview: msg.content.slice(0, 80) });
         target.sendMessage(`[Message from ${fromLabel}]: ${msg.content}`);
       } else {
-        logger.warn('message', `Delivery failed — target not found/running: ${msg.to.slice(0, 8)}`);
+        logger.warn({ module: 'comms', msg: 'Delivery failed — target not found/running', targetAgentId: msg.to });
       }
     });
   }
 
   setProjectRegistry(registry: import('../projects/ProjectRegistry.js').ProjectRegistry): void {
     this.projectRegistry = registry;
+  }
+
+  setSessionKnowledgeExtractor(extractor: SessionKnowledgeExtractor): void {
+    this.sessionKnowledgeExtractor = extractor;
+  }
+
+  setSkillsLoader(loader: SkillsLoader): void {
+    this.skillsLoader = loader;
+  }
+
+  setCollectiveMemory(memory: CollectiveMemory): void {
+    this.collectiveMemory = memory;
+  }
+
+  setConfigStore(store: import('../config/ConfigStore.js').ConfigStore): void {
+    this.configStore = store;
+  }
+
+  /** Late-inject IntegrationRouter to break circular dependency. */
+  setIntegrationRouter(router: import('../integrations/IntegrationRouter.js').IntegrationRouter): void {
+    this.dispatcher.setIntegrationRouter(router);
   }
 
   /**
@@ -269,7 +328,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   spawn(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
-      logger.error('agent', `Concurrency limit reached (${this.maxConcurrent})`, { role: role.id });
+      logger.error({ module: 'agent', msg: 'Concurrency limit reached', maxConcurrent: this.maxConcurrent, role: role.id });
       throw new Error(
         `Concurrency limit reached (${this.maxConcurrent}). Terminate an agent or increase the limit.`,
       );
@@ -286,9 +345,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const modelResolution = this.resolveModelForRole(role.id, model, effectiveProjectId);
     const effectiveModel = modelResolution.model;
     if (modelResolution.overridden && modelResolution.reason) {
-      logger.warn('model-config', modelResolution.reason);
+      logger.warn({ module: 'config', msg: modelResolution.reason! });
     } else if (modelResolution.reason) {
-      logger.info('model-config', modelResolution.reason);
+      logger.info({ module: 'config', msg: modelResolution.reason! });
     }
 
     // Filter initial peer list to same project to prevent cross-project visibility
@@ -314,10 +373,92 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       effectiveRole = { ...role, systemPrompt: role.systemPrompt.replace('{{ROLE_LIST}}', roleList) };
     }
 
+    // Inject relevant project knowledge into the agent's system prompt
+    if (this.knowledgeInjector && effectiveProjectId) {
+      const injectionCtx: InjectionContext = {
+        task: task || undefined,
+        role: role.id,
+      };
+      const injection = this.knowledgeInjector.injectKnowledge(effectiveProjectId, injectionCtx);
+      if (injection.text) {
+        effectiveRole = {
+          ...effectiveRole,
+          systemPrompt: `${effectiveRole.systemPrompt}\n\n${injection.text}`,
+        };
+        logger.info({
+          module: 'knowledge',
+          msg: 'Injected project knowledge into agent prompt',
+          projectId: effectiveProjectId,
+          role: role.id,
+          entriesIncluded: injection.entriesIncluded,
+          totalTokens: injection.totalTokens,
+        });
+      }
+    }
+
+    // Inject .github/skills/ content into the agent's system prompt
+    if (this.skillsLoader) {
+      const skillsBlock = this.skillsLoader.formatForInjection();
+      if (skillsBlock) {
+        effectiveRole = {
+          ...effectiveRole,
+          systemPrompt: `${effectiveRole.systemPrompt}\n\n${skillsBlock}`,
+        };
+        logger.info({
+          module: 'knowledge',
+          msg: 'Injected skills into agent prompt',
+          role: role.id,
+          skillCount: this.skillsLoader.count,
+        });
+      }
+    }
+
+    // Recall collective memories (cross-session patterns, decisions, gotchas)
+    if (this.collectiveMemory && effectiveProjectId) {
+      const categories: MemoryCategory[] = ['pattern', 'decision', 'gotcha'];
+      const memories = categories.flatMap((cat) =>
+        this.collectiveMemory!.recall(cat, undefined, effectiveProjectId),
+      );
+      if (memories.length > 0) {
+        const memoriesBlock = memories
+          .slice(0, 20) // cap to avoid prompt bloat
+          .map((m) => `- [${m.category}] ${m.key}: ${m.value}`)
+          .join('\n');
+        effectiveRole = {
+          ...effectiveRole,
+          systemPrompt: `${effectiveRole.systemPrompt}\n\n<collective_memory>\n${memoriesBlock}\n</collective_memory>`,
+        };
+        logger.info({
+          module: 'knowledge',
+          msg: 'Injected collective memories into agent prompt',
+          projectId: effectiveProjectId,
+          role: role.id,
+          memoriesIncluded: Math.min(memories.length, 20),
+        });
+      }
+    }
+
+    // Inject oversight tier behavioral instructions into agent prompt
+    if (this.configStore) {
+      const oversightConfig = this.configStore.current.oversight;
+      const tierInstructions = OVERSIGHT_TIER_INSTRUCTIONS[oversightConfig.level] ?? '';
+      const customInstructions = oversightConfig.customInstructions ?? '';
+      const parts: string[] = [];
+      if (tierInstructions) parts.push(tierInstructions);
+      if (customInstructions) parts.push(`Additional user instructions: ${customInstructions}`);
+      if (parts.length > 0) {
+        effectiveRole = {
+          ...effectiveRole,
+          systemPrompt: `${effectiveRole.systemPrompt}\n\n<oversight_instructions>\n${parts.join('\n\n')}\n</oversight_instructions>`,
+        };
+      }
+    }
+
     const agent = new Agent(effectiveRole, this.config, task, parentId, peers, autopilot, id);
     if (effectiveModel) agent.model = effectiveModel;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
+    if (resumeSessionId) agent._isResuming = true;
     if (options?.projectName) agent.projectName = options.projectName;
     if (options?.projectId) agent.projectId = options.projectId;
     if (role.id === 'lead') {
@@ -325,6 +466,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
     if (this._systemPaused) {
       agent.systemPaused = true;
+    }
+    if (this.messageQueueStore) {
+      agent.setMessageQueueStore(this.messageQueueStore);
     }
 
     // Track parent-child relationship (deduplicate for restart with same ID)
@@ -346,11 +490,32 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // This prevents "untitled project" scenarios where activities are logged
     // with projectId: '' and become invisible to scoped queries.
     if (!parentId && !agent.projectId) {
-      agent.projectId = randomUUID();
-      logger.warn('agent', `Root agent ${agent.id.slice(0, 8)} spawned without projectId — generated ${agent.projectId.slice(0, 8)}`);
+      agent.projectId = generateProjectId(agent.task || 'untitled');
+      logger.warn({ module: 'agent', msg: 'Root agent spawned without projectId', generatedProjectId: agent.projectId });
     }
 
+    // Compute organized artifact storage path
+    const artifactProjectId = agent.projectId || '_unscoped';
+    const leadId = agent.role.id === 'lead' ? agent.id : (agent.parentId || 'unknown');
+    agent.artifactDir = join(
+      homedir(), '.flightdeck', 'artifacts', artifactProjectId,
+      'sessions', leadId, `${agent.role.id}-${agent.id.slice(0, 8)}`,
+    );
+
     this.agents.set(agent.id, agent);
+
+    // Persist agent to roster DB for crash recovery
+    if (this.agentRosterRepository) {
+      try {
+        this.agentRosterRepository.upsertAgent(
+          agent.id, role.id, effectiveModel || 'default', 'idle',
+          undefined, agent.projectId,
+          parentId ? { parentId } : undefined,
+        );
+      } catch (err: any) {
+        logger.warn({ module: 'agent', msg: 'Failed to persist agent to roster', agentId: agent.id, error: err.message });
+      }
+    }
 
     // Create a conversation thread for this agent (for persistent message history)
     if (this.conversationStore) {
@@ -360,16 +525,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     // Listen for data to detect sub-agent spawn requests and coordination commands
     agent.onData((data) => {
-      this.emit('agent:text', { agentId: agent.id, text: data });
-      // Buffer agent output — flush after 2s of silence or on status change
-      this.bufferAgentMessage(agent.id, data);
-      // Buffer ACP text and scan for complete command patterns
-      this.dispatcher.appendToBuffer(agent.id, data);
-      this.dispatcher.scanBuffer(agent);
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:text', { agentId: agent.id, text: data });
+        this.bufferAgentMessage(agent.id, data);
+        this.dispatcher.appendToBuffer(agent.id, data);
+        this.dispatcher.scanBuffer(agent);
+      });
     });
 
     agent.onToolCall((info) => {
-      this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:tool_call', { agentId: agent.id, toolCall: info });
+      });
     });
 
     agent.onResponseStart(() => {
@@ -422,76 +589,110 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       // Also report to parent lead so it can resume this agent later
       if (agent.parentId) {
         this.agentMemory.store(agent.parentId, agent.id, 'sessionId', sessionId);
-        const parent = this.agents.get(agent.parentId);
-        if (parent && (parent.status === 'running' || parent.status === 'idle')) {
-          const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
-          parent.sendMessage(msg);
-          this.emit('agent:message_sent', {
-            from: agent.id,
-            fromRole: agent.role.name,
-            to: parent.id,
-            toRole: parent.role.name,
-            content: msg,
-          });
+        // Suppress notification during resume — the lead already knows about this agent.
+        if (!agent._isResuming) {
+          const parent = this.agents.get(agent.parentId);
+          if (parent && (parent.status === 'running' || parent.status === 'idle')) {
+            const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
+            parent.sendMessage(msg);
+            this.emit('agent:message_sent', {
+              from: agent.id,
+              fromRole: agent.role.name,
+              to: parent.id,
+              toRole: parent.role.name,
+              content: msg,
+            });
+          }
         }
       }
     });
 
+    agent.onSessionResumeFailed((info) => {
+      this.emit('agent:session_resume_failed', { agentId: agent.id, ...info });
+    });
+
     agent.onContextCompacted((info) => {
-      logger.info('agent', `Context compacted for ${agent.role.name} (${agent.id.slice(0, 8)}): ${info.percentDrop}% reduction`);
+      logger.info({ module: 'agent', msg: 'Context compacted', percentDrop: info.percentDrop });
       this.emit('agent:context_compacted', { agentId: agent.id, ...info });
+
+      // Re-inject artifact directory path — survives context compression as belt-and-suspenders
+      if (agent.artifactDir) {
+        agent.sendMessage(`[System] Your artifact storage directory: ${agent.artifactDir}`);
+      }
     });
 
     // Wire cost tracking: attribute token usage to the agent's current dagTaskId
     if (this.costTracker) {
       const tracker = this.costTracker;
-      agent.onUsage(({ agentId, inputTokens, outputTokens, dagTaskId }) => {
+      agent.onUsage(({ agentId, inputTokens, outputTokens, dagTaskId, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize }) => {
         if (dagTaskId && agent.parentId) {
-          tracker.recordUsage(agentId, dagTaskId, agent.parentId, inputTokens, outputTokens);
+          tracker.recordUsage(agentId, dagTaskId, agent.parentId, inputTokens, outputTokens, {
+            cacheReadTokens, cacheWriteTokens, costUsd,
+          });
         }
+        this.emit('agent:usage', { agentId, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize });
+      });
+    } else {
+      agent.onUsage((info) => {
+        this.emit('agent:usage', info);
       });
     }
 
     agent.onStatus((status) => {
-      this.emit('agent:status', { agentId: agent.id, status });
-      this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
-      // Flush buffered messages on turn boundaries
-      if (status === 'idle' || isTerminalStatus(status)) {
-        this.flushAgentMessage(agent.id);
-      }
-
-      // Track lead idle timing for heartbeat
-      if (agent.role.id === 'lead') {
-        if (status === 'idle') {
-          this.heartbeat.trackIdle(agent.id);
-        } else if (status === 'running') {
-          this.heartbeat.trackActive(agent.id);
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:status', { agentId: agent.id, status });
+        this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
+        if (status === 'idle' || isTerminalStatus(status)) {
+          this.flushAgentMessage(agent.id);
         }
-      }
 
-      // When a child agent goes idle (prompt complete), notify its parent
-      if (status === 'idle' && agent.parentId) {
-        this.dispatcher.notifyParentOfIdle(agent);
-      }
+        // Persist status to roster DB
+        if (this.agentRosterRepository) {
+          const rosterStatus = status === 'running' ? 'busy' : status === 'idle' ? 'idle' : undefined;
+          if (rosterStatus) {
+            try { this.agentRosterRepository.updateStatus(agent.id, rosterStatus); } catch { /* non-critical */ }
+          }
+        }
+
+        if (agent.role.id === 'lead') {
+          if (status === 'idle') {
+            this.heartbeat.trackIdle(agent.id);
+          } else if (status === 'running') {
+            this.heartbeat.trackActive(agent.id);
+          }
+        }
+
+        if (status === 'idle' && agent.parentId && !agent._isResuming) {
+          this.dispatcher.notifyParentOfIdle(agent);
+        }
+      });
     });
 
     agent.onExit((code) => {
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
       this.flushAgentMessage(agent.id);
       this.clearHungTimer(agent.id);
       this.dispatcher.clearBuffer(agent.id);
-      logger.info('agent', `Exited ${agent.role.name} (${agent.id.slice(0, 8)}) code=${code}`, {
-        role: agent.role.id,
-        status: agent.status,
-      });
+      logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
       // Release any file locks held by the exiting agent
       const releasedCount = this.lockRegistry.releaseAll(agent.id);
       if (releasedCount > 0) {
-        logger.info('lock', `Auto-released ${releasedCount} lock(s) for exiting agent ${agent.id.slice(0, 8)}`);
+        logger.info({ module: 'files', msg: 'Auto-released locks for exiting agent', count: releasedCount });
       }
 
       // Clear any pending timers for the exiting agent
       if (this.timerRegistry) this.timerRegistry.clearAgent(agent.id);
+
+      // G-1: Fail running DAG tasks when agent exits with error.
+      // Without this, crashed agents leave tasks stuck in 'running' forever,
+      // blocking dependents and showing 0% progress on the Home page.
+      if (agent.parentId && code !== 0) {
+        const reason = agent.exitError
+          ? `Agent crashed: ${agent.exitError}`
+          : `Agent exited with code ${code}`;
+        this.failDagTaskForAgent(agent.parentId, agent.id, reason);
+      }
 
       // Clean up parent-child reference
       if (agent.parentId) {
@@ -515,7 +716,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.role.id === 'lead' && !agent.parentId && agent.projectId && this.projectRegistry) {
         const status = (code !== null && code !== 0) ? 'crashed' : 'completed';
         this.projectRegistry.endSession(agent.id, status);
-        logger.info('project', `Session ended for project ${agent.projectId.slice(0, 8)} — ${status}`);
+        logger.info({ module: 'project', msg: 'Session ended', status });
+      }
+
+      // Extract knowledge from completed sessions (all agents, not just leads)
+      if (this.sessionKnowledgeExtractor && agent.projectId) {
+        this.extractSessionKnowledge(agent);
       }
 
       // Clean up dedup tracking after a delay
@@ -533,7 +739,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const agentRole = agent.role?.id ?? 'unknown';
         const crashKey = `${agentRole}:${agent.task ?? ''}`;
 
-        logger.error('agent', `Crashed ${agent.role.name} (${agent.id.slice(0, 8)}) exit=${code}`, { crashKey });
+        logger.error({ module: 'agent', msg: 'Agent crashed', exitCode: code, crashKey });
         this.activityLedger.log(agent.id, agentRole, 'error', `Agent crashed with exit code ${code}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         this.emit('agent:crashed', { agentId: agent.id, code });
 
@@ -541,25 +747,25 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.crashCounts.set(crashKey, count);
 
         if (this.autoRestart && count < this.maxRestarts) {
-          logger.warn('agent', `Auto-restarting ${agent.role.name} (attempt ${count + 1}/${this.maxRestarts})`);
+          logger.warn({ module: 'agent', msg: 'Auto-restarting agent', attempt: count + 1, maxRestarts: this.maxRestarts });
           setTimeout(() => {
             try {
               // Verify parent is still alive before restarting
               if (agent.parentId) {
                 const parent = this.agents.get(agent.parentId);
                 if (!parent || isTerminalStatus(parent.status)) {
-                  logger.warn('agent', `Skipping auto-restart: parent ${agent.parentId.slice(0, 8)} no longer active`);
+                  logger.warn({ module: 'agent', msg: 'Skipping auto-restart — parent no longer active', parentAgentId: agent.parentId });
                   return;
                 }
               }
-              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined, undefined, { projectName: agent.projectName, projectId: agent.projectId });
-              this.emit('agent:auto_restarted', { agentId: newAgent.id, previousAgentId: agent.id, crashCount: count });
+              const newAgent = this.spawn(agent.role, agent.task, agent.parentId, undefined, agent.model || undefined, agent.cwd, agent.sessionId || undefined, agent.id, { projectName: agent.projectName, projectId: agent.projectId });
+              this.emit('agent:auto_restarted', { agentId: newAgent.id, crashCount: count });
             } catch (err) {
-              logger.error('agent', `Auto-restart failed for ${agent.role.name}: ${(err as Error).message}`);
+              logger.error({ module: 'agent', msg: 'Auto-restart failed', err: (err as Error).message });
             }
           }, 2000);
         } else if (count >= this.maxRestarts) {
-          logger.error('agent', `Restart limit reached for ${agent.role.name} (${this.maxRestarts} restarts)`);
+          logger.error({ module: 'agent', msg: 'Restart limit reached', maxRestarts: this.maxRestarts });
           this.emit('agent:restart_limit', { agentId: agent.id });
         }
       } else {
@@ -567,30 +773,29 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const crashKey = `${agent.role?.id ?? 'unknown'}:${agent.task ?? ''}`;
         this.crashCounts.delete(crashKey);
       }
+      });
     });
 
     agent.onHung((elapsedMs) => {
-      this.emit('agent:hung', { agentId: agent.id, elapsedMs });
+      runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+        this.emit('agent:hung', { agentId: agent.id, elapsedMs });
 
-      if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
-        const timer = setTimeout(() => {
-          this.hungTimers.delete(agent.id);
-          if (agent.status === 'idle') {
-            this.terminate(agent.id);
-            this.emit('agent:hung_terminated', { agentId: agent.id });
-          }
-        }, this.autoTerminateTimeoutMs);
-        this.hungTimers.set(agent.id, timer);
-      }
+        if (this.autoTerminateTimeoutMs !== null && !this.hungTimers.has(agent.id)) {
+          const timer = setTimeout(() => {
+            this.hungTimers.delete(agent.id);
+            if (agent.status === 'idle') {
+              this.terminate(agent.id).catch(() => {});
+              this.emit('agent:hung_terminated', { agentId: agent.id });
+            }
+          }, this.autoTerminateTimeoutMs);
+          this.hungTimers.set(agent.id, timer);
+        }
+      });
     });
 
     // Helper: post-start actions (emit events after cwd is set)
     const postSpawn = () => {
-      logger.info('agent', `Spawned ${role.name} (${agent.id.slice(0, 8)})`, {
-        autopilot: agent.autopilot,
-        parentId: parentId?.slice(0, 8),
-        task,
-      });
+      logger.info({ module: 'agent', msg: 'Agent spawned', role: role.name, autopilot: agent.autopilot, parentAgentId: parentId, task });
       this.emit('agent:spawned', agent.toJSON());
       this.updateLeadBudgets();
       // Auto-add to groups with matching role criteria (B4: group auto-add)
@@ -599,22 +804,34 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     };
 
+    // Helper: start the agent via remote bridge or local ACP
+    const startAgent = () => {
+      if (this.agentServerClient) {
+        const isResume = !!agent.resumeSessionId;
+        // On resume, send nothing — SDK restores conversation history.
+        const initialPrompt = isResume ? undefined : agent.buildFullPrompt();
+        startRemoteBridge(agent, this.agentServerClient, initialPrompt);
+      } else {
+        agent.start();
+      }
+    };
+
     // Create isolated worktree if manager is available (async — delays agent.start)
     if (this.worktreeManager && !cwd) {
       this.worktreeManager.create(agent.id)
         .then(worktreePath => {
           agent.cwd = worktreePath;
-          logger.info('worktree', `Agent ${agent.id.slice(0, 8)} using worktree at ${worktreePath}`);
+          logger.info({ module: 'files', msg: 'Using worktree', worktreePath });
         })
         .catch(err => {
-          logger.warn('worktree', `Worktree creation failed for ${agent.id.slice(0, 8)}, using shared cwd: ${err.message}`);
+          logger.warn({ module: 'files', msg: 'Worktree creation failed, using shared cwd', err: err.message });
         })
         .finally(() => {
-          agent.start();
+          startAgent();
           postSpawn();
         });
     } else {
-      agent.start();
+      startAgent();
       postSpawn();
     }
 
@@ -631,12 +848,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       });
       if (allTerminal) {
         this.chatGroupRegistry.archiveGroup(group.name, group.leadId);
-        logger.info('group', `Auto-archived group "${group.name}" — all members terminated`);
+        logger.info({ module: 'comms', msg: 'Auto-archived group — all members terminated', groupName: group.name });
       }
     }
   }
 
-  terminate(id: string, visited: Set<string> = new Set()): boolean {
+  async terminate(id: string, visited: Set<string> = new Set()): Promise<boolean> {
     if (visited.has(id)) return false;
     visited.add(id);
 
@@ -648,23 +865,35 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
     if (releasedCount > 0) {
-      logger.info('lock', `Auto-released ${releasedCount} lock(s) for terminated agent ${id.slice(0, 8)}`);
+      logger.info({ module: 'files', msg: 'Auto-released locks for terminated agent', targetAgentId: id, count: releasedCount });
+    }
+
+    // Fail running DAG tasks assigned to this agent.
+    // Runs unconditionally (no exit code check) because explicit termination
+    // always means the agent can't finish its work — unlike onExit which only
+    // fails tasks on non-zero exit codes to allow clean completions.
+    let dagTaskFailed = false;
+    if (agent.parentId) {
+      dagTaskFailed = this.failDagTaskForAgent(agent.parentId, id, 'Agent terminated');
     }
 
     // Cascade: terminate orphaned children recursively
     for (const childId of [...agent.childIds]) {
       const child = this.agents.get(childId);
       if (child && !isTerminalStatus(child.status)) {
-        logger.info('agent', `Cascade-terminating orphaned child ${child.role.name} (${childId.slice(0, 8)})`);
-        this.terminate(childId, visited);
+        logger.info({ module: 'agent', msg: 'Cascade-terminating orphaned child', childAgentId: childId, childRole: child.role.name });
+        await this.terminate(childId, visited);
       }
     }
 
     // Clean up delegation records for this agent
     this.dispatcher.completeDelegationsForAgent(id);
 
-    // Notify parent and clean up childIds reference
-    this.dispatcher.notifyParentOfCompletion(agent, -1);
+    // Notify parent of completion — skip if failDagTaskForAgent already
+    // notified the parent to avoid double-messaging about the same termination.
+    if (!dagTaskFailed) {
+      this.dispatcher.notifyParentOfCompletion(agent, -1);
+    }
     if (agent.parentId) {
       const parent = this.agents.get(agent.parentId);
       if (parent) {
@@ -672,8 +901,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
 
-    agent.terminate();
+    await agent.terminate();
     this.emit('agent:terminated', id);
+
+    // Persist terminated status to roster DB
+    if (this.agentRosterRepository) {
+      try { this.agentRosterRepository.updateStatus(id, 'terminated'); } catch { /* non-critical */ }
+    }
 
     // Clean up agent timers
     if (this.timerRegistry) this.timerRegistry.clearAgent(id);
@@ -687,12 +921,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       this.worktreeManager.merge(id)
         .then(result => {
           if (!result.ok) {
-            logger.warn('worktree', `Merge failed for ${id.slice(0, 8)}: ${result.conflicts?.join(', ')}`);
+            logger.warn({ module: 'files', msg: 'Worktree merge failed', targetAgentId: id, conflicts: result.conflicts });
           }
         })
         .finally(() => {
           this.worktreeManager!.cleanup(id).catch(err => {
-            logger.warn('worktree', `Cleanup failed for ${id.slice(0, 8)}: ${err.message}`);
+            logger.warn({ module: 'files', msg: 'Worktree cleanup failed', targetAgentId: id, err: err.message });
           });
         });
     }
@@ -754,6 +988,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (!secretaryRole) return null;
 
     try {
+      // autoSpawnSecretary is a fallback for fresh starts only — resume is handled
+      // by the team respawn path in projects.ts which includes all crew members.
       const secretary = this.spawn(
         secretaryRole,
         'You are the auto-created project secretary. Track DAG progress, provide status reports when asked, and assist with dependency inference for auto-DAG tasks.',
@@ -766,10 +1002,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         { projectName: leadAgent.projectName, projectId: leadAgent.projectId },
       );
       secretary.isSystemAgent = true;
-      logger.info('agent', `Auto-spawned secretary (${secretary.id.slice(0, 8)}) for lead (${leadAgent.id.slice(0, 8)})`);
+      logger.info({ module: 'agent', msg: 'Auto-spawned secretary', secretaryId: secretary.id, leadAgentId: leadAgent.id });
       return secretary;
     } catch (err: any) {
-      logger.warn('agent', `Failed to auto-spawn secretary: ${err.message}`);
+      logger.warn({ module: 'agent', msg: 'Failed to auto-spawn secretary', err: err.message });
       setTimeout(() => {
         leadAgent.sendMessage(`[System] Auto-secretary spawn failed: ${err.message}. You can manually create one with CREATE_AGENT.`);
       }, 2000);
@@ -789,11 +1025,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     ).length;
   }
 
-  restart(id: string): Agent | null {
+  async restart(id: string): Promise<Agent | null> {
     const agent = this.agents.get(id);
     if (!agent) return null;
     const { role, task, sessionId, parentId, model, cwd, projectName, projectId } = agent;
-    agent.terminate();
+    await agent.terminate();
     this.agents.delete(id);
     // Re-spawn with same ID and resume the session if available
     const newAgent = this.spawn(role, task, parentId, undefined, model || undefined, cwd, sessionId || undefined, id, { projectName, projectId });
@@ -823,6 +1059,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return this.roleRegistry;
   }
 
+  /** Get the optional AgentServerClient (for remote agent spawning). */
+  getAgentServerClient(): AgentServerClient | undefined {
+    return this.agentServerClient;
+  }
+
+  /** Set or replace the AgentServerClient (for remote agent spawning). */
+  setAgentServerClient(client: AgentServerClient | undefined): void {
+    this.agentServerClient = client;
+  }
+
   setAutoRestart(enabled: boolean): void {
     this.autoRestart = enabled;
   }
@@ -839,7 +1085,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
     this.emit('system:paused', { paused: true });
-    logger.info('system', 'System paused by user');
+    logger.info({ module: 'agent', msg: 'System paused by user' });
   }
 
   /** Resume the system — deliver queued messages, notify agents */
@@ -854,7 +1100,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     }
     this.emit('system:paused', { paused: false });
-    logger.info('system', 'System resumed by user');
+    logger.info({ module: 'agent', msg: 'System resumed by user' });
     // Drain pending messages on all idle agents
     for (const agent of this.agents.values()) {
       if (agent.status === 'idle' || agent.status === 'running') {
@@ -891,18 +1137,21 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
-  shutdownAll(): void {
+  async shutdownAll(): Promise<void> {
     this._shuttingDown = true;
     this.heartbeat.stop();
-    for (const agent of this.agents.values()) {
-      if (!isTerminalStatus(agent.status)) {
-        agent.terminate();
-      }
+    const active = [...this.agents.values()]
+      .filter(agent => !isTerminalStatus(agent.status));
+    logger.info({ module: 'agent', msg: `Terminating ${active.length} active agent(s)...` });
+    const results = await Promise.allSettled(active.map(agent => agent.terminate()));
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length > 0) {
+      logger.warn({ module: 'agent', msg: `${failed.length} agent(s) failed to terminate cleanly` });
     }
     // Clean up all worktrees (async, best-effort)
     // Individual terminate() calls skip merge when _shuttingDown is true
     this.worktreeManager?.cleanupAll().catch(err => {
-      logger.warn('worktree', `Shutdown worktree cleanup failed: ${err.message}`);
+      logger.warn({ module: 'files', msg: 'Shutdown worktree cleanup failed', err: err.message });
     });
   }
 
@@ -973,6 +1222,25 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return this.conversationStore.getRecentMessages(agentId, limit).reverse(); // chronological order
   }
 
+  /**
+   * Fail running DAG task assigned to an agent and notify the parent lead.
+   * Shared by both onExit (crash path) and terminate (explicit kill path).
+   * Returns true if a task was actually failed (used to skip redundant notifications).
+   */
+  private failDagTaskForAgent(leadId: string, agentId: string, reason: string): boolean {
+    const dagTask = this.taskDAG.getTaskByAgent(leadId, agentId);
+    if (!dagTask || dagTask.dagStatus !== 'running') return false;
+
+    this.taskDAG.failTask(leadId, dagTask.id, reason);
+    logger.info({ module: 'agent', msg: 'Failed DAG task for agent', agentId, taskId: dagTask.id, reason });
+
+    const dagParent = this.agents.get(leadId);
+    if (dagParent && (dagParent.status === 'running' || dagParent.status === 'idle')) {
+      dagParent.sendMessage(`[System] DAG: Task "${dagTask.id}" FAILED (${reason}). Dependents blocked. Use RETRY_TASK or SKIP_TASK.`);
+    }
+    return true;
+  }
+
   /** Buffer agent output text, flushing after 2s of silence */
   private bufferAgentMessage(agentId: string, data: string): void {
     const existing = this.messageBuffers.get(agentId) || '';
@@ -1006,6 +1274,74 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
+  /**
+   * Extract knowledge from a completed agent session and store it.
+   * Gathers conversation history and builds SessionData for the extractor.
+   */
+  private extractSessionKnowledge(agent: Agent): void {
+    if (!this.sessionKnowledgeExtractor || !agent.projectId) return;
+
+    try {
+      const messages = this.getMessageHistory(agent.id, 200);
+      const sessionMessages: SessionMessage[] = messages.map((m) => ({
+        sender: m.sender,
+        content: m.content,
+        timestamp: m.timestamp,
+      }));
+
+      // Skip extraction for sessions with very few messages (likely aborted)
+      if (sessionMessages.length < 3) {
+        logger.debug({ module: 'knowledge', msg: 'Skipping extraction — too few messages', agentId: agent.id, messageCount: sessionMessages.length });
+        return;
+      }
+
+      const sessionData: SessionData = {
+        sessionId: agent.sessionId || agent.id,
+        projectId: agent.projectId,
+        task: agent.task,
+        role: agent.role.id,
+        agentId: agent.id,
+        messages: sessionMessages,
+        completionSummary: agent.completionSummary,
+        startedAt: agent.createdAt.toISOString(),
+        endedAt: new Date().toISOString(),
+      };
+
+      const result = this.sessionKnowledgeExtractor.extractFromSession(sessionData);
+      if (result.entriesStored > 0) {
+        this.activityLedger.log(
+          agent.id, agent.role.id, 'task_completed',
+          `Extracted ${result.entriesStored} knowledge entries (${result.decisions.length} decisions, ${result.patterns.length} patterns, ${result.errors.length} errors)`,
+          { entriesStored: result.entriesStored }, agent.projectId,
+        );
+      }
+
+      // Persist extracted knowledge into collective memory for cross-session recall
+      if (this.collectiveMemory) {
+        const entries = [...result.decisions, ...result.patterns, ...result.errors];
+        for (const entry of entries) {
+          const memCat = KNOWLEDGE_TO_MEMORY_CATEGORY[entry.category] ?? 'pattern';
+          this.collectiveMemory.remember(memCat, entry.key, entry.content, agent.id, agent.projectId!);
+        }
+        if (entries.length > 0) {
+          logger.info({
+            module: 'knowledge',
+            msg: 'Stored entries in collective memory',
+            agentId: agent.id,
+            count: entries.length,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn({
+        module: 'knowledge',
+        msg: 'Session knowledge extraction failed',
+        agentId: agent.id,
+        err: (err as Error).message,
+      });
+    }
+  }
+
   /** Keep all agents' budget info in sync with current state */
   private updateLeadBudgets(): void {
     const running = this.getRunningCount();
@@ -1026,12 +1362,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           const added = this.chatGroupRegistry.addMembers(leadId, group.name, [agent.id]);
           if (added.length > 0) {
             agent.queueMessage(`[System] You've been auto-added to group "${group.name}" (matches your role "${agent.role.id}"). Send messages: ⟦⟦ GROUP_MESSAGE {"group": "${group.name}", "content": "your message"} ⟧⟧`);
-            logger.info('groups', `Auto-added ${agent.role.name} (${agent.id.slice(0, 8)}) to group "${group.name}" via role criteria`);
+            logger.info({ module: 'comms', msg: 'Auto-added agent to group via role criteria', groupName: group.name, role: agent.role.name });
           }
         }
       }
     } catch (err) {
-      logger.warn('groups', `Failed to auto-add agent to role groups: ${(err as Error).message}`);
+      logger.warn({ module: 'comms', msg: 'Failed to auto-add agent to role groups', err: (err as Error).message });
     }
   }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DiffService, parseDiffOutput } from '../coordination/DiffService.js';
-import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
+import { DiffService, parseDiffOutput } from '../coordination/files/DiffService.js';
+import type { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
 
 // ── Mock execFileAsync ────────────────────────────────────────────
 

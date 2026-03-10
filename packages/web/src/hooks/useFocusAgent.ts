@@ -151,7 +151,6 @@ export function useDiffSummary(
     const timer = setInterval(fetch_, pollInterval);
     return () => {
       clearInterval(timer);
-      clearInterval(timer);
     };
   }, [agentId, pollInterval]);
 

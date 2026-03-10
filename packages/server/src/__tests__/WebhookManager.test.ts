@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WebhookManager } from '../coordination/WebhookManager.js';
+import { WebhookManager } from '../coordination/alerts/WebhookManager.js';
 
 // Helpers
 function mockFetchOk(status = 200) {

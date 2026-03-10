@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EscalationManager } from '../coordination/EscalationManager.js';
+import { EscalationManager } from '../coordination/alerts/EscalationManager.js';
 import { Database } from '../db/database.js';
-import { DecisionLog } from '../coordination/DecisionLog.js';
+import { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 
 vi.mock('../utils/logger.js', () => ({

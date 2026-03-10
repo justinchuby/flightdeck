@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { agentPlans } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { agentPlans, dagTasks } from '../db/schema.js';
+import { eq, desc } from 'drizzle-orm';
 import { logger } from '../utils/logger.js';
 import { validateBody, spawnAgentSchema, sendMessageSchema, agentInputSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
-import type { ContentBlock } from '@agentclientprotocol/sdk';
+import type { ContentBlock } from '../adapters/types.js';
 
 /** Build ContentBlock array from text + optional attachments */
 function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
@@ -22,7 +22,7 @@ function buildContentBlocks(text: string, attachments?: Array<{ name: string; mi
   return blocks;
 }
 
-import { DiffService } from '../coordination/DiffService.js';
+import { DiffService } from '../coordination/files/DiffService.js';
 
 export function agentsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, db: _db, lockRegistry, decisionLog, activityLedger } = ctx;
@@ -42,7 +42,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     const { roleId, task, mode, autopilot, model, sessionId } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) {
-      logger.warn('api', `POST /agents — unknown role: ${roleId}`);
+      logger.warn({ module: 'api', msg: 'POST /agents — unknown role', roleId });
       return res.status(400).json({ error: `Unknown role: ${roleId}` });
     }
     try {
@@ -57,16 +57,16 @@ export function agentsRoutes(ctx: AppContext): Router {
       }
 
       const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined, undefined, options);
-      logger.info('api', `POST /agents — ${sessionId ? 'resumed' : 'spawned'} ${role.name} (${agent.id.slice(0, 8)})`, { model: model || role.model, sessionId });
+      logger.info({ module: 'api', msg: `POST /agents — ${sessionId ? 'resumed' : 'spawned'}`, agentId: agent.id, roleName: role.name, model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
-      logger.error('api', `POST /agents — ${err.message}`);
+      logger.error({ module: 'api', msg: 'POST /agents failed', err: err.message });
       res.status(429).json({ error: err.message });
     }
   });
 
-  router.delete('/agents/:id', (req, res) => {
-    const ok = agentManager.terminate(req.params.id);
+  router.delete('/agents/:id', async (req, res) => {
+    const ok = await agentManager.terminate(req.params.id);
     res.json({ ok });
   });
 
@@ -78,22 +78,22 @@ export function agentsRoutes(ctx: AppContext): Router {
       agentManager.markHumanInterrupt(agent.id);
       res.json({ ok: true });
     } catch (err) {
-      logger.debug('api', 'Failed to interrupt agent', { error: (err as Error).message });
+      logger.debug({ module: 'api', msg: 'Failed to interrupt agent', err: (err as Error).message });
       res.json({ ok: false, error: 'Cancel not supported for this agent mode' });
     }
   });
 
-  router.post('/agents/:id/restart', (req, res) => {
-    const newAgent = agentManager.restart(req.params.id);
+  router.post('/agents/:id/restart', async (req, res) => {
+    const newAgent = await agentManager.restart(req.params.id);
     if (!newAgent) return res.status(404).json({ error: 'Agent not found' });
     res.status(201).json(newAgent.toJSON());
   });
 
-  router.post('/agents/:id/compact', (req, res) => {
+  router.post('/agents/:id/compact', async (req, res) => {
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     // Compact = restart with context handoff (same as restart but semantically different)
-    const newAgent = agentManager.restart(req.params.id);
+    const newAgent = await agentManager.restart(req.params.id);
     if (!newAgent) return res.status(500).json({ error: 'Failed to compact agent context' });
     res.status(201).json({ compacted: true, agent: newAgent.toJSON() });
   });
@@ -117,15 +117,47 @@ export function agentsRoutes(ctx: AppContext): Router {
   // Get message history for an agent (persisted across refreshes)
   router.get('/agents/:id/messages', (req, res) => {
     const limit = Math.min(parseInt(String(req.query.limit) || '200', 10) || 200, 1000);
-    const messages = agentManager.getMessageHistory(req.params.id as string, limit);
-    res.json({ agentId: req.params.id, messages });
+    const includeSystem = req.query.includeSystem === 'true';
+    const agentId = req.params.id as string;
+
+    // Get messages for this agent
+    let messages = agentManager.getMessageHistory(agentId, limit);
+    let fromPriorSession = false;
+
+    // For resumed sessions: also include messages from prior sessions of the same project
+    if (messages.length === 0 && ctx.projectRegistry) {
+      const agent = agentManager.get(agentId);
+      const projectId = agent?.projectId;
+      if (projectId) {
+        const sessions = ctx.projectRegistry.getSessions(projectId);
+        // Sessions are ordered by recency (newest first from getSessions)
+        const priorLeadIds = sessions
+          .map(s => s.leadId)
+          .filter(id => id !== agentId);
+        for (const leadId of priorLeadIds) {
+          const prior = agentManager.getMessageHistory(leadId, limit);
+          if (prior.length > 0) {
+            messages = prior;
+            fromPriorSession = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Filter out system messages by default (they contain internal prompts/context)
+    if (!includeSystem) {
+      messages = messages.filter(m => m.sender !== 'system');
+    }
+
+    res.json({ agentId, messages, fromPriorSession });
   });
 
   router.post('/agents/:id/input', validateBody(agentInputSchema), (req, res) => {
     const { text } = req.body;
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
-    logger.info('api', `Input → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"`);
+    logger.info({ module: 'api', msg: 'Input received', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80) });
     agent.write(text);
     res.json({ ok: true });
   });
@@ -147,12 +179,12 @@ export function agentsRoutes(ctx: AppContext): Router {
     const content = buildContentBlocks(formatted, attachments, agent.supportsImages);
 
     if (mode === 'interrupt') {
-      logger.info('api', `Interrupt message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      logger.info({ module: 'api', msg: 'Interrupt message', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80), attachments: attachments?.length || 0 });
       agentManager.markHumanInterrupt(agent.id);
       await agent.interruptWithMessage(content);
       res.json({ ok: true, mode: 'interrupt', status: agent.status });
     } else {
-      logger.info('api', `Queued message → ${agent.role.name} (${req.params.id.slice(0, 8)}): "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      logger.info({ module: 'api', msg: 'Queued message', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80), attachments: attachments?.length || 0 });
       agent.queueMessage(content);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount, status: agent.status });
     }
@@ -164,7 +196,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     const { model } = req.body;
     if (model !== undefined) {
       agent.model = model;
-      logger.info('api', `Updated model for ${agent.role.name} (${req.params.id.slice(0, 8)}): ${model}`);
+      logger.info({ module: 'api', msg: 'Model updated', agentId: req.params.id, roleName: agent.role.name, model });
     }
     res.json(agent.toJSON());
   });
@@ -229,6 +261,37 @@ export function agentsRoutes(ctx: AppContext): Router {
       fileLocks,
       diff,
     });
+  });
+
+  // ── GET /agents/:id/tasks — Task history for an agent ─────────────
+
+  router.get('/agents/:id/tasks', (req, res) => {
+    const agentId = req.params.id as string;
+    try {
+      const tasks = _db.drizzle
+        .select()
+        .from(dagTasks)
+        .where(eq(dagTasks.assignedAgentId, agentId))
+        .orderBy(desc(dagTasks.createdAt))
+        .all();
+
+      res.json(tasks.map(t => ({
+        id: t.id,
+        leadId: t.leadId,
+        title: t.title,
+        description: t.description,
+        dagStatus: t.dagStatus,
+        role: t.role,
+        priority: t.priority,
+        createdAt: t.createdAt,
+        startedAt: t.startedAt,
+        completedAt: t.completedAt,
+        failureReason: t.failureReason,
+      })));
+    } catch (err: any) {
+      logger.error({ module: 'agents', msg: 'Failed to get agent tasks', agentId, err: err.message });
+      res.status(500).json({ error: err.message });
+    }
   });
 
   return router;

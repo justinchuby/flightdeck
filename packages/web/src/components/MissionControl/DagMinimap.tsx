@@ -79,7 +79,7 @@ export function DagMinimap({ projectId, leadId }: DagMinimapProps) {
         if (fetchIdRef.current !== requestId) return;
         if (data?.tasks) setFetchedDag(data);
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [projectId, storeDag]);
 
   const dagStatus = storeDag ?? fetchedDag;

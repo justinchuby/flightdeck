@@ -1,53 +1,123 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useApi } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
-import { useSettingsStore } from './stores/settingsStore';
+import { useSettingsStore, shouldNotify } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
 import { CommandPalette } from './components/CommandPalette/CommandPalette';
 import { ContextualCoach } from './components/Onboarding';
-import { BottomTabBar } from './components/Layout/BottomTabBar';
-import { MobilePulse } from './components/Mobile';
-import { InstallPrompt } from './components/Mobile';
-import { OfflineBanner } from './components/Mobile';
 
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
-import { LeadDashboard } from './components/LeadDashboard';
+import { LeadDashboard, ReadOnlySession } from './components/LeadDashboard';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { PermissionDialog } from './components/PermissionDialog';
-import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
-import { Search, Pause, Play } from 'lucide-react';
+import { Search, Pause, Play, Bug } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SectionErrorBoundary, RouteErrorBoundary } from './components/SectionErrorBoundary';
+import { buildFeedbackUrl } from './components/ProvideFeedback';
 import { VersionBadge } from './components/VersionBadge';
 import { PulseStrip } from './components/Pulse';
+import { AttentionBar } from './components/AttentionBar';
 import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
 import { CatchUpBanner } from './components/CatchUp';
+import { AgentServerStatus } from './components/AgentServerStatus';
+import { StatusPopover } from './components/StatusPopover/StatusPopover';
+import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
+import { ProjectLayout } from './layouts/ProjectLayout';
 
 // Lazy-loaded route components (~40-50% initial bundle reduction)
-const AgentDashboard = lazy(() => import('./components/AgentDashboard/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
 const TaskQueuePanel = lazy(() => import('./components/TaskQueue/TaskQueuePanel').then(m => ({ default: m.TaskQueuePanel })));
 const SettingsPanel = lazy(() => import('./components/Settings/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
-const DataBrowser = lazy(() => import('./components/DataBrowser/DataBrowser').then(m => ({ default: m.DataBrowser })));
 const OrgChart = lazy(() => import('./components/OrgChart/OrgChart').then(m => ({ default: m.OrgChart })));
 const OverviewPage = lazy(() => import('./components/OverviewPage/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m => ({ default: m.GroupChat })));
 const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
-const MissionControlPage = lazy(() => import('./components/MissionControl').then(m => ({ default: m.MissionControlPage })));
 const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
+const AnalysisPage = lazy(() => import('./components/AnalysisPage').then(m => ({ default: m.AnalysisPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
+const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
+const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
+const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel').then(m => ({ default: m.ArtifactsPanel })));
+const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
+const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
+const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
+const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
+const UnifiedCrewPage = lazy(() => import('./components/CrewRoster/UnifiedCrewPage').then(m => ({ default: m.UnifiedCrewPage })));
 
 function RouteSpinner() {
   return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+/**
+ * Redirects from old flat routes to project-scoped routes.
+ * Resolves the active project ID from leadStore + live agents.
+ */
+function ProjectRedirect({ page }: { page: string }) {
+  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const agents = useAppStore((s) => s.agents);
+
+  const projectId = useMemo(() => {
+    if (!selectedLeadId) {
+      // Fall back to first live lead's projectId
+      const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
+      return firstLead?.projectId ?? firstLead?.id ?? null;
+    }
+    // If selectedLeadId is a project: prefix, extract the ID
+    if (selectedLeadId.startsWith('project:')) {
+      return selectedLeadId.slice('project:'.length);
+    }
+    // Otherwise it's a lead agent ID — find its projectId
+    const lead = agents.find((a) => a.id === selectedLeadId);
+    return lead?.projectId ?? selectedLeadId;
+  }, [selectedLeadId, agents]);
+
+  if (!projectId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/projects/${projectId}/${page}`} replace />;
+}
+
+/**
+ * Home route: redirect to active project's session or projects list.
+ */
+function HomeRedirect() {
+  const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const agents = useAppStore((s) => s.agents);
+
+  const projectId = useMemo(() => {
+    if (selectedLeadId) {
+      if (selectedLeadId.startsWith('project:')) {
+        return selectedLeadId.slice('project:'.length);
+      }
+      const lead = agents.find((a) => a.id === selectedLeadId);
+      return lead?.projectId ?? selectedLeadId;
+    }
+    // Fall back to first live lead
+    const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
+    return firstLead?.projectId ?? firstLead?.id ?? null;
+  }, [selectedLeadId, agents]);
+
+  if (!projectId) return <Navigate to="/projects" replace />;
+  return <Navigate to={`/projects/${projectId}/session`} replace />;
+}
+
+function NotFoundPage() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-th-text-muted" data-testid="not-found">
+      <span className="text-4xl">404</span>
+      <p className="text-sm">Page not found</p>
+      <Link to="/" className="text-sm text-accent hover:underline">← Back to Home</Link>
     </div>
   );
 }
@@ -85,6 +155,9 @@ export function App() {
   const { shouldShow } = useOnboarding();
   const [showOnboarding, setShowOnboarding] = useState(shouldShow);
 
+  // Setup wizard — show if providers not yet configured
+  const [showSetupWizard, setShowSetupWizard] = useState(() => shouldShowSetupWizard());
+
   // Shift+A global shortcut to open approval queue
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -99,30 +172,36 @@ export function App() {
   }, []);
 
   // Show notifications for agent lifecycle events, sound notifications, and context compaction
+  // Gated by Trust Dial oversight level (AC-16.5): detailed=all, standard=exceptions, minimal=critical only
   useEffect(() => {
     const handler = (event: Event) => {
       const msg = JSON.parse((event as MessageEvent).data);
       if (msg.type === 'agent:spawned') {
-        addToast('info', `${msg.agent.role.icon} ${msg.agent.role.name} agent spawned`);
+        if (shouldNotify('info')) addToast('info', `${msg.agent.role.icon} ${msg.agent.role.name} agent spawned`);
       } else if (msg.type === 'agent:exit') {
-        addToast(msg.code === 0 ? 'success' : 'error', `Agent ${msg.agentId.slice(0, 8)} ${msg.code === 0 ? 'completed' : 'failed'}`);
+        const failed = msg.code !== 0;
+        // Failures are critical — ALWAYS toast regardless of level
+        if (failed) {
+          addToast('error', `Agent ${msg.agentId.slice(0, 8)} failed`);
+        } else if (shouldNotify('info')) {
+          addToast('success', `Agent ${msg.agentId.slice(0, 8)} completed`);
+        }
       } else if (msg.type === 'agent:sub_spawned') {
-        addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
+        if (shouldNotify('info')) addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
       } else if (msg.type === 'agent:permission_request' && soundEnabled) {
         playAttentionSound();
       } else if (msg.type === 'agent:context_compacted') {
-        const pct = msg.percentDrop ? ` (${msg.percentDrop}% reduction)` : '';
-        addToast('info', `🔄 Context compacted for agent ${msg.agentId.slice(0, 8)}${pct}`);
+        if (shouldNotify('info')) {
+          const pct = msg.percentDrop ? ` (${msg.percentDrop}% reduction)` : '';
+          addToast('info', `🔄 Context compacted for agent ${msg.agentId.slice(0, 8)}${pct}`);
+        }
       } else if (msg.type === 'activity') {
         const e = msg.entry;
         if (e?.action === 'heartbeat_halted') {
-          addToast('info', `⏸️ Heartbeat halted by ${e.agentId?.slice(0, 8) ?? 'agent'}`);
+          if (shouldNotify('exception')) addToast('info', `⏸️ Heartbeat halted by ${e.agentId?.slice(0, 8) ?? 'agent'}`);
         } else if (e?.action === 'limit_change_requested') {
-          addToast('info', `⚙️ Agent limit change requested: ${e.details ?? ''}`);
+          if (shouldNotify('info')) addToast('info', `⚙️ Agent limit change requested: ${e.details ?? ''}`);
         }
-      } else if (msg.type === 'intent:alert') {
-        const label = msg.rule?.label || msg.decision?.title || 'Intent alert triggered';
-        addToast('info', `⚠️ Alert: ${label}`);
       }
     };
     window.addEventListener('ws-message', handler);
@@ -170,14 +249,17 @@ export function App() {
               }
             }
           })
-          .catch(() => {});
+          .catch(() => { /* message history fetch — non-critical, will load via WS */ });
       });
       // Auto-select first running lead
       if (!store.selectedLeadId) {
         const running = leads.find((l) => l.status === 'running');
         if (running) store.selectLead(running.id);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn('[App] Failed to load active leads:', err);
+      addToast('error', 'Failed to load sessions — check server connection');
+    });
 
     // Load persisted projects and register them in leadStore
     fetch('/api/projects').then((r) => r.json()).then((projects: Project[]) => {
@@ -193,17 +275,22 @@ export function App() {
         const first = projects.find((p) => p.status !== 'archived');
         if (first) store.selectLead(`project:${first.id}`);
       }
-    }).catch(() => {});
-  }, []);
+    }).catch((err) => {
+      console.warn('[App] Failed to load projects:', err);
+    });
+  }, [addToast]);
 
   return (
     <div className="flex h-screen bg-surface text-th-text-alt">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm">
         Skip to content
       </a>
+      <SectionErrorBoundary name="Sidebar">
       <Sidebar />
+      </SectionErrorBoundary>
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
+          <SectionErrorBoundary name="Header">
           <header className="h-12 border-b border-th-border flex items-center px-4 justify-between shrink-0">
             <div className="flex items-center gap-2">
               {/* Flightdeck logo */}
@@ -239,46 +326,84 @@ export function App() {
                 <span>Commands</span>
                 <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
-              <span
-                className={`inline-block w-2 h-2 rounded-full ${connected ? (systemPaused ? 'bg-yellow-400' : 'bg-green-400') : 'bg-red-400'}`}
-              />
-              <span className="text-sm text-th-text-muted">
-                {!connected ? 'Reconnecting...' : systemPaused ? 'Paused' : 'Connected'}
-              </span>
+              <StatusPopover />
+              <a
+                href={buildFeedbackUrl({ title: 'User feedback' })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
+                title="Submit Issue"
+                data-testid="top-bar-submit-issue"
+              >
+                <Bug className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Submit Issue</span>
+              </a>
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
           </header>
+          </SectionErrorBoundary>
 
+          <AttentionBar />
           <div data-tour="pulse-strip"><PulseStrip /></div>
-          <MobilePulse />
+          <AgentServerStatus />
 
           <main id="main-content" className="flex-1 overflow-hidden flex flex-col">
           <ErrorBoundary>
           <Suspense fallback={<RouteSpinner />}>
           <Routes>
-            <Route path="/" element={<LeadDashboard api={api} ws={ws} />} />
-            <Route path="/lead" element={<Navigate to="/" replace />} />
-            <Route path="/agents" element={<AgentDashboard api={api} ws={ws} />} />
-            <Route path="/overview" element={<OverviewPage api={api} ws={ws} />} />
-            <Route path="/groups" element={<GroupChat api={api} ws={ws} />} />
-            <Route path="/org" element={<OrgChart api={api} ws={ws} />} />
-            <Route path="/tasks" element={<TaskQueuePanel api={api} />} />
-            <Route path="/settings" element={<SettingsPanel api={api} />} />
-            <Route path="/data" element={<DataBrowser />} />
-            <Route path="/timeline" element={<TimelinePage api={api} ws={ws} />} />
-            <Route path="/mission-control" element={<MissionControlPage />} />
-            <Route path="/canvas" element={<CanvasPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/shared/:token" element={<SharedReplayViewer />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* ── Project-scoped nested routes ─────────────────── */}
+            <Route path="/projects/:id" element={<ProjectLayout />}>
+              <Route index element={<Navigate to="overview" replace />} />
+              <Route path="overview" element={<RouteErrorBoundary name="Overview"><OverviewPage api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel api={api} /></RouteErrorBoundary>} />
+              <Route path="crew" element={<RouteErrorBoundary name="Crew"><UnifiedCrewPage scope="project" /></RouteErrorBoundary>} />
+              <Route path="agents" element={<Navigate to="../crew" replace />} />
+              <Route path="knowledge" element={<RouteErrorBoundary name="Knowledge"><KnowledgePanel /></RouteErrorBoundary>} />
+              <Route path="artifacts" element={<RouteErrorBoundary name="Artifacts"><ArtifactsPanel /></RouteErrorBoundary>} />
+              <Route path="timeline" element={<RouteErrorBoundary name="Timeline"><TimelinePage api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="groups" element={<RouteErrorBoundary name="Groups"><GroupChat api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="org-chart" element={<RouteErrorBoundary name="Org Chart"><OrgChart api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="analytics" element={<RouteErrorBoundary name="Analytics"><AnalyticsPage /></RouteErrorBoundary>} />
+              <Route path="analysis" element={<RouteErrorBoundary name="Analysis"><AnalysisPage /></RouteErrorBoundary>} />
+              <Route path="canvas" element={<RouteErrorBoundary name="Canvas"><CanvasPage /></RouteErrorBoundary>} />
+            </Route>
+
+            {/* ── Global (non-project-scoped) routes ───────────── */}
+            <Route path="/projects" element={<RouteErrorBoundary name="Projects"><ProjectsPanel /></RouteErrorBoundary>} />
+            <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel api={api} /></RouteErrorBoundary>} />
+            <Route path="/agent-server" element={<RouteErrorBoundary name="Agent Server"><AgentServerPanel /></RouteErrorBoundary>} />
+            <Route path="/shared/:token" element={<RouteErrorBoundary name="Shared Replay"><SharedReplayViewer /></RouteErrorBoundary>} />
+
+            {/* ── Backward-compat redirects from old flat routes ─ */}
+            <Route path="/" element={<RouteErrorBoundary name="Home"><HomeDashboard /></RouteErrorBoundary>} />
+            <Route path="/lead" element={<ProjectRedirect page="session" />} />
+            <Route path="/overview" element={<ProjectRedirect page="overview" />} />
+            <Route path="/agents" element={<Navigate to="/crews" replace />} />
+            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Crews"><UnifiedCrewPage scope="global" /></RouteErrorBoundary></Suspense>} />
+            <Route path="/team" element={<Navigate to="/crews" replace />} />
+            <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
+            <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
+            <Route path="/timeline" element={<ProjectRedirect page="timeline" />} />
+            <Route path="/groups" element={<ProjectRedirect page="groups" />} />
+            <Route path="/org" element={<ProjectRedirect page="org-chart" />} />
+            <Route path="/analytics" element={<ProjectRedirect page="analytics" />} />
+            <Route path="/canvas" element={<ProjectRedirect page="canvas" />} />
+            <Route path="/mission-control" element={<ProjectRedirect page="overview" />} />
+            <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
+
+            {/* ── Catch-all ─────────────────────────────────────── */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </Suspense>
           </ErrorBoundary>
           </main>
         </div>
 
+        {/* Desktop: sidebar panel */}
         {selectedAgentId && (
-          <div className="w-[500px] border-l border-th-border flex flex-col">
+          <div className="w-full max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
             <ChatPanel agentId={selectedAgentId} ws={ws} />
           </div>
         )}
@@ -290,10 +415,8 @@ export function App() {
       <SearchDialog open={searchOpen} onClose={closeSearch} />
       {cmdOpen && <CommandPalette onClose={closeCmd} onOpenSearch={openSearch} />}
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      {showSetupWizard && !showOnboarding && <SetupWizard onComplete={() => setShowSetupWizard(false)} />}
       <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
-      <BottomTabBar />
-      <InstallPrompt />
-      <OfflineBanner />
     </div>
   );
 }

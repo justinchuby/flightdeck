@@ -13,11 +13,16 @@ export function useAutoScroll(
 ) {
   const { threshold = 150, resetKey } = opts;
   const initialDone = useRef(false);
+  const thresholdRef = useRef(threshold);
+  thresholdRef.current = threshold;
 
   // Reset when resetKey changes (e.g., switching agents/panels)
   useEffect(() => {
     initialDone.current = false;
   }, [resetKey]);
+
+  // Serialize caller-provided deps for stable comparison
+  const depsKey = JSON.stringify(deps);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -31,11 +36,10 @@ export function useAutoScroll(
     }
 
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceFromBottom < threshold) {
+    if (distanceFromBottom < thresholdRef.current) {
       endMarkerRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [depsKey, containerRef, endMarkerRef]);
 }
 
 /**

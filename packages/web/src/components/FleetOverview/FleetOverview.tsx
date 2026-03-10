@@ -161,7 +161,7 @@ export function FleetOverview({ api, ws }: Props) {
   }, [timelineData, projects]);
 
   return (
-    <div className="flex-1 overflow-auto p-4 space-y-4">
+    <div className="flex-1 overflow-auto p-4 space-y-4 focus:outline-none" tabIndex={0}>
       {/* Project selection tabs (only when multiple leads exist) */}
       {leads.length > 1 && (
         <div className="border-b border-th-border">

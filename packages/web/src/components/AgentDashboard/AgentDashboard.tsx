@@ -130,7 +130,7 @@ export function AgentDashboard({ api, ws }: Props) {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 space-y-4">
+    <div className="flex-1 overflow-auto p-4 space-y-4 focus:outline-none" tabIndex={0}>
       {/* Stats bar */}
       <FleetStats agents={agents} locks={locks} />
 

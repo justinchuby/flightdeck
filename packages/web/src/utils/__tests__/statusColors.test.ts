@@ -7,6 +7,7 @@ import {
   dagTaskText,
   decisionStatusText,
   decisionStatusCard,
+  sessionStatusDot,
 } from '../statusColors';
 
 describe('agentStatusDot', () => {
@@ -36,8 +37,8 @@ describe('agentStatusText', () => {
     expect(agentStatusText('running')).toBe('text-blue-400');
   });
 
-  it('returns muted for completed', () => {
-    expect(agentStatusText('completed')).toBe('text-th-text-muted');
+  it('returns purple for completed', () => {
+    expect(agentStatusText('completed')).toBe('text-purple-400');
   });
 
   it('falls back to muted for unknown', () => {
@@ -138,5 +139,29 @@ describe('decisionStatusCard', () => {
 
   it('returns neutral border for non-pending other', () => {
     expect(decisionStatusCard('other', false)).toContain('border-th-border');
+  });
+});
+
+describe('sessionStatusDot', () => {
+  it('returns purple for completed', () => {
+    expect(sessionStatusDot('completed')).toContain('purple');
+  });
+
+  it('returns blue with pulse for running', () => {
+    const dot = sessionStatusDot('running');
+    expect(dot).toContain('blue');
+    expect(dot).toContain('animate-pulse');
+  });
+
+  it('returns green for active', () => {
+    expect(sessionStatusDot('active')).toContain('green');
+  });
+
+  it('returns red for failed', () => {
+    expect(sessionStatusDot('failed')).toContain('red');
+  });
+
+  it('falls back to gray for unknown', () => {
+    expect(sessionStatusDot('nope')).toBe('bg-gray-400');
   });
 });

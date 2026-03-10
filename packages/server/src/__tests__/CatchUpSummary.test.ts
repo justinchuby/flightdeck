@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CatchUpService, type CatchUpSummary } from '../coordination/CatchUpSummary.js';
-import type { ActivityEntry, ActionType } from '../coordination/ActivityLedger.js';
+import { CatchUpService, type CatchUpSummary } from '../coordination/sessions/CatchUpSummary.js';
+import type { ActivityEntry, ActionType } from '../coordination/activity/ActivityLedger.js';
 
 function makeEntry(overrides: Partial<ActivityEntry> & { actionType: ActionType }): ActivityEntry {
   return {

@@ -35,17 +35,22 @@ export function handleTimerCancelled(msg: any, _ctx: HandlerContext): void {
 }
 
 // Track pending decisions globally for the approval queue badge
+// NOTE: This handler is currently unused — useWebSocket.ts handles lead:decision inline.
+// Kept for future ws-handlers migration. The active oversight check is in useWebSocket.ts.
 export function handleLeadDecision(msg: any, _ctx: HandlerContext): void {
   if (msg.needsConfirmation && msg.id) {
     useAppStore.getState().addPendingDecision({
       id: msg.id,
       agentId: msg.agentId,
       agentRole: msg.agentRole || 'Unknown',
-      projectId: msg.projectId,
+      leadId: msg.leadId ?? null,
+      projectId: msg.projectId ?? null,
       title: msg.title || 'Untitled decision',
       rationale: msg.rationale || '',
       needsConfirmation: true,
       status: 'recorded',
+      autoApproved: msg.autoApproved ?? false,
+      confirmedAt: msg.confirmedAt ?? null,
       category: msg.category,
       timestamp: msg.timestamp || new Date().toISOString(),
     });

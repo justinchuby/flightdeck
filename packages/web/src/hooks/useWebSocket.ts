@@ -5,7 +5,8 @@ import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
 import { hasUnclosedCommandBlock } from '../utils/commandParser';
 import type { WsMessage } from '../types';
-import { getAuthToken } from './useApi';
+import { getAuthToken, apiFetch } from './useApi';
+import { useSettingsStore } from '../stores/settingsStore';
 
 // Module-level WS ref for global access (e.g., timer pause from ApprovalSlideOver)
 let globalWs: WebSocket | null = null;
@@ -225,6 +226,16 @@ export function useWebSocket() {
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;
+        case 'agent:usage':
+          updateAgent(msg.agentId, {
+            inputTokens: msg.inputTokens,
+            outputTokens: msg.outputTokens,
+            ...(msg.cacheReadTokens != null ? { cacheReadTokens: msg.cacheReadTokens } : {}),
+            ...(msg.cacheWriteTokens != null ? { cacheWriteTokens: msg.cacheWriteTokens } : {}),
+            ...(msg.contextWindowUsed != null ? { contextWindowUsed: msg.contextWindowUsed } : {}),
+            ...(msg.contextWindowSize != null ? { contextWindowSize: msg.contextWindowSize } : {}),
+          });
+          break;
         case 'agent:message_sent': {
           // Show incoming messages in the recipient agent's chat panel
           const toId = msg.to;
@@ -347,15 +358,24 @@ export function useWebSocket() {
         // Track pending decisions globally for the approval queue badge
         case 'lead:decision': {
           if (msg.needsConfirmation && msg.id) {
+            // Minimal oversight: auto-approve all decisions without user prompts
+            const effectiveLevel = useSettingsStore.getState().getEffectiveLevel(msg.projectId ?? undefined);
+            if (effectiveLevel === 'autonomous') {
+              apiFetch(`/decisions/${msg.id}/confirm`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {});
+              break;
+            }
             useAppStore.getState().addPendingDecision({
               id: msg.id,
               agentId: msg.agentId,
               agentRole: msg.agentRole || 'Unknown',
-              projectId: msg.projectId,
+              leadId: msg.leadId ?? null,
+              projectId: msg.projectId ?? null,
               title: msg.title || 'Untitled decision',
               rationale: msg.rationale || '',
               needsConfirmation: true,
               status: 'recorded',
+              autoApproved: msg.autoApproved ?? false,
+              confirmedAt: msg.confirmedAt ?? null,
               category: msg.category,
               timestamp: msg.timestamp || new Date().toISOString(),
             });
@@ -377,6 +397,16 @@ export function useWebSocket() {
           for (const d of decisions) {
             if (d.id) useAppStore.getState().removePendingDecision(d.id);
           }
+          break;
+        }
+        case 'attention:changed': {
+          window.dispatchEvent(new CustomEvent('attention:changed'));
+          break;
+        }
+        case 'agent:session_resume_failed': {
+          const agentId = (msg.agentId ?? '').slice(0, 8);
+          const error = msg.error ?? 'Unknown error';
+          useToastStore.getState().add('error', `Session resume failed (agent ${agentId}): ${error}`);
           break;
         }
       }

@@ -27,7 +27,7 @@ export function PredictionSettingsPanel() {
   useEffect(() => {
     apiFetch<Prediction[]>('/predictions/history')
       .then(data => setHistory(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => { /* initial fetch — will retry */ });
   }, []);
 
   if (!config) {

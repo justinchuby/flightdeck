@@ -1,1 +1,10 @@
 export { LeadDashboard } from './LeadDashboard';
+export { ReadOnlySession } from './ReadOnlySession';
+export { InputComposer } from './InputComposer';
+export { ChatMessages } from './ChatMessages';
+export { SidebarTabs } from './SidebarTabs';
+export { CrewStatusContent, type CrewAgent } from './CrewStatusContent';
+export { NewProjectModal } from './NewProjectModal';
+export { ProgressDetailModal } from './ProgressDetailModal';
+export { useLeadWebSocket } from './useLeadWebSocket';
+export { useDragResize } from './useDragResize';

@@ -86,7 +86,7 @@ export function SharedReplayViewer() {
           <p className="text-4xl mb-3">📼</p>
           <p className="text-sm text-th-text-alt">Session replay at {formatTime(currentTime)}</p>
           <p className="text-xs text-th-text-muted mt-1">
-            {replay.stats.taskCount} tasks • {replay.stats.debateCount} debates
+            {replay.stats.taskCount} tasks
           </p>
         </div>
       </div>

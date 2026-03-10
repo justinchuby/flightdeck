@@ -16,7 +16,7 @@ const STEPS: OnboardingStep[] = [
   {
     title: 'Welcome to Flightdeck!',
     description:
-      'A multi-agent AI orchestration system. Your AI team works in parallel, coordinated by a lead agent.',
+      'A multi-agent AI orchestration system. Your AI crew works in parallel, coordinated by a lead agent.',
     icon: '🚀',
   },
   {

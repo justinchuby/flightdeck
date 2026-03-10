@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import type { ContentBlock } from '@agentclientprotocol/sdk';
+import type { ContentBlock } from '../adapters/types.js';
 import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
@@ -78,18 +78,20 @@ export function leadRoutes(ctx: AppContext): Router {
           const briefing = projectRegistry.buildBriefing(resolvedProjectId);
           if (briefing && briefing.sessions.length > 1) {
             const briefingText = projectRegistry.formatBriefing(briefing);
+            const BRIEFING_DELAY_MS = 3000;
             setTimeout(() => {
               agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
-            }, 3000);
+            }, BRIEFING_DELAY_MS);
           }
         }
       }
 
       if (task) {
+        const TASK_DELIVERY_DELAY_MS = 2000;
         setTimeout(() => {
           logger.info('lead', `Sending initial task to ${agent.id.slice(0, 8)}: "${task.slice(0, 80)}"`);
           agent.sendMessage(task);
-        }, 2000);
+        }, TASK_DELIVERY_DELAY_MS);
       }
 
       // Auto-spawn Secretary agent for DAG tracking and dependency analysis
@@ -252,7 +254,8 @@ export function leadRoutes(ctx: AppContext): Router {
   router.get('/lead/:id/dag', (req, res) => {
     const agent = agentManager.get(req.params.id);
     if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
-    const status = agentManager.getTaskDAG().getStatus(agent.id);
+    const includeArchived = req.query.includeArchived === 'true';
+    const status = agentManager.getTaskDAG().getStatus(agent.id, undefined, { includeArchived });
     res.json(status);
   });
 
@@ -274,6 +277,20 @@ export function leadRoutes(ctx: AppContext): Router {
     const tracker = agentManager.getCostTracker();
     if (!tracker) return res.json([]);
     res.json(tracker.getAgentTaskCosts(req.params.agentId));
+  });
+
+  router.get('/costs/by-project', (_req, res) => {
+    const tracker = agentManager.getCostTracker();
+    if (!tracker) return res.json([]);
+    res.json(tracker.getProjectCosts());
+  });
+
+  router.get('/costs/by-session', (req, res) => {
+    const tracker = agentManager.getCostTracker();
+    if (!tracker) return res.json([]);
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+    if (!projectId) return res.status(400).json({ error: 'projectId query parameter is required' });
+    res.json(tracker.getSessionCosts(projectId));
   });
 
   // --- Timers ---
@@ -365,7 +382,63 @@ export function leadRoutes(ctx: AppContext): Router {
   router.get('/lead/:id/progress', (req, res) => {
     const leadId = req.params.id;
     const delegations = agentManager.getDelegations(leadId);
-    const children = agentManager.getAll().filter((a) => a.parentId === leadId);
+
+    interface ProgressAgent {
+      id: string;
+      role: { id: string; name: string; model?: string } | string;
+      status: string;
+      task?: string;
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      contextWindowSize?: number;
+      contextWindowUsed?: number;
+    }
+
+    let children: ProgressAgent[] = agentManager.getAll()
+      .filter((a) => a.parentId === leadId)
+      .map((a) => ({
+        id: a.id,
+        role: a.role,
+        status: a.status,
+        task: a.task,
+        model: a.model || a.role.model || 'unknown',
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
+        contextWindowSize: a.contextWindowSize,
+        contextWindowUsed: a.contextWindowUsed,
+      }));
+
+    // DB fallback: when lead is no longer in memory (historical session),
+    // query agentRoster for crew members linked via metadata.parentId
+    if (children.length === 0 && ctx.agentRoster) {
+      const rosterAgents = ctx.agentRoster.getAllAgents();
+      const rosterChildren = rosterAgents.filter((a) => {
+        const meta = a.metadata ?? {};
+        return meta.parentId === leadId && a.agentId !== leadId;
+      });
+      if (rosterChildren.length > 0) {
+        // Pull real token data from CostTracker if available
+        const costTracker = agentManager.getCostTracker();
+        const agentCosts = costTracker?.getAgentCosts() ?? [];
+        const costMap = new Map(agentCosts.map((c) => [c.agentId, c]));
+
+        children = rosterChildren.map((a) => {
+          const cost = costMap.get(a.agentId);
+          return {
+            id: a.agentId,
+            role: typeof a.role === 'string' ? { id: a.role, name: a.role } : a.role,
+            status: a.status,
+            task: a.lastTaskSummary ?? undefined,
+            model: a.model,
+            inputTokens: cost?.totalInputTokens ?? 0,
+            outputTokens: cost?.totalOutputTokens ?? 0,
+            contextWindowSize: undefined,
+            contextWindowUsed: undefined,
+          };
+        });
+      }
+    }
 
     const active = delegations.filter((d) => d.status === 'active').length;
     const completed = delegations.filter((d) => d.status === 'completed').length;
@@ -387,7 +460,7 @@ export function leadRoutes(ctx: AppContext): Router {
         role: a.role,
         status: a.status,
         task: a.task,
-        model: a.model || a.role.model,
+        model: a.model || (typeof a.role === 'object' ? a.role.model : undefined),
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         contextWindowSize: a.contextWindowSize,

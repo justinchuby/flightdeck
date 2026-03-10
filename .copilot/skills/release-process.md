@@ -85,7 +85,7 @@ When multiple agents are working on release prep:
 2. Another handles test fixes + code cleanup
 3. QA runs comprehensive page sweep with screenshots
 4. Tech writer reviews documentation
-5. Use a group chat (e.g., `v030-team`) to coordinate
+5. Use a group chat (e.g., `v030-crew`) to coordinate
 6. Your job ends at version bump + CHANGELOG — user handles tagging
 
 ## Post-Release

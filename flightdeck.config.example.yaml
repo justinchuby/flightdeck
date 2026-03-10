@@ -1,0 +1,129 @@
+# flightdeck.config.yaml — Example configuration
+#
+# Config file resolution order:
+#   1. FLIGHTDECK_CONFIG env var (highest priority)
+#   2. Repo-level flightdeck.config.yaml (if exists — project overrides)
+#   3. ~/.flightdeck/config.yaml (default — auto-created on first run)
+#
+# This file is 100% optional. Without it, the system uses built-in defaults.
+# Hot-reloaded: changes take effect without server restart.
+# Section-specific notes on timing are inline.
+#
+# Precedence: hardcoded defaults ← this file ← env vars (startup-only) ← API PATCH
+
+server:
+  maxConcurrentAgents: 50    # immediate effect; min 1, max 200
+
+heartbeat:
+  idleThresholdMs: 60000           # immediate — how long before nudging idle lead
+  crewUpdateIntervalMs: 180000     # immediate — CREW_UPDATE push interval
+  staleTimerCleanupDays: 7         # next cleanup cycle
+
+models:
+  known:
+    - claude-opus-4.6
+    - claude-sonnet-4.6
+    - claude-sonnet-4.5
+    - claude-haiku-4.5
+    - claude-opus-4.5
+    - claude-sonnet-4
+    - gemini-3-pro-preview
+    - gpt-5.4
+    - gpt-5.3-codex
+    - gpt-5.2-codex
+    - gpt-5.2
+    - gpt-5.1-codex-max
+    - gpt-5.1-codex
+    - gpt-5.1
+    - gpt-5.1-codex-mini
+    - gpt-5-mini
+    - gpt-4.1
+  defaults:
+    developer: [claude-opus-4.6]
+    architect: [claude-opus-4.6]
+    code-reviewer: [gemini-3-pro-preview, claude-opus-4.6]
+    critical-reviewer: [gemini-3-pro-preview]
+    readability-reviewer: [gemini-3-pro-preview]
+    tech-writer: [claude-sonnet-4.6, gpt-5.2]
+    secretary: [gpt-4.1, gpt-5.2]
+    qa-tester: [claude-sonnet-4.6]
+    designer: [claude-opus-4.6]
+    product-manager: [gpt-5.3-codex]
+    generalist: [claude-opus-4.6]
+    radical-thinker: [gemini-3-pro-preview]
+    agent: [claude-sonnet-4.6]
+    lead: [claude-opus-4.6]
+
+roles:
+  # Override built-in role properties without code changes.
+  # Only specified fields are overridden — omitted fields keep built-in defaults.
+  # developer:
+  #   model: claude-sonnet-4.6        # override default model for developer role
+  # secretary:
+  #   model: gpt-4.1
+
+budget:
+  limit: null                         # null = unlimited, number = dollar cap
+  thresholds:
+    warning: 0.7
+    critical: 0.9
+    pause: 1.0
+
+provider:
+  id: copilot                         # Active provider — one of the 6 below
+  # binaryOverride: null              # Override binary path (optional)
+  # argsOverride: null                # Override spawn args (optional)
+  # envOverride: {}                   # Extra env vars (optional)
+
+# ── Provider reference ──────────────────────────────────────────────
+# Uncomment the provider block you want to use and set id: above.
+#
+# ┌─────────┬──────────────┬───────────────────────┬──────────────────────────┐
+# │ id      │ name         │ binary                │ required env vars        │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ copilot │ GitHub       │ copilot               │ (none — uses gh auth)    │
+# │         │ Copilot      │ --acp --stdio         │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ claude  │ Claude Code  │ claude                │ ANTHROPIC_API_KEY        │
+# │         │              │ --acp --stdio         │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ gemini  │ Google       │ gemini                │ GEMINI_API_KEY           │
+# │         │ Gemini CLI   │ --experimental-acp    │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ codex   │ Codex CLI    │ codex                 │ OPENAI_API_KEY           │
+# │         │              │ --acp                 │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ cursor  │ Cursor       │ agent                 │ CURSOR_API_KEY           │
+# │         │              │ acp                   │                          │
+# ├─────────┼──────────────┼───────────────────────┼──────────────────────────┤
+# │ opencode│ OpenCode     │ opencode              │ (none)                   │
+# │         │              │ acp                   │                          │
+# └─────────┴──────────────┴───────────────────────┴──────────────────────────┘
+#
+# Example: Switch to Claude Code
+# provider:
+#   id: claude
+#   envOverride:
+#     ANTHROPIC_API_KEY: sk-ant-...
+#
+# Example: Switch to Gemini
+# provider:
+#   id: gemini
+#   envOverride:
+#     GEMINI_API_KEY: AIza...
+#
+# Example: Switch to Codex CLI
+# provider:
+#   id: codex
+#   envOverride:
+#     OPENAI_API_KEY: sk-...
+#
+# Example: Switch to Cursor
+# provider:
+#   id: cursor
+#   envOverride:
+#     CURSOR_API_KEY: cur-...
+#
+# Example: Switch to OpenCode
+# provider:
+#   id: opencode

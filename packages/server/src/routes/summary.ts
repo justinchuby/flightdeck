@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { CatchUpService } from '../coordination/CatchUpSummary.js';
+import { CatchUpService } from '../coordination/sessions/CatchUpSummary.js';
 
 export function summaryRoutes(ctx: AppContext): Router {
   const { agentManager, activityLedger, decisionLog } = ctx;

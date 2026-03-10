@@ -91,24 +91,6 @@ Quick reference for all APIs, hooks, components, and design tokens.
 | POST | `/recovery/:eventId/briefing` | Get briefing |
 | POST | `/settings/recovery` | Update settings |
 
-### Playbooks
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/playbooks` | List playbooks |
-| POST | `/api/playbooks` | Create playbook |
-| DELETE | `/api/playbooks/:id` | Delete playbook |
-| POST | `/api/playbooks/:id/duplicate` | Duplicate |
-
-### Community Playbooks
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/playbooks/community` | Browse community |
-| GET | `/playbooks/community/:id` | Get detail |
-| POST | `/playbooks/community` | Publish |
-| GET | `/playbooks/community/:id/reviews` | Get reviews |
-| POST | `/playbooks/community/:id/reviews` | Submit review |
-| POST | `/playbooks/community/:id/fork` | Fork playbook |
-
 ### Roles
 | Method | Endpoint | Description |
 |--------|----------|-------------|

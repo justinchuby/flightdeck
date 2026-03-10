@@ -104,7 +104,7 @@ export class TaskTemplateRegistry {
   /** Register a custom template (overwrites if ID exists) */
   register(template: TaskTemplate): void {
     this.templates.set(template.id, template);
-    logger.info('task-template', `Registered template "${template.id}"`);
+    logger.info({ module: 'timer', msg: 'Template registered', templateId: template.id });
   }
 
   /**
@@ -127,7 +127,7 @@ export class TaskTemplateRegistry {
   ): Record<string, string> | null {
     const template = this.templates.get(templateId);
     if (!template) {
-      logger.warn('task-template', `Template "${templateId}" not found`);
+      logger.warn({ module: 'timer', msg: 'Template not found', templateId });
       return null;
     }
 
@@ -150,7 +150,7 @@ export class TaskTemplateRegistry {
     });
 
     taskDAG.declareTaskBatch(leadId, inputs);
-    logger.info('task-template', `Instantiated "${template.name}" template with ${template.tasks.length} tasks for lead ${leadId.slice(0, 8)}`);
+    logger.info({ module: 'timer', msg: 'Template instantiated', templateId, taskCount: template.tasks.length, leadId });
     return refToId;
   }
 }

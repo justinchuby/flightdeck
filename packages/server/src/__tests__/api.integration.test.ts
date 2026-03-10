@@ -2,6 +2,7 @@ import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { apiRouter } from '../api.js';
+import { getDefaultConfig } from '../config/configSchema.js';
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -143,6 +144,11 @@ const mockConfig = {
   parallelSessions: 10,
 } as any;
 
+const mockConfigStore = {
+  writePartial: vi.fn().mockResolvedValue(undefined),
+  current: getDefaultConfig(),
+} as any;
+
 const mockDrizzleChain = {
   get: vi.fn().mockReturnValue(null),
   all: vi.fn().mockReturnValue([]),
@@ -181,15 +187,16 @@ beforeAll(async () => {
   const app = express();
   app.use(express.json());
 
-  const router = apiRouter(
-    mockAgentManager as any,
-    mockRoleRegistry as any,
-    mockConfig,
-    mockDb,
-    mockLockRegistry as any,
-    mockActivityLedger as any,
-    mockDecisionLog as any,
-  );
+  const router = apiRouter({
+    agentManager: mockAgentManager,
+    roleRegistry: mockRoleRegistry,
+    config: mockConfig,
+    configStore: mockConfigStore,
+    db: mockDb,
+    lockRegistry: mockLockRegistry,
+    activityLedger: mockActivityLedger,
+    decisionLog: mockDecisionLog,
+  } as any);
   app.use('/api', router);
 
   await new Promise<void>((resolve) => {
@@ -439,7 +446,7 @@ describe('Config', () => {
     const body = await res.json();
     expect(body.maxConcurrentAgents).toBe(5);
     expect(mockAgentManager.setMaxConcurrent).toHaveBeenCalledWith(5);
-    expect(mockDb.setSetting).toHaveBeenCalledWith('maxConcurrentAgents', '5');
+    expect(mockConfigStore.writePartial).toHaveBeenCalledWith({ server: { maxConcurrentAgents: 5 } });
   });
 });
 

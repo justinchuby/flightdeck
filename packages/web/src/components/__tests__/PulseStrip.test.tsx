@@ -47,43 +47,15 @@ describe('PulseStrip', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows token count when agents exist', () => {
+  it('renders agent data when agents exist (token section hidden per issue #106)', () => {
     setAgents([
       makeAgent({ inputTokens: 50_000, outputTokens: 10_000, status: 'running' }),
       makeAgent({ inputTokens: 30_000, outputTokens: 5_000, status: 'idle' }),
     ]);
-    render(<MemoryRouter><PulseStrip /></MemoryRouter>);
-    // Token count: 50k + 10k + 30k + 5k = 95k
-    expect(screen.getByText('~95k')).toBeDefined();
-  });
-
-  it('shows pending decisions count from appStore', () => {
-    setAgents([
-      makeAgent({ status: 'running' }),
-      makeAgent({ status: 'running' }),
-    ]);
-    useAppStore.getState().setPendingDecisions([
-      {
-        id: 'dec-1',
-        agentId: 'agent-1',
-        agentRole: 'Developer',
-        title: 'Use prettier',
-        rationale: '',
-        needsConfirmation: true,
-        status: 'recorded' as const,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-    render(<MemoryRouter><PulseStrip /></MemoryRouter>);
-    // 1 pending decision from appStore + 0 permission requests
-    expect(screen.getByText('1')).toBeDefined();
-    expect(screen.getByText('pending')).toBeDefined();
-  });
-
-  it('shows zero pending when no decisions are waiting', () => {
-    setAgents([makeAgent({ status: 'running' })]);
-    render(<MemoryRouter><PulseStrip /></MemoryRouter>);
-    expect(screen.getByText('0')).toBeDefined();
+    const { container } = render(<MemoryRouter><PulseStrip /></MemoryRouter>);
+    expect(container.firstChild).not.toBeNull();
+    // Token display is intentionally hidden (issue #106)
+    expect(screen.queryByText('~95k')).toBeNull();
   });
 
   it('shows status breakdown with running and idle counts', () => {

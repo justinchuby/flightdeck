@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
@@ -57,6 +57,20 @@ export function ChatPanel({ agentId, ws }: Props) {
         a.role.name.toLowerCase().includes(q),
     );
   }, [mentionQuery, activeAgents]);
+
+  const mentionDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mentionQuery === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mentionDropdownRef.current && !mentionDropdownRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setMentionQuery(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [mentionQuery]);
 
   const updateMentionState = (value: string, cursorPos: number) => {
     const before = value.slice(0, cursorPos);
@@ -179,7 +193,7 @@ export function ChatPanel({ agentId, ws }: Props) {
 
       <div className="border-t border-th-border p-2 shrink-0 relative">
         {mentionSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-th-bg-alt border border-th-border rounded-lg shadow-lg max-h-40 overflow-y-auto z-10">
+          <div ref={mentionDropdownRef} className="absolute bottom-full left-2 right-2 mb-1 bg-th-bg-alt border border-th-border rounded-lg shadow-lg max-h-40 overflow-y-auto z-50">
             {mentionSuggestions.map((a, i) => (
               <button
                 key={a.id}

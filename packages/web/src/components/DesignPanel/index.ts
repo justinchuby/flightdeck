@@ -1,0 +1,1 @@
+export { DesignPanel } from './DesignPanel';

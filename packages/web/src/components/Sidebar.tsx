@@ -1,26 +1,8 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Settings, Crown, ListChecks, LayoutDashboard, GanttChart, Activity, MessageSquare, Network, Database, MoreHorizontal, ChevronDown, ChevronRight, Workflow, BarChart3 } from 'lucide-react';
-import { useAppStore } from '../stores/appStore';
-
-const primaryLinks = [
-  { to: '/', icon: Crown, label: 'Lead' },
-  { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
-  { to: '/agents', icon: Users, label: 'Agents' },
-  { to: '/tasks', icon: ListChecks, label: 'Tasks' },
-  { to: '/timeline', icon: GanttChart, label: 'Timeline' },
-  { to: '/mission-control', icon: Activity, label: 'Mission' },
-  { to: '/canvas', icon: Workflow, label: 'Canvas' },
-];
-
-const moreLinks = [
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/groups', icon: MessageSquare, label: 'Groups' },
-  { to: '/org', icon: Network, label: 'Org Chart' },
-  { to: '/data', icon: Database, label: 'Database' },
-];
-
-const SIDEBAR_MORE_KEY = 'sidebar-more-expanded';
+import { Home, FolderOpen, Users, Settings, Plus } from 'lucide-react';
+import { NewProjectModal } from './LeadDashboard/NewProjectModal';
+import { SubmitIssueButton } from './ProvideFeedback';
 
 function NavItem({ to, icon: Icon, label, badge, end }: {
   to: string; icon: any; label: string; badge?: number | null; end?: boolean;
@@ -40,12 +22,12 @@ function NavItem({ to, icon: Icon, label, badge, end }: {
       <div className="relative">
         <Icon size={18} />
         {badge != null && badge > 0 && (
-          <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-accent text-[8px] font-bold text-white px-0.5">
+          <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-accent text-[11px] font-bold text-white px-0.5">
             {badge}
           </span>
         )}
       </div>
-      <span className="text-[9px] leading-tight font-medium truncate w-full text-center">
+      <span className="text-[11px] leading-tight font-medium truncate w-full text-center" title={label}>
         {label}
       </span>
     </NavLink>
@@ -53,55 +35,29 @@ function NavItem({ to, icon: Icon, label, badge, end }: {
 }
 
 export function Sidebar() {
-  const pendingCount = useAppStore((s) => s.pendingDecisions.length);
-
-  const [moreOpen, setMoreOpen] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_MORE_KEY) === 'true'; } catch { return false; }
-  });
-
-  const toggleMore = () => {
-    const next = !moreOpen;
-    setMoreOpen(next);
-    try { localStorage.setItem(SIDEBAR_MORE_KEY, String(next)); } catch { /* noop */ }
-  };
+  const [showNewProject, setShowNewProject] = useState(false);
 
   return (
-    <nav data-tour="sidebar" className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-0.5 shrink-0">
-      {/* Primary nav */}
-      {primaryLinks.map(({ to, icon, label }) => (
-        <NavItem
-          key={to}
-          to={to}
-          icon={icon}
-          label={label}
-          end={to === '/' || to === '/agents'}
-          badge={
-            to === '/tasks' ? (pendingCount > 0 ? pendingCount : null) :
-            null
-          }
-        />
-      ))}
+    <nav data-tour="sidebar" className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-1 shrink-0">
+      <NavItem to="/" icon={Home} label="Home" end />
+      <NavItem to="/projects" icon={FolderOpen} label="Projects" />
+      <NavItem to="/crews" icon={Users} label="Crews" />
 
-      {/* ··· More section */}
       <button
-        onClick={toggleMore}
-        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-colors w-[58px] text-th-text-muted hover:text-th-text hover:bg-th-bg-muted/50"
-        aria-label={moreOpen ? 'Collapse more items' : 'Expand more items'}
-        data-testid="sidebar-more-toggle"
+        onClick={() => setShowNewProject(true)}
+        className="flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg w-[58px] transition-colors text-th-text-muted hover:text-accent hover:bg-accent/10"
+        title="New Project"
+        data-testid="sidebar-new-project"
       >
-        {moreOpen ? <ChevronDown size={16} /> : <MoreHorizontal size={16} />}
-        <span className="text-[9px] leading-tight font-medium">More</span>
+        <Plus size={16} />
+        <span className="text-[10px] leading-tight font-medium">New</span>
       </button>
 
-      {moreOpen && moreLinks.map(({ to, icon, label }) => (
-        <NavItem key={to} to={to} icon={icon} label={label} />
-      ))}
-
-      {/* Spacer */}
       <div className="flex-1" />
-
-      {/* Settings at bottom */}
+      <SubmitIssueButton />
       <NavItem to="/settings" icon={Settings} label="Settings" />
+
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
     </nav>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { KnowledgeTransfer } from '../coordination/KnowledgeTransfer.js';
-import type { KnowledgeCategory } from '../coordination/KnowledgeTransfer.js';
+import { KnowledgeTransfer } from '../coordination/knowledge/KnowledgeTransfer.js';
+import type { KnowledgeCategory } from '../coordination/knowledge/KnowledgeTransfer.js';
 
 describe('KnowledgeTransfer', () => {
   let kb: KnowledgeTransfer;

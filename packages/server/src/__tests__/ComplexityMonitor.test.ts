@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { ComplexityMonitor } from '../coordination/ComplexityMonitor.js';
+import { ComplexityMonitor } from '../coordination/code-quality/ComplexityMonitor.js';
 
 // ── Fixture helpers ───────────────────────────────────────────────────
 

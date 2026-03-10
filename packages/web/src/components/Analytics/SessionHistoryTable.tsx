@@ -64,8 +64,8 @@ export function SessionHistoryTable({
 
   function formatDate(iso: string): string {
     const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-      ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+      ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
   return (
@@ -76,6 +76,7 @@ export function SessionHistoryTable({
           <thead>
             <tr className="text-th-text-muted border-b border-th-border">
               {onToggleCompare && <th className="pb-2 text-left w-8">☐</th>}
+              <th className="pb-2 text-left">Session</th>
               <th className="pb-2 text-left cursor-pointer select-none" onClick={() => toggleSort('date')}>
                 <span className="inline-flex items-center gap-0.5">Date <SortIcon field="date" /></span>
               </th>
@@ -112,6 +113,13 @@ export function SessionHistoryTable({
                     />
                   </td>
                 )}
+                <td
+                  className="py-2 font-mono text-th-text-muted hover:text-th-text cursor-pointer"
+                  title={`Session: ${s.leadId} — click to copy`}
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.leadId); }}
+                >
+                  {s.leadId.slice(0, 8)}
+                </td>
                 <td className="py-2 text-th-text-alt">{formatDate(s.startedAt)}</td>
                 <td className="py-2 text-th-text-muted truncate max-w-[120px]">{s.projectId ?? s.leadId.slice(0, 8)}</td>
                 <td className="py-2 text-th-text-muted">{formatDuration(s)}</td>
@@ -121,7 +129,7 @@ export function SessionHistoryTable({
               </tr>
             ))}
             {paged.length === 0 && (
-              <tr><td colSpan={onToggleCompare ? 7 : 6} className="py-8 text-center text-th-text-muted">No sessions found</td></tr>
+              <tr><td colSpan={onToggleCompare ? 8 : 7} className="py-8 text-center text-th-text-muted">No sessions found</td></tr>
             )}
           </tbody>
         </table>

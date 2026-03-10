@@ -2,14 +2,15 @@ import type { DagStatus, DagTask } from '../../types';
 import { dagTaskText } from '../../utils/statusColors';
 
 const STATUS_CONFIG: Record<DagTask['dagStatus'], { icon: string; label: string; strikethrough?: boolean }> = {
-  pending:  { icon: '⏳', label: 'pending' },
-  ready:    { icon: '🟢', label: 'ready' },
-  running:  { icon: '🔵', label: 'running' },
-  done:     { icon: '✅', label: 'done' },
-  failed:   { icon: '❌', label: 'failed' },
-  blocked:  { icon: '🟠', label: 'blocked' },
-  paused:   { icon: '⏸️', label: 'paused' },
-  skipped:  { icon: '⏭️', label: 'skipped', strikethrough: true },
+  pending:    { icon: '⏳', label: 'pending' },
+  ready:      { icon: '🟢', label: 'ready' },
+  running:    { icon: '🔵', label: 'running' },
+  in_review:  { icon: '🔍', label: 'in review' },
+  done:       { icon: '✅', label: 'done' },
+  failed:     { icon: '❌', label: 'failed' },
+  blocked:    { icon: '🟠', label: 'blocked' },
+  paused:     { icon: '⏸️', label: 'paused' },
+  skipped:    { icon: '⏭️', label: 'skipped', strikethrough: true },
 };
 
 /** Badge pill for a task status */
@@ -124,7 +125,7 @@ export function TaskDagPanelContent({ dagStatus }: { dagStatus: DagStatus | null
 
   // Sort tasks: running first, then ready, then pending, then the rest
   const statusOrder: Record<DagTask['dagStatus'], number> = {
-    running: 0, ready: 1, pending: 2, blocked: 3, paused: 4, failed: 5, done: 6, skipped: 7,
+    running: 0, in_review: 1, ready: 2, pending: 3, blocked: 4, paused: 5, failed: 6, done: 7, skipped: 8,
   };
   const sorted = [...tasks].sort((a, b) => statusOrder[a.dagStatus] - statusOrder[b.dagStatus] || a.priority - b.priority);
 

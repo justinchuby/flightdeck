@@ -78,7 +78,7 @@ export function AgentMentionTooltip({
           id={tooltipId}
           role="tooltip"
           data-testid="mention-tooltip"
-          className="fixed z-[200] w-64 rounded-lg border border-th-border bg-th-bg-alt shadow-lg text-xs"
+          className="fixed z-tooltip w-64 rounded-lg border border-th-border bg-th-bg-alt shadow-lg text-xs"
           style={{
             top: position.top - 8,
             left: Math.max(8, Math.min(position.left - TOOLTIP_WIDTH / 2, window.innerWidth - TOOLTIP_WIDTH - 8)),

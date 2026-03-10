@@ -5,6 +5,9 @@ import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
 import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
 import { FilterTabs } from '../FilterTabs';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
+
+const EMPTY_GROUP_MSGS: GroupMessage[] = [];
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -113,6 +116,7 @@ function ReactionBadges({
 /* ------------------------------------------------------------------ */
 
 export function GroupChat(_props: { api: any; ws: any }) {
+  const contextProjectId = useOptionalProjectId();
   const agents = useAppStore((s) => s.agents);
   const {
     groups,
@@ -133,13 +137,27 @@ export function GroupChat(_props: { api: any; ws: any }) {
   const [newGroupMembers, setNewGroupMembers] = useState<Set<string>>(new Set());
   const [newGroupLeadId, setNewGroupLeadId] = useState('');
   const [creating, setCreating] = useState(false);
-  const [selectedProjectLeadId, setSelectedProjectLeadId] = useState<string | null>(null);
+  const [selectedProjectLeadId, setSelectedProjectLeadId] = useState<string | null>(contextProjectId);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const leads = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
+
+  // When inside a project context, only fetch groups for that project's leads
+  const scopedLeads = useMemo(() => {
+    if (!contextProjectId) return leads;
+    return leads.filter((l) => l.projectId === contextProjectId || l.id === contextProjectId);
+  }, [contextProjectId, leads]);
+
+  // Refs for values used in effects that would cause loops if included as deps
+  const scopedLeadsRef = useRef(scopedLeads);
+  scopedLeadsRef.current = scopedLeads;
+  const selectedGroupRef = useRef(selectedGroup);
+  selectedGroupRef.current = selectedGroup;
+  const openTabsRef = useRef(openTabs);
+  openTabsRef.current = openTabs;
 
   // Mention autocomplete — scoped to group members when a group is selected
   const mentionCandidates = useMemo(() => {
@@ -176,12 +194,12 @@ export function GroupChat(_props: { api: any; ws: any }) {
     textareaRef.current?.focus();
   };
 
-  // Auto-select first lead as project filter
+  // Auto-select first lead as project filter (skip if context provides project)
   useEffect(() => {
-    if (!selectedProjectLeadId && leads.length > 0) {
-      setSelectedProjectLeadId(leads[0].id);
+    if (!contextProjectId && !selectedProjectLeadId && scopedLeads.length > 0) {
+      setSelectedProjectLeadId(scopedLeads[0].id);
     }
-  }, [leads, selectedProjectLeadId]);
+  }, [contextProjectId, scopedLeads, selectedProjectLeadId]);
 
   // Filtered groups/tabs by selected project
   const filteredGroups = selectedProjectLeadId
@@ -191,14 +209,16 @@ export function GroupChat(_props: { api: any; ws: any }) {
     ? openTabs.filter((t) => t.leadId === selectedProjectLeadId)
     : openTabs;
 
-  /* ---- Fetch groups for every lead on mount ---- */
+  /* ---- Fetch groups for project-scoped leads ---- */
+  const leadIdsKey = scopedLeads.map((l) => l.id).join(',');
   useEffect(() => {
-    if (leads.length === 0) return;
+    const currentLeads = scopedLeadsRef.current;
+    if (currentLeads.length === 0) return;
     let cancelled = false;
 
     async function fetchAllGroups() {
       const allGroups: ChatGroup[] = [];
-      for (const lead of leads) {
+      for (const lead of currentLeads) {
         try {
           const res = await fetch(`/api/lead/${lead.id}/groups`);
           if (res.ok) {
@@ -213,29 +233,28 @@ export function GroupChat(_props: { api: any; ws: any }) {
         if (allGroups.length > 0) {
           const tabs = allGroups.map((g) => ({ leadId: g.leadId, name: g.name }));
           setOpenTabs(tabs);
-          if (!selectedGroup) selectGroup(tabs[0].leadId, tabs[0].name);
+          if (!selectedGroupRef.current) selectGroup(tabs[0].leadId, tabs[0].name);
         }
       }
     }
 
     void fetchAllGroups();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads.map((l) => l.id).join(',')]);
+  }, [leadIdsKey, setGroups, selectGroup]);
 
   /* ---- Auto-open new groups as tabs ---- */
   useEffect(() => {
+    const currentTabs = openTabsRef.current;
     const newTabs = groups
-      .filter((g) => !openTabs.some((t) => t.leadId === g.leadId && t.name === g.name))
+      .filter((g) => !currentTabs.some((t) => t.leadId === g.leadId && t.name === g.name))
       .map((g) => ({ leadId: g.leadId, name: g.name }));
     if (newTabs.length > 0) {
       setOpenTabs((prev) => [...prev, ...newTabs]);
-      if (!selectedGroup && newTabs.length > 0) {
+      if (!selectedGroupRef.current) {
         selectGroup(newTabs[0].leadId, newTabs[0].name);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups.length]);
+  }, [groups, selectGroup]);
 
   /* ---- Fetch messages when selected tab changes ---- */
   useEffect(() => {
@@ -278,8 +297,8 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
   /* ---- Auto-scroll on new messages ---- */
   const currentMessages = selectedGroup
-    ? messages[groupKey(selectedGroup.leadId, selectedGroup.name)] ?? []
-    : [];
+    ? messages[groupKey(selectedGroup.leadId, selectedGroup.name)] ?? EMPTY_GROUP_MSGS
+    : EMPTY_GROUP_MSGS;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -445,7 +464,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
   return (
     <div className="flex flex-col h-full bg-th-bg text-th-text-alt">
       {/* ---- Project tabs (first level) ---- */}
-      {leads.length > 0 && (
+      {!contextProjectId && leads.length > 0 && (
         <FilterTabs
           className="px-3 py-1.5 border-b border-th-border/50 shrink-0 bg-th-bg/50"
           items={leads.map((lead) => ({
@@ -603,7 +622,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
               {currentMessages.length === 0 && (
                 <div className="flex items-center justify-center h-full text-th-text-muted text-sm">
                   No messages yet — start the conversation!
@@ -729,7 +748,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                 type="text"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="e.g. frontend-team"
+                placeholder="e.g. frontend-crew"
                 className="w-full bg-th-bg-alt border border-th-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 autoFocus
               />

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { AnalyticsService } from '../coordination/AnalyticsService.js';
+import { AnalyticsService } from '../coordination/reporting/AnalyticsService.js';
 
 export function analyticsRoutes(ctx: AppContext): Router {
   const { db } = ctx;

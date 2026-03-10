@@ -6,6 +6,7 @@ import { CostTrendChart } from './CostTrendChart';
 import { InsightsPanel } from './InsightsPanel';
 import { SessionHistoryTable } from './SessionHistoryTable';
 import { SessionComparisonView } from './SessionComparisonView';
+import { EmptyState } from '../ui/EmptyState';
 import {
   generateInsights,
   type AnalyticsOverview,
@@ -112,14 +113,11 @@ export function AnalyticsPage() {
   if (!loading && overview.totalSessions === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8" data-testid="analytics-empty">
-        <div className="text-center">
-          <div className="text-4xl mb-3">📊</div>
-          <h2 className="text-lg font-semibold text-th-text-alt mb-1">Analytics</h2>
-          <p className="text-sm text-th-text-muted max-w-xs">
-            Complete a few sessions to start seeing analytics.
-            Token trends, model effectiveness, and insights will appear here.
-          </p>
-        </div>
+        <EmptyState
+          icon="📊"
+          title="No sessions yet"
+          description="Complete a few sessions to start seeing analytics. Token trends, model effectiveness, and insights will appear here."
+        />
       </div>
     );
   }

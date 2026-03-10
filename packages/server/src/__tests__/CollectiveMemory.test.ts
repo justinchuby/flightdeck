@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
-import { CollectiveMemory } from '../coordination/CollectiveMemory.js';
-import type { MemoryCategory } from '../coordination/CollectiveMemory.js';
+import { CollectiveMemory } from '../coordination/knowledge/CollectiveMemory.js';
+import type { MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 
 describe('CollectiveMemory', () => {
   let db: Database;

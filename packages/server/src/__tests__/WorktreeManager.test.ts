@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WorktreeManager } from '../coordination/WorktreeManager.js';
+import { WorktreeManager } from '../coordination/files/WorktreeManager.js';
 
 // ── Mock child_process ────────────────────────────────────────────
 // Keep a mutable handler so individual tests can customize exec behavior.

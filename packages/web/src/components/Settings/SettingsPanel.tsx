@@ -1,15 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import type { ThemeMode } from '../../stores/settingsStore';
-import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2 } from 'lucide-react';
-import { DashboardCustomizer } from './DashboardCustomizer';
-import { PlaybookLibrary } from '../Playbooks';
-import { IntentRulesDashboard } from '../IntentRules';
-import { RecoverySettingsPanel, RecoveryMetricsCard } from '../Recovery';
+import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
+import { apiFetch } from '../../hooks/useApi';
+import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
+import { ProvidersSection } from './ProvidersSection';
 import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
 import { ConflictSettingsPanel } from '../Conflicts';
 import { DataManagement } from './DataManagement';
+import { TelegramSettings } from './TelegramSettings';
+
+const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
+  { level: 'supervised', label: 'Supervised', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
+  { level: 'balanced', label: 'Balanced', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
+  { level: 'autonomous', label: 'Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
+];
 
 interface Props {
   api: any;
@@ -18,15 +23,39 @@ interface Props {
 export function SettingsPanel({ api }: Props) {
   const config = useAppStore((s) => s.config);
   const roles = useAppStore((s) => s.roles);
-  const { soundEnabled, toggleSound } = useSettingsStore();
+  const { soundEnabled, toggleSound, oversightLevel, setOversightLevel } = useSettingsStore();
   const [maxAgents, setMaxAgents] = useState(config?.maxConcurrentAgents || 10);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [instructionsSaved, setInstructionsSaved] = useState(false);
 
   useEffect(() => {
     if (config?.maxConcurrentAgents != null) {
       setMaxAgents(config.maxConcurrentAgents);
     }
   }, [config?.maxConcurrentAgents]);
+
+  // Load custom instructions from server config
+  useEffect(() => {
+    apiFetch<{ oversight?: { customInstructions?: string } }>('/config/yaml')
+      .then((data) => {
+        if (data?.oversight?.customInstructions) {
+          setCustomInstructions(data.oversight.customInstructions);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveCustomInstructions = useCallback(async () => {
+    try {
+      await apiFetch('/config', {
+        method: 'PATCH',
+        body: JSON.stringify({ customInstructions }),
+      });
+      setInstructionsSaved(true);
+      setTimeout(() => setInstructionsSaved(false), 2000);
+    } catch { /* best effort */ }
+  }, [customInstructions]);
 
   // New role form
   const [showRoleForm, setShowRoleForm] = useState(false);
@@ -64,8 +93,10 @@ export function SettingsPanel({ api }: Props) {
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
 
+  // tabIndex enables keyboard scrolling (Page Down, arrows); focus:outline-none hides focus ring
   return (
-    <div className="flex-1 overflow-auto p-6 max-w-5xl mx-auto">
+    <div className="flex-1 overflow-auto focus:outline-none" tabIndex={0}>
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-8">
         <Settings className="w-6 h-6 text-th-text-muted" />
         <h2 className="text-xl font-semibold">Settings</h2>
@@ -159,58 +190,74 @@ export function SettingsPanel({ api }: Props) {
         </label>
       </section>
 
-      {/* CLI Config */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
+      {/* Oversight Level (Trust Dial) — AC-16.1 */}
+      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6" data-testid="oversight-section">
         <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5" /> CLI Configuration
+          <Eye className="w-3.5 h-3.5" /> Oversight Level
         </h3>
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <label className="text-xs text-th-text-muted block mb-1">Command</label>
-            <code className="text-sm text-th-text-alt bg-th-bg-alt px-3 py-1.5 rounded-md block font-mono">
-              {config?.cliCommand || 'copilot'}
-            </code>
-          </div>
-          {config?.cliArgs && config.cliArgs.length > 0 && (
-            <div className="flex-1">
-              <label className="text-xs text-th-text-muted block mb-1">Arguments</label>
-              <code className="text-sm text-th-text-alt bg-th-bg-alt px-3 py-1.5 rounded-md block font-mono truncate">
-                {config.cliArgs.join(' ')}
-              </code>
-            </div>
-          )}
+        <div className="space-y-2">
+          {OVERSIGHT_OPTIONS.map(({ level, label, description }) => (
+            <label
+              key={level}
+              className={`flex items-start gap-3 p-2.5 rounded-md cursor-pointer transition-colors ${
+                oversightLevel === level
+                  ? 'bg-accent/10 border border-accent/30'
+                  : 'bg-th-bg-alt border border-transparent hover:border-th-border'
+              }`}
+              data-testid={`oversight-${level}`}
+            >
+              <input
+                type="radio"
+                name="oversight-level"
+                value={level}
+                checked={oversightLevel === level}
+                onChange={() => setOversightLevel(level)}
+                className="mt-0.5 accent-accent"
+              />
+              <div>
+                <div className="text-sm font-medium text-th-text">{label}</div>
+                <p className="text-xs text-th-text-muted mt-0.5">{description}</p>
+              </div>
+            </label>
+          ))}
         </div>
-        <p className="text-xs text-th-text-muted mt-2">
-          Set via <code className="text-th-text-muted">COPILOT_CLI_PATH</code> environment variable
-        </p>
+        <div className="mt-4">
+          <label className="text-xs text-th-text-muted block mb-1.5">Custom Instructions</label>
+          <textarea
+            value={customInstructions}
+            onChange={(e) => {
+              setCustomInstructions(e.target.value.slice(0, 500));
+              setInstructionsSaved(false);
+            }}
+            onBlur={handleSaveCustomInstructions}
+            placeholder="Optional: Add custom instructions for agents, e.g. Ask me before modifying database schemas"
+            maxLength={500}
+            rows={3}
+            className="w-full bg-th-bg-alt border border-th-border rounded-md px-3 py-2 text-sm text-th-text placeholder:text-th-text-muted/50 focus:outline-none focus:border-accent resize-none"
+          />
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-[10px] text-th-text-muted">{customInstructions.length}/500</span>
+            {instructionsSaved && (
+              <span className="text-[10px] text-green-400">Saved ✓</span>
+            )}
+          </div>
+          <p className="text-[10px] text-th-text-muted mt-1">
+            These instructions are injected into agent system prompts and shape how agents behave at each oversight level.
+          </p>
+        </div>
       </section>
 
-      {/* Dashboard Layout */}
-      <DashboardCustomizer />
+      {/* Providers (includes CLI configuration per provider) */}
+      <ProvidersSection activeProviderId={config?.provider} />
 
-      {/* Playbooks */}
+      {/* Telegram Integration */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <PlaybookLibrary />
-      </section>
-
-      {/* Intent Rules */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <IntentRulesDashboard />
+        <TelegramSettings />
       </section>
 
       {/* Conflict Detection */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <ConflictSettingsPanel />
-      </section>
-
-      {/* Recovery Settings */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <RecoverySettingsPanel />
-      </section>
-
-      {/* Recovery Metrics */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <RecoveryMetricsCard />
       </section>
 
       {/* Notification Preferences */}
@@ -382,8 +429,9 @@ export function SettingsPanel({ api }: Props) {
         <a href="https://github.com/justinchuby" target="_blank" rel="noopener noreferrer" className="underline hover:text-th-text-alt transition-colors">
           @justinchuby
         </a>{' '}
-        and a team of AIs
+        and a crew of AIs
       </footer>
+    </div>
     </div>
   );
 }

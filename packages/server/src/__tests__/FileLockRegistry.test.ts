@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Database } from '../db/database.js';
-import { FileLockRegistry } from '../coordination/FileLockRegistry.js';
+import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
 
 describe('FileLockRegistry', () => {
   let db: Database;

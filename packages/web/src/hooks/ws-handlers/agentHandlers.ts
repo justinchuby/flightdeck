@@ -1,5 +1,6 @@
 import { useAppStore } from '../../stores/appStore';
 import { useToastStore } from '../../components/Toast';
+import { shouldNotify } from '../../stores/settingsStore';
 import { hasUnclosedCommandBlock } from '../../utils/commandParser';
 import type { HandlerContext } from './index';
 
@@ -161,13 +162,25 @@ export function handleAgentPlan(msg: any, ctx: HandlerContext): void {
 
 export function handleAgentPermissionRequest(msg: any, ctx: HandlerContext): void {
   ctx.updateAgent(msg.agentId, { pendingPermission: msg.request });
-  const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
-  const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
-  useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
+  // Permission requests are exceptions — gate on oversight level (AC-16.5)
+  if (shouldNotify('exception')) {
+    const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+    const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
+    useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
+  }
 }
 
 export function handleAgentSessionReady(msg: any, ctx: HandlerContext): void {
   ctx.updateAgent(msg.agentId, { sessionId: msg.sessionId });
+}
+
+export function handleAgentSessionResumeFailed(msg: any, _ctx: HandlerContext): void {
+  const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+  const roleName = agent?.role?.name ?? msg.agentId?.slice(0, 8) ?? 'Agent';
+  const errorReason = msg.error || 'unknown error';
+  useToastStore.getState().add('error',
+    `⚠️ Failed to resume ${roleName} session.\n${errorReason}`
+  );
 }
 
 export function handleAgentMessageSent(msg: any, ctx: HandlerContext): void {
@@ -220,4 +233,15 @@ export function handleAgentMessageSent(msg: any, ctx: HandlerContext): void {
       ctx.updateAgent(fromId, { messages: msgs });
     }
   }
+}
+
+export function handleAgentUsage(msg: any, ctx: HandlerContext): void {
+  ctx.updateAgent(msg.agentId, {
+    inputTokens: msg.inputTokens,
+    outputTokens: msg.outputTokens,
+    ...(msg.cacheReadTokens != null ? { cacheReadTokens: msg.cacheReadTokens } : {}),
+    ...(msg.cacheWriteTokens != null ? { cacheWriteTokens: msg.cacheWriteTokens } : {}),
+    ...(msg.contextWindowUsed != null ? { contextWindowUsed: msg.contextWindowUsed } : {}),
+    ...(msg.contextWindowSize != null ? { contextWindowSize: msg.contextWindowSize } : {}),
+  });
 }

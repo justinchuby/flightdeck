@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { classifyEvent, type EventTier } from '../coordination/SynthesisEngine.js';
-import type { ActivityEntry } from '../coordination/ActivityLedger.js';
+import { classifyEvent, type EventTier } from '../coordination/events/SynthesisEngine.js';
+import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
 function makeEntry(overrides: Partial<ActivityEntry> = {}): ActivityEntry {
   return {

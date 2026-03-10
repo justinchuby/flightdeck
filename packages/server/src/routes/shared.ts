@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { ShareLinkService } from '../coordination/ShareLinkService.js';
-import { SessionReplay } from '../coordination/SessionReplay.js';
+import { ShareLinkService } from '../coordination/sharing/ShareLinkService.js';
+import { SessionReplay } from '../coordination/sessions/SessionReplay.js';
 
 export function sharedRoutes(ctx: AppContext): Router {
   const { db, agentManager, activityLedger, decisionLog, lockRegistry } = ctx;

@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { apiFetch } from '../../hooks/useApi';
 
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface CatchUpSummary {
   tasksCompleted: number;
+  tasksFailed: number;
   decisionsPending: number;
   decisionsAutoApproved: number;
   commits: number;
@@ -47,11 +49,12 @@ interface SummaryCategory {
 
 const CATEGORIES: SummaryCategory[] = [
   { key: 'decisionsPending', icon: '⚠', label: (n) => `${n} decision${n !== 1 ? 's' : ''} pending`, linkTo: '/tasks' },
-  { key: 'agentsCrashed', icon: '🔴', label: (n) => `${n} agent${n !== 1 ? 's' : ''} crashed`, linkTo: '/agents' },
+  { key: 'tasksFailed', icon: '❌', label: (n) => `${n} task${n !== 1 ? 's' : ''} failed`, linkTo: '/tasks?status=failed' },
+  { key: 'agentsCrashed', icon: '🔴', label: (n) => `${n} agent${n !== 1 ? 's' : ''} crashed`, linkTo: '/crews' },
   { key: 'tasksCompleted', icon: '✅', label: (n) => `${n} task${n !== 1 ? 's' : ''} completed`, linkTo: '/tasks' },
   { key: 'decisionsAutoApproved', icon: '✓', label: (n) => `${n} auto-approved`, linkTo: '/settings' },
   { key: 'commits', icon: '📦', label: (n) => `${n} commit${n !== 1 ? 's' : ''}`, linkTo: '/timeline' },
-  { key: 'agentsSpawned', icon: '🟢', label: (n) => `${n} agent${n !== 1 ? 's' : ''} spawned`, linkTo: '/agents' },
+  { key: 'agentsSpawned', icon: '🟢', label: (n) => `${n} agent${n !== 1 ? 's' : ''} spawned`, linkTo: '/crews' },
   { key: 'contextCompactions', icon: '🧠', label: (n) => `${n} compaction${n !== 1 ? 's' : ''}`, linkTo: '/mission-control' },
   { key: 'messageCount', icon: '💬', label: (n) => `${n} messages`, linkTo: '/mission-control', minCount: 5 },
 ];
@@ -61,8 +64,8 @@ const CATEGORIES: SummaryCategory[] = [
 type Severity = 'all-good' | 'normal' | 'attention' | 'critical';
 
 function deriveSeverity(s: CatchUpSummary): Severity {
-  if (s.budgetWarning || s.agentsCrashed >= 2) return 'critical';
-  if (s.decisionsPending > 0 || s.agentsCrashed > 0) return 'attention';
+  if (s.budgetWarning || s.agentsCrashed >= 2 || s.tasksFailed >= 2) return 'critical';
+  if (s.decisionsPending > 0 || s.agentsCrashed > 0 || s.tasksFailed > 0) return 'attention';
   const total = s.tasksCompleted + s.commits + s.agentsSpawned +
     s.decisionsAutoApproved + s.contextCompactions + s.messageCount;
   if (total > 0 && s.decisionsPending === 0 && s.agentsCrashed === 0) return 'all-good';
@@ -107,6 +110,10 @@ function generateNarrative(s: CatchUpSummary, highlights: CatchUpHighlight[]): s
       : `${s.tasksCompleted} task${s.tasksCompleted !== 1 ? 's' : ''} completed`);
   }
 
+  if ((s.tasksFailed ?? 0) > 0) {
+    parts.push(`${s.tasksFailed} task${s.tasksFailed !== 1 ? 's' : ''} failed`);
+  }
+
   if (s.agentsCrashed > 0) {
     const crashHighlight = highlights.find((h) => h.type === 'crash');
     parts.push(crashHighlight ? crashHighlight.summary : `${s.agentsCrashed} agent${s.agentsCrashed !== 1 ? 's' : ''} crashed`);
@@ -149,6 +156,7 @@ export function CatchUpBanner() {
   const agents = useAppStore((s) => s.agents);
   const setApprovalQueueOpen = useAppStore((s) => s.setApprovalQueueOpen);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
+  const oversightLevel = useSettingsStore((s) => s.oversightLevel);
   // Derive leadId: prefer selected, then first lead agent
   const leadId = useMemo(() => {
     if (selectedLeadId) return selectedLeadId;
@@ -170,12 +178,20 @@ export function CatchUpBanner() {
     try {
       const body = await apiFetch<CatchUpResponse>(`/summary/${leadId}/since?t=${encodeURIComponent(since)}`);
 
-      // Only show if there are meaningful events
       const s = body.summary;
-      const total = s.tasksCompleted + s.decisionsPending + s.decisionsAutoApproved +
-        s.commits + s.agentsSpawned + s.agentsCrashed + s.contextCompactions +
-        (s.messageCount >= 5 ? s.messageCount : 0) + (s.budgetWarning ? 1 : 0);
-      if (total === 0) return;
+
+      // AC-15.5: Count total state changes (must be ≥5 to show banner)
+      const totalChanges = s.tasksCompleted + (s.tasksFailed ?? 0) + s.decisionsPending +
+        s.decisionsAutoApproved + s.commits + s.agentsSpawned + s.agentsCrashed +
+        s.contextCompactions + (s.messageCount >= 5 ? s.messageCount : 0) +
+        (s.budgetWarning ? 1 : 0);
+      if (totalChanges < 5) return;
+
+      // AC-15.6: In Minimal mode, only show for RED-level exceptions (failures/crashes)
+      if (oversightLevel === 'autonomous') {
+        const hasRedExceptions = (s.tasksFailed ?? 0) > 0 || s.agentsCrashed > 0 || s.budgetWarning;
+        if (!hasRedExceptions) return;
+      }
 
       setData(body);
       setDismissed(false);
@@ -189,7 +205,7 @@ export function CatchUpBanner() {
     } catch {
       // API not ready yet — silently skip
     }
-  }, [leadId]);
+  }, [leadId, oversightLevel]);
 
   useIdleTimer({ onIdle: handleIdle, onReturn: handleReturn });
 
@@ -339,6 +355,15 @@ export function CatchUpBanner() {
                 data-testid="catchup-action-approval"
               >
                 Open Approval Queue ⚠
+              </button>
+            )}
+            {(data.summary.tasksFailed ?? 0) > 0 && (
+              <button
+                onClick={() => { navigate('/tasks?status=failed'); dismiss(); }}
+                className="px-3 py-1 text-[11px] font-medium bg-red-500/20 text-red-400 rounded-md hover:bg-red-500/30 transition-colors"
+                data-testid="catchup-action-failed"
+              >
+                View failed tasks ❌
               </button>
             )}
             <button

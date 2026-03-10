@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DecisionLog, classifyDecision } from '../coordination/DecisionLog.js';
-import type { DecisionCategory } from '../coordination/DecisionLog.js';
+import { DecisionLog, classifyDecision } from '../coordination/decisions/DecisionLog.js';
+import type { DecisionCategory } from '../coordination/decisions/DecisionLog.js';
 import { Database } from '../db/database.js';
 
 describe('DecisionLog — Batch Operations', () => {
@@ -152,93 +152,6 @@ describe('DecisionLog — Batch Operations', () => {
       const dismissed = result.results.filter(d => d.status === 'dismissed');
       expect(dismissed).toHaveLength(1);
       expect(dismissed[0].id).toBe(d3.id);
-    });
-  });
-
-  // ── Teach Me suggestion ───────────────────────────────────────────
-
-  describe('Teach Me suggestion', () => {
-    it('suggests rule when 3+ decisions share a category', () => {
-      const d1 = log.add('a1', 'dev', 'Format with prettier', '', true);
-      const d2 = log.add('a1', 'dev', 'Apply lint fix', '', true);
-      const d3 = log.add('a1', 'dev', 'Use eslint autofix', '', true);
-
-      const result = log.confirmBatch([d1.id, d2.id, d3.id]);
-      expect(result.suggestedRule).toBeDefined();
-      expect(result.suggestedRule!.category).toBe('style');
-      expect(result.suggestedRule!.count).toBe(3);
-    });
-
-    it('does not suggest rule when fewer than 3 share a category', () => {
-      const d1 = log.add('a1', 'dev', 'Format with prettier', '', true);
-      const d2 = log.add('a1', 'dev', 'Refactor auth module', '', true);
-
-      const result = log.confirmBatch([d1.id, d2.id]);
-      expect(result.suggestedRule).toBeUndefined();
-    });
-
-    it('does not suggest rule if one already exists for the category', () => {
-      log.addIntentRule('style', 'manual');
-      const d1 = log.add('a1', 'dev', 'Format with prettier', '', true);
-      const d2 = log.add('a1', 'dev', 'Apply lint fix', '', true);
-      const d3 = log.add('a1', 'dev', 'Use eslint autofix', '', true);
-
-      const result = log.confirmBatch([d1.id, d2.id, d3.id]);
-      expect(result.suggestedRule).toBeUndefined();
-    });
-  });
-
-  // ── Intent Rules ──────────────────────────────────────────────────
-
-  describe('Intent Rules', () => {
-    it('starts with no rules', () => {
-      expect(log.getIntentRules()).toHaveLength(0);
-    });
-
-    it('adds and retrieves a rule', () => {
-      const rule = log.addIntentRule('style', 'manual');
-      expect(rule.id).toMatch(/^rule-/);
-      expect(rule.match.categories).toContain('style');
-      expect(rule.metadata.source).toBe('manual');
-      expect(log.getIntentRules()).toHaveLength(1);
-    });
-
-    it('deletes a rule', () => {
-      const rule = log.addIntentRule('style', 'manual');
-      expect(log.deleteIntentRule(rule.id)).toBe(true);
-      expect(log.getIntentRules()).toHaveLength(0);
-    });
-
-    it('returns false when deleting non-existent rule', () => {
-      expect(log.deleteIntentRule('nonexistent')).toBe(false);
-    });
-
-    it('persists rules across DecisionLog instances', () => {
-      log.addIntentRule('style', 'manual');
-      const log2 = new DecisionLog(db);
-      expect(log2.getIntentRules()).toHaveLength(1);
-      expect(log2.getIntentRules()[0].match.categories).toContain('style');
-    });
-
-    it('auto-approves decisions matching an intent rule', () => {
-      log.addIntentRule('style', 'manual');
-      const d = log.add('a1', 'dev', 'Apply prettier formatting', '', true);
-      expect(d.status).toBe('confirmed');
-      expect(d.autoApproved).toBe(true);
-    });
-
-    it('does not auto-approve decisions not matching any rule', () => {
-      log.addIntentRule('style', 'manual');
-      const d = log.add('a1', 'dev', 'Refactor auth module', '', true);
-      expect(d.status).toBe('recorded');
-    });
-
-    it('increments matchCount when a rule matches', () => {
-      const rule = log.addIntentRule('style', 'manual');
-      log.add('a1', 'dev', 'Format code with prettier', '', true);
-      const rules = log.getIntentRules();
-      expect(rules[0].metadata.matchCount).toBe(1);
-      expect(rules[0].metadata.lastMatchedAt).toBeTruthy();
     });
   });
 

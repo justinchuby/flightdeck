@@ -233,4 +233,123 @@ describe('ProjectRegistry', () => {
       expect(registry.getSessionById(999)).toBeUndefined();
     });
   });
+
+  describe('reactivateSession', () => {
+    it('updates an existing session row instead of inserting a new one', () => {
+      const project = registry.create('Reactivate Test');
+      registry.startSession(project.id, 'lead-old', 'original task', 'lead');
+      registry.endSession('lead-old', 'completed');
+
+      const sessions = registry.getSessions(project.id);
+      expect(sessions).toHaveLength(1);
+      const sessionId = sessions[0].id;
+
+      // Claim then reactivate
+      const claimed = registry.claimSessionForResume(sessionId);
+      expect(claimed).toBe(true);
+
+      registry.reactivateSession(sessionId, 'resumed task', 'lead');
+
+      // Should still be 1 session, not 2
+      const after = registry.getSessions(project.id);
+      expect(after).toHaveLength(1);
+      // leadId is preserved — not overwritten by reactivation
+      expect(after[0].leadId).toBe('lead-old');
+      expect(after[0].task).toBe('resumed task');
+      expect(after[0].status).toBe('active');
+      expect(after[0].endedAt).toBeNull();
+    });
+
+    it('clears endedAt and resets startedAt', () => {
+      const project = registry.create('Reset Times');
+      registry.startSession(project.id, 'lead-1', 'task');
+      registry.endSession('lead-1', 'completed');
+
+      const sessions = registry.getSessions(project.id);
+      const oldStart = sessions[0].startedAt;
+      expect(sessions[0].endedAt).not.toBeNull();
+
+      registry.claimSessionForResume(sessions[0].id);
+      registry.reactivateSession(sessions[0].id, 'new task');
+
+      const updated = registry.getSessions(project.id);
+      expect(updated[0].endedAt).toBeNull();
+      // startedAt should be refreshed (may be same if fast, but at least set)
+      expect(updated[0].startedAt).toBeTruthy();
+      // leadId preserved
+      expect(updated[0].leadId).toBe('lead-1');
+    });
+
+    it('preserves session count when resuming multiple times', () => {
+      const project = registry.create('Multi Resume');
+      registry.startSession(project.id, 'lead-a', 'task 1');
+      registry.endSession('lead-a', 'completed');
+
+      const sessions = registry.getSessions(project.id);
+      registry.claimSessionForResume(sessions[0].id);
+      registry.reactivateSession(sessions[0].id, 'task 2');
+      registry.endSession('lead-a', 'completed');
+
+      // Resume again
+      const sessions2 = registry.getSessions(project.id);
+      registry.claimSessionForResume(sessions2[0].id);
+      registry.reactivateSession(sessions2[0].id, 'task 3');
+
+      // Still just 1 session row
+      const final = registry.getSessions(project.id);
+      expect(final).toHaveLength(1);
+      // leadId stays as original — never overwritten
+      expect(final[0].leadId).toBe('lead-a');
+      expect(final[0].status).toBe('active');
+    });
+  });
+
+  describe('reconcileStaleSessions', () => {
+    it('marks active sessions as stopped when agent is not alive', () => {
+      const project = registry.create('recon-1');
+      registry.startSession(project.id, 'lead-alive', 'task A');
+      registry.startSession(project.id, 'lead-dead', 'task B');
+
+      const reconciled = registry.reconcileStaleSessions(
+        (leadId) => leadId === 'lead-alive',
+      );
+
+      expect(reconciled).toBe(1);
+      const sessions = registry.getSessions(project.id);
+      const dead = sessions.find(s => s.leadId === 'lead-dead')!;
+      const alive = sessions.find(s => s.leadId === 'lead-alive')!;
+      expect(dead.status).toBe('stopped');
+      expect(dead.endedAt).toBeTruthy();
+      expect(alive.status).toBe('active');
+      expect(alive.endedAt).toBeNull();
+    });
+
+    it('reconciles resuming sessions with no running agent', () => {
+      const project = registry.create('recon-2');
+      registry.startSession(project.id, 'lead-r', 'task');
+      registry.endSession('lead-r', 'completed');
+
+      // Simulate a session stuck in 'resuming' state
+      const sessions = registry.getSessions(project.id);
+      registry.claimSessionForResume(sessions[0].id);
+
+      const reconciled = registry.reconcileStaleSessions(() => false);
+      expect(reconciled).toBe(1);
+
+      const after = registry.getSessions(project.id);
+      expect(after[0].status).toBe('stopped');
+      expect(after[0].endedAt).toBeTruthy();
+    });
+
+    it('leaves completed/crashed sessions untouched', () => {
+      const project = registry.create('recon-3');
+      registry.startSession(project.id, 'lead-c', 'task');
+      registry.endSession('lead-c', 'completed');
+      registry.startSession(project.id, 'lead-x', 'task 2');
+      registry.endSession('lead-x', 'crashed');
+
+      const reconciled = registry.reconcileStaleSessions(() => false);
+      expect(reconciled).toBe(0);
+    });
+  });
 });

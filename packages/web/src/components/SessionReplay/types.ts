@@ -10,7 +10,7 @@ export interface ReplayAnnotation {
 
 export interface ReplayHighlight {
   timestamp: string;
-  type: 'decision' | 'crash' | 'milestone' | 'debate' | 'cost_spike';
+  type: 'decision' | 'crash' | 'milestone' | 'cost_spike';
   summary: string;
   significance: number; // 0-100
 }
@@ -33,6 +33,5 @@ export interface ShareableReplay {
     agentCount: number;
     taskCount: number;
     totalCost: number;
-    debateCount: number;
   };
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { DiffService } from '../coordination/DiffService.js';
+import { DiffService } from '../coordination/files/DiffService.js';
 
 export function diffRoutes(ctx: AppContext): Router {
   const { agentManager, lockRegistry } = ctx;

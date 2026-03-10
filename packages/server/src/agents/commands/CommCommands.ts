@@ -27,6 +27,7 @@ const LIST_GROUPS_REGEX = /⟦⟦\s*LIST_GROUPS\s*⟧⟧/s;
 const QUERY_GROUPS_REGEX = /⟦⟦\s*QUERY_GROUPS\s*⟧⟧/s;
 const INTERRUPT_REGEX = /⟦⟦\s*INTERRUPT\s*(\{.*?\})\s*⟧⟧/s;
 const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
+const TELEGRAM_REPLY_REGEX = /⟦⟦\s*TELEGRAM_REPLY\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Exported: command entry list ─────────────────────────────────────
 
@@ -42,6 +43,7 @@ export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a), help: { description: 'List all groups you belong to', example: 'QUERY_GROUPS {}', category: 'Groups' } },
     { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication', args: deriveArgs(interruptSchema) } },
     { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
+    { regex: TELEGRAM_REPLY_REGEX, name: 'TELEGRAM_REPLY', handler: (a, d) => handleTelegramReply(ctx, a, d), help: { description: 'Reply to a Telegram message', example: 'TELEGRAM_REPLY {"messageId": "12345", "content": "response text"}', category: 'Communication' } },
   ];
 }
 
@@ -161,7 +163,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     const targetAgent = resolveAgentInProject(ctx, msg.to, senderProjectId);
 
     if (!targetAgent) {
-      logger.warn('message', `Cannot resolve target "${msg.to}" for message from ${agent.role.name} (${agent.id.slice(0, 8)})`);
+      logger.warn({ module: 'comms', msg: 'Cannot resolve message target', targetRef: msg.to });
       agent.sendMessage(`[System] Agent "${msg.to}" not found. Use QUERY_CREW to see available agents.`);
       return;
     }
@@ -174,9 +176,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
       content: msg.content,
     });
 
-    logger.info('message', `Agent message: ${agent.role.name} (${agent.id.slice(0, 8)}) → ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
-      contentPreview: msg.content.slice(0, 80),
-    });
+    logger.info({ module: 'comms', msg: 'Agent message sent', targetAgentId: targetId, targetRole: targetAgent.role.name, contentPreview: msg.content.slice(0, 80) });
     ctx.emit('agent:message_sent', {
       from: agent.id,
       fromRole: agent.role.name,
@@ -188,7 +188,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
       toAgentId: targetId, toRole: targetAgent.role.id,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
-    logger.debug('command', 'Failed to parse AGENT_MESSAGE command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'AGENT_MESSAGE', err: (err as Error).message });
   }
 }
 
@@ -202,7 +202,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
 
     const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
     if (!leadId) {
-      logger.warn('message', `Broadcast from ${agent.role.name} (${agent.id.slice(0, 8)}) — no team lead found`);
+      logger.warn({ module: 'comms', msg: 'Broadcast failed — no team lead found' });
       return;
     }
 
@@ -215,9 +215,9 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
       (a.status === 'running' || a.status === 'idle')
     );
 
-    const fromLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
-    logger.info('message', `Broadcast from ${fromLabel} to ${recipients.length} agents: ${msg.content.slice(0, 80)}`);
+    logger.info({ module: 'comms', msg: 'Broadcast sent', recipientCount: recipients.length, contentPreview: msg.content.slice(0, 80) });
 
+    const fromLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
     if (recipients.length === 0) {
       agent.sendMessage('[System] Warning: Broadcast sent to 0 agents — no other agents exist yet.');
     }
@@ -237,7 +237,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
       toAgentId: 'all', toRole: 'broadcast', recipientCount: recipients.length,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
-    logger.debug('command', 'Failed to parse BROADCAST command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'BROADCAST', err: (err as Error).message });
   }
 }
 
@@ -292,8 +292,8 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
     }
 
     ctx.emit('group:created', { group, leadId });
-    logger.info('groups', `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) created group "${req.name}" with ${group.memberIds.length} members`);
-  } catch (err) { logger.debug('command', 'Failed to parse CREATE_GROUP command', { error: (err as Error).message }); }
+    logger.info({ module: 'comms', msg: 'Group created', groupName: req.name, memberCount: group.memberIds.length });
+  } catch (err) { logger.debug({ module: 'command', msg: 'Parse failed', command: 'CREATE_GROUP', err: (err as Error).message }); }
 }
 
 function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -345,7 +345,7 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
     } else {
       agent.sendMessage(`[System] No new members added to "${req.group}" (already members or not found).`);
     }
-  } catch (err) { logger.debug('command', 'Failed to parse ADD_TO_GROUP command', { error: (err as Error).message }); }
+  } catch (err) { logger.debug({ module: 'command', msg: 'Parse failed', command: 'ADD_TO_GROUP', err: (err as Error).message }); }
 }
 
 function handleRemoveFromGroup(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -367,7 +367,7 @@ function handleRemoveFromGroup(ctx: CommandHandlerContext, agent: Agent, data: s
       const names = removed.map((id) => ctx.getAgent(id)?.role.name || id.slice(0, 8)).join(', ');
       agent.sendMessage(`[System] Removed ${names} from group "${req.group}".`);
     }
-  } catch (err) { logger.debug('command', 'Failed to parse REMOVE_FROM_GROUP command', { error: (err as Error).message }); }
+  } catch (err) { logger.debug({ module: 'command', msg: 'Parse failed', command: 'REMOVE_FROM_GROUP', err: (err as Error).message }); }
 }
 
 function handleGroupMessage(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -405,8 +405,8 @@ function handleGroupMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
     ctx.activityLedger.log(agent.id, agent.role.id, 'group_message', `Group "${req.group}": ${req.content.slice(0, 120)}`, {
       groupName: req.group, recipientCount: delivered,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
-    logger.info('groups', `Group message in "${req.group}": ${agent.role.name} (${agent.id.slice(0, 8)}) → ${delivered} recipients`);
-  } catch (err) { logger.debug('command', 'Failed to parse GROUP_MESSAGE command', { error: (err as Error).message }); }
+    logger.info({ module: 'comms', msg: 'Group message sent', groupName: req.group, recipientCount: delivered });
+  } catch (err) { logger.debug({ module: 'command', msg: 'Parse failed', command: 'GROUP_MESSAGE', err: (err as Error).message }); }
 }
 
 function handleListGroups(ctx: CommandHandlerContext, agent: Agent): void {
@@ -477,7 +477,7 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
 
     ctx.emit('agent:interrupted', { from: agent.id, to: target.id, content: req.content });
   } catch (err) {
-    logger.debug('command', 'Failed to parse INTERRUPT command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'INTERRUPT', err: (err as Error).message });
   }
 }
 
@@ -510,11 +510,40 @@ function handleReact(ctx: CommandHandlerContext, agent: Agent, data: string): vo
 
     const success = ctx.chatGroupRegistry.addReaction(messageId, agent.id, req.emoji);
     if (success) {
-      logger.info('groups', `Reaction ${req.emoji} by ${agent.role.name} (${agent.id.slice(0, 8)}) on ${messageId} in "${req.group}"`);
+      logger.info({ module: 'comms', msg: 'Reaction added', groupName: req.group, emoji: req.emoji, messageId });
     } else {
       agent.sendMessage(`[System] Could not add reaction — message not found or already reacted.`);
     }
   } catch (err) {
-    logger.debug('command', 'Failed to parse REACT command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'REACT', err: (err as Error).message });
+  }
+}
+
+// ── TELEGRAM_REPLY ──────────────────────────────────────────────────
+
+function handleTelegramReply(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  try {
+    const parsed = JSON.parse(data);
+    const messageId = parsed.messageId ?? parsed.message_id;
+    const content = parsed.content ?? parsed.text;
+
+    if (!messageId || !content) {
+      agent.sendMessage('[System] TELEGRAM_REPLY requires "messageId" and "content" fields.');
+      return;
+    }
+
+    if (!ctx.integrationRouter) {
+      agent.sendMessage('[System] Telegram integration is not configured.');
+      return;
+    }
+
+    const sent = ctx.integrationRouter.sendReply(String(messageId), String(content));
+    if (sent) {
+      logger.info({ module: 'comms', msg: 'Telegram reply sent', messageId, agentId: agent.id });
+    } else {
+      agent.sendMessage(`[System] No pending Telegram message with ID ${messageId}. The message may have expired (30-min TTL).`);
+    }
+  } catch (err) {
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'TELEGRAM_REPLY', err: (err as Error).message });
   }
 }

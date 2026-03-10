@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
-import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock, BarChart2 } from 'lucide-react';
+import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock, BarChart2, Columns3, Globe, SplitSquareHorizontal } from 'lucide-react';
 import { EmptyState } from '../Shared';
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
 import { DagGraph } from './DagGraph';
 import { DagGantt } from './DagGantt';
 import { DagResourceView } from './DagResourceView';
+import { KanbanBoard } from './KanbanBoard';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import type { GanttTask } from './DagGantt';
 import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
 
@@ -83,21 +85,21 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
         </div>
       )}
 
-      {/* Team agents */}
-      {progress && progress.teamAgents.length > 0 && (
+      {/* Crew agents */}
+      {progress && progress.crewAgents.length > 0 && (
         <div>
           <div className="flex items-center gap-1 mb-1">
             <Users size={12} className="text-th-text-muted" />
-            <span className="text-xs text-th-text-muted font-medium">Team ({progress.teamSize})</span>
+            <span className="text-xs text-th-text-muted font-medium">Crew ({progress.crewSize})</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {progress.teamAgents.map((a) => (
+            {progress.crewAgents.map((a) => (
               <span
                 key={a.id}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border ${
                   a.status === 'running' ? 'border-blue-500/50 bg-blue-500/10 text-blue-600 dark:text-blue-300' :
-                  a.status === 'idle' ? 'border-green-500/50 bg-green-500/10 text-green-600 dark:text-green-300' :
-                  a.status === 'completed' ? 'border-gray-500/50 bg-gray-500/10 text-th-text-muted' :
+                  a.status === 'idle' ? 'border-gray-500/50 bg-gray-500/10 text-gray-600 dark:text-gray-300' :
+                  a.status === 'completed' ? 'border-purple-500/50 bg-purple-500/10 text-purple-600 dark:text-purple-300' :
                   a.status === 'failed' ? 'border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-300' :
                   a.status === 'terminated' ? 'border-orange-500/50 bg-orange-500/10 text-orange-600 dark:text-orange-300' :
                   'border-th-border text-th-text-muted'
@@ -117,17 +119,125 @@ function SessionProgress({ progress, dagStatus }: { progress: LeadProgress | nul
 // ---------------------------------------------------------------------------
 // Reusable DAG task visualization panel
 // ---------------------------------------------------------------------------
+
+type TaskViewMode = 'graph' | 'list' | 'gantt' | 'resource' | 'kanban' | 'split';
+
 function DagPanel({
   dagStatus,
   dagView,
   setDagView,
+  projectId,
+  onTaskUpdated,
 }: {
   dagStatus: DagStatus | null;
-  dagView: 'graph' | 'list' | 'gantt' | 'resource' | null;
-  setDagView: (v: 'graph' | 'list' | 'gantt' | 'resource' | null) => void;
+  dagView: TaskViewMode | null;
+  setDagView: (v: TaskViewMode | null) => void;
+  projectId?: string;
+  onTaskUpdated?: () => void;
 }) {
-  const hasDeps = dagStatus?.tasks.some((t) => t.dependsOn.length > 0) ?? false;
-  const effectiveView = dagView ?? (hasDeps ? 'graph' : 'list');
+  const [kanbanScope, setKanbanScope] = useState<'project' | 'global'>('project');
+  const [globalDagStatus, setGlobalDagStatus] = useState<DagStatus | null>(null);
+  const [globalHasMore, setGlobalHasMore] = useState(false);
+  const [globalOffset, setGlobalOffset] = useState(0);
+  const [showArchived, setShowArchived] = useState(() => {
+    try { return localStorage.getItem('kanban-show-archived') === 'true'; } catch { return false; }
+  });
+  const handleShowArchivedChange = useCallback((v: boolean) => {
+    setShowArchived(v);
+    try { localStorage.setItem('kanban-show-archived', String(v)); } catch { /* ignore */ }
+  }, []);
+  const GLOBAL_PAGE_SIZE = 200;
+  const [projectNameMap, setProjectNameMap] = useState<Map<string, string>>(new Map());
+  const effectiveView = dagView ?? 'split';
+  const archivedParam = showArchived ? '&includeArchived=true' : '';
+
+  // Fetch global tasks when scope=global and view=kanban/split
+  useEffect(() => {
+    if (kanbanScope !== 'global' || (effectiveView !== 'kanban' && effectiveView !== 'split')) return;
+    let cancelled = false;
+    const fetchGlobal = async () => {
+      try {
+        const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=0${archivedParam}`);
+        if (!cancelled && data) {
+          const tasks = data.tasks;
+          setGlobalDagStatus({
+            tasks,
+            fileLockMap: {},
+            summary: {
+              pending: tasks.filter((t: any) => t.dagStatus === 'pending').length,
+              ready: tasks.filter((t: any) => t.dagStatus === 'ready').length,
+              running: tasks.filter((t: any) => t.dagStatus === 'running').length,
+              blocked: tasks.filter((t: any) => t.dagStatus === 'blocked').length,
+              done: tasks.filter((t: any) => t.dagStatus === 'done').length,
+              failed: tasks.filter((t: any) => t.dagStatus === 'failed').length,
+              paused: tasks.filter((t: any) => t.dagStatus === 'paused').length,
+              skipped: tasks.filter((t: any) => t.dagStatus === 'skipped').length,
+            },
+          });
+          setGlobalHasMore(data.hasMore);
+          setGlobalOffset(data.offset + data.limit);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch global tasks', err);
+      }
+    };
+    fetchGlobal();
+    const interval = setInterval(fetchGlobal, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [kanbanScope, effectiveView, showArchived]);
+
+  // Fetch project names for global view
+  useEffect(() => {
+    if (kanbanScope !== 'global') return;
+    apiFetch<Project[]>('/projects')
+      .then(projects => {
+        const map = new Map<string, string>();
+        for (const p of projects) map.set(p.id, p.name);
+        setProjectNameMap(map);
+      })
+      .catch(() => { /* data will load on next poll */ });
+  }, [kanbanScope]);
+
+  // Load next page of global tasks (appends to existing)
+  const loadMoreGlobalTasks = async () => {
+    if (!globalHasMore || !globalDagStatus) return;
+    try {
+      const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=${globalOffset}${archivedParam}`);
+      if (data) {
+        const merged = [...globalDagStatus.tasks, ...data.tasks];
+        setGlobalDagStatus({
+          tasks: merged,
+          fileLockMap: {},
+          summary: {
+            pending: merged.filter((t: any) => t.dagStatus === 'pending').length,
+            ready: merged.filter((t: any) => t.dagStatus === 'ready').length,
+            running: merged.filter((t: any) => t.dagStatus === 'running').length,
+            blocked: merged.filter((t: any) => t.dagStatus === 'blocked').length,
+            done: merged.filter((t: any) => t.dagStatus === 'done').length,
+            failed: merged.filter((t: any) => t.dagStatus === 'failed').length,
+            paused: merged.filter((t: any) => t.dagStatus === 'paused').length,
+            skipped: merged.filter((t: any) => t.dagStatus === 'skipped').length,
+          },
+        });
+        setGlobalHasMore(data.hasMore);
+        setGlobalOffset(data.offset + data.limit);
+      }
+    } catch (err) {
+      console.warn('Failed to load more global tasks', err);
+    }
+  };
+
+  const kanbanProps = {
+    dagStatus: kanbanScope === 'global' ? globalDagStatus : dagStatus,
+    projectId: kanbanScope === 'global' ? undefined : projectId,
+    onTaskUpdated: kanbanScope === 'global' ? undefined : onTaskUpdated,
+    scope: kanbanScope as 'project' | 'global',
+    projectNameMap,
+    hasMore: kanbanScope === 'global' ? globalHasMore : false,
+    onLoadMore: kanbanScope === 'global' ? loadMoreGlobalTasks : undefined,
+    showArchived,
+    onShowArchivedChange: handleShowArchivedChange,
+  };
 
   const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
     id:          t.id,
@@ -144,13 +254,15 @@ function DagPanel({
   }));
 
   const viewIcon =
+    effectiveView === 'split' ? <SplitSquareHorizontal size={14} className="text-teal-400" /> :
     effectiveView === 'graph' ? <Network size={14} className="text-blue-400" /> :
     effectiveView === 'gantt' ? <BarChart2 size={14} className="text-purple-400" /> :
     effectiveView === 'resource' ? <Users size={14} className="text-cyan-400" /> :
+    effectiveView === 'kanban' ? <Columns3 size={14} className="text-emerald-400" /> :
     <LayoutList size={14} className="text-blue-400" />;
 
   return (
-    <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col">
+    <div className="bg-th-bg-alt/50 rounded-lg border border-th-border flex flex-col flex-1 min-h-0">
       <div className="px-4 py-3 border-b border-th-border flex items-center justify-between">
         <h3 className="text-sm font-medium text-th-text flex items-center gap-2">
           {viewIcon}
@@ -159,15 +271,38 @@ function DagPanel({
             <span className="text-xs text-th-text-muted font-normal">{dagStatus.tasks.length} total</span>
           )}
         </h3>
-        <div className="flex bg-th-bg rounded p-0.5 border border-th-border">
+        <div className="flex items-center gap-2">
+          {/* Scope switcher (only shown when NOT inside a specific project) */}
+          {!projectId && (effectiveView === 'kanban' || effectiveView === 'split') && (
+            <select
+              value={kanbanScope}
+              onChange={(e) => setKanbanScope(e.target.value as 'project' | 'global')}
+              className="text-[11px] bg-th-bg border border-th-border rounded px-2 py-1 text-th-text cursor-pointer"
+              data-testid="scope-switcher"
+            >
+              <option value="project">📁 This Project</option>
+              <option value="global">🌐 All Projects</option>
+            </select>
+          )}
+          <div className="flex bg-th-bg rounded p-0.5 border border-th-border">
           <button
-            onClick={() => setDagView('list')}
+            onClick={() => setDagView('split')}
             className={`p-1 rounded transition-colors ${
-              effectiveView === 'list' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+              effectiveView === 'split' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
             }`}
-            title="List view"
+            title="Split view (Kanban + Graph)"
+            data-testid="view-split"
           >
-            <LayoutList size={13} />
+            <SplitSquareHorizontal size={13} />
+          </button>
+          <button
+            onClick={() => setDagView('kanban')}
+            className={`p-1 rounded transition-colors ${
+              effectiveView === 'kanban' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+            }`}
+            title="Kanban board"
+          >
+            <Columns3 size={13} />
           </button>
           <button
             onClick={() => setDagView('graph')}
@@ -177,6 +312,15 @@ function DagPanel({
             title="Graph view"
           >
             <Network size={13} />
+          </button>
+          <button
+            onClick={() => setDagView('list')}
+            className={`p-1 rounded transition-colors ${
+              effectiveView === 'list' ? 'bg-th-bg-muted text-th-text' : 'text-th-text-muted hover:text-th-text-alt'
+            }`}
+            title="List view"
+          >
+            <LayoutList size={13} />
           </button>
           <button
             onClick={() => setDagView('gantt')}
@@ -197,8 +341,26 @@ function DagPanel({
             <Users size={13} />
           </button>
         </div>
+        </div>
       </div>
-      {effectiveView === 'graph' ? (
+      {effectiveView === 'split' ? (
+        /* Split view: DAG on top, Kanban below (simple vertical stack) */
+        <div className="flex flex-col w-full flex-1 gap-2" data-testid="split-view">
+          {/* DAG graph */}
+          <div className="overflow-hidden" style={{ height: 350 }}>
+            <DagGraph dagStatus={dagStatus} fillContainer />
+          </div>
+
+          {/* Kanban board */}
+          <div className="flex-1 overflow-auto">
+            <KanbanBoard {...kanbanProps} />
+          </div>
+        </div>
+      ) : effectiveView === 'kanban' ? (
+        <div style={{ minHeight: 400 }}>
+          <KanbanBoard {...kanbanProps} />
+        </div>
+      ) : effectiveView === 'graph' ? (
         <div className="flex-1" style={{ minHeight: 400 }}>
           <DagGraph dagStatus={dagStatus} />
         </div>
@@ -236,9 +398,10 @@ function tabKey(tab: TabItem): string {
 export function TaskQueuePanel({ api }: Props) {
   const agents = useAppStore((s) => s.agents);
   const leadProjects = useLeadStore((s) => s.projects);
+  const projectId = useOptionalProjectId();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
   const [progress, setProgress] = useState<LeadProgress | null>(null);
-  const [dagView, setDagView] = useState<'graph' | 'list' | 'gantt' | 'resource' | null>('graph');
+  const [dagView, setDagView] = useState<TaskViewMode | null>(null);
   const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
   const [resuming, setResuming] = useState<string | null>(null);
   const [historicalDag, setHistoricalDag] = useState<DagStatus | null>(null);
@@ -249,7 +412,7 @@ export function TaskQueuePanel({ api }: Props) {
   useEffect(() => {
     apiFetch<Project[]>('/projects')
       .then((data) => setPersistedProjects(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [leads.length]); // re-fetch when leads change
 
   // Build tabs: active leads + inactive persisted projects
@@ -266,12 +429,19 @@ export function TaskQueuePanel({ api }: Props) {
       .map((p): TabItem => ({ type: 'persisted', project: p })),
   ];
 
-  // Auto-select first tab
+  // Auto-select first tab (or project-scoped tab if inside ProjectLayout)
   useEffect(() => {
-    if (tabs.length > 0 && (!selectedTab || !tabs.some(t => tabKey(t) === selectedTab))) {
+    if (projectId) {
+      // Inside a project — find the matching tab
+      const match = tabs.find(t =>
+        (t.type === 'active' && t.agent.projectId === projectId) ||
+        (t.type === 'persisted' && t.project.id === projectId),
+      );
+      if (match) setSelectedTab(tabKey(match));
+    } else if (tabs.length > 0 && (!selectedTab || !tabs.some(t => tabKey(t) === selectedTab))) {
       setSelectedTab(tabKey(tabs[0]));
     }
-  }, [tabs.length, selectedTab]);
+  }, [tabs.length, selectedTab, projectId]);
 
   // Selected tab data
   const currentTab = tabs.find(t => tabKey(t) === selectedTab);
@@ -284,7 +454,7 @@ export function TaskQueuePanel({ api }: Props) {
         .then((data) => {
           if (data) setPersistedProjects(prev => prev.map(p => p.id === data.id ? data : p));
         })
-        .catch(() => {});
+        .catch(() => { /* data will load on next poll */ });
     }
   }, [selectedTab, currentTab?.type]);
 
@@ -294,11 +464,11 @@ export function TaskQueuePanel({ api }: Props) {
       setHistoricalDag(null);
       return;
     }
-    apiFetch<DagStatus>(`/projects/${currentTab.project.id}/dag`)
+    apiFetch<DagStatus>(`/projects/${currentTab.project.id}/dag?includeArchived=true`)
       .then((data) => {
         if (data?.tasks?.length > 0) setHistoricalDag(data);
       })
-      .catch(() => {});
+      .catch(() => { /* data will load on next poll */ });
   }, [selectedTab, currentTab?.type]);
 
   // Fetch progress + DAG for active leads
@@ -309,7 +479,13 @@ export function TaskQueuePanel({ api }: Props) {
         apiFetch<LeadProgress>(`/lead/${leadId}/progress`),
       ]);
       if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData);
-      setProgress(progressData);
+      // Normalize server-side property names (team→crew rename, Phase 1)
+      const raw = progressData as any;
+      setProgress({
+        ...progressData,
+        crewAgents: progressData.crewAgents ?? raw.teamAgents ?? [],
+        crewSize: progressData.crewSize ?? raw.teamSize ?? 0,
+      });
     } catch { /* ignore */ }
   }, [api]);
 
@@ -346,7 +522,8 @@ export function TaskQueuePanel({ api }: Props) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* ---- Project tabs ---- */}
+      {/* ---- Project tabs (hidden when inside ProjectLayout) ---- */}
+      {!projectId && (
       <div className="flex items-center border-b border-th-border shrink-0 overflow-x-auto bg-th-bg">
         {tabs.length === 0 ? (
           <div className="flex items-center gap-2 px-4 h-10 text-th-text-muted text-sm">
@@ -389,8 +566,8 @@ export function TaskQueuePanel({ api }: Props) {
                   )}
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                     l.status === 'running' ? 'bg-blue-400 animate-pulse' :
-                    l.status === 'idle' ? 'bg-green-400' :
-                    l.status === 'completed' ? 'bg-gray-500' :
+                    l.status === 'idle' ? 'bg-gray-400' :
+                    l.status === 'completed' ? 'bg-purple-400' :
                     l.status === 'terminated' ? 'bg-orange-400' :
                     'bg-red-400'
                   }`} />
@@ -418,9 +595,10 @@ export function TaskQueuePanel({ api }: Props) {
           })
         )}
       </div>
+      )}
 
       {/* ---- Content for selected tab ---- */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-2 focus:outline-none" tabIndex={0}>
         {!currentTab ? (
           <div className="flex flex-col items-center justify-center py-12 text-th-text-muted">
             <Network size={32} className="mb-2 opacity-50" />
@@ -483,22 +661,22 @@ export function TaskQueuePanel({ api }: Props) {
                   </h3>
                   <SessionProgress progress={null} dagStatus={historicalDag} />
                 </div>
-                <DagPanel dagStatus={historicalDag} dagView={dagView} setDagView={setDagView} />
+                <DagPanel dagStatus={historicalDag} dagView={dagView} setDagView={setDagView} projectId={currentTab.project.id} />
               </>
             )}
           </div>
         ) : (
           /* Active lead — show progress and tasks */
-          <div className="space-y-4">
-            <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-4">
-              <h3 className="text-sm font-medium text-th-text mb-3 flex items-center gap-2">
+          <div className="space-y-2 flex flex-col flex-1 min-h-0">
+            <div className="bg-th-bg-alt/50 rounded-lg border border-th-border p-3 shrink-0">
+              <h3 className="text-sm font-medium text-th-text mb-2 flex items-center gap-2">
                 <Network size={14} className="text-cyan-400" />
                 Progress
               </h3>
               <SessionProgress progress={progress} dagStatus={dagStatus} />
             </div>
 
-            <DagPanel dagStatus={dagStatus} dagView={dagView} setDagView={setDagView} />
+            <DagPanel dagStatus={dagStatus} dagView={dagView} setDagView={setDagView} projectId={currentTab.type === 'active' ? (currentTab.agent?.projectId ?? currentTab.project?.id) : undefined} onTaskUpdated={activeLeadId ? () => fetchData(activeLeadId) : undefined} />
           </div>
         )}
       </div>

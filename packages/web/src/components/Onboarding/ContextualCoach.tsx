@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, Decision } from '../../types';
 
+const CONTEXT_PRESSURE_THRESHOLD = 0.8;
+const isContextPressured = (a: AgentInfo) =>
+  a.contextWindowSize && a.contextWindowUsed && (a.contextWindowUsed / a.contextWindowSize) > CONTEXT_PRESSURE_THRESHOLD;
+
 interface CoachTip {
   id: string;
   trigger: (state: { agents: AgentInfo[]; pendingDecisions: Decision[]; sessionMinutes: number }) => boolean;
@@ -13,14 +17,6 @@ interface CoachTip {
 
 const TIPS: CoachTip[] = [
   {
-    id: 'coach-intent-rules',
-    trigger: ({ sessionMinutes }) => sessionMinutes > 30,
-    title: 'Automate routine decisions',
-    body: 'Intent rules auto-handle routine decisions so you can focus on what matters.',
-    icon: '💡',
-    cta: { label: 'Learn more', action: '/settings' },
-  },
-  {
     id: 'coach-cmdk',
     trigger: ({ sessionMinutes }) => sessionMinutes > 10,
     title: 'Press \u2318K for quick commands',
@@ -29,7 +25,7 @@ const TIPS: CoachTip[] = [
   },
   {
     id: 'coach-context-pressure',
-    trigger: ({ agents }) => agents.some(a => a.contextWindowSize && a.contextWindowUsed && (a.contextWindowUsed / a.contextWindowSize) > 0.8),
+    trigger: ({ agents }) => agents.some(isContextPressured),
     title: 'Context running low',
     body: 'An agent is running low on context. You can compact it to continue.',
     icon: '💡',
@@ -39,20 +35,13 @@ const TIPS: CoachTip[] = [
     id: 'coach-batch-approve',
     trigger: ({ pendingDecisions }) => pendingDecisions.length >= 5,
     title: 'Batch approve decisions',
-    body: "You have several pending decisions. Consider using batch approval or creating an intent rule.",
+    body: 'You have several pending decisions. Consider using batch approval.',
     icon: '💡',
-    cta: { label: 'Create Rule', action: '/settings' },
+    cta: { label: 'View Queue', action: '/approvals' },
   },
   // Idle agents tip removed — idle agents don't cost anything (per-token billing),
   // and the Lead assigns tasks, not the user.
-  {
-    id: 'coach-canvas',
-    trigger: () => !localStorage.getItem('tour-seen-canvas'),
-    title: 'New: Canvas View',
-    body: 'See your agents as a spatial graph. Drag to rearrange.',
-    icon: '✨',
-    cta: { label: 'Take a look', action: '/canvas' },
-  },
+  // Canvas View tip removed — feature was removed.
 ];
 
 const AUTO_DISMISS_MS = 15_000;
@@ -109,15 +98,22 @@ export function ContextualCoach({ onNavigate }: Props) {
     handleDismiss();
     if (activeTip.cta.action.startsWith('/') && onNavigate) {
       onNavigate(activeTip.cta.action);
+    } else if (activeTip.cta.action === 'compact') {
+      const pressured = agents.find(isContextPressured);
+      if (pressured && onNavigate) {
+        onNavigate(`/projects/${pressured.projectId}/session?agent=${pressured.id}`);
+      } else if (onNavigate) {
+        // No pressured agent found — navigate to agents view as fallback
+        onNavigate('/crews');
+      }
     }
-    // Special actions like 'compact' can be handled by the parent
   };
 
   if (!activeTip || dismissed) return null;
 
   return (
     <div
-      className="fixed bottom-16 right-4 z-40 max-w-xs bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg shadow-lg p-3 animate-in slide-in-from-right"
+      className="fixed bottom-16 right-4 z-overlay max-w-xs bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg shadow-lg p-3 animate-in slide-in-from-right"
       role="alert"
     >
       <div className="flex items-start gap-2">

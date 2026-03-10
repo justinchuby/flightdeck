@@ -1,4 +1,5 @@
 import type { AnalyticsOverview } from './types';
+import { formatTokens } from '../../utils/format';
 
 interface SessionOverviewCardProps {
   overview: AnalyticsOverview;
@@ -16,12 +17,6 @@ export function SessionOverviewCard({ overview }: SessionOverviewCardProps) {
 
   const totalTasks = sessions.reduce((s, x) => s + x.taskCount, 0);
   const totalTokens = sessions.reduce((s, x) => s + x.totalInputTokens + x.totalOutputTokens, 0);
-
-  const formatTokens = (n: number): string => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
-    return String(n);
-  };
 
   return (
     <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="session-overview-card">

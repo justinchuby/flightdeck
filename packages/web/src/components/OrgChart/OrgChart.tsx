@@ -7,6 +7,7 @@ import { Network, MessageSquare, Grid3X3, Users, BarChart3 } from 'lucide-react'
 import { idColor } from '../../utils/markdown';
 import { CommHeatmap } from '../FleetOverview/CommHeatmap';
 import type { HeatmapMessage, CommType as HeatmapCommType } from '../FleetOverview/CommHeatmap';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
 
 // Unified message entry covering both 1:1 comms and group messages
 interface CommEntry {
@@ -299,24 +300,25 @@ interface Props {
 }
 
 export function OrgChart({ api, ws }: Props) {
+  const contextProjectId = useOptionalProjectId();
   const agents = useAppStore((s) => s.agents);
   const projects = useLeadStore((s) => s.projects);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(contextProjectId);
   const [commView, setCommView] = useState<'list' | 'matrix' | 'heatmap'>('list');
 
   // Identify leads (role.id === 'lead' with no parent)
   const leads = agents.filter((a) => a.role?.id === 'lead' && !a.parentId);
 
-  // Auto-select first lead when none selected
+  // Auto-select first lead when none selected (skip if context provides project)
   useEffect(() => {
-    if (!selectedLeadId && leads.length > 0) {
+    if (!contextProjectId && !selectedLeadId && leads.length > 0) {
       setSelectedLeadId(leads[0].id);
     }
     // If selected lead disappeared, reset
     if (selectedLeadId && !leads.some((l) => l.id === selectedLeadId)) {
       setSelectedLeadId(leads[0]?.id ?? null);
     }
-  }, [leads, selectedLeadId]);
+  }, [contextProjectId, leads, selectedLeadId]);
 
   const project = selectedLeadId ? projects[selectedLeadId] : null;
   const comms: AgentComm[] = project?.comms ?? [];
@@ -395,8 +397,8 @@ export function OrgChart({ api, ws }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto space-y-0">
-      {/* Project tabs — always visible */}
-      {leads.length > 0 && (
+      {/* Project tabs — only visible when not inside a project route */}
+      {!contextProjectId && leads.length > 0 && (
         <nav className="flex items-center gap-1 px-4 pt-2 overflow-x-auto border-b border-th-border-muted" role="tablist" aria-label="Project selection">
           {leads.map((l) => (
             <button

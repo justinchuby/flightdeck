@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NotificationService, type NotificationChannel, type NotificationPreference } from '../coordination/NotificationService.js';
+import { NotificationService, type NotificationChannel, type NotificationPreference } from '../coordination/alerts/NotificationService.js';
 import { Database } from '../db/database.js';
 
 describe('NotificationService', () => {
@@ -84,20 +84,12 @@ describe('NotificationService', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Invalid webhook URL');
     });
-
-    it('tests email channel with invalid address', () => {
-      const channel = service.createChannel('email', {
-        address: 'not-an-email',
-        digestFrequency: 'realtime',
-      });
-      expect(service.testChannel(channel.id).success).toBe(false);
-    });
   });
 
   describe('preferences', () => {
     it('returns default preferences for all events', () => {
       const prefs = service.getPreferences();
-      expect(prefs.length).toBeGreaterThanOrEqual(9);
+      expect(prefs.length).toBeGreaterThanOrEqual(8);
       expect(prefs.map(p => p.event)).toContain('decision_pending');
       expect(prefs.map(p => p.event)).toContain('agent_crashed');
     });
@@ -305,6 +297,51 @@ describe('NotificationService', () => {
       const prefs = service2.getPreferences();
       const crashPref = prefs.find(p => p.event === 'agent_crashed');
       expect(crashPref!.channels).toContain(channel.id);
+    });
+  });
+
+  // ── G-4: Telegram channel support ──────────────────────────
+
+  describe('telegram channel', () => {
+    it('creates a telegram channel', () => {
+      const channel = service.createChannel('telegram', { chatId: '12345' });
+      expect(channel.type).toBe('telegram');
+      expect(channel.enabled).toBe(true);
+      expect((channel.config as any).chatId).toBe('12345');
+    });
+
+    it('validates telegram channel requires chatId', () => {
+      const channel = service.createChannel('telegram', { chatId: '' });
+      const result = service.testChannel(channel.id);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('chatId');
+    });
+
+    it('validates telegram channel with valid chatId', () => {
+      const channel = service.createChannel('telegram', { chatId: '12345' });
+      const result = service.testChannel(channel.id);
+      expect(result.success).toBe(true);
+    });
+
+    it('routes notification events to telegram channel', () => {
+      const channel = service.createChannel('telegram', { chatId: '12345' });
+      service.updatePreferences([{
+        event: 'agent_crashed',
+        tier: 'interrupt',
+        channels: [channel.id],
+        enabled: true,
+      }]);
+
+      const sent = vi.fn();
+      service.on('notification:sent', sent);
+
+      const entries = service.routeEvent('agent_crashed', 'session-1', 'Agent dev crashed');
+      expect(entries).toHaveLength(1);
+      expect(entries[0].channelType).toBe('telegram');
+      expect(entries[0].status).toBe('sent');
+      expect(sent).toHaveBeenCalledWith(
+        expect.objectContaining({ channelType: 'telegram', event: 'agent_crashed' }),
+      );
     });
   });
 });

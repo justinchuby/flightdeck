@@ -18,7 +18,7 @@ Flightdeck uses [Drizzle ORM](https://orm.drizzle.team/) over `better-sqlite3` f
 ```
 packages/server/
 ├── src/db/
-│   ├── schema.ts          # All 13 table definitions (Drizzle schema DSL)
+│   ├── schema.ts          # All 25 table definitions (Drizzle schema DSL)
 │   ├── database.ts        # Database class — opens connection, applies pragmas, runs migrations
 │   └── ConversationStore.ts
 └── drizzle/
@@ -72,12 +72,12 @@ Applied at database open in `Database` constructor, before any queries:
 | `foreign_keys = ON` | Enforce constraints | Ensures referential integrity (e.g., messages must reference valid conversations). SQLite disables FK enforcement by default. |
 | `synchronous = NORMAL` | Sync on checkpoint | ~10x write speedup vs `FULL`. WAL mode protects against database corruption; `NORMAL` only risks losing the last few frames on an OS-level crash (not app crash). Acceptable for a development tool. |
 | `busy_timeout = 5000` | 5 second wait | When a write lock is held, other writers wait up to 5s instead of immediately returning `SQLITE_BUSY`. Prevents intermittent errors when multiple subsystems (locks, activity, tasks) write concurrently. |
-| `cache_size = -64000` | 64MB page cache | Keeps frequently accessed pages (locks, recent activity, task queue) in memory. Negative value is in KB. Default is ~2MB — 64MB keeps the working set cached for our 13 tables. |
+| `cache_size = -64000` | 64MB page cache | Keeps frequently accessed pages (locks, recent activity, task queue) in memory. Negative value is in KB. Default is ~2MB — 64MB keeps the working set cached for our 25 tables. |
 | `wal_checkpoint(PASSIVE)` | Non-blocking checkpoint | Reclaims WAL file space at startup without blocking concurrent readers. Prevents unbounded WAL growth across server restarts. |
 
 ## Table Reference
 
-The schema defines 13 tables across 5 functional areas. All definitions are in `packages/server/src/db/schema.ts`.
+The schema defines 25 tables across 10 functional areas. All definitions are in `packages/server/src/db/schema.ts`.
 
 ### Conversations & Messages
 
@@ -100,6 +100,7 @@ The schema defines 13 tables across 5 functional areas. All definitions are in `
 | `file_locks` | Active file locks with agent ownership, reason, and TTL expiry | `file_path` (text) |
 | `activity_log` | Append-only log of all agent actions (bounded to 10,000 entries) | `id` (auto-increment) |
 | `decisions` | Architectural decisions logged by agents, with optional user confirmation | `id` (text) |
+| `deferred_issues` | Issues found during code review, deferred for later resolution (severity, source file, status) | `id` (auto-increment) |
 
 ### Chat Groups
 
@@ -116,6 +117,42 @@ The schema defines 13 tables across 5 functional areas. All definitions are in `
 | `dag_tasks` | DAG task graph — dependencies, status, priority, assigned agent | `(id, lead_id)` composite |
 | `agent_memory` | Key-value memory store per agent, scoped to a lead | `id` (auto-increment), unique on `(lead_id, agent_id, key)` |
 | `agent_plans` | Persisted agent plan entries (JSON array of plan steps) | `agent_id` (text) |
+
+### Projects
+
+| Table | Purpose | Primary Key |
+|-------|---------|-------------|
+| `projects` | Persistent project definitions surviving lead sessions (name, cwd, status, model config) | `id` (text) |
+| `project_sessions` | Links a lead session to a project, tracking session role, task, and lifecycle | `id` (auto-increment), FK `project_id` → `projects` |
+
+### Agent Registry & Delegation
+
+| Table | Purpose | Primary Key |
+|-------|---------|-------------|
+| `agent_roster` | Persistent agent registry surviving server restarts (role, model, status, team) | `agent_id` (text) |
+| `active_delegations` | In-flight task assignments from lead to child agents (task, status, result) | `delegation_id` (text), FK `agent_id` → `agent_roster` |
+
+### Knowledge & Memory
+
+| Table | Purpose | Primary Key |
+|-------|---------|-------------|
+| `collective_memory` | Shared team knowledge persisting across sessions (category/key/value, usage tracking) | `id` (auto-increment), unique on `(category, key, project_id)` |
+| `knowledge` | Per-project 4-tier memory store (core, episodic, procedural, semantic) | `id` (auto-increment), unique on `(project_id, category, key)` |
+
+### Observability
+
+| Table | Purpose | Primary Key |
+|-------|---------|-------------|
+| `agent_file_history` | Tracks which files each agent has touched during a session (touch count, timestamps) | `(agent_id, lead_id, file_path)` composite |
+| `task_cost_records` | Token usage attribution per agent per DAG task (input/output tokens) | `(agent_id, dag_task_id, lead_id)` composite |
+| `session_retros` | Session retrospective data captured when sessions end (JSON blob) | `id` (auto-increment) |
+
+### Infrastructure
+
+| Table | Purpose | Primary Key |
+|-------|---------|-------------|
+| `timers` | Agent-created timers and reminders (delay, fire time, repeat, status) | `id` (text) |
+| `message_queue` | Queued inter-agent messages for crash-safe delivery (type, payload, attempts) | `id` (auto-increment) |
 
 ## Agent Plan Persistence
 

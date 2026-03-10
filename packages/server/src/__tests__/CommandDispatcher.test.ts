@@ -1119,7 +1119,7 @@ describe('CommandDispatcher', () => {
 
       dispatcher.notifyParentOfCompletion(child, 1);
 
-      expect(ctx.taskDAG.failTask).toHaveBeenCalledWith(leadAgent.id, 'task-1');
+      expect(ctx.taskDAG.failTask).toHaveBeenCalledWith(leadAgent.id, 'task-1', 'Agent exited with code 1');
       expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
         expect.stringContaining('FAILED'),
       );

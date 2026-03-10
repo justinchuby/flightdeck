@@ -23,8 +23,8 @@ export function InsightsPanel({ insights }: InsightsPanelProps) {
     <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="insights-panel">
       <h3 className="text-xs font-semibold text-th-text-muted uppercase tracking-wide mb-3">💡 Insights</h3>
       <div className="space-y-2">
-        {visible.map((insight, i) => (
-          <InsightCard key={i} insight={insight} />
+        {visible.map((insight) => (
+          <InsightCard key={`${insight.type}-${insight.title}`} insight={insight} />
         ))}
       </div>
       {insights.length > 3 && (

@@ -16,18 +16,34 @@ vi.mock('../agents/agentFiles.js', () => ({
   agentFlagForRole: (roleId: string) => roleId,
 }));
 
-// ── Mock AcpConnection ───────────────────────────────────────────
+// ── Mock AdapterFactory ───────────────────────────────────────
 const mockStart = vi.fn();
 const mockOn = vi.fn();
 
-vi.mock('../acp/AcpConnection.js', () => {
-  return {
-    AcpConnection: class MockAcpConnection {
-      start = mockStart;
-      on = mockOn;
-    },
-  };
-});
+const mockAdapter = {
+  start: mockStart,
+  on: mockOn,
+  type: 'acp',
+};
+
+vi.mock('../adapters/AdapterFactory.js', () => ({
+  createAdapterForProvider: vi.fn(() => ({
+    adapter: mockAdapter,
+    backend: 'acp',
+    fallback: false,
+  })),
+  buildStartOptions: vi.fn((config: any, agentOpts: any) => ({
+    cliCommand: config.binaryOverride || config.cliCommand || 'copilot',
+    cliArgs: [
+      ...(config.cliArgs ?? []),
+      ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
+      ...(config.model ? ['--model', config.model] : []),
+    ],
+    cwd: agentOpts.cwd ?? process.cwd(),
+    sessionId: agentOpts.sessionId,
+    model: config.model,
+  })),
+}));
 
 // Import AFTER mocking
 import { startAcp } from '../agents/AgentAcpBridge.js';
@@ -58,6 +74,7 @@ const fakeConfig: ServerConfig = {
   host: '127.0.0.1',
   cliCommand: 'copilot',
   cliArgs: [],
+  provider: 'copilot',
   maxConcurrentAgents: 50,
   dbPath: './test.db',
 };
@@ -73,7 +90,7 @@ describe('AgentAcpBridge — startAcp', () => {
 
   it('logs the actual error message when ACP start fails', async () => {
     const agent = createFakeAgent();
-    const startError = new Error('CLI binary "copilot" not found in PATH. Install it or set COPILOT_CLI_PATH.');
+    const startError = new Error('CLI binary "copilot" not found in PATH. Install the provider CLI or set the binary path in your config.');
     mockStart.mockRejectedValue(startError);
 
     startAcp(agent, fakeConfig);
@@ -85,9 +102,9 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // The error should be logged with details, NOT swallowed
     expect(logger.error).toHaveBeenCalledWith(
-      'acp',
-      expect.stringContaining('ACP start failed'),
       expect.objectContaining({
+        module: 'agent-bridge',
+        msg: 'Adapter start failed',
         cliCommand: 'copilot',
         cwd: '/test/project',
         role: 'lead',
@@ -96,9 +113,9 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // Verify the actual error message is included in the log
     const errorCall = (logger.error as any).mock.calls.find(
-      (call: any[]) => call[1]?.includes('ACP start failed'),
+      (call: any[]) => call[0]?.msg === 'Adapter start failed',
     );
-    expect(errorCall[1]).toContain('not found in PATH');
+    expect(errorCall[0].err).toContain('not found in PATH');
   });
 
   it('sets agent status to failed on error', async () => {
@@ -126,9 +143,10 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // Should not throw, should still log something
     expect(logger.error).toHaveBeenCalledWith(
-      'acp',
-      expect.stringContaining('ACP start failed'),
-      expect.any(Object),
+      expect.objectContaining({
+        module: 'agent-bridge',
+        msg: 'Adapter start failed',
+      }),
     );
   });
 
@@ -143,17 +161,19 @@ describe('AgentAcpBridge — startAcp', () => {
     });
 
     expect(logger.error).toHaveBeenCalledWith(
-      'acp',
-      expect.stringContaining('abcdef12'),
-      expect.any(Object),
+      expect.objectContaining({
+        module: 'agent-bridge',
+        msg: 'Adapter start failed',
+        err: 'timeout',
+      }),
     );
   });
 
-  it('passes correct cliArgs to AcpConnection.start', () => {
+  it('passes correct cliArgs to AcpConnection.start', async () => {
     const agent = createFakeAgent({ model: 'claude-sonnet-4' });
     mockStart.mockResolvedValue('session-123');
 
-    startAcp(agent, fakeConfig);
+    await startAcp(agent, fakeConfig);
 
     expect(mockStart).toHaveBeenCalledWith(
       expect.objectContaining({

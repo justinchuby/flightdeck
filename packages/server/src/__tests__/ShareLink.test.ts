@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ShareLinkService } from '../coordination/ShareLinkService.js';
+import { ShareLinkService } from '../coordination/sharing/ShareLinkService.js';
 
 function createMockDb() {
   const settings = new Map<string, string>();

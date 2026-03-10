@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
-import { DECISION_CATEGORIES, TRUST_PRESETS, type DecisionCategory, type TrustPreset, type IntentAction } from '../coordination/DecisionLog.js';
+import { DECISION_CATEGORIES, type DecisionCategory } from '../coordination/decisions/DecisionLog.js';
 
 export function decisionsRoutes(ctx: AppContext): Router {
   const { agentManager, decisionLog } = ctx;
@@ -150,77 +150,6 @@ export function decisionsRoutes(ctx: AppContext): Router {
     }
 
     res.json(result);
-  });
-
-  // --- Intent Rules ---
-  router.get('/intents', (_req, res) => {
-    res.json(decisionLog.getIntentRules());
-  });
-
-  router.post('/intents', (req, res) => {
-    const { category, name, roles, conditions, priority, action, enabled } = req.body ?? {};
-    if (!DECISION_CATEGORIES.includes(category as DecisionCategory)) {
-      return res.status(400).json({ error: `category must be one of: ${DECISION_CATEGORIES.join(', ')}` });
-    }
-    const validActions = ['allow', 'alert', 'require-review'];
-    const ruleAction = validActions.includes(action) ? action : 'allow';
-    const rule = decisionLog.addIntentRule(category as DecisionCategory, 'manual', {
-      name,
-      roles,
-      conditions,
-      priority,
-      action: ruleAction,
-      enabled: enabled ?? true,
-    });
-    res.status(201).json(rule);
-  });
-
-  router.patch('/intents/:id', (req, res) => {
-    const rules = decisionLog.getIntentRules();
-    const rule = rules.find(r => r.id === req.params.id);
-    if (!rule) return res.status(404).json({ error: 'Intent rule not found' });
-    const { name, roles, conditions, priority, enabled, action } = req.body ?? {};
-    if (name !== undefined) rule.name = name;
-    if (roles !== undefined) rule.match.roles = roles;
-    if (conditions !== undefined) rule.conditions = conditions;
-    if (priority !== undefined) rule.priority = priority;
-    if (enabled !== undefined) rule.enabled = enabled;
-    if (action !== undefined && ['allow', 'alert', 'require-review'].includes(action)) rule.action = action as IntentAction;
-    (decisionLog as any).saveIntentRules();
-    res.json(rule);
-  });
-
-  router.post('/intents/reorder', (req, res) => {
-    const { ids } = req.body ?? {};
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'ids must be a non-empty array of rule IDs' });
-    }
-    const updated = decisionLog.reorderIntentRules(ids);
-    res.json({ updated });
-  });
-
-  router.delete('/intents/:id', (req, res) => {
-    const deleted = decisionLog.deleteIntentRule(req.params.id as string);
-    if (!deleted) return res.status(404).json({ error: 'Intent rule not found' });
-    res.json({ deleted: true });
-  });
-
-  // --- Trust Presets ---
-  router.get('/intents/presets', (_req, res) => {
-    res.json(TRUST_PRESETS);
-  });
-
-  router.post('/intents/presets/:preset', (req, res) => {
-    const preset = req.params.preset as TrustPreset;
-    if (!TRUST_PRESETS[preset]) {
-      return res.status(400).json({ error: `Unknown preset. Must be one of: ${Object.keys(TRUST_PRESETS).join(', ')}` });
-    }
-    try {
-      const rules = decisionLog.applyTrustPreset(preset);
-      res.json({ applied: preset, rules });
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
   });
 
   // --- Timer Pause (REST alternative to queue_open/queue_closed WebSocket messages) ---

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import { NLCommandService } from '../coordination/NLCommandService.js';
+import { NLCommandService } from '../coordination/commands/NLCommandService.js';
 
 export function nlRoutes(ctx: AppContext): Router {
   const { agentManager, decisionLog, activityLedger } = ctx;

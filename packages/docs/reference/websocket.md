@@ -32,62 +32,118 @@ After subscribing:
 
 All events follow the shape `{ type: string, payload: object }`.
 
+### System
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `init` | `{ agents[], locks[], paused }` | Initial state snapshot sent on WebSocket connection |
+| `system:paused` | `{ paused: boolean }` | System pause toggled on or off |
+| `agentServerStatus` | `{ status, agents?, stats? }` | Agent server health check |
+| `config:reloaded` | `{}` | Configuration file reloaded |
+| `activity` | `{ entry }` | Activity log entry recorded |
+| `attention:changed` | `{}` | Signal to refetch attention items (clients should debounce ~300ms) |
+| `alert:new` | `{ alert }` | New alert triggered |
+| `reconciliation:complete` | `{ added, removed, updated }` | Agent reconciliation finished |
+
 ### Agent Lifecycle
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `agent:spawned` | Agent JSON | New agent created |
+| `agent:spawned` | `{ agent: AgentJSON }` | New agent created |
+| `agent:terminated` | `string` (agent ID) | Agent stopped |
 | `agent:killed` | `string` (agent ID) | Agent stopped by user |
-| `agent:exit` | `{ agentId, code }` | Agent process exited |
-| `agent:status` | `{ agentId, status }` | Status changed (running, idle, etc.) |
+| `agent:exit` | `{ agentId, code, error? }` | Agent process exited |
+| `agent:status` | `{ agentId, status }` | Status changed — running, idle, etc. (throttled to 500ms) |
 | `agent:crashed` | `{ agentId, code }` | Agent exited unexpectedly |
 | `agent:auto_restarted` | `{ agentId, previousAgentId, crashCount }` | Agent auto-restarted after crash |
 | `agent:restart_limit` | `{ agentId }` | Max restarts reached |
-| `agent:restarted` | `{ oldId, newAgent }` | Agent manually restarted |
+| `agent:sub_spawned` | `{ parentId, child: AgentJSON }` | Child agent spawned by a lead |
+| `agent:restarted` | `{ oldId, newAgent: AgentJSON }` | Agent manually restarted |
 
 ### Agent Output
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `agent:text` | `{ agentId, text }` | Text output from agent |
+| `agent:text` | `{ agentId, text }` | Text output from agent (batched with 100ms flush) |
 | `agent:content` | `{ agentId, content }` | Structured content output |
-| `agent:tool_call` | `{ agentId, toolCall }` | Agent invoked a tool |
-| `agent:plan` | `{ agentId, plan }` | Agent plan updated |
-| `agent:permission_request` | `{ agentId, request }` | Agent requesting tool permission |
+| `agent:thinking` | `{ agentId, text }` | Thinking/reasoning output |
+| `agent:tool_call` | `{ agentId, toolCall: ToolCallInfo }` | Agent invoked a tool |
+| `agent:plan` | `{ agentId, plan: PlanEntry[] }` | Agent plan updated |
+| `agent:response_start` | `{ agentId }` | Agent started responding |
+| `agent:buffer` | `{ agentId, buffer }` | Initial message buffer sent on connection |
+
+### Session Management
+
+| Event | Payload | Description |
+|-------|---------|-------------|
 | `agent:session_ready` | `{ agentId, sessionId }` | ACP session established |
+| `agent:session_resume_failed` | `{ agentId, requestedSessionId, newSessionId, error }` | Session resume failed, fell back to a new session |
+| `agent:context_compacted` | `{ agentId, previousUsed, currentUsed, percentDrop }` | Context window compacted |
 
 ### Communication
 
 | Event | Payload | Description |
 |-------|---------|-------------|
 | `agent:message_sent` | `{ from, fromRole, to, toRole, content }` | Inter-agent message |
-| `agent:sub_spawned` | `{ parentId, child }` | Lead created a sub-agent |
+| `agent:permission_request` | `{ agentId, request }` | Agent requesting tool permission |
 | `agent:spawn_error` | `{ agentId, message }` | Failed to create agent |
-| `agent:delegated` | `{ parentId, childId, delegation }` | Task delegated |
 | `agent:delegate_error` | `{ agentId, message }` | Delegation failed |
-| `agent:completion_reported` | `{ childId, parentId, status }` | Agent reported task complete |
+
+### Delegation & Tasks
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `agent:delegated` | `{ parentId, childId, delegation }` | Task delegated to child agent |
+| `agent:completion_reported` | `{ childId, parentId, status }` | Child agent reported task complete |
+| `dag:updated` | `{ leadId }` | Task DAG state changed |
+
+### Decisions & Approvals
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `lead:decision` | `{ id, agentId, agentRole, leadId, title, rationale, needsConfirmation, status }` | New decision recorded |
+| `decision:confirmed` | `{ id, status }` | Decision approved |
+| `decision:rejected` | `{ id, status }` | Decision rejected |
+| `decision:dismissed` | `{ id, status }` | Decision dismissed |
+| `decisions:batch` | `{ leadId, decisions[] }` | Bulk decision update |
+| `intent:alert` | `{ leadId, agentId, ... }` | Intent rule alert triggered |
+
+### Group Chat
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `group:created` | `{ group: ChatGroup, leadId }` | New group chat created |
+| `group:message` | `{ message: GroupMessage, groupName, leadId }` | Message in group chat |
+| `group:member_added` | `{ groupName, leadId, agentId }` | Member joined group |
+| `group:member_removed` | `{ groupName, leadId, agentId }` | Member left group |
+| `group:reaction` | `{ groupName, leadId, messageId, agentId, emoji }` | Reaction added to message |
+
+### File Coordination
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `lock:acquired` | `{ filePath, agentId, agentRole, expiresAt }` | File lock acquired |
+| `lock:released` | `{ filePath, agentId }` | File lock released |
+| `lock:expired` | `{ filePath, agentId }` | File lock expired |
+
+### Timers
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `timer:created` | `{ timer }` | Timer set by agent |
+| `timer:fired` | `{ timer }` | Timer triggered |
+| `timer:cancelled` | `{ timer }` | Timer cancelled |
+
+### Lead Progress
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `lead:progress` | `{ agentId/leadId, ...progressData }` | Session progress update |
+| `lead:stalled` | `{ leadId, nudgeCount, idleDuration }` | Lead detected as stalled |
 
 ### Context & Health
 
 | Event | Payload | Description |
 |-------|---------|-------------|
-| `agent:context_compacted` | `{ agentId, previousUsed, currentUsed, percentDrop }` | Context window compacted |
 | `agent:hung` | `{ agentId, elapsedMs }` | Agent appears unresponsive |
 | `agent:hung_killed` | `{ agentId }` | Hung agent was killed |
-
-### Lead-Specific
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `lead:decision` | `{ id, agentId, agentRole, leadId, title, rationale, needsConfirmation, status }` | Decision recorded |
-| `lead:progress` | `Record<string, any>` | Progress update |
-| `lead:stalled` | `{ leadId, nudgeCount, idleDuration }` | Lead appears stalled |
-
-### Coordination
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `dag:updated` | `{ leadId }` | Task DAG changed |
-| `group:created` | `{ group, leadId }` | Group chat created |
-| `group:message` | `{ message, groupName, leadId }` | Message in group chat |
-| `group:reaction` | `{ leadId, groupName, messageId, emoji, agentId, action }` | Reaction added/removed (`action`: `"add"` or `"remove"`) |

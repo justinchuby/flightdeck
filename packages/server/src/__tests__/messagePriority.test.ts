@@ -34,6 +34,7 @@ const testConfig: ServerConfig = {
   host: 'localhost',
   cliCommand: 'copilot',
   cliArgs: [],
+  provider: 'copilot',
   maxConcurrentAgents: 10,
   dbPath: ':memory:',
 };

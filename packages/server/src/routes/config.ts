@@ -3,18 +3,28 @@ import type { ServerConfig } from '../config.js';
 import { updateConfig, getConfig } from '../config.js';
 import { validateBody, configPatchSchema } from '../validation/schemas.js';
 import type { AppContext } from './context.js';
-import { BudgetEnforcer } from '../coordination/BudgetEnforcer.js';
+import { BudgetEnforcer } from '../coordination/scheduling/BudgetEnforcer.js';
 import { CostTracker } from '../agents/CostTracker.js';
+import { logger } from '../utils/logger.js';
 
 export function configRoutes(ctx: AppContext): Router {
   const { agentManager, db: _db } = ctx;
-  const costTracker = new CostTracker(_db);
+  // Use the container's costTracker if available, otherwise create one for backward compat
+  const costTracker = ctx.costTracker ?? new CostTracker(_db);
   const budgetEnforcer = new BudgetEnforcer(_db, costTracker);
   const router = Router();
 
   // --- Config ---
   router.get('/config', (_req, res) => {
     res.json(getConfig());
+  });
+
+  // GET /config/yaml — returns only the oversight section (never expose secrets like API keys)
+  router.get('/config/yaml', (_req, res) => {
+    if (!ctx.configStore) {
+      return res.status(503).json({ error: 'Config store not available' });
+    }
+    res.json({ oversight: ctx.configStore.current.oversight });
   });
 
   router.patch('/config', validateBody(configPatchSchema), (req, res) => {
@@ -27,9 +37,23 @@ export function configRoutes(ctx: AppContext): Router {
     }
     const updated = updateConfig(sanitized);
     agentManager.setMaxConcurrent(updated.maxConcurrentAgents);
-    // Persist maxConcurrentAgents to SQLite so it survives server restart
-    if (sanitized.maxConcurrentAgents !== undefined) {
-      _db.setSetting('maxConcurrentAgents', String(updated.maxConcurrentAgents));
+    // Persist to YAML config (single source of truth)
+    if (ctx.configStore) {
+      const yamlPatch: Record<string, unknown> = {};
+      if (sanitized.maxConcurrentAgents !== undefined) {
+        yamlPatch.server = { maxConcurrentAgents: updated.maxConcurrentAgents };
+      }
+      if (req.body.oversightLevel !== undefined) {
+        yamlPatch.oversight = { ...yamlPatch.oversight as Record<string, unknown> ?? {}, level: req.body.oversightLevel };
+      }
+      if (req.body.customInstructions !== undefined) {
+        yamlPatch.oversight = { ...yamlPatch.oversight as Record<string, unknown> ?? {}, customInstructions: req.body.customInstructions };
+      }
+      if (Object.keys(yamlPatch).length > 0) {
+        ctx.configStore.writePartial(yamlPatch).catch(err => {
+          logger.warn({ module: 'config', msg: 'Failed to persist config to YAML', error: (err as Error).message });
+        });
+      }
     }
     res.json(updated);
   });

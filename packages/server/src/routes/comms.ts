@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
-import type { ActivityEntry } from '../coordination/ActivityLedger.js';
+import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 

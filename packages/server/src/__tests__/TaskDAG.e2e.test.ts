@@ -441,7 +441,7 @@ describe('TaskDAG E2E', () => {
       ]);
 
       let s = dag.getStatus(LEAD).summary;
-      expect(s).toEqual({ pending: 1, ready: 2, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 });
+      expect(s).toEqual({ pending: 1, ready: 2, running: 0, in_review: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 });
 
       runTask(dag, LEAD, 'a', 'agent-1');
       s = dag.getStatus(LEAD).summary;
@@ -456,7 +456,7 @@ describe('TaskDAG E2E', () => {
 
       runTask(dag, LEAD, 'c', 'agent-3');
       s = dag.getStatus(LEAD).summary;
-      expect(s).toEqual({ pending: 0, ready: 0, running: 0, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 0 });
+      expect(s).toEqual({ pending: 0, ready: 0, running: 0, in_review: 0, done: 3, failed: 0, blocked: 0, paused: 0, skipped: 0 });
     });
   });
 

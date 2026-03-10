@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TimerRegistry } from '../coordination/TimerRegistry.js';
-import type { Timer } from '../coordination/TimerRegistry.js';
+import { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
+import type { Timer } from '../coordination/scheduling/TimerRegistry.js';
 import { createTestTimerDb } from './helpers/createTestTimerDb.js';
 
 describe('TimerRegistry', () => {

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Bell } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import {
-  CHANNEL_DISPLAY, EVENT_LABELS, PRESET_DEFAULTS,
+  CHANNEL_DISPLAY, EVENT_LABELS, EVENT_DESCRIPTIONS, PRESET_DEFAULTS, ROUTING_ALL_OFF,
   type NotificationChannel, type ChannelType, type NotifiableEvent, type PresetName,
 } from './types';
 
 const ALL_EVENTS = Object.keys(EVENT_LABELS) as NotifiableEvent[];
-const CHANNEL_ORDER: ChannelType[] = ['desktop', 'slack', 'email', 'webhook'];
+const CHANNEL_ORDER: ChannelType[] = ['desktop', 'slack', 'telegram'];
 
 export function NotificationPreferencesPanel() {
   const [channels, setChannels] = useState<NotificationChannel[]>([]);
@@ -22,7 +23,7 @@ export function NotificationPreferencesPanel() {
     Promise.all([
       apiFetch<unknown>('/notifications/channels').catch(() => []),
       apiFetch<unknown>('/notifications/routing').catch(() => ({
-        routing: PRESET_DEFAULTS.conservative,
+        routing: ROUTING_ALL_OFF,
         preset: 'conservative',
       })),
     ]).then(([channelsRaw, routingRaw]) => {
@@ -30,7 +31,7 @@ export function NotificationPreferencesPanel() {
       const ch = Array.isArray(channelsRaw) ? channelsRaw : (channelsRaw as any)?.channels ?? [];
       setChannels(ch);
       const rd = routingRaw as any;
-      setRouting(rd?.routing ?? PRESET_DEFAULTS.conservative);
+      setRouting(rd?.routing ?? ROUTING_ALL_OFF);
       setPreset(rd?.preset ?? 'conservative');
     }).finally(() => setLoading(false));
   }, []);
@@ -75,12 +76,10 @@ export function NotificationPreferencesPanel() {
   }
 
   return (
-    <div className="space-y-6 opacity-60 pointer-events-none select-none" data-testid="notification-preferences">
+    <div className="space-y-6" data-testid="notification-preferences">
       <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
-        🔔 Notification Settings
-        <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-          In Development
-        </span>
+        <Bell className="w-3.5 h-3.5" />
+        Notification Settings
       </h3>
 
       {/* Channels section */}
@@ -142,7 +141,10 @@ export function NotificationPreferencesPanel() {
             <tbody>
               {ALL_EVENTS.map((event) => (
                 <tr key={event} className="border-b border-th-border/30 hover:bg-th-bg-hover/30">
-                  <td className="py-1.5 pr-4 text-th-text-alt">{EVENT_LABELS[event]}</td>
+                  <td className="py-1.5 pr-4">
+                    <span className="text-th-text-alt">{EVENT_LABELS[event]}</span>
+                    <p className="text-[9px] text-th-text-muted leading-tight mt-0.5">{EVENT_DESCRIPTIONS[event]}</p>
+                  </td>
                   {CHANNEL_ORDER.map((type) => {
                     const isEnabled = enabledChannelTypes.includes(type);
                     const isChecked = (routing[event] ?? []).includes(type);

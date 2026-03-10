@@ -4,6 +4,13 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      zIndex: {
+        dropdown: '30',
+        overlay: '40',
+        modal: '50',
+        tooltip: '60',
+        tour: '70',
+      },
       colors: {
         surface: {
           DEFAULT: 'rgb(var(--th-bg) / <alpha-value>)',

@@ -1235,6 +1235,93 @@ describe('TaskDAG', () => {
       const result = dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
       expect(result.tasks).toHaveLength(1);
     });
+
+    it('soft-deletes tasks (sets archivedAt, keeps rows in DB)', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.resetDAG('lead-1');
+      // Active view sees nothing
+      expect(dag.getTasks('lead-1')).toHaveLength(0);
+      // includeArchived reveals the soft-deleted tasks
+      const archived = dag.getTasks('lead-1', { includeArchived: true });
+      expect(archived).toHaveLength(2);
+      expect(archived[0].archivedAt).toBeDefined();
+      expect(archived[1].archivedAt).toBeDefined();
+    });
+
+    it('getAll excludes archived tasks by default', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.declareTaskBatch('lead-2', [{ taskId: 'b', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      expect(dag.getAll()).toHaveLength(1);
+      expect(dag.getAll({ includeArchived: true })).toHaveLength(2);
+    });
+
+    it('getTasksByProject excludes archived by default', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }], 'proj-1');
+      dag.declareTaskBatch('lead-2', [{ taskId: 'b', role: 'Dev' }], 'proj-1');
+      dag.resetDAG('lead-1');
+      expect(dag.getTasksByProject('proj-1')).toHaveLength(1);
+      expect(dag.getTasksByProject('proj-1', { includeArchived: true })).toHaveLength(2);
+    });
+
+    it('hasAnyTasks returns false after reset (archived excluded)', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      expect(dag.hasAnyTasks('lead-1')).toBe(false);
+    });
+
+    it('hasActiveTasks returns false after reset (archived excluded)', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      expect(dag.hasActiveTasks('lead-1')).toBe(false);
+    });
+
+    it('getStatus excludes archived and supports includeArchived', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      const status = dag.getStatus('lead-1');
+      expect(status.tasks).toHaveLength(0);
+      const statusWithArchived = dag.getStatus('lead-1', undefined, { includeArchived: true });
+      expect(statusWithArchived.tasks).toHaveLength(1);
+      expect(statusWithArchived.tasks[0].archivedAt).toBeDefined();
+    });
+
+    it('unarchiveTask restores a single archived task', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev' },
+      ]);
+      dag.resetDAG('lead-1');
+      expect(dag.getTasks('lead-1')).toHaveLength(0);
+      const restored = dag.unarchiveTask('lead-1', 'a');
+      expect(restored).not.toBeNull();
+      expect(restored!.id).toBe('a');
+      expect(restored!.archivedAt).toBeUndefined();
+      // Only 'a' is restored, 'b' stays archived
+      expect(dag.getTasks('lead-1')).toHaveLength(1);
+      expect(dag.getTasks('lead-1', { includeArchived: true })).toHaveLength(2);
+    });
+
+    it('unarchiveTask returns null for non-archived task', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      expect(dag.unarchiveTask('lead-1', 'a')).toBeNull();
+    });
+
+    it('unarchiveTask returns null for nonexistent task', () => {
+      expect(dag.unarchiveTask('lead-1', 'nonexistent')).toBeNull();
+    });
+
+    it('unarchiveTask emits dag:updated', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.resetDAG('lead-1');
+      let emitted = false;
+      dag.on('dag:updated', () => { emitted = true; });
+      dag.unarchiveTask('lead-1', 'a');
+      expect(emitted).toBe(true);
+    });
   });
 
   describe('addDependency', () => {
@@ -1408,7 +1495,7 @@ describe('TaskDAG', () => {
       const error = dag.getTransitionError('lead-1', 'b', 'complete');
       expect(error).not.toBeNull();
       expect(error!.currentStatus).toBe('pending');
-      expect(error!.validStatuses).toEqual(['running', 'paused', 'ready']);
+      expect(error!.validStatuses).toEqual(['running', 'paused', 'ready', 'in_review']);
     });
 
     it('allows completing a paused task (work done outside DAG)', () => {
@@ -1840,6 +1927,116 @@ describe('TaskDAG', () => {
     it('returns null for non-existent dagTaskId', () => {
       const found = dag.findReadyTask('lead-1', { dagTaskId: 'nope', role: 'Dev' });
       expect(found).toBeNull();
+    });
+  });
+
+  // ── G-1: Regression — agent termination fails assigned DAG tasks ──
+
+  describe('agent termination → task failure (G-1)', () => {
+    it('getTaskByAgent finds running task assigned to agent', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+
+      dag.startTask('lead-1', 'a', 'agent-42');
+      const found = dag.getTaskByAgent('lead-1', 'agent-42');
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe('a');
+      expect(found!.dagStatus).toBe('running');
+    });
+
+    it('failTask transitions running task to failed and blocks dependents', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+        { taskId: 'c', role: 'Dev', dependsOn: ['b'] },
+      ]);
+
+      dag.startTask('lead-1', 'a', 'agent-42');
+
+      // Simulate: agent crashes → failTask called with reason
+      const result = dag.failTask('lead-1', 'a', 'Agent crashed: exit code 1');
+      expect(result).toBe(true);
+
+      const a = dag.getTask('lead-1', 'a')!;
+      expect(a.dagStatus).toBe('failed');
+      expect(a.failureReason).toBe('Agent crashed: exit code 1');
+
+      // Direct dependent blocked
+      const b = dag.getTask('lead-1', 'b')!;
+      expect(b.dagStatus).toBe('blocked');
+
+      // Transitive dependent stays pending (not directly dependent on 'a')
+      const c = dag.getTask('lead-1', 'c')!;
+      expect(c.dagStatus).toBe('pending');
+    });
+
+    it('getTaskByAgent returns null after task is failed', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-42');
+      dag.failTask('lead-1', 'a', 'Agent terminated');
+
+      const found = dag.getTaskByAgent('lead-1', 'agent-42');
+      expect(found).toBeNull();
+    });
+  });
+
+  describe('reviewTask (B-4)', () => {
+    it('transitions running task to in_review', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      const result = dag.reviewTask('lead-1', 'a');
+      expect(result).toBe(true);
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('in_review');
+    });
+
+    it('rejects review from non-running states', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      expect(dag.reviewTask('lead-1', 'a')).toBe(false); // pending
+      dag.forceReady('lead-1', 'a');
+      expect(dag.reviewTask('lead-1', 'a')).toBe(false); // ready
+    });
+
+    it('allows complete from in_review', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.reviewTask('lead-1', 'a');
+      const unblocked = dag.completeTask('lead-1', 'a');
+      expect(unblocked).not.toBeNull();
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('done');
+    });
+
+    it('allows fail from in_review', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.reviewTask('lead-1', 'a');
+      const result = dag.failTask('lead-1', 'a', 'Review rejected');
+      expect(result).toBe(true);
+      expect(dag.getTask('lead-1', 'a')!.dagStatus).toBe('failed');
+      expect(dag.getTask('lead-1', 'a')!.failureReason).toBe('Review rejected');
+    });
+
+    it('getStatus summary includes in_review count', () => {
+      dag.declareTaskBatch('lead-1', [
+        { taskId: 'a', role: 'Dev' },
+        { taskId: 'b', role: 'Dev', dependsOn: ['a'] },
+      ]);
+      dag.startTask('lead-1', 'a', 'agent-1');
+      dag.reviewTask('lead-1', 'a');
+      const { summary } = dag.getStatus('lead-1');
+      expect(summary.in_review).toBe(1);
+      expect(summary.pending).toBe(1); // b blocked by a's dependency
+    });
+  });
+
+  describe('overriddenBy (B-3)', () => {
+    it('overriddenBy defaults to undefined for new tasks', () => {
+      dag.declareTaskBatch('lead-1', [{ taskId: 'a', role: 'Dev' }]);
+      expect(dag.getTask('lead-1', 'a')!.overriddenBy).toBeUndefined();
     });
   });
 });

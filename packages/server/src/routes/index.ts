@@ -16,17 +16,18 @@ import { diffRoutes } from './diff.js';
 import { replayRoutes } from './replay.js';
 import { commsRoutes } from './comms.js';
 import { summaryRoutes } from './summary.js';
-import { playbookRoutes } from './playbooks.js';
-import { debateRoutes } from './debates.js';
 import { sharedRoutes } from './shared.js';
 import { analyticsRoutes } from './analytics.js';
-import { recoveryRoutes } from './recovery.js';
-import { handoffRoutes } from './handoffs.js';
 import { notificationRoutes } from './notifications.js';
 import { nlRoutes } from './nl.js';
 import { conflictRoutes } from './conflicts.js';
-import { communityRoutes } from './community.js';
 import { dataRoutes } from './data.js';
+import { knowledgeRoutes } from './knowledge.js';
+import { teamsRoutes } from './teams.js';
+import { agentServerRoutes } from './agent-server.js';
+import { settingsRoutes } from './settings.js';
+import { integrationRoutes } from './integrations.js';
+import { tasksRoutes } from './tasks.js';
 
 export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(agentsRoutes(ctx));
@@ -45,15 +46,17 @@ export function mountAllRoutes(router: Router, ctx: AppContext): void {
   router.use(replayRoutes(ctx));
   router.use(commsRoutes(ctx));
   router.use(summaryRoutes(ctx));
-  router.use(playbookRoutes(ctx));
-  router.use(debateRoutes(ctx));
   router.use(sharedRoutes(ctx));
   router.use(analyticsRoutes(ctx));
-  router.use(recoveryRoutes(ctx));
-  router.use(handoffRoutes(ctx));
+
   router.use(notificationRoutes(ctx));
   router.use(nlRoutes(ctx));
   router.use(conflictRoutes(ctx));
-  router.use(communityRoutes(ctx));
   router.use(dataRoutes(ctx));
+  router.use(knowledgeRoutes(ctx));
+  router.use(teamsRoutes(ctx));
+  router.use(agentServerRoutes(ctx));
+  router.use(settingsRoutes(ctx));
+  router.use(integrationRoutes(ctx));
+  router.use(tasksRoutes(ctx));
 }

@@ -12,6 +12,7 @@ export interface ReplayKeyframe {
   timestamp: string;
   label: string;
   type: 'spawn' | 'agent_exit' | 'delegation' | 'task' | 'milestone' | 'decision' | 'progress' | 'error' | 'commit';
+  agentId?: string;
 }
 
 export interface ReplayAgentState {

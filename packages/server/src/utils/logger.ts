@@ -1,57 +1,121 @@
 /**
- * Simple structured logger for Flightdeck server.
- * Outputs timestamped, categorized messages to stdout/stderr.
+ * Structured logger for Flightdeck server (R5).
+ *
+ * Uses pino for JSON-structured output with AsyncLocalStorage for
+ * automatic contextual correlation (requestId, agentId, sessionId, projectId).
+ *
+ * Backward-compatible API: logger.info('category', 'message', { details })
+ * New API also supported: logger.info({ module: 'x', msg: 'y', ...data })
+ *
+ * Integrates with R12 redaction engine — all log messages and detail objects
+ * are redacted before output.
  */
+import pino from 'pino';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { redact, redactObject } from './redaction.js';
 
-type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+// ── Log Context (AsyncLocalStorage) ─────────────────────────────────
 
-const LEVEL_ICONS: Record<LogLevel, string> = {
-  info: 'ℹ️ ',
-  warn: '⚠️ ',
-  error: '❌',
-  debug: '🔍',
-};
-
-const CATEGORY_COLORS: Record<string, string> = {
-  agent: '\x1b[36m',    // cyan
-  lead: '\x1b[35m',     // magenta
-  api: '\x1b[33m',      // yellow
-  ws: '\x1b[34m',       // blue
-  server: '\x1b[32m',   // green
-  delegation: '\x1b[35m',
-  message: '\x1b[34m',
-};
-
-const RESET = '\x1b[0m';
-const DIM = '\x1b[2m';
-
-function formatTime(): string {
-  return new Date().toISOString().slice(11, 23); // HH:MM:SS.mmm
+export interface LogContext {
+  requestId?: string;
+  agentId?: string;
+  agentRole?: string;
+  sessionId?: string;
+  projectId?: string;
+  leadId?: string;
+  taskId?: string;
+  wsClientId?: string;
+  [key: string]: unknown;
 }
 
-function log(level: LogLevel, category: string, message: string, details?: Record<string, unknown>): void {
-  const icon = LEVEL_ICONS[level];
-  const color = CATEGORY_COLORS[category] ?? '';
-  const time = `${DIM}${formatTime()}${RESET}`;
-  const cat = `${color}[${category}]${RESET}`;
-  const detailStr = details ? ` ${DIM}${JSON.stringify(details)}${RESET}` : '';
+export const logContext = new AsyncLocalStorage<LogContext>();
 
-  const line = `${time} ${icon} ${cat} ${message}${detailStr}`;
+// ── Pino Instance ───────────────────────────────────────────────────
 
-  if (level === 'error') {
-    process.stderr.write(line + '\n');
+const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+const isDev = !isTest && process.env.NODE_ENV !== 'production';
+
+function createPinoLogger(): pino.Logger {
+  const level = process.env.LOG_LEVEL || (isTest ? 'silent' : 'debug');
+
+  if (isDev) {
+    try {
+      return pino({
+        level,
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+            translateTime: 'HH:MM:ss.l',
+            ignore: 'pid,hostname',
+            messageFormat: '[{module}] {msg}',
+          },
+        },
+      });
+    } catch {
+      // pino-pretty not installed (e.g., production install) — fall back to JSON
+      return pino({ level });
+    }
+  }
+
+  // Production & test: plain JSON to stdout (test uses 'silent' level)
+  return pino({ level });
+}
+
+const pinoLogger = createPinoLogger();
+
+// ── Contextual Logger Helper ────────────────────────────────────────
+
+function getContextualLogger(): pino.Logger {
+  const ctx = logContext.getStore();
+  return ctx ? pinoLogger.child(ctx) : pinoLogger;
+}
+
+// ── Backward-Compatible API ─────────────────────────────────────────
+//
+// Supports both call styles:
+//   logger.info('category', 'message', { details })   ← existing 267 call sites
+//   logger.info({ module: 'x', msg: 'y', ...data })   ← new structured API
+
+type LogArg = string | Record<string, unknown>;
+
+function logCompat(
+  level: pino.Level,
+  categoryOrObj: LogArg,
+  message?: string,
+  details?: Record<string, unknown>,
+): void {
+  const log = getContextualLogger();
+
+  if (typeof categoryOrObj === 'object') {
+    // New API: logger.info({ module: 'x', msg: 'message', ...data })
+    const { msg, ...rest } = categoryOrObj as Record<string, unknown>;
+    const redactedMsg = typeof msg === 'string' ? redact(msg).text : msg;
+    const redactedRest = redactObject(rest).data;
+    log[level]({ ...redactedRest }, redactedMsg as string);
   } else {
-    process.stdout.write(line + '\n');
+    // Legacy API: logger.info('category', 'message', { details })
+    const redactedMsg = message ? redact(message).text : '';
+    const redactedDetails = details ? redactObject(details).data : undefined;
+    log[level]({ module: categoryOrObj, ...redactedDetails }, redactedMsg);
   }
 }
 
 export const logger = {
-  info: (category: string, message: string, details?: Record<string, unknown>) =>
-    log('info', category, message, details),
-  warn: (category: string, message: string, details?: Record<string, unknown>) =>
-    log('warn', category, message, details),
-  error: (category: string, message: string, details?: Record<string, unknown>) =>
-    log('error', category, message, details),
-  debug: (category: string, message: string, details?: Record<string, unknown>) =>
-    log('debug', category, message, details),
+  info: (cat: LogArg, msg?: string, details?: Record<string, unknown>) =>
+    logCompat('info', cat, msg, details),
+  warn: (cat: LogArg, msg?: string, details?: Record<string, unknown>) =>
+    logCompat('warn', cat, msg, details),
+  error: (cat: LogArg, msg?: string, details?: Record<string, unknown>) =>
+    logCompat('error', cat, msg, details),
+  debug: (cat: LogArg, msg?: string, details?: Record<string, unknown>) =>
+    logCompat('debug', cat, msg, details),
+  trace: (cat: LogArg, msg?: string, details?: Record<string, unknown>) =>
+    logCompat('trace', cat, msg, details),
+  fatal: (cat: LogArg, msg?: string, details?: Record<string, unknown>) =>
+    logCompat('fatal', cat, msg, details),
+  /** Create a pino child logger with bound fields (for specialized use). */
+  child: (bindings: Record<string, unknown>) => pinoLogger.child(bindings),
+  /** Access the raw pino instance (for middleware integration). */
+  pino: pinoLogger,
 };

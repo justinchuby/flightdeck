@@ -48,7 +48,7 @@ export function GroupsPanelContent({
           })));
         }
       })
-      .catch(() => {});
+      .catch((err) => console.warn('[GroupsPanel] fetch groups', err));
   }, [groups.length, projectId]);
 
   const effectiveGroups = groups.length > 0 ? groups : historicalGroups;
@@ -68,7 +68,7 @@ export function GroupsPanelContent({
             setHistoricalMessages((prev) => ({ ...prev, [expandedGroup]: data }));
           }
         })
-        .catch(() => {});
+        .catch((err) => console.warn('[GroupsPanel] fetch group messages', err));
     } else if (leadId) {
       // Fetch from live lead endpoint
       fetch(`/api/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
@@ -84,7 +84,7 @@ export function GroupsPanelContent({
             }
           }
         })
-        .catch(() => {});
+        .catch((err) => console.warn('[GroupsPanel] fetch live group messages', err));
     }
   }, [expandedGroup, leadId, projectId, isHistorical, fetchedGroups]);
 
@@ -98,7 +98,7 @@ export function GroupsPanelContent({
   }, [expandedGroup, effectiveMessages[expandedGroup ?? '']?.length]);
 
   return (
-    <div ref={feedRef} className="h-full overflow-y-auto">
+    <div ref={feedRef} className="h-full min-h-0 overflow-y-auto">
       {isHistorical && (
         <p className="text-[10px] text-th-text-muted text-center py-1 font-mono opacity-60">Historical group chats</p>
       )}

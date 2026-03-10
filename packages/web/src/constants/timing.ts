@@ -11,6 +11,3 @@ export const PLAYBACK_TICK_MS = 100;
 
 /** Minimum session duration before replay is meaningful. */
 export const MIN_SESSION_DURATION_MS = 1_000;
-
-/** Delay before showing the "Teach Me" prompt after batch approval. */
-export const TEACH_ME_DELAY_MS = 1_000;

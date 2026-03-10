@@ -1,30 +1,11 @@
-import { eq, desc, and, isNotNull, ne, sql } from 'drizzle-orm';
+import { eq, desc, and, isNotNull, ne, sql, inArray } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { projects, projectSessions, dagTasks, decisions, agentMemory } from '../db/schema.js';
-import { randomUUID } from 'crypto';
+import { generateProjectId } from '../utils/projectId.js';
 import { DEFAULT_MODEL_CONFIG, type ProjectModelConfig } from './ModelConfigDefaults.js';
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  cwd: string | null;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ProjectSession {
-  id: number;
-  projectId: string;
-  leadId: string;
-  sessionId: string | null;
-  role: string | null;
-  task: string | null;
-  status: string;
-  startedAt: string;
-  endedAt: string | null;
-}
+import type { Project, ProjectSession } from '@flightdeck/shared';
+export type { Project, ProjectSession } from '@flightdeck/shared';
 
 export interface ProjectBriefing {
   project: Project;
@@ -42,7 +23,8 @@ export class ProjectRegistry {
 
   /** Create a new project, return its ID */
   create(name: string, description?: string, cwd?: string): Project {
-    const id = randomUUID();
+    const existingIds = (id: string) => !!this.get(id);
+    const id = generateProjectId(name, existingIds);
     const now = new Date().toISOString();
     this.db.drizzle.insert(projects).values({
       id,
@@ -77,7 +59,11 @@ export class ProjectRegistry {
     }).where(eq(projects.id, id)).run();
   }
 
-  /** Record that a lead session started for this project */
+  /**
+   * Record that a lead session started for this project.
+   * INVARIANT: leadId is immutable after this insert — it permanently identifies this session.
+   * On resume, the same agent ID must be reused via spawn(id:).
+   */
   startSession(projectId: string, leadId: string, task?: string, role?: string): void {
     this.db.drizzle.insert(projectSessions).values({
       projectId,
@@ -99,7 +85,7 @@ export class ProjectRegistry {
   }
 
   /** Mark a lead session as ended */
-  endSession(leadId: string, status: 'completed' | 'crashed' = 'completed'): void {
+  endSession(leadId: string, status: 'completed' | 'crashed' | 'stopped' = 'completed'): void {
     this.db.drizzle.update(projectSessions).set({
       status,
       endedAt: new Date().toISOString(),
@@ -143,29 +129,37 @@ export class ProjectRegistry {
 
     // Task summary across all sessions for this project
     let taskSummary = { total: 0, done: 0, failed: 0, pending: 0 };
-    if (allLeadIds.length > 0) {
-      const placeholders = allLeadIds.map(() => '?').join(',');
-      const taskRows = this.db.all<{ dag_status: string; cnt: number }>(
-        `SELECT dag_status, count(*) as cnt FROM dag_tasks WHERE lead_id IN (${placeholders}) GROUP BY dag_status`,
-        allLeadIds,
-      );
-      for (const row of taskRows) {
-        const count = Number(row.cnt);
-        taskSummary.total += count;
-        if (row.dag_status === 'done') taskSummary.done += count;
-        else if (row.dag_status === 'failed') taskSummary.failed += count;
-        else taskSummary.pending += count;
-      }
+    const taskRows = this.db.drizzle
+      .select({
+        dagStatus: dagTasks.dagStatus,
+        cnt: sql<number>`count(*)`.as('cnt'),
+      })
+      .from(dagTasks)
+      .where(eq(dagTasks.projectId, projectId))
+      .groupBy(dagTasks.dagStatus)
+      .all();
+    for (const row of taskRows) {
+      const count = Number(row.cnt);
+      taskSummary.total += count;
+      if (row.dagStatus === 'done') taskSummary.done += count;
+      else if (row.dagStatus === 'failed') taskSummary.failed += count;
+      else taskSummary.pending += count;
     }
 
     // Recent decisions across all sessions
     let recentDecisions: Array<{ title: string; rationale: string; status: string }> = [];
     if (allLeadIds.length > 0) {
-      const placeholders = allLeadIds.map(() => '?').join(',');
-      recentDecisions = this.db.all<{ title: string; rationale: string; status: string }>(
-        `SELECT title, COALESCE(rationale,'') as rationale, COALESCE(status,'recorded') as status FROM decisions WHERE lead_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 20`,
-        allLeadIds,
-      );
+      recentDecisions = this.db.drizzle
+        .select({
+          title: decisions.title,
+          rationale: sql<string>`COALESCE(${decisions.rationale}, '')`.as('rationale'),
+          status: sql<string>`COALESCE(${decisions.status}, 'recorded')`.as('status'),
+        })
+        .from(decisions)
+        .where(inArray(decisions.leadId, allLeadIds))
+        .orderBy(desc(decisions.createdAt))
+        .limit(20)
+        .all();
     }
 
     // Aggregate memories from the most recent session's lead
@@ -292,6 +286,27 @@ export class ProjectRegistry {
   }
 
   /**
+   * Reactivate a previously-claimed session row instead of inserting a new one.
+   * INVARIANT: leadId is NEVER updated — session ID + agent ID are a permanent pair.
+   * The caller must spawn the new agent with the same ID as the original lead.
+   */
+  reactivateSession(sessionRowId: number, task?: string, role?: string): void {
+    this.db.drizzle.update(projectSessions).set({
+      task: task ?? null,
+      role: role ?? 'lead',
+      status: 'active',
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+    }).where(eq(projectSessions.id, sessionRowId)).run();
+
+    // Touch project updatedAt
+    const session = this.getSessionById(sessionRowId);
+    if (session) {
+      this.db.drizzle.update(projects).set({ updatedAt: new Date().toISOString() }).where(eq(projects.id, session.projectId)).run();
+    }
+  }
+
+  /**
    * Get the model config for a project.
    * Returns the stored config merged over defaults — stored values take precedence.
    * Results are cached in-memory; cache is invalidated on setModelConfig().
@@ -347,5 +362,33 @@ export class ProjectRegistry {
   getLastLeadId(projectId: string): string | undefined {
     const sessions = this.getSessions(projectId);
     return sessions[0]?.leadId;
+  }
+
+  /**
+   * Reconcile stale session states on server startup.
+   * After a crash/restart, sessions may be stuck as 'active' or 'resuming'
+   * with no running agent. This marks them as 'stopped' so resume works.
+   *
+   * @param isAgentAlive - callback to check if an agent is actually running
+   * @returns count of sessions reconciled
+   */
+  reconcileStaleSessions(isAgentAlive: (leadId: string) => boolean): number {
+    const now = new Date().toISOString();
+    // Find all sessions that claim to be active or resuming
+    const staleCandidates = this.db.drizzle.select().from(projectSessions)
+      .where(sql`${projectSessions.status} IN ('active', 'resuming')`)
+      .all() as ProjectSession[];
+
+    let reconciled = 0;
+    for (const session of staleCandidates) {
+      if (!isAgentAlive(session.leadId)) {
+        this.db.drizzle.update(projectSessions).set({
+          status: 'stopped',
+          endedAt: now,
+        }).where(eq(projectSessions.id, session.id)).run();
+        reconciled++;
+      }
+    }
+    return reconciled;
   }
 }

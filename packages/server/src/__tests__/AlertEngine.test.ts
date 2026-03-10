@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AlertEngine } from '../coordination/AlertEngine.js';
+import { AlertEngine } from '../coordination/alerts/AlertEngine.js';
 import type { Agent } from '../agents/Agent.js';
 import type { AgentManager } from '../agents/AgentManager.js';
-import type { FileLockRegistry } from '../coordination/FileLockRegistry.js';
-import type { DecisionLog } from '../coordination/DecisionLog.js';
-import type { ActivityLedger } from '../coordination/ActivityLedger.js';
+import type { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
+import type { DecisionLog } from '../coordination/decisions/DecisionLog.js';
+import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
 import type { TaskDAG } from '../tasks/TaskDAG.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────

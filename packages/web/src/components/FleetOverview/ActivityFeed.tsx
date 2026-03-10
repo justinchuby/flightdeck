@@ -118,7 +118,7 @@ export function ActivityFeed({ activity, agents }: Props) {
                 <button onClick={() => setSelected(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
               {/* Agent info */}
               <div>
                 <span className="text-[10px] text-th-text-muted uppercase tracking-wider">Agent</span>

@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { useConflictConfig } from '../../hooks/useConflicts';
 
 export function ConflictSettingsPanel() {
@@ -10,7 +11,8 @@ export function ConflictSettingsPanel() {
   return (
     <div className="space-y-3">
       <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
-        ⚠ Conflict Detection
+        <AlertTriangle className="w-3.5 h-3.5" />
+        Conflict Detection
       </h3>
 
       <label className="flex items-center justify-between">

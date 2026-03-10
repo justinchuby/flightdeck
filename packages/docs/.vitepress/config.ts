@@ -65,7 +65,6 @@ export default defineConfig({
             { text: 'Intent Rules', link: '/guide/intent-rules' },
             { text: 'Data Management', link: '/guide/data-management' },
             { text: 'GitHub Integration', link: '/guide/github-integration' },
-            { text: 'Playbooks & Roles', link: '/guide/playbooks' },
             { text: 'Mobile PWA', link: '/guide/mobile' },
           ],
         },
@@ -98,6 +97,7 @@ export default defineConfig({
           text: 'Design Documents',
           items: [
             { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
+            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
           ],
         },
         {
@@ -114,7 +114,6 @@ export default defineConfig({
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
             { text: 'GitHub & Conflicts', link: '/reference/github-api' },
-            { text: 'Playbooks & Roles', link: '/reference/playbooks-api' },
           ],
         },
         {
@@ -131,6 +130,7 @@ export default defineConfig({
           text: 'Design Documents',
           items: [
             { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
+            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
           ],
         },
         {
@@ -147,7 +147,6 @@ export default defineConfig({
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
             { text: 'GitHub & Conflicts', link: '/reference/github-api' },
-            { text: 'Playbooks & Roles', link: '/reference/playbooks-api' },
           ],
         },
         {

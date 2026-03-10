@@ -1,43 +1,45 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, Send, Users, CheckCircle, Clock, Loader2, Plus, Trash2, Wrench, MessageSquare, GitBranch, PanelRightClose, PanelRightOpen, ChevronDown, ChevronRight, ChevronUp, Lightbulb, Bot, FolderOpen, Check, X, BarChart3, AlertTriangle, RefreshCw, Network, Pencil, Square, Filter, Download, Settings, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
+import { Crown, MessageSquare, GitBranch, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, Download, FolderOpen, Eye } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
-import type { ActivityEvent, AgentComm, ProgressSnapshot, AgentReport } from '../../stores/leadStore';
-import type { AcpTextChunk, ChatGroup, GroupMessage, DagStatus, Project } from '../../types';
+import type { AgentReport, ProgressSnapshot, ActivityEvent, AgentComm } from '../../stores/leadStore';
+import type { AcpTextChunk, DagStatus, Decision, ChatGroup, GroupMessage, Delegation, LeadProgress } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
-import { MentionText, MarkdownContent, InlineMarkdownWithMentions } from '../../utils/markdown';
-import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
-import { TaskDagPanelContent } from './TaskDagPanel';
-import { ModelConfigPanel } from './ModelConfigPanel';
-import { formatTokens, AgentReportBlock } from './AgentReportBlock';
-import { BannerDecisionActions, DecisionPanelContent } from './DecisionPanel';
-import { CommsPanelContent } from './CommsPanel';
-import { GroupsPanelContent } from './GroupsPanel';
-import { CollapsibleReasoningBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
-import { CwdBar } from './CwdBar';
-import { TokenEconomics } from '../TokenEconomics/TokenEconomics';
-import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
-import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
-import { FolderPicker } from '../FolderPicker/FolderPicker';
-import { agentStatusText } from '../../utils/statusColors';
-import { apiFetch } from '../../hooks/useApi';
-import { useToastStore } from '../Toast';
-import { PromptNav, hasUserMention } from '../PromptNav';
+import { AgentReportBlock } from './AgentReportBlock';
+import { BannerDecisionActions } from './DecisionPanel';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { useAttachments } from '../../hooks/useAttachments';
-import { AttachmentBar } from '../AttachmentBar';
 import { DropOverlay } from '../DropOverlay';
+import { InputComposer } from './InputComposer';
+import { ChatMessages, type CatchUpSummary } from './ChatMessages';
+import { SidebarTabs } from './SidebarTabs';
+import { CrewStatusContent } from './CrewStatusContent';
+import { NewProjectModal } from './NewProjectModal';
+import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailModal';
+import { useLeadWebSocket } from './useLeadWebSocket';
+import { useDragResize } from './useDragResize';
 
-interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
+// Stable empty references — avoids new [] / {} on every render (zustand equality trap)
+const EMPTY_MESSAGES: AcpTextChunk[] = [];
+const EMPTY_DECISIONS: Decision[] = [];
+const EMPTY_PROGRESS_HISTORY: ProgressSnapshot[] = [];
+const EMPTY_ACTIVITY: ActivityEvent[] = [];
+const EMPTY_COMMS: AgentComm[] = [];
+const EMPTY_REPORTS: AgentReport[] = [];
+const EMPTY_GROUPS: ChatGroup[] = [];
+const EMPTY_GROUP_MESSAGES: Record<string, GroupMessage[]> = {};
+const EMPTY_DELEGATIONS: Delegation[] = [];
+const EMPTY_CREW_AGENTS: LeadProgress['crewAgents'] = [];
 
 interface Props {
   api: any;
   ws: any;
+  readOnly?: boolean;
 }
 
-export function LeadDashboard({ api, ws }: Props) {
+export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   const { projects, selectedLeadId, drafts } = useLeadStore(
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
@@ -51,6 +53,15 @@ export function LeadDashboard({ api, ws }: Props) {
     if (selectedLeadId.startsWith('project:')) return selectedLeadId.slice(8);
     const lead = agents.find((a) => a.id === selectedLeadId);
     return lead?.projectId ?? selectedLeadId;
+  }, [selectedLeadId, agents]);
+
+  // Resolve 'project:xxx' selectedLeadId to the actual active lead agent ID
+  const effectiveLeadId = useMemo(() => {
+    if (!selectedLeadId?.startsWith('project:')) return selectedLeadId;
+    const projectId = selectedLeadId.slice(8);
+    return agents.find(
+      (a) => a.projectId === projectId && a.role?.id === 'lead' && a.status !== 'terminated',
+    )?.id ?? selectedLeadId;
   }, [selectedLeadId, agents]);
 
   const { agents: derivedAgents } = useHistoricalAgents(agents.length, historicalProjectId);
@@ -67,28 +78,17 @@ export function LeadDashboard({ api, ws }: Props) {
     onInsertText: handleLeadFileInsert,
     onAttach: addAttachment,
   });
-  const [starting, setStarting] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectTask, setNewProjectTask] = useState('');
-  const [newProjectModel, setNewProjectModel] = useState('');
-  const [newProjectCwd, setNewProjectCwd] = useState('');
-  const [resumeSessionId, setResumeSessionId] = useState('');
-  const [showFolderPicker, setShowFolderPicker] = useState(false);
-  const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
-  const [showModelConfig, setShowModelConfig] = useState(false);
-  const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const reportsScrollRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<string>('team');
+  const [sidebarTab, setSidebarTab] = useState<string>('crew');
   const [sidebarTabHeight, setSidebarTabHeight] = useState(280);
   const [decisionsPanelHeight, setDecisionsPanelHeight] = useState(180);
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
-    const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
+    const allSupportedTabs = ['crew', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
     try {
       const stored = localStorage.getItem('flightdeck-sidebar-tabs');
       if (stored) {
@@ -110,7 +110,6 @@ export function LeadDashboard({ api, ws }: Props) {
     } catch {}
     return allSupportedTabs;
   });
-  const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('flightdeck-hidden-tabs');
@@ -126,16 +125,11 @@ export function LeadDashboard({ api, ws }: Props) {
   const [expandedReport, setExpandedReport] = useState<AgentReport | null>(null);
   const [reportsExpanded, setReportsExpanded] = useState(true);
   const [pendingBannerExpanded, setPendingBannerExpanded] = useState(false);
-  const [renamingLeadId, setRenamingLeadId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const isResizing = useRef(false);
-  const [persistedProjects, setPersistedProjects] = useState<Project[]>([]);
-  const [resumingProjectId, setResumingProjectId] = useState<string | null>(null);
 
   // ── Catch-up summary banner ──────────────────────────────────────────
   const lastInteractionRef = useRef(Date.now());
   const snapshotRef = useRef<{ tasks: number; decisions: number; comms: number; reports: number }>({ tasks: 0, decisions: 0, comms: 0, reports: 0 });
-  const [catchUpSummary, setCatchUpSummary] = useState<{ tasksCompleted: number; pendingDecisions: number; newMessages: number; newReports: number } | null>(null);
+  const [catchUpSummary, setCatchUpSummary] = useState<CatchUpSummary | null>(null);
 
   // Track user interactions
   useEffect(() => {
@@ -162,10 +156,10 @@ export function LeadDashboard({ api, ws }: Props) {
     const project = selectedLeadId ? projects[selectedLeadId] : null;
     if (!project) return;
     const currentCounts = {
-      tasks: agents.filter(a => a.parentId === selectedLeadId && (a.status === 'completed' || a.status === 'failed')).length,
-      decisions: (project.decisions ?? []).filter((d: any) => d.needsConfirmation && d.status === 'recorded').length,
-      comms: (project.comms ?? []).length,
-      reports: (project.agentReports ?? []).length,
+      tasks: agents.filter(a => a.parentId === effectiveLeadId && (a.status === 'completed' || a.status === 'failed')).length,
+      decisions: (project.decisions ?? EMPTY_DECISIONS).filter((d: any) => d.needsConfirmation && d.status === 'recorded').length,
+      comms: (project.comms ?? EMPTY_COMMS).length,
+      reports: (project.agentReports ?? EMPTY_REPORTS).length,
     };
     const elapsed = Date.now() - lastInteractionRef.current;
     if (elapsed >= 60_000 && !catchUpSummary) {
@@ -190,46 +184,40 @@ export function LeadDashboard({ api, ws }: Props) {
     setCatchUpSummary(null);
   }, [selectedLeadId]);
 
-  const leadAgents = agents.filter((a) => a.role.id === 'lead' && !a.parentId);
-  // Map active lead projectIds for merging
-  const activeProjectIds = new Set(leadAgents.map((a) => a.projectId).filter(Boolean));
-  // Inactive persisted projects (no active lead)
-  const inactiveProjects = persistedProjects.filter((p) => !activeProjectIds.has(p.id) && p.status !== 'archived');
   const currentProject = selectedLeadId ? projects[selectedLeadId] : null;
   const leadAgent = agents.find((a) => a.id === selectedLeadId);
   const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
-  // On mount, load existing leads and persisted projects from server
+  // On mount, load existing leads from server (skip in read-only mode — data pre-loaded)
   useEffect(() => {
-    // Load persisted projects
-    fetch('/api/projects')
-      .then((r) => r.json())
-      .then((data: Project[]) => { if (Array.isArray(data)) setPersistedProjects(data); })
-      .catch(() => {});
-
+    if (readOnly) return;
+    const controller = new AbortController();
     // Load active leads
-    fetch('/api/lead').then((r) => r.json()).then((leads: any[]) => {
+    fetch('/api/lead', { signal: controller.signal }).then((r) => r.json()).then((leads: any[]) => {
+      if (controller.signal.aborted) return;
       if (Array.isArray(leads)) {
         leads.forEach((l) => {
           useLeadStore.getState().addProject(l.id);
           // Pre-load message history for each lead
-          fetch(`/api/agents/${l.id}/messages?limit=200`)
+          fetch(`/api/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
             .then((r) => r.json())
             .then((data: any) => {
-              if (Array.isArray(data.messages) && data.messages.length > 0) {
+              if (controller.signal.aborted) return;
+              if (Array.isArray(data?.messages) && data.messages.length > 0) {
                 const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
                   type: 'text' as const,
                   text: m.content,
                   sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                   timestamp: new Date(m.timestamp).getTime(),
                 }));
+                // Only set if WS hasn't already delivered messages (WS wins)
                 const current = useLeadStore.getState().projects[l.id];
                 if (!current || current.messages.length === 0) {
                   useLeadStore.getState().setMessages(l.id, msgs);
                 }
               }
             })
-            .catch(() => {});
+            .catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Message history fetch failed:', err); });
         });
         // Auto-select first running lead if none selected
         if (!useLeadStore.getState().selectedLeadId) {
@@ -237,22 +225,23 @@ export function LeadDashboard({ api, ws }: Props) {
           if (running) useLeadStore.getState().selectLead(running.id);
         }
       }
-    }).catch(() => {});
-  }, []);
-
-  // Fetch available roles when new project modal opens
-  useEffect(() => {
-    if (!showNewProject) return;
-    fetch('/api/roles').then((r) => r.json()).then((roles: RoleInfo[]) => {
-      setAvailableRoles(roles.filter((r) => r.id !== 'lead'));
-    }).catch(() => {});
-  }, [showNewProject]);
+    }).catch((err) => {
+      if (!controller.signal.aborted) console.warn('[LeadDashboard] Failed to load leads:', err);
+    });
+    return () => controller.abort();
+  }, [readOnly]);
 
   // Subscribe to selected lead agent WS stream and load message history
   useEffect(() => {
     if (!selectedLeadId) return;
     chatInitialScroll.current = false; // reset so we scroll to bottom on lead change
-    ws.subscribe(selectedLeadId);
+
+    // In read-only mode, skip WS — data is pre-loaded by ReadOnlySession wrapper
+    if (!readOnly) {
+      ws.subscribe(selectedLeadId);
+    }
+
+    const controller = new AbortController();
     // Load persisted message history if we don't have any messages yet
     const proj = useLeadStore.getState().projects[selectedLeadId];
     if (!proj || proj.messages.length === 0) {
@@ -260,28 +249,32 @@ export function LeadDashboard({ api, ws }: Props) {
       const isHistorical = selectedLeadId.startsWith('project:');
       const url = isHistorical
         ? `/api/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-        : `/api/agents/${selectedLeadId}/messages?limit=200`;
-      fetch(url)
+        : `/api/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
+      fetch(url, { signal: controller.signal })
         .then((r) => r.json())
         .then((data: any) => {
-          if (Array.isArray(data.messages) && data.messages.length > 0) {
+          if (controller.signal.aborted) return;
+          if (Array.isArray(data?.messages) && data.messages.length > 0) {
             const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
               type: 'text' as const,
               text: m.content,
               sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
               timestamp: new Date(m.timestamp).getTime(),
             }));
-            // Only set if still no messages (avoid overwriting live data)
+            // Re-check: only set if WS hasn't delivered messages while we were fetching
             const current = useLeadStore.getState().projects[selectedLeadId];
             if (!current || current.messages.length === 0) {
               useLeadStore.getState().setMessages(selectedLeadId, msgs);
             }
           }
         })
-        .catch(() => {});
+        .catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Message history fetch failed:', err); });
     }
-    return () => ws.unsubscribe(selectedLeadId);
-  }, [selectedLeadId, ws]);
+    return () => {
+      controller.abort();
+      if (!readOnly) ws.unsubscribe(selectedLeadId);
+    };
+  }, [selectedLeadId, ws, readOnly]);
 
   // Auto-scroll on new messages only if near bottom
   const chatInitialScroll = useRef(false);
@@ -308,47 +301,70 @@ export function LeadDashboard({ api, ws }: Props) {
     }
   }, [currentProject?.agentReports?.length, reportsExpanded]);
 
-  // Poll progress for selected lead (skip for project: prefixed IDs — those are persisted projects, not running agents)
-  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:');
+  // Poll progress for selected lead (skip for project: prefixed IDs, read-only mode, and terminated agents)
+  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:') && !readOnly && isActive === true;
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
+    const controller = new AbortController();
+    let stopped = false;
     const fetchProgress = () => {
-      fetch(`/api/lead/${selectedLeadId}/progress`).then((r) => r.json()).then((data) => {
-        if (data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
-      }).catch(() => {});
+      if (stopped) return;
+      fetch(`/api/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((r) => {
+        if (r.status === 404) { stopped = true; return null; }
+        return r.json();
+      }).then((data) => {
+        if (!controller.signal.aborted && data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
+      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Progress poll failed:', err); });
     };
     fetchProgress();
     const interval = setInterval(fetchProgress, 5000);
-    return () => clearInterval(interval);
+    return () => { controller.abort(); clearInterval(interval); };
   }, [selectedLeadId, isActiveAgent]);
 
   // Poll decisions for selected lead
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
+    const controller = new AbortController();
+    let stopped = false;
     const fetchDecisions = () => {
-      fetch(`/api/lead/${selectedLeadId}/decisions`).then((r) => r.json()).then((data) => {
-        if (Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
-      }).catch(() => {});
+      if (stopped) return;
+      fetch(`/api/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((r) => {
+        if (r.status === 404) { stopped = true; return null; }
+        return r.json();
+      }).then((data) => {
+        if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
+      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Decisions poll failed:', err); });
     };
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 5000);
-    return () => clearInterval(interval);
+    return () => { controller.abort(); clearInterval(interval); };
   }, [selectedLeadId, isActiveAgent]);
 
   // Fetch groups for selected lead
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
-    fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
-      if (Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
-    }).catch(() => {});
+    const controller = new AbortController();
+    fetch(`/api/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((r) => {
+      if (r.status === 404) return null;
+      return r.json();
+    }).then((data) => {
+      if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
+    }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Groups fetch failed:', err); });
+    return () => controller.abort();
   }, [selectedLeadId, isActiveAgent]);
 
   // Fetch DAG status for selected lead — always use agent UUID for /api/lead/:id/dag
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
+    const controller = new AbortController();
+    let stopped = false;
     const fetchDag = () => {
-      fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
-        if (data && data.tasks) {
+      if (stopped) return;
+      fetch(`/api/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((r) => {
+        if (r.status === 404) { stopped = true; return null; }
+        return r.json();
+      }).then((data: any) => {
+        if (!controller.signal.aborted && data && data.tasks) {
           const store = useLeadStore.getState();
           store.setDagStatus(selectedLeadId, data as DagStatus);
           // Also store under projectId so DagMinimap can find it by either key
@@ -356,394 +372,31 @@ export function LeadDashboard({ api, ws }: Props) {
             store.setDagStatus(historicalProjectId, data as DagStatus);
           }
         }
-      }).catch(() => {});
+      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] DAG poll failed:', err); });
     };
     fetchDag();
     const interval = setInterval(fetchDag, 10000);
-    return () => clearInterval(interval);
+    return () => { controller.abort(); clearInterval(interval); };
   }, [selectedLeadId, historicalProjectId, isActiveAgent]);
 
-  // Listen for lead-specific WebSocket events
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const msg = JSON.parse((event as MessageEvent).data);
-      const store = useLeadStore.getState();
-      const selectedLeadId = store.selectedLeadId;
-
-      if (msg.type === 'lead:decision' && msg.agentId) {
-        // Route to correct lead project (child decisions go under their parent lead)
-        const targetLeadId = msg.leadId || msg.agentId;
-        store.addDecision(targetLeadId, { ...msg, agentRole: msg.agentRole || 'Lead' });
-      }
-
-      // Stream PL text into chat
-      if (msg.type === 'agent:text' && msg.agentId === selectedLeadId) {
-        const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-        store.appendToLastAgentMessage(msg.agentId, rawText);
-      }
-
-      // Stream PL reasoning/thinking into chat (collapsed in UI)
-      if (msg.type === 'agent:thinking' && msg.agentId === selectedLeadId) {
-        const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-        store.appendToThinkingMessage(msg.agentId, rawText);
-      }
-
-      // Stream PL rich content into chat
-      if (msg.type === 'agent:content' && msg.agentId === selectedLeadId) {
-        store.addMessage(msg.agentId, {
-          type: 'text',
-          text: msg.content.text || '',
-          sender: 'agent',
-          contentType: msg.content.contentType,
-          mimeType: msg.content.mimeType,
-          data: msg.content.data,
-          uri: msg.content.uri,
-        });
-      }
-
-      // When lead goes back to running after idle, promote queued messages
-      if (msg.type === 'agent:status' && msg.agentId === selectedLeadId && msg.status === 'running') {
-        store.promoteQueuedMessages(msg.agentId);
-      }
-
-      // Track tool calls from PL and its children
-      if (msg.type === 'agent:tool_call') {
-        const leadId = selectedLeadId;
-        if (!leadId) return;
-        const { agentId, toolCall } = msg;
-        // Only track if it's the lead or one of its children
-        const isChild = agents.some((a) => a.id === agentId && a.parentId === leadId);
-        if (agentId === leadId || isChild) {
-          const agent = agents.find((a) => a.id === agentId);
-          const roleName = agent?.role?.name ?? 'Agent';
-          const uniqueId = `${toolCall.toolCallId}-${toolCall.status || Date.now()}`;
-          store.addActivity(leadId, {
-            id: uniqueId,
-            agentId,
-            agentRole: roleName,
-            type: 'tool_call',
-            summary: (typeof toolCall.title === 'string' ? toolCall.title : toolCall.title?.text ?? JSON.stringify(toolCall.title)) || (typeof toolCall.kind === 'string' ? toolCall.kind : JSON.stringify(toolCall.kind)) || 'Working...',
-            status: toolCall.status,
-            timestamp: Date.now(),
-          });
-        }
-      }
-
-      // Track delegation events
-      if (msg.type === 'agent:delegated' && msg.parentId) {
-        store.addActivity(msg.parentId, {
-          id: msg.delegation?.id || `del-${Date.now()}`,
-          agentId: msg.parentId,
-          agentRole: 'Project Lead',
-          type: 'delegation',
-          summary: `Delegated to ${msg.delegation?.toRole}: ${msg.delegation?.task?.slice(0, 80) || ''}`,
-          timestamp: Date.now(),
-        });
-        // Also track as a comm for heatmap
-        const childAgent = agents.find((a) => a.id === msg.childId);
-        store.addComm(msg.parentId, {
-          id: `del-comm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          fromId: msg.parentId,
-          fromRole: 'Project Lead',
-          toId: msg.childId,
-          toRole: msg.delegation?.toRole || childAgent?.role?.name || 'Agent',
-          content: msg.delegation?.task ?? '',
-          timestamp: Date.now(),
-          type: 'delegation',
-        });
-      }
-
-      // Track agent completion reports
-      if (msg.type === 'agent:completion_reported' && msg.parentId) {
-        store.addActivity(msg.parentId, {
-          id: `done-${Date.now()}`,
-          agentId: msg.childId,
-          agentRole: 'Agent',
-          type: 'completion',
-          summary: `Agent ${msg.childId?.slice(0, 8)} ${msg.status}`,
-          timestamp: Date.now(),
-        });
-        // Also track as a comm for heatmap
-        const childAgent = agents.find((a) => a.id === msg.childId);
-        store.addComm(msg.parentId, {
-          id: `report-comm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          fromId: msg.childId,
-          fromRole: childAgent?.role?.name || 'Agent',
-          toId: msg.parentId,
-          toRole: 'Project Lead',
-          content: `Completion: ${msg.status ?? 'done'}`,
-          timestamp: Date.now(),
-          type: 'report',
-        });
-      }
-
-      // Handle PROGRESS updates from the lead
-      if (msg.type === 'lead:progress' && msg.agentId) {
-        const leadId = msg.agentId;
-        if (msg.summary) {
-          store.setProgressSummary(leadId, msg.summary);
-        }
-        // Store full snapshot for detail view
-        store.addProgressSnapshot(leadId, {
-          summary: msg.summary || 'Progress update',
-          completed: Array.isArray(msg.completed) ? msg.completed : [],
-          inProgress: Array.isArray(msg.in_progress) ? msg.in_progress : [],
-          blocked: Array.isArray(msg.blocked) ? msg.blocked : [],
-          timestamp: Date.now(),
-        });
-        // Build a display string for the activity feed
-        const parts: string[] = [];
-        if (msg.summary) parts.push(msg.summary);
-        if (Array.isArray(msg.in_progress) && msg.in_progress.length > 0) {
-          parts.push(`In progress: ${msg.in_progress.join(', ')}`);
-        }
-        if (Array.isArray(msg.blocked) && msg.blocked.length > 0) {
-          parts.push(`Blocked: ${msg.blocked.join(', ')}`);
-        }
-        store.addActivity(leadId, {
-          id: `progress-${Date.now()}`,
-          agentId: leadId,
-          agentRole: 'Project Lead',
-          type: 'progress',
-          summary: parts.join(' · ') || 'Progress update',
-          timestamp: Date.now(),
-        });
-      }
-
-      // Track inter-agent messages (DMs and broadcasts)
-      if (msg.type === 'agent:message_sent') {
-        const fromAgent = agents.find((a) => a.id === msg.from);
-        const toAgent = agents.find((a) => a.id === msg.to);
-        const leadId = selectedLeadId;
-        const isBroadcast = msg.to === 'all';
-        if (leadId && (msg.from === leadId || fromAgent?.parentId === leadId || toAgent?.parentId === leadId || isBroadcast)) {
-          store.addComm(leadId, {
-            id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            fromId: msg.from,
-            fromRole: msg.fromRole || fromAgent?.role?.name || 'Unknown',
-            toId: msg.to,
-            toRole: isBroadcast ? 'Team' : (msg.toRole || toAgent?.role?.name || 'Unknown'),
-            content: msg.content ?? '',
-            timestamp: Date.now(),
-            type: isBroadcast ? 'broadcast' : 'message',
-          });
-
-          // Store messages sent TO the lead as agent reports (separate from lead's output)
-          if (msg.to === leadId && msg.from !== 'system') {
-            const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
-            store.addAgentReport(leadId, {
-              id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              fromRole: senderRole,
-              fromId: msg.from,
-              content: msg.content ?? '',
-              timestamp: Date.now(),
-            });
-          }
-
-          // Surface DMs and broadcasts in the lead chat panel
-          const preview = (msg.content ?? '').slice(0, 2000);
-          const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
-          const senderId = (msg.from ?? '').slice(0, 8);
-          if (msg.from === 'system') {
-            store.addMessage(leadId, {
-              type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
-            });
-          } else if (isBroadcast) {
-            // Broadcasts tracked in comms panel — don't duplicate in chat
-          } else if (msg.to === leadId) {
-            store.addMessage(leadId, {
-              type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
-            });
-          } else if (msg.from === leadId) {
-            const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
-            const recipientId = (msg.to ?? '').slice(0, 8);
-            store.addMessage(leadId, {
-              type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system' as any, timestamp: Date.now(),
-            });
-          } else {
-            // Inter-agent DMs tracked in comms panel — don't duplicate in chat
-          }
-        }
-      }
-
-      // Group chat events
-      if (msg.type === 'group:created' && msg.leadId === selectedLeadId) {
-        fetch(`/api/lead/${selectedLeadId}/groups`).then((r) => r.json()).then((data) => {
-          if (Array.isArray(data)) store.setGroups(selectedLeadId!, data);
-        }).catch(() => {});
-      }
-      if (msg.type === 'group:message' && msg.leadId === selectedLeadId) {
-        store.addGroupMessage(selectedLeadId!, msg.groupName, msg.message);
-        // Also track as a comm for heatmap (from → all group members)
-        if (msg.message) {
-          const gm = msg.message;
-          store.addComm(selectedLeadId!, {
-            id: `grp-comm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            fromId: gm.fromAgentId,
-            fromRole: gm.fromRole || 'Agent',
-            toId: '',
-            toRole: msg.groupName || 'Group',
-            content: gm.content ?? '',
-            timestamp: Date.now(),
-            type: 'group_message',
-          });
-          // Group messages tracked in comms panel and groups tab — don't duplicate in chat
-        }
-      }
-
-      // DAG status updates
-      if (msg.type === 'dag:updated' && msg.leadId === selectedLeadId) {
-        fetch(`/api/lead/${selectedLeadId}/dag`).then((r) => r.json()).then((data: any) => {
-          if (data && data.tasks) {
-            store.setDagStatus(selectedLeadId!, data as DagStatus);
-            if (historicalProjectId && historicalProjectId !== selectedLeadId) {
-              store.setDagStatus(historicalProjectId, data as DagStatus);
-            }
-          }
-        }).catch(() => {});
-      }
-
-      // Context compaction — add system message to relevant lead's chat
-      if (msg.type === 'agent:context_compacted' && msg.agentId) {
-        const compactedId = msg.agentId;
-        // Find the lead project this agent belongs to (could be the lead itself or a child)
-        let targetLeadId: string | null = null;
-        if (store.projects[compactedId]) {
-          targetLeadId = compactedId;
-        } else {
-          const parentAgent = agents.find((a) => a.id === compactedId);
-          if (parentAgent?.parentId && store.projects[parentAgent.parentId]) {
-            targetLeadId = parentAgent.parentId;
-          }
-        }
-        if (targetLeadId) {
-          const pct = msg.percentDrop != null ? `${msg.percentDrop}%` : '?%';
-          store.addMessage(targetLeadId, {
-            type: 'text',
-            text: `🔄 Context compacted for agent ${compactedId.slice(0, 8)}: ${pct} reduction`,
-            sender: 'system',
-            timestamp: Date.now(),
-          });
-        }
-      }
-    };
-    window.addEventListener('ws-message', handler);
-    return () => window.removeEventListener('ws-message', handler);
-  }, [agents]);
+  // Listen for lead-specific WebSocket events (skip in read-only mode)
+  const wsAgents = readOnly ? [] : agents;
+  const wsProjectId = readOnly ? null : historicalProjectId;
+  useLeadWebSocket(wsAgents, wsProjectId);
 
   // Sidebar resize handlers
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
+  const startResize = useDragResize('x', sidebarWidth, setSidebarWidth, 200, 600, true);
+  const startTabResize = useDragResize('y', sidebarTabHeight, setSidebarTabHeight, 120, 600, true);
+  const startDecisionsResize = useDragResize('y', decisionsPanelHeight, setDecisionsPanelHeight, 80, 400);
 
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isResizing.current) return;
-      const delta = startX - e.clientX;
-      const newWidth = Math.min(600, Math.max(200, startWidth + delta));
-      setSidebarWidth(newWidth);
-    };
-
-    const onMouseUp = () => {
-      isResizing.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [sidebarWidth]);
-
-  const isTabResizing = useRef(false);
-  const startTabResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isTabResizing.current = true;
-    const startY = e.clientY;
-    const startHeight = sidebarTabHeight;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isTabResizing.current) return;
-      const delta = startY - ev.clientY;
-      const newHeight = Math.min(600, Math.max(120, startHeight + delta));
-      setSidebarTabHeight(newHeight);
-    };
-
-    const onMouseUp = () => {
-      isTabResizing.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [sidebarTabHeight]);
-
-  const isDecisionsResizing = useRef(false);
-  const startDecisionsResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDecisionsResizing.current = true;
-    const startY = e.clientY;
-    const startHeight = decisionsPanelHeight;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isDecisionsResizing.current) return;
-      const delta = ev.clientY - startY;
-      const newHeight = Math.min(400, Math.max(80, startHeight + delta));
-      setDecisionsPanelHeight(newHeight);
-    };
-
-    const onMouseUp = () => {
-      isDecisionsResizing.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [decisionsPanelHeight]);
-
-  const handleTabDragStart = useCallback((e: React.DragEvent, tabId: string) => {
-    e.dataTransfer.setData('text/plain', tabId);
-    e.dataTransfer.effectAllowed = 'move';
+  const handleTabOrderChange = useCallback((newOrder: string[]) => {
+    setTabOrder(newOrder);
+    localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder));
   }, []);
 
-  const handleTabDragOver = useCallback((e: React.DragEvent, tabId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverTab(tabId);
-  }, []);
-
-  const handleTabDrop = useCallback((e: React.DragEvent, targetTabId: string) => {
-    e.preventDefault();
-    setDragOverTab(null);
-    const sourceTabId = e.dataTransfer.getData('text/plain');
-    if (!sourceTabId || sourceTabId === targetTabId) return;
-    setTabOrder((prev) => {
-      const newOrder = [...prev];
-      const srcIdx = newOrder.indexOf(sourceTabId);
-      const tgtIdx = newOrder.indexOf(targetTabId);
-      if (srcIdx === -1 || tgtIdx === -1) return prev;
-      [newOrder[srcIdx], newOrder[tgtIdx]] = [newOrder[tgtIdx], newOrder[srcIdx]];
-      localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder));
-      return newOrder;
-    });
-  }, []);
-
-  const handleTabDragEnd = useCallback(() => {
-    setDragOverTab(null);
+  const handleDismissCatchUp = useCallback(() => setCatchUpSummary(null), []);
+  const handleScrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
   const toggleTabVisibility = useCallback((tabId: string) => {
@@ -759,8 +412,8 @@ export function LeadDashboard({ api, ws }: Props) {
       if (next.has(tabId)) {
         setSidebarTab((current) => {
           if (current === tabId) {
-            const allSupportedTabs = ['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
-            return allSupportedTabs.find((id) => !next.has(id)) ?? 'team';
+            const allSupportedTabs = ['crew', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'];
+            return allSupportedTabs.find((id) => !next.has(id)) ?? 'crew';
           }
           return current;
         });
@@ -768,51 +421,6 @@ export function LeadDashboard({ api, ws }: Props) {
       return next;
     });
   }, []);
-
-  const startLead = useCallback(async (name: string, task?: string, model?: string, cwd?: string, sessionId?: string, initialTeam?: string[]) => {
-    setStarting(true);
-    try {
-      // If initial team is selected, prepend to the task so the lead knows to create them
-      let fullTask = task;
-      if (initialTeam && initialTeam.length > 0) {
-        const teamHint = `\n\n[Initial Team] The user has pre-selected these roles for the initial team: ${initialTeam.join(', ')}. Please create these agents as your first action.`;
-        fullTask = (task || '') + teamHint;
-      }
-      const resp = await fetch('/api/lead/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, task: fullTask, model: model || undefined, cwd: cwd || undefined, sessionId: sessionId || undefined }),
-      });
-      const data = await resp.json();
-      if (data.id) {
-        useLeadStore.getState().addProject(data.id);
-        useLeadStore.getState().selectLead(data.id);
-        if (task) {
-          useLeadStore.getState().addMessage(data.id, { type: 'text', text: task, sender: 'user' });
-        }
-        // Save model config if customized during project creation
-        if (newProjectModelConfig && data.projectId) {
-          apiFetch(`/projects/${data.projectId}/model-config`, {
-            method: 'PUT',
-            body: JSON.stringify({ config: newProjectModelConfig }),
-          }).catch(() => { /* best-effort — project still created */ });
-        }
-        setShowNewProject(false);
-        setNewProjectName('');
-        setNewProjectTask('');
-        setNewProjectModel('');
-        setNewProjectCwd('');
-        setResumeSessionId('');
-        setSelectedRoles(new Set());
-        setNewProjectModelConfig(null);
-        setShowModelConfig(false);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setStarting(false);
-    }
-  }, [newProjectModelConfig]);
 
   const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!input.trim() || !selectedLeadId) return;
@@ -822,7 +430,7 @@ export function LeadDashboard({ api, ws }: Props) {
     // For interrupts, insert a separator so post-interrupt response appears as a new bubble
     if (mode === 'interrupt') {
       const proj = store.projects[selectedLeadId];
-      const msgs = proj?.messages ?? [];
+      const msgs = proj?.messages ?? EMPTY_MESSAGES;
       const last = msgs[msgs.length - 1];
       if (last?.sender === 'agent') {
         store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
@@ -940,23 +548,23 @@ export function LeadDashboard({ api, ws }: Props) {
     useAppStore.getState().setSelectedAgent(agentId);
   }, []);
 
-  const messages = currentProject?.messages ?? [];
-  const decisions = currentProject?.decisions ?? [];
+  const messages = currentProject?.messages ?? EMPTY_MESSAGES;
+  const decisions = currentProject?.decisions ?? EMPTY_DECISIONS;
   const pendingConfirmations = decisions.filter((d: any) => d.needsConfirmation && d.status === 'recorded');
   const progress = currentProject?.progress ?? null;
   const progressSummary = currentProject?.progressSummary ?? null;
-  const progressHistory = currentProject?.progressHistory ?? [];
-  const activity = currentProject?.activity ?? [];
-  const comms = currentProject?.comms ?? [];
-  const agentReports = currentProject?.agentReports ?? [];
-  const groups = currentProject?.groups ?? [];
-  const groupMessages = currentProject?.groupMessages ?? {};
+  const progressHistory = currentProject?.progressHistory ?? EMPTY_PROGRESS_HISTORY;
+  const activity = currentProject?.activity ?? EMPTY_ACTIVITY;
+  const comms = currentProject?.comms ?? EMPTY_COMMS;
+  const agentReports = currentProject?.agentReports ?? EMPTY_REPORTS;
+  const groups = currentProject?.groups ?? EMPTY_GROUPS;
+  const groupMessages = currentProject?.groupMessages ?? EMPTY_GROUP_MESSAGES;
   const dagStatus = currentProject?.dagStatus ?? null;
   const teamAgents = (() => {
-    const live = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+    const live = agents.filter((a) => a.id === effectiveLeadId || a.parentId === effectiveLeadId);
     if (live.length > 0) return live;
     // Fallback: progress endpoint, then keyframe-derived agents
-    const progressTeam = progress?.teamAgents ?? [];
+    const progressTeam = progress?.crewAgents ?? EMPTY_CREW_AGENTS;
     return progressTeam.length > 0 ? progressTeam : derivedAgents;
   })();
 
@@ -964,415 +572,8 @@ export function LeadDashboard({ api, ws }: Props) {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Project list sidebar */}
-      <div className="w-56 border-r border-th-border flex flex-col shrink-0">
-        <div className="px-3 py-2 border-b border-th-border flex items-center justify-between">
-          <span className="text-sm font-semibold flex items-center gap-1.5">
-            <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-            Projects
-          </span>
-          <button
-            onClick={() => setShowNewProject(true)}
-            className="p-1 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text"
-            title="New Project"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {leadAgents.length === 0 && inactiveProjects.length === 0 && !showNewProject && (
-            <div className="p-4 text-center">
-              <Crown className="w-10 h-10 text-yellow-600/50 dark:text-yellow-400/50 mx-auto mb-2" />
-              <p className="text-xs text-th-text-muted font-mono mb-3">No projects yet</p>
-              <button
-                onClick={() => setShowNewProject(true)}
-                className="text-xs bg-yellow-600 hover:bg-yellow-500 text-black px-3 py-1.5 rounded font-semibold"
-              >
-                Create Project
-              </button>
-            </div>
-          )}
-
-          {leadAgents.map((lead) => {
-            const isSelected = selectedLeadId === lead.id;
-            const isRunning = lead.status === 'running';
-            return (
-              <button
-                key={lead.id}
-                onClick={() => {
-                  useLeadStore.getState().addProject(lead.id);
-                  useLeadStore.getState().selectLead(lead.id);
-                }}
-                className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group ${
-                  isSelected
-                    ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
-                    : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isRunning ? 'bg-green-400' : 'bg-gray-500'}`} />
-                  {renamingLeadId === lead.id ? (
-                    <input
-                      autoFocus
-                      className="text-sm font-mono truncate flex-1 bg-th-bg-muted border border-th-border rounded px-1 py-0 text-th-text focus:outline-none focus:border-accent"
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.nativeEvent.isComposing) return;
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const trimmed = renameValue.trim();
-                          if (trimmed) {
-                            fetch(`/api/lead/${lead.id}`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ projectName: trimmed }),
-                            }).catch(() => {});
-                            useAppStore.getState().updateAgent(lead.id, { projectName: trimmed });
-                          }
-                          setRenamingLeadId(null);
-                        }
-                        if (e.key === 'Escape') setRenamingLeadId(null);
-                      }}
-                      onBlur={() => {
-                        const trimmed = renameValue.trim();
-                        if (trimmed && trimmed !== (lead.projectName || '')) {
-                          fetch(`/api/lead/${lead.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ projectName: trimmed }),
-                          }).catch(() => {});
-                          useAppStore.getState().updateAgent(lead.id, { projectName: trimmed });
-                        }
-                        setRenamingLeadId(null);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <span
-                      className="text-sm font-mono truncate flex-1"
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        setRenamingLeadId(lead.id);
-                        setRenameValue(lead.projectName || lead.task?.slice(0, 40) || '');
-                      }}
-                      title="Double-click to rename"
-                    >
-                      {lead.projectName || lead.task?.slice(0, 40) || lead.id.slice(0, 8)}
-                    </span>
-                  )}
-                  <span
-                    role="button"
-                    title="Rename project"
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-th-bg-muted rounded transition-opacity shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRenamingLeadId(lead.id);
-                      setRenameValue(lead.projectName || lead.task?.slice(0, 40) || '');
-                    }}
-                  >
-                    <Pencil className="w-3 h-3 text-th-text-muted hover:text-th-text-alt" />
-                  </span>
-                  <span
-                    role="button"
-                    title="Remove project"
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900/40 rounded transition-opacity shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!confirm('Remove this project? Running agents will be stopped.')) return;
-                      // Kill lead + children on server
-                      fetch(`/api/agents/${lead.id}`, { method: 'DELETE' }).catch(() => {});
-                      lead.childIds.forEach((cid: string) => fetch(`/api/agents/${cid}`, { method: 'DELETE' }).catch(() => {}));
-                      useLeadStore.getState().removeProject(lead.id);
-                    }}
-                  >
-                    <X className="w-3.5 h-3.5 text-th-text-muted hover:text-red-400" />
-                  </span>
-                </div>
-                <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
-                  {lead.status} · {agents.filter((a: any) => a.parentId === lead.id).length} agents
-                  </div>
-              </button>
-            );
-          })}
-
-          {/* Inactive persisted projects */}
-          {inactiveProjects.length > 0 && (
-            <>
-              {leadAgents.length > 0 && (
-                <div className="px-3 py-1.5 text-[10px] font-medium text-th-text-muted uppercase tracking-wider border-t border-th-border/50">
-                  Past Projects
-                </div>
-              )}
-              {inactiveProjects.map((proj) => {
-                const isSelected = selectedLeadId === `project:${proj.id}`;
-                return (
-                  <div
-                    key={proj.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      const key = `project:${proj.id}`;
-                      useLeadStore.getState().addProject(key);
-                      useLeadStore.getState().selectLead(key);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        const key = `project:${proj.id}`;
-                        useLeadStore.getState().addProject(key);
-                        useLeadStore.getState().selectLead(key);
-                      }
-                    }}
-                    className={`w-full text-left px-3 py-2.5 border-b border-th-border/50 transition-colors group cursor-pointer ${
-                      isSelected
-                        ? 'bg-yellow-600/15 border-l-2 border-l-yellow-500'
-                        : 'hover:bg-th-bg-alt border-l-2 border-l-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full shrink-0 bg-th-bg-hover" />
-                      <span className="text-sm font-mono truncate flex-1 text-th-text-muted">{proj.name}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setResumingProjectId(proj.id);
-                          fetch(`/api/projects/${proj.id}/resume`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({}),
-                          })
-                            .then((r) => r.json())
-                            .then((data) => {
-                              if (data.id) {
-                                useLeadStore.getState().addProject(data.id);
-                                useLeadStore.getState().selectLead(data.id);
-                                fetch('/api/projects').then((r) => r.json()).then((ps: Project[]) => {
-                                  if (Array.isArray(ps)) setPersistedProjects(ps);
-                                }).catch(() => {});
-                              }
-                            })
-                            .catch(() => {})
-                            .finally(() => setResumingProjectId(null));
-                        }}
-                        className="text-[10px] text-yellow-500 hover:text-yellow-600 dark:hover:text-yellow-400 bg-yellow-900/30 hover:bg-yellow-900/50 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                        title="Resume project"
-                      >
-                        {resumingProjectId === proj.id ? <Loader2 size={10} className="animate-spin" /> : 'Resume'}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!confirm(`Delete project "${proj.name}"? This cannot be undone.`)) return;
-                          fetch(`/api/projects/${proj.id}`, { method: 'DELETE' })
-                            .then(() => {
-                              setPersistedProjects((prev) => prev.filter((p) => p.id !== proj.id));
-                              useLeadStore.getState().removeProject(`project:${proj.id}`);
-                            })
-                            .catch(() => {});
-                        }}
-                        className="p-0.5 hover:bg-red-900/40 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                        title="Delete project"
-                      >
-                        <X className="w-3.5 h-3.5 text-th-text-muted hover:text-red-400" />
-                      </button>
-                    </div>
-                    <div className="text-xs text-th-text-muted mt-0.5 pl-4 font-mono">
-                      {proj.status} · {proj.updatedAt?.slice(0, 10)}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-
-        {/* New project button at bottom of sidebar */}
-        {showNewProject ? null : (
-          <div className="border-t border-th-border p-2">
-            <button
-              onClick={() => setShowNewProject(true)}
-              className="w-full flex items-center justify-center gap-1.5 text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-600 dark:hover:text-yellow-300 py-1.5 rounded hover:bg-th-bg-alt transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              New Project
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* New project modal */}
-      {showNewProject && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowNewProject(false); }}
-        >
-          <div
-            className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-xl flex flex-col"
-          >
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-th-border">
-              <Crown className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-              <h2 className="text-base font-semibold text-th-text">New Project</h2>
-            </div>
-            <div className="px-5 py-4 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-              <div>
-                <label className="block text-xs text-th-text-muted mb-1 font-medium">Project Name</label>
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  placeholder="My Feature"
-                  className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-th-text-muted mb-1 font-medium">Task / Prompt</label>
-                <textarea
-                  value={newProjectTask}
-                  onChange={(e) => setNewProjectTask(e.target.value)}
-                  placeholder="Describe what you want the team to work on..."
-                  rows={6}
-                  className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500 resize-y"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-th-text-muted mb-1 font-medium">Model</label>
-                  <select
-                    value={newProjectModel}
-                    onChange={(e) => setNewProjectModel(e.target.value)}
-                    className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
-                  >
-                    <option value="">Default</option>
-                    <option value="claude-opus-4.6">Claude Opus 4.6</option>
-                    <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
-                    <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
-                    <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
-                    <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
-                    <option value="gpt-5.2-codex">GPT-5.2 Codex</option>
-                    <option value="gpt-5.2">GPT-5.2</option>
-                    <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
-                    <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-th-text-muted mb-1 font-medium">Working Directory</label>
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={newProjectCwd}
-                      onChange={(e) => setNewProjectCwd(e.target.value)}
-                      placeholder="/path/to/project"
-                      className="flex-1 bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowFolderPicker(true)}
-                      className="px-2 py-2 bg-th-bg-muted hover:bg-th-bg-hover text-th-text-alt rounded-md text-xs shrink-0 transition-colors"
-                      title="Browse folders"
-                    >
-                      <FolderOpen className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-th-text-muted mb-1 font-medium">Resume Session <span className="text-th-text-muted">(optional — paste a session ID to continue previous work)</span></label>
-                  <input
-                    type="text"
-                    value={resumeSessionId}
-                    onChange={(e) => setResumeSessionId(e.target.value)}
-                    placeholder="session-id-from-previous-lead"
-                    className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              {/* Initial Team Selection */}
-              {availableRoles.length > 0 && (
-                <div>
-                  <label className="block text-xs text-th-text-muted mb-1.5 font-medium">Initial Team <span className="text-th-text-muted">(optional — pre-select roles to auto-create)</span></label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableRoles.map((role) => {
-                      const isSelected = selectedRoles.has(role.id);
-                      return (
-                        <button
-                          key={role.id}
-                          type="button"
-                          onClick={() => setSelectedRoles((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(role.id)) next.delete(role.id); else next.add(role.id);
-                            return next;
-                          })}
-                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors border ${
-                            isSelected
-                              ? 'bg-yellow-600/20 border-yellow-500/50 text-yellow-600 dark:text-yellow-200'
-                              : 'bg-th-bg border-th-border text-th-text-muted hover:border-th-border-hover'
-                          }`}
-                          title={role.description}
-                        >
-                          <span>{role.icon}</span>
-                          <span>{role.name}</span>
-                          {isSelected && <Check className="w-3 h-3" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {/* Model Configuration (collapsible) */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowModelConfig(!showModelConfig)}
-                  className="flex items-center gap-1 text-xs text-th-text-alt hover:text-th-text font-medium transition-colors"
-                >
-                  {showModelConfig ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  <Wrench className="w-3 h-3" />
-                  Model Configuration
-                </button>
-                {showModelConfig && (
-                  <div className="mt-2 border border-th-border rounded-md p-2 bg-th-bg">
-                    <ModelConfigPanel value={newProjectModelConfig ?? undefined} onChange={setNewProjectModelConfig} />
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-th-border">
-              <button
-                onClick={() => setShowNewProject(false)}
-                className="px-4 py-2 text-sm text-th-text-muted hover:text-th-text rounded-md hover:bg-th-bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => startLead(
-                  newProjectName || 'Untitled',
-                  newProjectTask.trim() || undefined,
-                  newProjectModel || undefined,
-                  newProjectCwd.trim() || undefined,
-                  resumeSessionId.trim() || undefined,
-                  selectedRoles.size > 0 ? Array.from(selectedRoles) : undefined,
-                )}
-                disabled={starting}
-                className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
-              >
-                {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                {starting ? 'Starting...' : resumeSessionId.trim() ? 'Resume Project' : 'Create Project'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Folder picker modal */}
-      {showFolderPicker && (
-        <FolderPicker
-          value={newProjectCwd}
-          onChange={(path) => setNewProjectCwd(path)}
-          onClose={() => setShowFolderPicker(false)}
-        />
-      )}
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
 
       {/* Main content */}
       {!selectedLeadId ? (
@@ -1386,7 +587,7 @@ export function LeadDashboard({ api, ws }: Props) {
         <>
           {/* Chat area */}
           <div
-            className="flex-1 flex flex-col min-w-0 relative"
+            className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden relative"
             onDragOver={leadDragOver}
             onDragLeave={leadDragLeave}
             onDrop={leadDrop}
@@ -1396,45 +597,30 @@ export function LeadDashboard({ api, ws }: Props) {
             {/* Progress banner — clickable to open detail */}
             {progress && progress.totalDelegations > 0 && (
               <div
-                className="border-b border-th-border px-4 py-2 flex items-center gap-4 text-sm font-mono bg-th-bg-alt/50 cursor-pointer hover:bg-th-bg-alt/80 transition-colors"
+                className="border-b border-th-border px-4 py-1 flex items-center gap-3 text-xs font-mono bg-th-bg-alt/50 cursor-pointer hover:bg-th-bg-alt/80 transition-colors"
                 onClick={() => setShowProgressDetail(true)}
                 title="Click for detailed progress view"
               >
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-blue-400" />
-                  <span>{progress.teamSize} agents</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  <span>{progress.active} active</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                  <span>{progress.completed} done</span>
-                </div>
+                <span className="text-blue-400">{progress.crewSize} agents</span>
+                <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
+                <span className="text-green-400">{progress.completed} done</span>
                 {progress.failed > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 text-red-400" />
-                    <span>{progress.failed} failed</span>
-                  </div>
+                  <span className="text-red-400">{progress.failed} failed</span>
                 )}
-                {(() => {
-                  return null;
-                })()}
-                <div className="ml-auto">
-                  <div className="w-32 bg-th-bg-muted rounded-full h-2">
+                <div className="ml-auto flex items-center gap-2">
+                  <div className="w-24 bg-th-bg-muted rounded-full h-1.5">
                     <div
-                      className="bg-green-500 h-2 rounded-full transition-all"
+                      className="bg-green-500 h-1.5 rounded-full transition-all"
                       style={{ width: `${progress.completionPct}%` }}
                     />
                   </div>
+                  <span className="text-th-text-muted">{progress.completionPct}%</span>
                 </div>
-                <span className="text-th-text-muted">{progress.completionPct}%</span>
               </div>
             )}
             {progressSummary && (
               <div
-                className="border-b border-th-border px-4 py-1.5 text-xs text-th-text-muted bg-th-bg-alt/30 font-mono truncate cursor-pointer hover:bg-th-bg-alt/50 transition-colors"
+                className="border-b border-th-border px-4 py-0.5 text-[11px] text-th-text-muted bg-th-bg-alt/30 font-mono truncate cursor-pointer hover:bg-th-bg-alt/50 transition-colors"
                 onClick={() => setShowProgressDetail(true)}
                 title="Click for detailed progress view"
               >
@@ -1442,54 +628,59 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
 
-            {/* Working directory bar */}
-            <CwdBar leadId={selectedLeadId!} cwd={leadAgent?.cwd} />
-
-            {/* Session ID bar — copyable for resume */}
-            {leadAgent?.sessionId && (
-              <div className="border-b border-th-border px-4 py-1 flex items-center gap-2 text-xs font-mono bg-th-bg-alt/20">
-                <GitBranch className="w-3 h-3 text-th-text-muted shrink-0" />
-                <span className="text-th-text-muted">Session:</span>
-                <span className="text-th-text-muted truncate" title={leadAgent.sessionId}>{leadAgent.sessionId}</span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(leadAgent.sessionId!);
-                    const btn = document.activeElement as HTMLElement;
-                    btn.textContent = 'copied!';
-                    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
-                  }}
-                  className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 ml-auto"
-                >
-                  copy
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(`/api/export/${selectedLeadId}`);
-                      const data = await res.json();
-                      if (data.error) {
-                        alert(`Export failed: ${data.error}`);
-                      } else {
-                        alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
+            {/* Session info bar — cwd + session ID merged into one line */}
+            <div className="border-b border-th-border px-4 py-0.5 flex items-center gap-3 text-[11px] font-mono text-th-text-muted bg-th-bg-alt/20 overflow-x-auto">
+              {leadAgent?.cwd && (
+                <span className="flex items-center gap-1 shrink-0">
+                  <FolderOpen className="w-3 h-3 shrink-0" />
+                  {leadAgent.cwd}
+                </span>
+              )}
+              {leadAgent?.sessionId && (
+                <span className="flex items-center gap-1 shrink-0 ml-auto">
+                  <GitBranch className="w-3 h-3 shrink-0" />
+                  {leadAgent.sessionId}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(leadAgent.sessionId!);
+                      const btn = e.currentTarget;
+                      btn.textContent = '✓';
+                      setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+                    }}
+                    className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0"
+                  >
+                    copy
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const res = await fetch(`/api/export/${selectedLeadId}`);
+                        const data = await res.json();
+                        if (data.error) {
+                          alert(`Export failed: ${data.error}`);
+                        } else {
+                          alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
+                        }
+                      } catch {
+                        alert('Export failed — server may be unavailable');
                       }
-                    } catch {
-                      alert('Export failed — server may be unavailable');
-                    }
-                  }}
-                  className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 flex items-center gap-1"
-                  title="Export session to disk (summary, agents, decisions, DAG)"
-                >
-                  <Download className="w-3 h-3" />
-                  export
-                </button>
-              </div>
-            )}
+                    }}
+                    className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 flex items-center gap-0.5"
+                    title="Export session to disk"
+                  >
+                    <Download className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
+            </div>
 
-            {/* Agent Reports — separate from lead output */}
+            {/* Agent Reports — compact toggle */}
             {agentReports.length > 0 && (
               <div className="border-b border-th-border bg-amber-500/5 dark:bg-amber-500/10">
                 <button
-                  className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
                   onClick={() => setReportsExpanded(!reportsExpanded)}
                 >
                   {reportsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
@@ -1523,7 +714,7 @@ export function LeadDashboard({ api, ws }: Props) {
             )}
 
             {/* Pending decisions banner */}
-            {pendingConfirmations.length > 0 && (
+            {pendingConfirmations.length > 0 && !readOnly && (
               <div className="border-b border-amber-700/50 bg-amber-900/30">
                 <button
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-600 dark:text-amber-200 hover:bg-amber-900/40 transition-colors"
@@ -1563,1015 +754,107 @@ export function LeadDashboard({ api, ws }: Props) {
               </div>
             )}
 
-            {/* Messages with prompt navigation */}
-            <div className="flex-1 relative min-h-0">
-              <div ref={chatContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-1">
-              {messages.filter((msg) => msg.text).map((msg, i, filtered) => {
-                if (msg.queued) return null; // queued messages rendered below
-                const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            <ChatMessages
+              messages={messages}
+              agents={agents}
+              isActive={!!isActive}
+              chatContainerRef={chatContainerRef}
+              messagesEndRef={messagesEndRef}
+              catchUpSummary={catchUpSummary}
+              onDismissCatchUp={handleDismissCatchUp}
+              onScrollToBottom={handleScrollToBottom}
+            />
 
-                if (msg.sender === 'user') {
-                  return (
-                    <div key={i} data-user-prompt={i} className="flex justify-end items-start gap-2 py-1">
-                      <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
-                      <div className="max-w-[80%]">
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end">
-                            {msg.attachments.map((att, ai) => (
-                              <div key={ai} className="rounded-lg overflow-hidden border border-white/20">
-                                {att.thumbnailDataUrl ? (
-                                  <img src={att.thumbnailDataUrl} alt={att.name} className="max-h-24 rounded-lg" />
-                                ) : (
-                                  <div className="px-2 py-1 bg-blue-700 text-xs text-blue-200">{att.name}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div className="rounded-lg px-3 py-2 bg-blue-600 text-white font-mono text-sm whitespace-pre-wrap">
-                          <MentionText text={msg.text} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (msg.sender === 'external') {
-                  return (
-                    <div key={i} className="flex items-start gap-2 py-1 bg-amber-500/[0.06] rounded-md border-l-2 border-amber-500/30 pl-2">
-                      <div className="max-w-[85%] rounded-lg px-3 py-2 bg-amber-500/10 dark:bg-amber-900/30 border border-amber-400/20 dark:border-amber-600/30 font-mono text-sm whitespace-pre-wrap text-th-text-alt">
-                        <div className="flex items-center gap-1.5 mb-1 text-amber-600 dark:text-amber-400 text-xs font-medium">
-                          <MessageSquare className="w-3 h-3" />
-                          {msg.fromRole || 'Agent'}
-                        </div>
-                        <MarkdownContent text={msg.text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                      </div>
-                      <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
-                    </div>
-                  );
-                }
-
-                if (msg.sender === 'system') {
-                  const sysText = typeof msg.text === 'string' ? msg.text : '';
-                  // Hide outgoing DM notifications — redundant with command blocks
-                  if (sysText.startsWith('📤')) return null;
-                  // Hide incoming DM notifications — shown in agent chat panes instead
-                  if (sysText.startsWith('📨')) return null;
-                  // Hide inter-agent DMs — shown in comms panel
-                  if (sysText.startsWith('💬')) return null;
-                  // Hide broadcasts — shown in comms panel
-                  if (sysText.startsWith('📢')) return null;
-                  // Hide group messages — shown in comms panel and groups tab
-                  if (sysText.startsWith('🗣️')) return null;
-                  return (
-                    <div key={i} className="flex justify-center py-1">
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-th-bg-alt/60 border border-th-border/50 text-xs font-mono text-th-text-muted">
-                        <RefreshCw className="w-3 h-3 text-th-text-muted" />
-                        <MentionText text={msg.text} agents={agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                        {ts && <span className="text-[10px] text-th-text-muted ml-1">{ts}</span>}
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Thinking/reasoning — collapsed by default, expandable on click
-                if (msg.sender === 'thinking') {
-                  return <CollapsibleReasoningBlock key={i} text={msg.text} timestamp={ts} />;
-                }
-
-                // Agent (lead) messages: no bubble, just flowing text
-                // Merge consecutive agent text messages so split command blocks render correctly.
-                // Only the first message in a run gets the timestamp and renders the merged text.
-                // NOTE: Parallel merge logic exists in AcpOutput.tsx (TimelineRow agent-group rendering).
-                const prevMsg = i > 0 ? filtered[i - 1] : null;
-                const isFirstInRun = !prevMsg || prevMsg.sender !== 'agent' || prevMsg.queued
-                  || (prevMsg.contentType && prevMsg.contentType !== 'text');
-                const agentTs = isFirstInRun ? ts : '';
-
-                if (!isFirstInRun && (!msg.contentType || msg.contentType === 'text')) {
-                  // Skip — this message's text was merged into the first message of the run
-                  return null;
-                }
-
-                // Collect all consecutive agent text messages in this run
-                let mergedText = msg.text;
-                if (isFirstInRun && (!msg.contentType || msg.contentType === 'text')) {
-                  for (let j = i + 1; j < filtered.length; j++) {
-                    const next = filtered[j];
-                    if (next.sender !== 'agent' || next.queued || (next.contentType && next.contentType !== 'text')) break;
-                    mergedText += next.text;
-                  }
-                }
-
-                if (msg.contentType && msg.contentType !== 'text') {
-                  return (
-                    <div key={i} className="py-1" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          <RichContentBlock msg={msg} />
-                        </div>
-                        {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <div key={i} className="py-0.5" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
-                        <AgentTextBlock text={mergedText} />
-                      </div>
-                      {agentTs && <span className="text-[10px] text-th-text-muted mt-0.5 shrink-0">{agentTs}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-              {isActive && messages.length > 0 && messages[messages.length - 1]?.sender === 'user' && !messages[messages.length - 1]?.queued && (
-                <div className="flex justify-start py-1">
-                  <div className="text-th-text-muted font-mono text-sm flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin text-yellow-600 dark:text-yellow-400" />
-                    <span>Working...</span>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
+            {readOnly ? (
+              <div className="border-t border-th-border px-4 py-2 bg-th-bg-alt/50 flex items-center gap-2 text-xs font-mono text-th-text-muted">
+                <Eye className="w-3.5 h-3.5 shrink-0" />
+                <span>Viewing past session — read-only</span>
               </div>
-              {/* Prompt navigation */}
-              <PromptNav containerRef={chatContainerRef} messages={messages} />
-              {/* Catch-up summary — floating overlay at bottom-center */}
-              {catchUpSummary && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 w-[420px] max-w-[calc(100%-2rem)] animate-in slide-in-from-bottom fade-in duration-300">
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    tabIndex={0}
-                    className="bg-th-bg/95 backdrop-blur-md border border-th-border rounded-xl shadow-2xl px-4 py-3"
-                    onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setCatchUpSummary(null); }}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <RefreshCw className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="text-xs font-semibold text-th-text-alt">While you were away</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono">
-                      {catchUpSummary.tasksCompleted > 0 && <span className="text-emerald-400">{catchUpSummary.tasksCompleted} task{catchUpSummary.tasksCompleted !== 1 ? 's' : ''} completed</span>}
-                      {catchUpSummary.pendingDecisions > 0 && <span className="text-amber-400">⚠ {catchUpSummary.pendingDecisions} decision{catchUpSummary.pendingDecisions !== 1 ? 's' : ''} pending</span>}
-                      {catchUpSummary.newMessages > 0 && <span className="text-blue-400">{catchUpSummary.newMessages} new message{catchUpSummary.newMessages !== 1 ? 's' : ''}</span>}
-                      {catchUpSummary.newReports > 0 && <span className="text-amber-600 dark:text-amber-400">{catchUpSummary.newReports} report{catchUpSummary.newReports !== 1 ? 's' : ''}</span>}
-                    </div>
-                    <div className="flex gap-2 mt-2.5">
-                      <button onClick={() => setCatchUpSummary(null)} className="text-[11px] px-2.5 py-1 rounded-md bg-th-bg-alt border border-th-border text-th-text-alt hover:bg-th-bg-muted transition-colors">Dismiss</button>
-                      <button onClick={() => { setCatchUpSummary(null); messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="text-[11px] px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-500 transition-colors">Show All</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Queued messages (pending) */}
-            {messages.some((m) => m.queued) && (
-              <div className="border-t border-dashed border-th-border px-4 py-2 bg-th-bg-alt/50">
-                <div className="text-[10px] text-th-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  Queued ({messages.filter((m) => m.queued).length})
-                </div>
-                {messages.filter((m) => m.queued).map((msg, i, arr) => (
-                  <div key={`q-${i}`} className="flex justify-end items-center gap-1.5 py-0.5 group">
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      {i > 0 && (
-                        <button type="button" aria-label="Move message up" onClick={() => reorderQueuedMessage(i, i - 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move up">
-                          <ChevronUp className="w-3 h-3" />
-                        </button>
-                      )}
-                      {i < arr.length - 1 && (
-                        <button type="button" aria-label="Move message down" onClick={() => reorderQueuedMessage(i, i + 1)} className="p-0.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text" title="Move down">
-                          <ChevronDown className="w-3 h-3" />
-                        </button>
-                      )}
-                      <button type="button" aria-label="Remove queued message" onClick={() => removeQueuedMessage(i)} className="p-0.5 rounded hover:bg-red-500/20 text-th-text-muted hover:text-red-400" title="Remove">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <span className="text-[10px] text-th-text-muted">
-                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
-                    <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
-                      {msg.text}
-                    </div>
-                    <Loader2 className="w-3 h-3 animate-spin text-blue-400 shrink-0" />
-                  </div>
-                ))}
-              </div>
+            ) : (
+              <InputComposer
+                input={input}
+                onInputChange={setInput}
+                isActive={!!isActive}
+                selectedLeadId={selectedLeadId}
+                messages={messages}
+                attachments={attachments}
+                onRemoveAttachment={removeAttachment}
+                onSendMessage={sendMessage}
+                onRemoveQueuedMessage={removeQueuedMessage}
+                onReorderQueuedMessage={reorderQueuedMessage}
+              />
             )}
-
-            {/* Input */}
-            <div className="border-t border-th-border p-3">
-              <AttachmentBar attachments={attachments} onRemove={removeAttachment} />
-              <div
-                className="flex gap-2 items-end relative rounded transition-all"
-              >
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.nativeEvent.isComposing) return;
-                    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                      e.preventDefault();
-                      sendMessage('queue');
-                    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      if (input.trim()) {
-                        sendMessage('interrupt');
-                      } else if (selectedLeadId) {
-                        apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
-                      }
-                    }
-                  }}
-                  placeholder={isActive ? 'Message the Lead... (Enter = send, Ctrl+Enter = interrupt, @ to mention files, drag & drop images)' : 'Project Lead is not active'}
-                  disabled={!isActive}
-                  rows={1}
-                  onInput={(e) => {
-                    const el = e.currentTarget;
-                    el.style.height = 'auto';
-                    el.style.height = Math.min(el.scrollHeight, 150) + 'px';
-                  }}
-                  className="flex-1 bg-th-bg-alt border border-th-border rounded px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500 disabled:opacity-50 resize-none overflow-y-auto"
-                  style={{ maxHeight: 150 }}
-                />
-                <div className="flex flex-col gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => sendMessage('queue')}
-                    disabled={!isActive || !input.trim()}
-                    title="Send (queued) — Enter"
-                    className="bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover text-black px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    Queue
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (input.trim()) {
-                        sendMessage('interrupt');
-                      } else if (selectedLeadId) {
-                        apiFetch(`/agents/${selectedLeadId}/interrupt`, { method: 'POST' });
-                      }
-                    }}
-                    disabled={!isActive}
-                    title="Interrupt agent (Ctrl+Enter)"
-                    className="bg-red-700 hover:bg-red-600 disabled:bg-th-bg-hover text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    Interrupt
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* Right sidebar: decisions + comms + activity + team */}
-          {sidebarCollapsed ? (
-            <div className="border-l border-th-border flex flex-col items-center py-2 w-10 shrink-0">
-              <button
-                type="button"
-                aria-label="Expand sidebar"
-                onClick={() => setSidebarCollapsed(false)}
-                className="p-1.5 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text relative"
-                title="Expand sidebar"
-              >
-                <PanelRightOpen className="w-4 h-4" />
-                {pendingConfirmations.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-yellow-500 rounded-full text-[8px] font-bold text-black flex items-center justify-center" title={`${pendingConfirmations.length} decision(s) need confirmation`}>
-                    {pendingConfirmations.length}
-                  </span>
-                )}
-              </button>
-            </div>
-          ) : (
-            <div className="flex shrink-0" style={{ width: sidebarWidth }}>
-              {/* Drag handle */}
-              <div
-                onMouseDown={startResize}
-                className="w-1 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0"
+          <SidebarTabs
+            layout={{
+              collapsed: sidebarCollapsed,
+              onToggle: () => setSidebarCollapsed((v) => !v),
+              width: sidebarWidth,
+              onResize: startResize,
+            }}
+            tabs={{
+              activeTab: sidebarTab,
+              onTabChange: setSidebarTab,
+              tabOrder,
+              onTabOrderChange: handleTabOrderChange,
+              hiddenTabs,
+              onToggleTabVisibility: toggleTabVisibility,
+              showConfig: showTabConfig,
+              onToggleConfig: () => setShowTabConfig((v) => !v),
+              onResize: startTabResize,
+            }}
+            decision={{
+              decisions,
+              pendingConfirmations: readOnly ? [] : pendingConfirmations,
+              panelHeight: decisionsPanelHeight,
+              onResize: startDecisionsResize,
+              // In read-only mode, pass noop handlers to prevent accidental POSTs
+              // to /api/decisions/:id — historical sessions may have unresolved decisions
+              // whose action buttons would otherwise be live.
+              ...(readOnly
+                ? { onConfirm: async () => {}, onReject: async () => {}, onDismiss: async () => {} }
+                : { onConfirm: handleConfirmDecision, onReject: handleRejectDecision, onDismiss: handleDismissDecision }
+              ),
+            }}
+            crewTabContent={
+              <CrewStatusContent
+                agents={teamAgents}
+                delegations={progress?.delegations ?? EMPTY_DELEGATIONS}
+                comms={comms}
+                activity={activity}
+                allAgents={agents}
+                onOpenChat={handleOpenAgentChat}
               />
-              <div className="flex-1 border-l border-th-border flex flex-col overflow-hidden min-w-0">
-                <div className="px-2 py-1 border-b border-th-border flex items-center justify-end shrink-0">
-                  <button
-                    type="button"
-                    aria-label="Collapse sidebar"
-                    onClick={() => setSidebarCollapsed(true)}
-                    className="p-1 rounded hover:bg-th-bg-muted text-th-text-muted hover:text-th-text"
-                    title="Collapse sidebar"
-                  >
-                    <PanelRightClose className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {/* Decisions — always visible at top */}
-                <div className="shrink-0 flex flex-col relative" style={{ height: decisionsPanelHeight, maxHeight: '30%' }}>
-                  <div className="px-3 py-1.5 flex items-center gap-2 border-b border-th-border shrink-0">
-                    <Lightbulb className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
-                    <span className="text-xs font-semibold">Decisions</span>
-                    {pendingConfirmations.length > 0 && (
-                      <span className="w-2 h-2 bg-yellow-500 rounded-full" title={`${pendingConfirmations.length} pending`} />
-                    )}
-                    <span className="text-[10px] text-th-text-muted ml-auto">{decisions.length}</span>
-                  </div>
-                  <div className="flex-1 min-h-0 overflow-y-auto">
-                    <DecisionPanelContent decisions={decisions} onConfirm={handleConfirmDecision} onReject={handleRejectDecision} onDismiss={handleDismissDecision} />
-                  </div>
-                  {/* Resize handle for decisions panel */}
-                  <div
-                    onMouseDown={startDecisionsResize}
-                    className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0 absolute bottom-0 left-0 right-0"
-                    style={{ transform: 'translateY(2px)', zIndex: 10 }}
-                  />
-                </div>
-
-                {/* Tabbed bottom panels */}
-                <div className="flex-1 min-h-0 border-t border-th-border flex flex-col relative">
-                  <div className="flex flex-wrap border-b border-th-border shrink-0 items-center">
-                    {(() => {
-                      const allTabs: Record<string, { icon: React.ReactNode; label: string; badge?: number }> = {
-                        team: { icon: <Bot className="w-3 h-3" />, label: 'Team' },
-                        comms: { icon: <MessageSquare className="w-3 h-3" />, label: 'Comms', badge: comms.length },
-                        groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
-                        dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
-                        models: { icon: <Wrench className="w-3 h-3" />, label: 'Models' },
-                        costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Attribution' },
-                        timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
-                      };
-                      const orderedIds = tabOrder.filter((id) => id in allTabs && !hiddenTabs.has(id));
-                      // Append any missing visible tabs (safety net)
-                      for (const id of Object.keys(allTabs)) {
-                        if (!orderedIds.includes(id) && !hiddenTabs.has(id)) orderedIds.push(id);
-                      }
-                      return orderedIds.map((tabId) => {
-                        const tab = allTabs[tabId];
-                        return (
-                          <button
-                            key={tabId}
-                            draggable
-                            onDragStart={(e) => handleTabDragStart(e, tabId)}
-                            onDragOver={(e) => handleTabDragOver(e, tabId)}
-                            onDrop={(e) => handleTabDrop(e, tabId)}
-                            onDragEnd={handleTabDragEnd}
-                            onDragLeave={() => setDragOverTab(null)}
-                            onClick={() => setSidebarTab(tabId)}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] whitespace-nowrap border-b-2 transition-colors cursor-grab active:cursor-grabbing ${
-                              dragOverTab === tabId
-                                ? 'border-blue-400 bg-blue-500/10 text-blue-600 dark:text-blue-300'
-                                : sidebarTab === tabId
-                                  ? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
-                                  : 'border-transparent text-th-text-muted hover:text-th-text-alt'
-                            }`}
-                          >
-                            {tab.icon}
-                            {tab.label}
-                            {tab.badge !== undefined && tab.badge > 0 && (
-                              <span className="text-[9px] bg-th-bg-muted text-th-text-muted px-1 rounded-full ml-0.5">{tab.badge}</span>
-                            )}
-                          </button>
-                        );
-                      });
-                    })()}
-                    {/* Tab visibility settings */}
-                    <div className="relative ml-auto">
-                      <button
-                        onClick={() => setShowTabConfig((v) => !v)}
-                        className="flex items-center px-1.5 py-1.5 text-th-text-muted hover:text-th-text-alt transition-colors"
-                        title="Configure visible tabs"
-                      >
-                        <Settings className="w-3 h-3" />
-                      </button>
-                      {showTabConfig && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowTabConfig(false)} />
-                          <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
-                            {(['team', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
-                              <button
-                                key={tabId}
-                                onClick={() => toggleTabVisibility(tabId)}
-                                className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] hover:bg-th-bg-muted transition-colors"
-                              >
-                                {hiddenTabs.has(tabId)
-                                  ? <EyeOff className="w-3 h-3 text-th-text-muted" />
-                                  : <Eye className="w-3 h-3 text-blue-500" />
-                                }
-                                <span className={hiddenTabs.has(tabId) ? 'text-th-text-muted' : ''}>{tabId.charAt(0).toUpperCase() + tabId.slice(1)}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-h-0 overflow-hidden">
-                    {sidebarTab === 'team' && <TeamStatusContent agents={teamAgents} delegations={progress?.delegations ?? []} comms={comms} activity={activity} allAgents={agents} onOpenChat={handleOpenAgentChat} />}
-                    {sidebarTab === 'comms' && <CommsPanelContent comms={comms} groupMessages={groupMessages} leadId={selectedLeadId} />}
-                    {sidebarTab === 'groups' && <GroupsPanelContent groups={groups} groupMessages={groupMessages} leadId={selectedLeadId} projectId={leadAgent?.projectId ?? (selectedLeadId?.startsWith('project:') ? selectedLeadId.slice(8) : null)} />}
-                    {sidebarTab === 'dag' && <TaskDagPanelContent dagStatus={dagStatus} />}
-                    {sidebarTab === 'models' && leadAgent?.projectId && (
-                      <div className="h-full overflow-y-auto p-2">
-                        <ModelConfigPanel projectId={leadAgent.projectId} compact />
-                      </div>
-                    )}
-                    {sidebarTab === 'models' && !leadAgent?.projectId && (
-                      <div className="flex items-center justify-center h-full text-th-text-muted text-xs">
-                        No project selected
-                      </div>
-                    )}
-                    {sidebarTab === 'costs' && <CostBreakdown />}
-                    {sidebarTab === 'timers' && <TimerDisplay projectAgentIds={teamAgentIds} />}
-                  </div>
-                  {/* Resize handle for tabbed section */}
-                  <div
-                    onMouseDown={startTabResize}
-                    className="h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500 transition-colors shrink-0 absolute top-0 left-0 right-0"
-                    style={{ transform: 'translateY(-2px)' }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+            }
+            comms={comms}
+            groups={groups}
+            groupMessages={groupMessages}
+            dagStatus={dagStatus}
+            leadAgent={leadAgent}
+            selectedLeadId={selectedLeadId}
+            activeTimerCount={activeTimerCount}
+            crewAgentIds={teamAgentIds}
+          />
         </>
       )}
 
       {/* Progress detail popup */}
       {showProgressDetail && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setShowProgressDetail(false); }}
-        >
-          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-purple-400" />
-                <span className="text-sm font-semibold text-th-text">Progress Detail</span>
-              </div>
-              <button type="button" aria-label="Close progress detail" onClick={() => setShowProgressDetail(false)} className="text-th-text-muted hover:text-th-text">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto space-y-4">
-              {/* Delegation stats */}
-              {progress && progress.totalDelegations > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-th-text-muted mb-2">Delegation Overview</p>
-                  <div className="flex items-center gap-4 text-sm font-mono mb-2">
-                    <span className="text-blue-400">{progress.teamSize} agents</span>
-                    <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
-                    <span className="text-purple-400">{progress.completed} done</span>
-                    {progress.failed > 0 && <span className="text-red-400">{progress.failed} failed</span>}
-                  </div>
-                  <div className="w-full bg-th-bg-muted rounded-full h-2.5 mb-1">
-                    <div
-                      className="bg-green-500 h-2.5 rounded-full transition-all"
-                      style={{ width: `${progress.completionPct}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-th-text-muted font-mono text-right">{progress.completionPct}% complete</p>
-                </div>
-              )}
-
-              {/* Agent team roster */}
-              {progress && progress.teamAgents && progress.teamAgents.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-th-text-muted mb-2">Team Roster</p>
-                  <div className="space-y-1">
-                    {progress.teamAgents.map((ta) => (
-                      <div key={ta.id} className="flex items-center gap-2 px-2 py-1 rounded bg-th-bg-muted/50 text-xs font-mono">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${ta.status === 'running' ? 'bg-green-400 animate-pulse motion-reduce:animate-none' : ta.status === 'idle' ? 'bg-yellow-400' : ta.status === 'failed' ? 'bg-red-400' : ta.status === 'terminated' ? 'bg-orange-400' : 'bg-gray-500'}`} />
-                        <span className="text-th-text-alt">{ta.role?.name || 'Agent'}</span>
-                        <span className="text-th-text-muted">{ta.id.slice(0, 8)}</span>
-                        <span className="ml-auto text-th-text-muted">{ta.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Latest lead progress report */}
-              {progressHistory.length > 0 && (() => {
-                const latest = progressHistory[progressHistory.length - 1];
-                return (
-                  <div>
-                    <p className="text-xs font-semibold text-th-text-muted mb-2">Latest Lead Report</p>
-                    <p className="text-sm font-mono text-th-text-alt mb-3">{latest.summary}</p>
-                    {latest.completed.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs text-purple-400 font-semibold mb-1">✓ Completed</p>
-                        <ul className="space-y-0.5">
-                          {latest.completed.map((item, i) => (
-                            <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
-                              <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {latest.inProgress.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs text-blue-400 font-semibold mb-1">⟳ In Progress</p>
-                        <ul className="space-y-0.5">
-                          {latest.inProgress.map((item, i) => (
-                            <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
-                              <Loader2 className="w-3 h-3 text-blue-400 animate-spin shrink-0" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {latest.blocked.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs text-red-400 font-semibold mb-1">⚠ Blocked</p>
-                        <ul className="space-y-0.5">
-                          {latest.blocked.map((item, i) => (
-                            <li key={i} className="text-xs font-mono text-th-text-alt pl-4 flex items-center gap-1.5">
-                              <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <p className="text-[10px] text-th-text-muted font-mono mt-2">
-                      {new Date(latest.timestamp).toLocaleString()}
-                    </p>
-                  </div>
-                );
-              })()}
-
-              {/* Progress history timeline */}
-              {progressHistory.length > 1 && (
-                <div>
-                  <p className="text-xs font-semibold text-th-text-muted mb-2">Progress Timeline</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {[...progressHistory].reverse().slice(1).map((snap, i) => (
-                      <div key={i} className="flex items-start gap-2 border-l-2 border-th-border pl-3 py-1">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-mono text-th-text-alt">{snap.summary}</p>
-                          <div className="flex items-center gap-3 mt-0.5 text-[10px] font-mono text-th-text-muted">
-                            {snap.completed.length > 0 && <span className="text-purple-500">✓{snap.completed.length}</span>}
-                            {snap.inProgress.length > 0 && <span className="text-blue-400">⟳{snap.inProgress.length}</span>}
-                            {snap.blocked.length > 0 && <span className="text-red-400">⚠{snap.blocked.length}</span>}
-                            <span>{new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Delegation details */}
-              {progress && progress.delegations && progress.delegations.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-th-text-muted mb-2">Delegations</p>
-                  <div className="space-y-1">
-                    {progress.delegations.map((d: any, i: number) => (
-                      <div key={d.id || i} className="px-2 py-1.5 rounded bg-th-bg-muted/50 text-xs font-mono">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${d.status === 'active' ? 'bg-blue-500/20 text-blue-400' : d.status === 'completed' ? 'bg-purple-500/20 text-purple-400' : d.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-th-text-muted'}`}>
-                            {d.status}
-                          </span>
-                          <span className="text-th-text-alt">{d.toRole}</span>
-                          <span className="text-th-text-muted ml-auto">{d.childId?.slice(0, 8)}</span>
-                        </div>
-                        {d.task && (
-                          <p className="text-th-text-muted mt-1 break-words">{d.task.length > 120 ? d.task.slice(0, 120) + '…' : d.task}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ProgressDetailModal
+          progress={progress}
+          progressHistory={progressHistory}
+          onClose={() => setShowProgressDetail(false)}
+        />
       )}
 
       {/* Agent report detail popup */}
       {expandedReport && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setExpandedReport(null); }}
-        >
-          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{expandedReport.fromRole}</span>
-                <span className="text-xs text-th-text-muted">→ Project Lead</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(expandedReport.timestamp).toLocaleTimeString()}
-                </span>
-                <button type="button" aria-label="Close report" onClick={() => setExpandedReport(null)} className="text-th-text-muted hover:text-th-text">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <AgentReportBlock content={expandedReport.content} />
-            </div>
-          </div>
-        </div>
+        <AgentReportDetailModal
+          report={expandedReport}
+          onClose={() => setExpandedReport(null)}
+        />
       )}
     </div>
-  );
-}
-
-function TeamStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: { agents: any[]; delegations: any[]; comms?: AgentComm[]; activity?: ActivityEvent[]; allAgents?: any[]; onOpenChat?: (agentId: string) => void }) {
-  const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
-  const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
-  const [agentMsg, setAgentMsg] = useState('');
-  const [sendingMsg, setSendingMsg] = useState(false);
-
-  const selectedDelegation = selectedAgent ? [...delegations].reverse().find((d: any) => d.toAgentId === selectedAgent.id) : null;
-  const agentComms = selectedAgent ? (comms ?? []).filter((c) => c.fromId === selectedAgent.id || c.toId === selectedAgent.id) : [];
-  const agentActivity = selectedAgent ? (activity ?? []).filter((e) => e.agentId === selectedAgent.id) : [];
-
-  return (
-    <>
-      <div className="h-full overflow-y-auto p-1.5 space-y-1">
-        {agents.length === 0 ? (
-          <p className="text-xs text-th-text-muted text-center py-4 font-mono">No team members yet</p>
-        ) : (
-          agents.map((agent: any) => {
-            const delegation = [...delegations].reverse().find((d: any) => d.toAgentId === agent.id);
-            const colorClass = agentStatusText(agent.status);
-            return (
-              <div
-                key={agent.id}
-                className="bg-th-bg-alt border border-th-border rounded p-1.5 cursor-pointer hover:border-th-border-hover transition-colors"
-                onClick={() => { setSelectedAgent(agent); setAgentMsg(''); setSendingMsg(false); }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm leading-none">{agent.role.icon}</span>
-                  <span className="text-xs font-mono font-semibold text-th-text-alt truncate">{agent.role.name}</span>
-                  <span className={`text-[10px] font-mono ${colorClass} ml-auto shrink-0`}>{agent.status}</span>
-                  {onOpenChat && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onOpenChat(agent.id); }}
-                      className="flex items-center gap-0.5 text-[10px] font-mono leading-none px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors shrink-0"
-                      title="Open agent chat panel"
-                    >
-                      <MessageSquare size={10} /> Chat
-                    </button>
-                  )}
-                  <span className="text-[10px] font-mono text-th-text-muted shrink-0">{agent.id.slice(0, 8)}</span>
-                </div>
-                {delegation && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-[10px] font-mono text-th-text-muted truncate flex-1 min-w-0" title={delegation.task}>{delegation.task}</p>
-                    {(agent.model || agent.role.model) && (
-                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
-                    )}
-                  </div>
-                )}
-                {!delegation && (agent.model || agent.role.model) && (
-                  <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                    {(agent.model || agent.role.model) && (
-                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
-                    )}
-                  </div>
-                )}
-                {(() => {
-                  const latestAct = (activity ?? []).filter((e) => e.agentId === agent.id).slice(-1)[0];
-                  if (!latestAct) return null;
-                  const actTime = new Date(latestAct.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  return (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-[9px] text-th-text-muted">{actTime}</span>
-                      <span className="text-[10px] text-th-text-muted truncate">{latestAct.summary}</span>
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Agent detail modal */}
-      {selectedAgent && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedAgent(null); }}
-        >
-          <div
-            className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
-          >
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-th-border">
-              <span className="text-2xl">{selectedAgent.role.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-semibold text-th-text">{selectedAgent.role.name}</span>
-                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${agentStatusText(selectedAgent.status)} bg-th-bg-muted`}>
-                    {selectedAgent.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-0.5 text-xs text-th-text-muted font-mono">
-                  <span>{selectedAgent.id.slice(0, 8)}</span>
-                  {(selectedAgent.model || selectedAgent.role.model) && (
-                    <span className="bg-th-bg-muted/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
-                  )}
-                </div>
-              </div>
-              {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
-                <div className="flex items-center gap-1 mr-2">
-                  <button
-                    onClick={() => apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' })}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 transition-colors"
-                    title="Interrupt agent"
-                  >
-                    <Zap size={12} /> Interrupt
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm('Stop this agent?')) {
-                        fetch(`/api/agents/${selectedAgent.id}`, { method: 'DELETE' });
-                        setSelectedAgent(null);
-                      }
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 transition-colors"
-                    title="Stop agent"
-                  >
-                    <Square size={12} /> Stop
-                  </button>
-                </div>
-              )}
-              <button
-                onClick={() => setSelectedAgent(null)}
-                className="text-th-text-muted hover:text-th-text text-lg leading-none p-1"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-              {/* Assigned Task */}
-              {selectedDelegation && (
-                <div className="px-5 py-3 border-b border-th-border">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Assigned Task</h4>
-                  <p className="text-sm font-mono text-th-text-alt whitespace-pre-wrap">{selectedDelegation.task}</p>
-                  {selectedDelegation.status && (
-                    <span className={`inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      selectedDelegation.status === 'completed' ? 'text-purple-400 bg-purple-900/30' :
-                      selectedDelegation.status === 'active' ? 'text-blue-400 bg-blue-900/30' :
-                      'text-red-400 bg-red-900/30'
-                    }`}>{selectedDelegation.status}</span>
-                  )}
-                </div>
-              )}
-
-              {/* Token Usage — hidden (issue #106) */}
-
-              {/* Context Window — keep this, it's real data from ACP */}
-              {selectedAgent.contextWindowSize > 0 && (
-                <div className="px-5 py-3 border-b border-th-border">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Context Window</h4>
-                  <div className="mt-1.5">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-th-text-muted">
-                      <span>Context: {formatTokens(selectedAgent.contextWindowUsed)} / {formatTokens(selectedAgent.contextWindowSize)}</span>
-                      <span>({Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100)}%)</span>
-                    </div>
-                    <div className="w-full bg-th-bg-muted rounded-full h-1 mt-1">
-                      <div
-                        className={`h-1 rounded-full transition-all ${
-                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.8 ? 'bg-red-500' :
-                          selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize > 0.5 ? 'bg-yellow-500' :
-                          'bg-blue-500'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.round((selectedAgent.contextWindowUsed / selectedAgent.contextWindowSize) * 100))}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Agent Output Preview */}
-              {selectedAgent.outputPreview && (
-                <div className="px-5 py-3 border-b border-th-border">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1">Latest Output</h4>
-                  <pre className="text-xs font-mono text-th-text-alt whitespace-pre-wrap max-h-40 overflow-y-auto bg-th-bg/50 rounded p-2">
-                    {selectedAgent.outputPreview}
-                  </pre>
-                </div>
-              )}
-
-              {/* Communications */}
-              {agentComms.length > 0 && (
-                <div className="px-5 py-3 border-b border-th-border">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-2">
-                    Communications ({agentComms.length})
-                  </h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {agentComms.slice(-20).map((c) => {
-                      const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const isSender = c.fromId === selectedAgent.id;
-                      return (
-                        <div
-                          key={c.id}
-                          className="text-xs font-mono cursor-pointer hover:bg-th-bg-muted/40 rounded px-1 py-0.5 transition-colors"
-                          onClick={() => setSelectedComm(c)}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span className={isSender ? 'text-cyan-400' : 'text-green-400'}>{isSender ? c.fromRole : c.toRole}</span>
-                            <span className="text-th-text-muted">{isSender ? '→' : '←'}</span>
-                            <span className={isSender ? 'text-green-400' : 'text-cyan-400'}>{isSender ? c.toRole : c.fromRole}</span>
-                            <span className="text-th-text-muted ml-auto">{time}</span>
-                          </div>
-                          <p className="text-th-text-alt mt-0.5 break-words whitespace-pre-wrap">
-                            <MentionText text={c.content.length > 200 ? c.content.slice(0, 200) + '…' : c.content} agents={useAppStore.getState().agents} onClickAgent={(id) => useAppStore.getState().setSelectedAgent(id)} />
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Activity */}
-              {agentActivity.length > 0 && (
-                <div className="px-5 py-3">
-                  <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-2">
-                    Activity ({agentActivity.length})
-                  </h4>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {agentActivity.slice(-15).map((evt) => {
-                      const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      return (
-                        <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
-                          <span className="text-th-text-muted">{time}</span>
-                          <span className="text-th-text-alt truncate">{evt.summary}</span>
-                          {evt.status && (
-                            <span className={`ml-auto shrink-0 text-[10px] ${
-                              evt.status === 'completed' ? 'text-purple-400' :
-                              evt.status === 'in_progress' ? 'text-blue-400' : 'text-th-text-muted'
-                            }`}>{evt.status}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Empty state */}
-              {!selectedDelegation && !selectedAgent.outputPreview && agentComms.length === 0 && agentActivity.length === 0 && (
-                <div className="px-5 py-8 text-center text-th-text-muted text-xs font-mono">
-                  No activity yet for this agent
-                </div>
-              )}
-            </div>
-
-            {/* Message Input */}
-            <div className="px-4 py-3 border-t border-th-border">
-              <h4 className="text-[10px] text-th-text-muted uppercase tracking-wider font-medium mb-1.5">Send Message</h4>
-              <div className="flex gap-2">
-                <textarea
-                  value={agentMsg}
-                  onChange={(e) => setAgentMsg(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                      e.preventDefault();
-                      if (agentMsg.trim() && !sendingMsg) {
-                        setSendingMsg(true);
-                        apiFetch(`/agents/${selectedAgent.id}/message`, {
-                          method: 'POST',
-                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'queue' }),
-                        }).then(() => {
-                          setAgentMsg('');
-                          useToastStore.getState().add('success', `Message sent to ${selectedAgent.role.name}`);
-                        }).catch((err: Error) => {
-                          useToastStore.getState().add('error', `Failed to send: ${err.message}`);
-                        }).finally(() => setSendingMsg(false));
-                      }
-                    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      if (agentMsg.trim() && !sendingMsg) {
-                        setSendingMsg(true);
-                        apiFetch(`/agents/${selectedAgent.id}/message`, {
-                          method: 'POST',
-                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'interrupt' }),
-                        }).then(() => {
-                          setAgentMsg('');
-                          useToastStore.getState().add('success', `Interrupt sent to ${selectedAgent.role.name}`);
-                        }).catch((err: Error) => {
-                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
-                        }).finally(() => setSendingMsg(false));
-                      } else {
-                        apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' }).then(() => {
-                          useToastStore.getState().add('success', `Interrupted ${selectedAgent.role.name}`);
-                        }).catch((err: Error) => {
-                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
-                        });
-                      }
-                    }
-                  }}
-                  placeholder={`Message ${selectedAgent.role.name}...`}
-                  className="flex-1 bg-th-bg border border-th-border rounded px-2.5 py-1.5 text-xs font-mono text-th-text resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                  rows={2}
-                  disabled={sendingMsg}
-                />
-                <div className="flex flex-col gap-1 self-end shrink-0">
-                  <button
-                    onClick={() => {
-                      if (agentMsg.trim() && !sendingMsg) {
-                        setSendingMsg(true);
-                        apiFetch(`/agents/${selectedAgent.id}/message`, {
-                          method: 'POST',
-                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'queue' }),
-                        }).then(() => {
-                          setAgentMsg('');
-                          useToastStore.getState().add('success', `Message sent to ${selectedAgent.role.name}`);
-                        }).catch((err: Error) => {
-                          useToastStore.getState().add('error', `Failed to send: ${err.message}`);
-                        }).finally(() => setSendingMsg(false));
-                      }
-                    }}
-                    disabled={!agentMsg.trim() || sendingMsg}
-                    className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
-                    title="Send message (Enter)"
-                  >
-                    <Send size={12} /> {sendingMsg ? 'Sending…' : 'Send'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (agentMsg.trim() && !sendingMsg) {
-                        setSendingMsg(true);
-                        apiFetch(`/agents/${selectedAgent.id}/message`, {
-                          method: 'POST',
-                          body: JSON.stringify({ text: agentMsg.trim(), mode: 'interrupt' }),
-                        }).then(() => {
-                          setAgentMsg('');
-                          useToastStore.getState().add('success', `Interrupt sent to ${selectedAgent.role.name}`);
-                        }).catch((err: Error) => {
-                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
-                        }).finally(() => setSendingMsg(false));
-                      } else {
-                        apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' }).then(() => {
-                          useToastStore.getState().add('success', `Interrupted ${selectedAgent.role.name}`);
-                        }).catch((err: Error) => {
-                          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
-                        });
-                      }
-                    }}
-                    disabled={sendingMsg}
-                    className="px-3 py-1.5 rounded bg-orange-600/80 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium flex items-center gap-1 transition-colors"
-                    title="Interrupt agent (Ctrl+Enter)"
-                  >
-                    <Zap size={12} /> Interrupt
-                  </button>
-                </div>
-              </div>
-              <p className="text-[10px] text-th-text-muted mt-1">Enter to send · Shift+Enter for newline · Ctrl+Enter to interrupt</p>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Comm detail popup */}
-      {selectedComm && (
-        <div
-          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedComm(null); }}
-        >
-          <div className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-th-border">
-              <div className="flex items-center gap-2 text-sm">
-                <MessageSquare className="w-4 h-4 text-blue-400" />
-                <span className="font-mono font-semibold text-cyan-400">{selectedComm.fromRole}</span>
-                <span className="text-th-text-muted">→</span>
-                <span className="font-mono font-semibold text-green-400">{selectedComm.toRole}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
-                </span>
-                <button type="button" aria-label="Close communication detail" onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
-                ? <AgentReportBlock content={selectedComm.content} />
-                : (
-                  <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
-                    <MentionText text={selectedComm.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedComm(null); }} />
-                  </pre>
-                )
-              }
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   );
 }

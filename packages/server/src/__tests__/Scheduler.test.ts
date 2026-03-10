@@ -99,9 +99,12 @@ describe('Scheduler', () => {
     expect(run).toHaveBeenCalledTimes(1);
     expect(scheduler.getRegistered()).toContain('failing');
     expect(logger.debug).toHaveBeenCalledWith(
-      'scheduler',
-      'Task "failing" failed',
-      { error: 'boom' },
+      expect.objectContaining({
+        module: 'timer',
+        msg: 'Task failed',
+        taskId: 'failing',
+        err: 'boom',
+      }),
     );
   });
 

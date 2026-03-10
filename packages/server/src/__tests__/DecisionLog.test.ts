@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DecisionLog } from '../coordination/DecisionLog.js';
+import { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 import { Database } from '../db/database.js';
 
 describe('DecisionLog', () => {

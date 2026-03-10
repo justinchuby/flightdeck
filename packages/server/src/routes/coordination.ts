@@ -1,8 +1,16 @@
 import { Router } from 'express';
-import type { ActionType } from '../coordination/ActivityLedger.js';
+import { normalize, isAbsolute } from 'node:path';
+import type { ActionType } from '../coordination/activity/ActivityLedger.js';
 import { validateBody, acquireLockSchema } from '../validation/schemas.js';
-import { extractCommFromActivity } from '../coordination/CommEventExtractor.js';
+import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
+
+/** Reject paths with traversal sequences or absolute paths. */
+function isTraversalPath(p: string): boolean {
+  if (isAbsolute(p)) return true;
+  const normalized = normalize(p).replace(/\\/g, '/');
+  return normalized.startsWith('../') || normalized === '..' || normalized.includes('/../') || p.includes('\0');
+}
 
 export function coordinationRoutes(ctx: AppContext): Router {
   const { agentManager, lockRegistry, activityLedger, eventPipeline } = ctx;
@@ -28,6 +36,9 @@ export function coordinationRoutes(ctx: AppContext): Router {
 
   router.post('/coordination/locks', validateBody(acquireLockSchema), (req, res) => {
     const { agentId, filePath, reason } = req.body;
+    if (isTraversalPath(filePath)) {
+      return res.status(400).json({ error: 'Invalid file path' });
+    }
     const agent = agentManager.get(agentId);
     const agentRole = agent?.role?.id ?? 'unknown';
     const projectId = agent ? agentManager.getProjectIdForAgent(agentId) ?? '' : '';
@@ -40,7 +51,10 @@ export function coordinationRoutes(ctx: AppContext): Router {
   });
 
   router.delete('/coordination/locks/:filePath', (req, res) => {
-    const filePath = req.params.filePath;
+    const filePath = String(req.params.filePath);
+    if (isTraversalPath(filePath)) {
+      return res.status(400).json({ error: 'Invalid file path' });
+    }
     const agentId = (req.query.agentId as string) ?? req.body?.agentId;
     if (!agentId) {
       return res.status(400).json({ error: 'agentId is required' });
@@ -51,7 +65,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
 
   router.get('/coordination/activity', (req, res) => {
     const { agentId, type, limit, since, projectId } = req.query;
-    const limitNum = limit ? Number(limit) : 50;
+    const limitNum = Math.min(limit ? Number(limit) : 50, 1000);
     const pid = projectId as string | undefined;
     let activities;
     if (since) {

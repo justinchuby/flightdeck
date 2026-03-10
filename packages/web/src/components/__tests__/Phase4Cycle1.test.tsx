@@ -302,15 +302,15 @@ describe('NLCommandRegistry', () => {
     expect(matchNLCommand('hi')).toBeNull();
   });
 
-  it('getNLPaletteItems returns 30 items', () => {
+  it('getNLPaletteItems returns 29 items', () => {
     const items = getNLPaletteItems(vi.fn());
-    expect(items).toHaveLength(30);
+    expect(items).toHaveLength(29);
     expect(items[0].type).toBe('nl-command');
   });
 
-  it('getAllPatterns returns 30 patterns', () => {
+  it('getAllPatterns returns 29 patterns', () => {
     const patterns = getAllPatterns();
-    expect(patterns).toHaveLength(30);
+    expect(patterns).toHaveLength(29);
     expect(patterns[0]).toHaveProperty('id');
     expect(patterns[0]).toHaveProperty('phrases');
   });
@@ -437,7 +437,7 @@ describe('SpotlightTour', () => {
 
 describe('QuickStart', () => {
   const defaultProps = {
-    onSelectPlaybook: vi.fn(),
+    onSelectTemplate: vi.fn(),
     onStartFromScratch: vi.fn(),
     onBrowseProjects: vi.fn(),
   };
@@ -446,7 +446,7 @@ describe('QuickStart', () => {
     vi.clearAllMocks();
   });
 
-  it('renders 5 playbook cards', () => {
+  it('renders 5 template cards', () => {
     render(<QuickStart {...defaultProps} />);
     // Each card has a "Start →" button
     const startButtons = screen.getAllByText('Start →');
@@ -459,11 +459,11 @@ describe('QuickStart', () => {
     expect(screen.getByText('Quick Fix')).toBeInTheDocument();
   });
 
-  it('calls onSelectPlaybook when Start is clicked', () => {
+  it('calls onSelectTemplate when Start is clicked', () => {
     render(<QuickStart {...defaultProps} />);
     const startButtons = screen.getAllByText('Start →');
-    fireEvent.click(startButtons[0]); // Click the first playbook's Start
-    expect(defaultProps.onSelectPlaybook).toHaveBeenCalledWith('code-review');
+    fireEvent.click(startButtons[0]); // Click the first template's Start
+    expect(defaultProps.onSelectTemplate).toHaveBeenCalledWith('code-review');
   });
 });
 

@@ -58,7 +58,7 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
       }, projectId);
     }
   } catch (err) {
-    logger.debug('command', 'Failed to parse LOCK_FILE command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'LOCK_FILE', err: (err as Error).message });
   }
 }
 
@@ -86,7 +86,7 @@ function handleLockRelease(ctx: CommandHandlerContext, agent: Agent, data: strin
         releaseLock(ctx, agent, request.filePath);
       });
   } catch (err) {
-    logger.debug('command', 'Failed to parse UNLOCK_FILE command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'UNLOCK_FILE', err: (err as Error).message });
   }
 }
 
@@ -116,7 +116,7 @@ function handleActivity(ctx: CommandHandlerContext, agent: Agent, data: string):
       ctx.getProjectIdForAgent(agent.id) ?? '',
     );
   } catch (err) {
-    logger.debug('command', 'Failed to parse ACTIVITY command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'ACTIVITY', err: (err as Error).message });
   }
 }
 
@@ -131,7 +131,7 @@ function handleDecision(ctx: CommandHandlerContext, agent: Agent, data: string):
     const needsConfirmation = decision.needsConfirmation === true;
     const leadId = agent.parentId || agent.id;
     const recorded = ctx.decisionLog.add(agent.id, agent.role?.id ?? 'unknown', decision.title, decision.rationale ?? '', needsConfirmation, leadId, agent.projectId);
-    logger.info('lead', `Decision by ${agent.role.name}: "${decision.title}"${needsConfirmation ? ' [needs confirmation]' : ''}`, { rationale: decision.rationale?.slice(0, 100) });
+    logger.info({ module: 'coordination', msg: 'Decision recorded', title: decision.title, needsConfirmation, rationale: decision.rationale?.slice(0, 100) });
     ctx.emit('lead:decision', {
       id: recorded.id,
       agentId: agent.id,
@@ -145,7 +145,7 @@ function handleDecision(ctx: CommandHandlerContext, agent: Agent, data: string):
       category: recorded.category,
     });
   } catch (err) {
-    logger.debug('command', 'Failed to parse DECISION command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'DECISION', err: (err as Error).message });
   }
 }
 
@@ -180,7 +180,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
       }
     }
 
-    logger.info('lead', `Progress update from ${agent.role.name} (${agent.id.slice(0, 8)})`, progress);
+    logger.info({ module: 'coordination', msg: 'Progress update', ...progress });
     ctx.emit('lead:progress', { agentId: agent.id, ...progress });
 
     // Persist to activity ledger so it appears in keyframes/milestones
@@ -202,7 +202,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
       secretary.sendMessage(progressMsg);
     }
   } catch (err) {
-    logger.debug('command', 'Failed to parse PROGRESS command', { error: (err as Error).message });
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'PROGRESS', err: (err as Error).message });
   }
 }
 
@@ -245,7 +245,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
         agent.sendMessage(`[System] ⚠ Warning: ${uncommitted.length} uncommitted file(s) not in this commit: ${listed}${more}. Use LOCK_FILE to include them, or specify them with {"files": [...]}.`);
       }
     } catch {
-      logger.debug('commit', `Pre-commit status check failed for ${agent.id.slice(0, 8)}`);
+      logger.debug({ module: 'command', msg: 'Pre-commit status check failed' });
     }
 
     const files = Array.from(allPaths);
@@ -284,7 +284,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
           }
         } catch {
           // Best-effort — don't fail the commit report if dirty-tree check fails
-          logger.debug('commit', `Post-commit dirty-tree check skipped for ${agent.id.slice(0, 8)} (git command failed)`);
+          logger.debug({ module: 'command', msg: 'Post-commit dirty-tree check skipped — git command failed' });
         }
 
         // Log to ActivityLedger only after verified commit
@@ -293,11 +293,11 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
           { type: 'commit', files, message },
           ctx.getProjectIdForAgent(agent.id) ?? '',
         );
-        logger.info('commit', `COMMIT for ${agent.role.name} (${agent.id.slice(0, 8)}): ${files.length} files — ${message.slice(0, 80)}`);
+        logger.info({ module: 'command', msg: 'COMMIT executed', command: 'COMMIT', fileCount: files.length, commitMessage: message.slice(0, 80) });
       })
       .catch((err: any) => {
         agent.sendMessage(`[System] COMMIT failed: ${err.message?.split('\n')[0] ?? 'unknown error'}`);
-        logger.warn('commit', `COMMIT exec failed for ${agent.id.slice(0, 8)}: ${err.message}`);
+        logger.warn({ module: 'command', msg: 'COMMIT exec failed', command: 'COMMIT', err: err.message });
       });
   } catch (err: any) {
     agent.sendMessage(`[System] COMMIT error: use {"message": "your commit message"}`);

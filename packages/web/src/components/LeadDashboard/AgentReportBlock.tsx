@@ -1,11 +1,8 @@
 import { Check, CheckCircle } from 'lucide-react';
+import { formatTokens } from '../../utils/format';
 
-/** Format token count for display (e.g. 1234 → "1.2k", 1234567 → "1.2M") */
-export function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
+// Re-export for backward compatibility
+export { formatTokens };
 
 /** Parse [Agent Report] or [Agent ACK] formatted content into structured parts */
 export function parseAgentReport(content: string): { header: string; task: string; output: string; sessionId: string; isReport: boolean; isAck: boolean } {

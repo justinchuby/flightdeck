@@ -245,7 +245,7 @@ describe('Phase 4 Cycle 3 — Conflict Detection', () => {
     it('renders all config options when loaded', () => {
       mockConflictConfig = defaultConfig;
       render(<ConflictSettingsPanel />);
-      expect(screen.getByText('Conflict Detection')).toBeInTheDocument();
+      expect(screen.getByText(/Conflict Detection/)).toBeInTheDocument();
       expect(screen.getByText('Conflict detection')).toBeInTheDocument();
       expect(screen.getByText('Check interval')).toBeInTheDocument();
       expect(screen.getByText('Same directory overlap')).toBeInTheDocument();

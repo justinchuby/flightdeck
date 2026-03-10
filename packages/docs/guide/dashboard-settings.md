@@ -2,6 +2,20 @@
 
 The Settings page lets you configure the orchestration framework.
 
+## Oversight
+
+Control how much autonomy agents have. Three tiers:
+
+- **Supervised** — Agents ask before most actions. Best for learning or critical codebases.
+- **Balanced** (default) — Routine work flows, structural changes need approval.
+- **Autonomous** — Agents work independently. You monitor results.
+
+Each tier injects behavioral instructions into agent system prompts. You can also add **custom instructions** in natural language (e.g., "Always run tests before committing").
+
+Oversight is per-project with a global default. New projects inherit the global setting.
+
+→ [Oversight Guide](/guide/oversight)
+
 ## Concurrency
 
 - **Max Concurrent Agents** — Maximum number of agents that can run simultaneously (default: 10)

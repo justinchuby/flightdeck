@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { DependencyScanner } from '../coordination/DependencyScanner.js';
+import { DependencyScanner } from '../coordination/files/DependencyScanner.js';
 
 // ── Fixture helpers ───────────────────────────────────────────────────
 

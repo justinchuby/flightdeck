@@ -1,14 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { formatTokens } from '../../utils/format';
 import type { AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 function useAgentMap(): Map<string, AgentInfo> {
   const agents = useAppStore((s) => s.agents);
@@ -76,11 +71,7 @@ export function CostBreakdown() {
     <div className="flex flex-col gap-3 p-3 text-sm">
       {/* Summary bar */}
       <div className="flex items-center justify-between rounded-lg bg-th-bg-alt/60 px-4 py-2.5 border border-th-border/50">
-        <div className="flex items-center gap-2">
-          <span className="text-base">📊</span>
-          <span className="font-medium text-th-text-alt">Token Attribution</span>
-        </div>
-        <div className="flex items-center gap-4 font-mono text-xs">
+        <div className="flex items-center gap-2 font-mono text-xs">
           <span className="text-blue-600 dark:text-blue-300">↑ {formatTokens(totalInput)} in</span>
           <span className="text-emerald-600 dark:text-emerald-300">↓ {formatTokens(totalOutput)} out</span>
           <span className="text-th-text-alt font-semibold">{formatTokens(total)} total</span>

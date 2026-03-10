@@ -5,9 +5,9 @@
 > [!WARNING]
 > This is purely AI generated code. Use the project with this understanding in mind.
 
-**One command. A whole engineering team.**
+**One command. A whole engineering crew.**
 
-Flightdeck orchestrates teams of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
+Flightdeck orchestrates crews of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
 
 ```bash
 npm install -g @flightdeck-ai/flightdeck
@@ -19,7 +19,7 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 ### Screenshots
 
 <p align="center">
-  <img src="packages/docs/public/screenshots/lead-dashboard.png" alt="Lead Dashboard — active projects, team status, and real-time progress" width="720" />
+  <img src="packages/docs/public/screenshots/lead-dashboard.png" alt="Lead Dashboard — active projects, crew status, and real-time progress" width="720" />
   <br /><em>Lead Dashboard — your home screen for tracking projects, agents, and progress</em>
 </p>
 
@@ -61,7 +61,7 @@ That's it. This installs Flightdeck globally and starts the server, opening the 
 ### What Happens Next
 
 1. **Create a project** — Click **Create Project**, describe what you want built, and point it at your repo
-2. **Watch the lead plan** — The Project Lead agent analyzes your task, breaks it into a task DAG, and assembles a team
+2. **Watch the lead plan** — The Project Lead agent analyzes your task, breaks it into a task DAG, and assembles a crew
 3. **Agents get to work** — Developers, reviewers, architects spin up in parallel — each in their own Copilot CLI session
 4. **Stay in the loop** — Message any agent directly, approve decisions, and watch progress in real time
 
@@ -91,9 +91,9 @@ npm run dev
 
 ## Features
 
-### 🎯 Team Orchestration
-- **Project Lead** — Breaks down tasks, assembles a team, creates a task DAG, delegates work, and synthesizes results
-- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical team structures
+### 🎯 Crew Orchestration
+- **Project Lead** — Breaks down tasks, assembles a crew, creates a task DAG, delegates work, and synthesizes results
+- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical crew structures
 - **13 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
 - **Task DAG** — Declarative task scheduling with dependencies; auto-links agents via `DELEGATE`/`CREATE_AGENT`
 - **Human-in-the-Loop** — Message any agent directly; queue, reorder, or remove messages before delivery
@@ -104,18 +104,29 @@ npm run dev
 - **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
 - **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
 - **Broadcasts** — Send a message to every active agent at once
+- **Telegram Integration** — Receive notifications via Telegram bot with batched delivery, challenge-response auth, and configurable settings
 
 ### 📈 Visualization & Monitoring
+- **Home Dashboard** — At-a-glance view of active projects, decisions made, decisions needing approval, action-required items, and progress milestones. Onboarding guide when no projects exist
+- **AttentionBar** — Persistent system-wide status bar with 3 escalation states (green/yellow/red). WebSocket push for <3s latency. Adjusts sensitivity based on Trust Dial level
+- **Kanban Board** — Interactive task board with drag-and-drop (via @dnd-kit), context menus, scope switcher (global/per-project), add-task form, filters, pagination, and soft-delete with archive/restore
+- **Project Design Tab** — File browser with Markdown preview for project documentation
 - **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, token usage curve, and progress indicators with unified project tabs
 - **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
 - **Timeline** — Swim-lane Gantt chart with decoupled vertical/horizontal scroll, Ctrl+wheel zoom, keyboard navigation, drag-to-pan, horizontal overflow for 10+ agents, and sticky Session Replay scrubber (4× default speed)
-- **Canvas** — Spatial agent graph with ReactFlow for visual crew topology and project tabs
 - **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
 - **Token Economics** — Per-agent token breakdown with estimation fallback (~4 chars/token from output preview), shown with `~` prefix and `(est.)` suffix
-- **The Pulse** — Persistent ambient status strip showing fleet health; empty indicators hidden, badges link to /agents
 - **Chat** — Virtual scrolling with `react-virtuoso`, pinned user message banner, grouped sequential messages, per-project group chat history
-- **Catch-Up Summary** — After 60s of inactivity, a banner summarizes what happened while you were away
+- **Catch-Up Banner** — "While you were away" slide-down summary of tasks completed, decisions pending, and failures
 - **Historical Data** — All pages load from REST API when no live agents are present — no empty states for existing projects
+
+### 🧭 Navigation
+- **Breadcrumbs** — Contextual navigation trail showing current location within the project hierarchy
+- **Recent Projects** — Quick-access list in sidebar with one-click navigation
+- **Keyboard Shortcuts** — Alt+1–5 to switch between project tabs
+- **Tab Persistence** — Active tab saved per project in localStorage; restored on return
+- **Page Transitions** — Smooth animations between pages; respects `prefers-reduced-motion`
+- **Mobile Layout** — Touch-scrollable tabs for narrow viewports
 
 ### ✅ Decision & Progress Tracking
 - **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
@@ -125,79 +136,134 @@ npm run dev
 ### 🔒 Coordination & Safety
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
 - **Scoped COMMIT** — `git add` only on files the agent has locked, then post-commit verification. Prevents `git add -A` from leaking other agents' work.
+- **Trust Dial** — 3-level oversight (Detailed / Standard / Minimal) controls notification volume, card density, and escalation thresholds. Per-project overrides supported
 - **Event Pipeline** — Reactive handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
 - **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
-- **Security** — Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
+- **Security** — Challenge-response auth, prompt injection sanitization (4-layer), default-deny allowlists, secret redaction, CORS lockdown, rate limiting, archived-only project deletion, CWD path validation
 
 ### 💾 Persistence & Recovery
-- **Session Resume** — Resume from a previous Copilot session ID with full context recovery
+- **Session Resume** — Resume from a previous Copilot session ID with full context recovery. Native SDK resume for Claude and Copilot adapters
+- **Knowledge Pipeline** — Automatic knowledge injection on agent spawn (KnowledgeInjector), session knowledge extraction on agent exit, SkillsLoader for `.github/skills/` with hot-reload via `fs.watch`, and AgentReconciliation on reconnect
+- **CollectiveMemory** — Cross-session `remember()` / `recall()` for persistent agent knowledge
 - **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
 - **Data Retention** — Data management in Settings with storage stats and cleanup by age (7d/30d/90d/all)
 
 ## Architecture
 
-**Monorepo** (`npm workspaces`):
+Flightdeck uses a **three-tier architecture** with clear separation of concerns:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      Web Client (Vite/React)                     │
+│  Dashboard · Project Views · Session Management · Real-time UI   │
+│  React 19 · TailwindCSS 4 · Zustand · WebSocket client          │
+└───────────────────────┬──────────────────────────────────────────┘
+                        │ REST API + WebSocket (/ws)
+┌───────────────────────▼──────────────────────────────────────────┐
+│                  Orchestration Server (Express 5)                 │
+│  Session mgmt · Project mgmt · GovernancePipeline · Task DAG     │
+│  Knowledge · Decisions · File locks · Chat groups · Integrations │
+│  SQLite/Drizzle · Zod validation · Pino logging                  │
+└───────────────────────┬──────────────────────────────────────────┘
+                        │ stdio + PID file (detached child process)
+┌───────────────────────▼──────────────────────────────────────────┐
+│                    Agent Server (Daemon)                          │
+│  Spawns & manages CLI agent processes via ACP protocol           │
+│  Copilot CLI · Claude CLI · Gemini CLI · Codex · Cursor          │
+│  Per-agent lifecycle · Auto-restart · Heartbeat monitoring        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### How the tiers interact
+
+1. **Client ↔ Orchestration Server** — The React frontend communicates with the Express server via REST endpoints (43 route modules covering agents, projects, sessions, tasks, decisions, knowledge, etc.) and a persistent WebSocket connection on `/ws` for real-time updates. WebSocket events are batched and throttled (agent text flushed every 100ms).
+
+2. **Orchestration Server ↔ Agent Server** — The orchestration server forks the agent server as a detached child process, communicating via stdio and monitoring health with heartbeat pings. The agent server manages individual CLI agent processes (Copilot, Claude, Gemini, Codex, Cursor, OpenCode) through the ACP (Agent Client Protocol) — each agent runs as a separate subprocess with its own context window and role.
+
+3. **Command flow** — Agents emit structured commands (wrapped in doubled Unicode brackets) in their output stream. The `CommandDispatcher` parses these and routes them to 10 domain-specific command modules (`AgentCommands`, `TaskCommands`, `CommCommands`, etc.). The `GovernancePipeline` intercepts commands through ordered hooks: security → permission → validation → rate-limit → policy → approval, with post-hooks for audit and metrics.
+
+### Monorepo structure
 
 | Package | Description |
 |---------|-------------|
-| `packages/server` | Express 5 + WebSocket server, ACP agent management, SQLite/Drizzle ORM |
-| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state, ReactFlow DAG, Mission Control |
+| `packages/shared` | TypeScript types, Zod schemas, protocol definitions (shared between server and client) |
+| `packages/server` | Express 5 orchestration server, agent management, SQLite/Drizzle ORM, knowledge pipeline |
+| `packages/web` | React 19 + Vite frontend, Tailwind CSS 4, Zustand state management |
+| `packages/docs` | Documentation website |
 
-**Tech stack**: Node.js · TypeScript · Express 5 · SQLite (WAL) · Drizzle ORM · React 19 · Vite · Tailwind CSS 4 · Zustand · ReactFlow · WebSocket (ws)
-
-```
-React UI ←→ WebSocket ←→ Node.js Server ←→ ACP ←→ Copilot CLI ×N
-                              │
-                         AgentManager (TypedEmitter)
-                        ┌─────┴──────┐
-                   MessageBus    ActivityLedger (batched writes)
-                   DecisionLog   FileLockRegistry
-                   Scheduler     ContextRefresher
-                   ProjectRegistry  ChatGroupRegistry
-                   CommandDispatcher  TimelineStore
-                   DeferredIssueRegistry  EventPipeline
-                   AlertEngine  TimerRegistry
-```
-
-### Key Components
+### Key server components
 
 | Component | Responsibility |
 |-----------|---------------|
-| **AgentManager** | Spawns agents, routes messages, manages delegations. Cascade termination with visited-set guard. |
-| **CommandDispatcher** | Thin router that delegates to 10 command modules. Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output. |
-| **Command Modules** | `AgentCommands`, `CommCommands`, `DirectMessageCommands`, `TaskCommands`, `CoordCommands`, `SystemCommands`, `DeferredCommands`, `TimerCommands`, `CapabilityCommands`, `TemplateCommands` — domain-grouped command handlers |
-| **Agent** | Wraps a Copilot CLI process (ACP) with lifecycle management, message buffering, and memory bounds |
-| **RoleRegistry** | Role definitions with system prompts, icons, colors, default models. `receivesStatusUpdates` flag for secretary auto-refresh. |
-| **MessageBus** | Routes inter-agent messages and group chats |
+| **AgentManager** | Spawns agents, routes messages, manages delegations. 25+ typed events. Cascade termination with visited-set guard. |
+| **CommandDispatcher** | Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output, routes to 10 command modules. |
+| **GovernancePipeline** | Single interception point for all commands — pre-hooks (security, permission, validation, rate-limit, policy, approval) and post-hooks (audit, metrics). |
+| **TaskDAG + EagerScheduler** | Directed acyclic graph for task scheduling with dependency resolution, parallel analysis, and eager pre-assignment of ready tasks. |
+| **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation. |
+| **SessionResumeManager** | Restores agent state after server restart with full context recovery. |
+| **KnowledgeInjector** | Injects session knowledge, skills, and collective memory into agent context on spawn. |
 | **FileLockRegistry** | Pessimistic file locking with TTL, glob support, expiry notifications. SQLite-backed. |
-| **WorktreeManager** | ⚠️ _In development._ Per-agent git worktrees — create/merge/cleanup lifecycle. Wired into AgentManager but not yet enabled. |
-| **ChatGroupRegistry** | Group lifecycle — create, archive, role-based membership, auto-creation for parallel work. Auto-adds new agents matching group role criteria. |
-| **ActivityLedger** | Batched activity logging (flushes every 250ms or 64 entries) |
-| **DecisionLog** | Decision tracking with accept/reject/reason workflow |
-| **AlertEngine** | Proactive detection: stuck agents (with exemptions for leads, new agents, prompting agents), context pressure, duplicate edits, idle+ready mismatch, stale decisions |
-| **ContextRefresher** | Re-injects crew context with health header after compaction events. Auto-refreshes secretary roles. |
-| **Scheduler** | Background tasks: expired lock cleanup, activity pruning, delegation cleanup |
-| **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation |
-| **HeartbeatMonitor** | DAG-aware stall detection — nudges idle leads with remaining work |
-| **EventPipeline** | Reactive event handlers: run CI after commits, log summaries on task completion, trigger webhooks |
-| **CapabilityRegistry** | Tracks acquired agent expertise (files, technologies, domains) for smart matching |
-| **EagerScheduler** | Pre-assigns upcoming tasks to idle agents before they become active |
-| **TaskTemplates** | Reusable task templates with natural-language decomposition |
-| **SearchEngine** | Full-text search across messages, tasks, decisions, and activity |
-| **PerformanceScorecard** | Agent performance metrics: throughput, first-pass rate, velocity, token efficiency |
-| **DecisionRecords** | ADR-style structured decision records with status tracking |
-| **CoverageTracker** | Test coverage monitoring with regression detection and trend analysis |
-| **ComplexityMonitor** | File complexity analysis with 4-tier scoring and hotspot detection |
-| **NotificationManager** | User notification preferences, quiet hours, priority-based routing |
-| **EscalationManager** | Auto-escalation for stale decisions and blocked tasks |
-| **ModelSelector** | Auto-picks optimal model based on task complexity, agent role, and budget |
-| **TokenBudgetOptimizer** | Priority-weighted token allocation across active agents |
-| **ParallelAnalyzer** | DAG bottleneck detection with critical path analysis |
-| **ReportGenerator** | Session report generation in HTML and Markdown |
-| **KnowledgeTransfer** | Cross-project knowledge sharing and context reuse |
+| **MessageBus + ChatGroupRegistry** | Inter-agent messaging, group chat lifecycle, role-based auto-membership. |
+| **DecisionLog** | Decision tracking with accept/reject/reason workflow and approval queue. |
+| **ActivityLedger** | Event-sourced activity logging (batched flushes every 250ms or 64 entries). |
+| **AlertEngine** | Proactive detection: stuck agents, context pressure, duplicate edits, stale decisions. |
+| **IntegrationRouter** | External platform routing — Telegram bot with batched notifications. |
+| **AdapterFactory** | Selects agent backend (Copilot CLI, Claude SDK, Gemini, Codex, Cursor, OpenCode) based on configuration. |
 
 > See the [Architecture Decisions](packages/docs/reference/architecture-decisions.md) page for the rationale behind key design choices.
+
+### Configuration
+
+Flightdeck uses layered configuration: **hardcoded defaults ← YAML config ← environment variables ← runtime API**.
+
+**Config file** (`flightdeck.config.yaml`):
+
+```yaml
+server:
+  maxConcurrentAgents: 50        # 1–200
+
+heartbeat:
+  idleThresholdMs: 60000         # Idle agent detection threshold
+  crewUpdateIntervalMs: 180000   # Crew status push interval
+
+models:
+  defaults:                      # Default model per role
+    lead: [claude-opus-4.6]
+    developer: [claude-opus-4.6]
+    architect: [claude-opus-4.6]
+    code-reviewer: [gemini-3-pro-preview]
+    # ... (14 roles total)
+
+provider:
+  id: copilot                    # Active provider: copilot | claude | gemini | codex | cursor | opencode
+
+budget:
+  limit: null                    # null = unlimited; set a dollar amount to cap spend
+  thresholds:
+    warning: 0.7
+    critical: 0.9
+    pause: 1.0
+```
+
+See [`flightdeck.config.example.yaml`](flightdeck.config.example.yaml) for the full reference.
+
+**Key environment variables:**
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `3001` | Server port |
+| `HOST` | `127.0.0.1` | Bind address |
+| `DB_PATH` | `./flightdeck.db` | SQLite database location |
+| `CLI_PROVIDER` | `copilot` | Agent provider (`copilot`, `claude`, `gemini`, `codex`, `cursor`, `opencode`) |
+| `ANTHROPIC_API_KEY` | — | Required for Claude provider |
+| `GEMINI_API_KEY` | — | Required for Gemini provider |
+| `OPENAI_API_KEY` | — | Required for Codex provider |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram integration (optional) |
+| `AUTH` | enabled | Set to `none` to disable authentication |
+| `SERVER_SECRET` | auto-generated | Fixed auth token (optional) |
+| `MAX_AGENTS` | `50` | Max concurrent agents (1–200) |
+| `FLIGHTDECK_CONFIG` | — | Path to YAML config file |
 
 ## Agent Roles
 
@@ -205,11 +271,11 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 
 | Role | Icon | Focus | Default Model |
 |------|------|-------|---------------|
-| **Project Lead** | 👑 | Orchestration, delegation, team coordination | Claude Opus 4.6 |
+| **Project Lead** | 👑 | Orchestration, delegation, crew coordination | Claude Opus 4.6 |
 | **Developer** | 💻 | Code implementation, tests, bug fixes | Claude Opus 4.6 |
 | **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | Claude Opus 4.6 |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
-| **Critical Reviewer** | 🛡️ | Security, performance, edge cases | Gemini 3 Pro |
+| **Critical Reviewer** | 🛡️ | Secure-by-design review, performance, edge cases | Gemini 3 Pro |
 | **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.3 Codex |
 | **Technical Writer** | 📝 | Documentation, API design review, developer experience | GPT-5.2 |
 | **Designer** | 🎨 | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
@@ -221,11 +287,13 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 
 Custom roles can be created via the Settings UI with your own system prompts, colors, and icons.
 
+> **AI-Aware Estimation:** Traditional human timelines don't apply. A crew of AI agents can compress weeks of work into hours. Plan in sessions (30 min – 2 hours), not sprints. See the [agent-collaboration-patterns](.github/skills/agent-collaboration-patterns/SKILL.md) skill for calibration data.
+
 ## ACP Command Reference
 
 Agents communicate via structured commands wrapped in doubled Unicode brackets (`⟦⟦ COMMAND {...} ⟧⟧`, U+27E6/U+27E7) detected in their output stream. Commands are parsed by the `CommandDispatcher` and routed to the appropriate subsystem.
 
-### Team Management (Lead + Architect)
+### Crew Management (Lead + Architect)
 
 | Command | Description |
 |---------|-------------|
@@ -309,7 +377,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 | View | Description |
 |------|-------------|
-| **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), team/comms/groups/DAG/tokens tabs, three-tier message hierarchy, catch-up banner |
+| **Lead Dashboard** | Chat with the lead, decisions panel (accept/reject with reasons), crew/comms/groups/DAG/tokens tabs, three-tier message hierarchy, catch-up banner |
 | **Mission Control** | Single-screen project overview: health summary, agent fleet, token economics, proactive alerts, activity feed, DAG minimap, comm heatmap, performance scorecards. Drag-and-drop panel reorder. |
 | **Agents** | Unified list with hierarchy, model selector, plan progress, agent controls, project grouping |
 | **Tasks** | Per-project task tabs with DAG status, progress badges, project grouping, duplicate detection |
@@ -354,3 +422,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 <img width="1412" height="826" alt="Agent fleet and controls" src="https://github.com/user-attachments/assets/14c5d4c1-b7fa-45a4-9027-393b46cc224f" />
 
 <img width="1406" height="817" alt="Settings and custom role editor" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
+
+## Acknowledgments
+
+Flightdeck is built on many excellent open-source projects. See [docs/CREDITS.md](docs/CREDITS.md) for full attribution, including the research projects, agent SDKs, core libraries, and design references that made this possible.

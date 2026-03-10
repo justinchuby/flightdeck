@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TimerRegistry } from '../coordination/TimerRegistry.js';
+import { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
 import { createTestTimerDb } from './helpers/createTestTimerDb.js';
 import { setTimerSchema } from '../agents/commands/commandSchemas.js';
 

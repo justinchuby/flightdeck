@@ -53,7 +53,7 @@ export function ToastContainer() {
             className="glass-toast flex items-center gap-2 px-4 py-3 rounded-xl animate-slide-in"
           >
             <Icon size={16} className={`shrink-0 ${ICON_COLORS[toast.type]}`} />
-            <span className="text-sm flex-1 text-th-text/90">{toast.message}</span>
+            <span className="text-sm flex-1 text-th-text/90 whitespace-pre-line">{toast.message}</span>
             <button onClick={() => remove(toast.id)} className="shrink-0 opacity-60 hover:opacity-100 text-th-text/70">
               <X size={14} />
             </button>

@@ -39,7 +39,7 @@ export function ConflictDetailPanel({ conflict, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <div
-        className="relative w-[480px] h-full bg-th-bg border-l border-th-border overflow-y-auto motion-slide-in-right"
+        className="relative w-full sm:max-w-[480px] h-full bg-th-bg border-l border-th-border overflow-y-auto motion-slide-in-right"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-4 space-y-4">

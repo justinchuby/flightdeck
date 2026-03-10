@@ -118,7 +118,7 @@ export function SpotlightTour({ onComplete }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60]" aria-modal="true" role="dialog" aria-label="Guided tour">
+    <div className="fixed inset-0 z-tour" aria-modal="true" role="dialog" aria-label="Guided tour">
       {/* Overlay with cutout */}
       <div
         className="absolute inset-0 bg-black/60 transition-all duration-300"
@@ -129,7 +129,7 @@ export function SpotlightTour({ onComplete }: Props) {
       {/* Tooltip */}
       <div
         style={tooltipStyle()}
-        className="z-[61] max-w-sm bg-th-bg rounded-xl shadow-xl border border-th-border p-4"
+        className="z-tour max-w-sm bg-th-bg rounded-xl shadow-xl border border-th-border p-4"
         role="alertdialog"
       >
         <h3 className="text-sm font-semibold text-th-text mb-1">{currentStep.title}</h3>

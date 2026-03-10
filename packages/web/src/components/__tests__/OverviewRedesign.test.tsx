@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { KeyStats } from '../OverviewPage/KeyStats';
+import { KeyStats } from '../AnalysisPage/KeyStats';
 import { MilestoneTimeline } from '../OverviewPage/MilestoneTimeline';
-import { AgentHeatmap } from '../OverviewPage/AgentHeatmap';
+import { AgentHeatmap } from '../AnalysisPage/AgentHeatmap';
 import type { AgentInfo } from '../../types';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
 
@@ -19,7 +19,10 @@ vi.mock('../../stores/appStore', () => ({
 }));
 
 vi.mock('../../stores/leadStore', () => ({
-  useLeadStore: (sel: any) => sel({ selectedLeadId: 'lead-1' }),
+  useLeadStore: (sel: any) => sel({
+    selectedLeadId: 'lead-1',
+    projects: {},
+  }),
 }));
 
 vi.mock('../../hooks/useApi', () => ({
@@ -31,6 +34,12 @@ vi.mock('../../hooks/useApi', () => ({
     }
     if (path.includes('/keyframes')) {
       return Promise.resolve({ keyframes: [] });
+    }
+    if (path.includes('/decisions')) {
+      return Promise.resolve([]);
+    }
+    if (path.includes('/activity')) {
+      return Promise.resolve([]);
     }
     return Promise.resolve({ ok: false });
   }),
@@ -47,29 +56,29 @@ const mockAgents: AgentInfo[] = [
 // ── Tests ──────────────────────────────────────────────────────────
 
 describe('KeyStats', () => {
-  it('renders stats card', () => {
+  it('renders stats card with agents, duration, and completed', () => {
     render(<KeyStats agents={mockAgents} />);
     expect(screen.getByTestId('key-stats')).toBeTruthy();
     expect(screen.getByText('Key Stats')).toBeTruthy();
     expect(screen.getByText('1 active / 3 total')).toBeTruthy();
-    // No token data on mock agents → tokens shows N/A
-    expect(screen.getByText('N/A')).toBeTruthy();
+    expect(screen.getByText('Agents')).toBeTruthy();
+    expect(screen.getByText('Duration')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
-  it('shows tokens when token data available', () => {
-    const agentsWithTokens = mockAgents.map((a, i) =>
-      i === 0 ? { ...a, inputTokens: 1000, outputTokens: 500 } : a,
-    );
-    render(<KeyStats agents={agentsWithTokens} totalTokens={1500} />);
-    expect(screen.getByText('~2k total')).toBeTruthy();
+  it('shows completed count for agents with completed status', () => {
+    render(<KeyStats agents={mockAgents} />);
+    // 1 completed agent in mockAgents (a3)
+    expect(screen.getByText('1 agent')).toBeTruthy();
   });
 
-  it('shows token count when token data available', () => {
-    const agentsWithTokens = mockAgents.map((a, i) =>
-      i === 0 ? { ...a, inputTokens: 1000, outputTokens: 500 } : a,
-    );
-    render(<KeyStats agents={agentsWithTokens} totalTokens={150000} />);
-    expect(screen.getByText('~150k total')).toBeTruthy();
+  it('shows active count reflecting running agents', () => {
+    const moreAgents = [
+      ...mockAgents,
+      { id: 'a4', role: { id: 'dev', name: 'Developer' } as any, status: 'running', model: 'claude' } as any,
+    ];
+    render(<KeyStats agents={moreAgents} />);
+    expect(screen.getByText('2 active / 4 total')).toBeTruthy();
   });
 });
 
@@ -133,17 +142,17 @@ describe('AgentHeatmap', () => {
   });
 });
 
-describe('OverviewPage project selector', () => {
-  it('renders project tabs when projects exist', async () => {
+describe('OverviewPage rendering', () => {
+  it('renders overview page without project tabs', async () => {
     const { OverviewPage } = await import('../OverviewPage/OverviewPage');
     render(
       <MemoryRouter>
         <OverviewPage />
       </MemoryRouter>,
     );
-    // Wait for project fetch to resolve — now renders as tabs
-    const tabs = await screen.findByTestId('project-tabs');
-    expect(tabs).toBeTruthy();
-    expect(screen.getByText('Test Project')).toBeTruthy();
+    // ProjectTabs were removed — page should render without them
+    const page = await screen.findByTestId('overview-page');
+    expect(page).toBeTruthy();
+    expect(screen.queryByTestId('project-tabs')).toBeNull();
   });
 });

@@ -153,29 +153,29 @@ The **Canvas** shows your agent crew as an interactive node graph.
 
 ---
 
-## Automating Decisions with Intent Rules
+## Adjusting Oversight Levels
 
-Instead of manually approving every agent decision, set up **Intent Rules** to handle routine approvals automatically.
+Control how much autonomy your agents have using the **Oversight System**.
 
 ### Getting Started
 
-1. Go to **Settings → Intent Rules**
-2. The default preset is **Autonomous** — most decisions auto-approved, alerts for architecture and dependencies
-3. Switch to **Moderate** or **Conservative** if you want more control
+1. Go to **Settings → Oversight**
+2. The default tier is **Balanced** — routine work flows through, structural changes need approval
+3. Switch to **Supervised** for more control or **Autonomous** for hands-off operation
 
 ### Recommended Approach
 
 | Phase | Strategy |
 |-------|----------|
-| **Starting out** | Use the default **Autonomous** preset — step in only when needed |
-| **Want more control** | Switch to **Moderate** — architecture requires review, routine work flows through |
-| **Critical project** | Use **Conservative** — review most decisions, only style is auto-approved |
+| **Starting out** | Use **Balanced** (default) — learn what agents do before granting full autonomy |
+| **Comfortable** | Switch to **Autonomous** — agents work independently, you review results |
+| **Critical project** | Use **Supervised** — agents explain reasoning and ask before acting |
 
 ::: tip
-After batch-approving 3+ decisions in the same category, Flightdeck will suggest creating an Allow rule automatically — the "Teach Me" feature.
+Add natural language custom instructions for project-specific guidance (e.g., "Always run tests before committing"). These are injected into every agent's system prompt.
 :::
 
-For full documentation, see the [Intent Rules guide](/guide/intent-rules).
+For full documentation, see the [Oversight guide](/guide/oversight).
 
 ---
 

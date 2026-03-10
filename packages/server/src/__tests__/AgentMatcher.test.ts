@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AgentMatcher } from '../coordination/AgentMatcher.js';
-import type { MatchQuery } from '../coordination/AgentMatcher.js';
+import { AgentMatcher } from '../coordination/agents/AgentMatcher.js';
+import type { MatchQuery } from '../coordination/agents/AgentMatcher.js';
 import type { AgentManager } from '../agents/AgentManager.js';
-import type { CapabilityRegistry } from '../coordination/CapabilityRegistry.js';
-import type { ActivityLedger } from '../coordination/ActivityLedger.js';
-import type { ActivityEntry } from '../coordination/ActivityLedger.js';
+import type { CapabilityRegistry } from '../coordination/agents/CapabilityRegistry.js';
+import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
+import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

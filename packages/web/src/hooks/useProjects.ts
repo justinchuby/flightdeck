@@ -18,7 +18,7 @@ export function useProjects() {
           setProjects(ps.filter((p) => p.status !== 'archived'));
         }
       })
-      .catch(() => {})
+      .catch(() => { /* initial fetch — will retry */ })
       .finally(() => setLoading(false));
   }, []);
 

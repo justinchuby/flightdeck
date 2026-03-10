@@ -3,25 +3,8 @@ import { eq, and, asc, desc, count } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { chatGroups, chatGroupMembers, chatGroupMessages } from '../db/schema.js';
 
-export interface ChatGroup {
-  name: string;
-  leadId: string;
-  projectId?: string;
-  archived?: boolean;
-  memberIds: string[];
-  createdAt: string;
-}
-
-export interface GroupMessage {
-  id: string;
-  groupName: string;
-  leadId: string;
-  fromAgentId: string;
-  fromRole: string;
-  content: string;
-  reactions: Record<string, string[]>;
-  timestamp: string;
-}
+import type { ChatGroup, GroupMessage } from '@flightdeck/shared';
+export type { ChatGroup, GroupMessage } from '@flightdeck/shared';
 
 export class ChatGroupRegistry extends EventEmitter {
   private db: Database;

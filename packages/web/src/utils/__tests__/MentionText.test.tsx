@@ -14,7 +14,7 @@ describe('MentionText', () => {
       <MentionText text="Hey @user check this" agents={agents} />,
     );
 
-    const userMention = container.querySelector('.bg-yellow-500\\/20');
+    const userMention = container.querySelector('.bg-yellow-500\\/25');
     expect(userMention).not.toBeNull();
     expect(userMention!.textContent).toBe('@user');
     // No tooltip wrapper — the span should NOT be inside an AgentMentionTooltip
@@ -40,7 +40,7 @@ describe('MentionText', () => {
       <MentionText text="@user please review @developer code" agents={agents} />,
     );
 
-    const yellowMentions = container.querySelectorAll('.bg-yellow-500\\/20');
+    const yellowMentions = container.querySelectorAll('.bg-yellow-500\\/25');
     const blueMentions = container.querySelectorAll('.bg-blue-500\\/20');
     expect(yellowMentions).toHaveLength(1);
     expect(blueMentions).toHaveLength(1);

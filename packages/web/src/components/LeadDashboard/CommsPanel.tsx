@@ -183,7 +183,7 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
               {selectedComm.content.startsWith('[Agent Report]') || selectedComm.content.startsWith('[Agent ACK]')
                 ? <AgentReportBlock content={selectedComm.content} />
                 : (
@@ -223,7 +223,7 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
               <pre className="text-sm font-mono text-th-text-alt whitespace-pre-wrap break-words leading-relaxed">
                 <MentionText text={selectedGroupMsg.content} agents={useAppStore.getState().agents} onClickAgent={(id) => { useAppStore.getState().setSelectedAgent(id); setSelectedGroupMsg(null); }} />
               </pre>

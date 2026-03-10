@@ -21,9 +21,32 @@ import {
 } from './commandSchemas.js';
 import { deriveArgs } from './CommandHelp.js';
 
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+/** Mark active delegations for an agent as completed/cancelled. */
+function markAgentDelegations(
+  ctx: CommandHandlerContext,
+  agentId: string,
+  match: 'to' | 'from',
+  status: 'completed' | 'cancelled',
+  result?: string,
+): number {
+  let count = 0;
+  for (const [, del] of ctx.delegations) {
+    const matchId = match === 'to' ? del.toAgentId : del.fromAgentId;
+    if (matchId === agentId && del.status === 'active') {
+      del.status = status;
+      del.completedAt = new Date().toISOString();
+      if (result !== undefined) del.result = result;
+      count++;
+    }
+  }
+  return count;
+}
+
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const DECLARE_TASKS_REGEX = /⟦⟦\s*DECLARE_TASKS\s*(\{.*?\})\s*⟧⟧/s;
+const DECLARE_TASKS_REGEX = /⟦⟦\s*DECLARE_TASKS\s*([\[{].*?[\]}])\s*⟧⟧/s;
 const TASK_STATUS_REGEX = /⟦⟦\s*TASK_STATUS\s*⟧⟧/s;
 const QUERY_TASKS_REGEX = /⟦⟦\s*QUERY_TASKS\s*⟧⟧/s;
 const PAUSE_TASK_REGEX = /⟦⟦\s*PAUSE_TASK\s*(\{.*?\})\s*⟧⟧/s;
@@ -50,6 +73,52 @@ function handleDeclareTasks(ctx: CommandHandlerContext, agent: Agent, data: stri
   const match = data.match(DECLARE_TASKS_REGEX);
   if (!match) return;
   try {
+    // Pre-parse to detect common format mistakes before Zod validation
+    let raw: unknown;
+    try {
+      raw = JSON.parse(match[1]);
+    } catch {
+      agent.sendMessage('[System] DECLARE_TASKS error: invalid JSON payload. Check syntax and try again.');
+      return;
+    }
+
+    // Bare array instead of {tasks: [...]}
+    if (Array.isArray(raw)) {
+      agent.sendMessage(
+        '[System] DECLARE_TASKS error: expected {tasks: [...]} object, got a bare array.\n' +
+        'Wrap your tasks: DECLARE_TASKS {"tasks": [...]}\n' +
+        'Example: DECLARE_TASKS {"tasks": [{"taskId": "t1", "role": "developer", "description": "..."}]}',
+      );
+      return;
+    }
+
+    // Wrong field names with helpful hints
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const obj = raw as Record<string, unknown>;
+      const tasks = Array.isArray(obj.tasks) ? obj.tasks : [];
+      const hints: string[] = [];
+      for (const task of tasks) {
+        if (task && typeof task === 'object') {
+          const t = task as Record<string, unknown>;
+          if ('id' in t && !('taskId' in t)) hints.push('"id" → "taskId"');
+          if ('deps' in t && !('dependsOn' in t)) hints.push('"deps" → "dependsOn"');
+          if ('dependencies' in t && !('dependsOn' in t)) hints.push('"dependencies" → "dependsOn"');
+          if ('title' in t && !('description' in t)) hints.push('"title" → "description"');
+          if ('name' in t && !('taskId' in t)) hints.push('"name" → "taskId"');
+          if ('type' in t && !('role' in t)) hints.push('"type" → "role"');
+        }
+      }
+      if (hints.length > 0) {
+        const unique = [...new Set(hints)];
+        agent.sendMessage(
+          `[System] DECLARE_TASKS hint: detected likely wrong field names. Did you mean:\n` +
+          unique.map(h => `  • ${h}`).join('\n') +
+          '\nRequired fields per task: taskId, role. Optional: description, dependsOn, files, priority.',
+        );
+        // Continue to Zod validation — it may still pass if required fields are present
+      }
+    }
+
     const req = parseCommandPayload(agent, match[1], declareTasksSchema, 'DECLARE_TASKS');
     if (!req) return;
     const projectId = ctx.getProjectIdForAgent(agent.id);
@@ -108,7 +177,7 @@ function handleTaskStatus(ctx: CommandHandlerContext, agent: Agent, _data: strin
   if (summary.skipped > 0) msg += `, ${summary.skipped} skipped`;
   msg += '\n\nTasks:';
   for (const task of tasks) {
-    const statusIcon = { pending: '⏳', ready: '🟢', running: '🔵', done: '✅', failed: '❌', blocked: '🚫', paused: '⏸️', skipped: '⏭️' }[task.dagStatus] || '?';
+    const statusIcon = { pending: '⏳', ready: '🟢', running: '🔵', done: '✅', failed: '❌', blocked: '🚫', paused: '⏸️', skipped: '⏭️', in_review: '🔍' }[task.dagStatus] || '?';
     msg += `\n  ${statusIcon} [${task.dagStatus.toUpperCase()}] ${task.id} (${task.role})`;
     if (task.description) msg += ` — ${task.description.slice(0, 80)}`;
     if (task.assignedAgentId) msg += ` [agent: ${task.assignedAgentId.slice(0, 8)}]`;
@@ -222,13 +291,7 @@ function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string):
           skippedAgent.sendMessage(`[System] Task "${req.taskId}" was skipped by the Project Lead. Please stop working on it.`);
         }
         ctx.lockRegistry.releaseAll(result.skippedAgentId);
-        // Cancel the active delegation to the orphaned agent
-        for (const [, del] of ctx.delegations) {
-          if (del.toAgentId === result.skippedAgentId && del.status === 'active') {
-            del.status = 'cancelled';
-            del.completedAt = new Date().toISOString();
-          }
-        }
+        markAgentDelegations(ctx, result.skippedAgentId, 'to', 'cancelled');
       }
       agent.sendMessage(`[System] Task "${req.taskId}" skipped. Dependents may now be ready. Use TASK_STATUS to check.`);
     } else {
@@ -269,8 +332,10 @@ function handleCancelTask(ctx: CommandHandlerContext, agent: Agent, data: string
 function handleResetDAG(ctx: CommandHandlerContext, agent: Agent, _data: string): void {
   if (agent.role.id !== 'lead') { agent.sendMessage('[System] Only the Project Lead can reset the DAG.'); return; }
   const count = ctx.taskDAG.resetDAG(agent.id);
+  const cancelledDelegations = markAgentDelegations(ctx, agent.id, 'from', 'cancelled');
   if (count > 0) {
-    agent.sendMessage(`[System] DAG reset: ${count} task(s) removed. You can now DECLARE_TASKS again.`);
+    const delNote = cancelledDelegations > 0 ? ` ${cancelledDelegations} delegation(s) cancelled.` : '';
+    agent.sendMessage(`[System] DAG reset: ${count} task(s) archived.${delNote} You can now DECLARE_TASKS again.`);
   } else {
     agent.sendMessage('[System] No DAG tasks to reset.');
   }
@@ -289,6 +354,9 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       const MAX_FIELD_LENGTH = 10_000;
       const summary = (req.summary || req.output || '(no summary)').slice(0, MAX_FIELD_LENGTH);
       const status = (req.status || 'done').slice(0, 200);
+
+      // Store on agent for knowledge extraction on session end
+      agent.completionSummary = summary;
 
       if (!agent.parentId) {
         agent.sendMessage('[System] COMPLETE_TASK failed: no parent agent found.');
@@ -355,6 +423,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         }
         // Prevent duplicate report when agent goes idle after COMPLETE_TASK
         ctx.reportedCompletions.add(`${agent.id}:idle`);
+        markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         ctx.emit('dag:updated', { leadId: agent.parentId });
         agent.sendMessage(`[System] Task "${taskId}" marked as done in DAG.${newlyReady && newlyReady.length > 0 ? ` ${newlyReady.length} task(s) now ready.` : ''}`);
       } else {
@@ -369,6 +438,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         }
         // Prevent duplicate report when agent goes idle after COMPLETE_TASK
         ctx.reportedCompletions.add(`${agent.id}:idle`);
+        markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         agent.sendMessage(`[System] Task completion signaled to parent. (No DAG task ID — use dagTaskId for DAG integration.)`);
       }
       return;
@@ -380,6 +450,9 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       return;
     }
     const summary = (req.summary || req.output || '').slice(0, 10_000) || undefined;
+
+    // Store on agent for knowledge extraction on session end
+    if (summary) agent.completionSummary = summary;
     const error = ctx.taskDAG.getTransitionError(agent.id, req.taskId, 'complete');
     if (error) {
       if (error.currentStatus === 'done' && error.attemptedAction === 'complete') {

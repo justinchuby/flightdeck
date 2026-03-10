@@ -6,7 +6,7 @@ Flightdeck's onboarding system has three layers designed to make new users produ
 
 ## QuickStart
 
-On first launch, instead of showing an empty dashboard, Flightdeck presents a **playbook selection** screen. Users pick a template that matches their goal:
+On first launch, instead of showing an empty dashboard, Flightdeck presents a **guided project creation** screen. Users configure their goal and team:
 
 - **Code Review** — spawn a reviewer for existing PRs
 - **Feature Build** — full team (lead, developers, architect, reviewer)
@@ -14,7 +14,7 @@ On first launch, instead of showing an empty dashboard, Flightdeck presents a **
 - **Documentation** — writer + reviewer
 - **Custom** — blank canvas, configure your own team
 
-Selecting a playbook immediately launches a configured session. The user goes from "first visit" to "watching agents work" in seconds.
+Selecting a configuration immediately launches a session. The user goes from "first visit" to "watching agents work" in seconds.
 
 > [!TIP]
 > QuickStart only appears on first visit. Returning users see the normal dashboard. Clear localStorage to re-trigger it during development.
@@ -51,12 +51,12 @@ The sidebar starts minimal and grows as the user demonstrates mastery:
 *Unlocked after: first session completed or 3+ agent interactions*
 
 ### Tier 3 — Operator  
-+2 items: Playbooks, Mission Control  
-*Unlocked after: created a playbook or used batch approval*
++2 items: Tasks, Mission Control  
+*Unlocked after: completed a session or used batch approval*
 
 ### Tier 4 — Power User
-+2 items: Roles, Community  
-*Unlocked after: created a custom role or published a playbook*
++2 items: Roles, Analytics  
+*Unlocked after: created a custom role or completed 3+ sessions*
 
 > [!TIP]
 > All routes are always accessible via ⌘K or direct URL — progressive disclosure only affects the sidebar. Power users are never locked out.
@@ -77,7 +77,7 @@ Six behavior-triggered tips appear as small toasts when specific conditions are 
 | Trigger | Tip |
 |---------|-----|
 | First approval | "You can approve multiple items at once with batch approval" |
-| 5+ manual approvals | "Set up Intent Rules to auto-approve trusted actions" |
+| 5+ manual approvals | "Adjust your Oversight level in Settings to reduce interruptions" |
 | First agent crash | "Recovery is automatic — check Settings to configure" |
 | Budget > 50% | "Set budget alerts in Settings → Budget" |
 | 3+ repeated commands | "Try Workflow Automation to handle this automatically" |

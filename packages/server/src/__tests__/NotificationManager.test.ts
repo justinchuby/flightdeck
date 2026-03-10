@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { NotificationManager } from '../coordination/NotificationManager.js';
-import type { NotificationPreference } from '../coordination/NotificationManager.js';
+import { NotificationManager } from '../coordination/alerts/NotificationManager.js';
+import type { NotificationPreference } from '../coordination/alerts/NotificationManager.js';
 
 vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

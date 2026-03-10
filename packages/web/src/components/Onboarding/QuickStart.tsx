@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-interface Playbook {
+interface Template {
   id: string;
   name: string;
   icon: string;
@@ -9,7 +9,7 @@ interface Playbook {
   recommended?: boolean;
 }
 
-const PLAYBOOKS: Playbook[] = [
+const TEMPLATES: Template[] = [
   {
     id: 'code-review',
     name: 'Code Review',
@@ -49,17 +49,17 @@ const PLAYBOOKS: Playbook[] = [
 ];
 
 interface Props {
-  onSelectPlaybook: (playbookId: string) => void;
+  onSelectTemplate: (templateId: string) => void;
   onStartFromScratch: () => void;
   onBrowseProjects: () => void;
 }
 
-export function QuickStart({ onSelectPlaybook, onStartFromScratch, onBrowseProjects }: Props) {
+export function QuickStart({ onSelectTemplate, onStartFromScratch, onBrowseProjects }: Props) {
   const [launching, setLaunching] = useState<string | null>(null);
 
   const handleStart = (id: string) => {
     setLaunching(id);
-    onSelectPlaybook(id);
+    onSelectTemplate(id);
   };
 
   return (
@@ -69,12 +69,12 @@ export function QuickStart({ onSelectPlaybook, onStartFromScratch, onBrowseProje
           <h1 className="text-3xl font-bold text-th-text mb-2">🚀 Welcome to Flightdeck</h1>
           <p className="text-th-text-muted text-lg">
             Supervise AI crews building software.<br />
-            Pick a playbook to start your first session.
+            Pick a template to start your first session.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {PLAYBOOKS.map(pb => (
+          {TEMPLATES.map(pb => (
             <div
               key={pb.id}
               className={`relative bg-th-bg-alt border rounded-xl p-5 flex flex-col gap-3 transition-all hover:border-accent/50 hover:shadow-lg ${

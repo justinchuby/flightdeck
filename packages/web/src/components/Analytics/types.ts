@@ -29,7 +29,7 @@ export interface SessionComparison {
 }
 
 export interface AnalyticsInsight {
-  type: 'cost' | 'efficiency' | 'model' | 'role' | 'playbook' | 'anomaly';
+  type: 'cost' | 'efficiency' | 'model' | 'role' | 'anomaly';
   severity: 'info' | 'suggestion' | 'warning';
   title: string;
   description: string;

@@ -4,6 +4,7 @@ import type { AgentInfo } from '../../types';
 import { RefreshCw, Square, Terminal, Zap, Check, Play } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { formatTokens } from '../../utils/format';
 import { DiffBadge } from '../DiffPreview';
 
 interface Props {
@@ -45,9 +46,20 @@ export function AgentCard({ agent, api }: Props) {
           <span className="text-lg">{agent.role.icon}</span>
           <div>
             <h3 className="text-sm font-medium">{agent.role.name} <span className="text-th-text-muted font-mono text-xs">({agent.id.slice(0, 8)})</span></h3>
-            <span className={`text-xs ${agentStatusText(agent.status)}`}>
-              {agent.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs ${agentStatusText(agent.status)}`}>
+                {agent.status}
+              </span>
+              {agent.sessionId && (
+                <button
+                  className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors"
+                  title={`Session: ${agent.sessionId} — click to copy`}
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+                >
+                  sess:{agent.sessionId.slice(0, 8)}
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -195,10 +207,40 @@ export function AgentCard({ agent, api }: Props) {
         );
       })()}
 
+      {/* Token metrics & context window bar */}
+      {(agent.inputTokens || agent.outputTokens || agent.contextWindowUsed) ? (
+        <div className="mt-1.5 space-y-1">
+          {(agent.inputTokens || agent.outputTokens) ? (
+            <div className="flex items-center gap-2 text-[10px] text-th-text-muted">
+              <span title="Input tokens">↓{formatTokens(agent.inputTokens)}</span>
+              <span title="Output tokens">↑{formatTokens(agent.outputTokens)}</span>
+              {(agent.cacheReadTokens != null && agent.cacheReadTokens > 0) && (
+                <span title="Cache read tokens" className="text-green-500/70">⚡{formatTokens(agent.cacheReadTokens)}</span>
+              )}
+            </div>
+          ) : null}
+          {agent.contextWindowSize && agent.contextWindowUsed ? (() => {
+            const pct = Math.min(100, Math.round((agent.contextWindowUsed / agent.contextWindowSize) * 100));
+            const color = pct > 85 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : 'bg-blue-500';
+            return (
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 bg-th-bg-muted rounded-full h-1">
+                  <div className={`${color} h-1 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[10px] text-th-text-muted">{pct}%</span>
+              </div>
+            );
+          })() : null}
+        </div>
+      ) : null}
+
       {agent.outputPreview && (
-        <pre className="text-xs text-th-text-muted mt-2 overflow-hidden h-12 font-mono bg-surface/50 rounded p-1">
-          {agent.outputPreview.slice(-200)}
-        </pre>
+        <div className="relative mt-2">
+          <pre className="text-xs text-th-text-muted overflow-hidden max-h-16 font-mono bg-surface/50 rounded p-1 whitespace-pre-wrap break-words">
+            {agent.outputPreview.slice(-200)}
+          </pre>
+          <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-surface/50 to-transparent rounded-b pointer-events-none" />
+        </div>
       )}
 
       <div className="flex items-center justify-between mt-2">

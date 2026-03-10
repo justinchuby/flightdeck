@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnalyticsService } from '../coordination/AnalyticsService.js';
+import { AnalyticsService } from '../coordination/reporting/AnalyticsService.js';
 import { Database } from '../db/database.js';
 
 describe('AnalyticsService', () => {

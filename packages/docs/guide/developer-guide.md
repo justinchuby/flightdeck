@@ -72,43 +72,23 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 | GET | `/conflicts/config` | Get config |
 | PUT | `/conflicts/config` | Update config |
 
-### Intent Rules
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/intents` | List all rules |
-| POST | `/intents` | Create rule |
-| PATCH | `/intents/:id` | Update rule |
-| DELETE | `/intents/:id` | Delete rule |
-| POST | `/intents/reorder` | Reorder rules by priority |
-| GET | `/intents/presets` | Get available presets |
-| POST | `/intents/presets/:preset` | Apply trust preset |
-| POST | `/intents/presets/:preset` | Apply trust preset |
+### Intent Rules (Removed)
 
-### Recovery
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/recovery/:eventId/approve` | Approve recovery |
-| POST | `/recovery/:eventId/cancel` | Cancel recovery |
-| POST | `/recovery/:eventId/briefing` | Get briefing |
-| POST | `/settings/recovery` | Update settings |
+> **Note:** The Intent Rules API has been removed. Use the [Oversight System](/guide/oversight) instead.
 
-### Playbooks
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/playbooks` | List playbooks |
-| POST | `/api/playbooks` | Create playbook |
-| DELETE | `/api/playbooks/:id` | Delete playbook |
-| POST | `/api/playbooks/:id/duplicate` | Duplicate |
+### Recovery (Removed)
 
-### Community Playbooks
+> **Note:** The Recovery/Handoff API has been removed. Agent crash recovery is now handled automatically by the orchestrator.
+
+### Oversight
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/playbooks/community` | Browse community |
-| GET | `/playbooks/community/:id` | Get detail |
-| POST | `/playbooks/community` | Publish |
-| GET | `/playbooks/community/:id/reviews` | Get reviews |
-| POST | `/playbooks/community/:id/reviews` | Submit review |
-| POST | `/playbooks/community/:id/fork` | Fork playbook |
+| GET | `/config/yaml` | Get full config (includes oversight section) |
+| PATCH | `/config` | Update oversight level and custom instructions |
+
+### Playbooks (Removed)
+
+> **Note:** The Playbooks API has been removed.
 
 ### Roles
 | Method | Endpoint | Description |
@@ -126,11 +106,11 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 | POST | `/replay/:leadId/share` | Create share link |
 | GET | `/api/shared/:token` | Get shared replay |
 
-### Notifications & Handoffs
+### Notifications
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/notifications/settings` | Update preferences |
-| POST | `/handoffs/:recordId/deliver` | Deliver handoff |
+| PUT | `/notifications/settings` | Update notification preferences |
+| GET | `/notifications/routing` | Get notification routing config |
 
 ### Analytics & Costs
 | Method | Endpoint | Description |
@@ -169,8 +149,6 @@ All hooks are in `src/hooks/`. Import example: `import { useProjects } from '../
 | `useDashboardLayout()` | `{ panels, allPanels, togglePanel, movePanel, reorderPanels }` | Dashboard panel config |
 | `useCanvasGraph(agents)` | `{ nodes, edges }` | React Flow graph from agents |
 | `useCanvasLayout()` | `[layout, setLayout]` | Persisted canvas positions |
-| `useSwipeGesture(handlers)` | `{ onTouchStart, onTouchMove, onTouchEnd, offsetX, offsetY }` | Touch swipe detection |
-| `useSpotlight(selector)` | `SpotlightRect \| null` | DOM element rect for tutorials |
 | `useAutoScroll(ref, deps)` | void | Auto-scroll container to bottom |
 | `useIdleTimer(timeout)` | `{ isIdle }` | User inactivity detection |
 | `useAttachments()` | `{ attachments, addAttachment, removeAttachment }` | File attachment state |

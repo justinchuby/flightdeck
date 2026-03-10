@@ -17,14 +17,16 @@ export function CostTrendChart({ overview }: CostTrendChartProps) {
 
   const { sessions } = overview;
 
-  // Build token trend from sessions
-  const tokenTrend = useMemo(() =>
-    sessions.map((s) => ({
-      date: s.startedAt.slice(0, 10),
-      tokens: s.totalInputTokens + s.totalOutputTokens,
-    })),
-    [sessions],
-  );
+  // Build token trend — aggregate sessions by date to avoid duplicate keys
+  const tokenTrend = useMemo(() => {
+    const byDate = new Map<string, number>();
+    for (const s of sessions) {
+      const date = s.startedAt.slice(0, 10);
+      byDate.set(date, (byDate.get(date) ?? 0) + s.totalInputTokens + s.totalOutputTokens);
+    }
+    return Array.from(byDate, ([date, tokens]) => ({ date, tokens }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [sessions]);
   const avgTokensPerSession = sessions.length > 0
     ? Math.round(sessions.reduce((s, x) => s + x.totalInputTokens + x.totalOutputTokens, 0) / sessions.length)
     : 0;
@@ -65,9 +67,9 @@ export function CostTrendChart({ overview }: CostTrendChartProps) {
           <svg width={width} height={height}>
             <Group left={margin.left} top={margin.top}>
               {/* Grid lines (manual) */}
-              {yScale.ticks(4).map((tick) => (
+              {yScale.ticks(4).map((tick, i) => (
                 <line
-                  key={tick}
+                  key={`grid-${i}`}
                   x1={0}
                   x2={innerW}
                   y1={yScale(tick)}

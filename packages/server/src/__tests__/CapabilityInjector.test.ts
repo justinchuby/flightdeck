@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CapabilityInjector } from '../agents/capabilities/CapabilityInjector.js';
 import type { Agent } from '../agents/Agent.js';
-import type { ActivityLedger } from '../coordination/ActivityLedger.js';
+import type { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
 
 /** Minimal Agent stub for testing */
 function makeAgent(id = 'agent-001', roleId = 'developer'): Agent {

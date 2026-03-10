@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
+import { hasUnclosedCommandBlock } from '../utils/commandParser';
 
 export interface ActivityEvent {
   id: string;
@@ -149,7 +150,14 @@ export const useLeadStore = create<LeadState>((set) => ({
   setProgress: (leadId, progress) =>
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, progress } } };
+      // Normalize server-side property names (team→crew rename, Phase 1)
+      const raw = progress as any;
+      const normalized: LeadProgress = {
+        ...progress,
+        crewAgents: progress.crewAgents ?? raw.teamAgents ?? [],
+        crewSize: progress.crewSize ?? raw.teamSize ?? 0,
+      };
+      return { projects: { ...s.projects, [leadId]: { ...proj, progress: normalized } } };
     }),
 
   setProgressSummary: (leadId, summary) =>
@@ -181,12 +189,19 @@ export const useLeadStore = create<LeadState>((set) => ({
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       const msgs = [...proj.messages];
-      const lastIdx = msgs.length - 1;
-      // If the last message has an unclosed ⟦⟦ block, always append to keep the command intact
-      const lastText = lastIdx >= 0 ? msgs[lastIdx].text : '';
-      const hasUnclosedCommand = lastText.lastIndexOf('⟦⟦') > lastText.lastIndexOf('⟧⟧');
-      if (lastIdx >= 0 && msgs[lastIdx].sender === 'agent' && (!proj.pendingNewline || hasUnclosedCommand)) {
-        msgs[lastIdx] = { ...msgs[lastIdx], text: lastText + text, timestamp: msgs[lastIdx].timestamp || Date.now() };
+      // Find the last agent message (may not be the very last message if thinking interleaved)
+      let agentIdx = -1;
+      for (let k = msgs.length - 1; k >= 0; k--) {
+        if (msgs[k].sender === 'agent') { agentIdx = k; break; }
+        // Only look past thinking messages — stop at user/system/external boundaries
+        if (msgs[k].sender !== 'thinking') break;
+      }
+      const agentText = agentIdx >= 0 ? msgs[agentIdx].text : '';
+      // Use depth-aware check — the old `lastIndexOf('⟦⟦') > lastIndexOf('⟧⟧')` heuristic
+      // fails when nested ⟦⟦ ⟧⟧ appear inside command JSON (e.g. DELEGATE with example commands)
+      const unclosedCommand = hasUnclosedCommandBlock(agentText);
+      if (agentIdx >= 0 && (!proj.pendingNewline || unclosedCommand)) {
+        msgs[agentIdx] = { ...msgs[agentIdx], text: agentText + text, timestamp: msgs[agentIdx].timestamp || Date.now() };
       } else {
         msgs.push({ type: 'text', text: text, sender: 'agent', timestamp: Date.now() });
       }

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Database, Brain, MessageSquare, CheckCircle, Activity, Trash2, ChevronDown, ChevronRight, RefreshCw, BarChart3 } from 'lucide-react';
 import { decisionStatusText } from '../../utils/statusColors';
 import { SkeletonCard } from '../Shared';
+import { Tabs } from '../ui/Tabs';
+import type { TabItem } from '../ui/Tabs';
 
 interface DbStats {
   memory: number;
@@ -33,7 +35,7 @@ export function DataBrowser() {
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
-  const tabs: { id: TabId; label: string; icon: React.ReactNode; count?: number }[] = [
+  const tabs: TabItem[] = [
     { id: 'stats', label: 'Overview', icon: <BarChart3 size={14} /> },
     { id: 'memory', label: 'Memory', icon: <Brain size={14} />, count: stats?.memory },
     { id: 'conversations', label: 'Conversations', icon: <MessageSquare size={14} />, count: stats?.conversations },
@@ -42,7 +44,8 @@ export function DataBrowser() {
   ];
 
   return (
-    <div className="flex-1 overflow-auto p-6 max-w-6xl mx-auto">
+    <div className="flex-1 overflow-auto focus:outline-none" tabIndex={0}>
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Database className="w-6 h-6 text-th-text-muted" />
         <h2 className="text-xl font-semibold">Database</h2>
@@ -52,31 +55,19 @@ export function DataBrowser() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-th-border mb-4">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors border-b-2 ${
-              tab === t.id
-                ? 'border-accent text-accent'
-                : 'border-transparent text-th-text-muted hover:text-th-text'
-            }`}
-          >
-            {t.icon}
-            {t.label}
-            {t.count != null && (
-              <span className="text-[10px] bg-th-bg-alt text-th-text-muted px-1.5 py-0.5 rounded-full ml-1">{t.count}</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={tabs}
+        activeTab={tab}
+        onTabChange={(id) => setTab(id as TabId)}
+        className="mb-4"
+      />
 
       {tab === 'stats' && <StatsPanel stats={stats} />}
       {tab === 'memory' && <MemoryPanel onCountChange={loadStats} />}
       {tab === 'conversations' && <ConversationsPanel onCountChange={loadStats} />}
       {tab === 'decisions' && <DecisionsPanel onCountChange={loadStats} />}
       {tab === 'activity' && <ActivityPanel onCountChange={loadStats} />}
+    </div>
     </div>
   );
 }

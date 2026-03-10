@@ -77,7 +77,7 @@ export function generateSuggestions(input: SuggestionInput): Suggestion[] {
     suggestions.push({
       id: 'suggest-all-done',
       label: '🎉 All tasks complete!',
-      description: 'Export session or save as playbook',
+      description: 'Export session',
       icon: '✅',
       score: 1.0,
       actionType: 'export',
