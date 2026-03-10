@@ -57,12 +57,12 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
     const req = parseCommandPayload(agent, match[1], createAgentSchema, 'CREATE_AGENT');
     if (!req) return;
 
-    // Lead, architect, and agents with delegation capability can create agents
-    const canCreate = agent.role.id === 'lead' || agent.role.id === 'architect'
+    // Only leads (and agents with injected delegation capability) can create agents
+    const canCreate = agent.role.id === 'lead'
       || ctx.capabilityInjector?.hasCommand(agent.id, 'CREATE_AGENT');
     if (!canCreate) {
-      logger.warn({ module: 'agent', msg: 'CREATE_AGENT rejected — only leads and architects can create agents', command: 'CREATE_AGENT' });
-      agent.sendMessage(`[System] Only the Project Lead and Architects can create agents. Ask the lead if you need help from a specialist.`);
+      logger.warn({ module: 'agent', msg: 'CREATE_AGENT rejected — only leads can create agents', command: 'CREATE_AGENT' });
+      agent.sendMessage(`[System] Only the Project Lead can create agents. Ask the lead via AGENT_MESSAGE if you need help from a specialist.`);
       return;
     }
 
@@ -184,12 +184,12 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     const req = parseCommandPayload(agent, match[1], delegateSchema, 'DELEGATE');
     if (!req) return;
 
-    // Lead, architect, and agents with delegation capability can delegate
-    const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect'
+    // Only leads (and agents with injected delegation capability) can delegate
+    const canDelegate = agent.role.id === 'lead'
       || ctx.capabilityInjector?.hasCommand(agent.id, 'DELEGATE');
     if (!canDelegate) {
-      logger.warn({ module: 'delegation', msg: 'DELEGATE rejected — only leads and architects can delegate', command: 'DELEGATE' });
-      agent.sendMessage(`[System] Only the Project Lead and Architects can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
+      logger.warn({ module: 'delegation', msg: 'DELEGATE rejected — only leads can delegate', command: 'DELEGATE' });
+      agent.sendMessage(`[System] Only the Project Lead can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
       return;
     }
 

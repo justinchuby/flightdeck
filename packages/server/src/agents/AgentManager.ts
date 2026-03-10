@@ -50,7 +50,7 @@ export type { Delegation } from './CommandDispatcher.js';
 const OVERSIGHT_TIER_INSTRUCTIONS: Record<string, string> = {
   supervised: 'The user has set oversight to supervised mode. Be cautious and deliberate. Explain your reasoning before making changes. Show diffs and plans before executing. Prefer smaller, incremental steps.',
   balanced: 'The user has set oversight to balanced mode. Use good judgment. Explain significant decisions like architecture changes or file deletions, but proceed efficiently with routine work.',
-  autonomous: 'The user has set oversight to autonomous mode. Work efficiently and independently. Focus on results over explanations. Move fast and make decisions confidently.',
+  autonomous: 'The user has set oversight to autonomous mode. Work efficiently and independently. Focus on results over explanations. Make decisions confidently.',
 };
 
 // ── Typed event map for AgentManager ────────────────────────────────

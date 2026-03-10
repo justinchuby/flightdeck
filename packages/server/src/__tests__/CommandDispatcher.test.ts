@@ -424,7 +424,7 @@ describe('CommandDispatcher', () => {
       );
     });
 
-    it('allows architect agents to delegate to their children', () => {
+    it('rejects architect agents attempting to delegate', () => {
       const architectAgent = makeAgent({
         id: 'agent-arch-0009-0000-000000000009',
         role: makeRole({ id: 'architect', name: 'Architect' }),
@@ -437,8 +437,10 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, architectAgent, `⟦⟦ DELEGATE {"to": "${child.id}", "task": "implement API"} ⟧⟧`);
 
-      expect(dispatcher.getDelegationsMap().size).toBe(1);
-      expect((child.sendMessage as any)).toHaveBeenCalledWith('implement API');
+      expect(dispatcher.getDelegationsMap().size).toBe(0);
+      expect((architectAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Only the Project Lead can delegate'),
+      );
     });
 
     it('warns about similar active delegations', () => {
@@ -1224,6 +1226,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, architectAgent, `⟦⟦ DELEGATE {"to": "${child.id}", "task": "implement API"} ⟧⟧`);
 
+      // Architect can no longer delegate, so no DAG task should start
       expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
     });
   });
