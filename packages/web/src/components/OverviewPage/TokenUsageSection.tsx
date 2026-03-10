@@ -1,15 +1,14 @@
 /**
  * TokenUsageSection — Shows token usage at project, session, and agent levels.
  *
- * Works even when sessions are not active — reads from persisted DB data via API.
- * Fetches from /api/costs/by-agent and /api/costs/by-task endpoints.
- * Structured to easily swap to /api/costs/by-project and /api/costs/by-session
- * when those endpoints become available.
+ * Uses /api/costs/by-project for totals (server-side aggregation).
+ * Agent/task breakdown fetched separately, filtered at render time.
+ * Works even when sessions are not active — reads from persisted DB data.
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { formatTokens } from '../../utils/format';
-import type { AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
+import type { ProjectCostSummary, AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
 import { Coins, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface Props {
@@ -17,6 +16,7 @@ interface Props {
 }
 
 export function TokenUsageSection({ projectId }: Props) {
+  const [projectCost, setProjectCost] = useState<ProjectCostSummary | null>(null);
   const [agentCosts, setAgentCosts] = useState<AgentCostSummary[]>([]);
   const [taskCosts, setTaskCosts] = useState<TaskCostSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export function TokenUsageSection({ projectId }: Props) {
     [agents],
   );
 
-  // Filter to agents belonging to this project
+  // Stable set for render-time filtering — no effect dependency
   const projectAgentIds = useMemo(() => {
     const ids = new Set<string>();
     for (const a of agents) {
@@ -37,48 +37,47 @@ export function TokenUsageSection({ projectId }: Props) {
     return ids;
   }, [agents, projectId]);
 
+  // Effect depends only on projectId (stable string prop)
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     const fetchCosts = async () => {
       try {
-        const [agentRes, taskRes] = await Promise.all([
-          fetch('/api/costs/by-agent'),
-          fetch('/api/costs/by-task'),
+        const [projRes, agentRes, taskRes] = await Promise.all([
+          fetch('/api/costs/by-project', { signal: controller.signal }),
+          fetch('/api/costs/by-agent', { signal: controller.signal }),
+          fetch('/api/costs/by-task', { signal: controller.signal }),
         ]);
-        if (cancelled) return;
-        const allAgentCosts: AgentCostSummary[] = await agentRes.json();
-        const allTaskCosts: TaskCostSummary[] = await taskRes.json();
-
-        // Filter to this project's agents
-        // When /api/costs/by-project becomes available, replace this with a direct call
-        const filteredAgents = allAgentCosts.filter(c => projectAgentIds.has(c.agentId));
-        const filteredTasks = allTaskCosts.filter(c => {
-          // Include tasks where any contributing agent belongs to this project
-          return c.agents.some(a => projectAgentIds.has(a.agentId));
-        });
-
-        setAgentCosts(filteredAgents);
-        setTaskCosts(filteredTasks);
+        if (controller.signal.aborted) return;
+        const allProjects: ProjectCostSummary[] = await projRes.json();
+        setProjectCost(allProjects.find(c => c.projectId === projectId) ?? null);
+        setAgentCosts(await agentRes.json());
+        setTaskCosts(await taskRes.json());
       } catch (err) {
-        console.warn('[TokenUsage] Failed to fetch costs:', err);
+        if (!controller.signal.aborted) {
+          console.warn('[TokenUsage] Failed to fetch costs:', err);
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchCosts();
     const interval = setInterval(fetchCosts, 15_000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [projectAgentIds]);
+    return () => { controller.abort(); clearInterval(interval); };
+  }, [projectId]);
 
-  // Aggregate totals
-  const totalInput = useMemo(
-    () => agentCosts.reduce((s, c) => s + c.totalInputTokens, 0),
-    [agentCosts],
+  // Filter to this project's agents at render time (not in effect)
+  const filteredAgentCosts = useMemo(
+    () => agentCosts.filter(c => projectAgentIds.has(c.agentId)),
+    [agentCosts, projectAgentIds],
   );
-  const totalOutput = useMemo(
-    () => agentCosts.reduce((s, c) => s + c.totalOutputTokens, 0),
-    [agentCosts],
+  const filteredTaskCosts = useMemo(
+    () => taskCosts.filter(c => c.agents.some(a => projectAgentIds.has(a.agentId))),
+    [taskCosts, projectAgentIds],
   );
+
+  // Use server-side totals from by-project endpoint
+  const totalInput = projectCost?.totalInputTokens ?? 0;
+  const totalOutput = projectCost?.totalOutputTokens ?? 0;
   const totalTokens = totalInput + totalOutput;
 
   if (loading) {
@@ -111,7 +110,7 @@ export function TokenUsageSection({ projectId }: Props) {
           <Coins className="w-4 h-4 text-amber-500" />
           <span className="text-sm font-medium text-th-text-alt">Token Usage</span>
           <span className="text-xs text-th-text-muted">
-            ({agentCosts.length} agent{agentCosts.length !== 1 ? 's' : ''})
+            ({projectCost?.agentCount ?? 0} agent{(projectCost?.agentCount ?? 0) !== 1 ? 's' : ''})
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -130,11 +129,11 @@ export function TokenUsageSection({ projectId }: Props) {
       {expanded && (
         <div className="border-t border-th-border/30 px-4 py-3 space-y-3">
           {/* Per-agent breakdown */}
-          <AgentBreakdown costs={agentCosts} agentMap={agentMap} total={totalTokens} />
+          <AgentBreakdown costs={filteredAgentCosts} agentMap={agentMap} total={totalTokens} />
 
           {/* Per-task breakdown (collapsed by default) */}
-          {taskCosts.length > 0 && (
-            <TaskBreakdown costs={taskCosts} agentMap={agentMap} total={totalTokens} />
+          {filteredTaskCosts.length > 0 && (
+            <TaskBreakdown costs={filteredTaskCosts} agentMap={agentMap} total={totalTokens} />
           )}
         </div>
       )}

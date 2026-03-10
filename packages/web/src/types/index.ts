@@ -195,6 +195,15 @@ export interface TimerInfo extends Timer {
   remainingMs: number;
 }
 
+export interface ProjectCostSummary {
+  projectId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  sessionCount: number;
+  agentCount: number;
+}
+
 export interface AgentCostSummary {
   agentId: string;
   totalInputTokens: number;
