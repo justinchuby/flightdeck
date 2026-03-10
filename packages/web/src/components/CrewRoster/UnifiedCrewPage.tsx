@@ -818,8 +818,9 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
       if (selectedAgent === agentId) {
         setSelectedAgent(null);
       }
-    } catch (err: any) {
-      addToast('error', `Failed to remove agent: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      addToast('error', `Failed to remove agent: ${message}`);
     }
   }, [addToast, selectedAgent]);
 

@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { isTerminalStatus } from '../agents/Agent.js';
 import type { AppContext } from './context.js';
 
 // ── Rate Limiters ───────────────────────────────────────────────────
@@ -438,7 +439,7 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     // Don't allow deleting active agents — check AgentManager
     const liveAgent = agentManager.getAll().find(a => a.id === agentId);
-    if (liveAgent && (liveAgent.status === 'running' || liveAgent.status === 'idle' || liveAgent.status === 'creating')) {
+    if (liveAgent && !isTerminalStatus(liveAgent.status)) {
       return res.status(409).json({ error: 'Cannot delete an active agent. Stop the agent first.' });
     }
 
