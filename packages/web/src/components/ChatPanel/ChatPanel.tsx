@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
@@ -33,13 +33,8 @@ export function ChatPanel({ agentId, ws }: Props) {
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const agent = agents.find((a) => a.id === agentId);
 
-  const handleFileInsert = useCallback((text: string) => {
-    setInputText((prev) => (prev ? prev + ' ' + text : text));
-    inputRef.current?.focus();
-  }, []);
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
   const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handlePaste, dropZoneClassName } = useFileDrop({
-    onInsertText: handleFileInsert,
     onAttach: addAttachment,
   });
 

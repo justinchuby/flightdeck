@@ -70,12 +70,8 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   const setInput = useCallback((text: string) => {
     if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
   }, [selectedLeadId]);
-  const handleLeadFileInsert = useCallback((text: string) => {
-    setInput(input ? input + ' ' + text : text);
-  }, [input, setInput]);
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
   const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, handlePaste: leadPaste, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
-    onInsertText: handleLeadFileInsert,
     onAttach: addAttachment,
   });
   const [showNewProject, setShowNewProject] = useState(false);

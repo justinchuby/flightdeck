@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFileExtension, buildInsertText, MAX_IMAGE_SIZE, type DroppedFile } from '../useFileDrop';
+import { classifyFileExtension, MAX_IMAGE_SIZE } from '../useFileDrop';
 
 describe('classifyFileExtension', () => {
   it('classifies common image extensions', () => {
@@ -42,51 +42,6 @@ describe('classifyFileExtension', () => {
     expect(classifyFileExtension('Photo.PNG')).toBe('image');
     expect(classifyFileExtension('App.TSX')).toBe('code');
     expect(classifyFileExtension('IMAGE.JPEG')).toBe('image');
-  });
-});
-
-describe('buildInsertText', () => {
-  const makeFile = (overrides: Partial<DroppedFile>): DroppedFile => ({
-    kind: 'code',
-    name: 'test.ts',
-    path: 'src/test.ts',
-    file: new File([''], 'test.ts'),
-    ...overrides,
-  });
-
-  it('builds @mention for code files', () => {
-    const result = buildInsertText(makeFile({ kind: 'code', path: 'src/utils.ts' }));
-    expect(result).toBe('@src/utils.ts');
-  });
-
-  it('builds @mention for unknown files', () => {
-    const result = buildInsertText(makeFile({ kind: 'unknown', name: 'Makefile', path: 'Makefile' }));
-    expect(result).toBe('@Makefile');
-  });
-
-  it('builds image markdown for image files with dataUrl', () => {
-    const result = buildInsertText(makeFile({
-      kind: 'image',
-      name: 'screenshot.png',
-      path: 'screenshot.png',
-      dataUrl: 'data:image/png;base64,abc123',
-    }));
-    expect(result).toBe('![screenshot.png](data:image/png;base64,abc123)');
-  });
-
-  it('falls back to @mention for image files without dataUrl', () => {
-    const result = buildInsertText(makeFile({
-      kind: 'image',
-      name: 'photo.jpg',
-      path: 'photo.jpg',
-      dataUrl: undefined,
-    }));
-    expect(result).toBe('@photo.jpg');
-  });
-
-  it('uses name when path is empty', () => {
-    const result = buildInsertText(makeFile({ kind: 'code', name: 'app.js', path: '' }));
-    expect(result).toBe('@app.js');
   });
 });
 

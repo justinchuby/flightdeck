@@ -302,15 +302,15 @@ describe('NLCommandRegistry', () => {
     expect(matchNLCommand('hi')).toBeNull();
   });
 
-  it('getNLPaletteItems returns 29 items', () => {
+  it('getNLPaletteItems returns 28 items', () => {
     const items = getNLPaletteItems(vi.fn());
-    expect(items).toHaveLength(29);
+    expect(items).toHaveLength(28);
     expect(items[0].type).toBe('nl-command');
   });
 
-  it('getAllPatterns returns 29 patterns', () => {
+  it('getAllPatterns returns 28 patterns', () => {
     const patterns = getAllPatterns();
-    expect(patterns).toHaveLength(29);
+    expect(patterns).toHaveLength(28);
     expect(patterns[0]).toHaveProperty('id');
     expect(patterns[0]).toHaveProperty('phrases');
   });

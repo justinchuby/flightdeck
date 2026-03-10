@@ -20,15 +20,6 @@ const CODE_EXTENSIONS = new Set([
 
 export type FileDropKind = 'image' | 'code' | 'unknown';
 
-export interface DroppedFile {
-  kind: FileDropKind;
-  name: string;
-  path: string;
-  /** Only set for image files — base64 data URL */
-  dataUrl?: string;
-  file: File;
-}
-
 export function classifyFileExtension(filename: string): FileDropKind {
   const dotIndex = filename.lastIndexOf('.');
   if (dotIndex === -1) return 'unknown';
@@ -36,18 +27,6 @@ export function classifyFileExtension(filename: string): FileDropKind {
   if (IMAGE_EXTENSIONS.has(ext)) return 'image';
   if (CODE_EXTENSIONS.has(ext)) return 'code';
   return 'unknown';
-}
-
-/**
- * Build the text to insert into the textarea for a dropped file.
- * Images get `![filename](dataUrl)`, code/text files get `@filename`.
- */
-export function buildInsertText(file: DroppedFile): string {
-  if (file.kind === 'image' && file.dataUrl) {
-    return `![${file.name}](${file.dataUrl})`;
-  }
-  // For code files and unknown files, insert as a mention
-  return `@${file.path || file.name}`;
 }
 
 // ── Thumbnail generation ────────────────────────────────────────────────
@@ -100,10 +79,8 @@ export function generateThumbnail(file: File): Promise<string | undefined> {
 // ── Hook ────────────────────────────────────────────────────────────────
 
 export interface UseFileDropOptions {
-  /** Called with text to insert into the textarea (legacy interface) */
-  onInsertText?: (text: string) => void;
   /** Called with a structured Attachment when a file is dropped */
-  onAttach?: (attachment: Attachment) => void;
+  onAttach: (attachment: Attachment) => void;
   /** Whether the drop zone is enabled (default: true) */
   enabled?: boolean;
 }
@@ -123,7 +100,7 @@ export interface UseFileDropResult {
   dropZoneClassName: string;
 }
 
-export function useFileDrop({ onInsertText, onAttach, enabled = true }: UseFileDropOptions): UseFileDropResult {
+export function useFileDrop({ onAttach, enabled = true }: UseFileDropOptions): UseFileDropResult {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -175,13 +152,9 @@ export function useFileDrop({ onInsertText, onAttach, enabled = true }: UseFileD
       const files = Array.from(e.dataTransfer.files);
       if (files.length === 0) return;
 
-      if (onAttach) {
-        processDroppedFilesAsAttachments(files, onAttach);
-      } else if (onInsertText) {
-        processDroppedFiles(files, onInsertText);
-      }
+      processDroppedFilesAsAttachments(files, onAttach);
     },
-    [enabled, onInsertText, onAttach],
+    [enabled, onAttach],
   );
 
   const handlePaste = useCallback(
@@ -194,13 +167,9 @@ export function useFileDrop({ onInsertText, onAttach, enabled = true }: UseFileD
         .filter((f): f is File => f !== null);
       if (files.length === 0) return;
       e.preventDefault();
-      if (onAttach) {
-        processDroppedFilesAsAttachments(files, onAttach);
-      } else if (onInsertText) {
-        processDroppedFiles(files, onInsertText);
-      }
+      processDroppedFilesAsAttachments(files, onAttach);
     },
-    [enabled, onInsertText, onAttach],
+    [enabled, onAttach],
   );
 
   const dropZoneClassName = isDragOver
@@ -303,49 +272,5 @@ async function processDroppedFilesAsAttachments(
       });
     }
   }
-}
-
-// ── File processing (legacy text insertion mode) ────────────────────────
-
-const LEGACY_MAX_IMAGE_SIZE = MAX_IMAGE_SIZE;
-
-function processDroppedFiles(files: File[], onInsertText: (text: string) => void): void {
-  const insertions: Promise<string>[] = files.map((file) => {
-    const kind = classifyFileExtension(file.name);
-    const path = (file as any).path || file.name;
-
-    if (kind === 'image') {
-      if (file.size > LEGACY_MAX_IMAGE_SIZE) {
-        return Promise.resolve(
-          buildInsertText({ kind: 'code', name: file.name, path, file }),
-        );
-      }
-      return readFileAsDataUrl(file)
-        .then((dataUrl) =>
-          buildInsertText({ kind, name: file.name, path, dataUrl, file }),
-        )
-        .catch(() => {
-          return buildInsertText({ kind: 'code', name: file.name, path, file });
-        });
-    }
-
-    return Promise.resolve(
-      buildInsertText({ kind, name: file.name, path, file }),
-    );
-  });
-
-  Promise.all(insertions).then((texts) => {
-    const combined = texts.filter(Boolean).join(' ');
-    if (combined) onInsertText(combined);
-  });
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
