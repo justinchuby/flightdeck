@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 
 // ── Mutable mock state ──────────────────────────────────────────────────────
 
@@ -28,17 +27,6 @@ vi.mock('../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
 }));
 
-vi.mock('../../hooks/useSwipeGesture', () => ({
-  useSwipeGesture: () => ({
-    onTouchStart: vi.fn(),
-    onTouchMove: vi.fn(),
-    onTouchEnd: vi.fn(),
-    offsetX: 0,
-    offsetY: 0,
-    swiping: false,
-  }),
-}));
-
 vi.mock('../../services/PaletteSearchEngine', () => ({
   PaletteSearchEngine: class {
     updateItems() {}
@@ -50,27 +38,8 @@ vi.mock('../../services/PaletteSearchEngine', () => ({
 
 // pricing module is now deprecated (no exports needed)
 
-// Mock localStorage for InstallPrompt (jsdom may not provide it)
-const localStorageMap = new Map<string, string>();
-const mockLocalStorage = {
-  getItem: (key: string) => localStorageMap.get(key) ?? null,
-  setItem: (key: string, val: string) => localStorageMap.set(key, val),
-  removeItem: (key: string) => localStorageMap.delete(key),
-  clear: () => localStorageMap.clear(),
-  get length() { return localStorageMap.size; },
-  key: (_i: number) => null as string | null,
-};
-Object.defineProperty(window, 'localStorage', { value: mockLocalStorage, writable: true });
-
 // ── Imports (AFTER vi.mock calls) ───────────────────────────────────────────
 
-import { BottomTabBar } from '../Layout/BottomTabBar';
-import { MobileApprovalStack } from '../Mobile/MobileApprovalStack';
-import { MobilePulse } from '../Mobile/MobilePulse';
-import { MobileAgentCard } from '../Mobile/MobileAgentCard';
-import { MobileCommandSheet, CommandFAB } from '../Mobile/MobileCommandSheet';
-import { InstallPrompt } from '../Mobile/InstallPrompt';
-import { OfflineBanner } from '../Mobile/OfflineBanner';
 import { RoleGallery } from '../Roles/RoleGallery';
 import { RoleBuilder } from '../Roles/RoleBuilder';
 import { RolePreview } from '../Roles/RolePreview';
@@ -133,261 +102,10 @@ beforeEach(() => {
   mockPendingDecisions = [];
   mockRoles = [];
   mockApiFetch.mockResolvedValue([]);
-  // Reset navigator.onLine for OfflineBanner tests
-  Object.defineProperty(navigator, 'onLine', { value: true, writable: true, configurable: true });
-  // Clear localStorage for InstallPrompt tests
-  localStorageMap.clear();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  1. BottomTabBar
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('BottomTabBar', () => {
-  const renderBar = (route = '/overview') =>
-    render(
-      <MemoryRouter initialEntries={[route]}>
-        <BottomTabBar />
-      </MemoryRouter>,
-    );
-
-  it('renders all five tab labels', () => {
-    renderBar();
-    expect(screen.getByText('Home')).toBeInTheDocument();
-    expect(screen.getByText('Tasks')).toBeInTheDocument();
-    expect(screen.getByText('Crews')).toBeInTheDocument();
-    expect(screen.getByText('Timeline')).toBeInTheDocument();
-    expect(screen.getByText('More')).toBeInTheDocument();
-  });
-
-  it('marks active tab with aria-current="page"', () => {
-    renderBar('/crews');
-    const crewBtn = screen.getByText('Crews').closest('button')!;
-    expect(crewBtn).toHaveAttribute('aria-current', 'page');
-    // Home should NOT be active
-    const homeBtn = screen.getByText('Home').closest('button')!;
-    expect(homeBtn).not.toHaveAttribute('aria-current');
-  });
-
-  it('renders Crews tab without badge (badges only on More for pending decisions)', () => {
-    mockAgents = [makeAgent({ status: 'failed' }), makeAgent({ id: 'a2', status: 'running' })];
-    renderBar();
-    const crewBtn = screen.getByText('Crews').closest('button')!;
-    expect(crewBtn).toBeInTheDocument();
-  });
-
-  it('renders Tasks tab without badge (badges only on More for pending decisions)', () => {
-    mockAgents = [makeAgent({ status: 'running' }), makeAgent({ id: 'a2', status: 'running' })];
-    renderBar();
-    const taskBtn = screen.getByText('Tasks').closest('button')!;
-    expect(taskBtn).toBeInTheDocument();
-  });
-
-  it('toggles More sheet on click', () => {
-    renderBar();
-    expect(screen.queryByText('Canvas')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('More'));
-    expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  2. MobileApprovalStack
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('MobileApprovalStack', () => {
-  it('shows "All caught up" when no decisions', () => {
-    mockPendingDecisions = [];
-    render(<MobileApprovalStack />);
-    expect(screen.getByText('All caught up!')).toBeInTheDocument();
-    expect(screen.getByText('No pending decisions')).toBeInTheDocument();
-  });
-
-  it('shows decision card with category and title', () => {
-    mockPendingDecisions = [makeDecision()];
-    render(<MobileApprovalStack />);
-    expect(screen.getByText(/Architecture/)).toBeInTheDocument();
-    expect(screen.getByText('Add caching layer')).toBeInTheDocument();
-  });
-
-  it('shows card counter', () => {
-    mockPendingDecisions = [makeDecision(), makeDecision({ id: 'dec-2', title: 'Second' })];
-    render(<MobileApprovalStack />);
-    expect(screen.getByText('Card 1 of 2')).toBeInTheDocument();
-  });
-
-  it('has Approve, Reject, and Dismiss buttons', () => {
-    mockPendingDecisions = [makeDecision()];
-    render(<MobileApprovalStack />);
-    expect(screen.getByText(/Approve/)).toBeInTheDocument();
-    expect(screen.getByText(/Reject/)).toBeInTheDocument();
-    expect(screen.getByText(/Dismiss/)).toBeInTheDocument();
-  });
-
-  it('calls apiFetch on Approve click', async () => {
-    mockPendingDecisions = [makeDecision()];
-    mockApiFetch.mockResolvedValue({});
-    render(<MobileApprovalStack />);
-    fireEvent.click(screen.getByText(/Approve/));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/decisions/dec-1/approve', { method: 'POST' });
-    });
-  });
-
-  it('calls apiFetch on Reject click', async () => {
-    mockPendingDecisions = [makeDecision()];
-    mockApiFetch.mockResolvedValue({});
-    render(<MobileApprovalStack />);
-    fireEvent.click(screen.getByText(/Reject/));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/decisions/dec-1/reject', { method: 'POST' });
-    });
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  3. MobilePulse
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('MobilePulse', () => {
-  it('returns null when no agents', () => {
-    mockAgents = [];
-    const { container } = render(<MobilePulse />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('shows running count and token count', () => {
-    mockAgents = [makeAgent({ status: 'running' }), makeAgent({ id: 'a2', status: 'idle' })];
-    const { container } = render(<MobilePulse />);
-    // running count and tokens are split across text nodes; check container text
-    const text = container.textContent || '';
-    expect(text).toContain('1●');
-  });
-
-  it('shows max context pressure percentage', () => {
-    mockAgents = [makeAgent({ contextWindowSize: 100000, contextWindowUsed: 82000 })];
-    render(<MobilePulse />);
-    // 82000/100000 = 82%
-    expect(screen.getByText('82%')).toBeInTheDocument();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  4. MobileAgentCard
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('MobileAgentCard', () => {
-  it('shows role icon, name, and status dot', () => {
-    const agent = makeAgent();
-    const { container } = render(<MobileAgentCard agent={agent as any} />);
-    expect(screen.getByText('🏗')).toBeInTheDocument();
-    expect(screen.getByText('Architect')).toBeInTheDocument();
-    // status dot is rendered
-    const dot = container.querySelector('.rounded-full');
-    expect(dot).toBeInTheDocument();
-  });
-
-  it('shows context pressure bar when used > 0', () => {
-    const agent = makeAgent({ contextWindowSize: 100000, contextWindowUsed: 70000 });
-    render(<MobileAgentCard agent={agent as any} />);
-    // 70% pressure
-    expect(screen.getByText('70%')).toBeInTheDocument();
-  });
-
-  it('shows current task when dagTaskId is set', () => {
-    const agent = makeAgent({ dagTaskId: 'task-1', task: 'Design system architecture' });
-    render(<MobileAgentCard agent={agent as any} />);
-    expect(screen.getByText('Design system architecture')).toBeInTheDocument();
-  });
-
-  it('shows output preview', () => {
-    const agent = makeAgent({ outputPreview: 'Designing module layout...' });
-    render(<MobileAgentCard agent={agent as any} />);
-    expect(screen.getByText('Designing module layout...')).toBeInTheDocument();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  5. MobileCommandSheet + CommandFAB
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('MobileCommandSheet', () => {
-  const noop = vi.fn();
-
-  it('returns null when closed', () => {
-    const { container } = render(
-      <MobileCommandSheet isOpen={false} onClose={noop} items={[]} />,
-    );
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('shows search input and quick actions when open', () => {
-    render(<MobileCommandSheet isOpen={true} onClose={noop} items={[]} />);
-    expect(screen.getByPlaceholderText(/Ask anything/)).toBeInTheDocument();
-    expect(screen.getByText('Quick Actions')).toBeInTheDocument();
-    expect(screen.getByText('Pause all agents')).toBeInTheDocument();
-    expect(screen.getByText('Resume all agents')).toBeInTheDocument();
-  });
-
-  it('has dialog role and label', () => {
-    render(<MobileCommandSheet isOpen={true} onClose={noop} items={[]} />);
-    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
-  });
-});
-
-describe('CommandFAB', () => {
-  it('renders command button with label', () => {
-    const onClick = vi.fn();
-    render(<CommandFAB onClick={onClick} />);
-    const btn = screen.getByLabelText('Open command palette');
-    expect(btn).toBeInTheDocument();
-    fireEvent.click(btn);
-    expect(onClick).toHaveBeenCalledOnce();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  6. InstallPrompt
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('InstallPrompt', () => {
-  it('returns null when no beforeinstallprompt event fired', () => {
-    const { container } = render(<InstallPrompt />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('returns null on first visit even with prompt event', () => {
-    // visitCount starts at 1 for first render (incremented from 0)
-    localStorage.setItem('pwa-visit-count', '0');
-    const { container } = render(<InstallPrompt />);
-    // visitCount = 1 < 2, so null
-    expect(container.firstChild).toBeNull();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  7. OfflineBanner
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('OfflineBanner', () => {
-  it('returns null when online', () => {
-    Object.defineProperty(navigator, 'onLine', { value: true, writable: true, configurable: true });
-    const { container } = render(<OfflineBanner />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('shows banner when offline', () => {
-    Object.defineProperty(navigator, 'onLine', { value: false, writable: true, configurable: true });
-    render(<OfflineBanner />);
-    expect(screen.getByText(/Offline/)).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  8. RoleGallery
+//  1. RoleGallery
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('RoleGallery', () => {
@@ -423,7 +141,7 @@ describe('RoleGallery', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  9. RoleBuilder
+//  2. RoleBuilder
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('RoleBuilder', () => {
@@ -487,7 +205,7 @@ describe('RoleBuilder', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  10. RolePreview
+//  3. RolePreview
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('RolePreview', () => {
@@ -516,7 +234,7 @@ describe('RolePreview', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  11. RoleTestDialog
+//  4. RoleTestDialog
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('RoleTestDialog', () => {

@@ -6,10 +6,6 @@ import { useSettingsStore, shouldNotify } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
 import { CommandPalette } from './components/CommandPalette/CommandPalette';
 import { ContextualCoach } from './components/Onboarding';
-import { BottomTabBar } from './components/Layout/BottomTabBar';
-import { MobilePulse } from './components/Mobile';
-import { InstallPrompt } from './components/Mobile';
-import { OfflineBanner } from './components/Mobile';
 
 import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { LeadDashboard, ReadOnlySession } from './components/LeadDashboard';
@@ -354,7 +350,6 @@ export function App() {
 
           <AttentionBar />
           <div data-tour="pulse-strip"><PulseStrip /></div>
-          <MobilePulse />
           <AgentServerStatus />
 
           <main id="main-content" className="flex-1 overflow-hidden flex flex-col">
@@ -411,9 +406,9 @@ export function App() {
           </main>
         </div>
 
-        {/* Mobile: full-screen overlay. Desktop: sidebar panel */}
+        {/* Desktop: sidebar panel */}
         {selectedAgentId && (
-          <div className="fixed inset-0 z-30 md:relative md:inset-auto md:z-auto w-full md:max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
+          <div className="w-full max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
             <ChatPanel agentId={selectedAgentId} ws={ws} />
           </div>
         )}
@@ -427,9 +422,6 @@ export function App() {
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
       {showSetupWizard && !showOnboarding && <SetupWizard onComplete={() => setShowSetupWizard(false)} />}
       <ContextualCoach onNavigate={(path) => { const nav = document.querySelector(`a[href="${path}"]`) as HTMLAnchorElement; nav?.click(); }} />
-      <BottomTabBar />
-      <InstallPrompt />
-      <OfflineBanner />
     </div>
   );
 }
