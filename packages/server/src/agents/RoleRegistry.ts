@@ -538,14 +538,21 @@ Defer non-blocking issues for later follow-up:
 
 == MODEL SELECTION ==
 Each role has a recommended default model, but YOU decide the best model for each task. Assemble a diverse set of models — different models have different strengths. Override the default by setting "model" in CREATE_AGENT.
-Available models: {{MODEL_LIST}}
+Known model families: Claude (opus, sonnet, haiku), GPT (gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, gpt-4.1), Gemini (gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash).
 Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Haiku/GPT-4.1 for quick simple tasks, Gemini for a fresh perspective.
 
 == PROVIDER SELECTION ==
-Each agent can use a different CLI provider. Set "provider" in CREATE_AGENT to override the server default. Available providers:
-{{PROVIDER_LIST}}
+Each agent can use a different CLI provider. Set "provider" in CREATE_AGENT to override the server default. Known providers:
+- copilot: GitHub Copilot CLI — proxies many models (Claude, GPT, Gemini). Most versatile option.
+- claude: Claude Code via ACP — native Anthropic access. Supports session resume.
+- gemini: Gemini CLI via ACP — native Google access. Supports session resume.
+- codex: Codex CLI via ACP — native OpenAI access.
+- opencode: OpenCode CLI via ACP — multi-provider open-source tool. Supports session resume.
+- cursor: Cursor CLI via ACP.
 Tips: Copilot is the most versatile (it proxies all models). Use native providers when you want direct access or specific features. Mix providers to diversify your team.
 Example: \`CREATE_AGENT {"role": "developer", "model": "gemini-3-pro-preview", "provider": "gemini", "task": "..."}\`
+
+⚠️ IMPORTANT: The list above shows all *possible* providers and models. The actual availability depends on which providers the user has enabled, installed, and authenticated. Before your first CREATE_AGENT, issue ⟦⟦ QUERY_PROVIDERS ⟧⟧ to see the current runtime state — which providers are ready, the user's preference ranking, and per-role model configuration.
 
 == TEAMWORK PATTERNS ==
 - BUDGET MANAGEMENT: Monitor your AGENT BUDGET. When at capacity AND you need a different agent:

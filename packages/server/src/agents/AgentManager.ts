@@ -40,9 +40,7 @@ import type { KnowledgeInjector, InjectionContext } from '../knowledge/Knowledge
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
 import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
-import { PROVIDER_PRESETS } from '../adapters/presets.js';
-import type { ProviderId } from '../adapters/presets.js';
-import { KNOWN_MODEL_IDS } from '../projects/ModelConfigDefaults.js';
+
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
 export type { Delegation } from './CommandDispatcher.js';
@@ -256,6 +254,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   setProjectRegistry(registry: import('../projects/ProjectRegistry.js').ProjectRegistry): void {
     this.projectRegistry = registry;
+    this.dispatcher.setProjectRegistry(registry);
   }
 
   setSessionKnowledgeExtractor(extractor: SessionKnowledgeExtractor): void {
@@ -309,9 +308,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
   }
 
-  /** Late-inject ProviderManager so lead prompt can include enabled providers. */
+  /** Late-inject ProviderManager so lead prompt and QUERY_PROVIDERS can include enabled providers. */
   setProviderManager(pm: import('../providers/ProviderManager.js').ProviderManager): void {
     this.providerManager = pm;
+    this.dispatcher.setProviderManager(pm);
   }
 
   /** Late-inject IntegrationRouter to break circular dependency. */
@@ -330,58 +330,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (override) level = override;
     }
     return level;
-  }
-
-  /**
-   * Generate dynamic provider list for lead prompt based on installed/enabled state.
-   * Returns only providers the user has enabled, ordered by user preference ranking.
-   */
-  private generateProviderList(): string {
-    const lines: string[] = [];
-    // Use user's ranking order if available, otherwise default order
-    const orderedProviders = this.providerManager
-      ? this.providerManager.getProviderRanking()
-      : Object.keys(PROVIDER_PRESETS) as ProviderId[];
-
-    for (const id of orderedProviders) {
-      const preset = PROVIDER_PRESETS[id];
-      if (!preset) continue;
-      const enabled = this.providerManager
-        ? this.providerManager.isProviderEnabled(id)
-        : true;
-      if (!enabled) continue;
-
-      const installed = this.providerManager
-        ? this.providerManager.getProviderStatus(id).installed
-        : null;
-      const status = installed === false ? ' (not installed)' : '';
-      lines.push(`- "${id}" — ${preset.name}${status}`);
-    }
-
-    if (lines.length === 0) {
-      return 'No providers are enabled. Ask the user to enable providers in Settings.';
-    }
-    return lines.join('\n') + '\nProviders are listed in the user\'s preferred order. Prefer earlier providers when no specific provider is needed.';
-  }
-
-  /**
-   * Generate dynamic model list for lead prompt based on project model config.
-   * If a project has a custom config, only show models that are allowed.
-   */
-  private generateModelList(projectId?: string): string {
-    if (projectId && this.projectRegistry) {
-      const { config } = this.projectRegistry.getModelConfig(projectId);
-      // Collect all unique models across all roles
-      const models = new Set<string>();
-      for (const allowed of Object.values(config)) {
-        for (const m of allowed) models.add(m);
-      }
-      if (models.size > 0) {
-        return Array.from(models).join(', ');
-      }
-    }
-    // Fallback: return all known models
-    return KNOWN_MODEL_IDS.join(', ');
   }
 
   /**
@@ -467,14 +415,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     let effectiveRole = role;
     if (role.id === 'lead') {
       const roleList = this.roleRegistry.generateRoleList();
-      let prompt = role.systemPrompt.replace('{{ROLE_LIST}}', roleList);
-
-      // Inject dynamic provider list based on enabled/installed state
-      prompt = prompt.replace('{{PROVIDER_LIST}}', this.generateProviderList());
-
-      // Inject dynamic model list based on project config
-      prompt = prompt.replace('{{MODEL_LIST}}', this.generateModelList(effectiveProjectId));
-
+      const prompt = role.systemPrompt.replace('{{ROLE_LIST}}', roleList);
       effectiveRole = { ...role, systemPrompt: prompt };
     }
 

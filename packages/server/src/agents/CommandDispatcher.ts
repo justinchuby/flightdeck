@@ -90,6 +90,16 @@ export class CommandDispatcher {
     this.handlerCtx.integrationRouter = router;
   }
 
+  /** Late-inject ProviderManager so QUERY_PROVIDERS sees live state. */
+  setProviderManager(pm: import('../providers/ProviderManager.js').ProviderManager): void {
+    this.handlerCtx.providerManager = pm;
+  }
+
+  /** Late-inject ProjectRegistry so commands can read project config. */
+  setProjectRegistry(reg: import('../projects/ProjectRegistry.js').ProjectRegistry): void {
+    this.handlerCtx.projectRegistry = reg;
+  }
+
   // ── Buffer management ──────────────────────────────────────────────
 
   appendToBuffer(agentId: string, data: string): void {
