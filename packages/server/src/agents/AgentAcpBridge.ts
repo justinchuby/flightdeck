@@ -73,8 +73,10 @@ export function ensureSharedWorkspace(agent: Agent): void {
 export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: string): Promise<void> {
   const rawModel = agent.model || agent.role.model;
 
+  const effectiveProvider = agent.provider || config.provider || 'copilot';
+
   const adapterConfig = {
-    provider: config.provider || 'copilot',
+    provider: effectiveProvider,
     model: rawModel,
     binaryOverride: config.providerBinaryOverride,
     argsOverride: config.providerArgsOverride,
@@ -103,7 +105,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   });
 
   agent._setAcpConnection(conn);
-  agent.provider = config.provider || 'copilot';
+  agent.provider = effectiveProvider;
   agent.backend = backend;
   agent.status = 'running';
   wireAcpEvents(agent, conn);

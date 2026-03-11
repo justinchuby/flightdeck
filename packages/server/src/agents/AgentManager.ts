@@ -362,7 +362,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     };
   }
 
-  spawn(role: Role, task?: string, parentId?: string, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string }): Agent {
+  spawn(role: Role, task?: string, parentId?: string, model?: string, cwd?: string, resumeSessionId?: string, id?: string, options?: { projectName?: string; projectId?: string; provider?: string }): Agent {
     if (this.getRunningCount() >= this.maxConcurrent) {
       logger.error({ module: 'agent', msg: 'Concurrency limit reached', maxConcurrent: this.maxConcurrent, role: role.id });
       throw new Error(
@@ -499,6 +499,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (resumeSessionId) agent._isResuming = true;
     if (options?.projectName) agent.projectName = options.projectName;
     if (options?.projectId) agent.projectId = options.projectId;
+    if (options?.provider) agent.provider = options.provider;
     if (role.id === 'lead') {
       agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
     }

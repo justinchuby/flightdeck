@@ -54,6 +54,7 @@ export const spawnAgentSchema = z.object({
   roleId: z.string(),
   task: z.string(),
   model: z.string().optional(),
+  provider: z.string().optional(),
   mode: z.boolean().optional(),
   autopilot: z.string().optional(),
   sessionId: z.string().optional(),
