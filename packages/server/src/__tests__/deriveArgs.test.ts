@@ -114,7 +114,7 @@ describe('deriveArgs', () => {
 
   it('handles schemas with many fields (createAgentSchema)', () => {
     const args = deriveArgs(createAgentSchema);
-    expect(args.length).toBe(8);
+    expect(args.length).toBe(9);
     const role = args.find(a => a.name === 'role')!;
     expect(role.required).toBe(true);
     expect(role.description).toBe('Role ID to assign');

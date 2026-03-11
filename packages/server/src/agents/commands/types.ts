@@ -36,7 +36,7 @@ export interface CommandContext {
   getAllAgents(): Agent[];
   getProjectIdForAgent(agentId: string): string | undefined;
   getRunningCount(): number;
-  spawnAgent(role: Role, task?: string, parentId?: string, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string }): Agent;
+  spawnAgent(role: Role, task?: string, parentId?: string, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string; provider?: string }): Agent;
   terminateAgent(id: string): boolean | Promise<boolean>;
   emit(event: string, ...args: any[]): boolean;
   roleRegistry: RoleRegistry;

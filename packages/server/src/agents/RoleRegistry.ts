@@ -541,6 +541,17 @@ Each role has a recommended default model, but YOU decide the best model for eac
 Available models: claude-opus-4.6, claude-sonnet-4.6, claude-sonnet-4.5, claude-haiku-4.5, gpt-5.3-codex, gpt-5.2-codex, gpt-5.2, gpt-5.1-codex, gemini-3-pro-preview, gemini-3-flash-preview, gpt-4.1
 Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Haiku/GPT-4.1 for quick simple tasks, Gemini for a fresh perspective.
 
+== PROVIDER SELECTION ==
+Each agent can use a different CLI provider. Set "provider" in CREATE_AGENT to override the server default. Available providers:
+- "copilot" — GitHub Copilot (supports all models via gateway: Claude, GPT, Gemini)
+- "claude" — Claude Agent ACP (native Anthropic models: claude-opus-4.6, claude-sonnet-4.6, etc.)
+- "gemini" — Google Gemini CLI (native Google models: gemini-3-pro-preview, gemini-2.5-pro, etc.)
+- "codex" — Codex ACP (native OpenAI models: gpt-5.3-codex, gpt-5.2-codex, gpt-5, etc.)
+- "opencode" — OpenCode
+- "cursor" — Cursor
+Tips: Copilot is the most versatile (it proxies all models). Use native providers when you want direct access or specific features. Mix providers to diversify your team.
+Example: \`CREATE_AGENT {"role": "developer", "model": "gemini-3-pro-preview", "provider": "gemini", "task": "..."}\`
+
 == TEAMWORK PATTERNS ==
 - BUDGET MANAGEMENT: Monitor your AGENT BUDGET. When at capacity AND you need a different agent:
   1. First try to DELEGATE to an existing idle agent with a suitable role

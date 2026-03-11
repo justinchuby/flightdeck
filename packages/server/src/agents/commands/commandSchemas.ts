@@ -62,6 +62,7 @@ export const createAgentSchema = z.object({
   role: z.string({ message: 'Missing required field "role"' }).min(1, 'Missing required field "role"').max(MAX_NAME_LENGTH, `"role" too long (max ${MAX_NAME_LENGTH})`).describe('Role ID to assign'),
   task: z.string().max(MAX_TASK_TEXT_LENGTH, `"task" too long (max ${MAX_TASK_TEXT_LENGTH})`).optional().describe('Task to assign'),
   model: z.string().max(MAX_NAME_LENGTH).optional().describe('Model override'),
+  provider: z.string().max(MAX_NAME_LENGTH).optional().describe('Provider override (e.g. copilot, claude, gemini, codex)'),
   context: z.string().max(MAX_CONTENT_LENGTH, `"context" too long (max ${MAX_CONTENT_LENGTH})`).optional().describe('Additional context'),
   dagTaskId: z.string().max(MAX_ID_LENGTH).optional().describe('DAG task ID to link'),
   dependsOn: z.array(z.string().max(MAX_ID_LENGTH)).max(20).optional().describe('Task IDs this depends on'),
