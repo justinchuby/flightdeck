@@ -330,6 +330,15 @@ function AgentRow({ agent, isLead, isSelected, onSelect }: {
         <div className="flex items-center gap-2">
           <span className="text-xs capitalize">{agent.role}</span>
           <code className="text-[10px] text-th-text-muted">{agent.agentId.slice(0, 8)}</code>
+          {agent.sessionId && (
+            <button
+              className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors truncate max-w-[120px]"
+              title={`Session: ${agent.sessionId} — click to copy`}
+              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+            >
+              {agent.sessionId}
+            </button>
+          )}
           {agent.provider && (
             <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded">{agent.provider}</span>
           )}
