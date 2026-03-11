@@ -6,7 +6,7 @@
  * - Collapsible health strip from CrewPage
  * - Project-scoped filtering when scope='project'
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Users,
   Search,
@@ -17,14 +17,10 @@ import {
   Activity,
   Heart,
   X,
-  Server,
-  Power,
-  Wifi,
-  WifiOff,
   CheckCircle,
+  CheckCircle2,
   Info,
   PauseCircle,
-  UserMinus,
   MessageSquare,
   Zap,
   Square,
@@ -45,6 +41,7 @@ import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
 import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
 import { AgentChatPanel } from '../AgentChatPanel';
+import { useAppStore } from '../../stores/appStore';
 
 // ── Types (shared with CrewRoster) ─────────────────────────
 
@@ -116,23 +113,6 @@ interface SessionDetail {
   durationMs: number | null;
   taskSummary: { total: number; done: number; failed: number };
   hasRetro: boolean;
-}
-
-interface HealthData {
-  teamId: string;
-  totalAgents: number;
-  statusCounts: Record<string, number>;
-  massFailurePaused: boolean;
-}
-
-interface ServerStatus {
-  running: boolean;
-  connected: boolean;
-  state: string;
-  agentCount: number | null;
-  latencyMs: number | null;
-  pendingRequests: number;
-  trackedAgents: number;
 }
 
 interface UnifiedCrewPageProps {
@@ -598,42 +578,18 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
 
 // ── Health Strip (collapsible footer) ─────────────────────
 
-function HealthStrip({ teamId }: { teamId: string }) {
-  const addToast = useToastStore(s => s.add);
+function HealthStrip({ teamId: _teamId }: { teamId: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
-  const [confirmStop, setConfirmStop] = useState(false);
+  const liveAgents = useAppStore(s => s.agents);
 
-  useEffect(() => {
-    const fetchHealth = async () => {
-      try {
-        const [h, s] = await Promise.all([
-          apiFetch<HealthData>(`/teams/${teamId}/health`),
-          apiFetch<ServerStatus>('/server/status'),
-        ]);
-        setHealth(h);
-        setServerStatus(s);
-      } catch {
-        // Health data is optional
-      }
-    };
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 10_000);
-    return () => clearInterval(interval);
-  }, [teamId]);
-
-  const handleStopServer = async () => {
-    try {
-      await apiFetch('/server/stop', { method: 'POST' });
-      addToast('success', 'Agent server stopped');
-      setConfirmStop(false);
-    } catch (err: any) {
-      addToast('error', `Failed to stop server: ${err.message}`);
-    }
-  };
-
-  const statusCounts = health?.statusCounts ?? {};
+  // Derive counts from live agent data (same source as StatusPopover)
+  const statusCounts = useMemo(() => {
+    const running = liveAgents.filter(a => a.status === 'running' || a.status === 'creating').length;
+    const idle = liveAgents.filter(a => a.status === 'idle').length;
+    const completed = liveAgents.filter(a => a.status === 'completed' || a.status === 'terminated').length;
+    const failed = liveAgents.filter(a => a.status === 'failed').length;
+    return { running, idle, completed, failed, total: liveAgents.length };
+  }, [liveAgents]);
 
   return (
     <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
@@ -641,74 +597,38 @@ function HealthStrip({ teamId }: { teamId: string }) {
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-2 px-4 py-2 text-xs text-th-text-muted hover:bg-th-bg-alt/30 transition-colors"
       >
-        {serverStatus && !serverStatus.connected && <WifiOff className="w-3 h-3 text-red-400" />}
-        {health?.massFailurePaused && <AlertTriangle className="w-3 h-3 text-red-400" />}
         <Heart className="w-3.5 h-3.5" />
         <span>Health</span>
         <span className="text-[10px]">
-          {health
-            ? `${health.totalAgents} total · ${statusCounts.busy ?? 0} active · ${statusCounts.idle ?? 0} idle`
-            : '…'}
+          {`${statusCounts.total} total · ${statusCounts.running} running · ${statusCounts.idle} idle`}
         </span>
         <ChevronRight className={`w-3 h-3 ml-auto transition-transform ${expanded ? 'rotate-90' : ''}`} />
       </button>
 
       {expanded && (
         <div className="border-t border-th-border/50 px-4 py-3 space-y-3">
-          {health?.massFailurePaused && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded p-2 flex items-center gap-2 text-xs text-red-400">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              Mass failure detected — agent spawning is paused
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex items-center gap-2 text-xs">
               <Users className="w-3.5 h-3.5 text-th-text-muted" />
-              <span className="font-bold">{health?.totalAgents ?? 0}</span>
+              <span className="font-bold">{statusCounts.total}</span>
               <span className="text-th-text-muted">Total</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Activity className="w-3.5 h-3.5 text-green-400" />
-              <span className="font-bold text-green-400">{statusCounts.busy ?? 0}</span>
-              <span className="text-th-text-muted">Active</span>
+              <span className="font-bold text-green-400">{statusCounts.running}</span>
+              <span className="text-th-text-muted">Running</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <PauseCircle className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-bold text-blue-400">{statusCounts.idle ?? 0}</span>
+              <span className="font-bold text-blue-400">{statusCounts.idle}</span>
               <span className="text-th-text-muted">Idle</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <UserMinus className="w-3.5 h-3.5 text-gray-400" />
-              <span className="font-bold text-gray-400">{statusCounts.retired ?? 0}</span>
-              <span className="text-th-text-muted">Retired</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              <span className="font-bold text-gray-400">{statusCounts.completed}</span>
+              <span className="text-th-text-muted">Done</span>
             </div>
-            {serverStatus && (
-              <div className="flex items-center gap-2 text-xs">
-                <Server className="w-3.5 h-3.5 text-th-text-muted" />
-                {serverStatus.connected ? <Wifi className="w-3 h-3 text-green-400" /> : <WifiOff className="w-3 h-3 text-red-400" />}
-                <span className="text-th-text-muted">{serverStatus.agentCount || health?.totalAgents || 0} agents</span>
-                {serverStatus.latencyMs != null && <span className="text-th-text-muted">{serverStatus.latencyMs}ms</span>}
-              </div>
-            )}
           </div>
-
-          {serverStatus?.running && (
-            <div className="flex items-center gap-2">
-              {!confirmStop ? (
-                <button onClick={() => setConfirmStop(true)}
-                  className="px-2 py-1 text-[10px] rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors flex items-center gap-1">
-                  <Power className="w-3 h-3" />Stop Server
-                </button>
-              ) : (
-                <>
-                  <span className="text-[10px] text-red-400">Stop server? All agents will be terminated.</span>
-                  <button onClick={handleStopServer} className="px-2 py-1 text-[10px] rounded bg-red-600 text-white hover:bg-red-500">Confirm</button>
-                  <button onClick={() => setConfirmStop(false)} className="px-2 py-1 text-[10px] rounded bg-th-bg-alt text-th-text-alt hover:bg-th-border">Cancel</button>
-                </>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>

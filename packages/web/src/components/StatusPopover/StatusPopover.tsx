@@ -70,12 +70,11 @@ export function StatusPopover() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  // Agent counts
+  // Agent counts — only show active (running + idle)
   const agentCounts = useMemo(() => {
     const running = agents.filter((a) => a.status === 'running' || a.status === 'creating').length;
     const idle = agents.filter((a) => a.status === 'idle').length;
-    const terminated = agents.filter((a) => a.status === 'terminated' || a.status === 'completed').length;
-    return { running, idle, terminated, total: agents.length };
+    return { running, idle, active: running + idle };
   }, [agents]);
 
   // Last activity: most recent agent createdAt
@@ -161,8 +160,8 @@ export function StatusPopover() {
               icon={Users}
               iconColor="text-th-text-muted"
               label="Active Agents"
-              value={`${agentCounts.total} total`}
-              detail={`${agentCounts.running} running, ${agentCounts.idle} idle, ${agentCounts.terminated} done`}
+              value={`${agentCounts.active} active`}
+              detail={`${agentCounts.running} running, ${agentCounts.idle} idle`}
             />
 
             {lastActivity && (
