@@ -40,9 +40,10 @@ function AgentCheckbox({
           )}
           <span className="text-th-text-muted">({agent.model})</span>
           {agent.sessionId ? (
-            <span className="text-green-500 flex items-center gap-0.5" title="Has session — can resume with context">
+            <span className="text-green-500 flex items-center gap-0.5" title={`Session: ${agent.sessionId}`}>
               <CheckCircle2 size={10} />
               <span className="text-[10px]">resumable</span>
+              <code className="text-[10px] text-green-500/70">{agent.sessionId.slice(0, 8)}</code>
             </span>
           ) : (
             <span className="text-th-text-muted flex items-center gap-0.5" title="No session ID — will start fresh">
