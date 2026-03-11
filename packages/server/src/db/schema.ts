@@ -353,6 +353,7 @@ export const agentRoster = sqliteTable('agent_roster', {
   status: text('status').notNull().default('idle'), // 'idle' | 'running' | 'terminated'
   sessionId: text('session_id'),
   projectId: text('project_id'),
+  provider: text('provider'),
   teamId: text('team_id').notNull().default('default'),
   createdAt: text('created_at').notNull().default(utcNow),
   updatedAt: text('updated_at').notNull().default(utcNow),

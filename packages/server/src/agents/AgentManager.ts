@@ -549,7 +549,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.agentRosterRepository.upsertAgent(
           agent.id, role.id, effectiveModel || 'default', 'idle',
           undefined, agent.projectId,
-          { ...(parentId ? { parentId } : {}), ...(agent.provider ? { provider: agent.provider } : {}) },
+          parentId ? { parentId } : undefined,
+          'default',
+          agent.provider,
         );
       } catch (err: any) {
         logger.warn({ module: 'agent', msg: 'Failed to persist agent to roster', agentId: agent.id, error: err.message });

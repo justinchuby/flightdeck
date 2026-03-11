@@ -248,7 +248,7 @@ export class SessionResumeManager {
         metadata?.cwd,
         record.sessionId,    // resumeSessionId — triggers resume flow
         agentId,             // reuse same agent ID
-        { projectId: record.projectId },
+        { projectId: record.projectId, provider: record.provider },
       );
 
       return {
@@ -287,7 +287,7 @@ export class SessionResumeManager {
         metadata?.cwd,
         undefined,           // no resumeSessionId — fresh start
         agentId,
-        { projectId: record.projectId },
+        { projectId: record.projectId, provider: record.provider },
       );
 
       return { agentId: agent.id, success: true };

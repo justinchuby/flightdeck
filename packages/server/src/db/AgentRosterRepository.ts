@@ -11,6 +11,7 @@ export interface AgentRecord {
   status: RosterAgentStatus;
   sessionId?: string;
   projectId?: string;
+  provider?: string;
   teamId: string;
   createdAt: string;
   updatedAt: string;
@@ -30,6 +31,7 @@ export class AgentRosterRepository {
     projectId?: string,
     metadata?: Record<string, unknown>,
     teamId: string = 'default',
+    provider?: string,
   ): AgentRecord {
     const now = new Date().toISOString();
     this.db.drizzle
@@ -41,6 +43,7 @@ export class AgentRosterRepository {
         status,
         sessionId: sessionId ?? null,
         projectId: projectId ?? null,
+        provider: provider ?? null,
         teamId,
         metadata: metadata ? JSON.stringify(metadata) : null,
         createdAt: now,
@@ -54,6 +57,7 @@ export class AgentRosterRepository {
           status,
           sessionId: sessionId ?? null,
           projectId: projectId ?? null,
+          provider: provider ?? null,
           teamId,
           metadata: metadata ? JSON.stringify(metadata) : null,
           updatedAt: now,
@@ -68,6 +72,7 @@ export class AgentRosterRepository {
       status,
       sessionId,
       projectId,
+      provider,
       teamId,
       createdAt: now,
       updatedAt: now,
@@ -223,6 +228,7 @@ export class AgentRosterRepository {
       source.projectId,
       cloneMeta,
       source.teamId,
+      source.provider,
     );
   }
 
@@ -243,6 +249,7 @@ export class AgentRosterRepository {
       status: row.status as RosterAgentStatus,
       sessionId: row.sessionId ?? undefined,
       projectId: row.projectId ?? undefined,
+      provider: row.provider ?? undefined,
       teamId: row.teamId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
