@@ -272,7 +272,7 @@ describe('GlobalAgentsPage', () => {
 
     fireEvent.click(screen.getByText('Confirm Stop'));
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/agents/aaa-111', { method: 'DELETE' });
+      expect(mockApiFetch).toHaveBeenCalledWith('/agents/aaa-111/terminate', { method: 'POST' });
     });
   });
 

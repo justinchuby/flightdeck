@@ -74,6 +74,11 @@ export function agentsRoutes(ctx: AppContext): Router {
     res.json({ ok });
   });
 
+  router.post('/agents/:id/terminate', async (req, res) => {
+    const ok = await agentManager.terminate(req.params.id);
+    res.json({ ok });
+  });
+
   router.post('/agents/:id/interrupt', async (req, res) => {
     const agent = agentManager.get(req.params.id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });

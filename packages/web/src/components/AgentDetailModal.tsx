@@ -96,7 +96,7 @@ export function AgentDetailModal({ agentId, onClose }: AgentDetailModalProps) {
               <button
                 onClick={() => {
                   if (confirm('Stop this agent?')) {
-                    apiFetch(`/agents/${agent.id}`, { method: 'DELETE' });
+                    apiFetch(`/agents/${agent.id}/terminate`, { method: 'POST' });
                     onClose();
                   }
                 }}

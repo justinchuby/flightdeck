@@ -388,7 +388,7 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
   const handleStop = async () => {
     setActionLoading('stop');
     try {
-      await apiFetch(`/agents/${agentId}`, { method: 'DELETE' });
+      await apiFetch(`/agents/${agentId}/terminate`, { method: 'POST' });
       addToast('success', 'Agent terminated');
       setConfirmStop(false);
       // Refresh profile to reflect new status
