@@ -411,7 +411,7 @@ export class AgentServer {
     this.wireAdapterEvents(agent);
 
     // Start the adapter
-    const startOpts = buildStartOptions(config, { cwd: process.cwd(), sessionId: resumeSessionId });
+    const startOpts = buildStartOptions(config, { cwd: (msg.context?.cwd as string) || process.cwd(), sessionId: resumeSessionId });
     adapter.start(startOpts).then((sessionId) => {
       agent.sessionId = sessionId;
       agent.status = 'running';
