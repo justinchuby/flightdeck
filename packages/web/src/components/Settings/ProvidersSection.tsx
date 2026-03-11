@@ -4,9 +4,14 @@
  * Shows which CLI providers are installed, authenticated, and enabled.
  * Includes per-provider configuration: binary override, default model,
  * required environment variables, and default CLI arguments.
+ * Drag-and-drop reordering via @dnd-kit/sortable.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Star, Terminal, Key, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Star, Terminal, Key, Settings2, GripVertical } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { EmptyState } from '../ui/EmptyState';
@@ -115,24 +120,27 @@ function ProviderCard({
   provider,
   isActive,
   rank,
-  totalCount,
   onToggle,
   onSetActive,
-  onMoveUp,
-  onMoveDown,
 }: {
   provider: ProviderStatus;
   isActive: boolean;
   rank: number;
-  totalCount: number;
   onToggle: (id: string, enabled: boolean) => void;
   onSetActive: (id: string) => void;
-  onMoveUp: (id: string) => void;
-  onMoveDown: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: provider.id });
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -157,8 +165,17 @@ function ProviderCard({
   const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
   const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
 
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={`bg-surface-raised border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover ${
         isActive ? 'border-accent/50 ring-1 ring-accent/20' : 'border-th-border'
       }`}
@@ -172,6 +189,17 @@ function ProviderCard({
         aria-expanded={expanded}
         aria-label={`${provider.name} provider details`}
       >
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          className="touch-none p-0.5 text-th-text-muted/40 hover:text-th-text-muted cursor-grab active:cursor-grabbing transition-colors shrink-0"
+          aria-label={`Drag to reorder ${provider.name}`}
+          title="Drag to reorder"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
         <span className="text-lg" role="img" aria-label={provider.name}>
           {icon}
         </span>
@@ -192,27 +220,6 @@ function ProviderCard({
               ? `${authLabel}${provider.version ? ` · ${provider.version}` : ''}`
               : 'CLI not found on PATH'}
           </div>
-        </div>
-        {/* Rank up/down */}
-        <div className="flex flex-col gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => onMoveUp(provider.id)}
-            disabled={rank <= 1}
-            className="p-0.5 text-th-text-muted hover:text-th-text-alt disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-            aria-label={`Move ${provider.name} up`}
-            title="Move up"
-          >
-            <ArrowUp className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => onMoveDown(provider.id)}
-            disabled={rank >= totalCount}
-            className="p-0.5 text-th-text-muted hover:text-th-text-alt disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-            aria-label={`Move ${provider.name} down`}
-            title="Move down"
-          >
-            <ArrowDown className="w-3 h-3" />
-          </button>
         </div>
         {/* Enable/disable toggle */}
         <button
@@ -427,27 +434,20 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
     }
   }, [activeId]);
 
-  const handleMoveUp = useCallback(async (id: string) => {
-    const idx = ranking.indexOf(id);
-    if (idx <= 0) return;
-    const newRanking = [...ranking];
-    [newRanking[idx - 1], newRanking[idx]] = [newRanking[idx], newRanking[idx - 1]];
-    setRanking(newRanking);
-    try {
-      await apiFetch('/settings/provider-ranking', {
-        method: 'PUT',
-        body: JSON.stringify({ ranking: newRanking }),
-      });
-    } catch {
-      setRanking(ranking);
-    }
-  }, [ranking]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-  const handleMoveDown = useCallback(async (id: string) => {
-    const idx = ranking.indexOf(id);
-    if (idx < 0 || idx >= ranking.length - 1) return;
-    const newRanking = [...ranking];
-    [newRanking[idx], newRanking[idx + 1]] = [newRanking[idx + 1], newRanking[idx]];
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = ranking.indexOf(active.id as string);
+    const newIndex = ranking.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newRanking = arrayMove(ranking, oldIndex, newIndex);
     setRanking(newRanking);
     try {
       await apiFetch('/settings/provider-ranking', {
@@ -467,7 +467,7 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
         <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
           <Cpu className="w-3.5 h-3.5" /> CLI Providers
           <span className="text-[10px] font-normal normal-case tracking-normal text-th-text-muted/60">
-            — ordered by preference
+            — drag to reorder
           </span>
         </h3>
         {!loading && (
@@ -500,21 +500,26 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
       )}
 
       {!loading && !error && sortedProviders.length > 0 && (
-        <div className="space-y-2" data-testid="providers-list">
-          {sortedProviders.map((provider, idx) => (
-            <ProviderCard
-              key={provider.id}
-              provider={provider}
-              isActive={provider.id === activeId}
-              rank={idx + 1}
-              totalCount={sortedProviders.length}
-              onToggle={handleToggle}
-              onSetActive={handleSetActive}
-              onMoveUp={handleMoveUp}
-              onMoveDown={handleMoveDown}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={ranking} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2" data-testid="providers-list">
+              {sortedProviders.map((provider, idx) => (
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  isActive={provider.id === activeId}
+                  rank={idx + 1}
+                  onToggle={handleToggle}
+                  onSetActive={handleSetActive}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </section>
   );
