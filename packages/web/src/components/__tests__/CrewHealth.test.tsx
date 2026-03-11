@@ -27,11 +27,11 @@ vi.mock('../AgentLifecycle', () => ({
 const MOCK_HEALTH: CrewHealthData = {
   teamId: 'team-1',
   totalAgents: 3,
-  statusCounts: { busy: 2, idle: 1, terminated: 0 },
+  statusCounts: { running: 2, idle: 1, terminated: 0 },
   massFailurePaused: false,
   agents: [
-    { agentId: 'agent-001', role: 'developer', model: 'gpt-4', status: 'busy', uptimeMs: 3_600_000 },
-    { agentId: 'agent-002', role: 'architect', model: 'gpt-4', status: 'busy', uptimeMs: 7_200_000 },
+    { agentId: 'agent-001', role: 'developer', model: 'gpt-4', status: 'running', uptimeMs: 3_600_000 },
+    { agentId: 'agent-002', role: 'architect', model: 'gpt-4', status: 'running', uptimeMs: 7_200_000 },
     { agentId: 'agent-003', role: 'reviewer', model: 'gpt-4', status: 'idle', uptimeMs: 1_800_000 },
   ],
 };
@@ -58,7 +58,7 @@ describe('CrewHealth', () => {
     });
 
     expect(screen.getByTestId('card-total')).toHaveTextContent('3');
-    expect(screen.getByTestId('card-active')).toHaveTextContent('2');
+    expect(screen.getByTestId('card-running')).toHaveTextContent('2');
     expect(screen.getByTestId('card-idle')).toHaveTextContent('1');
   });
 

@@ -35,7 +35,7 @@ const AGENTS = [
     agentId: 'agent-2',
     role: 'developer',
     model: 'gpt-4',
-    status: 'busy' as const,
+    status: 'running' as const,
     projectId: 'proj-1',
     teamId: 'team-1',
     createdAt: '2026-01-02T00:00:00Z',

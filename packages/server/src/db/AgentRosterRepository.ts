@@ -2,7 +2,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import type { Database } from './database.js';
 import { agentRoster } from './schema.js';
 
-export type RosterAgentStatus = 'idle' | 'busy' | 'terminated';
+export type RosterAgentStatus = 'idle' | 'running' | 'terminated';
 
 export interface AgentRecord {
   agentId: string;
@@ -228,7 +228,7 @@ export class AgentRosterRepository {
 
   getStatusCounts(teamId?: string): Record<string, number> {
     const agents = this.getAllAgents(undefined, teamId);
-    const counts: Record<string, number> = { idle: 0, busy: 0, terminated: 0 };
+    const counts: Record<string, number> = { idle: 0, running: 0, terminated: 0 };
     for (const a of agents) {
       counts[a.status] = (counts[a.status] ?? 0) + 1;
     }
@@ -253,14 +253,14 @@ export class AgentRosterRepository {
 
   /**
    * Reconcile stale roster entries on server startup.
-   * Marks agents showing as 'busy' or 'idle' as 'terminated' when they
+   * Marks agents showing as 'running' or 'idle' as 'terminated' when they
    * have no live process (e.g. after a server crash).
    *
    * @param isAgentAlive - callback to check if an agent actually has a live process
    * @returns count of agents reconciled
    */
   reconcileStaleAgents(isAgentAlive: (agentId: string) => boolean): number {
-    const busy = this.getAllAgents('busy');
+    const busy = this.getAllAgents('running');
     const idle = this.getAllAgents('idle');
     const candidates = [...busy, ...idle];
 

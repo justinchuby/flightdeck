@@ -22,7 +22,7 @@ import type { AppContext } from './context.js';
 
 const MOCK_AGENTS = [
   { agentId: 'a1', role: 'architect', model: 'gpt-4', status: 'idle', teamId: 'team-1' },
-  { agentId: 'a2', role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1' },
+  { agentId: 'a2', role: 'developer', model: 'gpt-4', status: 'running', teamId: 'team-1' },
   { agentId: 'a3', role: 'reviewer', model: 'gpt-4', status: 'idle', teamId: 'team-2' },
 ];
 
@@ -295,7 +295,7 @@ describe('teamsRoutes', () => {
       // Roster entries: lead has no metadata, dev has no metadata (simulates pre-fix data)
       const rosterAgents = [
         { agentId: leadId, role: 'lead', model: 'gpt-4', status: 'idle', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-        { agentId: devId, role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+        { agentId: devId, role: 'developer', model: 'gpt-4', status: 'running', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
       ];
       // Live agents have parentId set
       const liveAgents = [
@@ -326,7 +326,7 @@ describe('teamsRoutes', () => {
     it('groups crew members using metadata parentId when available', async () => {
       const rosterAgents = [
         { agentId: 'lead-2', role: 'lead', model: 'gpt-4', status: 'idle', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-        { agentId: 'dev-2', role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1', projectId: 'proj-1', metadata: { parentId: 'lead-2' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+        { agentId: 'dev-2', role: 'developer', model: 'gpt-4', status: 'running', teamId: 'team-1', projectId: 'proj-1', metadata: { parentId: 'lead-2' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
       ];
 
       const srv = createTestServer({

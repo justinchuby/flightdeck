@@ -27,7 +27,7 @@ import type { TabItem } from '../ui/Tabs';
 
 // ── Types ─────────────────────────────────────────────────
 
-type RosterStatus = 'idle' | 'busy' | 'terminated';
+type RosterStatus = 'idle' | 'running' | 'terminated';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 type ProfileTab = 'overview' | 'history' | 'settings';
 
@@ -117,7 +117,7 @@ function statusBadge(status: RosterStatus, liveStatus: LiveStatus): { bg: string
   if (liveStatus === 'terminated') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Terminated' };
   // liveStatus is null — agent not in memory. Fall back to DB status.
   if (status === 'terminated') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Terminated' };
-  // DB says idle/busy but agent not found in live manager → offline
+  // DB says idle/running but agent not found in live manager → offline
   return { bg: 'bg-gray-500/20 text-gray-400', label: 'Offline' };
 }
 
@@ -772,7 +772,7 @@ export function CrewRoster() {
         </div>
 
         <div className="flex gap-1">
-          {(['all', 'idle', 'busy', 'terminated'] as const).map(s => (
+          {(['all', 'idle', 'running', 'terminated'] as const).map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}

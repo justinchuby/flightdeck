@@ -33,7 +33,7 @@ import type { TabItem } from '../components/ui/Tabs';
 // ── Types ─────────────────────────────────────────────────
 
 type CrewTab = 'roster' | 'health' | 'export';
-type AgentStatus = 'idle' | 'busy' | 'terminated';
+type AgentStatus = 'idle' | 'running' | 'terminated';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 type ProfileTab = 'overview' | 'history' | 'knowledge' | 'skills' | 'settings';
 type SortField = 'role' | 'status' | 'updatedAt';
@@ -973,7 +973,7 @@ export function CrewPage() {
             </div>
 
             <div className="flex gap-1">
-              {(['all', 'busy', 'idle', 'terminated'] as const).map(s => (
+              {(['all', 'running', 'idle', 'terminated'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -1060,8 +1060,8 @@ export function CrewPage() {
               testId="card-total"
             />
             <OverviewCard
-              label="Active"
-              count={statusCounts.busy ?? 0}
+              label="Running"
+              count={statusCounts.running ?? 0}
               icon={<Activity className="w-4 h-4" />}
               color="text-green-400"
               testId="card-active"

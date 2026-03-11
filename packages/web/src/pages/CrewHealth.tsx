@@ -49,7 +49,7 @@ function formatUptime(ms: number): string {
 
 function statusColor(status: string): string {
   switch (status) {
-    case 'busy': return 'bg-green-400';
+    case 'running': return 'bg-green-400';
     case 'idle': return 'bg-blue-400';
     case 'terminated': return 'bg-red-400';
     default: return 'bg-yellow-400';
@@ -58,7 +58,7 @@ function statusColor(status: string): string {
 
 function statusLabel(status: string): string {
   switch (status) {
-    case 'busy': return 'Active';
+    case 'running': return 'Running';
     case 'idle': return 'Idle';
     case 'terminated': return 'Terminated';
     default: return status;
@@ -177,8 +177,8 @@ export function CrewHealth({ teamId = 'default' }: Props) {
           color="text-th-text"
         />
         <StatusCard
-          label="Active"
-          count={statusCounts.busy ?? 0}
+          label="Running"
+          count={statusCounts.running ?? 0}
           icon={<Activity className="w-4 h-4" />}
           color="text-green-400"
         />

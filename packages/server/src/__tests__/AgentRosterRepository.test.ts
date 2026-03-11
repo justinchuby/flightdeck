@@ -28,7 +28,7 @@ describe('AgentRosterRepository', () => {
 
     it('inserts agent with optional fields', () => {
       const agent = repo.upsertAgent(
-        'agent-2', 'lead', 'gpt-4', 'busy',
+        'agent-2', 'lead', 'gpt-4', 'running',
         'session-abc', 'project-xyz', { custom: 'data' },
       );
       expect(agent.sessionId).toBe('session-abc');
@@ -38,11 +38,11 @@ describe('AgentRosterRepository', () => {
 
     it('updates existing agent on conflict', () => {
       repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle');
-      const updated = repo.upsertAgent('agent-1', 'lead', 'gpt-4', 'busy');
+      const updated = repo.upsertAgent('agent-1', 'lead', 'gpt-4', 'running');
 
       expect(updated.role).toBe('lead');
       expect(updated.model).toBe('gpt-4');
-      expect(updated.status).toBe('busy');
+      expect(updated.status).toBe('running');
 
       const fromDb = repo.getAgent('agent-1');
       expect(fromDb).toBeDefined();
@@ -54,7 +54,7 @@ describe('AgentRosterRepository', () => {
       repo.upsertAgent('agent-1', 'developer', 'claude-sonnet');
       const original = repo.getAgent('agent-1');
 
-      repo.upsertAgent('agent-1', 'lead', 'gpt-4', 'busy');
+      repo.upsertAgent('agent-1', 'lead', 'gpt-4', 'running');
       const updated = repo.getAgent('agent-1');
 
       // createdAt is stored by the DB default on first insert;
@@ -92,7 +92,7 @@ describe('AgentRosterRepository', () => {
   describe('getAllAgents', () => {
     beforeEach(() => {
       repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle');
-      repo.upsertAgent('agent-2', 'lead', 'gpt-4', 'busy');
+      repo.upsertAgent('agent-2', 'lead', 'gpt-4', 'running');
       repo.upsertAgent('agent-3', 'reviewer', 'claude-haiku', 'terminated');
     });
 
@@ -106,7 +106,7 @@ describe('AgentRosterRepository', () => {
       expect(idle.length).toBe(1);
       expect(idle[0].agentId).toBe('agent-1');
 
-      const busy = repo.getAllAgents('busy');
+      const busy = repo.getAllAgents('running');
       expect(busy.length).toBe(1);
       expect(busy[0].agentId).toBe('agent-2');
     });
@@ -114,7 +114,7 @@ describe('AgentRosterRepository', () => {
     it('returns empty array when no matches', () => {
       const result = repo.getAllAgents('idle');
       // We know agent-1 is idle, but let's test with a specific scenario
-      repo.updateStatus('agent-1', 'busy');
+      repo.updateStatus('agent-1', 'running');
       const idleAfter = repo.getAllAgents('idle');
       expect(idleAfter.length).toBe(0);
     });
@@ -123,11 +123,11 @@ describe('AgentRosterRepository', () => {
   describe('updateStatus', () => {
     it('updates agent status', () => {
       repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle');
-      const updated = repo.updateStatus('agent-1', 'busy');
+      const updated = repo.updateStatus('agent-1', 'running');
       expect(updated).toBe(true);
 
       const agent = repo.getAgent('agent-1');
-      expect(agent!.status).toBe('busy');
+      expect(agent!.status).toBe('running');
     });
 
     it('updates updatedAt timestamp', () => {
@@ -135,13 +135,13 @@ describe('AgentRosterRepository', () => {
       const before = repo.getAgent('agent-1')!.updatedAt;
 
       // Small delay to ensure timestamp differs
-      repo.updateStatus('agent-1', 'busy');
+      repo.updateStatus('agent-1', 'running');
       const after = repo.getAgent('agent-1')!.updatedAt;
       expect(after).toBeDefined();
     });
 
     it('returns false for non-existent agent', () => {
-      const result = repo.updateStatus('does-not-exist', 'busy');
+      const result = repo.updateStatus('does-not-exist', 'running');
       expect(result).toBe(false);
     });
   });
@@ -174,7 +174,7 @@ describe('AgentRosterRepository', () => {
 
   describe('removeAgent', () => {
     it('sets status to terminated (soft delete)', () => {
-      repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'busy');
+      repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'running');
       const removed = repo.removeAgent('agent-1');
       expect(removed).toBe(true);
 
@@ -212,8 +212,8 @@ describe('AgentRosterRepository', () => {
       expect(repo.getAgent('agent-1')!.status).toBe('idle');
 
       // Assign work
-      repo.updateStatus('agent-1', 'busy');
-      expect(repo.getAgent('agent-1')!.status).toBe('busy');
+      repo.updateStatus('agent-1', 'running');
+      expect(repo.getAgent('agent-1')!.status).toBe('running');
 
       // Track SDK session
       repo.updateSessionId('agent-1', 'sdk-session-abc');
@@ -258,7 +258,7 @@ describe('AgentRosterRepository', () => {
 
     it('updates teamId on upsert', () => {
       repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', undefined, undefined, undefined, 'team-a');
-      repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'busy', undefined, undefined, undefined, 'team-b');
+      repo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'running', undefined, undefined, undefined, 'team-b');
 
       const fromDb = repo.getAgent('agent-1');
       expect(fromDb!.teamId).toBe('team-b');
@@ -267,7 +267,7 @@ describe('AgentRosterRepository', () => {
     it('filters getAllAgents by teamId', () => {
       repo.upsertAgent('a1', 'dev', 'model', 'idle', undefined, undefined, undefined, 'team-x');
       repo.upsertAgent('a2', 'dev', 'model', 'idle', undefined, undefined, undefined, 'team-y');
-      repo.upsertAgent('a3', 'lead', 'model', 'busy', undefined, undefined, undefined, 'team-x');
+      repo.upsertAgent('a3', 'lead', 'model', 'running', undefined, undefined, undefined, 'team-x');
 
       expect(repo.getAllAgents(undefined, 'team-x').length).toBe(2);
       expect(repo.getAllAgents(undefined, 'team-y').length).toBe(1);
@@ -276,11 +276,11 @@ describe('AgentRosterRepository', () => {
 
     it('filters getAllAgents by status AND teamId', () => {
       repo.upsertAgent('a1', 'dev', 'model', 'idle', undefined, undefined, undefined, 'team-x');
-      repo.upsertAgent('a2', 'dev', 'model', 'busy', undefined, undefined, undefined, 'team-x');
+      repo.upsertAgent('a2', 'dev', 'model', 'running', undefined, undefined, undefined, 'team-x');
       repo.upsertAgent('a3', 'dev', 'model', 'idle', undefined, undefined, undefined, 'team-y');
 
       expect(repo.getAllAgents('idle', 'team-x').length).toBe(1);
-      expect(repo.getAllAgents('busy', 'team-x').length).toBe(1);
+      expect(repo.getAllAgents('running', 'team-x').length).toBe(1);
       expect(repo.getAllAgents('idle', 'team-y').length).toBe(1);
     });
 
@@ -294,8 +294,8 @@ describe('AgentRosterRepository', () => {
 
   describe('reconcileStaleAgents', () => {
     it('marks busy/idle agents as terminated when not alive', () => {
-      repo.upsertAgent('alive-1', 'lead', 'model', 'busy');
-      repo.upsertAgent('dead-1', 'dev', 'model', 'busy');
+      repo.upsertAgent('alive-1', 'lead', 'model', 'running');
+      repo.upsertAgent('dead-1', 'dev', 'model', 'running');
       repo.upsertAgent('dead-2', 'dev', 'model', 'idle');
       repo.upsertAgent('done-1', 'dev', 'model', 'terminated');
 
@@ -304,14 +304,14 @@ describe('AgentRosterRepository', () => {
       );
 
       expect(reconciled).toBe(2);
-      expect(repo.getAgent('alive-1')!.status).toBe('busy');
+      expect(repo.getAgent('alive-1')!.status).toBe('running');
       expect(repo.getAgent('dead-1')!.status).toBe('terminated');
       expect(repo.getAgent('dead-2')!.status).toBe('terminated');
       expect(repo.getAgent('done-1')!.status).toBe('terminated');
     });
 
     it('returns 0 when all agents are alive', () => {
-      repo.upsertAgent('a1', 'lead', 'model', 'busy');
+      repo.upsertAgent('a1', 'lead', 'model', 'running');
       repo.upsertAgent('a2', 'dev', 'model', 'idle');
 
       const reconciled = repo.reconcileStaleAgents(() => true);

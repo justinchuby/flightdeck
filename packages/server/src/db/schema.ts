@@ -350,7 +350,7 @@ export const agentRoster = sqliteTable('agent_roster', {
   agentId: text('agent_id').primaryKey(),
   role: text('role').notNull(),
   model: text('model').notNull(),
-  status: text('status').notNull().default('idle'), // 'idle' | 'busy' | 'terminated'
+  status: text('status').notNull().default('idle'), // 'idle' | 'running' | 'terminated'
   sessionId: text('session_id'),
   projectId: text('project_id'),
   teamId: text('team_id').notNull().default('default'),

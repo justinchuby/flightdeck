@@ -45,7 +45,7 @@ import { useAppStore } from '../../stores/appStore';
 
 // ── Types (shared with CrewRoster) ─────────────────────────
 
-type RosterStatus = 'idle' | 'busy' | 'terminated';
+type RosterStatus = 'idle' | 'running' | 'terminated';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 type ProfileTab = 'overview' | 'chat' | 'settings';
 
@@ -782,7 +782,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const summaryMap = new Map(crewSummaries.map(s => [s.leadId, s]));
 
   const hasActiveAgents = agents.some(a =>
-    a.status === 'idle' || a.status === 'busy' || a.liveStatus === 'running' || a.liveStatus === 'creating' || a.liveStatus === 'idle'
+    a.status === 'idle' || a.status === 'running' || a.liveStatus === 'running' || a.liveStatus === 'creating' || a.liveStatus === 'idle'
   );
   const allTerminated = agents.length > 0 && !hasActiveAgents;
 
@@ -823,7 +823,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
             className="w-full pl-9 pr-3 py-2 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt" />
         </div>
         <div className="flex gap-1">
-          {(['all', 'idle', 'busy', 'terminated'] as const).map(s => (
+          {(['all', 'idle', 'running', 'terminated'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 text-xs rounded capitalize transition-colors ${
                 statusFilter === s

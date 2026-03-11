@@ -14,7 +14,7 @@
  * Lifecycle persistence (write-on-mutation):
  *   - agent:spawned   → upsert into agentRoster
  *   - agent:session_ready → update sessionId
- *   - agent:status    → update status (running→busy, idle→idle)
+ *   - agent:status    → update status (running→running, idle→idle)
  *   - agent:terminated → mark as terminated
  */
 import { EventEmitter } from 'events';
@@ -48,7 +48,7 @@ export interface ResumeAllResult {
 
 function toRosterStatus(agentStatus: string): RosterStatus | null {
   switch (agentStatus) {
-    case 'running': return 'busy';
+    case 'running': return 'running';
     case 'idle': return 'idle';
     case 'completed':
     case 'failed':

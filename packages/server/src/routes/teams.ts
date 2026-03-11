@@ -119,7 +119,7 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     const teamId = paramStr(req.params.teamId);
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
-    const validStatuses = new Set(['idle', 'busy', 'terminated']);
+    const validStatuses = new Set(['idle', 'running', 'terminated']);
 
     if (statusFilter && !validStatuses.has(statusFilter)) {
       return res.status(400).json({ error: `Invalid status filter: ${statusFilter}` });
@@ -127,7 +127,7 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     try {
       const agents = agentRoster.getAllAgents(
-        statusFilter as 'idle' | 'busy' | 'terminated' | undefined,
+        statusFilter as 'idle' | 'running' | 'terminated' | undefined,
         teamId,
       );
 

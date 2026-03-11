@@ -119,15 +119,15 @@ describe('agentStatusProps', () => {
   });
 
   it('maps live idle liveStatus to info', () => {
-    expect(agentStatusProps('busy', 'idle')).toEqual({ variant: 'info', label: 'Idle' });
+    expect(agentStatusProps('running', 'idle')).toEqual({ variant: 'info', label: 'Idle' });
   });
 
   it('maps idle DB status without liveStatus to Offline', () => {
     expect(agentStatusProps('idle')).toEqual({ variant: 'neutral', label: 'Offline' });
   });
 
-  it('maps busy DB status without liveStatus to Offline', () => {
-    expect(agentStatusProps('busy')).toEqual({ variant: 'neutral', label: 'Offline' });
+  it('maps running DB status without liveStatus to Offline', () => {
+    expect(agentStatusProps('running')).toEqual({ variant: 'neutral', label: 'Offline' });
   });
 
   it('maps idle DB status with null liveStatus to Offline', () => {

@@ -682,7 +682,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
         // Persist status to roster DB
         if (this.agentRosterRepository) {
-          const rosterStatus = status === 'running' ? 'busy' : status === 'idle' ? 'idle' : undefined;
+          const rosterStatus = status === 'running' ? 'running' : status === 'idle' ? 'idle' : undefined;
           if (rosterStatus) {
             try { this.agentRosterRepository.updateStatus(agent.id, rosterStatus); } catch { /* non-critical */ }
           }
