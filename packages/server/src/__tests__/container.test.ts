@@ -99,11 +99,6 @@ describe('createContainer', () => {
     expect(container.sessionExporter).toBeDefined();
     expect(container.performanceTracker).toBeDefined();
 
-    // Agent Server architecture
-    expect(container.agentServerClient).toBeDefined();
-    expect(container.agentServerHealth).toBeDefined();
-    expect(container.massFailureDetector).toBeDefined();
-
     // costTracker available both publicly and internally
     expect(container.costTracker).toBeDefined();
 

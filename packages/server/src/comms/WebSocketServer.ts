@@ -11,7 +11,6 @@ import { getAuthSecret } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 import { redactWsMessage } from '../utils/redaction.js';
 import { runWithWsContext } from '../middleware/requestContext.js';
-import type { AgentServerHealth, HealthStateChange } from '../agents/AgentServerHealth.js';
 
 interface ClientConnection {
   id: string;
@@ -34,7 +33,6 @@ export class WebSocketServer {
   private textBuffer = new Map<string, { texts: string[]; projectId?: string }>();
   private textFlushTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly TEXT_FLUSH_MS = 100;
-  private agentServerHealth: AgentServerHealth | null = null;
 
   constructor(
     server: HttpServer,
@@ -104,7 +102,6 @@ export class WebSocketServer {
           agents: agentManager.getAll().map((a) => a.toJSON()),
           locks: lockRegistry.getAll(),
           systemPaused: agentManager.isSystemPaused,
-          agentServerState: this.agentServerHealth?.state ?? 'connected',
         }),
       );
     });
@@ -519,32 +516,6 @@ export class WebSocketServer {
   /** Public broadcast for external event sources (e.g., AlertEngine, TimerRegistry) */
   broadcastEvent(msg: Record<string, unknown>, projectId?: string): void {
     this.broadcastToProject(msg, projectId);
-  }
-
-  /**
-   * Wire AgentServerHealth state changes → WS 'agentServerStatus' events.
-   * Broadcasts to all clients (global, not project-scoped) so the UI connection
-   * status banner (AS19) can show degraded/disconnected state.
-   */
-  wireAgentServerHealth(health: AgentServerHealth): () => void {
-    this.agentServerHealth = health;
-    const unsub = health.onStateChange((change: HealthStateChange) => {
-      let detail: string | undefined;
-      if (change.current === 'degraded') {
-        detail = `${change.missedPongs} missed pong(s)`;
-      } else if (change.current === 'disconnected') {
-        detail = 'Agent server unreachable';
-      }
-
-      this.broadcastAll({
-        type: 'agentServerStatus',
-        state: change.current,
-        detail,
-      });
-    });
-
-    this.eventCleanups.push(unsub);
-    return unsub;
   }
 
   /** Flush buffered agent:text events — coalesces rapid text chunks into single WS messages */

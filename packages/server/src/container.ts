@@ -39,15 +39,6 @@ import { SessionKnowledgeExtractor } from './knowledge/SessionKnowledgeExtractor
 import { CollectiveMemory } from './coordination/knowledge/CollectiveMemory.js';
 import { SkillsLoader } from './knowledge/SkillsLoader.js';
 
-import { randomUUID } from 'node:crypto';
-
-// ── Imports: Agent Server Transport & Client ────────────────
-import { ForkTransport } from './transport/ForkTransport.js';
-import { AgentServerClient } from './agents/AgentServerClient.js';
-import { AgentServerHealth } from './agents/AgentServerHealth.js';
-import { MassFailureDetector } from './transport/MassFailureDetector.js';
-import { AgentReconciliation } from './agents/AgentReconciliation.js';
-import type { ExpectedAgent } from './agents/AgentReconciliation.js';
 
 // ── Imports: Tier 2 (Stateless Services) ───────────────────
 import { MessageBus } from './comms/MessageBus.js';
@@ -79,7 +70,6 @@ import { SearchEngine } from './coordination/knowledge/SearchEngine.js';
 
 // ── Imports: Tier 4-5 (AgentManager + dependents) ──────────
 import { AgentManager } from './agents/AgentManager.js';
-import { isTerminalStatus } from './agents/Agent.js';
 import { ContextRefresher } from './coordination/agents/ContextRefresher.js';
 import { CapabilityRegistry } from './coordination/agents/CapabilityRegistry.js';
 import { AlertEngine } from './coordination/alerts/AlertEngine.js';
@@ -189,38 +179,6 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const sessionKnowledgeExtractor = new SessionKnowledgeExtractor(knowledgeStore);
   const collectiveMemory = new CollectiveMemory(db);
 
-  // ── Agent Server Transport & Client ─────────────────────
-  // In dev mode (tsx), fork the TypeScript source directly using tsx loader.
-  // In production, fork the compiled JS entry point.
-  // Detection: tsx sets its loader in process.execArgv, not process.argv.
-  const isTsx = process.execArgv.some(a => a.includes('tsx')) || !!process.env.TSX;
-  const agentServerScript = isTsx
-    ? `${repoRoot}/packages/server/src/agent-server-entry.ts`
-    : `${repoRoot}/packages/server/dist/agent-server-entry.js`;
-  const agentServerExecArgv = isTsx ? ['--import', 'tsx'] : [];
-
-  const forkTransport = new ForkTransport({
-    serverScript: agentServerScript,
-    execArgv: agentServerExecArgv,
-    stateDir: process.env.FLIGHTDECK_STATE_DIR,
-  });
-  const agentServerClient = new AgentServerClient(
-    forkTransport,
-    { projectId: (effectiveConfig as any).projectId ?? 'default', teamId: (effectiveConfig as any).teamId ?? 'default' },
-  );
-  const agentServerHealth = new AgentServerHealth(
-    () => {
-      const id = randomUUID();
-      // Fire ping and wire the pong response back to health monitor
-      agentServerClient.ping()
-        .then(() => agentServerHealth.recordPong(id))
-        .catch(() => { /* missed pong — health monitor handles via tick */ });
-      return id;
-    },
-  );
-  onShutdown('agentServerHealth', () => agentServerHealth.stop());
-  onShutdown('agentServerClient', () => { agentServerClient.dispose(); });
-  const massFailureDetector = new MassFailureDetector();
   const timerRegistry = new TimerRegistry(db.drizzle);
   const costTracker = new CostTracker(db);
   const messageQueueStore = new MessageQueueStore(db);
@@ -277,7 +235,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
       db, deferredIssueRegistry, timerRegistry, capabilityInjector,
       taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker,
       governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository,
-      agentServerClient, knowledgeInjector,
+      knowledgeInjector,
     },
   );
   agentManager.setProjectRegistry(projectRegistry);
@@ -413,9 +371,6 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     trainingCapture,
     sessionKnowledgeExtractor,
     collectiveMemory,
-    agentServerClient,
-    agentServerHealth,
-    massFailureDetector,
     agentRoster: agentRosterRepository,
     integrationRouter,
     configStore,
@@ -454,14 +409,6 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   // ── Wire cross-service events ──────────────────────────
   wireEvents(container);
 
-  // Register reconciliation listener cleanup for shutdown (H-12)
-  if (container.agentServerClient) {
-    const unsubReconciliation = wireReconciliationOnReconnect(
-      container.agentServerClient, container.agentManager, container.internal.wsServer,
-    );
-    onShutdown('reconciliationListener', unsubReconciliation);
-  }
-
   return container;
 }
 
@@ -483,11 +430,6 @@ export function wireHttpLayer(
   container.alertEngine?.on('alert:new', (alert: any) => {
     wsServer.broadcastEvent({ type: 'alert:new', alert }, alert.projectId);
   });
-
-  // Wire agent server health → WS broadcast for UI status banner (AS17)
-  if (container.agentServerHealth) {
-    wsServer.wireAgentServerHealth(container.agentServerHealth);
-  }
 }
 
 // ── Event Wiring ───────────────────────────────────────────
@@ -496,7 +438,7 @@ function wireEvents(c: ServiceContainer): void {
   const {
     eventPipeline, activityLedger, lockRegistry, decisionLog,
     alertEngine, eagerScheduler, agentManager, webhookManager,
-    capabilityRegistry, decisionRecordStore, agentServerClient,
+    capabilityRegistry, decisionRecordStore,
   } = c;
   const { taskDAG, timerRegistry, configStore } = c.internal;
 
@@ -582,75 +524,6 @@ function wireEvents(c: ServiceContainer): void {
 }
 
 // ── Test Helper ────────────────────────────────────────────
-
-// ── Reconciliation Wiring ──────────────────────────────────
-
-/**
- * Wire AgentReconciliation to auto-run when the agent server client reconnects.
- * Skips the initial connect (no agents to reconcile) and only runs on
- * subsequent reconnects when there are non-terminal agents to verify.
- */
-export function wireReconciliationOnReconnect(
-  agentServerClient: AgentServerClient,
-  agentManager: AgentManager,
-  wsServer?: { broadcastEvent: (event: any, projectId?: string) => void } | null,
-): () => void {
-  const reconciliation = new AgentReconciliation(agentServerClient);
-  let hasConnectedBefore = false;
-  let isReconciling = false;
-
-  const handler = () => {
-    if (!hasConnectedBefore) {
-      hasConnectedBefore = true;
-      return; // Skip reconciliation on initial connect
-    }
-
-    if (isReconciling) return; // Prevent concurrent reconciliation on rapid reconnects
-
-    const nonTerminalAgents = agentManager.getAll().filter(
-      a => !isTerminalStatus(a.status),
-    );
-    if (nonTerminalAgents.length === 0) return;
-
-    const expectedAgents: ExpectedAgent[] = nonTerminalAgents.map(a => ({
-      agentId: a.id,
-      role: a.role?.id ?? 'unknown',
-      model: a.model ?? 'unknown',
-      lastSeenEventId: agentServerClient.getLastSeenEventId(a.id),
-    }));
-
-    isReconciling = true;
-    reconciliation.reconcile(expectedAgents)
-      .then(report => {
-        logger.info({
-          module: 'reconciliation',
-          msg: 'Agent reconciliation completed after reconnect',
-          reconnected: report.reconnected.length,
-          lost: report.lost.length,
-          discovered: report.discovered.length,
-        });
-        wsServer?.broadcastEvent({
-          type: 'reconciliation:complete',
-          report,
-        });
-      })
-      .catch(err => {
-        logger.warn({
-          module: 'reconciliation',
-          msg: 'Agent reconciliation failed after reconnect',
-          error: err.message,
-        });
-      })
-      .finally(() => {
-        isReconciling = false;
-      });
-  };
-
-  agentServerClient.on('connected', handler);
-
-  // Return unsubscribe function for shutdown cleanup
-  return () => { agentServerClient.removeListener('connected', handler); };
-}
 
 /**
  * Creates a container with an in-memory database for testing.

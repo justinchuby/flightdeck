@@ -34,8 +34,6 @@ import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { runWithAgentContext } from '../middleware/requestContext.js';
-import type { AgentServerClient } from './AgentServerClient.js';
-import { startRemoteBridge } from './ServerClientBridge.js';
 import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExtractor.js';
 import type { SessionData, SessionMessage } from '../knowledge/types.js';
 import type { KnowledgeInjector, InjectionContext } from '../knowledge/KnowledgeInjector.js';
@@ -125,7 +123,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private messageQueueStore?: MessageQueueStore;
   private agentRosterRepository?: AgentRosterRepository;
   private activeDelegationRepository?: ActiveDelegationRepository;
-  private agentServerClient?: AgentServerClient;
   private knowledgeInjector?: KnowledgeInjector;
   private skillsLoader?: SkillsLoader;
   private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
@@ -144,7 +141,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, agentServerClient, knowledgeInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; agentServerClient?: AgentServerClient; knowledgeInjector?: KnowledgeInjector } = {},
+    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, knowledgeInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; knowledgeInjector?: KnowledgeInjector } = {},
   ) {
     super();
     this.config = config;
@@ -164,7 +161,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.messageQueueStore = messageQueueStore;
     this.agentRosterRepository = agentRosterRepository;
     this.activeDelegationRepository = activeDelegationRepository;
-    this.agentServerClient = agentServerClient;
     this.knowledgeInjector = knowledgeInjector;
     this.db = db;
     if (db) this.conversationStore = new ConversationStore(db);
@@ -849,16 +845,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
     };
 
-    // Helper: start the agent via remote bridge or local ACP
+    // Helper: start the agent via local ACP adapter
     const startAgent = () => {
-      if (this.agentServerClient) {
-        const isResume = !!agent.resumeSessionId;
-        // On resume, send nothing — SDK restores conversation history.
-        const initialPrompt = isResume ? undefined : agent.buildFullPrompt();
-        startRemoteBridge(agent, this.agentServerClient, initialPrompt);
-      } else {
-        agent.start();
-      }
+      agent.start();
     };
 
     // Create isolated worktree if manager is available (async — delays agent.start)
@@ -1101,16 +1090,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   getRoleRegistry(): RoleRegistry {
     return this.roleRegistry;
-  }
-
-  /** Get the optional AgentServerClient (for remote agent spawning). */
-  getAgentServerClient(): AgentServerClient | undefined {
-    return this.agentServerClient;
-  }
-
-  /** Set or replace the AgentServerClient (for remote agent spawning). */
-  setAgentServerClient(client: AgentServerClient | undefined): void {
-    this.agentServerClient = client;
   }
 
   setAutoRestart(enabled: boolean): void {

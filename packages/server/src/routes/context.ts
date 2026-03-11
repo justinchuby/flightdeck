@@ -20,10 +20,6 @@ import type { KnowledgeStore } from '../knowledge/KnowledgeStore.js';
 import type { HybridSearchEngine } from '../knowledge/HybridSearchEngine.js';
 import type { MemoryCategoryManager } from '../knowledge/MemoryCategoryManager.js';
 import type { TrainingCapture } from '../knowledge/TrainingCapture.js';
-import type { MassFailureDetector } from '../transport/MassFailureDetector.js';
-import type { AgentRosterRepository } from '../db/AgentRosterRepository.js';
-import type { AgentServerClient } from '../agents/AgentServerClient.js';
-import type { AgentServerHealth } from '../agents/AgentServerHealth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { execSync } from 'node:child_process';
 
@@ -70,10 +66,7 @@ export interface AppContext {
   trainingCapture?: TrainingCapture;
   sessionKnowledgeExtractor?: import('../knowledge/SessionKnowledgeExtractor.js').SessionKnowledgeExtractor;
   collectiveMemory?: import('../coordination/knowledge/CollectiveMemory.js').CollectiveMemory;
-  agentServerClient?: AgentServerClient;
-  agentServerHealth?: AgentServerHealth;
-  massFailureDetector?: MassFailureDetector;
-  agentRoster?: AgentRosterRepository;
+  agentRoster?: import('../db/AgentRosterRepository.js').AgentRosterRepository;
   integrationRouter?: import('../integrations/IntegrationRouter.js').IntegrationRouter;
   configStore?: import('../config/ConfigStore.js').ConfigStore;
 }

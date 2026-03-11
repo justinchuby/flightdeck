@@ -15,10 +15,6 @@ import {
   Clock,
   PauseCircle,
   UserMinus,
-  Server,
-  Power,
-  Wifi,
-  WifiOff,
   X,
   Download,
   Upload,
@@ -30,7 +26,7 @@ import {
 import { apiFetch } from '../hooks/useApi';
 import { useToastStore } from '../components/Toast';
 import { AgentLifecycle } from '../components/AgentLifecycle';
-import { StatusBadge, agentStatusProps, connectionStatusProps } from '../components/ui/StatusBadge';
+import { StatusBadge, agentStatusProps } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Tabs } from '../components/ui/Tabs';
 import type { TabItem } from '../components/ui/Tabs';
@@ -105,16 +101,6 @@ interface HealthData {
   agents: AgentHealthInfo[];
 }
 
-interface ServerStatus {
-  running: boolean;
-  connected: boolean;
-  state: string;
-  agentCount: number | null;
-  latencyMs: number | null;
-  pendingRequests: number;
-  trackedAgents: number;
-}
-
 interface CrewDetail {
   teamId: string;
   agentCount: number;
@@ -150,12 +136,6 @@ function formatUptime(ms: number): string {
   return `${(ms / 86_400_000).toFixed(1)}d`;
 }
 
-function serverStateBadge(running: boolean, state: string): { variant: 'success' | 'warning' | 'error'; label: string } {
-  if (!running) return { variant: 'error', label: 'Agent Server: Stopped' };
-  const base = connectionStatusProps(state) as { variant: 'success' | 'warning' | 'error'; label: string };
-  return { ...base, label: `Agent Server: ${base.label}` };
-}
-
 // ── Sub-components ────────────────────────────────────────
 
 function OverviewCard({ label, count, icon, color, testId }: {
@@ -172,37 +152,6 @@ function OverviewCard({ label, count, icon, color, testId }: {
         <span className="text-2xl font-bold">{count}</span>
       </div>
       <span className="text-xs text-th-text-muted mt-1 block">{label}</span>
-    </div>
-  );
-}
-
-function ServerCard({ status, onStop }: { status: ServerStatus | null; onStop: () => void }) {
-  if (!status) return null;
-  const badge = serverStateBadge(status.running, status.state);
-
-  return (
-    <div className="bg-th-bg-alt border border-th-border rounded-lg p-4" data-testid="card-server">
-      <div className="flex items-center gap-2 text-th-text mb-1" title="The agent daemon process that manages agent lifecycles">
-        <Server className="w-4 h-4" />
-        <StatusBadge variant={badge.variant} label={badge.label} dot pulse={badge.variant === 'success'} />
-      </div>
-      <div className="flex items-center gap-3 text-xs text-th-text-muted">
-        {status.connected
-          ? <Wifi className="w-3 h-3 text-green-400" />
-          : <WifiOff className="w-3 h-3 text-red-400" />}
-        <span>{status.agentCount ?? 0} agents</span>
-        {status.latencyMs != null && <span>{status.latencyMs}ms</span>}
-      </div>
-      {status.running && (
-        <button
-          onClick={onStop}
-          className="mt-2 px-2 py-1 text-xs rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors flex items-center gap-1"
-          data-testid="stop-server-btn"
-        >
-          <Power className="w-3 h-3" />
-          Stop Server
-        </button>
-      )}
     </div>
   );
 }
@@ -782,7 +731,6 @@ export function CrewPage() {
   const [selectedTeam, setSelectedTeam] = useState('default');
   const [agents, setAgents] = useState<RosterAgent[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
-  const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [teamDetail, setTeamDetail] = useState<CrewDetail | null>(null);
@@ -794,7 +742,6 @@ export function CrewPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [managingAgent, setManagingAgent] = useState<string | null>(null);
-  const [confirmStop, setConfirmStop] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [activeTab, setActiveTab] = useState<CrewTab>('roster');
@@ -818,10 +765,9 @@ export function CrewPage() {
         ? `/teams/${selectedTeam}/agents`
         : `/teams/${selectedTeam}/agents?status=${statusFilter}`;
 
-      const [agentData, healthData, serverData, crewDetailData] = await Promise.allSettled([
+      const [agentData, healthData, crewDetailData] = await Promise.allSettled([
         apiFetch<RosterAgent[]>(agentUrl),
         apiFetch<HealthData>(`/teams/${encodeURIComponent(selectedTeam)}/health`),
-        apiFetch<ServerStatus>('/agent-server/status'),
         apiFetch<CrewDetail>(`/teams/${encodeURIComponent(selectedTeam)}`),
       ]);
 
@@ -844,7 +790,6 @@ export function CrewPage() {
       }
 
       if (healthData.status === 'fulfilled') setHealth(healthData.value);
-      if (serverData.status === 'fulfilled') setServerStatus(serverData.value);
       if (crewDetailData.status === 'fulfilled') setTeamDetail(crewDetailData.value);
     } catch (err: any) {
       setError(err.message ?? 'Failed to load crew data');
@@ -878,17 +823,6 @@ export function CrewPage() {
   }, [fetchData]);
 
   // ── Actions ──────────────────────────────────────────────
-
-  const handleStopServer = async () => {
-    try {
-      await apiFetch('/agent-server/stop', { method: 'POST' });
-      addToast('success', 'Agent server stop requested');
-      setConfirmStop(false);
-      setTimeout(fetchData, 1000);
-    } catch (err: any) {
-      addToast('error', err.message ?? 'Failed to stop server');
-    }
-  };
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -1148,32 +1082,7 @@ export function CrewPage() {
               color="text-gray-400"
               testId="card-retired"
             />
-            <ServerCard
-              status={serverStatus}
-              onStop={() => setConfirmStop(true)}
-            />
           </div>
-
-          {/* Stop server confirmation */}
-          {confirmStop && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30">
-              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <span className="text-sm text-red-400">Stop agent server? All agents will be terminated.</span>
-              <button
-                onClick={handleStopServer}
-                className="ml-auto px-3 py-1 text-xs rounded bg-red-600 hover:bg-red-500 text-white"
-                data-testid="confirm-stop-btn"
-              >
-                Confirm Stop
-              </button>
-              <button
-                onClick={() => setConfirmStop(false)}
-                className="px-3 py-1 text-xs rounded bg-th-bg-alt hover:bg-th-border text-th-text-alt"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
         </>
       )}
 

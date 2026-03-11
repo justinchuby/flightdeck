@@ -246,14 +246,10 @@ export function teamsRoutes(ctx: AppContext): Router {
         };
       });
 
-      // Mass failure status from context (if available)
-      const massFailurePaused = ctx.massFailureDetector?.isPaused ?? false;
-
       res.json({
         teamId,
         totalAgents: agents.length,
         statusCounts,
-        massFailurePaused,
         agents: agentDetails,
       });
     } catch (err: any) {

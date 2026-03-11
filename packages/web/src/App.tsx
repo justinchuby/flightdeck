@@ -24,7 +24,6 @@ import { PulseStrip } from './components/Pulse';
 import { AttentionBar } from './components/AttentionBar';
 import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
 import { CatchUpBanner } from './components/CatchUp';
-import { AgentServerStatus } from './components/AgentServerStatus';
 import { StatusPopover } from './components/StatusPopover/StatusPopover';
 import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
@@ -46,7 +45,6 @@ const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
 const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel').then(m => ({ default: m.ArtifactsPanel })));
-const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
 const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
@@ -342,7 +340,6 @@ export function App() {
 
           <AttentionBar />
           <div data-tour="pulse-strip"><PulseStrip /></div>
-          <AgentServerStatus />
 
           <main id="main-content" className="flex-1 overflow-hidden flex flex-col">
           <ErrorBoundary>
@@ -370,7 +367,6 @@ export function App() {
             {/* ── Global (non-project-scoped) routes ───────────── */}
             <Route path="/projects" element={<RouteErrorBoundary name="Projects"><ProjectsPanel /></RouteErrorBoundary>} />
             <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel api={api} /></RouteErrorBoundary>} />
-            <Route path="/agent-server" element={<RouteErrorBoundary name="Agent Server"><AgentServerPanel /></RouteErrorBoundary>} />
             <Route path="/shared/:token" element={<RouteErrorBoundary name="Shared Replay"><SharedReplayViewer /></RouteErrorBoundary>} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}

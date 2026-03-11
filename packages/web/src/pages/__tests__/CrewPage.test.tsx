@@ -91,16 +91,6 @@ const healthData = {
   ],
 };
 
-const serverStatus = {
-  running: true,
-  connected: true,
-  state: 'connected',
-  agentCount: 2,
-  latencyMs: 12,
-  pendingRequests: 0,
-  trackedAgents: 2,
-};
-
 const profileData = {
   agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900',
   role: 'architect',
@@ -135,7 +125,6 @@ function setupMocks(overrides: Partial<{
   teams: any;
   agents: any;
   health: any;
-  server: any;
   profile: any;
   teamDetail: any;
   exportResult: any;
@@ -147,8 +136,6 @@ function setupMocks(overrides: Partial<{
     if (path === '/teams/import') return Promise.resolve(overrides.importResult ?? { success: true, report: { success: true, teamId: 'default', agents: [], knowledge: { imported: 5, skipped: 0, conflicts: 0 }, training: { correctionsImported: 2, feedbackImported: 3 }, warnings: [], validation: { valid: true, issues: [] } } });
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/health')) return Promise.resolve(overrides.health ?? healthData);
-    if (path === '/agent-server/status') return Promise.resolve(overrides.server ?? serverStatus);
-    if (path === '/agent-server/stop') return Promise.resolve({ ok: true });
     // Match /teams/:teamId (but not /teams/:teamId/agents or /teams/:teamId/health)
     if (/^\/teams\/[^/]+$/.test(path)) return Promise.resolve(overrides.teamDetail ?? teamDetailData);
     if (path.includes('/agents')) return Promise.resolve(overrides.agents ?? rosterAgents);
@@ -205,22 +192,6 @@ describe('CrewPage', () => {
     expect(screen.getByTestId('card-active')).toBeInTheDocument();
     expect(screen.getByTestId('card-idle')).toBeInTheDocument();
     expect(screen.getByTestId('card-retired')).toBeInTheDocument();
-  });
-
-  it('renders server status card', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByTestId('card-server')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Agent Server: Online')).toBeInTheDocument();
-    expect(screen.getByText('2 agents')).toBeInTheDocument();
-    expect(screen.getByText('12ms')).toBeInTheDocument();
   });
 
   it('renders agent cards with roles and IDs', async () => {
@@ -402,42 +373,6 @@ describe('CrewPage', () => {
     });
   });
 
-  it('shows stop server confirmation', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByTestId('stop-server-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('stop-server-btn'));
-    expect(screen.getByText(/stop agent server/i)).toBeInTheDocument();
-    expect(screen.getByTestId('confirm-stop-btn')).toBeInTheDocument();
-  });
-
-  it('stops server on confirm', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByTestId('stop-server-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('stop-server-btn'));
-    fireEvent.click(screen.getByTestId('confirm-stop-btn'));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/agent-server/stop', { method: 'POST' });
-    });
-  });
-
   it('switches profile tabs', async () => {
     setupMocks();
     renderPage();
@@ -475,20 +410,6 @@ describe('CrewPage', () => {
     await waitFor(() => {
       expect(mockApiFetch.mock.calls.length).toBeGreaterThan(callCount);
     });
-  });
-
-  it('hides stop button when server not running', async () => {
-    setupMocks({ server: { ...serverStatus, running: false, state: 'disconnected', connected: false } });
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByText('Agent Server: Stopped')).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('stop-server-btn')).not.toBeInTheDocument();
   });
 
   // ── Team identity section ─────────────────────────────

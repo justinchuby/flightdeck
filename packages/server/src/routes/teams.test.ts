@@ -187,29 +187,8 @@ describe('teamsRoutes', () => {
         expect(body.teamId).toBe('team-1');
         expect(body.totalAgents).toBe(3);
         expect(body.statusCounts).toEqual({ idle: 1, busy: 2, retired: 0, terminated: 0 });
-        expect(body.massFailurePaused).toBe(false);
         expect(body.agents).toHaveLength(3);
         expect(body.agents[0]).toHaveProperty('uptimeMs');
-      } finally {
-        await srv.stop();
-      }
-    });
-
-    it('shows mass failure paused when detector triggered', async () => {
-      const srv = createTestServer({
-        agentRoster: {
-          getAllAgents: vi.fn().mockReturnValue(MOCK_AGENTS),
-          getStatusCounts: vi.fn().mockReturnValue({ idle: 1, busy: 2 }),
-        } as any,
-        massFailureDetector: {
-          get isPaused() { return true; },
-        } as any,
-      });
-      const base = await srv.start();
-      try {
-        const res = await fetch(`${base}/teams/team-1/health`);
-        const body = await res.json();
-        expect(body.massFailurePaused).toBe(true);
       } finally {
         await srv.stop();
       }

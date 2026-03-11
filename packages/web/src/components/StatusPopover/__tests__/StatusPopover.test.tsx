@@ -17,11 +17,6 @@ vi.mock('../../../stores/appStore', () => ({
   useAppStore: (selector: (s: typeof mockAppState) => unknown) => selector(mockAppState),
 }));
 
-const mockApiFetch = vi.fn();
-vi.mock('../../../hooks/useApi', () => ({
-  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
-}));
-
 vi.mock('../../../utils/formatRelativeTime', () => ({
   formatRelativeTime: (ts: string) => `relative(${ts})`,
 }));
@@ -39,15 +34,6 @@ describe('StatusPopover', () => {
       { id: 'a2', status: 'idle', role: { id: 'lead' }, createdAt: '2026-03-08T09:00:00Z', childIds: [] },
       { id: 'a3', status: 'terminated', role: { id: 'dev' }, createdAt: '2026-03-08T08:00:00Z', childIds: [] },
     ];
-    mockApiFetch.mockResolvedValue({
-      running: true,
-      connected: true,
-      state: 'connected',
-      agentCount: 3,
-      latencyMs: 42,
-      pendingRequests: 0,
-      trackedAgents: 3,
-    });
   });
 
   afterEach(() => {
@@ -86,7 +72,6 @@ describe('StatusPopover', () => {
 
     expect(screen.getByText('System Status')).toBeInTheDocument();
     expect(screen.getByText('Server Connection')).toBeInTheDocument();
-    expect(screen.getByText('Agent Server')).toBeInTheDocument();
     expect(screen.getByText('Active Agents')).toBeInTheDocument();
     expect(screen.getByText('Last Activity')).toBeInTheDocument();
   });
@@ -99,27 +84,6 @@ describe('StatusPopover', () => {
       expect(screen.getByText('3 total')).toBeInTheDocument();
     });
     expect(screen.getByText('1 running, 1 idle, 1 done')).toBeInTheDocument();
-  });
-
-  it('fetches daemon status when opened', async () => {
-    render(<StatusPopover />);
-    fireEvent.click(screen.getByTestId('status-popover-trigger'));
-
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/agent-server/status');
-    });
-    expect(screen.getByText('Running')).toBeInTheDocument();
-    expect(screen.getByText('42ms latency')).toBeInTheDocument();
-  });
-
-  it('shows daemon unreachable on fetch error', async () => {
-    mockApiFetch.mockRejectedValue(new Error('Network error'));
-    render(<StatusPopover />);
-    fireEvent.click(screen.getByTestId('status-popover-trigger'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Unreachable')).toBeInTheDocument();
-    });
   });
 
   it('shows Healthy badge when all systems ok', async () => {
@@ -178,28 +142,6 @@ describe('StatusPopover', () => {
 
     await waitFor(() => {
       expect(screen.getByText('relative(2026-03-08T10:00:00Z)')).toBeInTheDocument();
-    });
-  });
-
-  it('re-fetches daemon status when WS reconnects', async () => {
-    mockApiFetch.mockResolvedValue({ running: true, connected: true, state: 'connected', agentCount: 2, latencyMs: 5, pendingRequests: 0, trackedAgents: 2 });
-    mockAppState.connected = true;
-
-    const { rerender } = render(<StatusPopover />);
-
-    // Simulate disconnect
-    mockAppState.connected = false;
-    rerender(<StatusPopover />);
-
-    mockApiFetch.mockClear();
-
-    // Simulate reconnect
-    mockAppState.connected = true;
-    rerender(<StatusPopover />);
-
-    // Should have triggered a daemon fetch on reconnect
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/agent-server/status');
     });
   });
 });
