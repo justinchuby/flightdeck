@@ -104,7 +104,7 @@ export interface AgentInfo {
   messages?: AcpTextChunk[];
   projectName?: string;
   projectId?: string;
-  model?: string;
+  model: string;
   cwd?: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -168,7 +168,7 @@ export interface LeadProgress {
     role: Role;
     status: AgentStatus;
     task?: string;
-    model?: string;
+    model: string;
     inputTokens?: number;
     outputTokens?: number;
     contextWindowSize?: number;

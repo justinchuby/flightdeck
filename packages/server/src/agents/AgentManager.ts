@@ -40,6 +40,7 @@ import type { KnowledgeInjector, InjectionContext } from '../knowledge/Knowledge
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
 import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
 import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
+import { DEFAULT_MODEL } from '../projects/ModelConfigDefaults.js';
 
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
@@ -341,16 +342,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
    *   3. If no model requested → use the first allowed model from project config (role default)
    *   4. If no project config or no restrictions for role → return requestedModel unchanged
    */
-  resolveModelForRole(roleId: string, requestedModel: string | undefined, projectId: string | undefined): { model: string | undefined; overridden: boolean; reason?: string } {
+  resolveModelForRole(roleId: string, requestedModel: string | undefined, projectId: string | undefined): { model: string; overridden: boolean; reason?: string } {
     if (!projectId || !this.projectRegistry) {
-      return { model: requestedModel, overridden: false };
+      return { model: requestedModel || DEFAULT_MODEL, overridden: false };
     }
 
     const { config } = this.projectRegistry.getModelConfig(projectId);
     const allowedModels = config[roleId];
 
     if (!allowedModels || allowedModels.length === 0) {
-      return { model: requestedModel, overridden: false };
+      return { model: requestedModel || DEFAULT_MODEL, overridden: false };
     }
 
     const roleDefault = allowedModels[0];
@@ -512,7 +513,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     const agent = new Agent(effectiveRole, this.config, task, parentId, peers, id);
-    if (effectiveModel) agent.model = effectiveModel;
+    agent.model = effectiveModel;
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
     if (resumeSessionId) agent._isResuming = true;
@@ -568,7 +569,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         // teamId = root lead ID so all agents in a crew share the same team
         const teamId = this.getRootLeadId(agent.id);
         this.agentRosterRepository.upsertAgent(
-          agent.id, role.id, effectiveModel || 'default', 'idle',
+          agent.id, role.id, effectiveModel, 'idle',
           undefined, agent.projectId,
           parentId ? { parentId } : undefined,
           teamId,

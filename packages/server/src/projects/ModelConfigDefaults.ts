@@ -40,6 +40,9 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
 
 const knownSet = new Set<string>(KNOWN_MODEL_IDS);
 
+/** Fallback model when no project config or role default is available. */
+export const DEFAULT_MODEL = 'claude-sonnet-4.6';
+
 /** Default model config used when a project has no custom config. */
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   developer: ['claude-opus-4.6'],

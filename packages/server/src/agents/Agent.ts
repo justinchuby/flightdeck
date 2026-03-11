@@ -50,7 +50,7 @@ export interface AgentJSON {
   sessionId?: string | null;
   projectName?: string;
   projectId?: string;
-  model?: string;
+  model: string;
   cwd?: string;
   inputTokens: number;
   outputTokens: number;
@@ -96,8 +96,8 @@ export class Agent {
   }
   public projectName?: string;
   public projectId?: string;
-  /** Model override for this agent (e.g. "claude-opus-4.6"). Overrides role default. */
-  public model?: string;
+  /** Model for this agent (e.g. "claude-opus-4.6"). Always set during spawn. */
+  public model = '';
   /** Working directory for this agent's CLI process */
   public cwd?: string;
   /** Error message if agent failed to start (e.g., CLI binary not found) */
@@ -729,7 +729,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       sessionId: this.sessionId,
       projectName: this.projectName,
       projectId: this.projectId,
-      model: this.model || this.role.model,
+      model: this.model,
       cwd: this.cwd,
       inputTokens: this.inputTokens,
       outputTokens: this.outputTokens,
