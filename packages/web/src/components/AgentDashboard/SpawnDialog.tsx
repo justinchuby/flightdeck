@@ -11,15 +11,17 @@ export function SpawnDialog({ api, onClose }: Props) {
   const roles = useAppStore((s) => s.roles);
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSpawn = async () => {
     if (!selectedRole) return;
     setLoading(true);
+    setError('');
     try {
       await api.spawnAgent(selectedRole);
       onClose();
-    } catch (err) {
-      console.error('Failed to spawn agent:', err);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to spawn agent');
     } finally {
       setLoading(false);
     }
@@ -62,6 +64,11 @@ export function SpawnDialog({ api, onClose }: Props) {
           ))}
         </div>
 
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md text-sm text-red-400">
+            {error}
+          </div>
+        )}
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}

@@ -278,6 +278,11 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:session_resume_failed', ...data }, projectId);
     });
 
+    this.track(agentManager, 'agent:spawn_error', (data: AgentManagerEvents['agent:spawn_error']) => {
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:spawn_error', ...data }, projectId);
+    });
+
     this.track(agentManager, 'agent:context_compacted', (data: AgentManagerEvents['agent:context_compacted']) => {
       const projectId = this.resolveAgentProjectId(data.agentId);
       this.broadcastToProject({ type: 'agent:context_compacted', ...data }, projectId);

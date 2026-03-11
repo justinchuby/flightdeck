@@ -128,6 +128,12 @@ export function useWebSocket() {
             ],
           });
           break;
+        case 'agent:spawn_error': {
+          const parentAgent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+          const label = parentAgent?.role?.name ?? msg.agentId?.slice(0, 8) ?? 'Agent';
+          useToastStore.getState().add('error', `Spawn failed (${label}): ${msg.message}`);
+          break;
+        }
         case 'agent:text': {
           const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
           const state = useAppStore.getState();

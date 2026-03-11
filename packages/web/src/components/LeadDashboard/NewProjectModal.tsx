@@ -24,6 +24,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [showModelConfig, setShowModelConfig] = useState(false);
   const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
+  const [error, setError] = useState('');
 
   // Fetch available roles on mount
   useEffect(() => {
@@ -35,6 +36,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
   const handleCreate = useCallback(async () => {
     if (!newProjectName.trim()) { setNewProjectNameTouched(true); return; }
     setStarting(true);
+    setError('');
     try {
       const task = newProjectTask.trim() || undefined;
       let fullTask = task;
@@ -60,8 +62,8 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
         }
         onClose();
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      setError(err?.message || 'Failed to start project');
     } finally {
       setStarting(false);
     }
@@ -215,6 +217,11 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
               )}
             </div>
           </div>
+          {error && (
+            <div className="mx-5 mb-0 p-3 bg-red-500/10 border border-red-500/30 rounded-md text-sm text-red-400">
+              {error}
+            </div>
+          )}
           <div className="flex justify-end gap-2 px-5 py-3 border-t border-th-border">
             <button
               onClick={onClose}
