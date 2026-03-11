@@ -255,7 +255,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
 
   beforeAll(async () => {
     mockSpawn.mockImplementation(
-      (_role: any, _task: any, _parentId: any, _auto: any, _model: any, _cwd: any, _resumeSession: any, id?: string) =>
+      (_role: any, _task: any, _parentId: any, _model: any, _cwd: any, _resumeSession: any, id?: string) =>
         makeFakeAgent(id ?? 'new-lead-1'),
     );
     mockGet.mockReturnValue({ id: 'proj-1', name: 'Test', cwd: '/tmp/test' });
@@ -338,12 +338,12 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     const secondCall = mockSpawn.mock.calls[1];
     expect(secondCall[0].id).toBe('developer'); // role
     expect(secondCall[2]).toBe('old-lead');    // parentId = resumed lead (same ID as original)
-    expect(secondCall[6]).toBe('ses-dev1');       // resumeSessionId
+    expect(secondCall[5]).toBe('ses-dev1');       // resumeSessionId
 
     // Verify secretary resumed with session ID
     const secretaryCall = mockSpawn.mock.calls[3];
     expect(secretaryCall[0].id).toBe('secretary');
-    expect(secretaryCall[6]).toBe('ses-sec1');    // resumeSessionId
+    expect(secretaryCall[5]).toBe('ses-sec1');    // resumeSessionId
 
     vi.useRealTimers();
   });
