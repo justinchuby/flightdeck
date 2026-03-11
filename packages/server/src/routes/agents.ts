@@ -65,7 +65,8 @@ export function agentsRoutes(ctx: AppContext): Router {
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error({ module: 'api', msg: 'POST /agents failed', err: err.message });
-      res.status(429).json({ error: err.message });
+      const status = err.message?.includes('disabled') ? 400 : 429;
+      res.status(status).json({ error: err.message });
     }
   });
 

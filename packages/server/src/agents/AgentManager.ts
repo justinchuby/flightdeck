@@ -379,6 +379,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       );
     }
 
+    // Enforce provider enabled state
+    if (options?.provider && this.providerManager) {
+      if (!this.providerManager.isProviderEnabled(options.provider as import('../adapters/presets.js').ProviderId)) {
+        throw new Error(
+          `Provider '${options.provider}' is disabled. Enable it in Settings or choose a different provider.`,
+        );
+      }
+    }
+
     // Determine the project scope for this agent:
     // - explicit projectId from options
     // - inherited from parent
