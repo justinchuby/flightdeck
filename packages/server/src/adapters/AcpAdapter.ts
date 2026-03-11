@@ -143,10 +143,18 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
         throw new Error(`Session resume failed: ${message}`);
       }
     } else {
+      // Build _meta for providers that accept system prompt via session metadata
+      const meta: Record<string, unknown> = {};
+      if (opts.systemPrompt && opts.provider === 'claude') {
+        meta.systemPrompt = opts.systemPrompt;
+      }
+      const hasMeta = Object.keys(meta).length > 0;
+
       const sessionResult = await withTimeout(
         this.connection!.newSession({
           cwd: opts.cwd || process.cwd(),
           mcpServers: [],
+          ...(hasMeta ? { _meta: meta } : {}),
         }),
         SDK_TIMEOUT_MS, 'newSession',
       );

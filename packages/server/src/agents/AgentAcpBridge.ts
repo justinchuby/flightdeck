@@ -114,6 +114,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     cwd: agent.cwd || process.cwd(),
     sessionId: agent.resumeSessionId,
     agentFlag: agentFlagForRole(agent.role.id),
+    systemPrompt: agent.role.systemPrompt,
   });
 
   conn.start(startOpts).then((sessionId) => {

@@ -90,6 +90,10 @@ export interface AdapterStartOptions {
   model?: string;
   /** Maximum turns before auto-stop */
   maxTurns?: number;
+  /** System prompt to inject via provider-specific mechanism */
+  systemPrompt?: string;
+  /** Provider ID for provider-specific session setup */
+  provider?: string;
 }
 
 // ── Core Interface ──────────────────────────────────────────────────

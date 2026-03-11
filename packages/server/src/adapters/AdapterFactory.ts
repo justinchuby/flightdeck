@@ -106,6 +106,12 @@ export function buildStartOptions(
   // Merge env: cloudProvider → preset → explicit envOverride (last wins)
   const cloudEnv = cloudProviderToEnv(config.cloudProvider);
   const rawEnv = { ...cloudEnv, ...preset?.env, ...config.envOverride };
+
+  // Gemini: deliver system prompt via GEMINI_WRITE_SYSTEM_MD env var
+  if (providerId === 'gemini' && agentOpts.systemPrompt) {
+    rawEnv['GEMINI_WRITE_SYSTEM_MD'] = agentOpts.systemPrompt;
+  }
+
   const env = Object.fromEntries(
     Object.entries(rawEnv).filter(([, v]) => v),
   );
@@ -127,6 +133,8 @@ export function buildStartOptions(
     sessionId: agentOpts.sessionId,
     model: resolution?.model,
     maxTurns: agentOpts.maxTurns,
+    systemPrompt: agentOpts.systemPrompt,
+    provider: providerId,
   };
 }
 

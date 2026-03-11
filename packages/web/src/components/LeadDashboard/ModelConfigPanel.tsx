@@ -81,7 +81,7 @@ const PROVIDER_TABS: { id: string; label: string; color: string; models: (m: str
   { id: 'copilot', label: 'Copilot', color: 'text-purple-400 border-purple-400', models: () => true },
   { id: 'claude', label: 'Claude', color: 'text-orange-400 border-orange-400', models: (m) => m.startsWith('claude-') },
   { id: 'gemini', label: 'Gemini', color: 'text-blue-400 border-blue-400', models: (m) => m.startsWith('gemini-') },
-  { id: 'openai', label: 'OpenAI', color: 'text-green-400 border-green-400', models: (m) => m.startsWith('gpt-') },
+  { id: 'codex', label: 'Codex', color: 'text-green-400 border-green-400', models: (m) => m.startsWith('gpt-') },
 ];
 
 interface Props {
