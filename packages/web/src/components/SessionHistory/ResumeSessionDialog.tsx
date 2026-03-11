@@ -219,7 +219,6 @@ export function ResumeSessionDialog({ projectId, lastSession, onClose, onResume 
                   context={{
                     title: 'Session resume failed',
                     errorMessage: error,
-                    sessionId: lastSession.leadId,
                   }}
                 />
               </div>
