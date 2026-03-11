@@ -57,6 +57,12 @@ export function agentsRoutes(ctx: AppContext): Router {
       }
 
       const agent = agentManager.spawn(role, task, undefined, model, undefined, sessionId || undefined, undefined, options);
+
+      // Record the session so it appears in the Sessions tab
+      if (role.id === 'lead' && options?.projectId && ctx.projectRegistry) {
+        ctx.projectRegistry.startSession(options.projectId, agent.id, task);
+      }
+
       logger.info({ module: 'api', msg: `POST /agents — ${sessionId ? 'resumed' : 'spawned'}`, agentId: agent.id, roleName: role.name, model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
