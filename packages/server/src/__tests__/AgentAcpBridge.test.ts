@@ -19,10 +19,12 @@ vi.mock('../agents/agentFiles.js', () => ({
 // ── Mock AdapterFactory ───────────────────────────────────────
 const mockStart = vi.fn();
 const mockOn = vi.fn();
+const mockTerminate = vi.fn().mockResolvedValue(undefined);
 
 const mockAdapter = {
   start: mockStart,
   on: mockOn,
+  terminate: mockTerminate,
   type: 'acp',
 };
 
@@ -187,5 +189,18 @@ describe('AgentAcpBridge — startAcp', () => {
         cliArgs: expect.arrayContaining(['--agent=lead', '--model', 'claude-sonnet-4']),
       }),
     );
+  });
+
+  it('terminates adapter on start failure to prevent orphan processes', async () => {
+    const agent = createFakeAgent();
+    mockStart.mockRejectedValue(new Error('spawn failed'));
+
+    startAcp(agent, fakeConfig);
+
+    await vi.waitFor(() => {
+      expect(agent._notifyExit).toHaveBeenCalledWith(1);
+    });
+
+    expect(mockTerminate).toHaveBeenCalled();
   });
 });

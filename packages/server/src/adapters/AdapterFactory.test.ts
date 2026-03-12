@@ -214,6 +214,16 @@ describe('AdapterFactory', () => {
       expect(opts.env).toBeUndefined();
     });
 
+    it('sets GEMINI_SYSTEM_MD env var for gemini provider with system prompt', () => {
+      const { options: opts } = buildStartOptions(
+        { ...baseConfig, provider: 'gemini' },
+        { cwd: '/test', systemPrompt: 'You are a helpful agent.' },
+      );
+      expect(opts.env?.GEMINI_SYSTEM_MD).toBe('You are a helpful agent.');
+      // Must NOT use the wrong env var (GEMINI_WRITE_SYSTEM_MD exports the default, not sets custom)
+      expect(opts.env?.GEMINI_WRITE_SYSTEM_MD).toBeUndefined();
+    });
+
     it('sets cwd from agentOpts', () => {
       const { options: opts } = buildStartOptions(baseConfig, { cwd: '/custom/path' });
       expect(opts.cwd).toBe('/custom/path');
