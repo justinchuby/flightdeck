@@ -111,8 +111,8 @@ export function CollapsibleCommandBlock({ text }: { text: string }) {
       className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
       onClick={() => setExpanded((e) => !e)}
     >
-      <div className="flex items-start gap-1 min-w-0">
-        {expanded ? <ChevronDown className="w-3 h-3 shrink-0 mt-0.5" /> : <ChevronRight className="w-3 h-3 shrink-0 mt-0.5" />}
+      <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+        {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
         <span className="font-mono text-th-text-alt shrink-0">{label}</span>
         {!expanded && preview && <span className="font-mono text-th-text-muted ml-1 truncate">— {preview}</span>}
       </div>
