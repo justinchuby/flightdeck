@@ -672,7 +672,13 @@ export function projectsRoutes(ctx: AppContext): Router {
       return res.status(400).json({ error: 'Invalid oversight level. Must be supervised, balanced, or autonomous.' });
     }
 
-    projectRegistry.update(req.params.id, { name, description, cwd, status });
+    const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (cwd !== undefined) updates.cwd = cwd;
+    if (status !== undefined) updates.status = status;
+
+    projectRegistry.update(req.params.id, updates as Partial<Pick<typeof project, 'name' | 'description' | 'cwd' | 'status'>>);
 
     // Set per-project oversight level separately (null clears override)
     if (oversightLevel !== undefined) {
