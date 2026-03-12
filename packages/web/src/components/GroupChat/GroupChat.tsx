@@ -3,7 +3,8 @@ import { useAppStore } from '../../stores/appStore';
 import { useGroupStore, groupKey } from '../../stores/groupStore';
 import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
-import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
+import { MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
+import { Markdown } from '../ui/Markdown';
 import { FilterTabs } from '../FilterTabs';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 
@@ -201,30 +202,40 @@ export function GroupChat(_props: { api: any; ws: any }) {
     }
   }, [contextProjectId, scopedLeads, selectedProjectLeadId]);
 
-  // Build a set of lead agent IDs for the selected project so we can filter
-  // groups by either projectId OR leadId (since projectId is optional on ChatGroup)
-  const selectedProjectLeadIds = useMemo(() => {
-    if (!selectedProjectLeadId) return null;
-    const ids = new Set<string>();
-    // If selectedProjectLeadId is itself a lead agent ID, include it
-    if (leads.some((l) => l.id === selectedProjectLeadId)) {
-      ids.add(selectedProjectLeadId);
-    }
-    // Also include any leads whose projectId matches (covers project UUID case)
+  // Build sets of lead agent IDs and project UUIDs for the selected project
+  // so we can filter groups by leadId OR projectId (since projectId is optional on ChatGroup).
+  // selectedProjectLeadId may be a lead agent ID or a project UUID depending on context.
+  const { selectedLeadIds, selectedProjectIds } = useMemo(() => {
+    if (!selectedProjectLeadId) return { selectedLeadIds: null, selectedProjectIds: null };
+    const leadIds = new Set<string>();
+    const projectIds = new Set<string>();
     for (const l of leads) {
-      if (l.projectId === selectedProjectLeadId || l.id === selectedProjectLeadId) {
-        ids.add(l.id);
+      const matchesAsLeadId = l.id === selectedProjectLeadId;
+      const matchesAsProjectId = l.projectId === selectedProjectLeadId;
+      if (matchesAsLeadId || matchesAsProjectId) {
+        leadIds.add(l.id);
+        if (l.projectId) projectIds.add(l.projectId);
       }
     }
-    return ids.size > 0 ? ids : null;
+    // If selectedProjectLeadId looks like a project UUID (not matching any lead ID),
+    // include it directly in projectIds
+    if (!leads.some((l) => l.id === selectedProjectLeadId)) {
+      projectIds.add(selectedProjectLeadId);
+    }
+    return {
+      selectedLeadIds: leadIds.size > 0 ? leadIds : null,
+      selectedProjectIds: projectIds.size > 0 ? projectIds : null,
+    };
   }, [selectedProjectLeadId, leads]);
 
-  // Filtered groups/tabs by selected project
-  const filteredGroups = selectedProjectLeadIds
-    ? groups.filter((g) => g.projectId === selectedProjectLeadId || selectedProjectLeadIds.has(g.leadId))
+  // Filtered groups/tabs by selected project — match on leadId or projectId
+  const filteredGroups = selectedLeadIds
+    ? groups.filter((g) =>
+        selectedLeadIds.has(g.leadId) ||
+        (g.projectId != null && selectedProjectIds?.has(g.projectId)))
     : groups;
-  const filteredTabs = selectedProjectLeadIds
-    ? openTabs.filter((t) => selectedProjectLeadIds.has(t.leadId))
+  const filteredTabs = selectedLeadIds
+    ? openTabs.filter((t) => selectedLeadIds.has(t.leadId))
     : openTabs;
 
   /* ---- Fetch groups for project-scoped leads ---- */
@@ -677,7 +688,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                         </div>
                         <div className={`rounded-lg px-3 py-2 text-sm ${human ? 'bg-blue-600 text-white' : 'bg-th-bg-alt text-th-text-alt'}`}>
                           <div className="whitespace-pre-wrap break-words prose-sm">
-                            <MarkdownContent text={msg.content} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                            <Markdown text={msg.content} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </div>
                         </div>
                         <div className={`text-xs text-th-text-muted mt-0.5 ${human ? 'text-right' : ''}`}>
