@@ -280,10 +280,12 @@ describe('AgentDetailPanel', () => {
   it('shows strikethrough requested model and yellow resolved model when translated', () => {
     mockAgents = [makeAgent({
       model: 'gemini-2.5-pro',
-      modelTranslated: true,
-      requestedModel: 'claude-sonnet-4',
-      resolvedModel: 'gemini-2.5-pro',
-      modelResolutionReason: 'claude-sonnet-4 not available on gemini provider',
+      modelResolution: {
+        requested: 'claude-sonnet-4',
+        resolved: 'gemini-2.5-pro',
+        translated: true,
+        reason: 'claude-sonnet-4 not available on gemini provider',
+      },
     })];
     render(<AgentDetailPanel agentId={mockAgents[0].id} mode="modal" onClose={onClose} />);
     expect(screen.getByText('claude-sonnet-4')).toHaveClass('line-through');
@@ -291,7 +293,7 @@ describe('AgentDetailPanel', () => {
   });
 
   it('shows plain model when no translation occurred', () => {
-    mockAgents = [makeAgent({ modelTranslated: false })];
+    mockAgents = [makeAgent({ modelResolution: undefined })];
     render(<AgentDetailPanel agentId={mockAgents[0].id} mode="modal" onClose={onClose} />);
     expect(screen.getByText('claude-sonnet-4')).not.toHaveClass('line-through');
   });

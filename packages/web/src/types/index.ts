@@ -122,14 +122,17 @@ export interface AgentInfo {
   exitError?: string;
   /** Process exit code (non-zero indicates failure) */
   exitCode?: number;
-  /** Model originally requested before cross-provider resolution */
-  requestedModel?: string;
-  /** Model actually used by the CLI after resolution */
-  resolvedModel?: string;
-  /** Whether the model was translated to a different model for the target provider */
-  modelTranslated?: boolean;
-  /** Human-readable reason for model translation */
-  modelResolutionReason?: string;
+  /** Model resolution metadata when the requested model differs from the resolved model */
+  modelResolution?: {
+    /** Model originally requested before cross-provider resolution */
+    requested: string;
+    /** Model actually used by the CLI after resolution */
+    resolved: string;
+    /** Whether the model was translated to a different model for the target provider */
+    translated: boolean;
+    /** Human-readable reason for model translation */
+    reason: string;
+  };
 }
 
 export interface ServerConfig {

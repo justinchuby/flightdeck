@@ -36,8 +36,8 @@ export interface CompactionInfo {
 
 /** Info emitted when a model was translated/resolved to a different model for the target provider */
 export interface ModelFallbackInfo {
-  requestedModel: string;
-  resolvedModel: string;
+  requested: string;
+  resolved: string;
   reason: string;
   provider: string;
 }

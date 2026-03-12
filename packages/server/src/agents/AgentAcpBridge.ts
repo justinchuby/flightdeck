@@ -5,12 +5,17 @@
 import { mkdirSync, existsSync, renameSync, symlinkSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { createAdapterForProvider, buildStartOptions } from '../adapters/AdapterFactory.js';
+import { createRoleFileWriter, listRoleFileWriterProviders } from '../adapters/RoleFileWriter.js';
+import type { RoleDefinition } from '../adapters/RoleFileWriter.js';
 import type { AgentAdapter, ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { runWithAgentContext } from '../middleware/requestContext.js';
 import { agentFlagForRole } from './agentFiles.js';
 import type { Agent } from './Agent.js';
+
+/** Set of provider IDs that have a RoleFileWriter. Cached at module load. */
+const ROLE_FILE_PROVIDERS = new Set(listRoleFileWriterProviders());
 
 /** Ensure the shared workspace directory exists for inter-agent artifact sharing. */
 export function ensureSharedWorkspace(agent: Agent): void {
@@ -62,6 +67,45 @@ export function ensureSharedWorkspace(agent: Agent): void {
         }, null, 2));
       } catch { /* non-critical */ }
     }
+  }
+}
+
+/**
+ * Write CLI-specific role/agent definition files so the spawned CLI process
+ * can discover the agent's system prompt natively (e.g. AGENTS.md for Codex,
+ * .github/agents/*.agent.md for Copilot, .gemini/agents/*.md for Gemini).
+ *
+ * Non-critical — if writing fails, the first-prompt fallback still delivers
+ * the system prompt as user-message text.
+ */
+async function writeRoleFilesForProvider(provider: string, agent: Agent, cwd: string): Promise<void> {
+  if (!ROLE_FILE_PROVIDERS.has(provider)) return;
+
+  const roleDef: RoleDefinition = {
+    role: agent.role.id,
+    description: agent.role.description,
+    instructions: agent.role.systemPrompt,
+  };
+
+  try {
+    const writer = createRoleFileWriter(provider);
+    const written = await writer.writeRoleFiles([roleDef], cwd);
+    if (written.length > 0) {
+      logger.info({
+        module: 'agent-bridge',
+        msg: `Wrote ${written.length} role file(s) for ${provider}`,
+        agentId: agent.id,
+        files: written.map(f => f.replace(cwd, '.')),
+      });
+    }
+  } catch (err: any) {
+    logger.warn({
+      module: 'agent-bridge',
+      msg: 'Role file write failed (non-critical — falling back to prompt delivery)',
+      provider,
+      agentId: agent.id,
+      error: err?.message,
+    });
   }
 }
 
@@ -119,10 +163,12 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
 
   // Store model resolution metadata on the agent
   if (modelResolution) {
-    agent.requestedModel = modelResolution.original;
-    agent.resolvedModel = modelResolution.model;
-    agent.modelTranslated = modelResolution.translated;
-    agent.modelResolutionReason = modelResolution.reason;
+    agent.modelResolution = {
+      requested: modelResolution.original,
+      resolved: modelResolution.model,
+      translated: modelResolution.translated,
+      reason: modelResolution.reason ?? '',
+    };
     // Update displayed model to the actual resolved model
     agent.model = modelResolution.model;
   }
@@ -133,12 +179,17 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   // the lead's current prompt completes, so timing is safe).
   if (modelResolution?.translated) {
     agent._notifyModelFallback({
-      requestedModel: modelResolution.original,
-      resolvedModel: modelResolution.model,
+      requested: modelResolution.original,
+      resolved: modelResolution.model,
       reason: modelResolution.reason ?? 'cross-provider equivalence',
       provider: effectiveProvider,
     });
   }
+
+  // Write CLI-specific role files BEFORE spawning the process.
+  // The CLI reads these from CWD on startup (e.g. AGENTS.md, .agent.md).
+  const agentCwd = agent.cwd || process.cwd();
+  await writeRoleFilesForProvider(effectiveProvider, agent, agentCwd);
 
   conn.start(startOpts).then((sessionId) => {
     agent.sessionId = sessionId;

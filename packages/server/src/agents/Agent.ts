@@ -68,14 +68,17 @@ export interface AgentJSON {
   backend?: string;
   /** Error message if agent failed to start or crashed */
   exitError?: string;
-  /** Model originally requested before cross-provider resolution */
-  requestedModel?: string;
-  /** Model actually used by the CLI after resolution */
-  resolvedModel?: string;
-  /** Whether the model was translated to a different model for the target provider */
-  modelTranslated?: boolean;
-  /** Human-readable reason for model translation */
-  modelResolutionReason?: string;
+  /** Model resolution metadata when the requested model differs from the resolved model */
+  modelResolution?: {
+    /** Model originally requested before cross-provider resolution */
+    requested: string;
+    /** Model actually used by the CLI after resolution */
+    resolved: string;
+    /** Whether the model was translated to a different model for the target provider */
+    translated: boolean;
+    /** Human-readable reason for model translation */
+    reason: string;
+  };
 }
 
 export class Agent {
@@ -110,14 +113,13 @@ export class Agent {
   public cwd?: string;
   /** Error message if agent failed to start (e.g., CLI binary not found) */
   public exitError?: string;
-  /** Model originally requested before cross-provider resolution */
-  public requestedModel?: string;
-  /** Model actually used by the CLI after resolution */
-  public resolvedModel?: string;
-  /** Whether the model was translated to a different model for the target provider */
-  public modelTranslated?: boolean;
-  /** Human-readable reason for model translation */
-  public modelResolutionReason?: string;
+  /** Model resolution metadata when the requested model differs from the resolved model */
+  public modelResolution?: {
+    requested: string;
+    resolved: string;
+    translated: boolean;
+    reason: string;
+  };
   /** Summary from COMPLETE_TASK command, used for knowledge extraction */
   public completionSummary?: string;
   /** Tracks when the last human message was received (for leads) */
@@ -759,10 +761,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       provider: this.provider,
       backend: this.backend,
       exitError: this.exitError,
-      requestedModel: this.requestedModel,
-      resolvedModel: this.resolvedModel,
-      modelTranslated: this.modelTranslated || undefined,
-      modelResolutionReason: this.modelResolutionReason,
+      modelResolution: this.modelResolution,
     };
   }
 }

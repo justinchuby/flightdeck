@@ -141,13 +141,15 @@ export function useWebSocket() {
         }
         case 'agent:model_fallback': {
           updateAgent(msg.agentId, {
-            model: msg.resolvedModel,
-            requestedModel: msg.requestedModel,
-            resolvedModel: msg.resolvedModel,
-            modelTranslated: true,
-            modelResolutionReason: msg.reason,
+            model: msg.resolved,
+            modelResolution: {
+              requested: msg.requested,
+              resolved: msg.resolved,
+              translated: true,
+              reason: msg.reason,
+            },
           });
-          useToastStore.getState().add('info', `🔄 ${msg.agentRole}: ${msg.requestedModel} → ${msg.resolvedModel} (${msg.provider})`);
+          useToastStore.getState().add('info', `🔄 ${msg.agentRole}: ${msg.requested} → ${msg.resolved} (${msg.provider})`);
           break;
         }
         case 'agent:text': {

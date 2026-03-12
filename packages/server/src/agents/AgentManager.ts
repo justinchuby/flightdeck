@@ -14,7 +14,6 @@ import type { ChatGroupRegistry, ChatGroup, GroupMessage } from '../comms/ChatGr
 import type { Database } from '../db/database.js';
 import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
-import type { DeferredIssueRegistry } from '../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../tasks/TaskTemplates.js';
@@ -76,7 +75,7 @@ export interface AgentManagerEvents {
   // Events emitted via CommandDispatcher pass-through
   'agent:sub_spawned': { parentId: string; child: ReturnType<Agent['toJSON']> };
   'agent:spawn_error': { agentId: string; message: string };
-  'agent:model_fallback': { agentId: string; agentRole: string; requestedModel: string; resolvedModel: string; reason: string; provider: string };
+  'agent:model_fallback': { agentId: string; agentRole: string; requested: string; resolved: string; reason: string; provider: string };
   'agent:delegated': { parentId: string; childId: string; delegation: Delegation };
   'agent:delegate_error': { agentId: string; message: string };
   'agent:completion_reported': { childId: string; parentId: string | undefined; status: string };
@@ -101,7 +100,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentMemory: AgentMemory;
   private chatGroupRegistry: ChatGroupRegistry;
   private taskDAG: TaskDAG;
-  private deferredIssueRegistry: DeferredIssueRegistry;
   private timerRegistry: TimerRegistry;
   private capabilityInjector?: CapabilityInjector;
   private db?: Database;
@@ -139,7 +137,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agentMemory: AgentMemory,
     chatGroupRegistry: ChatGroupRegistry,
     taskDAG: TaskDAG,
-    { maxRestarts = 3, autoRestart = true, db, deferredIssueRegistry, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, knowledgeInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; deferredIssueRegistry?: DeferredIssueRegistry; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; knowledgeInjector?: KnowledgeInjector } = {},
+    { maxRestarts = 3, autoRestart = true, db, timerRegistry, capabilityInjector, taskTemplateRegistry, taskDecomposer, worktreeManager, costTracker, governancePipeline, messageQueueStore, agentRosterRepository, activeDelegationRepository, knowledgeInjector }: { maxRestarts?: number; autoRestart?: boolean; db?: Database; timerRegistry?: TimerRegistry; capabilityInjector?: CapabilityInjector; taskTemplateRegistry?: TaskTemplateRegistry; taskDecomposer?: TaskDecomposer; worktreeManager?: WorktreeManager; costTracker?: CostTracker; governancePipeline?: import('../governance/GovernancePipeline.js').GovernancePipeline; messageQueueStore?: MessageQueueStore; agentRosterRepository?: AgentRosterRepository; activeDelegationRepository?: ActiveDelegationRepository; knowledgeInjector?: KnowledgeInjector } = {},
   ) {
     super();
     this.config = config;
@@ -151,7 +149,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.agentMemory = agentMemory;
     this.chatGroupRegistry = chatGroupRegistry;
     this.taskDAG = taskDAG;
-    this.deferredIssueRegistry = deferredIssueRegistry ?? (null as any);
     this.timerRegistry = timerRegistry ?? (null as any);
     this.capabilityInjector = capabilityInjector;
     this.worktreeManager = worktreeManager;
@@ -183,7 +180,6 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       agentMemory: this.agentMemory,
       chatGroupRegistry: this.chatGroupRegistry,
       taskDAG: this.taskDAG,
-      deferredIssueRegistry: this.deferredIssueRegistry,
       timerRegistry: this.timerRegistry,
       capabilityInjector: this.capabilityInjector,
       taskTemplateRegistry,
@@ -616,7 +612,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.parentId) {
         const parent = this.agents.get(agent.parentId);
         if (parent && (parent.status === 'running' || parent.status === 'idle')) {
-          parent.sendMessage(`[System] Model fallback for ${agent.role.name}: "${info.requestedModel}" not available on ${info.provider}. Using "${info.resolvedModel}" instead.`);
+          parent.sendMessage(`[System] Model fallback for ${agent.role.name}: "${info.requested}" not available on ${info.provider}. Using "${info.resolved}" instead.`);
         }
       }
     });
