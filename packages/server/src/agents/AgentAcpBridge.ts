@@ -127,7 +127,10 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent.model = modelResolution.model;
   }
 
-  // Notify listeners when the model was translated to a different model
+  // Notify listeners when the model was translated to a different model.
+  // This fires before conn.start() — intentional. The AgentManager listener
+  // queues a system message to the lead (queued messages are delivered once
+  // the lead's current prompt completes, so timing is safe).
   if (modelResolution?.translated) {
     agent._notifyModelFallback({
       requestedModel: modelResolution.original,
