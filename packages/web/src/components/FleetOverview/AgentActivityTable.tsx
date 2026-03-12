@@ -6,6 +6,7 @@ import { Square, RefreshCw, Terminal, Zap, Check, Play } from 'lucide-react';
 import { EmptyState } from '../Shared';
 import { formatTokens } from '../../utils/format';
 import { AVAILABLE_MODELS } from '../../constants/models';
+import { getProviderColors } from '../../utils/providerColors';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -206,11 +207,14 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                 {/* Provider + Model */}
                 <td className="px-3 py-2.5 hidden md:table-cell">
                   <div className="flex items-center gap-1 flex-wrap">
-                    {agent.provider && (
-                      <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded shrink-0">
-                        {agent.provider}
-                      </span>
-                    )}
+                    {agent.provider && (() => {
+                      const pc = getProviderColors(agent.provider);
+                      return (
+                        <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${pc.bg} ${pc.text}`}>
+                          {agent.provider}
+                        </span>
+                      );
+                    })()}
                     {isActive ? (
                       <select
                         value={currentModel}

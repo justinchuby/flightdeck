@@ -8,6 +8,7 @@ import { agentStatusText } from '../../utils/statusColors';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { AgentReportBlock } from './AgentReportBlock';
+import { getProviderColors } from '../../utils/providerColors';
 import { formatTokens } from '../../utils/format';
 
 /** Minimal agent shape accepted by CrewStatusContent — compatible with AgentInfo, LeadProgress.crewAgents, and DerivedAgent */
@@ -106,9 +107,10 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                 {delegation && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <p className="text-[10px] font-mono text-th-text-muted truncate flex-1 min-w-0" title={delegation.task}>{delegation.task}</p>
-                    {agent.provider && (
-                      <span className="text-[9px] bg-blue-500/15 text-blue-400 px-1 py-px rounded shrink-0">{agent.provider}</span>
-                    )}
+                    {agent.provider && (() => {
+                      const pc = getProviderColors(agent.provider);
+                      return <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${pc.bg} ${pc.text}`}>{agent.provider}</span>;
+                    })()}
                     {(agent.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model}</span>
                     )}
@@ -116,9 +118,10 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                 )}
                 {!delegation && (agent.model) && (
                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                    {agent.provider && (
-                      <span className="text-[9px] bg-blue-500/15 text-blue-400 px-1 py-px rounded shrink-0">{agent.provider}</span>
-                    )}
+                    {agent.provider && (() => {
+                      const pc = getProviderColors(agent.provider);
+                      return <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${pc.bg} ${pc.text}`}>{agent.provider}</span>;
+                    })()}
                     {(agent.model) && (
                       <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model}</span>
                     )}
@@ -162,9 +165,10 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                 </div>
                 <div className="flex items-center gap-3 mt-0.5 text-xs text-th-text-muted font-mono">
                   <span>{selectedAgent.id.slice(0, 8)}</span>
-                  {selectedAgent.provider && (
-                    <span className="bg-blue-500/15 text-blue-400 px-1.5 rounded">{selectedAgent.provider}</span>
-                  )}
+                  {selectedAgent.provider && (() => {
+                    const pc = getProviderColors(selectedAgent.provider);
+                    return <span className={`${pc.bg} ${pc.text} px-1.5 rounded`}>{selectedAgent.provider}</span>;
+                  })()}
                   {(selectedAgent.model || selectedAgent.role.model) && (
                     <span className="bg-th-bg-muted/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
                   )}

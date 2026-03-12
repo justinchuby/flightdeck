@@ -7,6 +7,7 @@ import { agentStatusText } from '../../utils/statusColors';
 import { formatTokens } from '../../utils/format';
 import { DiffBadge } from '../DiffPreview';
 import { AVAILABLE_MODELS } from '../../constants/models';
+import { getProviderColors } from '../../utils/providerColors';
 
 interface Props {
   agent: AgentInfo;
@@ -19,13 +20,14 @@ export function AgentCard({ agent, api }: Props) {
   const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const isSelected = selectedAgentId === agent.id;
   const [confirmKill, setConfirmKill] = useState(false);
+  const providerColors = getProviderColors(agent.provider);
 
   return (
     <div
-      className={`rounded-lg border p-3 cursor-pointer transition-colors ${
+      className={`rounded-lg border p-3 cursor-pointer transition-colors border-l-[3px] ${providerColors.border} ${
         isSelected
-          ? 'border-accent bg-accent/5'
-          : 'border-th-border bg-surface-raised hover:border-th-border-hover'
+          ? 'border-t-accent border-r-accent border-b-accent bg-accent/5'
+          : 'border-t-th-border border-r-th-border border-b-th-border bg-surface-raised hover:border-t-th-border-hover hover:border-r-th-border-hover hover:border-b-th-border-hover'
       }`}
       onClick={() => setSelectedAgent(isSelected ? null : agent.id)}
     >
@@ -143,9 +145,8 @@ export function AgentCard({ agent, api }: Props) {
       {(agent.status === 'running' || agent.status === 'idle') && (
         <div className="flex items-center gap-1.5 mb-1">
           {agent.provider && (
-            <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-0.5 rounded">{agent.provider}</span>
+            <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${providerColors.bg} ${providerColors.text}`}>{agent.provider}</span>
           )}
-          <span className="text-[10px] text-th-text-muted">Model:</span>
           <select
             value={agent.model || ''}
             onChange={(e) => {
@@ -153,7 +154,7 @@ export function AgentCard({ agent, api }: Props) {
               api.updateAgent(agent.id, { model: e.target.value });
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
+            className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer min-w-0 truncate"
           >
             {(() => {
               const currentModel = agent.model || '';
@@ -171,9 +172,9 @@ export function AgentCard({ agent, api }: Props) {
       {!(agent.status === 'running' || agent.status === 'idle') && (agent.model || agent.provider) && (
         <div className="flex items-center gap-1.5 text-[10px] text-th-text-muted mb-1">
           {agent.provider && (
-            <span className="bg-blue-500/15 text-blue-400 px-1 py-0.5 rounded">{agent.provider}</span>
+            <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${providerColors.bg} ${providerColors.text}`}>{agent.provider}</span>
           )}
-          {agent.model && <span>{agent.model}</span>}
+          {agent.model && <span className="truncate">{agent.model}</span>}
         </div>
       )}
 
