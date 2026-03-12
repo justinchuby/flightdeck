@@ -257,21 +257,6 @@ On termination:
 - All file locks held by the agent are released
 - The `isTerminalStatus()` helper returns true for `completed`, `failed`, and `terminated` — used in 6+ call sites for consistent status checks
 
-## Deferred Issues
-
-The `DeferredIssueRegistry` provides a lightweight issue tracker scoped to each project lead. Agents flag quality issues, configuration problems, or blockers that can't be addressed immediately.
-
-**Commands:**
-- `DEFER_ISSUE {"description": "...", "severity": "P2", "filePath": "..."}` — Flag an issue with optional severity (P1/P2/P3) and source file
-- `QUERY_DEFERRED {"status": "open"}` — List issues with optional status filter (open/resolved/dismissed)
-- `RESOLVE_DEFERRED {"issueId": 42}` — Mark as resolved, or `{"issueId": 42, "dismiss": true}` to dismiss
-
-**Key design:**
-- Lead-scoped — agents only see issues within their lead's project
-- Tracked with severity levels for triage
-- Persistent in SQLite (`deferred_issues` table)
-- Activity logged and events emitted for real-time UI updates
-
 ## Event Pipeline
 
 The `EventPipeline` (`packages/server/src/coordination/EventPipeline.ts`) provides reactive event processing — auto-trigger actions when specific events occur in the system.

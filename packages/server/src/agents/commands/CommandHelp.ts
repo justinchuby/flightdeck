@@ -26,7 +26,6 @@ const CATEGORY_ORDER = [
   'System',
   'Timers',
   'Capabilities',
-  'Deferred Issues',
 ];
 
 /**

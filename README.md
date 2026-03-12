@@ -347,9 +347,6 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `UNLOCK_FILE {"filePath": "..."}` | Release a file lock. |
 | `COMMIT {"message": "..."}` | Scoped git commit — executes `git add` only on locked files, commits, then verifies files landed via `git diff --name-only HEAD~1`. Warns if expected files are missing. |
 | `QUERY_CREW` | Get the current roster of agents with IDs, roles, models, and status. |
-| `DEFER_ISSUE {"description": "...", "severity": "P2"}` | Flag a quality issue for later resolution. Tracked per-project with severity levels. |
-| `QUERY_DEFERRED {"status": "open"}` | List deferred issues. Optional status filter (open/resolved/dismissed). |
-| `RESOLVE_DEFERRED {"issueId": 42}` | Mark a deferred issue as resolved. Use `"dismiss": true` to dismiss instead. |
 | `ACTIVITY {"action": "...", "summary": "..."}` | Log a structured activity entry to the activity ledger for auditing and tracking. |
 | `HALT_HEARTBEAT` | Pause automatic heartbeat nudges from the system. *(Lead-only)* |
 | `REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "..."}` | Request to increase max concurrent agents. Requires user approval. *(Lead-only)* |

@@ -28,10 +28,9 @@ const CAPABILITIES: Record<string, CapabilityDefinition> = {
     description: 'Review code for correctness, security, and performance',
     instructions: `You have acquired CODE REVIEW capability. When reviewing:
 - Focus on correctness, security, and performance — not style
-- Use DEFER_ISSUE to flag issues with severity levels
 - Be specific: cite file, line, and exact problem
 - Suggest fixes, don't just point out problems`,
-    gatedCommands: ['DEFER_ISSUE'],
+    gatedCommands: [],
   },
   'architecture': {
     id: 'architecture',

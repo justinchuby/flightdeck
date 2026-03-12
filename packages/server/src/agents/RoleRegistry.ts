@@ -527,12 +527,6 @@ This ensures the task is properly tracked in the DAG with correct dependencies, 
 
 **If you see ⚠️ dagTaskId missing:** Run TASK_STATUS to check the current DAG, find the correct task ID, and use it in future delegations. If the task doesn't exist yet, use ADD_TASK to create it.
 
-== ADDITIONAL COMMANDS ==
-Defer non-blocking issues for later follow-up:
-\`⟦⟦ DEFER_ISSUE {"description": "Fix flaky test in TestX", "severity": "low"} ⟧⟧\`
-\`⟦⟦ QUERY_DEFERRED {} ⟧⟧\` — list all deferred issues
-\`⟦⟦ RESOLVE_DEFERRED {"issueId": 1} ⟧⟧\` — mark a deferred issue as resolved (issueId is a number)
-
 == SPECIALIST ROLES (with recommended default models) ==
 {{ROLE_LIST}}
 

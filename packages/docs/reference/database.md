@@ -100,7 +100,6 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 | `file_locks` | Active file locks with agent ownership, reason, and TTL expiry | `file_path` (text) |
 | `activity_log` | Append-only log of all agent actions (bounded to 10,000 entries) | `id` (auto-increment) |
 | `decisions` | Architectural decisions logged by agents, with optional user confirmation | `id` (text) |
-| `deferred_issues` | Issues found during code review, deferred for later resolution (severity, source file, status) | `id` (auto-increment) |
 
 ### Chat Groups
 

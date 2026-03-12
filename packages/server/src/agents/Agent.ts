@@ -337,9 +337,6 @@ Tools (bash, view, edit, grep, glob) are for filesystem work. Commands are for c
 12. When referencing other agents in messages, always use the @ prefix (e.g., @568c3298, not 568c3298). This enables clickable @mention tooltips in the UI.
 13. Log important decisions by outputting:
 \`⟦⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧⟧\`
-14. To defer a non-blocking issue for later:
-\`⟦⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧⟧\`
-\`⟦⟦ QUERY_DEFERRED {} ⟧⟧\`
 
 == SKILLS (reusable knowledge for future work) ==
 Skills are reusable instructions that Copilot CLI loads automatically when relevant. Use them to capture REUSABLE KNOWLEDGE — patterns, techniques, and approaches that will benefit future work sessions.
