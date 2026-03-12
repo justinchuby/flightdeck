@@ -1,11 +1,9 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Group } from '@visx/group';
 import { AreaClosed, LinePath, Line } from '@visx/shape';
 import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
-import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
-import { localPoint } from '@visx/event';
-import { bisector } from 'd3-array';
+import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
 
 export interface CostPoint {
   time: number;
@@ -21,22 +19,10 @@ interface CostCurveProps {
 }
 
 const MARGIN = { top: 12, right: 12, bottom: 28, left: 40 };
+const SVG_HEADER_OFFSET = 28;
 const INPUT_COLOR = '#60a5fa';   // blue-400
 const OUTPUT_COLOR = 'rgb(var(--chart-success))';
 const TOTAL_FALLBACK_COLOR = '#34d399'; // emerald-400 for non-breakdown mode
-
-const tooltipStyles = {
-  ...defaultStyles,
-  background: 'rgba(23, 25, 35, 0.92)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#e5e7eb',
-  fontSize: 11,
-  lineHeight: '1.4',
-  padding: '6px 10px',
-  borderRadius: '6px',
-};
-
-const bisectTime = bisector<CostPoint, number>((d) => d.time).left;
 
 const formatTokens = (n: number) => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -45,16 +31,13 @@ const formatTokens = (n: number) => {
 };
 
 export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
-  const svgH = height - 28;
+  const svgH = height - SVG_HEADER_OFFSET;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = svgH - MARGIN.top - MARGIN.bottom;
 
   const hasBreakdown = data.some(
     (d) => d.cumulativeInput != null && d.cumulativeOutput != null,
   );
-
-  const { showTooltip, hideTooltip, tooltipData, tooltipLeft, tooltipTop, tooltipOpen } =
-    useTooltip<CostPoint>();
 
   const { xScale, yScale } = useMemo(() => {
     if (data.length === 0) {
@@ -79,27 +62,8 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
     };
   }, [data, innerW, innerH]);
 
-  const handleTooltip = useCallback(
-    (event: React.TouchEvent<SVGRectElement> | React.MouseEvent<SVGRectElement>) => {
-      const coords = localPoint(event);
-      if (!coords || data.length === 0) return;
-      const x0 = coords.x - MARGIN.left;
-      const time0 = xScale.invert(x0).getTime();
-      let idx = bisectTime(data, time0, 1);
-      if (idx >= data.length) idx = data.length - 1;
-      const d0 = data[idx - 1];
-      const d1 = data[idx];
-      const nearest = d0 && d1 ? (time0 - d0.time > d1.time - time0 ? d1 : d0) : (d1 ?? d0);
-      if (!nearest) return;
-      const tooltipX = (xScale(new Date(nearest.time)) ?? 0) + MARGIN.left;
-      showTooltip({
-        tooltipData: nearest,
-        tooltipLeft: tooltipX,
-        tooltipTop: MARGIN.top,
-      });
-    },
-    [data, xScale, showTooltip],
-  );
+  const { handleTooltip, hideTooltip, tooltipOpen, tooltipData, tooltipLeft, tooltipTop } =
+    useChartTooltip<CostPoint>({ data, xScale, marginLeft: MARGIN.left, marginTop: MARGIN.top });
 
   if (data.length === 0) {
     return (
@@ -295,7 +259,7 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
         <TooltipWithBounds
           left={tooltipLeft}
           top={tooltipTop}
-          style={tooltipStyles}
+          style={CHART_TOOLTIP_STYLES}
         >
           <div style={{ fontWeight: 600, marginBottom: 3 }}>
             {new Date(tooltipData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

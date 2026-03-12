@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import { EmptyState } from '../Shared';
 import type { CommType } from '../../stores/leadStore';
+import { buildAgentLabel } from '../../utils/agentLabel';
 
 export type { CommType };
 
@@ -59,28 +60,6 @@ function intensityClass(count: number, max: number): string {
   if (ratio < 0.7) return 'bg-accent/60';
   if (ratio < 0.9) return 'bg-accent/80';
   return 'bg-accent';
-}
-
-function toTitleCase(value: string): string {
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(word => word[0].toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-}
-
-function formatRoleLabel(role?: string): string {
-  if (!role) return 'Agent';
-  return toTitleCase(role.replace(/[_-]+/g, ' ').trim());
-}
-
-function shortAgentId(agentId: string): string {
-  const compactId = agentId.replace(/[^a-zA-Z0-9]/g, '');
-  return (compactId || agentId).slice(0, 5);
-}
-
-function buildAgentLabel(agent: HeatmapAgent): string {
-  return `${formatRoleLabel(agent.role)} ${shortAgentId(agent.id)}`;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────

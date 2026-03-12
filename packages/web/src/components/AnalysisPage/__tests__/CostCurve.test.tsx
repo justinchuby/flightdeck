@@ -48,9 +48,9 @@ vi.mock('@visx/shape', async (importOriginal) => {
     Line: () => <line data-testid="crosshair-line" />,
   };
 });
-vi.mock('@visx/tooltip', () => ({
-  useTooltip: () => ({
-    showTooltip: () => {},
+vi.mock('../../hooks/useChartTooltip', () => ({
+  useChartTooltip: () => ({
+    handleTooltip: () => {},
     hideTooltip: () => {},
     tooltipData: null,
     tooltipLeft: 0,
@@ -58,13 +58,7 @@ vi.mock('@visx/tooltip', () => ({
     tooltipOpen: false,
   }),
   TooltipWithBounds: () => null,
-  defaultStyles: {},
-}));
-vi.mock('@visx/event', () => ({
-  localPoint: () => ({ x: 0, y: 0 }),
-}));
-vi.mock('d3-array', () => ({
-  bisector: () => ({ left: () => 0 }),
+  CHART_TOOLTIP_STYLES: {},
 }));
 
 describe('CostCurve', () => {

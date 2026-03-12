@@ -1,12 +1,10 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Group } from '@visx/group';
 import { AreaClosed, LinePath, Line } from '@visx/shape';
 import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
 import { curveMonotoneX } from '@visx/curve';
-import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
-import { localPoint } from '@visx/event';
-import { bisector } from 'd3-array';
+import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
 
 export interface FlowPoint {
   time: number;
@@ -30,26 +28,10 @@ const SERIES = [
   { key: 'completed' as const, color: 'rgb(168, 85, 247)', label: 'Done' },
 ];
 
-const tooltipStyles = {
-  ...defaultStyles,
-  background: 'rgba(23, 25, 35, 0.92)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  color: '#e5e7eb',
-  fontSize: 11,
-  lineHeight: '1.4',
-  padding: '6px 10px',
-  borderRadius: '6px',
-};
-
-const bisectTime = bisector<FlowPoint, number>((d) => d.time).left;
-
 export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFlowProps) {
   const svgH = height - SVG_HEADER_OFFSET;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = svgH - MARGIN.top - MARGIN.bottom;
-
-  const { showTooltip, hideTooltip, tooltipData, tooltipLeft, tooltipTop, tooltipOpen } =
-    useTooltip<FlowPoint>();
 
   const { xScale, yScale } = useMemo(() => {
     if (data.length === 0) {
@@ -70,27 +52,8 @@ export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFl
     };
   }, [data, innerW, innerH]);
 
-  const handleTooltip = useCallback(
-    (event: React.TouchEvent<SVGRectElement> | React.MouseEvent<SVGRectElement>) => {
-      const coords = localPoint(event);
-      if (!coords || data.length === 0) return;
-      const x0 = coords.x - MARGIN.left;
-      const time0 = xScale.invert(x0).getTime();
-      let idx = bisectTime(data, time0, 1);
-      if (idx >= data.length) idx = data.length - 1;
-      const d0 = data[idx - 1];
-      const d1 = data[idx];
-      const nearest = d0 && d1 ? (time0 - d0.time > d1.time - time0 ? d1 : d0) : (d1 ?? d0);
-      if (!nearest) return;
-      const tooltipX = (xScale(new Date(nearest.time)) ?? 0) + MARGIN.left;
-      showTooltip({
-        tooltipData: nearest,
-        tooltipLeft: tooltipX,
-        tooltipTop: MARGIN.top,
-      });
-    },
-    [data, xScale, showTooltip],
-  );
+  const { handleTooltip, hideTooltip, tooltipOpen, tooltipData, tooltipLeft, tooltipTop } =
+    useChartTooltip<FlowPoint>({ data, xScale, marginLeft: MARGIN.left, marginTop: MARGIN.top });
 
   if (data.length === 0) {
     return (
@@ -217,7 +180,7 @@ export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFl
         <TooltipWithBounds
           left={tooltipLeft}
           top={tooltipTop}
-          style={tooltipStyles}
+          style={CHART_TOOLTIP_STYLES}
         >
           <div style={{ fontWeight: 600, marginBottom: 3 }}>
             {new Date(tooltipData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

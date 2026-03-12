@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useLayoutEffect } from 'react';
 import type { AgentInfo } from '../../types';
+import { buildAgentLabel } from '../../utils/agentLabel';
 
 export interface HeatmapBucket {
   agentId: string;
@@ -24,12 +25,6 @@ function intensityColor(intensity: number): string {
   if (intensity >= 0.2) return 'rgba(59, 130, 246, 0.3)';
   if (intensity > 0) return 'rgba(59, 130, 246, 0.1)';
   return 'transparent';
-}
-
-function formatRoleLabel(agent: AgentInfo): string {
-  const role = agent.role?.name ?? 'Agent';
-  const shortId = agent.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5);
-  return `${role} ${shortId}`;
 }
 
 function formatTimeLabel(bucketIndex: number, bucketWidthMs: number): string {
@@ -134,7 +129,7 @@ export function AgentHeatmap({ agents, buckets, bucketWidthMs = 120_000 }: Agent
             Math.floor((b.time - timeRange.min) / bucketWidthMs),
             b.intensity,
           ]));
-          const label = formatRoleLabel(a);
+          const label = buildAgentLabel(a);
 
           return (
             <div key={a.id} className="flex items-center" style={{ height: ROW_HEIGHT, marginBottom: 1 }}>
