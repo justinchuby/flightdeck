@@ -5,6 +5,8 @@ import {
   getTierModels,
   listTiers,
   isValidModel,
+  getModelsForProvider,
+  getModelsByProvider,
 } from './ModelResolver.js';
 import type { ModelResolution, ModelTier } from './ModelResolver.js';
 import type { ProviderId } from './presets.js';
@@ -36,7 +38,7 @@ describe('ModelResolver', () => {
       expect(resolveModel('standard', 'claude')?.model).toBe('sonnet');
       expect(resolveModel('standard', 'gemini')?.model).toBe('gemini-2.5-flash');
       expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-4.6');
-      expect(resolveModel('standard', 'codex')?.model).toBe('gpt-5.1-codex');
+      expect(resolveModel('standard', 'codex')?.model).toBe('gpt-5.3-codex');
       expect(resolveModel('standard', 'opencode')?.model).toBe('anthropic/claude-sonnet-4-6');
     });
 
@@ -45,7 +47,7 @@ describe('ModelResolver', () => {
       expect(resolveModel('premium', 'claude')?.model).toBe('opus');
       expect(resolveModel('premium', 'gemini')?.model).toBe('gemini-2.5-pro');
       expect(resolveModel('premium', 'cursor')?.model).toBe('claude-opus-4.6');
-      expect(resolveModel('premium', 'codex')?.model).toBe('gpt-5.2-codex');
+      expect(resolveModel('premium', 'codex')?.model).toBe('gpt-5.4');
       expect(resolveModel('premium', 'opencode')?.model).toBe('anthropic/claude-opus-4-6');
     });
 
@@ -171,11 +173,17 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('maps gemini-2.5-pro to claude-opus-4.6 on Copilot (passthrough since multi-gateway)', () => {
-      // Copilot supports Google, so gemini models pass through
-      const result = resolveModel('gemini-2.5-pro', 'copilot')!;
-      expect(result.model).toBe('gemini-2.5-pro');
+    it('passes gemini-3-pro-preview through on Copilot (allowed in restricted catalog)', () => {
+      const result = resolveModel('gemini-3-pro-preview', 'copilot')!;
+      expect(result.model).toBe('gemini-3-pro-preview');
       expect(result.translated).toBe(false);
+    });
+
+    it('maps gemini-2.5-pro to equivalent on Copilot (not in restricted catalog)', () => {
+      // Copilot only supports gemini-3-pro-preview from Google's catalog
+      const result = resolveModel('gemini-2.5-pro', 'copilot')!;
+      expect(result.model).toBe('claude-opus-4.6');
+      expect(result.translated).toBe(true);
     });
 
     it('maps gemini-2.5-pro to gpt-5.2-codex on Codex', () => {
@@ -184,9 +192,9 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('maps gemini-3-pro-preview to sonnet on Claude', () => {
+    it('maps gemini-3-pro-preview to opus on Claude', () => {
       const result = resolveModel('gemini-3-pro-preview', 'claude')!;
-      expect(result.model).toBe('sonnet');
+      expect(result.model).toBe('opus');
       expect(result.translated).toBe(true);
     });
 
@@ -215,7 +223,7 @@ describe('ModelResolver', () => {
 
     it('falls back for unknown model on Codex', () => {
       const result = resolveModel('some-obscure-model', 'codex')!;
-      expect(result.model).toBe('gpt-5.1-codex');
+      expect(result.model).toBe('gpt-5.3-codex');
       expect(result.translated).toBe(true);
     });
 
@@ -329,7 +337,7 @@ describe('ModelResolver', () => {
       expect(models).toBeDefined();
       expect(models!['copilot']).toBe('claude-opus-4.6');
       expect(models!['gemini']).toBe('gemini-2.5-pro');
-      expect(models!['codex']).toBe('gpt-5.2-codex');
+      expect(models!['codex']).toBe('gpt-5.4');
     });
 
     it('returns undefined for invalid tier', () => {
@@ -397,6 +405,81 @@ describe('ModelResolver', () => {
       // Should still return something (falls through to step 4 or passthrough)
       expect(result).toBeDefined();
       expect(result!.original).toBe('fast');
+    });
+  });
+
+  // ── getModelsForProvider() ────────────────────────────
+
+  describe('getModelsForProvider()', () => {
+    it('copilot returns Claude, GPT, and only gemini-3-pro-preview', () => {
+      const models = getModelsForProvider('copilot');
+      expect(models).toContain('claude-opus-4.6');
+      expect(models).toContain('gpt-5.4');
+      expect(models).toContain('gpt-5.1-codex');
+      expect(models).toContain('gemini-3-pro-preview');
+      // Copilot does NOT have gemini-2.5-* models
+      expect(models).not.toContain('gemini-2.5-pro');
+      expect(models).not.toContain('gemini-2.5-flash');
+      expect(models).not.toContain('gemini-2.5-flash-lite');
+      expect(models).not.toContain('gemini-3-flash-preview');
+    });
+
+    it('claude returns only Anthropic models', () => {
+      const models = getModelsForProvider('claude');
+      expect(models.every(m => m.startsWith('claude-'))).toBe(true);
+      expect(models).toContain('claude-opus-4.6');
+      expect(models).toContain('claude-haiku-4.5');
+    });
+
+    it('gemini returns only Google models', () => {
+      const models = getModelsForProvider('gemini');
+      expect(models.every(m => m.startsWith('gemini-'))).toBe(true);
+      expect(models).toContain('gemini-2.5-pro');
+      expect(models).toContain('gemini-2.5-flash');
+    });
+
+    it('codex returns only OpenAI models', () => {
+      const models = getModelsForProvider('codex');
+      expect(models.every(m => m.startsWith('gpt-'))).toBe(true);
+      expect(models).toContain('gpt-5.4');
+      expect(models).toContain('gpt-5.3-codex');
+      expect(models).toContain('gpt-5.1-codex');
+      expect(models).toContain('gpt-4.1');
+    });
+
+    it('opencode returns Anthropic, OpenAI, and Google models', () => {
+      const models = getModelsForProvider('opencode');
+      const hasAnthropic = models.some(m => m.startsWith('claude-'));
+      const hasOpenAI = models.some(m => m.startsWith('gpt-'));
+      const hasGoogle = models.some(m => m.startsWith('gemini-'));
+      expect(hasAnthropic).toBe(true);
+      expect(hasOpenAI).toBe(true);
+      expect(hasGoogle).toBe(true);
+    });
+  });
+
+  describe('getModelsByProvider()', () => {
+    it('returns model lists for all 6 providers', () => {
+      const result = getModelsByProvider();
+      expect(Object.keys(result)).toHaveLength(6);
+      expect(result).toHaveProperty('copilot');
+      expect(result).toHaveProperty('claude');
+      expect(result).toHaveProperty('gemini');
+      expect(result).toHaveProperty('codex');
+      expect(result).toHaveProperty('cursor');
+      expect(result).toHaveProperty('opencode');
+    });
+
+    it('each provider list contains only valid models', () => {
+      const result = getModelsByProvider();
+      for (const [provider, models] of Object.entries(result)) {
+        for (const model of models) {
+          expect(
+            isValidModel(model, provider as ProviderId),
+            `${model} should be valid for ${provider}`,
+          ).toBe(true);
+        }
+      }
     });
   });
 });

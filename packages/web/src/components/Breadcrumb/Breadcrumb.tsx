@@ -9,6 +9,7 @@ import { ChevronRight, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { TAB_LABELS } from '../../utils/tabLabels';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface BreadcrumbSegment {
   label: string;
@@ -29,7 +30,7 @@ export function Breadcrumb() {
 
   if (projectId) {
     segments.push({
-      label: projectName || projectId.slice(0, 8),
+      label: projectName || shortAgentId(projectId),
       path: `/projects/${projectId}/overview`,
     });
 

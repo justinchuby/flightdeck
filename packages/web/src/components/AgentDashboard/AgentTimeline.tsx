@@ -1,5 +1,6 @@
 import { useAppStore } from '../../stores/appStore';
 import { MessageSquare, GitBranch } from 'lucide-react';
+import { shortAgentId } from '../../utils/agentLabel';
 
 export function AgentTimeline() {
   const agents = useAppStore((s) => s.agents);
@@ -46,7 +47,7 @@ function AgentTreeNode({ agentId, depth }: { agentId: string; depth: number }) {
           <GitBranch size={12} className="text-th-text-muted shrink-0" />
         )}
         <span>{agent.role.icon}</span>
-        <span className="truncate">{agent.role.name} ({agentId.slice(0, 8)})</span>
+        <span className="truncate">{agent.role.name} ({shortAgentId(agentId)})</span>
       </button>
       {children.map((child) => (
         <AgentTreeNode key={child.id} agentId={child.id} depth={depth + 1} />

@@ -2,15 +2,16 @@ import { eq, and, isNull } from 'drizzle-orm';
 import type { Database } from './database.js';
 import { agentRoster } from './schema.js';
 
-export type AgentStatus = 'idle' | 'busy' | 'terminated' | 'retired';
+export type RosterAgentStatus = 'idle' | 'running' | 'terminated' | 'failed';
 
 export interface AgentRecord {
   agentId: string;
   role: string;
   model: string;
-  status: AgentStatus;
+  status: RosterAgentStatus;
   sessionId?: string;
   projectId?: string;
+  provider?: string;
   teamId: string;
   createdAt: string;
   updatedAt: string;
@@ -25,11 +26,12 @@ export class AgentRosterRepository {
     agentId: string,
     role: string,
     model: string,
-    status: AgentStatus = 'idle',
+    status: RosterAgentStatus = 'idle',
     sessionId?: string,
     projectId?: string,
     metadata?: Record<string, unknown>,
     teamId: string = 'default',
+    provider?: string,
   ): AgentRecord {
     const now = new Date().toISOString();
     this.db.drizzle
@@ -41,6 +43,7 @@ export class AgentRosterRepository {
         status,
         sessionId: sessionId ?? null,
         projectId: projectId ?? null,
+        provider: provider ?? null,
         teamId,
         metadata: metadata ? JSON.stringify(metadata) : null,
         createdAt: now,
@@ -54,6 +57,7 @@ export class AgentRosterRepository {
           status,
           sessionId: sessionId ?? null,
           projectId: projectId ?? null,
+          provider: provider ?? null,
           teamId,
           metadata: metadata ? JSON.stringify(metadata) : null,
           updatedAt: now,
@@ -68,6 +72,7 @@ export class AgentRosterRepository {
       status,
       sessionId,
       projectId,
+      provider,
       teamId,
       createdAt: now,
       updatedAt: now,
@@ -86,7 +91,7 @@ export class AgentRosterRepository {
     return this.rowToRecord(row);
   }
 
-  getAllAgents(status?: AgentStatus, teamId?: string): AgentRecord[] {
+  getAllAgents(status?: RosterAgentStatus, teamId?: string): AgentRecord[] {
     const conditions = [];
     if (status) conditions.push(eq(agentRoster.status, status));
     if (teamId) conditions.push(eq(agentRoster.teamId, teamId));
@@ -109,7 +114,7 @@ export class AgentRosterRepository {
     return rows.map((r) => this.rowToRecord(r));
   }
 
-  updateStatus(agentId: string, status: AgentStatus): boolean {
+  updateStatus(agentId: string, status: RosterAgentStatus): boolean {
     const result = this.db.drizzle
       .update(agentRoster)
       .set({ status, updatedAt: new Date().toISOString() })
@@ -139,7 +144,7 @@ export class AgentRosterRepository {
   removeAgent(agentId: string): boolean {
     const result = this.db.drizzle
       .update(agentRoster)
-      .set({ status: 'terminated' as AgentStatus, updatedAt: new Date().toISOString() })
+      .set({ status: 'terminated' as RosterAgentStatus, updatedAt: new Date().toISOString() })
       .where(eq(agentRoster.agentId, agentId))
       .run();
     return result.changes > 0;
@@ -197,27 +202,6 @@ export class AgentRosterRepository {
     return deleted;
   }
 
-  retireAgent(agentId: string, reason?: string): boolean {
-    const now = new Date().toISOString();
-    const existing = this.getAgent(agentId);
-    if (!existing) return false;
-
-    const meta = existing.metadata ?? {};
-    (meta as Record<string, unknown>).retiredAt = now;
-    if (reason) (meta as Record<string, unknown>).retiredReason = reason;
-
-    const result = this.db.drizzle
-      .update(agentRoster)
-      .set({
-        status: 'retired' as AgentStatus,
-        metadata: JSON.stringify(meta),
-        updatedAt: now,
-      })
-      .where(eq(agentRoster.agentId, agentId))
-      .run();
-    return result.changes > 0;
-  }
-
   cloneAgent(sourceAgentId: string, newAgentId: string): AgentRecord | undefined {
     const source = this.getAgent(sourceAgentId);
     if (!source) return undefined;
@@ -244,12 +228,13 @@ export class AgentRosterRepository {
       source.projectId,
       cloneMeta,
       source.teamId,
+      source.provider,
     );
   }
 
   getStatusCounts(teamId?: string): Record<string, number> {
     const agents = this.getAllAgents(undefined, teamId);
-    const counts: Record<string, number> = { idle: 0, busy: 0, terminated: 0, retired: 0 };
+    const counts: Record<string, number> = { idle: 0, running: 0, terminated: 0, failed: 0 };
     for (const a of agents) {
       counts[a.status] = (counts[a.status] ?? 0) + 1;
     }
@@ -261,9 +246,10 @@ export class AgentRosterRepository {
       agentId: row.agentId,
       role: row.role,
       model: row.model,
-      status: row.status as AgentStatus,
+      status: row.status as RosterAgentStatus,
       sessionId: row.sessionId ?? undefined,
       projectId: row.projectId ?? undefined,
+      provider: row.provider ?? undefined,
       teamId: row.teamId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -274,14 +260,14 @@ export class AgentRosterRepository {
 
   /**
    * Reconcile stale roster entries on server startup.
-   * Marks agents showing as 'busy' or 'idle' as 'terminated' when they
+   * Marks agents showing as 'running' or 'idle' as 'terminated' when they
    * have no live process (e.g. after a server crash).
    *
    * @param isAgentAlive - callback to check if an agent actually has a live process
    * @returns count of agents reconciled
    */
   reconcileStaleAgents(isAgentAlive: (agentId: string) => boolean): number {
-    const busy = this.getAllAgents('busy');
+    const busy = this.getAllAgents('running');
     const idle = this.getAllAgents('idle');
     const candidates = [...busy, ...idle];
 

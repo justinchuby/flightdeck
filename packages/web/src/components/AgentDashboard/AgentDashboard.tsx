@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
+import { shortAgentId } from '../../utils/agentLabel';
 import { SpawnDialog } from './SpawnDialog';
 import { FleetStats } from '../FleetOverview/FleetStats';
 import { AgentActivityTable } from '../FleetOverview/AgentActivityTable';
@@ -33,7 +34,7 @@ export function AgentDashboard({ api, ws }: Props) {
   // Derive historical agents from keyframe events when no live agents
   const { agents: historicalAgents } = useHistoricalAgents(liveAgents.length);
 
-  const agents = liveAgents.length > 0 ? liveAgents : (historicalAgents as any[]);
+  const agents = liveAgents.length > 0 ? liveAgents : historicalAgents;
 
   // Keyboard shortcut: 'n' to spawn new agent
   useEffect(() => {
@@ -156,7 +157,7 @@ export function AgentDashboard({ api, ws }: Props) {
               <option value="">All agents</option>
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.role.icon} {a.role.name} ({a.id.slice(0, 8)})
+                  {a.role.icon} {a.role.name} ({shortAgentId(a.id)})
                 </option>
               ))}
             </select>
@@ -176,7 +177,7 @@ export function AgentDashboard({ api, ws }: Props) {
       {groupByProject && projectGroups ? (
         Array.from(projectGroups.entries()).map(([leadId, groupAgents]) => {
           const lead = agents.find((a) => a.id === leadId);
-          const label = lead?.projectName || lead?.task?.slice(0, 40) || (leadId === '_unassigned' ? 'Unassigned' : leadId.slice(0, 8));
+          const label = lead?.projectName || lead?.task?.slice(0, 40) || (leadId === '_unassigned' ? 'Unassigned' : shortAgentId(leadId));
           const isCollapsed = collapsedGroups.has(leadId);
           return (
             <div key={leadId} className="border border-th-border rounded-lg bg-surface-raised">

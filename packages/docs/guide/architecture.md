@@ -1,6 +1,6 @@
 # Architecture
 
-Flightdeck uses a **three-tier architecture** that separates agent process management from orchestration logic and the user interface. This separation ensures that agent processes survive orchestrator restarts and that the system can recover gracefully from crashes.
+Flightdeck uses a **two-tier architecture** that separates the orchestration server from the user interface. Agents run in-process via the AcpAdapter and AgentAcpBridge — there is no separate agent server process.
 
 ## System Overview
 
@@ -14,16 +14,9 @@ Flightdeck uses a **three-tier architecture** that separates agent process manag
 ┌──────────────────────────────────────────────────┐
 │       Orchestration Server (Express 5)           │
 │  Projects, Sessions, Knowledge, Governance,      │
-│  AgentManager, 35 route modules, WebSocket hub   │
+│  AgentManager, AcpAdapter, WebSocket hub         │
 └──────────────────┬───────────────────────────────┘
-                   │ IPC (parent→child) + TCP (reconnect)
-                   ▼
-┌──────────────────────────────────────────────────┐
-│       Agent Server (Detached Child Process)       │
-│  CLI adapters (Copilot, Claude, Gemini, etc.)    │
-│  Process isolation, PID files, event replay       │
-└──────────────────┬───────────────────────────────┘
-                   │ SDK / ACP protocol
+                   │ ACP protocol (stdio) via AgentAcpBridge
                    ▼
             ┌──────────────┐
             │  CLI Binaries │
@@ -31,57 +24,22 @@ Flightdeck uses a **three-tier architecture** that separates agent process manag
             └──────────────┘
 ```
 
-## Tier 1: Agent Server
+## Agent Adapters
 
-The agent server runs as a **detached child process** that manages CLI agent lifecycles. It survives orchestrator restarts, enabling session resume without losing running agents.
-
-**Entry point:** `packages/server/src/agent-server-entry.ts`
-
-### Process Model
-
-1. The orchestrator forks the agent server with `detached: true`
-2. The agent server writes PID, port, and auth token files to `~/.flightdeck/`
-3. Communication flows over Node.js IPC (parent↔child pipe)
-4. If the orchestrator restarts, it reconnects via TCP using the port file
-
-```
-~/.flightdeck/
-  agent-server.pid       # PID of running agent server
-  agent-server.port      # TCP port for reconnection
-  agent-server.token     # 256-bit hex auth token (timingSafeEqual)
-```
-
-### Key Components
-
-| Component | Responsibility |
-|-----------|---------------|
-| **AgentServer** | Message dispatch for spawn, terminate, prompt, cancel, list, subscribe, shutdown. Orphan self-termination timer (12h). |
-| **ForkListener** | Dual-mode listener: IPC (primary) + TCP localhost (reconnection). Auth timeout: 5s. |
-| **ManagedAgent** | Wraps a CLI adapter instance with lifecycle state and event forwarding. |
-| **EventBuffer** | Replays missed events on reconnect via `lastSeenEventId` cursor. |
-| **AgentServerPersistence** | Saves agent state to SQLite on lifecycle events (spawn, terminate, exit). |
-
-### IPC Messages
-
-**Orchestrator → Agent Server:**
-`spawn_agent`, `send_message`, `terminate_agent`, `cancel_agent`, `list_agents`, `subscribe`, `ping`, `authenticate`
-
-**Agent Server → Orchestrator:**
-`agent_spawned`, `agent_event` (text, thinking, tool_call, usage, etc.), `agent_exited`, `agent_list`, `pong`, `auth_result`, `error`
+Agents run **in-process** within the orchestration server. Each agent is managed by the AgentManager and communicates with its CLI binary via the AcpAdapter and AgentAcpBridge over ACP (stdio).
 
 ### CLI Adapters
 
-Three adapter backends implement the `AgentAdapter` interface:
+All providers use a single adapter backend that implements the `AgentAdapter` interface:
 
 | Backend | Transport | Session Resume | Used By |
 |---------|-----------|---------------|---------|
-| **AcpAdapter** | ACP over stdio | Best-effort | All 6 providers |
-| **ClaudeSdkAdapter** | `@anthropic-ai/claude-agent-sdk` | Explicit (`query({ resume })`) | Claude |
-| **CopilotSdkAdapter** | `@github/copilot-sdk` JSON-RPC | Explicit (`client.resumeSession()`) | Copilot |
+| **AcpAdapter** | ACP over stdio | Best-effort (`loadSession()`, falls back to `newSession()`) | All providers (Copilot, Claude, Gemini, Cursor, Codex, OpenCode) |
+| **MockAdapter** | In-memory | N/A | Testing only |
 
-All SDK imports are **lazy** (`dynamic import()`) so the server starts without any SDK installed. See the [adapter-architecture-pattern](/skills) for details.
+See the [adapter-architecture-pattern](/skills) for details.
 
-## Tier 2: Orchestration Server
+## Tier 1: Orchestration Server
 
 The orchestration server is the main process — an Express 5 application with WebSocket support that manages projects, sessions, knowledge, governance, and agent coordination.
 
@@ -92,10 +50,9 @@ The orchestration server is the main process — an Express 5 application with W
 1. Load config (YAML + env vars)
 2. Create DI container via `createContainer()` — 35+ services in 6 dependency tiers
 3. Reconcile stale sessions/agents from previous runs
-4. Fork or reconnect to the agent server
-5. Mount Express routes and WebSocket server
-6. Attempt session resume (non-blocking)
-7. Install graceful shutdown handlers
+4. Mount Express routes and WebSocket server
+5. Attempt session resume (non-blocking)
+6. Install graceful shutdown handlers
 
 ### Service Container
 
@@ -112,9 +69,9 @@ Services are initialized in dependency order (Tier 0 → Tier 5):
 
 ### Route Modules
 
-35 route modules provide ~279 REST endpoints:
+34 route modules provide ~279 REST endpoints:
 
-`agents`, `agent-server`, `analytics`, `browse`, `comms`, `config`, `conflicts`, `context`, `coordination`, `data`, `db`, `decisions`, `diff`, `integrations`, `knowledge`, `lead`, `nl`, `notifications`, `oversight`, `projects`, `replay`, `roles`, `search`, `services`, `sessions`, `settings`, `shared`, `summary`, `tasks`, `teams`
+`agents`, `analytics`, `browse`, `comms`, `config`, `conflicts`, `context`, `coordination`, `data`, `db`, `decisions`, `diff`, `integrations`, `knowledge`, `lead`, `nl`, `notifications`, `oversight`, `projects`, `replay`, `roles`, `search`, `services`, `sessions`, `settings`, `shared`, `summary`, `tasks`, `teams`
 
 All routes receive the full `AppContext` (service container) for dependency injection.
 
@@ -131,7 +88,7 @@ All routes receive the full `AppContext` (service container) for dependency inje
 | **AlertEngine** | Proactive detection: stuck agents, context pressure, duplicate edits, stale decisions |
 | **IntegrationRouter** | Routes agent events to external channels (Telegram, Slack) via NotificationBatcher |
 
-## Tier 3: Web Client
+## Tier 2: Web Client
 
 A React 19 single-page application built with Vite and Tailwind CSS 4.
 
@@ -194,10 +151,6 @@ Standard REST with JSON payloads. Auth via bearer token (auto-generated on first
 | `alert:new` | System alerts |
 | `context_compacted` | Context window compaction |
 
-### IPC (Orchestration Server ↔ Agent Server)
-
-Binary-safe JSON messages over Node.js IPC channel (primary) or TCP localhost (reconnection). See [Tier 1: Agent Server](#tier-1-agent-server) for message types.
-
 ## Database
 
 SQLite with WAL mode and Drizzle ORM. 30+ tables across domains:
@@ -238,6 +191,6 @@ Key environment variables:
 | `FLIGHTDECK_PORT` | `3000` | Server port |
 | `FLIGHTDECK_HOST` | `127.0.0.1` | Bind address |
 | `FLIGHTDECK_CONFIG` | `./flightdeck.config.yaml` | Config file path |
-| `FLIGHTDECK_STATE_DIR` | `~/.flightdeck` | State directory (PID files, etc.) |
+| `FLIGHTDECK_STATE_DIR` | `~/.flightdeck` | State directory |
 
 See [Configuration Reference](/reference/configuration) for the full config schema and `flightdeck.config.example.yaml` for an annotated example.

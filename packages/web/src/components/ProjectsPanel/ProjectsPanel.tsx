@@ -29,6 +29,7 @@ import { NewProjectModal } from '../LeadDashboard/NewProjectModal';
 import { StatusBadge, projectStatusProps } from '../ui/StatusBadge';
 import { sessionStatusDot } from '../../utils/statusColors';
 import { SessionViewer, type ViewableSession } from '../SessionHistory';
+import { shortAgentId } from '../../utils/agentLabel';
 
 /** Extended project type with storage and agent count info from the enriched API */
 interface EnrichedProject {
@@ -295,7 +296,7 @@ function ProjectCard({
                       title={`Session: ${s.leadId} — click to copy`}
                       onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.leadId); }}
                     >
-                      {s.leadId.slice(0, 8)}
+                      {shortAgentId(s.leadId)}
                     </span>
                     <span className="text-th-text-alt truncate">{s.task || s.status}</span>
                     <span className="text-th-text-muted ml-auto shrink-0">

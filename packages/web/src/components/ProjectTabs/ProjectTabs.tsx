@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useProjects } from '../../hooks/useProjects';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ export function ProjectTabs({ activeId, onChange, className }: ProjectTabsProps)
       const active = lead.status === 'running' || lead.status === 'creating' || lead.status === 'idle';
       items.push({
         id: tabId,
-        label: lead.projectName || lead.role?.name || lead.id.slice(0, 8),
+        label: lead.projectName || lead.role?.name || shortAgentId(lead.id),
         isLive: active,
       });
     }
@@ -54,7 +55,7 @@ export function ProjectTabs({ activeId, onChange, className }: ProjectTabsProps)
       if (!seen.has(proj.id)) {
         items.push({
           id: proj.id,
-          label: proj.name || proj.id.slice(0, 8),
+          label: proj.name || shortAgentId(proj.id),
           isLive: false,
         });
       }

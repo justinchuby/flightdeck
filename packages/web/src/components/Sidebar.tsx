@@ -41,7 +41,7 @@ export function Sidebar() {
     <nav data-tour="sidebar" className="w-[66px] border-r border-th-border flex flex-col items-center py-3 gap-1 shrink-0">
       <NavItem to="/" icon={Home} label="Home" end />
       <NavItem to="/projects" icon={FolderOpen} label="Projects" />
-      <NavItem to="/crews" icon={Users} label="Crews" />
+      <NavItem to="/agents" icon={Users} label="Agents" />
 
       <button
         onClick={() => setShowNewProject(true)}

@@ -11,7 +11,7 @@
 import { EventEmitter } from 'events';
 import { spawn, execFileSync, ChildProcess } from 'child_process';
 import { Readable, Writable } from 'stream';
-import type * as acp from '@agentclientprotocol/sdk';
+import * as acp from '@agentclientprotocol/sdk';
 import { logger } from '../utils/logger.js';
 import type {
   AgentAdapter,
@@ -28,10 +28,6 @@ import type {
 /** Timeout for graceful process shutdown before force-killing */
 const TERMINATE_TIMEOUT_MS = 5000;
 
-// ── Lazy SDK Loading ────────────────────────────────────────────────
-// The ACP SDK is loaded dynamically so the adapter module can be imported
-// without triggering SDK loading. The SDK is loaded on first start().
-
 /** Wraps a promise with a timeout. Rejects with a descriptive error if exceeded. */
 function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
   return Promise.race([
@@ -43,20 +39,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Pro
 }
 
 const SDK_TIMEOUT_MS = 30_000;
-
-let acpSdk: typeof import('@agentclientprotocol/sdk') | null = null;
-
-async function loadAcpSdk(): Promise<typeof import('@agentclientprotocol/sdk')> {
-  if (acpSdk) return acpSdk;
-  try {
-    acpSdk = await import('@agentclientprotocol/sdk');
-    return acpSdk;
-  } catch {
-    throw new Error(
-      'ACP SDK not installed. Run: npm install @agentclientprotocol/sdk',
-    );
-  }
-}
 
 /** Extract displayable text from ACP content (single item, array, or string) */
 function extractContentText(content: unknown): string | undefined {
@@ -114,18 +96,10 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   private _promptingStartedAt: number | null = null;
   private promptQueue: PromptContent[] = [];
   private promptQueuePriorityCount = 0;
-  private autopilot: boolean;
   private agentCapabilities: acp.AgentCapabilities | null = null;
-  private pendingPermissions = new Map<string, {
-    resolve: (result: acp.RequestPermissionResponse) => void;
-    options: acp.PermissionOption[];
-    timeout: ReturnType<typeof setTimeout>;
-  }>();
-  private latestPermissionId: string | null = null;
 
-  constructor(opts?: { autopilot?: boolean }) {
+  constructor() {
     super();
-    this.autopilot = opts?.autopilot ?? false;
   }
 
   get isConnected(): boolean { return this._isConnected; }
@@ -150,7 +124,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           }),
           SDK_TIMEOUT_MS, 'loadSession',
         );
-        // LoadSessionResponse has no sessionId — the session ID stays the same on successful load
         sessionId = opts.sessionId;
       } catch (err) {
         // Resume failed — do NOT fall back to a new session.
@@ -170,10 +143,18 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
         throw new Error(`Session resume failed: ${message}`);
       }
     } else {
+      // Build _meta for providers that accept system prompt via session metadata
+      const meta: Record<string, unknown> = {};
+      if (opts.systemPrompt && opts.provider === 'claude') {
+        meta.systemPrompt = opts.systemPrompt;
+      }
+      const hasMeta = Object.keys(meta).length > 0;
+
       const sessionResult = await withTimeout(
         this.connection!.newSession({
           cwd: opts.cwd || process.cwd(),
           mcpServers: [],
+          ...(hasMeta ? { _meta: meta } : {}),
         }),
         SDK_TIMEOUT_MS, 'newSession',
       );
@@ -200,7 +181,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   }
 
   private async spawnAndConnect(opts: AdapterStartOptions): Promise<void> {
-    const sdk = await loadAcpSdk();
     this.validateCliCommand(opts.cliCommand);
 
     const args = [...(opts.baseArgs || ['--acp', '--stdio']), ...(opts.cliArgs || [])];
@@ -240,42 +220,19 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
 
     const output = Writable.toWeb(this.process.stdin) as WritableStream<Uint8Array>;
     const input = Readable.toWeb(this.process.stdout) as ReadableStream<Uint8Array>;
-    const stream = sdk.ndJsonStream(output, input);
+    const stream = acp.ndJsonStream(output, input);
 
     const client: acp.Client = {
       requestPermission: async (params) => {
-        if (this.autopilot) {
-          const allowOption = params.options.find(
-            (o: acp.PermissionOption) => o.kind === 'allow_once'
-          );
-          return {
-            outcome: allowOption
-              ? { outcome: 'selected', optionId: allowOption.optionId }
-              : { outcome: 'cancelled' },
-          };
-        }
-
-        return new Promise<acp.RequestPermissionResponse>((resolve) => {
-          const permId = `perm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-          const timeout = setTimeout(() => {
-            if (this.pendingPermissions.has(permId)) {
-              this.pendingPermissions.delete(permId);
-              if (this.latestPermissionId === permId) this.latestPermissionId = null;
-              resolve({ outcome: { outcome: 'cancelled' } });
-            }
-          }, 60_000);
-
-          this.pendingPermissions.set(permId, { resolve, options: params.options, timeout });
-          this.latestPermissionId = permId;
-
-          this.emit('permission_request', {
-            id: permId,
-            toolName: params.title ?? params.description ?? 'Tool action',
-            arguments: params.metadata ?? {},
-            timestamp: new Date().toISOString(),
-          });
-        });
+        // Always auto-approve — oversight is prompt-only
+        const allowOption = params.options.find(
+          (o: acp.PermissionOption) => o.kind === 'allow_once'
+        );
+        return {
+          outcome: allowOption
+            ? { outcome: 'selected', optionId: allowOption.optionId }
+            : { outcome: 'cancelled' },
+        };
       },
 
       sessionUpdate: async (params) => {
@@ -350,10 +307,10 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       },
     };
 
-    this.connection = new sdk.ClientSideConnection((_agent) => client, stream);
+    this.connection = new acp.ClientSideConnection((_agent) => client, stream);
 
     const initResult = await this.connection.initialize({
-      protocolVersion: sdk.PROTOCOL_VERSION,
+      protocolVersion: acp.PROTOCOL_VERSION,
       clientCapabilities: {},
     });
     this.agentCapabilities = initResult.agentCapabilities ?? null;
@@ -443,27 +400,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     }
   }
 
-  resolvePermission(approved: boolean): void {
-    const id = this.latestPermissionId;
-    if (!id) return;
-    const entry = this.pendingPermissions.get(id);
-    if (!entry) return;
-    this.pendingPermissions.delete(id);
-    this.latestPermissionId = null;
-    clearTimeout(entry.timeout);
-
-    if (approved) {
-      const allowOption = entry.options.find((o) => o.kind === 'allow_once');
-      entry.resolve({
-        outcome: allowOption
-          ? { outcome: 'selected', optionId: allowOption.optionId }
-          : { outcome: 'cancelled' },
-      });
-    } else {
-      entry.resolve({ outcome: { outcome: 'cancelled' } });
-    }
-  }
-
   async cancel(): Promise<void> {
     if (this.connection && this.sessionId) {
       await this.connection.cancel({ sessionId: this.sessionId });
@@ -471,14 +407,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   }
 
   async terminate(): Promise<void> {
-    // Resolve all pending permissions as cancelled and clear timeouts
-    for (const [id, entry] of this.pendingPermissions) {
-      clearTimeout(entry.timeout);
-      entry.resolve({ outcome: { outcome: 'cancelled' } });
-    }
-    this.pendingPermissions.clear();
-    this.latestPermissionId = null;
-
     if (this.process) {
       const proc = this.process;
       this.process = null;

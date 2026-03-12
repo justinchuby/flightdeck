@@ -1,21 +1,9 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { CheckCircle, XCircle, AlertCircle, Activity, Users, Clock } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { CheckCircle, XCircle, Activity, Users, Clock } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
-import { apiFetch } from '../../hooks/useApi';
-import type { AgentServerConnectionState } from '../AgentServerStatus';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 
 // ── Types ─────────────────────────────────────────────────
-
-interface AgentServerStatus {
-  running: boolean;
-  connected: boolean;
-  state: string;
-  agentCount: number | null;
-  latencyMs: number | null;
-  pendingRequests: number;
-  trackedAgents: number;
-}
 
 interface StatusRowProps {
   icon: typeof CheckCircle;
@@ -59,56 +47,6 @@ export function StatusPopover() {
   const systemPaused = useAppStore((s) => s.systemPaused);
   const agents = useAppStore((s) => s.agents);
 
-  const [daemon, setDaemon] = useState<AgentServerStatus | null>(null);
-  const [daemonError, setDaemonError] = useState(false);
-  const [agentServerState, setAgentServerState] = useState<AgentServerConnectionState>('connected');
-  const prevConnectedRef = useRef(connected);
-
-  // Listen for agent server status via WS
-  useEffect(() => {
-    function onWsMessage(event: Event) {
-      try {
-        const raw = (event as MessageEvent).data;
-        const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (msg?.type === 'agentServerStatus' && typeof msg.state === 'string') {
-          setAgentServerState(msg.state as AgentServerConnectionState);
-        }
-        // Server sends current health state in init message on connect
-        if (msg?.type === 'init' && typeof msg.agentServerState === 'string') {
-          setAgentServerState(msg.agentServerState as AgentServerConnectionState);
-        }
-      } catch { /* ignore non-JSON */ }
-    }
-    window.addEventListener('ws-message', onWsMessage);
-    return () => window.removeEventListener('ws-message', onWsMessage);
-  }, []);
-
-  // Fetch daemon status when popover opens
-  const fetchDaemon = useCallback(async () => {
-    try {
-      const data = await apiFetch<AgentServerStatus>('/agent-server/status');
-      setDaemon(data);
-      setDaemonError(false);
-    } catch {
-      setDaemon(null);
-      setDaemonError(true);
-    }
-  }, []);
-
-  // Reset stale state and re-fetch daemon status when WS reconnects
-  useEffect(() => {
-    if (connected && !prevConnectedRef.current) {
-      setAgentServerState('connected');
-      setDaemonError(false);
-      setDaemon(null);
-      fetchDaemon();
-    }
-    prevConnectedRef.current = connected;
-  }, [connected, fetchDaemon]);
-
-  useEffect(() => {
-    if (open) fetchDaemon();
-  }, [open, fetchDaemon]);
 
   // Click-outside close
   useEffect(() => {
@@ -132,12 +70,11 @@ export function StatusPopover() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  // Agent counts
+  // Agent counts — only show active (running + idle)
   const agentCounts = useMemo(() => {
     const running = agents.filter((a) => a.status === 'running' || a.status === 'creating').length;
     const idle = agents.filter((a) => a.status === 'idle').length;
-    const terminated = agents.filter((a) => a.status === 'terminated' || a.status === 'completed').length;
-    return { running, idle, terminated, total: agents.length };
+    return { running, idle, active: running + idle };
   }, [agents]);
 
   // Last activity: most recent agent createdAt
@@ -152,7 +89,7 @@ export function StatusPopover() {
   }, [agents]);
 
   // Overall health
-  const overallDegraded = connected && (agentServerState === 'degraded' || systemPaused);
+  const overallDegraded = connected && systemPaused;
   const overallOk = connected && !overallDegraded;
 
   const dotColor = !connected
@@ -166,17 +103,6 @@ export function StatusPopover() {
     : systemPaused
       ? 'Server: Paused'
       : 'Server: Connected';
-
-  // Daemon row
-  const daemonOk = daemon?.running ?? false;
-  const daemonValue = daemonError
-    ? 'Unreachable'
-    : daemon
-      ? daemon.running ? 'Running' : 'Stopped'
-      : 'Checking...';
-  const daemonIcon = daemonError
-    ? { icon: AlertCircle as typeof CheckCircle, color: 'text-yellow-400' }
-    : statusIcon(daemonOk);
 
   // Connection row — destructure once to avoid calling statusIcon twice
   const connIcon = statusIcon(connected);
@@ -231,19 +157,11 @@ export function StatusPopover() {
             />
 
             <StatusRow
-              icon={daemonIcon.icon}
-              iconColor={daemonIcon.color}
-              label="Agent Server"
-              value={daemonValue}
-              detail={daemon?.latencyMs != null ? `${daemon.latencyMs}ms latency` : undefined}
-            />
-
-            <StatusRow
               icon={Users}
               iconColor="text-th-text-muted"
               label="Active Agents"
-              value={`${agentCounts.total} total`}
-              detail={`${agentCounts.running} running, ${agentCounts.idle} idle, ${agentCounts.terminated} done`}
+              value={`${agentCounts.active} active`}
+              detail={`${agentCounts.running} running, ${agentCounts.idle} idle`}
             />
 
             {lastActivity && (

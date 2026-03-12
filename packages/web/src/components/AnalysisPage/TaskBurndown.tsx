@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { Group } from '@visx/group';
-import { AreaClosed, LinePath } from '@visx/shape';
+import { AreaClosed, LinePath, Line } from '@visx/shape';
 import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
 import { curveMonotoneX } from '@visx/curve';
+import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
 
 export interface FlowPoint {
   time: number;
@@ -19,6 +20,7 @@ interface CumulativeFlowProps {
 }
 
 const MARGIN = { top: 12, right: 12, bottom: 28, left: 36 };
+const SVG_HEADER_OFFSET = 24;
 
 const SERIES = [
   { key: 'created' as const, color: 'rgb(239, 68, 68)', label: 'Created' },
@@ -26,8 +28,8 @@ const SERIES = [
   { key: 'completed' as const, color: 'rgb(168, 85, 247)', label: 'Done' },
 ];
 
-export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFlowProps) {
-  const svgH = height - 40;
+export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFlowProps) {
+  const svgH = height - SVG_HEADER_OFFSET;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = svgH - MARGIN.top - MARGIN.bottom;
 
@@ -50,16 +52,19 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
     };
   }, [data, innerW, innerH]);
 
+  const { handleTooltip, hideTooltip, tooltipOpen, tooltipData, tooltipLeft, tooltipTop } =
+    useChartTooltip<FlowPoint>({ data, xScale, marginLeft: MARGIN.left, marginTop: MARGIN.top });
+
   if (data.length === 0) {
     return (
-      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px] flex items-center justify-center" data-testid="cumulative-flow">
+      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] flex items-center justify-center" data-testid="cumulative-flow">
         <p className="text-xs text-th-text-muted opacity-60">No task data</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[180px]" data-testid="cumulative-flow">
+    <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] relative" data-testid="cumulative-flow">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider">
           Task Flow
@@ -98,6 +103,43 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
             />
           ))}
 
+          {/* Crosshair on hover */}
+          {tooltipOpen && tooltipData && (
+            <>
+              <Line
+                from={{ x: xScale(new Date(tooltipData.time)) ?? 0, y: 0 }}
+                to={{ x: xScale(new Date(tooltipData.time)) ?? 0, y: innerH }}
+                stroke="#9ca3af"
+                strokeWidth={1}
+                strokeDasharray="3,3"
+                pointerEvents="none"
+              />
+              {SERIES.map((s) => (
+                <circle
+                  key={s.key}
+                  cx={xScale(new Date(tooltipData.time)) ?? 0}
+                  cy={yScale(tooltipData[s.key]) ?? 0}
+                  r={3}
+                  fill={s.color}
+                  stroke="#1a1a2e"
+                  strokeWidth={1.5}
+                  pointerEvents="none"
+                />
+              ))}
+            </>
+          )}
+
+          {/* Invisible overlay for mouse events */}
+          <rect
+            width={innerW}
+            height={innerH}
+            fill="transparent"
+            onMouseMove={handleTooltip}
+            onTouchMove={handleTooltip}
+            onMouseLeave={hideTooltip}
+            onTouchEnd={hideTooltip}
+          />
+
           <AxisBottom
             top={innerH}
             scale={xScale}
@@ -134,6 +176,23 @@ export function CumulativeFlow({ data, width = 260, height = 180 }: CumulativeFl
           />
         </Group>
       </svg>
+      {tooltipOpen && tooltipData && (
+        <TooltipWithBounds
+          left={tooltipLeft}
+          top={tooltipTop}
+          style={CHART_TOOLTIP_STYLES}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 3 }}>
+            {new Date(tooltipData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </div>
+          {SERIES.map((s) => (
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: s.color, flexShrink: 0 }} />
+              <span>{s.label}: <strong>{tooltipData[s.key]}</strong></span>
+            </div>
+          ))}
+        </TooltipWithBounds>
+      )}
     </div>
   );
 }

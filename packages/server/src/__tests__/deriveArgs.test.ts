@@ -22,9 +22,6 @@ import {
   requestLimitChangeSchema,
   setTimerSchema,
   cancelTimerSchema,
-  deferIssueSchema,
-  resolveDeferredSchema,
-  queryDeferredSchema,
   acquireCapabilitySchema,
   releaseCapabilitySchema,
   directMessageSchema,
@@ -71,11 +68,10 @@ describe('deriveArgs', () => {
   });
 
   it('handles number fields', () => {
-    const args = deriveArgs(resolveDeferredSchema);
-    // Field may be 'id' or 'issueId' depending on rename status
-    const numField = args.find(a => a.type === 'number')!;
-    expect(numField).toBeDefined();
-    expect(numField.required).toBe(true);
+    const args = deriveArgs(assignTaskSchema);
+    const taskId = args.find(a => a.name === 'taskId')!;
+    expect(taskId).toBeDefined();
+    expect(taskId.required).toBe(true);
   });
 
   it('handles boolean fields', () => {
@@ -92,11 +88,11 @@ describe('deriveArgs', () => {
     expect(dependsOn.required).toBe(true);
   });
 
-  it('handles enum fields as string', () => {
-    const args = deriveArgs(queryDeferredSchema);
-    const status = args.find(a => a.name === 'status')!;
-    expect(status.type).toBe('string');
-    expect(status.required).toBe(false);
+  it('handles optional string fields', () => {
+    const args = deriveArgs(activitySchema);
+    const actionType = args.find(a => a.name === 'actionType')!;
+    expect(actionType.type).toBe('string');
+    expect(actionType.required).toBe(false);
   });
 
   it('handles record fields as object', () => {
@@ -114,7 +110,7 @@ describe('deriveArgs', () => {
 
   it('handles schemas with many fields (createAgentSchema)', () => {
     const args = deriveArgs(createAgentSchema);
-    expect(args.length).toBe(8);
+    expect(args.length).toBe(9);
     const role = args.find(a => a.name === 'role')!;
     expect(role.required).toBe(true);
     expect(role.description).toBe('Role ID to assign');
@@ -187,9 +183,6 @@ describe('schema-arg drift detection', () => {
     requestLimitChangeSchema,
     setTimerSchema,
     cancelTimerSchema,
-    deferIssueSchema,
-    resolveDeferredSchema,
-    queryDeferredSchema,
     acquireCapabilitySchema,
     releaseCapabilitySchema,
     directMessageSchema,

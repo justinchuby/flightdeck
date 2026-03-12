@@ -127,7 +127,7 @@ Be aware of these constraints when applying the patterns below:
 
 **Problem:** The critical reviewer found 5 P1 issues but only the P0 was addressed. The other 4 P1s existed only in a shared markdown file that would be lost after the session.
 
-**Guideline:** Use `DEFER_ISSUE` during the session to queue deferred findings. At session end, file GitHub issues as a batch for any deferred findings that weren't resolved. Only file immediately for P0/P1 issues that definitely won't be addressed this session. Never leave deferred findings only in ephemeral session files — a finding that isn't tracked is a finding that's lost.
+**Guideline:** Track deferred findings using a shared checklist or group chat during the session. At session end, file GitHub issues as a batch for any findings that weren't resolved. Only file immediately for P0/P1 issues that definitely won't be addressed this session. Never leave deferred findings only in ephemeral session files — a finding that isn't tracked is a finding that's lost.
 
 ## Anti-Pattern 6: Context Pressure From Long-Running Agents
 
@@ -150,4 +150,4 @@ Be aware of these constraints when applying the patterns below:
 - [ ] Check `QUERY_TASKS` before delegating to avoid duplicate assignments.
 - [ ] Plan explicit sequencing for shared files (who goes first, second, third).
 - [ ] Assign triple reviewers (code, critical, readability) for implementation work.
-- [ ] Use `DEFER_ISSUE` for findings that won't be addressed this session; batch-file GitHub issues at session end.
+- [ ] Track deferred findings in a shared checklist or group chat; batch-file GitHub issues at session end.

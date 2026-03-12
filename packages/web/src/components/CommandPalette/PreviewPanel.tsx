@@ -76,6 +76,7 @@ export function buildPreviewData(
         { label: 'Task', value: agent.task ?? 'None' },
         { label: 'Context', value: ctxPct },
         { label: 'Status', value: agent.status },
+        ...(agent.provider ? [{ label: 'Provider', value: agent.provider }] : []),
         ...(agent.model ? [{ label: 'Model', value: agent.model }] : []),
       ],
     };

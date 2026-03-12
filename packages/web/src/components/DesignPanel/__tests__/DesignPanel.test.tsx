@@ -14,8 +14,8 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
 }));
 
-vi.mock('../../../utils/markdown', () => ({
-  MarkdownContent: ({ text }: { text: string }) => <div data-testid="md-render">{text}</div>,
+vi.mock('../../ui/Markdown', () => ({
+  Markdown: ({ text }: { text: string }) => <div data-testid="md-render">{text}</div>,
 }));
 
 function renderPanel() {

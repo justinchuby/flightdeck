@@ -94,11 +94,14 @@ export function CollapsibleCommandBlock({ text }: { text: string }) {
   if (jsonMatch) {
     try {
       const obj = JSON.parse(jsonMatch[0]);
-      const parts: string[] = [];
+      // Show only the first string field as a short one-line preview
       for (const [k, v] of Object.entries(obj)) {
-        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
+        if (typeof v === 'string') {
+          const flat = v.replace(/[\n\r]+/g, ' ');
+          preview = `${k}: ${flat.length > 80 ? flat.slice(0, 77) + '...' : flat}`;
+          break;
+        }
       }
-      preview = parts.join(', ');
     } catch {
       preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
     }
@@ -108,10 +111,10 @@ export function CollapsibleCommandBlock({ text }: { text: string }) {
       className="my-1 px-2 py-1 bg-th-bg-alt/80 border border-th-border rounded text-[11px] text-th-text-alt cursor-pointer hover:border-th-border-hover transition-colors"
       onClick={() => setExpanded((e) => !e)}
     >
-      <div className="flex items-center gap-1 min-w-0">
+      <div className="flex items-center gap-1 min-w-0 overflow-hidden">
         {expanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
         <span className="font-mono text-th-text-alt shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-th-text-muted truncate ml-1">— {preview}</span>}
+        {!expanded && preview && <span className="font-mono text-th-text-muted ml-1 truncate">— {preview}</span>}
       </div>
       {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
     </div>

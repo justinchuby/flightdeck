@@ -57,12 +57,12 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
     const req = parseCommandPayload(agent, match[1], createAgentSchema, 'CREATE_AGENT');
     if (!req) return;
 
-    // Lead, architect, and agents with delegation capability can create agents
-    const canCreate = agent.role.id === 'lead' || agent.role.id === 'architect'
+    // Only leads (and agents with injected delegation capability) can create agents
+    const canCreate = agent.role.id === 'lead'
       || ctx.capabilityInjector?.hasCommand(agent.id, 'CREATE_AGENT');
     if (!canCreate) {
-      logger.warn({ module: 'agent', msg: 'CREATE_AGENT rejected — only leads and architects can create agents', command: 'CREATE_AGENT' });
-      agent.sendMessage(`[System] Only the Project Lead and Architects can create agents. Ask the lead if you need help from a specialist.`);
+      logger.warn({ module: 'agent', msg: 'CREATE_AGENT rejected — only leads can create agents', command: 'CREATE_AGENT' });
+      agent.sendMessage(`[System] Only the Project Lead can create agents. Ask the lead via AGENT_MESSAGE if you need help from a specialist.`);
       return;
     }
 
@@ -72,14 +72,36 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       return;
     }
 
+    // Duplicate-role guard: when creating an agent with a role that already has
+    // an active child, redirect to delegation instead. Prevents duplicate agents
+    // during session resume (lead re-creates agents that were already respawned).
+    // Only checks agents the lead actually owns (parentId match) and that are active.
+    if (agent.resumeSessionId) {
+      const existingChild = ctx.getAllAgents().find(a =>
+        a.parentId === agent.id &&
+        a.role.id === role.id &&
+        a.id !== agent.id &&
+        (a.status === 'running' || a.status === 'idle' || a.status === 'creating')
+      );
+      if (existingChild) {
+        logger.info({ module: 'agent', msg: 'Duplicate role redirected to delegation (resume guard)', role: role.id, existingAgentId: existingChild.id, leadId: agent.id });
+        agent.sendMessage(
+          `[System] Agent with role "${role.name}" already exists: ${existingChild.id.slice(0, 8)} [${existingChild.status}]. ` +
+          `Delegating your task to the existing agent instead. Use TERMINATE_AGENT first if you need a fresh one.`
+        );
+        existingChild.sendMessage(`[Delegated from ${agent.role.name} ${agent.id.slice(0, 8)}]\n${req.task}${req.context ? `\n\nContext: ${req.context}` : ''}`);
+        return;
+      }
+    }
+
     const subLeadName = role.id === 'lead'
       ? (req.name || req.task?.slice(0, 60) || `Sub-project ${new Date().toLocaleDateString()}`)
       : undefined;
-    const spawnOptions: { projectName?: string; projectId?: string } | undefined =
-      (subLeadName || agent.projectId)
-        ? { projectName: subLeadName, projectId: agent.projectId }
+    const spawnOptions: { projectName?: string; projectId?: string; provider?: string } | undefined =
+      (subLeadName || agent.projectId || req.provider)
+        ? { projectName: subLeadName, projectId: agent.projectId, provider: req.provider }
         : undefined;
-    const child = ctx.spawnAgent(role, req.task, agent.id, true, req.model, agent.cwd, spawnOptions);
+    const child = ctx.spawnAgent(role, req.task, agent.id, req.model, agent.cwd, spawnOptions);
     if (role.id === 'lead') {
       child.hierarchyLevel = agent.hierarchyLevel + 1;
     }
@@ -184,12 +206,12 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     const req = parseCommandPayload(agent, match[1], delegateSchema, 'DELEGATE');
     if (!req) return;
 
-    // Lead, architect, and agents with delegation capability can delegate
-    const canDelegate = agent.role.id === 'lead' || agent.role.id === 'architect'
+    // Only leads (and agents with injected delegation capability) can delegate
+    const canDelegate = agent.role.id === 'lead'
       || ctx.capabilityInjector?.hasCommand(agent.id, 'DELEGATE');
     if (!canDelegate) {
-      logger.warn({ module: 'delegation', msg: 'DELEGATE rejected — only leads and architects can delegate', command: 'DELEGATE' });
-      agent.sendMessage(`[System] Only the Project Lead and Architects can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
+      logger.warn({ module: 'delegation', msg: 'DELEGATE rejected — only leads can delegate', command: 'DELEGATE' });
+      agent.sendMessage(`[System] Only the Project Lead can delegate tasks. Ask the lead via AGENT_MESSAGE if you need help.`);
       return;
     }
 

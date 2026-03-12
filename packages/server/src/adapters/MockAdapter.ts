@@ -103,10 +103,6 @@ export class MockAdapter extends EventEmitter implements AgentAdapter {
     this.emit('exit', 0);
   }
 
-  resolvePermission(_approved: boolean): void {
-    // No-op for mock
-  }
-
   // ── Test Helpers ────────────────────────────────────────────────
 
   /** Queue a response for the next prompt() call. */

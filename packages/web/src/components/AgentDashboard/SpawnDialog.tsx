@@ -1,6 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { X } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
+
+interface ProviderStatus {
+  id: string;
+  name: string;
+  installed: boolean;
+  authenticated: boolean | null;
+  enabled: boolean;
+}
 
 interface Props {
   api: any;
@@ -9,18 +17,50 @@ interface Props {
 
 export function SpawnDialog({ api, onClose }: Props) {
   const roles = useAppStore((s) => s.roles);
+  const config = useAppStore((s) => s.config);
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
-  const [autopilot, setAutopilot] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
+  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Fetch available providers and models
+  useEffect(() => {
+    const baseUrl = (config as any)?.baseUrl || '';
+    const fetchData = async () => {
+      try {
+        const [provRes, modelRes] = await Promise.all([
+          fetch(`${baseUrl}/settings/providers`),
+          fetch(`${baseUrl}/models`),
+        ]);
+        if (provRes.ok) {
+          const data = await provRes.json();
+          setProviders(data.filter((p: ProviderStatus) => p.installed));
+        }
+        if (modelRes.ok) {
+          const data = await modelRes.json();
+          setModels(data.models || []);
+        }
+      } catch { /* ignore — advanced options just won't be available */ }
+    };
+    fetchData();
+  }, [config]);
 
   const handleSpawn = async () => {
     if (!selectedRole) return;
     setLoading(true);
+    setError('');
     try {
-      await api.spawnAgent(selectedRole, undefined, autopilot);
+      const options: { model?: string; provider?: string } = {};
+      if (selectedProvider) options.provider = selectedProvider;
+      if (selectedModel) options.model = selectedModel;
+      await api.spawnAgent(selectedRole, undefined, Object.keys(options).length ? options : undefined);
       onClose();
-    } catch (err) {
-      console.error('Failed to spawn agent:', err);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to spawn agent');
     } finally {
       setLoading(false);
     }
@@ -63,17 +103,60 @@ export function SpawnDialog({ api, onClose }: Props) {
           ))}
         </div>
 
-        <label className="flex items-center gap-2 mb-4 px-1 text-sm text-th-text-alt cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autopilot}
-            onChange={(e) => setAutopilot(e.target.checked)}
-            className="rounded border-th-border bg-th-bg-alt text-accent focus:ring-accent/30"
-          />
-          <span>Autopilot</span>
-          <span className="text-xs text-th-text-muted">— auto-approve all tool calls</span>
-        </label>
+        {/* Advanced options: provider & model */}
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-1 text-xs text-th-text-muted hover:text-th-text mb-3 transition-colors"
+        >
+          <ChevronDown size={14} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          Advanced options
+        </button>
 
+        {showAdvanced && (
+          <div className="space-y-3 mb-4 p-3 border border-th-border rounded-lg bg-surface-sunken">
+            {/* Provider selector */}
+            {providers.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-th-text-muted mb-1">Provider</label>
+                <select
+                  value={selectedProvider}
+                  onChange={(e) => setSelectedProvider(e.target.value)}
+                  className="w-full bg-surface-raised border border-th-border rounded-md px-3 py-1.5 text-sm text-th-text"
+                >
+                  <option value="">Default (server config)</option>
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.authenticated === false ? '(not authenticated)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Model selector */}
+            {models.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-th-text-muted mb-1">Model</label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full bg-surface-raised border border-th-border rounded-md px-3 py-1.5 text-sm text-th-text"
+                >
+                  <option value="">Default (role config)</option>
+                  {models.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md text-sm text-red-400">
+            {error}
+          </div>
+        )}
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}

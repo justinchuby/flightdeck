@@ -22,12 +22,15 @@ import { getRoleIcon } from '../../utils/getRoleIcon';
 import { sessionStatusDot } from '../../utils/statusColors';
 import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
+import { formatTokens } from '../../utils/format';
 import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
+import { useModels, deriveModelName } from '../../hooks/useModels';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types ─────────────────────────────────────────────────
 
-type RosterStatus = 'idle' | 'busy' | 'terminated' | 'retired';
+type RosterStatus = 'idle' | 'running' | 'terminated' | 'failed';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
 type ProfileTab = 'overview' | 'history' | 'settings';
 
@@ -45,6 +48,12 @@ interface RosterAgent {
   createdAt: string;
   updatedAt: string;
   provider: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  contextWindowSize: number | null;
+  contextWindowUsed: number | null;
+  task: string | null;
+  outputPreview: string | null;
 }
 
 interface AgentProfile {
@@ -62,11 +71,11 @@ interface AgentProfile {
   live: {
     task: string | null;
     outputPreview: string | null;
-    autopilot: boolean;
     model: string | null;
     sessionId: string | null;
     provider: string | null;
     backend: string | null;
+    exitError: string | null;
   } | null;
 }
 
@@ -118,8 +127,8 @@ function statusBadge(status: RosterStatus, liveStatus: LiveStatus): { bg: string
   if (liveStatus === 'terminated') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Terminated' };
   // liveStatus is null — agent not in memory. Fall back to DB status.
   if (status === 'terminated') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Terminated' };
-  if (status === 'retired') return { bg: 'bg-gray-500/20 text-gray-400', label: 'Retired' };
-  // DB says idle/busy but agent not found in live manager → offline
+  if (status === 'failed') return { bg: 'bg-red-500/20 text-red-400', label: 'Failed' };
+  // DB says idle/running but agent not found in live manager → offline
   return { bg: 'bg-gray-500/20 text-gray-400', label: 'Offline' };
 }
 
@@ -174,7 +183,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
   const isActive = activeCount > 0;
   const latestActivity = summary?.lastActivity ??
     agents.reduce((latest, a) => a.updatedAt > latest ? a.updatedAt : latest, '');
-  const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${lead.projectId.slice(0, 8)}` : `Crew ${leadId.slice(0, 8)}`);
+  const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${shortAgentId(lead.projectId)}` : `Crew ${shortAgentId(leadId)}`);
 
   const handleDeleteCrew = async () => {
     setDeleting(true);
@@ -209,7 +218,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
               )}
             </div>
             <div className="flex items-center gap-3 text-[10px] text-th-text-muted mt-0.5">
-              {lead && <span>🎖️ Lead: {lead.agentId.slice(0, 8)} · {lead.model}</span>}
+              {lead && <span>🎖️ Lead: {shortAgentId(lead.agentId)}{lead.provider ? ` · ${lead.provider}` : ''} · {lead.model}</span>}
               {summary?.sessionCount ? <span>📋 {summary.sessionCount} session{summary.sessionCount !== 1 ? 's' : ''}</span> : null}
               {latestActivity && <span>{formatRelativeTime(latestActivity)}</span>}
             </div>
@@ -316,19 +325,43 @@ function AgentRow({ agent, isLead, isSelected, onSelect }: {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-xs capitalize">{agent.role}</span>
-          <code className="text-[10px] text-th-text-muted">{agent.agentId.slice(0, 8)}</code>
+          <code className="text-[10px] text-th-text-muted">{shortAgentId(agent.agentId)}</code>
+          {agent.sessionId && (
+            <button
+              className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors truncate max-w-[120px]"
+              title={`Session: ${agent.sessionId} — click to copy`}
+              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+            >
+              {agent.sessionId}
+            </button>
+          )}
+          {agent.provider && (
+            <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded">{agent.provider}</span>
+          )}
           <span className="text-[10px] text-th-text-muted">{agent.model}</span>
         </div>
         {agent.lastTaskSummary && (
           <div className="text-[10px] text-th-text-muted truncate">{agent.lastTaskSummary}</div>
         )}
+        {agent.task && (
+          <div className="text-[10px] text-th-text-alt truncate">📋 {agent.task}</div>
+        )}
+        {(agent.inputTokens || agent.outputTokens) ? (
+          <div className="flex items-center gap-2 text-[10px] text-th-text-muted">
+            <span>↓{formatTokens(agent.inputTokens)}</span>
+            <span>↑{formatTokens(agent.outputTokens)}</span>
+            {agent.contextWindowSize && agent.contextWindowUsed ? (
+              <span className={agent.contextWindowUsed / agent.contextWindowSize > 0.85 ? 'text-red-400' : agent.contextWindowUsed / agent.contextWindowSize > 0.6 ? 'text-yellow-400' : ''}>
+                ctx {Math.round((agent.contextWindowUsed / agent.contextWindowSize) * 100)}%
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {agent.outputPreview && (
+          <div className="text-[10px] text-th-text-muted font-mono truncate opacity-60">{agent.outputPreview.trim().split('\n').pop()}</div>
+        )}
       </div>
       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${badge.bg}`}>{badge.label}</span>
-      {agent.provider && (
-        <span className="px-1 py-0.5 rounded text-[10px] bg-th-bg-alt text-th-text-muted border border-th-border capitalize shrink-0">
-          {agent.provider}
-        </span>
-      )}
     </button>
   );
 }
@@ -337,6 +370,7 @@ function AgentRow({ agent, isLead, isSelected, onSelect }: {
 
 function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: string; onClose: () => void }) {
   const addToast = useToastStore(s => s.add);
+  const { models: availableModels } = useModels();
   const [profile, setProfile] = useState<AgentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
@@ -539,7 +573,6 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-3">
               <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Team:</span> <span className="text-th-text">{profile.teamId}</span></div>
               <div><span className="text-th-text-alt">Project:</span> <span className="text-th-text">{profile.projectId ?? '—'}</span></div>
               <div><span className="text-th-text-alt">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
               <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleDateString()}</span></div>
@@ -566,6 +599,15 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
                 <p className="text-th-text mt-1">{profile.lastTaskSummary}</p>
               </div>
             )}
+            {profile.live?.exitError && (
+              <div className="mt-3 p-3 rounded bg-red-500/10 border border-red-500/20">
+                <div className="flex items-center gap-2 text-red-400 text-xs font-medium mb-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Exit Error
+                </div>
+                <pre className="text-xs font-mono text-red-400 whitespace-pre-wrap break-words">{profile.live.exitError}</pre>
+              </div>
+            )}
             {profile.live && (
               <div className="mt-3 p-3 rounded bg-green-500/10 border border-green-500/20">
                 <div className="flex items-center gap-2 text-green-400 text-xs mb-1">
@@ -587,15 +629,41 @@ function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: s
 
         {activeTab === 'settings' && (
           <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Autopilot:</span> <span className="text-th-text">{profile.live?.autopilot ? 'On' : 'Off'}</span></div>
-              {profile.live?.provider && (
-                <div><span className="text-th-text-alt">CLI Provider:</span> <span className="text-th-text capitalize">{profile.live.provider}</span></div>
-              )}
-              {profile.live?.backend && (
-                <div><span className="text-th-text-alt">Backend:</span> <span className="text-th-text">{profile.live.backend}</span></div>
-              )}
+            <div className="space-y-3">
+              <div>
+                <label className="text-th-text-alt text-xs block mb-1">Model</label>
+                {isAlive ? (
+                  <select
+                    value={profile.live?.model || profile.model}
+                    onChange={async (e) => {
+                      try {
+                        await apiFetch(`/agents/${agentId}`, { method: 'PATCH', body: JSON.stringify({ model: e.target.value }) });
+                        setProfile(p => p ? { ...p, model: e.target.value, live: p.live ? { ...p.live, model: e.target.value } : p.live } : p);
+                        addToast('success', 'Model updated');
+                      } catch (err: any) {
+                        addToast('error', `Failed to update model: ${err.message}`);
+                      }
+                    }}
+                    className="w-full text-sm bg-th-bg-alt border border-th-border text-th-text rounded px-2 py-1.5 focus:outline-none focus:border-accent cursor-pointer"
+                  >
+                    {(() => {
+                      const current = profile.live?.model || profile.model;
+                      const options = availableModels.includes(current) ? availableModels : [current, ...availableModels];
+                      return options.map(m => <option key={m} value={m}>{deriveModelName(m)}</option>);
+                    })()}
+                  </select>
+                ) : (
+                  <span className="text-th-text">{profile.model}</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {profile.live?.provider && (
+                  <div><span className="text-th-text-alt">CLI Provider:</span> <span className="text-th-text capitalize">{profile.live.provider}</span></div>
+                )}
+                {profile.live?.backend && (
+                  <div><span className="text-th-text-alt">Backend:</span> <span className="text-th-text">{profile.live.backend}</span></div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -742,7 +810,7 @@ export function CrewRoster() {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-6 max-w-5xl mx-auto">
+    <div className="flex flex-col h-full min-h-0 p-6 max-w-screen-2xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -775,7 +843,7 @@ export function CrewRoster() {
         </div>
 
         <div className="flex gap-1">
-          {(['all', 'idle', 'busy', 'terminated', 'retired'] as const).map(s => (
+          {(['all', 'idle', 'running', 'terminated', 'failed'] as const).map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -794,7 +862,7 @@ export function CrewRoster() {
       {/* Content: Grouped List + Profile */}
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-y-auto mt-4">
         {/* Crew Groups — stable width at desktop/tablet, full-width responsive on mobile */}
-        <div className={`space-y-3 w-full max-w-full md:min-w-[320px] lg:min-w-[400px] ${selectedAgent ? 'md:w-1/2' : 'w-full'}`}>
+        <div className={`space-y-3 min-w-0 ${selectedAgent ? 'flex-1' : 'w-full'}`}>
           {crewGroups.length === 0 ? (
             <div className="text-center py-8 text-th-text-alt text-sm bg-surface-raised rounded-lg border border-th-border">
               <Cpu className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -818,7 +886,7 @@ export function CrewRoster() {
 
         {/* Profile Panel */}
         {selectedAgent && (
-          <div className="w-full max-w-full md:w-1/2 md:min-w-[320px] lg:min-w-[400px]">
+          <div className="w-full max-w-full md:w-[400px] lg:w-[480px] shrink-0">
             <ProfilePanel
               agentId={selectedAgent}
               teamId={selectedAgentTeamId}

@@ -2,7 +2,7 @@
  * Teams route tests.
  *
  * Covers: list teams, team details, agent profiles, health,
- * retire/clone, crews summary, error handling, and missing dependencies.
+ * clone, crews summary, error handling, and missing dependencies.
  */
 import { describe, it, expect, vi, afterAll } from 'vitest';
 import express from 'express';
@@ -22,7 +22,7 @@ import type { AppContext } from './context.js';
 
 const MOCK_AGENTS = [
   { agentId: 'a1', role: 'architect', model: 'gpt-4', status: 'idle', teamId: 'team-1' },
-  { agentId: 'a2', role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1' },
+  { agentId: 'a2', role: 'developer', model: 'gpt-4', status: 'running', teamId: 'team-1' },
   { agentId: 'a3', role: 'reviewer', model: 'gpt-4', status: 'idle', teamId: 'team-2' },
 ];
 
@@ -176,7 +176,7 @@ describe('teamsRoutes', () => {
       const srv = createTestServer({
         agentRoster: {
           getAllAgents: vi.fn().mockReturnValue(MOCK_AGENTS),
-          getStatusCounts: vi.fn().mockReturnValue({ idle: 1, busy: 2, retired: 0, terminated: 0 }),
+          getStatusCounts: vi.fn().mockReturnValue({ idle: 1, busy: 2, terminated: 0 }),
         } as any,
       });
       const base = await srv.start();
@@ -186,30 +186,9 @@ describe('teamsRoutes', () => {
         const body = await res.json();
         expect(body.teamId).toBe('team-1');
         expect(body.totalAgents).toBe(3);
-        expect(body.statusCounts).toEqual({ idle: 1, busy: 2, retired: 0, terminated: 0 });
-        expect(body.massFailurePaused).toBe(false);
+        expect(body.statusCounts).toEqual({ idle: 1, busy: 2, terminated: 0 });
         expect(body.agents).toHaveLength(3);
         expect(body.agents[0]).toHaveProperty('uptimeMs');
-      } finally {
-        await srv.stop();
-      }
-    });
-
-    it('shows mass failure paused when detector triggered', async () => {
-      const srv = createTestServer({
-        agentRoster: {
-          getAllAgents: vi.fn().mockReturnValue(MOCK_AGENTS),
-          getStatusCounts: vi.fn().mockReturnValue({ idle: 1, busy: 2 }),
-        } as any,
-        massFailureDetector: {
-          get isPaused() { return true; },
-        } as any,
-      });
-      const base = await srv.start();
-      try {
-        const res = await fetch(`${base}/teams/team-1/health`);
-        const body = await res.json();
-        expect(body.massFailurePaused).toBe(true);
       } finally {
         await srv.stop();
       }
@@ -236,91 +215,6 @@ describe('teamsRoutes', () => {
       const base = await srv.start();
       try {
         const res = await fetch(`${base}/teams/team-1/health`);
-        expect(res.status).toBe(503);
-      } finally {
-        await srv.stop();
-      }
-    });
-  });
-
-  // ── POST /teams/:teamId/agents/:agentId/retire ─────────────────
-
-  describe('POST /teams/:teamId/agents/:agentId/retire', () => {
-    it('retires an agent', async () => {
-      const srv = createTestServer({
-        agentRoster: {
-          getAgent: vi.fn().mockReturnValue({ agentId: 'a1', status: 'idle' }),
-          retireAgent: vi.fn().mockReturnValue(true),
-          getAllAgents: vi.fn().mockReturnValue(MOCK_AGENTS),
-        } as any,
-      });
-      const base = await srv.start();
-      try {
-        const res = await fetch(`${base}/teams/team-1/agents/a1/retire`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: 'end of project' }),
-        });
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.ok).toBe(true);
-        expect(body.status).toBe('retired');
-      } finally {
-        await srv.stop();
-      }
-    });
-
-    it('returns 404 for unknown agent', async () => {
-      const srv = createTestServer({
-        agentRoster: {
-          getAgent: vi.fn().mockReturnValue(undefined),
-          getAllAgents: vi.fn().mockReturnValue(MOCK_AGENTS),
-        } as any,
-      });
-      const base = await srv.start();
-      try {
-        const res = await fetch(`${base}/teams/team-1/agents/unknown/retire`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        expect(res.status).toBe(404);
-      } finally {
-        await srv.stop();
-      }
-    });
-
-    it('returns 409 if already retired', async () => {
-      const srv = createTestServer({
-        agentRoster: {
-          getAgent: vi.fn().mockReturnValue({ agentId: 'a1', status: 'retired' }),
-          getAllAgents: vi.fn().mockReturnValue(MOCK_AGENTS),
-        } as any,
-      });
-      const base = await srv.start();
-      try {
-        const res = await fetch(`${base}/teams/team-1/agents/a1/retire`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        expect(res.status).toBe(409);
-        const body = await res.json();
-        expect(body.error).toContain('already retired');
-      } finally {
-        await srv.stop();
-      }
-    });
-
-    it('returns 503 when roster not available', async () => {
-      const srv = createTestServer({ agentRoster: undefined });
-      const base = await srv.start();
-      try {
-        const res = await fetch(`${base}/teams/team-1/agents/a1/retire`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
         expect(res.status).toBe(503);
       } finally {
         await srv.stop();
@@ -401,7 +295,7 @@ describe('teamsRoutes', () => {
       // Roster entries: lead has no metadata, dev has no metadata (simulates pre-fix data)
       const rosterAgents = [
         { agentId: leadId, role: 'lead', model: 'gpt-4', status: 'idle', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-        { agentId: devId, role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+        { agentId: devId, role: 'developer', model: 'gpt-4', status: 'running', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
       ];
       // Live agents have parentId set
       const liveAgents = [
@@ -432,7 +326,7 @@ describe('teamsRoutes', () => {
     it('groups crew members using metadata parentId when available', async () => {
       const rosterAgents = [
         { agentId: 'lead-2', role: 'lead', model: 'gpt-4', status: 'idle', teamId: 'team-1', projectId: 'proj-1', metadata: null, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-        { agentId: 'dev-2', role: 'developer', model: 'gpt-4', status: 'busy', teamId: 'team-1', projectId: 'proj-1', metadata: { parentId: 'lead-2' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+        { agentId: 'dev-2', role: 'developer', model: 'gpt-4', status: 'running', teamId: 'team-1', projectId: 'proj-1', metadata: { parentId: 'lead-2' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
       ];
 
       const srv = createTestServer({
@@ -515,6 +409,114 @@ describe('teamsRoutes', () => {
       const base = await srv.start();
       try {
         const res = await fetch(`${base}/crews/lead-1`, { method: 'DELETE' });
+        expect(res.status).toBe(503);
+      } finally {
+        await srv.stop();
+      }
+    });
+  });
+
+  // ── GET /teams/:teamId/agents — provider fallback ─────────────────
+
+  describe('GET /teams/:teamId/agents', () => {
+    it('returns provider from roster when live agent is gone (terminated)', async () => {
+      const rosterAgents = [
+        {
+          agentId: 'term-1',
+          role: 'developer',
+          model: 'gpt-4',
+          status: 'terminated',
+          teamId: 'team-1',
+          provider: 'copilot',
+          projectId: 'proj-1',
+          sessionId: 'sess-1',
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          lastTaskSummary: null,
+          metadata: {},
+        },
+      ];
+      const srv = createTestServer({
+        agentRoster: {
+          getAllAgents: vi.fn().mockReturnValue(rosterAgents),
+        } as any,
+        agentManager: {
+          getAll: vi.fn().mockReturnValue([]),
+        } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/teams/team-1/agents`);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toHaveLength(1);
+        expect(body[0].provider).toBe('copilot');
+      } finally {
+        await srv.stop();
+      }
+    });
+
+    it('prefers live provider over roster provider', async () => {
+      const rosterAgents = [
+        {
+          agentId: 'live-1',
+          role: 'developer',
+          model: 'gpt-4',
+          status: 'running',
+          teamId: 'team-1',
+          provider: 'copilot',
+          projectId: null,
+          sessionId: null,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          lastTaskSummary: null,
+          metadata: {},
+        },
+      ];
+      const liveAgents = [
+        {
+          id: 'live-1',
+          status: 'running',
+          provider: 'claude',
+          parentId: undefined,
+          toJSON: () => ({
+            inputTokens: 100,
+            outputTokens: 50,
+            contextWindowSize: 200000,
+            contextWindowUsed: 1000,
+            task: 'test task',
+            outputPreview: 'hello',
+            provider: 'claude',
+          }),
+        },
+      ];
+      const srv = createTestServer({
+        agentRoster: {
+          getAllAgents: vi.fn().mockReturnValue(rosterAgents),
+        } as any,
+        agentManager: {
+          getAll: vi.fn().mockReturnValue(liveAgents),
+        } as any,
+      });
+
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/teams/team-1/agents`);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toHaveLength(1);
+        expect(body[0].provider).toBe('claude');
+      } finally {
+        await srv.stop();
+      }
+    });
+
+    it('returns 503 when roster not available', async () => {
+      const srv = createTestServer({ agentRoster: undefined });
+      const base = await srv.start();
+      try {
+        const res = await fetch(`${base}/teams/team-1/agents`);
         expect(res.status).toBe(503);
       } finally {
         await srv.stop();

@@ -39,7 +39,7 @@ export function agentsRoutes(ctx: AppContext): Router {
   });
 
   router.post('/agents', spawnLimiter, validateBody(spawnAgentSchema), (req, res) => {
-    const { roleId, task, mode, autopilot, model, sessionId } = req.body;
+    const { roleId, task, model, provider, sessionId } = req.body;
     const role = roleRegistry.get(roleId);
     if (!role) {
       logger.warn({ module: 'api', msg: 'POST /agents — unknown role', roleId });
@@ -49,23 +49,33 @@ export function agentsRoutes(ctx: AppContext): Router {
       // Auto-create a project for lead agents so they always have a projectId.
       // Without this, the entire delegation tree inherits undefined and
       // activities log with projectId: '', breaking scoped queries.
-      let options: { projectName?: string; projectId?: string } | undefined;
+      let options: { projectName?: string; projectId?: string; provider?: string } | undefined;
       if (role.id === 'lead' && ctx.projectRegistry) {
         const projectName = `Project ${new Date().toLocaleDateString()}`;
         const project = ctx.projectRegistry.create(projectName, task ?? '');
         options = { projectName: project.name, projectId: project.id };
       }
+      if (provider) {
+        options = { ...options, provider };
+      }
 
-      const agent = agentManager.spawn(role, task, undefined, mode, autopilot, model, sessionId || undefined, undefined, options);
+      const agent = agentManager.spawn(role, task, undefined, model, undefined, sessionId || undefined, undefined, options);
+
       logger.info({ module: 'api', msg: `POST /agents — ${sessionId ? 'resumed' : 'spawned'}`, agentId: agent.id, roleName: role.name, model: model || role.model, sessionId });
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error({ module: 'api', msg: 'POST /agents failed', err: err.message });
-      res.status(429).json({ error: err.message });
+      const status = err.message?.includes('disabled') ? 400 : 429;
+      res.status(status).json({ error: err.message });
     }
   });
 
   router.delete('/agents/:id', async (req, res) => {
+    const ok = await agentManager.terminate(req.params.id);
+    res.json({ ok });
+  });
+
+  router.post('/agents/:id/terminate', async (req, res) => {
     const ok = await agentManager.terminate(req.params.id);
     res.json({ ok });
   });
@@ -226,13 +236,6 @@ export function agentsRoutes(ctx: AppContext): Router {
     const ok = agent.reorderPendingMessage(from, to);
     if (!ok) return res.status(400).json({ error: 'Invalid indices' });
     res.json({ ok: true, queue: agent.getPendingMessageSummaries() });
-  });
-
-  router.post('/agents/:id/permission', (req, res) => {
-    const { approved } = req.body;
-    const ok = agentManager.resolvePermission(req.params.id, approved);
-    if (!ok) return res.status(404).json({ error: 'Agent not found' });
-    res.json({ ok: true });
   });
 
   // --- Focus Mode: aggregated single-agent view ---

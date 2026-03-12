@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Brain, Trash2, RefreshCw } from 'lucide-react';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export function MemoryBrowser() {
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-medium text-th-text-alt">{entry.key}</span>
                   {entry.agentId && (
-                    <span className="text-[10px] text-th-text-muted font-mono">{entry.agentId.slice(0, 8)}</span>
+                    <span className="text-[10px] text-th-text-muted font-mono">{shortAgentId(entry.agentId)}</span>
                   )}
                   {entry.createdAt && (
                     <span className="text-[10px] text-th-text-muted">{entry.createdAt}</span>

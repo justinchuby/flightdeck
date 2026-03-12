@@ -26,7 +26,6 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
     childIds: [],
     createdAt: new Date().toISOString(),
     outputPreview: '',
-    autopilot: true,
     ...overrides,
   };
 }

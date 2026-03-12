@@ -2,6 +2,7 @@
 // Zod schema + TypeScript types for the hot-reloadable config file.
 
 import { z } from 'zod';
+import { PROVIDER_IDS } from '@flightdeck/shared';
 
 // ── Section schemas ────────────────────────────────────────
 
@@ -18,7 +19,8 @@ const heartbeatSchema = z.object({
 const DEFAULT_KNOWN_MODELS = [
   'claude-opus-4.6', 'claude-sonnet-4.6', 'claude-sonnet-4.5', 'claude-haiku-4.5',
   'claude-opus-4.5', 'claude-sonnet-4',
-  'gemini-3-pro-preview',
+  'gemini-3-pro-preview', 'gemini-3-flash-preview',
+  'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
   'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2',
   'gpt-5.1-codex-max', 'gpt-5.1-codex', 'gpt-5.1', 'gpt-5.1-codex-mini',
   'gpt-5-mini', 'gpt-4.1',
@@ -46,10 +48,9 @@ const budgetSchema = z.object({
 
 // ── Provider schema ────────────────────────────────────────
 
-// Provider IDs are the single source of truth from presets.ts.
-// We duplicate the list here as a Zod literal for schema validation
-// since Zod .enum() requires a const tuple, not a runtime import.
-const VALID_PROVIDERS = ['copilot', 'gemini', 'opencode', 'cursor', 'codex', 'claude'] as const;
+// Provider IDs derived from the central ProviderRegistry.
+// Cast to tuple for Zod .enum() which requires a const tuple.
+const VALID_PROVIDERS = PROVIDER_IDS as unknown as readonly [string, ...string[]];
 
 // ── Cloud Provider schema (Bedrock / Vertex / Anthropic) ───
 
@@ -141,19 +142,10 @@ const oversightSchema = z.preprocess(
     return val;
   },
   z.object({
-    level: z.enum(['supervised', 'balanced', 'autonomous']).default('balanced'),
+    level: z.enum(['supervised', 'balanced', 'autonomous']).default('autonomous'),
     customInstructions: z.string().max(500).optional(),
   }),
 );
-
-// ── Conflicts section ──────────────────────────────────────
-const conflictsSchema = z.object({
-  enabled: z.boolean().default(true),
-  checkIntervalMs: z.number().int().min(5_000).max(600_000).default(60_000),
-  directoryOverlapEnabled: z.boolean().default(true),
-  importAnalysisEnabled: z.boolean().default(true),
-  branchDivergenceEnabled: z.boolean().default(true),
-});
 
 // ── Notifications section ──────────────────────────────────
 const notificationChannelSchema = z.object({
@@ -221,10 +213,11 @@ export const flightdeckConfigSchema = z.preprocess(
     provider: sectionDefault(providerSchema),
     oversight: sectionDefault(oversightSchema),
     telegram: sectionDefault(telegramSchema),
-    conflicts: sectionDefault(conflictsSchema),
     notifications: sectionDefault(notificationsSchema),
     predictions: sectionDefault(predictionsSchema),
     providerSettings: z.preprocess((val) => val ?? {}, z.record(z.string(), providerSettingsSchema)),
+    /** Ordered provider preference list — first = most preferred */
+    providerRanking: z.preprocess((val) => val ?? [], z.array(z.string())).default([]),
   }),
 );
 

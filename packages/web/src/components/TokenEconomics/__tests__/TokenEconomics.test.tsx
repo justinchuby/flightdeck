@@ -17,7 +17,6 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
     id: 'agent-' + Math.random().toString(36).slice(2, 10),
     role: { id: 'developer', name: 'Developer', icon: '💻', description: '', systemPrompt: '', color: '#000', builtIn: false },
     status: 'running',
-    autopilot: false,
     task: 'test task',
     parentId: null,
     childIds: [],

@@ -1,3 +1,5 @@
+import { shortAgentId } from '../../utils/agentLabel';
+
 interface TaskPillProps {
   id: string;
   title: string;
@@ -20,7 +22,7 @@ export function TaskPill({ id, title, status }: TaskPillProps) {
       className="flex items-center gap-1.5 pl-2 border-l border-dotted border-th-border"
       title={`${id}: ${title} (${status})`}
     >
-      <span className="text-[10px] font-mono text-th-text-muted">{id.slice(0, 8)}</span>
+      <span className="text-[10px] font-mono text-th-text-muted">{shortAgentId(id)}</span>
       <span className="text-[11px] text-th-text-alt truncate">{truncated}</span>
       <span className="text-[10px] shrink-0">{icon}</span>
     </div>

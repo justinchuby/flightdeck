@@ -97,7 +97,7 @@ describe('ProviderManager', () => {
       const status = createManager().getProviderStatus('claude');
 
       expect(status.id).toBe('claude');
-      expect(status.name).toBe('Claude Agent SDK');
+      expect(status.name).toBe('Claude Agent (ACP)');
       expect(status.installed).toBe(true);
       expect(status.authenticated).toBe(true);
       expect(status.enabled).toBe(true);

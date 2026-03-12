@@ -5,6 +5,7 @@ import { useToastStore } from '../Toast';
 import { apiFetch } from '../../hooks/useApi';
 import type { DagStatus, Decision } from '../../types';
 import type { AgentInfo } from '../../types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ export function detectAlerts(
     if (agent.contextWindowSize && agent.contextWindowUsed) {
       const pct = agent.contextWindowUsed / agent.contextWindowSize;
       const roleName = typeof agent.role === 'object' ? agent.role.name : agent.role;
-      const shortId = agent.id.slice(0, 8);
+      const shortId = shortAgentId(agent.id);
       const burnLabel = agent.contextBurnRate && agent.contextBurnRate > 0
         ? ` • ~${Math.round(agent.contextBurnRate * 60)}k tok/min`
         : '';
@@ -98,7 +99,7 @@ export function detectAlerts(
         severity: 'critical',
         icon: '💥',
         title: `${roleName} failed`,
-        detail: `Agent ${agent.id.slice(0, 8)} exited with failure status.`,
+        detail: `Agent ${shortAgentId(agent.id)} exited with failure status.`,
         timestamp: now,
       });
     }

@@ -1,5 +1,6 @@
 import type { DagStatus, DagTask } from '../../types';
 import { dagTaskText } from '../../utils/statusColors';
+import { shortAgentId } from '../../utils/agentLabel';
 
 const STATUS_CONFIG: Record<DagTask['dagStatus'], { icon: string; label: string; strikethrough?: boolean }> = {
   pending:    { icon: '⏳', label: 'pending' },
@@ -82,7 +83,7 @@ function TaskCard({ task }: { task: DagTask }) {
           <span>files: [{task.files.join(', ')}]</span>
         )}
         {task.assignedAgentId && (
-          <span>agent: {task.assignedAgentId.slice(0, 8)}</span>
+          <span>agent: {shortAgentId(task.assignedAgentId)}</span>
         )}
       </div>
     </div>
@@ -102,7 +103,7 @@ function FileLockMap({ fileLockMap }: { fileLockMap: DagStatus['fileLockMap'] })
           <span className="text-blue-400">🔒</span>
           <span className="font-mono truncate">{file}</span>
           <span className="text-th-text-muted ml-auto shrink-0">
-            ← {lock.taskId}{lock.agentId ? ` (${lock.agentId.slice(0, 8)})` : ''}
+            ← {lock.taskId}{lock.agentId ? ` (${shortAgentId(lock.agentId)})` : ''}
           </span>
         </div>
       ))}

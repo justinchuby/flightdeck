@@ -24,9 +24,7 @@ export function PulsePredictionIndicator() {
         ? `tokens ~${urgent.timeHorizon}m`
         : urgent.type === 'agent_stall'
           ? `stall ${urgent.timeHorizon}m`
-          : urgent.type === 'file_conflict'
-            ? 'conflict'
-            : urgent.type === 'task_duration'
+          : urgent.type === 'task_duration'
               ? `task +${urgent.timeHorizon}m`
               : `~${urgent.timeHorizon}m`;
 

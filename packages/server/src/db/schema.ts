@@ -20,6 +20,7 @@ export const messages = sqliteTable('messages', {
   conversationId: text('conversation_id').notNull().references(() => conversations.id),
   sender: text('sender').notNull(),
   content: text('content').notNull(),
+  fromRole: text('from_role'),
   timestamp: text('timestamp').default(utcNow),
 }, (table) => [
   index('idx_messages_conversation').on(table.conversationId),
@@ -180,24 +181,6 @@ export const dagTasks = sqliteTable('dag_tasks', {
   index('idx_dag_tasks_id_team').on(table.id, table.teamId),
 ]);
 
-// ── Deferred Issues ──────────────────────────────────────────────
-
-export const deferredIssues = sqliteTable('deferred_issues', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  leadId: text('lead_id').notNull(),
-  reviewerAgentId: text('reviewer_agent_id').notNull(),
-  reviewerRole: text('reviewer_role').notNull(),
-  severity: text('severity').notNull().default('P1'),
-  description: text('description').notNull(),
-  sourceFile: text('source_file').default(''),
-  status: text('status').notNull().default('open'),       // open | resolved | dismissed
-  createdAt: text('created_at').default(utcNow),
-  resolvedAt: text('resolved_at'),
-}, (table) => [
-  index('idx_deferred_issues_lead').on(table.leadId),
-  index('idx_deferred_issues_status').on(table.status),
-]);
-
 // ── Agent Plans ──────────────────────────────────────────────────────
 
 export const agentPlans = sqliteTable('agent_plans', {
@@ -216,6 +199,7 @@ export const projects = sqliteTable('projects', {
   cwd: text('cwd'),
   status: text('status').default('active'),       // active | archived | completed
   modelConfig: text('model_config').default('{}'),  // JSON: role → allowed model IDs
+  oversightLevel: text('oversight_level'),           // null = inherit global; 'supervised' | 'balanced' | 'autonomous'
   createdAt: text('created_at').default(utcNow),
   updatedAt: text('updated_at').default(utcNow),
 }, (table) => [
@@ -280,6 +264,7 @@ export const taskCostRecords = sqliteTable('task_cost_records', {
   agentId: text('agent_id').notNull(),
   dagTaskId: text('dag_task_id').notNull(),
   leadId: text('lead_id').notNull(),
+  projectId: text('project_id'),
   inputTokens: integer('input_tokens').default(0),
   outputTokens: integer('output_tokens').default(0),
   cacheReadTokens: integer('cache_read_tokens').default(0),
@@ -291,6 +276,7 @@ export const taskCostRecords = sqliteTable('task_cost_records', {
   primaryKey({ columns: [table.agentId, table.dagTaskId, table.leadId] }),
   index('idx_task_cost_agent').on(table.agentId),
   index('idx_task_cost_task').on(table.dagTaskId, table.leadId),
+  index('idx_task_cost_project').on(table.projectId),
 ]);
 
 // ── Session Retrospectives ──────────────────────────────────────────
@@ -347,9 +333,10 @@ export const agentRoster = sqliteTable('agent_roster', {
   agentId: text('agent_id').primaryKey(),
   role: text('role').notNull(),
   model: text('model').notNull(),
-  status: text('status').notNull().default('idle'), // 'idle' | 'busy' | 'terminated'
+  status: text('status').notNull().default('idle'), // 'idle' | 'running' | 'terminated'
   sessionId: text('session_id'),
   projectId: text('project_id'),
+  provider: text('provider'),
   teamId: text('team_id').notNull().default('default'),
   createdAt: text('created_at').notNull().default(utcNow),
   updatedAt: text('updated_at').notNull().default(utcNow),

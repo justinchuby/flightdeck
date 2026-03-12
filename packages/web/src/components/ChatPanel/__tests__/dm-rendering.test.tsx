@@ -9,15 +9,15 @@ import { describe, it, expect } from 'vitest';
 import { groupTimeline, type TimelineItem } from '../groupTimeline';
 import type { AcpTextChunk } from '../../../types';
 
-function msg(text: string, sender: AcpTextChunk['sender'], ts: number, index: number): TimelineItem {
-  return { kind: 'message', msg: { type: 'text', text, sender, timestamp: ts }, index };
+function msg(text: string, sender: AcpTextChunk['sender'], ts: number, index: number, fromRole?: string): TimelineItem {
+  return { kind: 'message', msg: { type: 'text', text, sender, fromRole, timestamp: ts }, index };
 }
 
 describe('DM notification rendering in agent groups', () => {
-  it('📨 messages in systemEvents are separated from non-DM events', () => {
+  it('external messages in systemEvents are separated from agent messages', () => {
     const items: TimelineItem[] = [
       msg('Working on feature...', 'agent', 1000, 0),
-      msg('📨 [From Developer (abc123)] Hey, the auth module is ready', 'user', 1200, 1),
+      msg('Hey, the auth module is ready', 'external', 1200, 1, 'Developer'),
       msg('Continuing the implementation', 'agent', 1500, 2),
     ];
     const result = groupTimeline(items);
@@ -27,21 +27,16 @@ describe('DM notification rendering in agent groups', () => {
     expect(result[0].kind).toBe('agent-group');
 
     if (result[0].kind === 'agent-group') {
-      // DM is in systemEvents, not in messages
+      // External DM is in systemEvents, not in messages
       expect(result[0].systemEvents).toHaveLength(1);
       const dmEvent = result[0].systemEvents[0];
       expect(dmEvent.kind).toBe('message');
 
       if (dmEvent.kind === 'message') {
-        const dmText = dmEvent.msg.text;
-        expect(dmText).toMatch(/^📨/);
-
-        // The rendering contract: text starting with 📨 should be rendered
-        // with CollapsibleIncomingMessage (amber styling), not plain text.
-        // This is enforced in AcpOutput.tsx at two levels:
-        // 1. Group-level: 📨 events extracted from systemEvents and rendered directly
-        // 2. Fallback in CollapsibleSystemEvents: 📨 check before plain rendering
-        expect(dmText).toContain('[From Developer (abc123)]');
+        // External messages use sender:'external' with fromRole for amber card rendering
+        expect(dmEvent.msg.sender).toBe('external');
+        expect(dmEvent.msg.fromRole).toBe('Developer');
+        expect(dmEvent.msg.text).toContain('auth module is ready');
       }
 
       // Agent messages stay grouped for command block merging
@@ -51,9 +46,9 @@ describe('DM notification rendering in agent groups', () => {
     }
   });
 
-  it('standalone 📨 messages (no active agent group) remain as standalone items', () => {
+  it('standalone external messages (no active agent group) remain as standalone items', () => {
     const items: TimelineItem[] = [
-      msg('📨 [From Architect (xyz789)] Design review complete', 'user', 1000, 0),
+      msg('Design review complete', 'external', 1000, 0, 'Architect'),
     ];
     const result = groupTimeline(items);
 
@@ -61,16 +56,16 @@ describe('DM notification rendering in agent groups', () => {
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe('message');
     if (result[0].kind === 'message') {
-      expect(result[0].msg.text).toMatch(/^📨/);
-      expect(result[0].msg.sender).toBe('user');
+      expect(result[0].msg.sender).toBe('external');
+      expect(result[0].msg.fromRole).toBe('Architect');
     }
   });
 
-  it('multiple 📨 messages interleaved with agent output stay in group systemEvents', () => {
+  it('multiple external messages interleaved with agent output stay in group systemEvents', () => {
     const items: TimelineItem[] = [
       msg('Starting build...', 'agent', 1000, 0),
-      msg('📨 [From Developer (a)] Auth module done', 'user', 1200, 1),
-      msg('📨 [From Tester (b)] Tests passing', 'user', 1300, 2),
+      msg('Auth module done', 'external', 1200, 1, 'Developer'),
+      msg('Tests passing', 'external', 1300, 2, 'Tester'),
       msg('Build complete.', 'agent', 1500, 3),
     ];
     const result = groupTimeline(items);
@@ -82,7 +77,7 @@ describe('DM notification rendering in agent groups', () => {
       // Both DMs should be in systemEvents
       expect(result[0].systemEvents).toHaveLength(2);
       expect(result[0].systemEvents.every(
-        (e) => e.kind === 'message' && typeof e.msg.text === 'string' && e.msg.text.startsWith('📨'),
+        (e) => e.kind === 'message' && e.msg.sender === 'external',
       )).toBe(true);
 
       // Agent messages merged

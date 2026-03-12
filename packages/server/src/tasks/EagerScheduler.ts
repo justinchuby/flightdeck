@@ -73,7 +73,7 @@ export class EagerScheduler extends EventEmitter {
       if (deps.length === 0) continue;
 
       // Count unsatisfied dependencies (anything not done/skipped)
-      const unsatisfiedDeps = deps.filter(depId => {
+      const unsatisfiedDeps = deps.filter((depId: string) => {
         const depTask = taskMap.get(depId);
         // If dep doesn't exist it was cancelled — treat as satisfied
         if (!depTask) return false;

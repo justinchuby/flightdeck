@@ -42,6 +42,20 @@ describe('ConversationStore', () => {
       expect(msg.id).toBeDefined();
       expect(msg.timestamp).toBeDefined();
     });
+
+    it('stores a message with fromRole for external messages', () => {
+      const thread = store.createThread('agent-1');
+      const msg = store.addMessage(thread.id, 'external', 'Agent DM content', 'Developer (abc12345)');
+      expect(msg.sender).toBe('external');
+      expect(msg.content).toBe('Agent DM content');
+      expect(msg.fromRole).toBe('Developer (abc12345)');
+    });
+
+    it('stores fromRole as undefined when not provided', () => {
+      const thread = store.createThread('agent-1');
+      const msg = store.addMessage(thread.id, 'user', 'No role');
+      expect(msg.fromRole).toBeUndefined();
+    });
   });
 
   describe('getThreadsByAgent', () => {
@@ -87,6 +101,18 @@ describe('ConversationStore', () => {
       const messages = store.getMessages(thread.id, 3);
       expect(messages.length).toBe(3);
     });
+
+    it('returns fromRole for external messages', () => {
+      const thread = store.createThread('agent-1');
+      store.addMessage(thread.id, 'external', 'DM content', 'Developer (abc12345)');
+      store.addMessage(thread.id, 'agent', 'Response');
+
+      const messages = store.getMessages(thread.id);
+      expect(messages[0].sender).toBe('external');
+      expect(messages[0].fromRole).toBe('Developer (abc12345)');
+      expect(messages[1].sender).toBe('agent');
+      expect(messages[1].fromRole).toBeUndefined();
+    });
   });
 
   describe('getRecentMessages', () => {
@@ -111,6 +137,16 @@ describe('ConversationStore', () => {
 
       const messages = store.getRecentMessages('agent-1', 5);
       expect(messages.length).toBe(5);
+    });
+
+    it('returns fromRole for external messages', () => {
+      const thread = store.createThread('agent-1');
+      store.addMessage(thread.id, 'external', 'Agent DM', 'Reviewer (def67890)');
+
+      const messages = store.getRecentMessages('agent-1');
+      expect(messages.length).toBe(1);
+      expect(messages[0].sender).toBe('external');
+      expect(messages[0].fromRole).toBe('Reviewer (def67890)');
     });
   });
 });

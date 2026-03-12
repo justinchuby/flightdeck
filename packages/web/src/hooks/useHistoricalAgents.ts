@@ -1,23 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from './useApi';
 import type { ReplayKeyframe } from './useSessionReplay';
-import type { Project } from '../types';
+import type { AgentInfo, Project } from '../types';
+import type { AgentStatus, Role } from '@flightdeck/shared';
 import { getRoleIcon } from '../utils/getRoleIcon';
 
-/** Minimal agent shape derived from keyframe events */
-export interface DerivedAgent {
-  id: string;
-  status: string;
-  role: { id: string; name: string; icon: string };
-  inputTokens: number;
-  outputTokens: number;
-  createdAt?: string;
-  messages: never[];
-  childIds: never[];
-  contextWindowSize: number;
-  contextWindowUsed: number;
-  outputPreview: string;
-  autopilot: boolean;
+/** Minimal agent shape derived from keyframe events, structurally compatible with AgentInfo */
+export type DerivedAgent = AgentInfo;
+
+/** Build a default Role object from partial data */
+function buildRole(partial: { id?: string; name?: string; icon?: string }): Role {
+  const id = partial.id ?? 'agent';
+  const name = partial.name ?? 'Agent';
+  return {
+    id,
+    name,
+    description: '',
+    systemPrompt: '',
+    color: '#6b7280',
+    icon: partial.icon ?? getRoleIcon(id),
+    builtIn: false,
+  };
 }
 
 /**
@@ -99,21 +102,21 @@ function normalize(a: any): DerivedAgent {
   const roleId = a.role?.id ?? 'agent';
   return {
     id: a.id ?? 'unknown',
-    status: a.status ?? 'completed',
-    role: {
+    status: (a.status ?? 'completed') as AgentStatus,
+    role: buildRole({
       id: roleId,
-      name: a.role?.name ?? 'Agent',
-      icon: a.role?.icon ?? getRoleIcon(roleId),
-    },
+      name: a.role?.name,
+      icon: a.role?.icon,
+    }),
+    model: a.model ?? '',
     inputTokens: a.inputTokens ?? 0,
     outputTokens: a.outputTokens ?? 0,
-    createdAt: a.createdAt,
+    createdAt: a.createdAt ?? new Date().toISOString(),
     messages: [],
     childIds: [],
     contextWindowSize: a.contextWindowSize ?? 0,
     contextWindowUsed: a.contextWindowUsed ?? 0,
     outputPreview: a.outputPreview ?? '',
-    autopilot: a.autopilot ?? false,
   };
 }
 
@@ -143,22 +146,22 @@ export function deriveAgentsFromKeyframes(kf: ReplayKeyframe[]): DerivedAgent[] 
 
       // Check if this agent was later terminated
       const remainingExits = roleExitCounts.get(roleName) ?? 0;
-      const status = remainingExits > 0 ? 'terminated' : 'idle';
+      const status: AgentStatus = remainingExits > 0 ? 'terminated' : 'idle';
       if (remainingExits > 0) roleExitCounts.set(roleName, remainingExits - 1);
 
       agents.push({
         id: frame.agentId,
         status,
-        role: { id: roleId, name: roleName, icon: getRoleIcon(roleId) },
+        role: buildRole({ id: roleId, name: roleName }),
+        model: '',
         inputTokens: 0,
         outputTokens: 0,
-        createdAt: frame.timestamp,
+        createdAt: frame.timestamp ?? new Date().toISOString(),
         messages: [],
         childIds: [],
         contextWindowSize: 0,
         contextWindowUsed: 0,
         outputPreview: '',
-        autopilot: false,
       });
     }
   }

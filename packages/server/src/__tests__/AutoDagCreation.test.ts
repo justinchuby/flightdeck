@@ -82,7 +82,6 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
     decisionLog: { log: vi.fn() },
     agentMemory: { store: vi.fn() },
     chatGroupRegistry: {},
-    deferredIssueRegistry: {},
     delegations: new Map(),
     reportedCompletions: new Set(),
     pendingSystemActions: new Map(),

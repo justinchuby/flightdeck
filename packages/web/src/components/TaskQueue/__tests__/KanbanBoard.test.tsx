@@ -20,6 +20,11 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
 }));
 
+// Mock settingsStore so oversight level is 'balanced' (default 'autonomous' hides role/agent UI)
+vi.mock('../../../stores/settingsStore', () => ({
+  useSettingsStore: (selector: (s: any) => any) => selector({ oversightLevel: 'balanced' }),
+}));
+
 // ── Fixtures ──────────────────────────────────────────────────────
 
 function makeTask(overrides: Partial<DagTask> = {}): DagTask {

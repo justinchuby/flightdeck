@@ -12,6 +12,7 @@ import { generateSuggestions } from '../../services/PaletteSuggestionEngine';
 import { getNLPaletteItems, type NLPattern } from '../../services/NLCommandRegistry';
 import { apiFetch } from '../../hooks/useApi';
 import { useRecentCommands } from '../../hooks/useRecentCommands';
+import { shortAgentId } from '../../utils/agentLabel';
 import { PreviewPanel, buildPreviewData } from './PreviewPanel';
 import type { AgentInfo, DagStatus } from '../../types';
 
@@ -69,7 +70,7 @@ function buildAgentItems(
     label: `${a.role?.name ?? 'Agent'} — ${a.task ?? a.status}`,
     description: `${a.status}${a.task ? ` · ${a.task}` : ''}`,
     icon: a.role?.name === 'Lead' ? '👑' : '🤖',
-    keywords: [a.role?.name ?? '', a.role?.id ?? '', a.id.slice(0, 6), a.status],
+    keywords: [a.role?.name ?? '', a.role?.id ?? '', shortAgentId(a.id), a.status],
     action: () => {
       navigate(`/crews?focus=${a.id}`);
       onClose();

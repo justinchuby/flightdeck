@@ -1,9 +1,5 @@
 // ── Shared domain types (single source of truth) ─────────────────
-// These types are defined in @flightdeck/shared and re-exported here
-// for backward compatibility. Fixes 3 drift bugs:
-//   1. Delegation.status now includes 'cancelled' | 'terminated'
-//   2. DagTask now includes projectId
-//   3. ChatGroup now includes archived
+// Re-exported from @flightdeck/shared so web code imports from one place.
 export type {
   AgentStatus,
   DagTask,
@@ -84,14 +80,6 @@ export interface AcpPlanEntry {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
-export interface AcpPermissionRequest {
-  id: string;
-  agentId: string;
-  toolName: string;
-  arguments: Record<string, any>;
-  timestamp: string;
-}
-
 export interface AcpSessionInfo {
   sessionId: string;
   isPrompting: boolean;
@@ -109,16 +97,14 @@ export interface AgentInfo {
   childIds: string[];
   createdAt: string;
   outputPreview: string;
-  autopilot: boolean;
   session?: AcpSessionInfo;
   sessionId?: string | null;
   plan?: AcpPlanEntry[];
   toolCalls?: AcpToolCall[];
   messages?: AcpTextChunk[];
-  pendingPermission?: AcpPermissionRequest;
   projectName?: string;
   projectId?: string;
-  model?: string;
+  model: string;
   cwd?: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -130,8 +116,23 @@ export interface AgentInfo {
   estimatedExhaustionMinutes?: number | null;
   /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
   provider?: string;
-  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  /** Adapter backend type (e.g. 'acp') */
   backend?: string;
+  /** Error message if agent failed to start or crashed */
+  exitError?: string;
+  /** Process exit code (non-zero indicates failure) */
+  exitCode?: number;
+  /** Model resolution metadata when the requested model differs from the resolved model */
+  modelResolution?: {
+    /** Model originally requested before cross-provider resolution */
+    requested: string;
+    /** Model actually used by the CLI after resolution */
+    resolved: string;
+    /** Whether the model was translated to a different model for the target provider */
+    translated: boolean;
+    /** Human-readable reason for model translation */
+    reason: string;
+  };
 }
 
 export interface ServerConfig {
@@ -180,7 +181,7 @@ export interface LeadProgress {
     role: Role;
     status: AgentStatus;
     task?: string;
-    model?: string;
+    model: string;
     inputTokens?: number;
     outputTokens?: number;
     contextWindowSize?: number;
@@ -218,5 +219,5 @@ export interface TaskCostSummary {
   totalInputTokens: number;
   totalOutputTokens: number;
   agentCount: number;
-  agents: Array<{ agentId: string; inputTokens: number; outputTokens: number }>;
+  agents: Array<{ agentId: string; agentRole?: string; inputTokens: number; outputTokens: number }>;
 }

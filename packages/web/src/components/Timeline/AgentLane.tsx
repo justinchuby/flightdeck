@@ -104,6 +104,9 @@ export function AgentLane({ agent, xScale, y, width, height = DEFAULT_HEIGHT, on
             <span className="text-xs font-medium text-th-text-alt truncate">{agent.role}</span>
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-mono text-th-text-muted">{agent.shortId}</span>
+              {agent.provider && (
+                <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded">{agent.provider}</span>
+              )}
               {agent.model && (
                 <span className="text-[11px] text-th-text-muted truncate">{agent.model}</span>
               )}

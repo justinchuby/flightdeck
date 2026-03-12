@@ -57,7 +57,6 @@ function makeAgent(overrides: Record<string, any> = {}) {
     childIds: [],
     createdAt: '2025-01-01T00:00:00Z',
     outputPreview: 'Designing module layout...',
-    autopilot: false,
     inputTokens: 5000,
     outputTokens: 2000,
     contextWindowSize: 100000,

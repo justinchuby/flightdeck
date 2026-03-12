@@ -34,6 +34,14 @@ export interface CompactionInfo {
   percentDrop: number;
 }
 
+/** Info emitted when a model was translated/resolved to a different model for the target provider */
+export interface ModelFallbackInfo {
+  requested: string;
+  resolved: string;
+  reason: string;
+  provider: string;
+}
+
 /**
  * Manages all event listener arrays for Agent.
  * Instantiated inside Agent; methods are exposed via Agent's public API.
@@ -43,16 +51,15 @@ export class AgentEventEmitter {
   private contentListeners: Array<(content: any) => void> = [];
   private thinkingListeners: Array<(text: string) => void> = [];
   private exitListeners: Array<(code: number) => void> = [];
-  private hungListeners: Array<(elapsedMs: number) => void> = [];
   private statusListeners: Array<(status: AgentStatus) => void> = [];
   private toolCallListeners: Array<(info: ToolCallInfo) => void> = [];
   private planListeners: Array<(entries: PlanEntry[]) => void> = [];
-  private permissionRequestListeners: Array<(request: any) => void> = [];
   private sessionReadyListeners: Array<(sessionId: string) => void> = [];
   private sessionResumeFailedListeners: Array<(info: SessionResumeFailedInfo) => void> = [];
   private contextCompactedListeners: Array<(info: CompactionInfo) => void> = [];
   private usageListeners: Array<(info: UsageInfo) => void> = [];
   private responseStartListeners: Array<() => void> = [];
+  private modelFallbackListeners: Array<(info: ModelFallbackInfo) => void> = [];
 
   private _idleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly IDLE_DEBOUNCE_MS = 500;
@@ -63,16 +70,15 @@ export class AgentEventEmitter {
   onContent(listener: (content: any) => void): void { this.contentListeners.push(listener); }
   onThinking(listener: (text: string) => void): void { this.thinkingListeners.push(listener); }
   onExit(listener: (code: number) => void): void { this.exitListeners.push(listener); }
-  onHung(listener: (elapsedMs: number) => void): void { this.hungListeners.push(listener); }
   onStatus(listener: (status: AgentStatus) => void): void { this.statusListeners.push(listener); }
   onToolCall(listener: (info: ToolCallInfo) => void): void { this.toolCallListeners.push(listener); }
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.planListeners.push(listener); }
-  onPermissionRequest(listener: (request: any) => void): void { this.permissionRequestListeners.push(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.sessionReadyListeners.push(listener); }
   onSessionResumeFailed(listener: (info: SessionResumeFailedInfo) => void): void { this.sessionResumeFailedListeners.push(listener); }
   onContextCompacted(listener: (info: CompactionInfo) => void): void { this.contextCompactedListeners.push(listener); }
   onUsage(listener: (info: UsageInfo) => void): void { this.usageListeners.push(listener); }
   onResponseStart(listener: () => void): void { this.responseStartListeners.push(listener); }
+  onModelFallback(listener: (info: ModelFallbackInfo) => void): void { this.modelFallbackListeners.push(listener); }
 
   // ── Notification (called by AgentAcpBridge and Agent internals) ─────────
 
@@ -80,15 +86,14 @@ export class AgentEventEmitter {
   notifyContent(content: any): void { for (const l of this.contentListeners) l(content); }
   notifyThinking(text: string): void { for (const l of this.thinkingListeners) l(text); }
   notifyExit(code: number): void { for (const l of this.exitListeners) l(code); }
-  notifyHung(elapsedMs: number): void { for (const l of this.hungListeners) l(elapsedMs); }
   notifyToolCall(info: ToolCallInfo): void { for (const l of this.toolCallListeners) l(info); }
   notifyPlan(entries: PlanEntry[]): void { for (const l of this.planListeners) l(entries); }
-  notifyPermissionRequest(request: any): void { for (const l of this.permissionRequestListeners) l(request); }
   notifySessionReady(sessionId: string): void { for (const l of this.sessionReadyListeners) l(sessionId); }
   notifySessionResumeFailed(info: SessionResumeFailedInfo): void { for (const l of this.sessionResumeFailedListeners) l(info); }
   notifyContextCompacted(info: CompactionInfo): void { for (const l of this.contextCompactedListeners) l(info); }
   notifyUsage(info: UsageInfo): void { for (const l of this.usageListeners) l(info); }
   notifyResponseStart(): void { for (const l of this.responseStartListeners) l(); }
+  notifyModelFallback(info: ModelFallbackInfo): void { for (const l of this.modelFallbackListeners) l(info); }
 
   /**
    * Debounced status notification. Idle transitions are delayed to avoid
@@ -115,16 +120,16 @@ export class AgentEventEmitter {
     this.dataListeners.length = 0;
     this.contentListeners.length = 0;
     this.exitListeners.length = 0;
-    this.hungListeners.length = 0;
     this.statusListeners.length = 0;
     this.toolCallListeners.length = 0;
     this.planListeners.length = 0;
-    this.permissionRequestListeners.length = 0;
     this.sessionReadyListeners.length = 0;
+    this.sessionResumeFailedListeners.length = 0;
     this.contextCompactedListeners.length = 0;
     this.thinkingListeners.length = 0;
     this.usageListeners.length = 0;
     this.responseStartListeners.length = 0;
+    this.modelFallbackListeners.length = 0;
     if (this._idleDebounceTimer) {
       clearTimeout(this._idleDebounceTimer);
       this._idleDebounceTimer = null;

@@ -1,5 +1,4 @@
-// Root barrel — re-exports all domain clusters for backward compatibility.
-// Consumers can import from here or directly from subdirectories.
+// Root barrel — re-exports all domain clusters.
 
 export * from './activity/index.js';
 export * from './alerts/index.js';

@@ -44,13 +44,6 @@ describe('AgentEventEmitter', () => {
     expect(listener).toHaveBeenCalledWith(0);
   });
 
-  it('notifies hung listeners', () => {
-    const listener = vi.fn();
-    emitter.onHung(listener);
-    emitter.notifyHung(30_000);
-    expect(listener).toHaveBeenCalledWith(30_000);
-  });
-
   it('notifies tool call listeners', () => {
     const listener = vi.fn();
     emitter.onToolCall(listener);
@@ -65,13 +58,6 @@ describe('AgentEventEmitter', () => {
     const entries = [{ title: 'step 1' }] as any;
     emitter.notifyPlan(entries);
     expect(listener).toHaveBeenCalledWith(entries);
-  });
-
-  it('notifies permission request listeners', () => {
-    const listener = vi.fn();
-    emitter.onPermissionRequest(listener);
-    emitter.notifyPermissionRequest({ tool: 'bash', action: 'run' });
-    expect(listener).toHaveBeenCalledWith({ tool: 'bash', action: 'run' });
   });
 
   it('notifies session ready listeners', () => {

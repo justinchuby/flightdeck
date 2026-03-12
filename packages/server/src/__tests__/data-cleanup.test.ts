@@ -20,7 +20,6 @@ import {
   taskCostRecords,
   sessionRetros,
   timers,
-  deferredIssues,
   agentPlans,
 } from '../db/schema.js';
 import { sql } from 'drizzle-orm';
@@ -93,9 +92,6 @@ function seedTestData(db: Database) {
   // Agent memory
   d.insert(agentMemory).values({ leadId: LEAD_ID, agentId: SUB_AGENT_ID, key: 'pref', value: 'typescript' }).run();
 
-  // Deferred issues
-  d.insert(deferredIssues).values({ leadId: LEAD_ID, reviewerAgentId: SUB_AGENT_ID, reviewerRole: 'Developer', description: 'Fix later' }).run();
-
   // Agent plans
   d.insert(agentPlans).values({ agentId: SUB_AGENT_ID, leadId: LEAD_ID, planJson: '[{"step":"code"}]' }).run();
 
@@ -160,7 +156,6 @@ describe('POST /data/cleanup', () => {
       expect(body.deleted.project_sessions).toBe(1);
       expect(body.deleted.decisions).toBe(1);
       expect(body.deleted.agent_memory).toBe(1);
-      expect(body.deleted.deferred_issues).toBe(1);
       expect(body.deleted.agent_plans).toBe(1);
       expect(body.deleted.timers).toBe(1);
       expect(body.deleted.file_locks).toBe(1);
@@ -184,7 +179,7 @@ describe('POST /data/cleanup', () => {
         'conversations', 'messages', 'agent_memory', 'decisions',
         'file_locks', 'agent_file_history', 'collective_memory',
         'task_cost_records', 'session_retros', 'timers',
-        'deferred_issues', 'agent_plans',
+        'agent_plans',
       ]) {
         expect(countTable(db, tableName)).toBe(0);
       }
@@ -220,7 +215,6 @@ describe('POST /data/cleanup', () => {
       // Previously missing tables should now be deleted
       expect(countTable(db, 'decisions')).toBe(0);
       expect(countTable(db, 'agent_memory')).toBe(0);
-      expect(countTable(db, 'deferred_issues')).toBe(0);
       expect(countTable(db, 'agent_plans')).toBe(0);
       expect(countTable(db, 'timers')).toBe(0);
       expect(countTable(db, 'file_locks')).toBe(0);
@@ -242,7 +236,6 @@ describe('POST /data/cleanup', () => {
       // These were previously not counted in dry run
       expect(body.deleted.decisions).toBe(1);
       expect(body.deleted.agent_memory).toBe(1);
-      expect(body.deleted.deferred_issues).toBe(1);
       expect(body.deleted.agent_plans).toBe(1);
       expect(body.deleted.timers).toBe(1);
       expect(body.deleted.file_locks).toBe(1);

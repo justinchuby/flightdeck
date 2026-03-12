@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
+import { deriveModelName } from '../../hooks/useModels';
 import { Plus, Loader2, Check, Sparkles } from 'lucide-react';
 
 interface RoleInfo {
@@ -15,26 +16,6 @@ interface ModelsListResponse {
   models: string[];
   defaults: Record<string, string[]>;
 }
-
-/** Human-readable display names for model IDs (mirrors ModelConfigPanel) */
-const MODEL_NAMES: Record<string, string> = {
-  'claude-opus-4.6': 'Claude Opus 4.6',
-  'claude-opus-4.5': 'Claude Opus 4.5',
-  'claude-sonnet-4.6': 'Claude Sonnet 4.6',
-  'claude-sonnet-4.5': 'Claude Sonnet 4.5',
-  'claude-sonnet-4': 'Claude Sonnet 4',
-  'claude-haiku-4.5': 'Claude Haiku 4.5',
-  'gemini-3-pro-preview': 'Gemini 3 Pro',
-  'gpt-5.3-codex': 'GPT-5.3 Codex',
-  'gpt-5.2-codex': 'GPT-5.2 Codex',
-  'gpt-5.2': 'GPT-5.2',
-  'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
-  'gpt-5.1-codex': 'GPT-5.1 Codex',
-  'gpt-5.1': 'GPT-5.1',
-  'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
-  'gpt-5-mini': 'GPT-5 Mini',
-  'gpt-4.1': 'GPT-4.1',
-};
 
 export interface NewSessionDialogProps {
   projectId: string;
@@ -148,7 +129,7 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
             >
               <option value="">Default</option>
               {availableModels.map((id) => (
-                <option key={id} value={id}>{MODEL_NAMES[id] ?? id}</option>
+                <option key={id} value={id}>{deriveModelName(id)}</option>
               ))}
             </select>
           </div>

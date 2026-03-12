@@ -6,33 +6,18 @@
  * - Collapsible health strip from CrewPage
  * - Project-scoped filtering when scope='project'
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Users,
   Search,
   ChevronRight,
   RefreshCw,
   AlertTriangle,
-  Cpu,
   Activity,
   Heart,
   X,
-  Server,
-  Power,
-  Wifi,
-  WifiOff,
-  CheckCircle,
-  Info,
+  CheckCircle2,
   PauseCircle,
-  UserMinus,
-  MessageSquare,
-  Zap,
-  Square,
-  Send,
-  User,
-  Clock,
-  Settings,
-  ArrowLeft,
   Trash2,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
@@ -40,17 +25,17 @@ import { getRoleIcon } from '../../utils/getRoleIcon';
 import { sessionStatusDot } from '../../utils/statusColors';
 import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
+import { formatTokens } from '../../utils/format';
 import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
-import { Tabs } from '../ui/Tabs';
-import type { TabItem } from '../ui/Tabs';
 import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
-import { AgentChatPanel } from '../AgentChatPanel';
+import { useAppStore } from '../../stores/appStore';
+import { AgentDetailPanel } from '../AgentDetailPanel';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types (shared with CrewRoster) ─────────────────────────
 
-type RosterStatus = 'idle' | 'busy' | 'terminated' | 'retired';
+type RosterStatus = 'idle' | 'running' | 'terminated' | 'failed';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
-type ProfileTab = 'overview' | 'chat' | 'settings';
 
 interface RosterAgent {
   agentId: string;
@@ -66,29 +51,12 @@ interface RosterAgent {
   createdAt: string;
   updatedAt: string;
   provider: string | null;
-}
-
-interface AgentProfile {
-  agentId: string;
-  role: string;
-  model: string;
-  status: RosterStatus;
-  liveStatus: LiveStatus;
-  teamId: string;
-  projectId: string | null;
-  lastTaskSummary: string | null;
-  createdAt: string;
-  updatedAt: string;
-  knowledgeCount: number;
-  live: {
-    task: string | null;
-    outputPreview: string | null;
-    autopilot: boolean;
-    model: string | null;
-    sessionId: string | null;
-    provider: string | null;
-    backend: string | null;
-  } | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  contextWindowSize: number | null;
+  contextWindowUsed: number | null;
+  task: string | null;
+  outputPreview: string | null;
 }
 
 interface TeamInfo {
@@ -117,23 +85,6 @@ interface SessionDetail {
   durationMs: number | null;
   taskSummary: { total: number; done: number; failed: number };
   hasRetro: boolean;
-}
-
-interface HealthData {
-  teamId: string;
-  totalAgents: number;
-  statusCounts: Record<string, number>;
-  massFailurePaused: boolean;
-}
-
-interface ServerStatus {
-  running: boolean;
-  connected: boolean;
-  state: string;
-  agentCount: number | null;
-  latencyMs: number | null;
-  pendingRequests: number;
-  trackedAgents: number;
 }
 
 interface UnifiedCrewPageProps {
@@ -197,7 +148,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
   const isActive = activeCount > 0;
   const latestActivity = summary?.lastActivity ??
     agents.reduce((latest, a) => a.updatedAt > latest ? a.updatedAt : latest, '');
-  const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${lead.projectId.slice(0, 8)}` : `Crew ${leadId.slice(0, 8)}`);
+  const displayName = summary?.projectName ?? (lead?.projectId ? `Project ${shortAgentId(lead.projectId)}` : `Crew ${shortAgentId(leadId)}`);
 
   const handleDeleteCrew = async () => {
     setDeleting(true);
@@ -232,8 +183,7 @@ function CrewGroup({ leadId, agents, summary, defaultExpanded = true, onSelectAg
               )}
             </div>
             <div className="flex items-center gap-3 text-[10px] text-th-text-muted mt-0.5">
-              {lead && <span>🎖️ Lead: {lead.agentId.slice(0, 8)} · {lead.model}</span>}
-              {summary?.sessionCount ? <span>📋 {summary.sessionCount} session{summary.sessionCount !== 1 ? 's' : ''}</span> : null}
+              {lead && <span>🎖️ Lead: {shortAgentId(lead.agentId)}{lead.provider ? ` · ${lead.provider}` : ''} · {lead.model}</span>}
               {latestActivity && <span>{formatRelativeTime(latestActivity)}</span>}
             </div>
           </div>
@@ -329,19 +279,19 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
 }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
-  
+
   // Check if this is a lead with children
   const hasChildren = isLead && crewAgents && crewAgents.some(a => a.parentId === agent.agentId && a.agentId !== agent.agentId);
-  
-  // Only show remove button for terminated/retired agents that aren't leads with children
+
+  // Only show remove button for terminated agents that aren't leads with children
   const canRemove = !hasChildren &&
-                    (agent.status === 'terminated' || agent.status === 'retired') && 
+                    (agent.status === 'terminated' || agent.status === 'failed') &&
                     (!agent.liveStatus || agent.liveStatus === 'terminated' || agent.liveStatus === 'failed' || agent.liveStatus === 'completed');
 
   const handleRemove = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onRemove) return;
-    
+
     if (!confirmingRemove) {
       setConfirmingRemove(true);
       return;
@@ -383,27 +333,51 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-xs capitalize">{agent.role}</span>
-            <code className="text-[10px] text-th-text-muted">{agent.agentId.slice(0, 8)}</code>
+            <code className="text-[10px] text-th-text-muted">{shortAgentId(agent.agentId)}</code>
+            {agent.sessionId && (
+              <button
+                className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors truncate max-w-[120px]"
+                title={`Session: ${agent.sessionId} — click to copy`}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+              >
+                {agent.sessionId}
+              </button>
+            )}
+            {agent.provider && (
+              <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded">{agent.provider}</span>
+            )}
             <span className="text-[10px] text-th-text-muted">{agent.model}</span>
           </div>
           {agent.lastTaskSummary && (
             <div className="text-[10px] text-th-text-muted truncate">{agent.lastTaskSummary}</div>
           )}
+          {agent.task && (
+            <div className="text-[10px] text-th-text-alt truncate">📋 {agent.task}</div>
+          )}
+          {(agent.inputTokens || agent.outputTokens) ? (
+            <div className="flex items-center gap-2 text-[10px] text-th-text-muted">
+              <span>↓{formatTokens(agent.inputTokens)}</span>
+              <span>↑{formatTokens(agent.outputTokens)}</span>
+              {agent.contextWindowSize && agent.contextWindowUsed ? (
+                <span className={agent.contextWindowUsed / agent.contextWindowSize > 0.85 ? 'text-red-400' : agent.contextWindowUsed / agent.contextWindowSize > 0.6 ? 'text-yellow-400' : ''}>
+                  ctx {Math.round((agent.contextWindowUsed / agent.contextWindowSize) * 100)}%
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {agent.outputPreview && (
+            <div className="text-[10px] text-th-text-muted font-mono truncate opacity-60">{agent.outputPreview.trim().split('\n').pop()}</div>
+          )}
         </div>
         <StatusBadge {...agentStatusProps(agent.status, agent.liveStatus)} />
-        {agent.provider && (
-          <span className="px-1 py-0.5 rounded text-[10px] bg-th-bg-alt text-th-text-muted border border-th-border capitalize shrink-0">
-            {agent.provider}
-          </span>
-        )}
         {canRemove && onRemove && (
           <button
             onClick={handleRemove}
             disabled={removing}
             title={confirmingRemove ? "Confirm removal" : "Remove agent from roster"}
             className={`p-1 rounded transition-colors shrink-0 ${
-              confirmingRemove 
-                ? 'bg-red-500 text-white hover:bg-red-600' 
+              confirmingRemove
+                ? 'bg-red-500 text-white hover:bg-red-600'
                 : 'text-th-text-muted hover:text-red-400 hover:bg-red-500/10'
             } ${removing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
@@ -429,213 +403,21 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
   );
 }
 
-// ── Profile Panel ─────────────────────────────────────────
-
-function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: string; onClose: () => void }) {
-  const addToast = useToastStore(s => s.add);
-  const [profile, setProfile] = useState<AgentProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
-  const [confirmStop, setConfirmStop] = useState(false);
-  const [messageText, setMessageText] = useState('');
-  const [showMessageInput, setShowMessageInput] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const ActivityIcon = Activity;
-
-  useEffect(() => {
-    setLoading(true);
-    apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`)
-      .then(data => setProfile(data))
-      .catch(() => setProfile(null))
-      .finally(() => setLoading(false));
-  }, [agentId, teamId]);
-
-  const isAlive = profile?.liveStatus === 'running' || profile?.liveStatus === 'creating' || profile?.liveStatus === 'idle';
-
-  const handleAction = async (action: string, endpoint: string, method = 'POST', body?: string) => {
-    setActionLoading(action);
-    try {
-      await apiFetch(endpoint, { method, ...(body ? { body, headers: { 'Content-Type': 'application/json' } } : {}) });
-      addToast('success', action === 'stop' ? 'Agent terminated' : action === 'interrupt' ? 'Interrupt sent' : 'Message sent');
-      if (action === 'stop') {
-        const data = await apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`);
-        setProfile(data);
-        setConfirmStop(false);
-      }
-      if (action === 'message') { setMessageText(''); setShowMessageInput(false); }
-    } catch (err: any) {
-      addToast('error', `Failed: ${err.message}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  if (loading) return <div className="flex items-center justify-center h-48 text-th-text-alt"><RefreshCw className="w-4 h-4 animate-spin mr-2" />Loading profile…</div>;
-  if (!profile) return <div className="flex items-center justify-center h-48 text-red-400"><AlertTriangle className="w-4 h-4 mr-2" />Profile not found</div>;
-
-  const tabs: TabItem[] = [
-    { id: 'overview', label: 'Overview', icon: <User className="w-3.5 h-3.5" /> },
-    { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-3.5 h-3.5" /> },
-    { id: 'settings', label: 'Settings', icon: <Settings className="w-3.5 h-3.5" /> },
-  ];
-
-  return (
-    <div className="bg-surface-raised rounded-lg border border-th-border w-full">
-      <div className="p-4 border-b border-th-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-th-bg-alt flex items-center justify-center">
-              <span className="text-xl">{getRoleIcon(profile.role)}</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-th-text capitalize">{profile.role}</h2>
-                <StatusBadge {...agentStatusProps(profile.status, profile.liveStatus)} />
-              </div>
-              <span className="text-xs font-mono text-th-text-alt">{profile.agentId.slice(0, 12)}</span>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-th-bg-alt text-th-text-alt"><X className="w-4 h-4" /></button>
-        </div>
-
-        {isAlive && (
-          <div className="flex items-center gap-2 mt-3">
-            <button onClick={() => setShowMessageInput(v => !v)} disabled={actionLoading !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors disabled:opacity-50">
-              <MessageSquare className="w-3.5 h-3.5" />Message
-            </button>
-            <button onClick={() => handleAction('interrupt', `/agents/${agentId}/interrupt`)} disabled={actionLoading !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors disabled:opacity-50">
-              {actionLoading === 'interrupt' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}Interrupt
-            </button>
-            <button onClick={() => setConfirmStop(true)} disabled={actionLoading !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50">
-              <Square className="w-3.5 h-3.5" />Stop
-            </button>
-          </div>
-        )}
-
-        {confirmStop && (
-          <div className="mt-2 p-3 rounded bg-red-500/10 border border-red-500/30">
-            <p className="text-xs text-red-300 mb-2">Terminate this agent? This cannot be undone.</p>
-            <div className="flex gap-2">
-              <button onClick={() => handleAction('stop', `/agents/${agentId}/terminate`)} disabled={actionLoading === 'stop'}
-                className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50">
-                {actionLoading === 'stop' ? 'Stopping...' : 'Confirm'}
-              </button>
-              <button onClick={() => setConfirmStop(false)} className="px-3 py-1 text-xs rounded bg-th-bg-alt text-th-text-alt hover:bg-th-border transition-colors">Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {showMessageInput && (
-          <div className="mt-2 flex gap-2">
-            <input type="text" value={messageText} onChange={e => setMessageText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAction('message', `/agents/${agentId}/message`, 'POST', JSON.stringify({ content: messageText.trim() })); } }}
-              placeholder="Type a message…" className="flex-1 px-3 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt" autoFocus />
-            <button onClick={() => handleAction('message', `/agents/${agentId}/message`, 'POST', JSON.stringify({ content: messageText.trim() }))}
-              disabled={!messageText.trim() || actionLoading === 'message'}
-              className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1">
-              {actionLoading === 'message' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}Send
-            </button>
-          </div>
-        )}
-      </div>
-
-      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={(id) => setActiveTab(id as ProfileTab)} className="px-4" />
-
-      <div className="p-4">
-        {activeTab === 'overview' && (
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Team:</span> <span className="text-th-text">{profile.teamId}</span></div>
-              <div><span className="text-th-text-alt">Project:</span> <span className="text-th-text">{profile.projectId ?? '—'}</span></div>
-              <div><span className="text-th-text-alt">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
-              <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleDateString()}</span></div>
-              <div><span className="text-th-text-alt">Last Active:</span> <span className="text-th-text">{new Date(profile.updatedAt).toLocaleDateString()}</span></div>
-              {profile.live?.provider && (
-                <div><span className="text-th-text-alt">CLI:</span> <span className="text-th-text capitalize">{profile.live.provider}{profile.live.backend && profile.live.backend !== 'acp' ? ` (${profile.live.backend})` : ''}</span></div>
-              )}
-              {profile.live?.sessionId && (
-                <div className="col-span-2">
-                  <span className="text-th-text-alt">Session:</span>{' '}
-                  <button className="font-mono text-xs text-th-text bg-th-bg-alt/60 px-1.5 py-0.5 rounded hover:bg-th-bg-alt transition-colors"
-                    title="Click to copy" onClick={() => navigator.clipboard.writeText(profile.live!.sessionId!)}>
-                    {profile.live.sessionId.slice(0, 12)}…
-                  </button>
-                </div>
-              )}
-            </div>
-            {profile.lastTaskSummary && (
-              <div><span className="text-th-text-alt">Last Task:</span><p className="text-th-text mt-1">{profile.lastTaskSummary}</p></div>
-            )}
-            {profile.live && (
-              <div className="mt-3 p-3 rounded bg-green-500/10 border border-green-500/20">
-                <div className="flex items-center gap-2 text-green-400 text-xs mb-1"><ActivityIcon className="w-3.5 h-3.5" />Live Session</div>
-                {profile.live.task && <p className="text-sm text-th-text">{profile.live.task}</p>}
-              </div>
-            )}
-          </div>
-        )}
-        {activeTab === 'chat' && (
-          <div className="flex-1 min-h-0" style={{ minHeight: 200 }}>
-            <AgentChatPanel agentId={agentId} readOnly={!isAlive} maxHeight="400px" />
-          </div>
-        )}
-        {activeTab === 'settings' && (
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Autopilot:</span> <span className="text-th-text">{profile.live?.autopilot ? 'On' : 'Off'}</span></div>
-              {profile.live?.provider && <div><span className="text-th-text-alt">CLI Provider:</span> <span className="text-th-text capitalize">{profile.live.provider}</span></div>}
-              {profile.live?.backend && <div><span className="text-th-text-alt">Backend:</span> <span className="text-th-text">{profile.live.backend}</span></div>}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Health Strip (collapsible footer) ─────────────────────
 
-function HealthStrip({ teamId }: { teamId: string }) {
-  const addToast = useToastStore(s => s.add);
+function HealthStrip({ teamId: _teamId }: { teamId: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
-  const [confirmStop, setConfirmStop] = useState(false);
+  const liveAgents = useAppStore(s => s.agents);
 
-  useEffect(() => {
-    const fetchHealth = async () => {
-      try {
-        const [h, s] = await Promise.all([
-          apiFetch<HealthData>(`/teams/${teamId}/health`),
-          apiFetch<ServerStatus>('/server/status'),
-        ]);
-        setHealth(h);
-        setServerStatus(s);
-      } catch {
-        // Health data is optional
-      }
-    };
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 10_000);
-    return () => clearInterval(interval);
-  }, [teamId]);
-
-  const handleStopServer = async () => {
-    try {
-      await apiFetch('/server/stop', { method: 'POST' });
-      addToast('success', 'Agent server stopped');
-      setConfirmStop(false);
-    } catch (err: any) {
-      addToast('error', `Failed to stop server: ${err.message}`);
-    }
-  };
-
-  const statusCounts = health?.statusCounts ?? {};
+  // Derive counts from live agent data (same source as StatusPopover)
+  const statusCounts = useMemo(() => {
+    const running = liveAgents.filter(a => a.status === 'running' || a.status === 'creating').length;
+    const idle = liveAgents.filter(a => a.status === 'idle').length;
+    const completed = liveAgents.filter(a => a.status === 'completed' || a.status === 'terminated').length;
+    const failed = liveAgents.filter(a => a.status === 'failed').length;
+    return { running, idle, completed, failed, total: liveAgents.length };
+  }, [liveAgents]);
 
   return (
     <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
@@ -643,74 +425,38 @@ function HealthStrip({ teamId }: { teamId: string }) {
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-2 px-4 py-2 text-xs text-th-text-muted hover:bg-th-bg-alt/30 transition-colors"
       >
-        {serverStatus && !serverStatus.connected && <WifiOff className="w-3 h-3 text-red-400" />}
-        {health?.massFailurePaused && <AlertTriangle className="w-3 h-3 text-red-400" />}
         <Heart className="w-3.5 h-3.5" />
         <span>Health</span>
         <span className="text-[10px]">
-          {health
-            ? `${health.totalAgents} total · ${statusCounts.busy ?? 0} active · ${statusCounts.idle ?? 0} idle`
-            : '…'}
+          {`${statusCounts.total} total · ${statusCounts.running} running · ${statusCounts.idle} idle`}
         </span>
         <ChevronRight className={`w-3 h-3 ml-auto transition-transform ${expanded ? 'rotate-90' : ''}`} />
       </button>
 
       {expanded && (
         <div className="border-t border-th-border/50 px-4 py-3 space-y-3">
-          {health?.massFailurePaused && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded p-2 flex items-center gap-2 text-xs text-red-400">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              Mass failure detected — agent spawning is paused
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex items-center gap-2 text-xs">
               <Users className="w-3.5 h-3.5 text-th-text-muted" />
-              <span className="font-bold">{health?.totalAgents ?? 0}</span>
+              <span className="font-bold">{statusCounts.total}</span>
               <span className="text-th-text-muted">Total</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Activity className="w-3.5 h-3.5 text-green-400" />
-              <span className="font-bold text-green-400">{statusCounts.busy ?? 0}</span>
-              <span className="text-th-text-muted">Active</span>
+              <span className="font-bold text-green-400">{statusCounts.running}</span>
+              <span className="text-th-text-muted">Running</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <PauseCircle className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-bold text-blue-400">{statusCounts.idle ?? 0}</span>
+              <span className="font-bold text-blue-400">{statusCounts.idle}</span>
               <span className="text-th-text-muted">Idle</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <UserMinus className="w-3.5 h-3.5 text-gray-400" />
-              <span className="font-bold text-gray-400">{statusCounts.retired ?? 0}</span>
-              <span className="text-th-text-muted">Retired</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />
+              <span className="font-bold text-gray-400">{statusCounts.completed}</span>
+              <span className="text-th-text-muted">Done</span>
             </div>
-            {serverStatus && (
-              <div className="flex items-center gap-2 text-xs">
-                <Server className="w-3.5 h-3.5 text-th-text-muted" />
-                {serverStatus.connected ? <Wifi className="w-3 h-3 text-green-400" /> : <WifiOff className="w-3 h-3 text-red-400" />}
-                <span className="text-th-text-muted">{serverStatus.agentCount || health?.totalAgents || 0} agents</span>
-                {serverStatus.latencyMs != null && <span className="text-th-text-muted">{serverStatus.latencyMs}ms</span>}
-              </div>
-            )}
           </div>
-
-          {serverStatus?.running && (
-            <div className="flex items-center gap-2">
-              {!confirmStop ? (
-                <button onClick={() => setConfirmStop(true)}
-                  className="px-2 py-1 text-[10px] rounded bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors flex items-center gap-1">
-                  <Power className="w-3 h-3" />Stop Server
-                </button>
-              ) : (
-                <>
-                  <span className="text-[10px] text-red-400">Stop server? All agents will be terminated.</span>
-                  <button onClick={handleStopServer} className="px-2 py-1 text-[10px] rounded bg-red-600 text-white hover:bg-red-500">Confirm</button>
-                  <button onClick={() => setConfirmStop(false)} className="px-2 py-1 text-[10px] rounded bg-th-bg-alt text-th-text-alt hover:bg-th-border">Cancel</button>
-                </>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -782,7 +528,10 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         });
         setAgents(filtered);
       } else {
-        setAgents(allAgents);
+        // Global scope: only show active agents
+        const activeStatuses = new Set(['running', 'idle', 'creating']);
+        const active = allAgents.filter(a => a.liveStatus && activeStatuses.has(a.liveStatus));
+        setAgents(active);
       }
     } catch (err: any) {
       setError(err.message ?? 'Failed to fetch crew roster');
@@ -795,12 +544,22 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
 
   const handleDeleteCrew = useCallback(async (leadId: string) => {
     try {
-      await apiFetch(`/crews/${leadId}`, { method: 'DELETE' });
-      addToast('success', 'Crew deleted');
-      setAgents(prev => prev.filter(a => a.agentId !== leadId && a.parentId !== leadId));
+      if (leadId === 'unassigned') {
+        // Unassigned agents have no lead — remove each individually
+        const unassigned = agents.filter(a => !a.parentId && a.role !== 'lead');
+        await Promise.all(unassigned.map(a => apiFetch(`/roster/${a.agentId}`, { method: 'DELETE' })));
+        addToast('success', `Removed ${unassigned.length} unassigned agent(s)`);
+        setAgents(prev => prev.filter(a => a.parentId || a.role === 'lead'));
+      } else {
+        await apiFetch(`/crews/${leadId}`, { method: 'DELETE' });
+        addToast('success', 'Crew deleted');
+        setAgents(prev => prev.filter(a => a.agentId !== leadId && a.parentId !== leadId));
+      }
       if (selectedAgent) {
         const deletedAgent = agents.find(a => a.agentId === selectedAgent);
-        if (deletedAgent && (deletedAgent.agentId === leadId || deletedAgent.parentId === leadId)) {
+        if (deletedAgent && (leadId === 'unassigned'
+          ? (!deletedAgent.parentId && deletedAgent.role !== 'lead')
+          : (deletedAgent.agentId === leadId || deletedAgent.parentId === leadId))) {
           setSelectedAgent(null);
         }
       }
@@ -854,7 +613,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const summaryMap = new Map(crewSummaries.map(s => [s.leadId, s]));
 
   const hasActiveAgents = agents.some(a =>
-    a.status === 'idle' || a.status === 'busy' || a.liveStatus === 'running' || a.liveStatus === 'creating' || a.liveStatus === 'idle'
+    a.status === 'idle' || a.status === 'running' || a.liveStatus === 'running' || a.liveStatus === 'creating' || a.liveStatus === 'idle'
   );
   const allTerminated = agents.length > 0 && !hasActiveAgents;
 
@@ -867,16 +626,16 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-6 max-w-5xl mx-auto">
+    <div className="flex flex-col h-full min-h-0 p-6 max-w-screen-2xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Users className="w-6 h-6 text-th-accent" />
           <h1 className="text-xl font-bold text-th-text">
-            {scope === 'project' ? 'Crew' : 'All Crews'}
+            {scope === 'project' ? 'Crew' : 'Agents'}
           </h1>
           <span className="text-sm text-th-text-muted">
-            {crewGroups.length} crew{crewGroups.length !== 1 ? 's' : ''} · {filtered.length} agent{filtered.length !== 1 ? 's' : ''}
+            {filtered.length} agent{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -891,32 +650,34 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
       <div className="flex flex-wrap items-center gap-3 mt-4 shrink-0">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-th-text-alt" />
-          <input type="text" placeholder="Search crews, agents, tasks..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="Search agents..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt" />
         </div>
-        <div className="flex gap-1">
-          {(['all', 'idle', 'busy', 'terminated', 'retired'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs rounded capitalize transition-colors ${
-                statusFilter === s
-                  ? 'bg-th-accent/20 text-th-accent border border-th-accent/30'
-                  : 'bg-th-bg-alt text-th-text-alt border border-th-border hover:bg-th-border'
-              }`}>
-              {s}
-            </button>
-          ))}
-        </div>
+        {scope === 'project' && (
+          <div className="flex gap-1">
+            {(['all', 'idle', 'running', 'terminated', 'failed'] as const).map(s => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 text-xs rounded capitalize transition-colors ${
+                  statusFilter === s
+                    ? 'bg-th-accent/20 text-th-accent border border-th-accent/30'
+                    : 'bg-th-bg-alt text-th-text-alt border border-th-border hover:bg-th-border'
+                }`}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content: Grouped List + Profile */}
-      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-y-auto mt-4">
-        <div className={`space-y-3 w-full max-w-full md:min-w-[320px] lg:min-w-[400px] ${selectedAgent ? 'md:w-[60%]' : 'w-full'}`}>
+      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 mt-4">
+        <div className={`space-y-3 min-w-0 overflow-y-auto ${selectedAgent ? 'flex-1' : 'w-full'}`}>
           {/* Empty: no agents at all */}
           {agents.length === 0 && !loading && (
             <div className="text-center py-12 text-th-text-alt text-sm bg-surface-raised rounded-lg border border-th-border">
               <span className="text-4xl block mb-2">🤖</span>
-              <p className="font-medium text-th-text">No agents yet</p>
-              <p className="text-th-text-muted mt-1">Start a session to spawn your first crew.</p>
+              <p className="font-medium text-th-text">{scope === 'global' ? 'No active agents' : 'No agents yet'}</p>
+              <p className="text-th-text-muted mt-1">{scope === 'global' ? 'All agents are idle or terminated.' : 'Start a session to spawn your first crew.'}</p>
             </div>
           )}
 
@@ -952,27 +713,28 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           ))}
         </div>
 
-        {/* Profile Panel — mobile: full-screen slide-over; desktop: side panel */}
-        <div
-          className={`
-            fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
-            md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
-            ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
-            ${selectedAgent ? 'md:w-[40%] md:min-w-[360px] md:max-w-[480px]' : 'md:w-0 md:hidden'}
-          `}
-        >
-          {selectedAgent && (
-            <div className="h-full overflow-y-auto">
-              <button
-                onClick={() => setSelectedAgent(null)}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs text-th-text-alt hover:text-th-text transition-colors md:hidden"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />Back
-              </button>
-              <ProfilePanel agentId={selectedAgent} teamId={selectedAgentTeamId} onClose={() => setSelectedAgent(null)} />
-            </div>
-          )}
-        </div>
+        {/* Agent Detail — global: centered modal; project: inline side panel */}
+        {scope === 'global' ? (
+          selectedAgent && (
+            <AgentDetailPanel agentId={selectedAgent} mode="modal" onClose={() => setSelectedAgent(null)} />
+          )
+        ) : (
+          <div
+            className={`
+              fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
+              md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
+              ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
+              ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
+              md:self-start md:sticky md:top-0 md:max-h-full
+            `}
+          >
+            {selectedAgent && (
+              <div className="h-full overflow-y-auto">
+                <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Health Strip (collapsed at bottom) */}

@@ -9,9 +9,9 @@ import { categoryLabel } from '../../constants/categories';
 import type { Decision } from '../../types';
 
 const OVERSIGHT_HINT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
-  { level: 'supervised', label: 'Supervised', description: 'Review all agent actions' },
-  { level: 'balanced', label: 'Balanced', description: 'Review key decisions only' },
-  { level: 'autonomous', label: 'Autonomous', description: 'Agents work autonomously' },
+  { level: 'supervised', label: '🔍 Supervised', description: 'Review all agent actions' },
+  { level: 'balanced', label: '⚖️ Balanced', description: 'Review key decisions only' },
+  { level: 'autonomous', label: '🚀 Autonomous', description: 'Agents work autonomously' },
 ];
 
 // ── Urgency helpers ──────────────────────────────────────────────────

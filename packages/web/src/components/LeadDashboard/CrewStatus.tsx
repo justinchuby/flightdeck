@@ -2,6 +2,8 @@ import { Bot, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import type { AgentInfo, Delegation } from '../../types';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { shortAgentId } from '../../utils/agentLabel';
+import { ProviderBadge } from '../ProviderBadge';
 
 interface Props {
   agents: AgentInfo[];
@@ -51,7 +53,7 @@ export function CrewStatus({ agents, delegations }: Props) {
                 <div className="flex items-center gap-2">
                   <span className="text-base">{agent.role.icon}</span>
                   <span className="text-sm font-mono font-semibold text-th-text-alt truncate">
-                    {agent.role.name} <span className="text-th-text-muted text-xs">({agent.id.slice(0, 8)})</span>
+                    {agent.role.name} <span className="text-th-text-muted text-xs">({shortAgentId(agent.id)})</span>
                   </span>
                   <Icon className={`w-3.5 h-3.5 ${colorClass} ml-auto shrink-0 ${agent.status === 'running' ? 'animate-spin' : ''}`} />
                 </div>
@@ -63,9 +65,10 @@ export function CrewStatus({ agents, delegations }: Props) {
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-xs font-mono ${colorClass}`}>{agent.status}</span>
                   <span className="ml-auto flex items-center gap-2">
-                    {(agent.model || agent.role.model) && (
-                      <span className="text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded" title={agent.model || agent.role.model}>
-                        {shortModel(agent.model || agent.role.model)}
+                    <ProviderBadge provider={agent.provider} />
+                    {(agent.model) && (
+                      <span className="text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded" title={agent.model}>
+                        {shortModel(agent.model)}
                       </span>
                     )}
                     <AgentIdBadge id={agent.id} />

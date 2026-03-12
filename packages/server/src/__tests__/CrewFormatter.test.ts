@@ -29,7 +29,7 @@ describe('CrewFormatter', () => {
       expect(shortenModel('claude-opus-4.6')).toBe('opus');
       expect(shortenModel('claude-sonnet-4.6')).toBe('sonnet');
       expect(shortenModel('claude-haiku-4.5')).toBe('haiku');
-      expect(shortenModel('gemini-3-pro-preview')).toBe('gemini');
+      expect(shortenModel('gemini-3-pro-preview')).toBe('gemini-pro');
       expect(shortenModel('gpt-5.2-codex')).toBe('codex');
       expect(shortenModel('gpt-4.1')).toBe('gpt4.1');
     });

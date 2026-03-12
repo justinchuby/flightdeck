@@ -319,14 +319,14 @@ describe('groupTimeline', () => {
     if (result[0].kind === 'agent-group') expect(result[0].messages).toHaveLength(4);
   });
 
-  it('📨 DM notifications do not break agent groups (treated as system events)', () => {
+  it('external DM notifications do not break agent groups (treated as system events)', () => {
     const items: TimelineItem[] = [
       msg('⟦⟦ DELEGATE {"task": "build', 'agent', 1000, 0),
-      msg('📨 [From Developer (dev-abc)] Done with the task', 'user', 1200, 1),
+      msg('Done with the task', 'external', 1200, 1),
       msg(' feature"} ⟧⟧', 'agent', 1500, 2),
     ];
     const result = groupTimeline(items);
-    // The 📨 DM notification should NOT flush the agent group.
+    // The external DM notification should NOT flush the agent group.
     // Both agent texts stay in one group so split commands can be merged during rendering.
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe('agent-group');
@@ -337,7 +337,7 @@ describe('groupTimeline', () => {
       // The DM notification should be in systemEvents
       expect(result[0].systemEvents).toHaveLength(1);
       if (result[0].systemEvents[0].kind === 'message') {
-        expect(result[0].systemEvents[0].msg.text).toContain('📨');
+        expect(result[0].systemEvents[0].msg.sender).toBe('external');
       }
     }
   });

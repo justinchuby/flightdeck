@@ -2,7 +2,7 @@
 
 > **Status:** Exploratory Design (not for implementation)
 > **Author:** Architect (cc29bb0d)
-> **Depends on:** [Agent Server Architecture](agent-server-architecture.md) — multi-team model
+> **Depends on:** Multi-team model — team scoping via `(projectId, teamId)`
 > **Context:** Teams are independent by default. This document explores how teams COULD collaborate on a shared project, from zero awareness to full integration.
 
 ## Collaboration Modes
@@ -33,7 +33,7 @@ Teams can operate at five levels of collaboration, each building on the previous
 Teams are fully independent. No awareness of each other.
 
 ```
-Team A ─── Agent Server ─── Team B
+Team A ─── Server ─── Team B
   (no link between A and B)
 ```
 
@@ -51,7 +51,7 @@ Team A ─── Agent Server ─── Team B
 Teams can see each other's existence and high-level status but cannot interact.
 
 ```
-Team A ─── Agent Server ─── Team B
+Team A ─── Server ─── Team B
   │                           │
   └─── shared status board ───┘
 ```
@@ -330,7 +330,7 @@ Cross-team dependencies create synchronization points — one team's task blocks
 
 Teams self-organize based on project needs. No human configuration of collaboration level.
 
-- Agent server detects that two teams are modifying overlapping files and automatically escalates to Level 2
+- Server detects that two teams are modifying overlapping files and automatically escalates to Level 2
 - Secretaries autonomously negotiate collaboration level based on work overlap
 - Agents self-nominate for cross-team review based on expertise matching
 - The system suggests team composition changes ("Team B needs a database specialist — Team A's DBA agent has relevant expertise")
@@ -353,16 +353,16 @@ Team A internals ←→ Secretary A ←→ Coordination Log ←→ Secretary B �
 3. **Conflict monitoring:** Watch file locks for overlapping work. Alert proactively.
 4. **Status reporting:** Maintain a concise status summary for other secretaries to query.
 
-**Message routing through agent server:**
+**Message routing through server:**
 
-Cross-team messages don't travel directly between orchestration servers. They go through the agent server's coordination log (SQLite table), which both orchestration servers can read:
+Cross-team messages don't travel directly between orchestration servers. They go through the coordination log (SQLite table), which both orchestration servers can read:
 
 ```
-Orchestration A → Agent Server → coordination_log (DB) → Agent Server → Orchestration B
-                     (write)                                  (read/notify)
+Orchestration A → Server → coordination_log (DB) → Server → Orchestration B
+                   (write)                           (read/notify)
 ```
 
-The agent server can push notifications via WebSocket events when new coordination log entries are written, so Secretary B doesn't need to poll.
+The server can push notifications via WebSocket events when new coordination log entries are written, so Secretary B doesn't need to poll.
 
 ### Knowledge Sharing Boundaries
 
@@ -394,9 +394,9 @@ At each collaboration level, knowledge flows differently:
 
 ## System Impact
 
-### Agent Server Changes
+### Server Changes
 
-| Level | Agent Server Changes |
+| Level | Server Changes |
 |-------|---------------------|
 | 0 | None (current design) |
 | 1 | Add `ListProjectTeamsMessage` handler with minimal summary response |
@@ -404,7 +404,7 @@ At each collaboration level, knowledge flows differently:
 | 3 | Add knowledge notification events + review request routing + sync point lifecycle |
 | 4 | Add cross-team delegation protocol + shared agent permission model + multi-team event routing |
 
-**Core principle:** The agent server is the routing layer. It doesn't understand collaboration semantics — it routes messages and enforces access control. The collaboration logic lives in the secretaries (orchestration server).
+**Core principle:** The server is the routing layer. It doesn't understand collaboration semantics — it routes messages and enforces access control. The collaboration logic lives in the secretaries (orchestration server).
 
 ### Orchestration Server Changes
 
@@ -507,9 +507,9 @@ CREATE TABLE shared_agents (
 | 1 | +1 query per project load (team summary) — negligible |
 | 2 | Secretary polling or WebSocket notifications for coordination log — ~1 event/minute typical |
 | 3 | Knowledge notifications on write — filtered by relevance before delivery — low overhead |
-| 4 | Cross-team event routing doubles the agent server's event fan-out — needs benchmarking |
+| 4 | Cross-team event routing doubles the server's event fan-out — needs benchmarking |
 
-**Level 4 is the performance cliff.** With N teams of M agents each, cross-team event routing creates O(N×M) fan-out. The agent server's event routing must be efficient (indexed by scope, not linear scan).
+**Level 4 is the performance cliff.** With N teams of M agents each, cross-team event routing creates O(N×M) fan-out. The server's event routing must be efficient (indexed by scope, not linear scan).
 
 ## Implementation Priority
 

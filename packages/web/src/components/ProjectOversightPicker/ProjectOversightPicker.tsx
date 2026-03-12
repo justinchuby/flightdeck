@@ -9,9 +9,9 @@ import { Eye } from 'lucide-react';
 import { useSettingsStore, type OversightLevel } from '../../stores/settingsStore';
 
 const LEVELS: Array<{ level: OversightLevel; label: string; short: string }> = [
-  { level: 'supervised', label: 'Supervised', short: 'Review all actions' },
-  { level: 'balanced', label: 'Balanced', short: 'Review key decisions' },
-  { level: 'autonomous',  label: 'Autonomous',  short: 'Autonomous — critical only' },
+  { level: 'supervised', label: '🔍 Supervised', short: 'Review all actions' },
+  { level: 'balanced', label: '⚖️ Balanced', short: 'Review key decisions' },
+  { level: 'autonomous',  label: '🚀 Autonomous',  short: 'Autonomous — critical only' },
 ];
 
 interface Props {

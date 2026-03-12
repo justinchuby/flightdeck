@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Check, RotateCcw, Save, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Check, RotateCcw, Save, Loader2, X } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
+import { deriveModelName } from '../../hooks/useModels';
+import { getProviderColors } from '../../utils/providerColors';
+import { getProvider } from '@flightdeck/shared';
 
 /** Role ID → allowed model IDs */
 export type ModelConfigMap = Record<string, string[]>;
@@ -13,27 +16,11 @@ interface ModelConfigResponse {
 interface ModelsListResponse {
   models: string[];
   defaults: ModelConfigMap;
+  modelsByProvider?: Record<string, string[]>;
 }
 
-/** Human-readable display names for model IDs */
-const MODEL_NAMES: Record<string, string> = {
-  'claude-opus-4.6': 'Claude Opus 4.6',
-  'claude-opus-4.5': 'Claude Opus 4.5',
-  'claude-sonnet-4.6': 'Claude Sonnet 4.6',
-  'claude-sonnet-4.5': 'Claude Sonnet 4.5',
-  'claude-sonnet-4': 'Claude Sonnet 4',
-  'claude-haiku-4.5': 'Claude Haiku 4.5',
-  'gemini-3-pro-preview': 'Gemini 3 Pro',
-  'gpt-5.3-codex': 'GPT-5.3 Codex',
-  'gpt-5.2-codex': 'GPT-5.2 Codex',
-  'gpt-5.2': 'GPT-5.2',
-  'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
-  'gpt-5.1-codex': 'GPT-5.1 Codex',
-  'gpt-5.1': 'GPT-5.1',
-  'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
-  'gpt-5-mini': 'GPT-5 Mini',
-  'gpt-4.1': 'GPT-4.1',
-};
+/** Human-readable display names derived from model IDs */
+const modelName = deriveModelName;
 
 /** Role display names */
 const ROLE_NAMES: Record<string, string> = {
@@ -71,6 +58,11 @@ const CONFIG_ROLES = [
   'lead',
 ];
 
+/** Provider tab label — derived from central ProviderRegistry. */
+function getProviderLabel(id: string): string {
+  return getProvider(id)?.name.replace(/ \(ACP\)$/, '').replace(/^Google /, '').replace(/^GitHub /, '') ?? id;
+}
+
 interface Props {
   /** Project ID — if provided, loads/saves config for this project */
   projectId?: string;
@@ -81,29 +73,56 @@ interface Props {
   compact?: boolean;
 }
 
+/** Deep-compare two ModelConfigMaps (order-insensitive per-role) */
+function configsEqual(a: ModelConfigMap, b: ModelConfigMap): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!(key in b)) return false;
+    const listA = [...(a[key] ?? [])].sort();
+    const listB = [...(b[key] ?? [])].sort();
+    if (listA.length !== listB.length) return false;
+    if (listA.some((v, i) => v !== listB[i])) return false;
+  }
+  return true;
+}
+
 export function ModelConfigPanel({ projectId, value, onChange, compact }: Props) {
   const [config, setConfig] = useState<ModelConfigMap>(value ?? {});
+  const [savedConfig, setSavedConfig] = useState<ModelConfigMap>(value ?? {});
   const [defaults, setDefaults] = useState<ModelConfigMap>({});
   const [allModels, setAllModels] = useState<string[]>([]);
+  const [modelsByProvider, setModelsByProvider] = useState<Record<string, string[]>>({});
+  const [providerTab, setProviderTab] = useState<string>('copilot');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isDirty = useMemo(() => !configsEqual(config, savedConfig), [config, savedConfig]);
+
   // Fetch available models and defaults
   useEffect(() => {
-    apiFetch<ModelsListResponse>('/models')
-      .then((data) => {
-        setAllModels(data.models);
-        setDefaults(data.defaults);
-        if (!value && !projectId) {
-          setConfig(data.defaults);
+    const fetchAll = async () => {
+      try {
+        const modelsData = await apiFetch<ModelsListResponse>('/models');
+        setAllModels(modelsData.models);
+        setDefaults(modelsData.defaults);
+        if (modelsData.modelsByProvider) {
+          setModelsByProvider(modelsData.modelsByProvider);
         }
-      })
-      .catch(() => setError('Failed to load models'))
-      .finally(() => {
+        if (!value && !projectId) {
+          setConfig(modelsData.defaults);
+          setSavedConfig(modelsData.defaults);
+        }
+      } catch {
+        setError('Failed to load models');
+      } finally {
         if (!projectId) setLoading(false);
-      });
+      }
+    };
+    fetchAll();
   }, []);
 
   // Fetch project-specific config if projectId is provided
@@ -113,6 +132,7 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
     apiFetch<ModelConfigResponse>(`/projects/${projectId}/model-config`)
       .then((data) => {
         setConfig(data.config);
+        setSavedConfig(data.config);
         setDefaults(data.defaults);
       })
       .catch(() => setError('Failed to load project model config'))
@@ -145,6 +165,12 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
     setSaved(false);
   }, [defaults, onChange]);
 
+  const discardChanges = useCallback(() => {
+    setConfig(savedConfig);
+    onChange?.(savedConfig);
+    setSaved(false);
+  }, [savedConfig, onChange]);
+
   const saveConfig = useCallback(async () => {
     if (!projectId) return;
     setSaving(true);
@@ -154,6 +180,7 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
         method: 'PUT',
         body: JSON.stringify({ config }),
       });
+      setSavedConfig(config);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err: any) {
@@ -177,53 +204,107 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
 
   return (
     <div className={`${compact ? 'text-[11px]' : 'text-xs'} space-y-2`}>
-      {/* Header with actions */}
-      {projectId && (
-        <div className="flex items-center justify-between px-1">
-          <span className="text-th-text-muted font-medium">Model Allowlist</span>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={resetToDefaults}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 text-th-text-muted hover:text-th-text-alt rounded transition-colors"
-              title="Reset to defaults"
-            >
-              <RotateCcw className="w-3 h-3" />
-            </button>
-            <button
-              onClick={saveConfig}
-              disabled={saving}
-              className={`flex items-center gap-0.5 px-2 py-0.5 rounded transition-colors ${
-                saved
-                  ? 'bg-green-600/20 text-green-400'
-                  : 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-600 dark:text-yellow-400'
-              }`}
-            >
-              {saving ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : saved ? (
-                <Check className="w-3 h-3" />
-              ) : (
-                <Save className="w-3 h-3" />
+      {/* Sticky header: title, actions, and provider tabs */}
+      <div className="sticky top-0 z-10 bg-th-bg pb-1" data-testid="allowlist-sticky-header">
+        {/* Header with actions */}
+        {projectId && (
+          <div className="flex items-center justify-between px-1 pb-1">
+            <span className="text-th-text-muted font-medium">Model Allowlist</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={resetToDefaults}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 text-th-text-muted hover:text-th-text-alt rounded transition-colors"
+                title="Reset to defaults"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+              {(isDirty || saving || saved) && (
+                <>
+                  <button
+                    onClick={discardChanges}
+                    disabled={saving}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded transition-colors bg-th-bg-hover hover:bg-th-bg-alt text-th-text-muted hover:text-th-text-alt"
+                    data-testid="discard-changes"
+                  >
+                    <X className="w-3 h-3" />
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveConfig}
+                    disabled={saving}
+                    className={`flex items-center gap-0.5 px-2 py-0.5 rounded transition-colors ${
+                      saved
+                        ? 'bg-green-600/20 text-green-400'
+                        : 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-600 dark:text-yellow-400'
+                    }`}
+                    data-testid="save-config"
+                  >
+                    {saving ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : saved ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Save className="w-3 h-3" />
+                    )}
+                    {saved ? 'Saved' : 'Save'}
+                  </button>
+                </>
               )}
-              {saved ? 'Saved' : 'Save'}
-            </button>
+            </div>
           </div>
+        )}
+
+        {error && <div className="px-1 text-red-400 text-[10px]">{error}</div>}
+
+        {/* Provider tabs */}
+        <div className="flex gap-1 px-1 border-b border-th-border pb-1 overflow-x-auto"
+             style={{ scrollbarWidth: 'thin' }}>
+          {Object.keys(modelsByProvider).length > 0
+            ? Object.entries(modelsByProvider).map(([providerId, providerModels]) => {
+                const tabModels = allModels.filter((m) => providerModels.includes(m));
+                if (tabModels.length === 0) return null;
+                const isActive = providerTab === providerId;
+                const label = getProviderLabel(providerId);
+                const colors = getProviderColors(providerId);
+                return (
+                  <button
+                    key={providerId}
+                    onClick={() => setProviderTab(providerId)}
+                    className={`px-2 py-0.5 rounded-t text-[10px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      isActive
+                        ? `${colors.text} border-current bg-th-bg-alt`
+                        : 'text-th-text-muted border-transparent hover:text-th-text-alt'
+                    }`}
+                  >
+                    {label}
+                    <span className="ml-1 opacity-60">({tabModels.length})</span>
+                  </button>
+                );
+              })
+            : /* Fallback: show a single "All" tab when backend hasn't responded */
+              <button className="px-2 py-0.5 rounded-t text-[10px] font-medium border-b-2 text-th-text-muted border-current bg-th-bg-alt">
+                All ({allModels.length})
+              </button>
+          }
         </div>
-      )}
+      </div>
 
-      {error && <div className="px-1 text-red-400 text-[10px]">{error}</div>}
-
-      {/* Role → Model grid */}
+      {/* Role → Model grid for selected provider tab */}
       <div className="space-y-1.5">
         {CONFIG_ROLES.map((roleId) => {
           const allowedModels = config[roleId] ?? defaults[roleId] ?? [];
+          const providerModelSet = modelsByProvider[providerTab];
+          const visibleModels = providerModelSet
+            ? allModels.filter((m) => providerModelSet.includes(m))
+            : allModels;
+          if (visibleModels.length === 0) return null;
           return (
             <div key={roleId} className="px-1">
               <div className="text-th-text-alt font-medium mb-0.5">
                 {ROLE_NAMES[roleId] || roleId}
               </div>
               <div className="flex flex-wrap gap-1">
-                {allModels.map((modelId) => {
+                {visibleModels.map((modelId) => {
                   const isSelected = allowedModels.includes(modelId);
                   return (
                     <button
@@ -234,11 +315,11 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
                           ? 'bg-yellow-600/20 border-yellow-500/50 text-yellow-600 dark:text-yellow-200'
                           : 'bg-th-bg border-th-border text-th-text-muted hover:border-th-border-hover opacity-50'
                       }`}
-                      title={MODEL_NAMES[modelId] || modelId}
+                      title={modelName(modelId)}
                     >
                       {compact
-                        ? modelId.replace('claude-', '').replace('gemini-3-pro-preview', 'gemini-3').replace('gpt-', 'g')
-                        : MODEL_NAMES[modelId] || modelId}
+                        ? modelId.replace('claude-', '').replace(/^gemini-/, 'g-').replace('gpt-', 'g')
+                        : modelName(modelId)}
                     </button>
                   );
                 })}

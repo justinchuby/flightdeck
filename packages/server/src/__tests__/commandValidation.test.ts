@@ -10,7 +10,6 @@ import { getAgentCommands } from '../agents/commands/AgentCommands.js';
 import { getCoordCommands } from '../agents/commands/CoordCommands.js';
 import { getSystemCommands } from '../agents/commands/SystemCommands.js';
 import { getTimerCommands } from '../agents/commands/TimerCommands.js';
-import { getDeferredCommands } from '../agents/commands/DeferredCommands.js';
 import { getCapabilityCommands } from '../agents/commands/CapabilityCommands.js';
 import { getDirectMessageCommands } from '../agents/commands/DirectMessageCommands.js';
 import { getTemplateCommands } from '../agents/commands/TemplateCommands.js';
@@ -84,12 +83,6 @@ function makeCtx(overrides: Record<string, any> = {}): CommandHandlerContext {
       hasAnyTasks: vi.fn().mockReturnValue(false),
       failTask: vi.fn(),
       getTaskByAgent: vi.fn(),
-    },
-    deferredIssueRegistry: {
-      add: vi.fn().mockReturnValue({ id: 1, severity: 'P1', description: 'test' }),
-      list: vi.fn().mockReturnValue([]),
-      resolve: vi.fn(),
-      dismiss: vi.fn(),
     },
     timerRegistry: {
       create: vi.fn().mockReturnValue({ id: 'timer-1', label: 'test', repeat: false }),
@@ -441,6 +434,118 @@ describe('SystemCommands validation', () => {
       expect.stringContaining('REQUEST_LIMIT_CHANGE validation error'),
     );
   });
+
+  // ── QUERY_PROVIDERS ──
+
+  it('QUERY_PROVIDERS rejects non-lead agents', () => {
+    const ctx = makeCtx();
+    const agent = makeAgent({ role: { id: 'developer', name: 'Developer' } });
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Only the Project Lead'),
+    );
+  });
+
+  it('QUERY_PROVIDERS returns unavailable message when providerManager not set', () => {
+    const ctx = makeCtx({ providerManager: undefined });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+    expect(agent.sendMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Provider information is not available yet'),
+    );
+  });
+
+  it('QUERY_PROVIDERS lists providers ranked by preference with status', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['copilot', 'claude', 'gemini']),
+        getProviderStatus: vi.fn((id: string) => ({
+          enabled: id !== 'gemini',
+          installed: id === 'copilot',
+        })),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).toContain('AVAILABLE PROVIDERS');
+    // copilot: enabled + installed → ✓
+    expect(response).toContain('(copilot) — ✓');
+    // claude: enabled but not installed → ⚠
+    expect(response).toContain('(claude) — ⚠ not installed');
+    // gemini: disabled → ✗
+    expect(response).toContain('(gemini) — ✗ disabled');
+    // Ranking order preserved
+    const copilotIdx = response.indexOf('1.');
+    const claudeIdx = response.indexOf('2.');
+    const geminiIdx = response.indexOf('3.');
+    expect(copilotIdx).toBeLessThan(claudeIdx);
+    expect(claudeIdx).toBeLessThan(geminiIdx);
+  });
+
+  it('QUERY_PROVIDERS includes default model and resume support', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['claude']),
+        getProviderStatus: vi.fn().mockReturnValue({ enabled: true, installed: true }),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).toContain('Default model:');
+    expect(response).toContain('Resume support:');
+  });
+
+  it('QUERY_PROVIDERS includes project model config when available', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue('proj-123'),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['copilot']),
+        getProviderStatus: vi.fn().mockReturnValue({ enabled: true, installed: true }),
+      },
+      projectRegistry: {
+        getModelConfig: vi.fn().mockReturnValue({
+          config: {
+            lead: ['claude-sonnet-4', 'gpt-5.2-codex'],
+            developer: ['claude-haiku-4.5'],
+          },
+        }),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).toContain('PROJECT MODEL CONFIGURATION');
+    expect(response).toContain('lead: claude-sonnet-4, gpt-5.2-codex');
+    expect(response).toContain('developer: claude-haiku-4.5');
+  });
+
+  it('QUERY_PROVIDERS omits model config section when no project', () => {
+    const ctx = makeCtx({
+      getProjectIdForAgent: vi.fn().mockReturnValue(undefined),
+      providerManager: {
+        getProviderRanking: vi.fn().mockReturnValue(['copilot']),
+        getProviderStatus: vi.fn().mockReturnValue({ enabled: true, installed: true }),
+      },
+    });
+    const agent = makeLeadAgent();
+    const cmd = findHandler(getSystemCommands(ctx), 'QUERY_PROVIDERS');
+    cmd.handler(agent, '⟦⟦ QUERY_PROVIDERS ⟧⟧');
+
+    const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(response).not.toContain('PROJECT MODEL CONFIGURATION');
+  });
 });
 
 // ── TimerCommands validation ─────────────────────────────────────────
@@ -493,30 +598,6 @@ describe('TimerCommands validation', () => {
     cmd.handler(agent, '⟦⟦ CANCEL_TIMER {} ⟧⟧');
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('CANCEL_TIMER validation error'),
-    );
-  });
-});
-
-// ── DeferredCommands validation ──────────────────────────────────────
-
-describe('DeferredCommands validation', () => {
-  it('DEFER_ISSUE rejects missing "description"', () => {
-    const ctx = makeCtx();
-    const agent = makeAgent();
-    const cmd = findHandler(getDeferredCommands(ctx), 'DEFER_ISSUE');
-    cmd.handler(agent, '⟦⟦ DEFER_ISSUE {"severity": "P2"} ⟧⟧');
-    expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Missing required field "description"'),
-    );
-  });
-
-  it('RESOLVE_DEFERRED rejects missing "issueId"', () => {
-    const ctx = makeCtx();
-    const agent = makeAgent();
-    const cmd = findHandler(getDeferredCommands(ctx), 'RESOLVE_DEFERRED');
-    cmd.handler(agent, '⟦⟦ RESOLVE_DEFERRED {} ⟧⟧');
-    expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('RESOLVE_DEFERRED validation error'),
     );
   });
 });
@@ -716,52 +797,6 @@ describe('TaskCommands validation', () => {
     cmd.handler(agent, `⟦⟦ DELEGATE {"to":"dev","task":"${bigTask}"} ⟧⟧`);
     expect(agent.sendMessage).toHaveBeenCalledWith(
       expect.stringContaining('DELEGATE validation error'),
-    );
-  });
-});
-
-// ── QUERY_DEFERRED validation ────────────────────────────────────────
-
-describe('QUERY_DEFERRED validation', () => {
-  it('accepts valid status filter', () => {
-    const ctx = makeCtx();
-    const agent = makeAgent();
-    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED {"status": "open"} ⟧⟧');
-    // Should not get a validation error (may get "no deferred issues" which is fine)
-    expect(agent.sendMessage).not.toHaveBeenCalledWith(
-      expect.stringContaining('QUERY_DEFERRED validation error'),
-    );
-  });
-
-  it('accepts no payload', () => {
-    const ctx = makeCtx();
-    const agent = makeAgent();
-    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED ⟧⟧');
-    // Should not get a validation error
-    expect(agent.sendMessage).not.toHaveBeenCalledWith(
-      expect.stringContaining('QUERY_DEFERRED validation error'),
-    );
-  });
-
-  it('rejects invalid status value', () => {
-    const ctx = makeCtx();
-    const agent = makeAgent();
-    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED {"status": "invalid"} ⟧⟧');
-    expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('QUERY_DEFERRED validation error'),
-    );
-  });
-
-  it('rejects invalid JSON payload', () => {
-    const ctx = makeCtx();
-    const agent = makeAgent();
-    const cmd = findHandler(getDeferredCommands(ctx), 'QUERY_DEFERRED');
-    cmd.handler(agent, '⟦⟦ QUERY_DEFERRED {bad json} ⟧⟧');
-    expect(agent.sendMessage).toHaveBeenCalledWith(
-      expect.stringContaining('QUERY_DEFERRED error: invalid JSON'),
     );
   });
 });

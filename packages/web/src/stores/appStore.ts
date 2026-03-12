@@ -22,7 +22,6 @@ interface AppState {
   setRoles: (roles: Role[]) => void;
   setConfig: (config: ServerConfig) => void;
   setSelectedAgent: (id: string | null) => void;
-  clearPermission: (agentId: string) => void;
   setConnected: (connected: boolean) => void;
   setLoading: (loading: boolean) => void;
   setSystemPaused: (paused: boolean) => void;
@@ -63,12 +62,6 @@ export const useAppStore = create<AppState>((set) => ({
       selectedAgentId: s.selectedAgentId === id ? null : s.selectedAgentId,
     })),
 
-  clearPermission: (agentId) =>
-    set((s) => ({
-      agents: s.agents.map((a) =>
-        a.id === agentId ? { ...a, pendingPermission: undefined } : a,
-      ),
-    })),
   setRoles: (roles) => set({ roles }),
   setConfig: (config) => set({ config }),
   setSelectedAgent: (selectedAgentId) => set({ selectedAgentId }),

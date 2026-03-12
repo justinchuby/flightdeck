@@ -20,6 +20,7 @@ import { dagTaskText } from '../../utils/statusColors';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { DagTask } from '../../types';
 import { truncate, priorityBadge, timeInStatus, TRUNCATE_LENGTHS } from './kanbanConstants';
+import { AgentDetailPanel } from '../AgentDetailPanel';
 
 // ── Task Card Component ─────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentSending, setCommentSending] = useState(false);
+  const [detailAgentId, setDetailAgentId] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const title = task.title || task.description || task.id;
@@ -232,10 +234,15 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
         <div className="flex items-center gap-2 mt-1.5 text-[10px] text-th-text-muted">
           <span className="bg-th-bg-muted px-1.5 py-0.5 rounded text-th-text-alt">{task.role}</span>
           {task.assignedAgentId && (
-            <span className="flex items-center gap-0.5" data-testid="agent-badge">
+            <button
+              className="flex items-center gap-0.5 hover:text-th-text-accent hover:underline cursor-pointer"
+              data-testid="agent-badge"
+              onClick={(e) => { e.stopPropagation(); setDetailAgentId(task.assignedAgentId!); }}
+              title="View agent details"
+            >
               <User size={9} />
               {truncate(task.assignedAgentId, 4)}
-            </span>
+            </button>
           )}
           {statusTime && (
             <span className="ml-auto" title={task.startedAt || task.createdAt}>
@@ -370,6 +377,9 @@ export function TaskCard({ task, allTasks, isDragOverlay, projectId, onTaskUpdat
             </div>
           </div>
         </div>
+      )}
+      {detailAgentId && (
+        <AgentDetailPanel agentId={detailAgentId} mode="modal" onClose={() => setDetailAgentId(null)} />
       )}
     </div>
   );

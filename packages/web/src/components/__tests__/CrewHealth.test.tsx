@@ -26,14 +26,13 @@ vi.mock('../AgentLifecycle', () => ({
 
 const MOCK_HEALTH: CrewHealthData = {
   teamId: 'team-1',
-  totalAgents: 4,
-  statusCounts: { busy: 2, idle: 1, retired: 1, terminated: 0 },
+  totalAgents: 3,
+  statusCounts: { running: 2, idle: 1, terminated: 0 },
   massFailurePaused: false,
   agents: [
-    { agentId: 'agent-001', role: 'developer', model: 'gpt-4', status: 'busy', uptimeMs: 3_600_000 },
-    { agentId: 'agent-002', role: 'architect', model: 'gpt-4', status: 'busy', uptimeMs: 7_200_000 },
+    { agentId: 'agent-001', role: 'developer', model: 'gpt-4', status: 'running', uptimeMs: 3_600_000 },
+    { agentId: 'agent-002', role: 'architect', model: 'gpt-4', status: 'running', uptimeMs: 7_200_000 },
     { agentId: 'agent-003', role: 'reviewer', model: 'gpt-4', status: 'idle', uptimeMs: 1_800_000 },
-    { agentId: 'agent-004', role: 'tester', model: 'gpt-4', status: 'retired', uptimeMs: 86_400_000, retiredAt: '2026-01-01T00:00:00Z' },
   ],
 };
 
@@ -58,10 +57,9 @@ describe('CrewHealth', () => {
       expect(screen.getByTestId('crew-health-dashboard')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('card-total')).toHaveTextContent('4');
-    expect(screen.getByTestId('card-active')).toHaveTextContent('2');
+    expect(screen.getByTestId('card-total')).toHaveTextContent('3');
+    expect(screen.getByTestId('card-running')).toHaveTextContent('2');
     expect(screen.getByTestId('card-idle')).toHaveTextContent('1');
-    expect(screen.getByTestId('card-retired')).toHaveTextContent('1');
   });
 
   it('shows agent table with all agents', async () => {
@@ -75,7 +73,6 @@ describe('CrewHealth', () => {
     expect(screen.getByText('developer')).toBeInTheDocument();
     expect(screen.getByText('architect')).toBeInTheDocument();
     expect(screen.getByText('reviewer')).toBeInTheDocument();
-    expect(screen.getByText('tester')).toBeInTheDocument();
   });
 
   it('shows mass failure alert when paused', async () => {
@@ -161,7 +158,7 @@ describe('CrewHealth', () => {
 
     act(() => {
       const event = new MessageEvent('ws-message', {
-        data: JSON.stringify({ type: 'team:agent_retired', agentId: 'agent-003' }),
+        data: JSON.stringify({ type: 'team:agent_cloned', agentId: 'agent-003' }),
       });
       window.dispatchEvent(event);
     });

@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import { EmptyState } from '../Shared';
 import type { CommType } from '../../stores/leadStore';
+import { buildAgentLabel } from '../../utils/agentLabel';
 
 export type { CommType };
 
@@ -109,14 +110,19 @@ export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps)
     return { commMap, maxCount };
   }, [filteredMessages]);
 
+  const labelByAgentId = useMemo(
+    () => new Map(agents.map(agent => [agent.id, buildAgentLabel(agent)])),
+    [agents],
+  );
+
   if (agents.length === 0) {
     return <EmptyState icon="🔥" title="No agents to display" compact />;
   }
 
-  // Keep cells readable even for large fleets.
-  const cellSize   = Math.min(36, Math.max(16, Math.floor(360 / agents.length)));
-  const labelWidth = Math.min(88, Math.max(48, cellSize * 2.2));
-  const fontSize   = cellSize <= 20 ? 8 : cellSize <= 28 ? 9 : 10;
+  // Use rectangular cells so long labels remain readable.
+  const columnWidth = Math.min(140, Math.max(84, Math.floor(1100 / agents.length)));
+  const rowHeight = Math.min(24, Math.max(14, Math.floor(380 / agents.length)));
+  const labelWidth = Math.min(220, Math.max(132, Math.floor(columnWidth * 1.65)));
 
   return (
     <div className="overflow-auto">
@@ -142,21 +148,20 @@ export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps)
         </div>
       )}
 
-      <div style={{ display: 'inline-block' }}>
+      <div className="min-w-max">
         {/* ── Column headers ── */}
-        <div className="flex" style={{ paddingLeft: labelWidth, marginBottom: 4 }}>
+        <div className="flex" style={{ paddingLeft: labelWidth, height: 92, marginBottom: 6 }}>
           {agents.map(agent => (
             <div
               key={agent.id}
-              className="shrink-0 text-center overflow-hidden"
-              style={{ width: cellSize }}
+              className="shrink-0 relative overflow-visible"
+              style={{ width: columnWidth }}
             >
               <span
-                className="block text-th-text-muted truncate px-px"
-                style={{ fontSize }}
-                title={`${agent.name} — ${agent.role}`}
+                className="absolute left-1 bottom-1 text-[11px] text-th-text-muted whitespace-nowrap origin-bottom-left -rotate-45"
+                title={`${labelByAgentId.get(agent.id)} (${agent.id})`}
               >
-                {agent.name}
+                {labelByAgentId.get(agent.id)}
               </span>
             </div>
           ))}
@@ -167,11 +172,11 @@ export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps)
           <div key={fromAgent.id} className="flex items-center" style={{ marginBottom: 1 }}>
             {/* Row label */}
             <div
-              className="shrink-0 text-th-text-muted truncate text-right pr-1.5"
-              style={{ width: labelWidth, fontSize }}
-              title={`${fromAgent.name} — ${fromAgent.role}`}
+              className="shrink-0 text-th-text-muted truncate text-right pr-2 text-[11px]"
+              style={{ width: labelWidth }}
+              title={`${labelByAgentId.get(fromAgent.id)} (${fromAgent.id})`}
             >
-              {fromAgent.name}
+              {labelByAgentId.get(fromAgent.id)}
             </div>
 
             {/* Cells */}
@@ -192,12 +197,12 @@ export function CommHeatmap({ agents, messages, hideFilters }: CommHeatmapProps)
                         : 'bg-th-bg-alt/15 border-th-border/10'
                     }
                   `}
-                  style={{ width: cellSize - 2, height: cellSize - 2, margin: '0 1px' }}
+                  style={{ width: columnWidth - 2, height: rowHeight - 2, margin: '0 1px' }}
                   onMouseEnter={e =>
                     !isSelf &&
                     setTooltip({
-                      from:  fromAgent.name,
-                      to:    toAgent.name,
+                      from:  labelByAgentId.get(fromAgent.id) ?? fromAgent.id,
+                      to:    labelByAgentId.get(toAgent.id) ?? toAgent.id,
                       count,
                       x: e.clientX,
                       y: e.clientY,

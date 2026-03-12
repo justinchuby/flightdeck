@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { formatTokens } from '../../utils/format';
+import { shortAgentId } from '../../utils/agentLabel';
 import type { ProjectCostSummary, AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
 import { Coins, ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -161,14 +162,14 @@ function AgentBreakdown({
           const agent = agentMap.get(cost.agentId);
           const roleName = agent?.role.name
             ?? (cost.agentRole ? cost.agentRole.charAt(0).toUpperCase() + cost.agentRole.slice(1) : undefined)
-            ?? cost.agentId.slice(0, 6);
+            ?? shortAgentId(cost.agentId);
           const roleIcon = agent?.role.icon ?? '🤖';
           const agentTotal = cost.totalInputTokens + cost.totalOutputTokens;
           const pct = total > 0 ? (agentTotal / total) * 100 : 0;
           return (
             <div key={cost.agentId} className="flex items-center gap-1.5 text-xs">
               <span className="w-4 text-center shrink-0">{roleIcon}</span>
-              <span className="text-th-text-alt w-16 truncate shrink-0" title={`${roleName} (${cost.agentId.slice(0, 8)})`}>
+              <span className="text-th-text-alt w-16 truncate shrink-0" title={`${roleName} (${shortAgentId(cost.agentId)})`}>
                 {roleName}
               </span>
               <div className="flex-1 min-w-0 h-1.5 bg-th-bg-alt rounded-full overflow-hidden">
@@ -240,7 +241,7 @@ function TaskBreakdown({
                   {cost.agents.slice(0, 3).map((a) => {
                     const agent = agentMap.get(a.agentId);
                     return (
-                      <span key={a.agentId} title={agent?.role.name ?? a.agentId.slice(0, 6)}>
+                      <span key={a.agentId} title={agent?.role.name ?? shortAgentId(a.agentId)}>
                         {agent?.role.icon ?? '🤖'}
                       </span>
                     );

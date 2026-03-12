@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
 import { TimerCreateForm } from './TimerCreateForm';
 import type { TimerInfo } from '../../types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 type TimerFilter = 'active' | 'fired' | 'all';
 
@@ -16,7 +17,7 @@ function formatRemaining(ms: number): string {
 }
 
 function shortId(id: string): string {
-  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+  return id.length > 12 ? `${shortAgentId(id)}…` : id;
 }
 
 /** Resolve agent role name from appStore by agentId */

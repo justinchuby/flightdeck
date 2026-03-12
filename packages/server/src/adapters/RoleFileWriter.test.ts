@@ -78,7 +78,7 @@ describe('CopilotRoleFileWriter', () => {
 
     expect(content).toContain(FLIGHTDECK_MARKER);
     expect(content).toContain('name: flightdeck-developer');
-    expect(content).toContain('description: "Writes and modifies code"');
+    expect(content).toContain('description: "Flightdeck Developer: Writes and modifies code"');
     expect(content).toContain('tools:');
     expect(content).toContain('  - read');
     expect(content).toContain('  - edit');
@@ -144,7 +144,7 @@ describe('CopilotRoleFileWriter', () => {
       join(tempDir, '.github', 'agents', 'flightdeck-tester.agent.md'),
       'utf-8',
     );
-    expect(content).toContain('description: "Tests \\"everything\\" thoroughly"');
+    expect(content).toContain('description: "Flightdeck Tester: Tests \\"everything\\" thoroughly"');
   });
 });
 
@@ -174,7 +174,7 @@ describe('ClaudeRoleFileWriter', () => {
 
     expect(content).toContain(FLIGHTDECK_MARKER);
     expect(content).toContain('name: flightdeck-developer');
-    expect(content).toContain('description: "Writes and modifies code"');
+    expect(content).toContain('description: "Flightdeck Developer: Writes and modifies code"');
     expect(content).not.toContain('tools:');
     expect(content).toContain('# Developer');
     expect(content).toContain('You are a developer. Write clean code and tests.');
@@ -222,7 +222,7 @@ describe('GeminiRoleFileWriter', () => {
     expect(content).toContain(FLIGHTDECK_MARKER);
     expect(content).not.toContain('---');
     expect(content).toContain('# Developer');
-    expect(content).toContain('> Writes and modifies code');
+    expect(content).toContain('> Flightdeck Developer: Writes and modifies code');
     expect(content).toContain('You are a developer. Write clean code and tests.');
   });
 
@@ -266,7 +266,7 @@ describe('CursorRoleFileWriter', () => {
     );
 
     expect(content).toContain(FLIGHTDECK_MARKER);
-    expect(content).toContain('description: "Writes and modifies code"');
+    expect(content).toContain('description: "Flightdeck Developer: Writes and modifies code"');
     expect(content).toContain('alwaysApply: true');
     expect(content).toContain('# Developer');
     expect(content).toContain('You are a developer. Write clean code and tests.');
@@ -322,10 +322,10 @@ describe('CodexRoleFileWriter', () => {
     expect(content).toContain(FLIGHTDECK_MARKER);
     expect(content).toContain('# Flightdeck Agents');
     expect(content).toContain('## Developer');
-    expect(content).toContain('> Writes and modifies code');
+    expect(content).toContain('> Flightdeck Developer: Writes and modifies code');
     expect(content).toContain('You are a developer. Write clean code and tests.');
     expect(content).toContain('## Architect');
-    expect(content).toContain('> Designs system architecture');
+    expect(content).toContain('> Flightdeck Architect: Designs system architecture');
     expect(content).toContain('---');
   });
 
@@ -388,12 +388,12 @@ describe('OpenCodeRoleFileWriter', () => {
 
     expect(config._generatedByFlightdeck).toBe(true);
     expect(config.agents['flightdeck-developer']).toEqual({
-      description: 'Writes and modifies code',
+      description: 'Flightdeck Developer: Writes and modifies code',
       prompt: 'You are a developer. Write clean code and tests.',
       tools: { read: 'allow', edit: 'allow', shell: 'allow' },
     });
     expect(config.agents['flightdeck-architect']).toEqual({
-      description: 'Designs system architecture',
+      description: 'Flightdeck Architect: Designs system architecture',
       prompt: 'You are an architect. Think about scalability and maintainability.',
     });
   });

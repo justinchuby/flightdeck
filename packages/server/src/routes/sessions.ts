@@ -46,7 +46,7 @@ export function sessionsRoutes(ctx: AppContext): Router {
 
     try {
       const agent = agentManager.spawn(
-        role, task, undefined, true, model,
+        role, task, undefined, model,
         project.cwd ?? undefined,
         session.sessionId,
         session.leadId,

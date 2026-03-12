@@ -4,6 +4,7 @@ import { useTooltip, TooltipWithBounds, defaultStyles } from '@visx/tooltip';
 import type { ScaleTime } from '@visx/vendor/d3-scale';
 import { formatTimestamp } from './formatTimestamp';
 import type { TimeRange } from './formatTimestamp';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -245,7 +246,7 @@ export function CommunicationLinks({
             : undefined;
 
           return (
-            <g key={linkIndex} role="listitem" aria-label={`${style.label} from ${comm.fromAgentId.slice(0, 8)}${comm.toAgentId ? ` to ${comm.toAgentId.slice(0, 8)}` : comm.groupName ? ` to group ${comm.groupName}` : ''}`}>
+            <g key={linkIndex} role="listitem" aria-label={`${style.label} from ${shortAgentId(comm.fromAgentId)}${comm.toAgentId ? ` to ${shortAgentId(comm.toAgentId)}` : comm.groupName ? ` to group ${comm.groupName}` : ''}`}>
               {/* Invisible wider hit area for hover */}
               <path
                 d={path}
@@ -302,9 +303,9 @@ export function CommunicationLinks({
               </span>
             </div>
             <div className="text-[10px] text-th-text-muted">
-              {tooltipData.fromAgentId.slice(0, 8)}
+              {shortAgentId(tooltipData.fromAgentId)}
               {tooltipData.toAgentId
-                ? ` → ${tooltipData.toAgentId.slice(0, 8)}`
+                ? ` → ${shortAgentId(tooltipData.toAgentId)}`
                 : tooltipData.groupName
                   ? ` → 👥 ${tooltipData.groupName}`
                   : ' → ?'}

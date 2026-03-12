@@ -10,10 +10,10 @@ import {
   Clock,
   PauseCircle,
   XCircle,
-  UserMinus,
   Wifi,
   WifiOff,
 } from 'lucide-react';
+import { shortAgentId } from '../utils/agentLabel';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -32,7 +32,6 @@ export interface AgentHealthInfo {
   status: string;
   uptimeMs: number;
   lastTaskSummary?: string;
-  retiredAt?: string;
   clonedFromId?: string;
 }
 
@@ -51,20 +50,20 @@ function formatUptime(ms: number): string {
 
 function statusColor(status: string): string {
   switch (status) {
-    case 'busy': return 'bg-green-400';
+    case 'running': return 'bg-green-400';
     case 'idle': return 'bg-blue-400';
-    case 'retired': return 'bg-gray-400';
     case 'terminated': return 'bg-red-400';
+    case 'failed': return 'bg-orange-400';
     default: return 'bg-yellow-400';
   }
 }
 
 function statusLabel(status: string): string {
   switch (status) {
-    case 'busy': return 'Active';
+    case 'running': return 'Running';
     case 'idle': return 'Idle';
-    case 'retired': return 'Retired';
     case 'terminated': return 'Terminated';
+    case 'failed': return 'Failed';
     default: return status;
   }
 }
@@ -101,7 +100,7 @@ export function CrewHealth({ teamId = 'default' }: Props) {
       try {
         const raw = (event as MessageEvent).data;
         const msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (msg.type === 'team:agent_retired' || msg.type === 'team:agent_cloned') {
+        if (msg.type === 'team:agent_cloned') {
           fetchHealth();
         }
       } catch { /* ignore parse errors */ }
@@ -181,8 +180,8 @@ export function CrewHealth({ teamId = 'default' }: Props) {
           color="text-th-text"
         />
         <StatusCard
-          label="Active"
-          count={statusCounts.busy ?? 0}
+          label="Running"
+          count={statusCounts.running ?? 0}
           icon={<Activity className="w-4 h-4" />}
           color="text-green-400"
         />
@@ -191,12 +190,6 @@ export function CrewHealth({ teamId = 'default' }: Props) {
           count={statusCounts.idle ?? 0}
           icon={<PauseCircle className="w-4 h-4" />}
           color="text-blue-400"
-        />
-        <StatusCard
-          label="Retired"
-          count={statusCounts.retired ?? 0}
-          icon={<UserMinus className="w-4 h-4" />}
-          color="text-gray-400"
         />
       </div>
 
@@ -250,7 +243,7 @@ export function CrewHealth({ teamId = 'default' }: Props) {
                   <button
                     onClick={() => setSelectedAgent(agent.agentId)}
                     className="text-xs text-accent hover:underline"
-                    data-testid={`manage-${agent.agentId.slice(0, 8)}`}
+                    data-testid={`manage-${shortAgentId(agent.agentId)}`}
                   >
                     Manage
                   </button>

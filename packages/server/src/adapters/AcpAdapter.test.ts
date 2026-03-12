@@ -127,10 +127,6 @@ describe('AcpAdapter', () => {
       expect(adapter.supportsImages).toBe(false);
     });
 
-    it('accepts autopilot option', () => {
-      const adapter = new AcpAdapter({ autopilot: true });
-      expect(adapter).toBeDefined();
-    });
   });
 
   // ── 2. start() ──────────────────────────────────────────────────
@@ -863,10 +859,10 @@ describe('AcpAdapter', () => {
   // ── 8. Permission handling ──────────────────────────────────────
 
   describe('permission handling', () => {
-    it('auto-approves in autopilot mode', async () => {
+    it('requestPermission always auto-approves with allow_once', async () => {
       setupSuccessfulStart();
 
-      const adapter = new AcpAdapter({ autopilot: true });
+      const adapter = new AcpAdapter();
       await adapter.start(DEFAULT_START_OPTS);
 
       const client = capturedClientFactory!(null);
@@ -881,179 +877,6 @@ describe('AcpAdapter', () => {
 
       expect(result.outcome.outcome).toBe('selected');
       expect(result.outcome.optionId).toBe('allow-1');
-    });
-
-    it('emits permission_request in manual mode', async () => {
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const requests: any[] = [];
-      adapter.on('permission_request', (req: any) => requests.push(req));
-
-      const client = capturedClientFactory!(null);
-      // Don't await — it waits for resolvePermission
-      client.requestPermission({
-        title: 'Run bash command',
-        options: [
-          { optionId: 'allow-1', kind: 'allow_once', label: 'Allow' },
-        ],
-      });
-
-      // Give the event loop a tick
-      await new Promise((r) => setTimeout(r, 10));
-
-      expect(requests).toHaveLength(1);
-      expect(requests[0].toolName).toBe('Run bash command');
-    });
-
-    it('resolvePermission(true) selects allow_once option', async () => {
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const client = capturedClientFactory!(null);
-      const permPromise = client.requestPermission({
-        title: 'Edit file',
-        options: [
-          { optionId: 'allow-1', kind: 'allow_once', label: 'Allow' },
-          { optionId: 'deny-1', kind: 'deny', label: 'Deny' },
-        ],
-      });
-
-      await new Promise((r) => setTimeout(r, 10));
-      adapter.resolvePermission(true);
-
-      const result = await permPromise;
-      expect(result.outcome.outcome).toBe('selected');
-      expect(result.outcome.optionId).toBe('allow-1');
-    });
-
-    it('resolvePermission(false) cancels the request', async () => {
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const client = capturedClientFactory!(null);
-      const permPromise = client.requestPermission({
-        title: 'Delete file',
-        options: [
-          { optionId: 'allow-1', kind: 'allow_once', label: 'Allow' },
-        ],
-      });
-
-      await new Promise((r) => setTimeout(r, 10));
-      adapter.resolvePermission(false);
-
-      const result = await permPromise;
-      expect(result.outcome.outcome).toBe('cancelled');
-    });
-
-    it('resolvePermission is safe to call with no pending request', () => {
-      const adapter = new AcpAdapter();
-      expect(() => adapter.resolvePermission(true)).not.toThrow();
-    });
-
-    it('should not clobber first request when second arrives (C-6 race)', async () => {
-      vi.useFakeTimers();
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const client = capturedClientFactory!(null);
-      const permOpts = {
-        title: 'Tool action',
-        options: [
-          { optionId: 'allow-1', kind: 'allow_once' as const, label: 'Allow' },
-        ],
-      };
-
-      // First permission request
-      const result1 = client.requestPermission(permOpts);
-
-      // Tick to let event loop process
-      await vi.advanceTimersByTimeAsync(10);
-
-      // Second permission request overwrites
-      const result2 = client.requestPermission(permOpts);
-      await vi.advanceTimersByTimeAsync(10);
-
-      // Resolve the latest (second)
-      adapter.resolvePermission(true);
-      expect((await result2).outcome.outcome).toBe('selected');
-
-      // First request auto-cancels on timeout
-      vi.advanceTimersByTime(60_001);
-      expect((await result1).outcome.outcome).toBe('cancelled');
-
-      vi.useRealTimers();
-    });
-
-    it('should resolve pending permission as cancelled on terminate', async () => {
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const client = capturedClientFactory!(null);
-      const permPromise = client.requestPermission({
-        title: 'Run bash',
-        options: [
-          { optionId: 'allow-1', kind: 'allow_once', label: 'Allow' },
-        ],
-      });
-
-      await new Promise((r) => setTimeout(r, 10));
-      await adapter.terminate();
-
-      const result = await permPromise;
-      expect(result.outcome.outcome).toBe('cancelled');
-    });
-
-    it('should emit exit event on terminate (H-9)', async () => {
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const exitHandler = vi.fn();
-      adapter.on('exit', exitHandler);
-
-      await adapter.terminate();
-
-      expect(exitHandler).toHaveBeenCalledWith(0);
-    });
-
-    it('should not double-resolve on terminate during timeout window (C-6 race)', async () => {
-      vi.useFakeTimers();
-      setupSuccessfulStart();
-
-      const adapter = new AcpAdapter({ autopilot: false });
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const client = capturedClientFactory!(null);
-      const permPromise = client.requestPermission({
-        title: 'Tool action',
-        options: [
-          { optionId: 'allow-1', kind: 'allow_once', label: 'Allow' },
-        ],
-      });
-
-      await vi.advanceTimersByTimeAsync(10);
-      // Start terminate but don't await — it needs timers to advance
-      const terminatePromise = adapter.terminate();
-      // Advance past stdin flush delay (10ms) + kill timeout (5s)
-      await vi.advanceTimersByTimeAsync(5100);
-      await terminatePromise;
-      expect((await permPromise).outcome.outcome).toBe('cancelled');
-
-      // Timeout fires but permission already resolved — no double-resolve
-      vi.advanceTimersByTime(60_001);
-      vi.useRealTimers();
     });
   });
 

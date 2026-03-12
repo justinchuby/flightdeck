@@ -5,7 +5,6 @@ import {
   Users,
   Network,
   Wrench,
-  BarChart3,
   Clock,
   PanelRightClose,
   PanelRightOpen,
@@ -19,7 +18,7 @@ import { CommsPanelContent } from './CommsPanel';
 import { GroupsPanelContent } from './GroupsPanel';
 import { TaskDagPanelContent } from './TaskDagPanel';
 import { ModelConfigPanel } from './ModelConfigPanel';
-import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
+
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
 import type { DagStatus, AgentInfo } from '../../types';
 import type { AgentComm } from '../../stores/leadStore';
@@ -118,7 +117,6 @@ export function SidebarTabs({
     groups: { icon: <Users className="w-3 h-3" />, label: 'Groups', badge: groups.length },
     dag: { icon: <Network className="w-3 h-3" />, label: 'DAG', badge: dagStatus?.tasks.length },
     models: { icon: <Wrench className="w-3 h-3" />, label: 'Models' },
-    costs: { icon: <BarChart3 className="w-3 h-3" />, label: 'Attribution' },
     timers: { icon: <Clock className="w-3 h-3" />, label: 'Timers', badge: activeTimerCount || undefined },
   };
 
@@ -234,7 +232,7 @@ export function SidebarTabs({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => tabs.onToggleConfig()} />
                   <div className="absolute right-0 top-full mt-1 z-50 glass-dropdown rounded-md py-1 min-w-[140px]">
-                    {(['crew', 'comms', 'groups', 'dag', 'models', 'costs', 'timers'] as const).map((tabId) => (
+                    {(['crew', 'comms', 'groups', 'dag', 'models', 'timers'] as const).map((tabId) => (
                       <button
                         key={tabId}
                         onClick={() => tabs.onToggleTabVisibility(tabId)}
@@ -268,7 +266,6 @@ export function SidebarTabs({
                 No project selected
               </div>
             )}
-            {tabs.activeTab === 'costs' && <CostBreakdown />}
             {tabs.activeTab === 'timers' && <TimerDisplay projectAgentIds={crewAgentIds} />}
           </div>
           {/* Resize handle for tabbed section */}

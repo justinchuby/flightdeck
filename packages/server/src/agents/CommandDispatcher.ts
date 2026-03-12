@@ -26,14 +26,12 @@ import {
 import { getCommCommands } from './commands/CommCommands.js';
 import { getTaskCommands } from './commands/TaskCommands.js';
 import { getCoordCommands } from './commands/CoordCommands.js';
-import { getDeferredCommands } from './commands/DeferredCommands.js';
 import { getSystemCommands } from './commands/SystemCommands.js';
 import { getTimerCommands } from './commands/TimerCommands.js';
 import { getCapabilityCommands } from './commands/CapabilityCommands.js';
 import { getDirectMessageCommands } from './commands/DirectMessageCommands.js';
 import { getTemplateCommands } from './commands/TemplateCommands.js';
 
-// Re-export types for backward compatibility (AgentManager, HeartbeatMonitor import from here)
 export type { Delegation, CommandContext } from './commands/types.js';
 
 // ── CommandDispatcher ────────────────────────────────────────────────
@@ -68,7 +66,6 @@ export class CommandDispatcher {
       ...getCommCommands(this.handlerCtx),
       ...getTaskCommands(this.handlerCtx),
       ...getCoordCommands(this.handlerCtx),
-      ...getDeferredCommands(this.handlerCtx),
       ...getSystemCommands(this.handlerCtx),
       ...getTimerCommands(this.handlerCtx),
       ...getCapabilityCommands(this.handlerCtx),
@@ -89,6 +86,16 @@ export class CommandDispatcher {
   /** Late-inject IntegrationRouter to break circular dependency. */
   setIntegrationRouter(router: import('../integrations/IntegrationRouter.js').IntegrationRouter): void {
     this.handlerCtx.integrationRouter = router;
+  }
+
+  /** Late-inject ProviderManager so QUERY_PROVIDERS sees live state. */
+  setProviderManager(pm: import('../providers/ProviderManager.js').ProviderManager): void {
+    this.handlerCtx.providerManager = pm;
+  }
+
+  /** Late-inject ProjectRegistry so commands can read project config. */
+  setProjectRegistry(reg: import('../projects/ProjectRegistry.js').ProjectRegistry): void {
+    this.handlerCtx.projectRegistry = reg;
   }
 
   // ── Buffer management ──────────────────────────────────────────────

@@ -45,7 +45,7 @@ const rosterAgents = [
     agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900',
     role: 'architect',
     model: 'claude-sonnet-4-6',
-    status: 'busy',
+    status: 'running',
     liveStatus: 'running',
     teamId: 'default',
     projectId: 'proj-1',
@@ -82,30 +82,20 @@ const rosterAgents = [
 const healthData = {
   teamId: 'default',
   totalAgents: 3,
-  statusCounts: { busy: 1, idle: 1, terminated: 1, retired: 0 },
+  statusCounts: { running: 1, idle: 1, terminated: 1 },
   massFailurePaused: false,
   agents: [
-    { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'busy', uptimeMs: 540_000_000, lastTaskSummary: 'Designing auth module' },
+    { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'running', uptimeMs: 540_000_000, lastTaskSummary: 'Designing auth module' },
     { agentId: 'bb22cc33-dd44-ee55-ff66-778899001122', role: 'developer', model: 'claude-sonnet-4-6', status: 'idle', uptimeMs: 450_000_000 },
     { agentId: 'cc33dd44-ee55-ff66-7788-990011223344', role: 'reviewer', model: 'claude-opus-4.6', status: 'terminated', uptimeMs: 550_000_000, clonedFromId: 'original-123' },
   ],
-};
-
-const serverStatus = {
-  running: true,
-  connected: true,
-  state: 'connected',
-  agentCount: 2,
-  latencyMs: 12,
-  pendingRequests: 0,
-  trackedAgents: 2,
 };
 
 const profileData = {
   agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900',
   role: 'architect',
   model: 'claude-sonnet-4-6',
-  status: 'busy',
+  status: 'running',
   liveStatus: 'running',
   teamId: 'default',
   projectId: 'proj-1',
@@ -116,7 +106,6 @@ const profileData = {
   live: {
     task: 'Security architecture',
     outputPreview: 'Working on JWT...',
-    autopilot: true,
     model: 'claude-sonnet-4-6',
   },
 };
@@ -125,7 +114,7 @@ const teamDetailData = {
   teamId: 'default',
   agentCount: 3,
   agents: [
-    { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'busy' },
+    { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'running' },
     { agentId: 'bb22cc33-dd44-ee55-ff66-778899001122', role: 'developer', model: 'claude-sonnet-4-6', status: 'idle' },
   ],
   knowledgeCount: 42,
@@ -136,20 +125,13 @@ function setupMocks(overrides: Partial<{
   teams: any;
   agents: any;
   health: any;
-  server: any;
   profile: any;
   teamDetail: any;
-  exportResult: any;
-  importResult: any;
 }> = {}) {
   mockApiFetch.mockImplementation((path: string, opts?: any) => {
     if (path === '/teams') return Promise.resolve(overrides.teams ?? teamsData);
-    if (path.includes('/export')) return Promise.resolve(overrides.exportResult ?? { success: true, bundle: { manifest: {} } });
-    if (path === '/teams/import') return Promise.resolve(overrides.importResult ?? { success: true, report: { success: true, teamId: 'default', agents: [], knowledge: { imported: 5, skipped: 0, conflicts: 0 }, training: { correctionsImported: 2, feedbackImported: 3 }, warnings: [], validation: { valid: true, issues: [] } } });
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/health')) return Promise.resolve(overrides.health ?? healthData);
-    if (path === '/agent-server/status') return Promise.resolve(overrides.server ?? serverStatus);
-    if (path === '/agent-server/stop') return Promise.resolve({ ok: true });
     // Match /teams/:teamId (but not /teams/:teamId/agents or /teams/:teamId/health)
     if (/^\/teams\/[^/]+$/.test(path)) return Promise.resolve(overrides.teamDetail ?? teamDetailData);
     if (path.includes('/agents')) return Promise.resolve(overrides.agents ?? rosterAgents);
@@ -205,23 +187,6 @@ describe('CrewPage', () => {
     });
     expect(screen.getByTestId('card-active')).toBeInTheDocument();
     expect(screen.getByTestId('card-idle')).toBeInTheDocument();
-    expect(screen.getByTestId('card-retired')).toBeInTheDocument();
-  });
-
-  it('renders server status card', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByTestId('card-server')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Agent Server: Online')).toBeInTheDocument();
-    expect(screen.getByText('2 agents')).toBeInTheDocument();
-    expect(screen.getByText('12ms')).toBeInTheDocument();
   });
 
   it('renders agent cards with roles and IDs', async () => {
@@ -403,42 +368,6 @@ describe('CrewPage', () => {
     });
   });
 
-  it('shows stop server confirmation', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByTestId('stop-server-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('stop-server-btn'));
-    expect(screen.getByText(/stop agent server/i)).toBeInTheDocument();
-    expect(screen.getByTestId('confirm-stop-btn')).toBeInTheDocument();
-  });
-
-  it('stops server on confirm', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByTestId('stop-server-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('stop-server-btn'));
-    fireEvent.click(screen.getByTestId('confirm-stop-btn'));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith('/agent-server/stop', { method: 'POST' });
-    });
-  });
-
   it('switches profile tabs', async () => {
     setupMocks();
     renderPage();
@@ -470,26 +399,12 @@ describe('CrewPage', () => {
     const callCount = mockApiFetch.mock.calls.length;
     act(() => {
       window.dispatchEvent(new MessageEvent('ws-message', {
-        data: JSON.stringify({ type: 'team:agent_retired' }),
+        data: JSON.stringify({ type: 'team:agent_cloned' }),
       }));
     });
     await waitFor(() => {
       expect(mockApiFetch.mock.calls.length).toBeGreaterThan(callCount);
     });
-  });
-
-  it('hides stop button when server not running', async () => {
-    setupMocks({ server: { ...serverStatus, running: false, state: 'disconnected', connected: false } });
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Health tab
-    switchTab('Health');
-    await waitFor(() => {
-      expect(screen.getByText('Agent Server: Stopped')).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('stop-server-btn')).not.toBeInTheDocument();
   });
 
   // ── Team identity section ─────────────────────────────
@@ -504,94 +419,4 @@ describe('CrewPage', () => {
     expect(screen.getByText('5 corrections')).toBeInTheDocument();
   });
 
-  // ── Export/Import buttons ─────────────────────────────
-
-  it('shows export and import buttons in export tab', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Export tab
-    switchTab('Export');
-    await waitFor(() => {
-      expect(screen.getByTestId('export-crew-btn')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('import-crew-btn')).toBeInTheDocument();
-  });
-
-  it('opens export dialog', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Export tab
-    switchTab('Export');
-    await waitFor(() => {
-      expect(screen.getByTestId('export-crew-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('export-crew-btn'));
-    expect(screen.getByTestId('export-dialog')).toBeInTheDocument();
-    expect(screen.getAllByText(/\.flightdeck-team\//).length).toBeGreaterThan(0);
-    expect(screen.getByText('Include knowledge entries')).toBeInTheDocument();
-  });
-
-  it('triggers export download', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Export tab
-    switchTab('Export');
-    await waitFor(() => {
-      expect(screen.getByTestId('export-crew-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('export-crew-btn'));
-    fireEvent.click(screen.getByTestId('export-download-btn'));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/export'),
-        expect.objectContaining({ method: 'POST' }),
-      );
-    });
-  });
-
-  it('opens import dialog', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Export tab
-    switchTab('Export');
-    await waitFor(() => {
-      expect(screen.getByTestId('import-crew-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('import-crew-btn'));
-    expect(screen.getByTestId('import-dialog')).toBeInTheDocument();
-    expect(screen.getByText(/choose crew bundle/i)).toBeInTheDocument();
-    expect(screen.getByTestId('import-project-input')).toBeInTheDocument();
-  });
-
-  it('shows conflict strategy selectors in import dialog', async () => {
-    setupMocks();
-    renderPage();
-    await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
-    });
-    // Switch to Export tab
-    switchTab('Export');
-    await waitFor(() => {
-      expect(screen.getByTestId('import-crew-btn')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId('import-crew-btn'));
-    expect(screen.getByText('Agent conflicts')).toBeInTheDocument();
-    expect(screen.getByText('Knowledge conflicts')).toBeInTheDocument();
-  });
 });

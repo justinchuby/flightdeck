@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useProjectId } from '../../contexts/ProjectContext';
 import { apiFetch } from '../../hooks/useApi';
-import { MarkdownContent } from '../../utils/markdown';
+import { Markdown } from '../ui/Markdown';
 import { FileTree } from './FileTree';
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -182,8 +182,8 @@ export function DesignPanel() {
           {!loading && !error && fileData && (
             <div className="max-w-4xl mx-auto">
               {isMarkdown ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none" data-testid="markdown-preview">
-                  <MarkdownContent text={fileData.content} />
+                <div data-testid="markdown-preview">
+                  <Markdown text={fileData.content} />
                 </div>
               ) : (
                 <pre

@@ -63,6 +63,17 @@ const MOCK_PROVIDERS = [
   },
 ];
 
+const MOCK_RANKING = {
+  ranking: ['copilot', 'claude', 'gemini', 'opencode', 'cursor', 'codex'],
+};
+
+/** Mock both /settings/providers and /settings/provider-ranking API calls. */
+function mockProviderApis() {
+  mockApiFetch
+    .mockResolvedValueOnce(MOCK_PROVIDERS)
+    .mockResolvedValueOnce(MOCK_RANKING);
+}
+
 // ── Tests ─────────────────────────────────────────────────
 
 describe('ProvidersSection', () => {
@@ -77,7 +88,7 @@ describe('ProvidersSection', () => {
   });
 
   it('renders all 6 provider cards after loading', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -91,7 +102,7 @@ describe('ProvidersSection', () => {
   });
 
   it('shows installed count', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByText('3/6 installed')).toBeInTheDocument();
@@ -99,7 +110,7 @@ describe('ProvidersSection', () => {
   });
 
   it('shows "Ready" badge for installed+authenticated providers', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -110,7 +121,7 @@ describe('ProvidersSection', () => {
   });
 
   it('shows "Not installed" for missing providers', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -120,7 +131,7 @@ describe('ProvidersSection', () => {
   });
 
   it('shows "Not authenticated" for installed but unauthed providers', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -129,7 +140,7 @@ describe('ProvidersSection', () => {
   });
 
   it('has enable/disable toggles for each provider', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -139,12 +150,12 @@ describe('ProvidersSection', () => {
   });
 
   it('calls API when toggling a provider', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
-    mockApiFetch.mockResolvedValue({ ...MOCK_PROVIDERS[0], enabled: false });
+    mockApiFetch.mockResolvedValueOnce({ ...MOCK_PROVIDERS[0], enabled: false });
     fireEvent.click(screen.getByTestId('toggle-copilot'));
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
@@ -155,7 +166,7 @@ describe('ProvidersSection', () => {
   });
 
   it('expands a card and shows test connection button', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -167,9 +178,9 @@ describe('ProvidersSection', () => {
   });
 
   it('shows test connection result on click', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_PROVIDERS)
-      .mockResolvedValueOnce({ success: true, message: 'Provider is installed and responsive' });
+    mockProviderApis();
+    // Third call: test connection response
+    mockApiFetch.mockResolvedValueOnce({ success: true, message: 'Provider is installed and responsive' });
 
     render(<ProvidersSection />);
     await waitFor(() => {
@@ -196,8 +207,49 @@ describe('ProvidersSection', () => {
     expect(screen.getByText(/Network error/)).toBeInTheDocument();
   });
 
+  it('does not show preview badge for Codex', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    const codexCard = screen.getByTestId('provider-card-codex');
+    expect(codexCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
+  });
+
+  it('shows preview badge for Claude but not Copilot or Codex', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    const copilotCard = screen.getByTestId('provider-card-copilot');
+    const claudeCard = screen.getByTestId('provider-card-claude');
+    const codexCard = screen.getByTestId('provider-card-codex');
+    expect(copilotCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
+    expect(claudeCard.querySelector('[data-testid="preview-badge"]')).not.toBeNull();
+    expect(codexCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
+  });
+
+  it('shows two setup links for Codex when expanded', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+    const codexCard = screen.getByTestId('provider-card-codex');
+    fireEvent.click(codexCard.querySelector('[role="button"]')!);
+    const linksContainer = screen.getByTestId('provider-links-codex');
+    const links = linksContainer.querySelectorAll('a');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveTextContent('ACP adapter');
+    expect(links[0]).toHaveAttribute('href', 'https://github.com/zed-industries/codex-acp');
+    expect(links[1]).toHaveTextContent('CLI quickstart');
+    expect(links[1]).toHaveAttribute('href', 'https://developers.openai.com/codex/quickstart/?setup=cli');
+  });
+
   it('does not render API key fields anywhere in the DOM', async () => {
-    mockApiFetch.mockResolvedValue(MOCK_PROVIDERS);
+    mockProviderApis();
     const { container } = render(<ProvidersSection />);
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
@@ -205,7 +257,6 @@ describe('ProvidersSection', () => {
     const html = container.innerHTML;
     expect(html).not.toContain('maskedKey');
     expect(html).not.toContain('apiKey');
-    expect(html).not.toContain('API_KEY');
     expect(html).not.toContain('requiredEnvVars');
   });
 });

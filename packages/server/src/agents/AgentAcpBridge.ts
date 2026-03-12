@@ -5,12 +5,17 @@
 import { mkdirSync, existsSync, renameSync, symlinkSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { createAdapterForProvider, buildStartOptions } from '../adapters/AdapterFactory.js';
+import { createRoleFileWriter, listRoleFileWriterProviders } from '../adapters/RoleFileWriter.js';
+import type { RoleDefinition } from '../adapters/RoleFileWriter.js';
 import type { AgentAdapter, ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { runWithAgentContext } from '../middleware/requestContext.js';
 import { agentFlagForRole } from './agentFiles.js';
 import type { Agent } from './Agent.js';
+
+/** Set of provider IDs that have a RoleFileWriter. Cached at module load. */
+const ROLE_FILE_PROVIDERS = new Set(listRoleFileWriterProviders());
 
 /** Ensure the shared workspace directory exists for inter-agent artifact sharing. */
 export function ensureSharedWorkspace(agent: Agent): void {
@@ -66,6 +71,45 @@ export function ensureSharedWorkspace(agent: Agent): void {
 }
 
 /**
+ * Write CLI-specific role/agent definition files so the spawned CLI process
+ * can discover the agent's system prompt natively (e.g. AGENTS.md for Codex,
+ * .github/agents/*.agent.md for Copilot, .gemini/agents/*.md for Gemini).
+ *
+ * Non-critical — if writing fails, the first-prompt fallback still delivers
+ * the system prompt as user-message text.
+ */
+async function writeRoleFilesForProvider(provider: string, agent: Agent, cwd: string): Promise<void> {
+  if (!ROLE_FILE_PROVIDERS.has(provider)) return;
+
+  const roleDef: RoleDefinition = {
+    role: agent.role.id,
+    description: agent.role.description,
+    instructions: agent.role.systemPrompt,
+  };
+
+  try {
+    const writer = createRoleFileWriter(provider);
+    const written = await writer.writeRoleFiles([roleDef], cwd);
+    if (written.length > 0) {
+      logger.info({
+        module: 'agent-bridge',
+        msg: `Wrote ${written.length} role file(s) for ${provider}`,
+        agentId: agent.id,
+        files: written.map(f => f.replace(cwd, '.')),
+      });
+    }
+  } catch (err: any) {
+    logger.warn({
+      module: 'agent-bridge',
+      msg: 'Role file write failed (non-critical — falling back to prompt delivery)',
+      provider,
+      agentId: agent.id,
+      error: err?.message,
+    });
+  }
+}
+
+/**
  * Create and start an adapter connection for the agent.
  * Uses the unified AdapterFactory to pick the right backend (ACP or Claude SDK).
  * Wires all protocol events to the agent's state and listener arrays.
@@ -73,9 +117,10 @@ export function ensureSharedWorkspace(agent: Agent): void {
 export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt?: string): Promise<void> {
   const rawModel = agent.model || agent.role.model;
 
+  const effectiveProvider = agent.provider || config.provider || 'copilot';
+
   const adapterConfig = {
-    provider: config.provider || 'copilot',
-    autopilot: agent.autopilot,
+    provider: effectiveProvider,
     model: rawModel,
     binaryOverride: config.providerBinaryOverride,
     argsOverride: config.providerArgsOverride,
@@ -104,16 +149,47 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   });
 
   agent._setAcpConnection(conn);
-  agent.provider = config.provider || 'copilot';
+  agent.provider = effectiveProvider;
   agent.backend = backend;
   agent.status = 'running';
   wireAcpEvents(agent, conn);
 
-  const startOpts = buildStartOptions(adapterConfig, {
+  const { options: startOpts, modelResolution } = buildStartOptions(adapterConfig, {
     cwd: agent.cwd || process.cwd(),
     sessionId: agent.resumeSessionId,
     agentFlag: agentFlagForRole(agent.role.id),
+    systemPrompt: agent.role.systemPrompt,
   });
+
+  // Store model resolution metadata on the agent
+  if (modelResolution) {
+    agent.modelResolution = {
+      requested: modelResolution.original,
+      resolved: modelResolution.model,
+      translated: modelResolution.translated,
+      reason: modelResolution.reason ?? '',
+    };
+    // Update displayed model to the actual resolved model
+    agent.model = modelResolution.model;
+  }
+
+  // Notify listeners when the model was translated to a different model.
+  // This fires before conn.start() — intentional. The AgentManager listener
+  // queues a system message to the lead (queued messages are delivered once
+  // the lead's current prompt completes, so timing is safe).
+  if (modelResolution?.translated) {
+    agent._notifyModelFallback({
+      requested: modelResolution.original,
+      resolved: modelResolution.model,
+      reason: modelResolution.reason ?? 'cross-provider equivalence',
+      provider: effectiveProvider,
+    });
+  }
+
+  // Write CLI-specific role files BEFORE spawning the process.
+  // The CLI reads these from CWD on startup (e.g. AGENTS.md, .agent.md).
+  const agentCwd = agent.cwd || process.cwd();
+  await writeRoleFilesForProvider(effectiveProvider, agent, agentCwd);
 
   conn.start(startOpts).then((sessionId) => {
     agent.sessionId = sessionId;
@@ -128,6 +204,9 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
     logger.error({ module: 'agent-bridge', msg: 'Adapter start failed', err: errorMsg, backend, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
+
+    // Kill the spawned process to prevent orphan leaks
+    Promise.resolve(conn.terminate()).catch(() => { /* already exited */ });
 
     // Store error for exit event (text pipeline is buffered, races with immediate exit)
     agent.exitError = errorMsg;
@@ -188,10 +267,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     agent._notifyPlan(entries);
   }));
 
-  conn.on('permission_request', (request: any) => withCtx(() => {
-    agent._notifyPermissionRequest(request);
-  }));
-
   conn.on('session_resume_failed', (info: { requestedSessionId: string; error: string }) => withCtx(() => {
     agent._notifySessionResumeFailed(info);
   }));
@@ -242,7 +317,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
       }
       agent.status = 'idle';
       agent._notifyStatusChange(agent.status);
-      agent._notifyHung(0);
     }
   }));
 

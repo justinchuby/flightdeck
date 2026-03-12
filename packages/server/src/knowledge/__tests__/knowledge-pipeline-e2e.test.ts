@@ -517,7 +517,7 @@ describe('Knowledge Pipeline E2E', () => {
       const mgr = createAgentManager({ knowledgeInjector: injector });
       const agent = mgr.spawn(
         makeRole(), 'Build auth module',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
 
@@ -531,7 +531,7 @@ describe('Knowledge Pipeline E2E', () => {
       const mgr = createAgentManager({ knowledgeInjector: injector });
       const agent = mgr.spawn(
         makeRole(), 'Build feature',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: 'empty-project' },
       );
 
@@ -546,12 +546,12 @@ describe('Knowledge Pipeline E2E', () => {
 
       const agent1 = mgr.spawn(
         makeRole({ id: 'developer' }), 'Task A',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
       const agent2 = mgr.spawn(
         makeRole({ id: 'architect' }), 'Task B',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
 
@@ -572,7 +572,7 @@ describe('Knowledge Pipeline E2E', () => {
       });
       const agent1 = mgr.spawn(
         makeRole(), 'Build auth',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
       expect(agent1.role.systemPrompt).toContain('TypeScript');
@@ -601,7 +601,7 @@ describe('Knowledge Pipeline E2E', () => {
       // Step 5: Second agent spawns via AgentManager → gets BOTH core + learned knowledge
       const agent2 = mgr.spawn(
         makeRole(), 'Build user profile',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
 
@@ -625,7 +625,7 @@ describe('Knowledge Pipeline E2E', () => {
       });
       const agent = mgr.spawn(
         makeRole(), 'Quick task',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
 
@@ -678,7 +678,7 @@ describe('Knowledge Pipeline E2E', () => {
       });
       const agent = mgr.spawn(
         makeRole(), 'Build feature',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
 
@@ -762,7 +762,7 @@ describe('Knowledge Pipeline E2E', () => {
       // 4. First agent: has knowledge + skills
       const agent1 = mgr.spawn(
         makeRole(), 'Initial setup',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
       expect(agent1.role.systemPrompt).toContain('Modular monolith');
@@ -785,7 +785,7 @@ describe('Knowledge Pipeline E2E', () => {
       // 6. Second agent gets everything: core + learned + skills
       const agent2 = mgr.spawn(
         makeRole({ id: 'architect' }), 'Design new module',
-        undefined, false, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
         { projectId: PROJECT_ID },
       );
 

@@ -21,7 +21,6 @@ import {
   taskCostRecords,
   sessionRetros,
   timers,
-  deferredIssues,
   agentPlans,
 } from '../db/schema.js';
 
@@ -72,7 +71,6 @@ const DATA_TABLES: { name: string; table: any; selectiveFilter: SelectiveFilter 
   // We include NULL rows in cleanup so they don't accumulate silently.
   { name: 'decisions', table: decisions, selectiveFilter: { by: 'leadId', column: decisions.leadId, nullable: true } },
   { name: 'agent_memory', table: agentMemory, selectiveFilter: { by: 'leadId', column: agentMemory.leadId } },
-  { name: 'deferred_issues', table: deferredIssues, selectiveFilter: { by: 'leadId', column: deferredIssues.leadId } },
   { name: 'agent_plans', table: agentPlans, selectiveFilter: { by: 'leadId', column: agentPlans.leadId, nullable: true } },
   { name: 'timers', table: timers, selectiveFilter: { by: 'leadId', column: timers.leadId, nullable: true } },
   { name: 'file_locks', table: fileLocks, selectiveFilter: { by: 'projectId', column: fileLocks.projectId } },

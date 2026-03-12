@@ -6,7 +6,6 @@ export { getTaskCommands } from './TaskCommands.js';
 export { getCommCommands, maybeAutoCreateGroup } from './CommCommands.js';
 export { getCoordCommands } from './CoordCommands.js';
 export { getSystemCommands } from './SystemCommands.js';
-export { getDeferredCommands } from './DeferredCommands.js';
 export { getCapabilityCommands } from './CapabilityCommands.js';
 export {
   getAgentCommands,

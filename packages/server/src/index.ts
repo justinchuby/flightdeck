@@ -28,8 +28,6 @@ const container = await createContainer({ config, repoRoot });
 // ── Startup reconciliation ──────────────────────────────────
 // After a crash/restart, sessions and roster entries may be stuck in
 // stale states. Reconcile before accepting requests.
-// Important: don't assume agents are dead — the agent daemon is separate.
-// Check for live processes before marking anything as stopped/terminated.
 {
   const isAgentAlive = (agentId: string) => {
     const agent = container.agentManager.get(agentId);
@@ -49,19 +47,6 @@ const container = await createContainer({ config, repoRoot });
   if (staleSessions > 0 || staleAgents > 0) {
     console.log(`🔧 Reconciled ${staleSessions} stale session(s), ${staleAgents} stale agent(s) on startup`);
   }
-}
-
-// ── Fork agent server (two-process architecture) ─────────────────
-// The agent server runs in a detached child process that survives
-// orchestrator restarts. connect() forks or reconnects via PID file.
-if (container.agentServerClient) {
-  container.agentServerClient.connect().then(() => {
-    console.log('🔌 Agent server connected');
-    container.agentServerHealth?.start();
-  }).catch((err: Error) => {
-    console.warn(`⚠️  Agent server connection failed: ${err.message}`);
-    console.warn('   Orchestrator will operate without agent server. Retry with restart.');
-  });
 }
 
 // ── Express app ────────────────────────────────────────────

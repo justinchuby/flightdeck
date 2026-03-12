@@ -34,7 +34,7 @@ vi.mock('../utils/logger.js', () => ({
 }));
 
 // Import AFTER mocking
-import { AcpConnection } from '../acp/AcpConnection.js';
+import { AcpAdapter as AcpConnection } from '../adapters/AcpAdapter.js';
 import { logger } from '../utils/logger.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ describe('AcpConnection', () => {
         throw new Error('not found');
       });
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       await expect(conn.start({
         cliCommand: 'nonexistent-binary',
         cwd: '/tmp',
@@ -76,7 +76,7 @@ describe('AcpConnection', () => {
         throw new Error('not found');
       });
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       await expect(conn.start({
         cliCommand: 'copilot',
         cwd: '/tmp',
@@ -88,7 +88,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
@@ -107,7 +107,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
@@ -130,7 +130,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const exitEvents: number[] = [];
       conn.on('exit', (code: number) => exitEvents.push(code));
 
@@ -158,7 +158,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
@@ -173,7 +173,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
@@ -188,7 +188,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const exitEvents: (number | null)[] = [];
       conn.on('exit', (code: number | null) => exitEvents.push(code));
 
@@ -210,7 +210,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const exitEvents: number[] = [];
       conn.on('exit', (code: number) => exitEvents.push(code));
 
@@ -237,7 +237,7 @@ describe('AcpConnection', () => {
       const fakeProc = createFakeProcess();
       mockSpawn.mockReturnValue(fakeProc);
 
-      const conn = new AcpConnection({ autopilot: true });
+      const conn = new AcpConnection();
       const exitEvents: number[] = [];
       conn.on('exit', (code: number) => exitEvents.push(code));
 

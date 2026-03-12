@@ -14,12 +14,15 @@ import {
   Eye,
 } from 'lucide-react';
 import { ResumeSessionDialog } from './ResumeSessionDialog';
+import { shortAgentId } from '../../utils/agentLabel';
 
 export interface SessionAgent {
   role: string;
   model: string;
   agentId: string;
   sessionId: string | null;
+  lastTaskSummary?: string | null;
+  provider?: string | null;
 }
 
 export interface SessionDetail {
@@ -71,9 +74,10 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
     }
   }, [projectId]);
 
+  // Refetch when hasActiveLead changes (new session started or ended)
   useEffect(() => {
     fetchSessions();
-  }, [fetchSessions]);
+  }, [fetchSessions, hasActiveLead]);
 
   return (
     <div className="space-y-2" data-testid="session-history">
@@ -116,7 +120,7 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
                   role="button"
                   onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(session.leadId); }}
                 >
-                  {session.leadId.slice(0, 8)}
+                  {shortAgentId(session.leadId)}
                 </span>
                 <span className="text-xs flex-1 truncate text-th-text">
                   {session.task || 'No task description'}
@@ -148,9 +152,10 @@ export function SessionHistory({ projectId, hasActiveLead }: SessionHistoryProps
                         <span
                           key={a.agentId}
                           className="text-xs px-1.5 py-0.5 rounded bg-th-bg-muted/50 text-th-text-muted"
-                          title={`${a.role} — ${a.model}${a.sessionId ? ' (resumable)' : ''}`}
+                          title={`${a.role}${a.provider ? ` — ${a.provider}` : ''} — ${a.model}${a.sessionId ? ' (resumable)' : ''}`}
                         >
                           {a.role}
+                          {a.provider && <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded ml-0.5">{a.provider}</span>}
                           <span className="opacity-60 ml-0.5">({a.model})</span>
                         </span>
                       ))}

@@ -28,7 +28,6 @@ import {
   Plus,
   ChevronRight,
   ChevronDown,
-  Shield,
   Gavel,
   ListChecks,
   Loader2,
@@ -171,7 +170,7 @@ function ActiveAgentRow({ agent, projectName }: { agent: AgentInfo; projectName:
 
 /** Only explicit PROGRESS commands from the lead — nothing else */
 const PROGRESS_ACTION_TYPES = new Set([
-  'progress',
+  'progress_update',
 ]);
 
 
@@ -362,13 +361,8 @@ export function HomeDashboard() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [pendingDecisions]);
 
-  // Permission requests from agents
-  const permissionRequests = useMemo(() => {
-    return agents.filter(a => a.pendingPermission);
-  }, [agents]);
-
   // Total action-required count
-  const actionRequiredCount = decisionsNeedingApproval.length + permissionRequests.length;
+  const actionRequiredCount = decisionsNeedingApproval.length;
 
   // Recent decisions (informational feed — all statuses, last 10)
   const recentDecisions = useMemo(() => {
@@ -532,17 +526,6 @@ export function HomeDashboard() {
             </span>
           </div>
           <div className="bg-surface-raised border border-amber-400/20 rounded-lg divide-y divide-th-border">
-            {/* Permission requests first (most urgent) */}
-            {permissionRequests.map((agent) => (
-              <ActionRequiredItem
-                key={`perm-${agent.id}`}
-                icon={<Shield className="w-4 h-4" />}
-                title={`${agent.role?.name ?? 'Agent'} requests permission: ${agent.pendingPermission?.toolName ?? 'tool access'}`}
-                subtitle={`${resolveProjectName(agent.projectId, projects, agents)} · Permission request`}
-                timestamp={agent.pendingPermission?.timestamp ?? agent.createdAt}
-                onClick={() => { if (agent.projectId) handleNavigateToProject(agent.projectId); }}
-              />
-            ))}
             {/* Decisions needing approval */}
             {decisionsNeedingApproval.slice(0, 5).map((d) => (
               <ActionRequiredItem

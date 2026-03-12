@@ -11,7 +11,6 @@ Configuration is stored in the `settings` SQLite table and can be updated via th
 | `maxConcurrent` | `10` | Maximum concurrent agents (includes idle agents) |
 | `autoRestart` | `true` | Auto-restart crashed agents |
 | `maxRestarts` | `3` | Max restart attempts per agent |
-| `autoKillTimeoutMs` | `null` | Auto-terminate hung agents after this many ms |
 
 ### Environment Variables
 

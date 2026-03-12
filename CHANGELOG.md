@@ -79,6 +79,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AcpAdapter unit tests** — Comprehensive test suite added (59 tests).
 - **Connection timeouts** — All SDK adapters now have configurable connection timeouts.
 
+#### Model Resolution & Provider Scoping
+
+- **Per-provider model scoping** — `getModelsForProvider()` and `getModelsByProvider()` in `ModelResolver.ts` compute which models each CLI provider natively supports. Exposed via `GET /models` as `modelsByProvider`.
+- **CLI_RESTRICTED_MODELS** — Providers with restricted catalogs (e.g., Copilot only supports `gemini-3-pro-preview` from Google) are now explicitly modeled. Non-allowed models fall through to cross-provider equivalence mapping instead of passthrough.
+- **Data-driven model allowlist UI** — `ModelConfigPanel.tsx` provider tabs now filter models from the backend-provided per-provider list instead of hardcoded filter functions.
+- **Model fallback notification system** — When `ModelResolver` translates a requested model to a provider-compatible equivalent, dual notifications fire: a system message to the lead agent and a WebSocket-driven toast to the user showing `requestedModel → resolvedModel (provider)`.
+- **Codex tier updates** — Standard tier updated to `gpt-5.3-codex`, premium to `gpt-5.4`. Added `gpt-5.4` to all model lists.
+
+#### Unified Agent Detail Panel
+
+- **AgentDetailPanel** (`packages/web/src/components/AgentDetailPanel/`) — Single component replacing both `AgentDetailModal` (popup) and `ProfilePanel` (crew page side panel). Supports `mode='inline'` (side-by-side on Crew/Agents pages) and `mode='modal'` (popup on sidebar/org-chart clicks).
+- **Three tabs** — Details (task, tokens, context window, output, errors, profile metadata), Chat (full message history via AgentChatPanel), Settings (editable model dropdown, provider info).
+- **Dual data source** — App store for live data (always), profile API for persistent data (when `teamId` is provided). Smart merge with nullish coalescing.
+- **Model fallback display** — Strikethrough requested model → yellow resolved model in header when `modelTranslated` is true, with tooltip showing resolution reason.
+- **AgentDetailModal removed** — 328 lines of dead code deleted after unification.
+
+#### Agent & Provider Fixes
+
+- **Terminated agent provider display** — `teams.ts` falls back to roster DB provider when live agent is gone after 30s cleanup. `useWebSocket.ts` changed from `removeAgent()` to `updateAgent({ status: 'terminated' })` so agents remain visible with all data.
+- **Terminated status guard** — `agent:exit` handler no longer overwrites explicit `terminated` status with `failed`.
+- **Gemini `--agent` flag fix** — `buildStartOptions()` skips `--agent` for providers that don't support it (gemini, claude, codex).
+- **Gemini env var fix** — `GEMINI_SYSTEM_MD` environment variable handling corrected.
+- **Gemini orphan process leak** — Fixed orphan child processes on Gemini agent termination.
+- **Session resume duplicate prevention** — `resumeAll()` race condition fix prevents duplicate agent instances.
+
+#### UI Improvements
+
+- **Clickable org chart nodes** — Agent nodes in the Agent Hierarchy open the agent detail popup on click, with cursor pointer and hover effects.
+- **Interactive chart tooltips** — Task Flow and Token Usage charts on the Analysis page now show crosshair indicators with data values on hover.
+- **Communication heatmap improvements** — Role names alongside agent IDs, untruncated top-axis labels (45° rotation), responsive rectangular layout instead of forced square.
+- **Agent card provider display** — Color-coded left border and micro-pill tag showing provider on agent cards. Per-provider colors via `getProviderColors()` utility.
+- **Full session ID display** — Agent detail views show complete session UUID on its own line instead of truncated inline.
+- **FileLockPanel on OverviewPage** — Reusable file lock display added after Attention Items section.
+- **Improved markdown rendering** — New `Markdown` component using `react-markdown` with GFM, syntax highlighting, and clickable `@mentions`.
+- **OverviewPage decisions fix** — Changed endpoint from `/lead/:id/decisions` to `/decisions?projectId=` (was matching nothing).
+- **OverviewPage progress fix** — Changed `type=progress` to `type=progress_update` to match stored `actionType`.
+- **Analysis page fixes** — Removed misleading AgentHeatmap (spawn data only), added project-scoped CostBreakdown filter, added session title display.
+- **Provider badge colors** — New `getProviderColors()` shared utility in `packages/web/src/utils/providerColors.ts` returns per-provider Tailwind classes (copilot=purple, gemini=blue, claude=amber, codex=green, cursor=cyan, opencode=zinc).
+
 #### Telegram Integration
 
 - **TelegramBot** — Core bot implementation with grammY framework.
@@ -242,6 +281,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Teams → Crews** — All UI components renamed: TeamPage→CrewPage, TeamHealth→CrewHealth, TeamRoster→CrewRoster, TeamStatus→CrewStatus, TeamStatusContent→CrewStatusContent. Route `/team` → `/crews` with backward-compat redirect.
 - **Locale-aware relative dates** — Replaced manual relative time strings with `Intl.RelativeTimeFormat` for proper localization.
 - **0 TypeScript errors** — Both `packages/server` and `packages/web` compile cleanly with `tsc --noEmit`.
+- **AgentDetailModal → AgentDetailPanel** — Unified agent detail component replaces separate `AgentDetailModal` (popup) and `ProfilePanel` (crew side panel). All consumers updated: `UnifiedCrewPage`, `OrgChart`.
+- **Provider badge styling** — Hardcoded `bg-blue-500/15 text-blue-400` replaced with per-provider color utility (`getProviderColors()`). Copilot=purple, Claude=amber, Gemini=blue, Codex=green.
+- **Codex default model** — Default model updated from `gpt-5` to `gpt-5.3-codex` in provider preset.
+- **Codex tier mapping** — Standard: `gpt-5.1-codex` → `gpt-5.3-codex`. Premium: `gpt-5.2-codex` → `gpt-5.4`.
+- **ModelConfigPanel data-driven** — Provider tab model filter functions (`() => true`, `m.startsWith('claude-')`, etc.) replaced with backend-provided `modelsByProvider` data.
+- **Markdown rendering** — Hand-rolled markdown parser replaced with `react-markdown` + `remark-gfm` + `rehype-highlight` for proper GFM support.
 
 ### Fixed
 
@@ -292,6 +337,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Light theme Overview colors** — Fixed status banner colors in light mode.
 - **Status badge inconsistency** — Runtime agent state now overrides stale DB status values in header and Overview.
 - **Tasks scope dropdown** — Removed redundant scope dropdown from Tasks view when inside project context.
+
+### Removed
+
+- **AgentDetailModal** — Replaced by unified `AgentDetailPanel` supporting both inline and modal rendering modes. 328 lines of dead code deleted.
+- **ProfilePanel (inline)** — ~220 lines of inline component removed from `UnifiedCrewPage.tsx`, replaced by `AgentDetailPanel`.
+- **AgentHeatmap on Analysis page** — Removed from `AnalysisPage.tsx` because it only displayed spawn data, not actual communication patterns. Misleading visualization.
+- **DEFER_ISSUE / QUERY_DEFERRED / RESOLVE_DEFERRED** — Deferred issue system being removed. Stored in SQLite `deferred_issues` table and showed as 📌 in Activity Feed but had no dedicated UI panel. Value did not justify complexity vs. decision/progress logging.
 
 ### Stats
 

@@ -11,13 +11,11 @@ const ISSUE_LABELS = 'user-feedback';
 interface FeedbackContext {
   /** Short context for the issue title, e.g. "Session resume failed" */
   title?: string;
-  /** Error message or details for the issue body */
+  /** Error message or details — maps to the "Error Message" field in the template */
   errorMessage?: string;
-  /** Session or agent ID for debugging */
-  sessionId?: string;
 }
 
-/** Build a GitHub issue URL with pre-filled fields. */
+/** Build a GitHub issue URL with pre-filled fields matching the YAML form template. */
 export function buildFeedbackUrl(ctx: FeedbackContext = {}): string {
   const params = new URLSearchParams();
   params.set('template', ISSUE_TEMPLATE);
@@ -27,17 +25,8 @@ export function buildFeedbackUrl(ctx: FeedbackContext = {}): string {
     params.set('title', ctx.title);
   }
 
-  const bodyParts: string[] = [];
   if (ctx.errorMessage) {
-    bodyParts.push(`**Error:** ${ctx.errorMessage}`);
-  }
-  if (ctx.sessionId) {
-    bodyParts.push(`**Session ID:** \`${ctx.sessionId}\``);
-  }
-  bodyParts.push(`**Timestamp:** ${new Date().toISOString()}`);
-
-  if (bodyParts.length > 0) {
-    params.set('body', bodyParts.join('\n'));
+    params.set('error-message', ctx.errorMessage);
   }
 
   return `${GITHUB_ISSUE_URL}?${params.toString()}`;

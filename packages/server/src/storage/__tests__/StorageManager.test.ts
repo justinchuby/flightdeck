@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 import YAML from 'yaml';
-import { StorageManager, atomicWriteFile, assertWithinDir } from '../StorageManager.js';
+import { StorageManager, atomicWriteFile } from '../StorageManager.js';
+import { validatePathWithinDir } from '../../utils/pathValidation.js';
 import type { ProjectMetadata } from '../types.js';
 import { PROJECT_SUBDIRS } from '../types.js';
 
@@ -190,22 +191,22 @@ describe('path traversal protection', () => {
   });
 });
 
-describe('assertWithinDir', () => {
+describe('validatePathWithinDir', () => {
   it('allows paths within parent directory', () => {
-    const result = assertWithinDir('/projects/my-proj', 'knowledge/core/rules.md');
+    const result = validatePathWithinDir('/projects/my-proj', 'knowledge/core/rules.md');
     expect(result).toBe('/projects/my-proj/knowledge/core/rules.md');
   });
 
   it('rejects paths that escape via ../', () => {
-    expect(() => assertWithinDir('/projects/my-proj', '../../../etc/passwd')).toThrow(/Path traversal/);
+    expect(() => validatePathWithinDir('/projects/my-proj', '../../../etc/passwd')).toThrow(/Path traversal/);
   });
 
   it('rejects paths that escape via absolute path', () => {
-    expect(() => assertWithinDir('/projects/my-proj', '/etc/passwd')).toThrow(/Path traversal/);
+    expect(() => validatePathWithinDir('/projects/my-proj', '/etc/passwd')).toThrow(/Path traversal/);
   });
 
   it('allows deeply nested valid paths', () => {
-    const result = assertWithinDir('/root', 'a/b/c/d.txt');
+    const result = validatePathWithinDir('/root', 'a/b/c/d.txt');
     expect(result).toBe('/root/a/b/c/d.txt');
   });
 });

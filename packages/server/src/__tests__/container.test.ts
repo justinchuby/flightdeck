@@ -99,11 +99,6 @@ describe('createContainer', () => {
     expect(container.sessionExporter).toBeDefined();
     expect(container.performanceTracker).toBeDefined();
 
-    // Agent Server architecture
-    expect(container.agentServerClient).toBeDefined();
-    expect(container.agentServerHealth).toBeDefined();
-    expect(container.massFailureDetector).toBeDefined();
-
     // costTracker available both publicly and internally
     expect(container.costTracker).toBeDefined();
 
@@ -112,7 +107,6 @@ describe('createContainer', () => {
     expect(container.internal.agentMemory).toBeDefined();
     expect(container.internal.chatGroupRegistry).toBeDefined();
     expect(container.internal.taskDAG).toBeDefined();
-    expect(container.internal.deferredIssueRegistry).toBeDefined();
     expect(container.internal.contextRefresher).toBeDefined();
     expect(container.internal.scheduler).toBeDefined();
     expect(container.internal.worktreeManager).toBeDefined();

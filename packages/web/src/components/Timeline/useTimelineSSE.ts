@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { TimelineData } from './useTimelineData';
+import { shortAgentId } from '../../utils/agentLabel';
 
 export type ConnectionHealth = 'connected' | 'connecting' | 'reconnecting' | 'degraded' | 'offline';
 
@@ -77,7 +78,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     eventSourceRef.current = eventSource;
 
     eventSource.addEventListener('init', (event: MessageEvent) => {
-      const eventId = (event as any).lastEventId;
+      const eventId = event.lastEventId;
       if (eventId && seenEventIds.current.has(eventId)) return;
       if (eventId) {
         trackSeenId(eventId);
@@ -99,7 +100,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     });
 
     eventSource.addEventListener('reconnect', (event: MessageEvent) => {
-      const eventId = (event as any).lastEventId;
+      const eventId = event.lastEventId;
       if (eventId && seenEventIds.current.has(eventId)) return;
       if (eventId) trackSeenId(eventId);
 
@@ -118,7 +119,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     });
 
     eventSource.addEventListener('activity', (event: MessageEvent) => {
-      const eventId = (event as any).lastEventId;
+      const eventId = event.lastEventId;
       if (eventId && seenEventIds.current.has(eventId)) return;
       if (eventId) {
         trackSeenId(eventId);
@@ -134,7 +135,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     });
 
     eventSource.addEventListener('lock', (event: MessageEvent) => {
-      const eventId = (event as any).lastEventId;
+      const eventId = event.lastEventId;
       if (eventId && seenEventIds.current.has(eventId)) return;
       if (eventId) trackSeenId(eventId);
 
@@ -147,7 +148,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
     });
 
     eventSource.addEventListener('comm:update', (event: MessageEvent) => {
-      const eventId = (event as any).lastEventId;
+      const eventId = event.lastEventId;
       if (eventId && seenEventIds.current.has(eventId)) return;
       if (eventId) {
         trackSeenId(eventId);
@@ -270,7 +271,7 @@ function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
     if (!agent) {
       agent = {
         id: entry.agentId,
-        shortId: entry.agentId.slice(0, 8),
+        shortId: shortAgentId(entry.agentId),
         role: entry.agentRole,
         createdAt: entry.timestamp,
         segments: [],
@@ -314,7 +315,7 @@ function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
     communications.push({
       type: 'group_message',
       fromAgentId: entry.agentId,
-      toAgentId: undefined as any,
+      toAgentId: undefined,
       groupName: entry.details.groupName,
       summary: (entry.summary ?? '').slice(0, 120),
       timestamp: entry.timestamp,

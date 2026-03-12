@@ -50,7 +50,7 @@ const MOCK_STATUSES = [
   { id: 'gemini', name: 'Google Gemini CLI', installed: false, authenticated: null, enabled: true, binaryPath: null },
   { id: 'opencode', name: 'OpenCode', installed: false, authenticated: null, enabled: true, binaryPath: null },
   { id: 'cursor', name: 'Cursor', installed: false, authenticated: null, enabled: false, binaryPath: null },
-  { id: 'codex', name: 'Codex CLI', installed: true, authenticated: false, enabled: true, binaryPath: '/usr/bin/codex' },
+  { id: 'codex', name: 'Codex (ACP)', installed: true, authenticated: false, enabled: true, binaryPath: '/usr/bin/codex-acp' },
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ describe('settings routes', () => {
     });
 
     it('returns failure when auth check fails', async () => {
-      mockDetectInstalled.mockReturnValue({ installed: true, binaryPath: '/usr/bin/codex' });
+      mockDetectInstalled.mockReturnValue({ installed: true, binaryPath: '/usr/bin/codex-acp' });
       mockCheckAuth.mockReturnValue({ authenticated: false, error: 'not logged in' });
       const res = await fetch(`${baseUrl}/settings/providers/codex/test`, { method: 'POST' });
       const body = await res.json();

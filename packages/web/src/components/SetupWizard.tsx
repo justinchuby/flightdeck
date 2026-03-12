@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { apiFetch } from '../hooks/useApi';
+import { getProvider } from '@flightdeck/shared';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -25,24 +26,6 @@ interface ProviderStatus {
 type Step = 'welcome' | 'providers' | 'done';
 
 const STORAGE_KEY = 'flightdeck-setup-completed';
-
-const PROVIDER_ICONS: Record<string, string> = {
-  copilot: '🐙',
-  claude: '🟠',
-  gemini: '💎',
-  opencode: '🔓',
-  cursor: '↗️',
-  codex: '🤖',
-};
-
-const PROVIDER_DOCS: Record<string, string> = {
-  copilot: 'https://github.com/features/copilot',
-  claude: 'https://docs.anthropic.com/en/docs/claude-code/overview',
-  gemini: 'https://github.com/google-gemini/gemini-cli',
-  opencode: 'https://github.com/nicepkg/opencode',
-  cursor: 'https://www.cursor.com/',
-  codex: 'https://github.com/openai/codex',
-};
 
 // ── Component ───────────────────────────────────────────────────────
 
@@ -126,9 +109,9 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                       data-testid={`provider-${p.id}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">{PROVIDER_ICONS[p.id] ?? '🔧'}</span>
+                        <span className="text-lg">{getProvider(p.id)?.icon ?? '🔧'}</span>
                         <span className="text-sm font-medium text-th-text">{p.name}</span>
-                        {p.id !== 'copilot' && (
+                        {(getProvider(p.id)?.isPreview ?? true) && (
                           <span className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
                             Preview
                           </span>
@@ -141,7 +124,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                         </span>
                       ) : (
                         <a
-                          href={PROVIDER_DOCS[p.id] ?? '#'}
+                          href={getProvider(p.id)?.docsUrl ?? '#'}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-xs text-accent hover:underline"

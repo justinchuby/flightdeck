@@ -4,8 +4,11 @@ import type { AgentInfo } from '../../types';
 import { RefreshCw, Square, Terminal, Zap, Check, Play } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { shortAgentId } from '../../utils/agentLabel';
 import { formatTokens } from '../../utils/format';
 import { DiffBadge } from '../DiffPreview';
+import { useModels } from '../../hooks/useModels';
+import { getProviderColors } from '../../utils/providerColors';
 
 interface Props {
   agent: AgentInfo;
@@ -13,31 +16,20 @@ interface Props {
   ws: any;
 }
 
-const AVAILABLE_MODELS = [
-  'claude-opus-4.6',
-  'claude-sonnet-4.6',
-  'claude-sonnet-4.5',
-  'claude-haiku-4.5',
-  'gpt-5.3-codex',
-  'gpt-5.2-codex',
-  'gpt-5.2',
-  'gpt-5.1-codex',
-  'gemini-3-pro-preview',
-  'gpt-4.1',
-];
-
 export function AgentCard({ agent, api }: Props) {
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const isSelected = selectedAgentId === agent.id;
   const [confirmKill, setConfirmKill] = useState(false);
+  const providerColors = getProviderColors(agent.provider);
+  const { models: availableModels } = useModels();
 
   return (
     <div
-      className={`rounded-lg border p-3 cursor-pointer transition-colors ${
+      className={`rounded-lg border p-3 cursor-pointer transition-colors border-l-[3px] ${providerColors.border} ${
         isSelected
-          ? 'border-accent bg-accent/5'
-          : 'border-th-border bg-surface-raised hover:border-th-border-hover'
+          ? 'border-t-accent border-r-accent border-b-accent bg-accent/5'
+          : 'border-t-th-border border-r-th-border border-b-th-border bg-surface-raised hover:border-t-th-border-hover hover:border-r-th-border-hover hover:border-b-th-border-hover'
       }`}
       onClick={() => setSelectedAgent(isSelected ? null : agent.id)}
     >
@@ -45,21 +37,21 @@ export function AgentCard({ agent, api }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-lg">{agent.role.icon}</span>
           <div>
-            <h3 className="text-sm font-medium">{agent.role.name} <span className="text-th-text-muted font-mono text-xs">({agent.id.slice(0, 8)})</span></h3>
+            <h3 className="text-sm font-medium">{agent.role.name} <span className="text-th-text-muted font-mono text-xs">({shortAgentId(agent.id)})</span></h3>
             <div className="flex items-center gap-2">
               <span className={`text-xs ${agentStatusText(agent.status)}`}>
                 {agent.status}
               </span>
-              {agent.sessionId && (
-                <button
-                  className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors"
-                  title={`Session: ${agent.sessionId} — click to copy`}
-                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
-                >
-                  sess:{agent.sessionId.slice(0, 8)}
-                </button>
-              )}
             </div>
+            {agent.sessionId && (
+              <button
+                className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors block mt-0.5 truncate max-w-[220px]"
+                title={`Session: ${agent.sessionId} — click to copy`}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+              >
+                sess:{agent.sessionId}
+              </button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -146,23 +138,31 @@ export function AgentCard({ agent, api }: Props) {
         </div>
       )}
 
+      {agent.exitError && (
+        <div className="text-[10px] font-mono text-red-400 bg-red-900/20 border border-red-800/30 rounded px-2 py-1 mb-1 whitespace-pre-wrap max-h-12 overflow-hidden">
+          {agent.exitError.length > 120 ? agent.exitError.slice(0, 120) + '…' : agent.exitError}
+        </div>
+      )}
+
       {(agent.status === 'running' || agent.status === 'idle') && (
         <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[10px] text-th-text-muted">Model:</span>
+          {agent.provider && (
+            <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${providerColors.bg} ${providerColors.text}`}>{agent.provider}</span>
+          )}
           <select
-            value={agent.model || agent.role.model || ''}
+            value={agent.model || ''}
             onChange={(e) => {
               e.stopPropagation();
               api.updateAgent(agent.id, { model: e.target.value });
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer"
+            className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer min-w-0 truncate"
           >
             {(() => {
-              const currentModel = agent.model || agent.role.model || '';
-              const options = AVAILABLE_MODELS.includes(currentModel)
-                ? AVAILABLE_MODELS
-                : [currentModel, ...AVAILABLE_MODELS];
+              const currentModel = agent.model || '';
+              const options = availableModels.includes(currentModel)
+                ? availableModels
+                : [currentModel, ...availableModels];
               return options.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ));
@@ -171,9 +171,12 @@ export function AgentCard({ agent, api }: Props) {
         </div>
       )}
 
-      {!(agent.status === 'running' || agent.status === 'idle') && agent.model && (
-        <div className="text-[10px] text-th-text-muted mb-1">
-          Model: <span className="text-th-text-muted">{agent.model}</span>
+      {!(agent.status === 'running' || agent.status === 'idle') && (agent.model || agent.provider) && (
+        <div className="flex items-center gap-1.5 text-[10px] text-th-text-muted mb-1">
+          {agent.provider && (
+            <span className={`text-[9px] shrink-0 px-1 py-px rounded-sm font-medium ${providerColors.bg} ${providerColors.text}`}>{agent.provider}</span>
+          )}
+          {agent.model && <span className="truncate">{agent.model}</span>}
         </div>
       )}
 
@@ -249,11 +252,6 @@ export function AgentCard({ agent, api }: Props) {
             className="inline-block w-2.5 h-2.5 rounded-full"
             style={{ backgroundColor: agent.role.color }}
           />
-          {agent.autopilot && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400">
-              autopilot
-            </span>
-          )}
           {(agent.status === 'running' || agent.status === 'idle') && (
             <DiffBadge agentId={agent.id} />
           )}

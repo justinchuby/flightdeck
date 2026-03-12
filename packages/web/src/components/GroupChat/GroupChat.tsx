@@ -3,9 +3,11 @@ import { useAppStore } from '../../stores/appStore';
 import { useGroupStore, groupKey } from '../../stores/groupStore';
 import { MessageSquare, Send, Users, X, Plus, Crown } from 'lucide-react';
 import type { ChatGroup, GroupMessage } from '../../types';
-import { MarkdownContent, MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
+import { MentionText, AgentIdBadge, idColor } from '../../utils/markdown';
+import { Markdown } from '../ui/Markdown';
 import { FilterTabs } from '../FilterTabs';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
+import { shortAgentId } from '../../utils/agentLabel';
 
 const EMPTY_GROUP_MSGS: GroupMessage[] = [];
 
@@ -172,7 +174,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
     if (mentionQuery === null) return [];
     const q = mentionQuery.toLowerCase();
     return mentionCandidates.filter(
-      (a) => a.id.slice(0, 8).toLowerCase().startsWith(q) || a.role.name.toLowerCase().includes(q),
+      (a) => shortAgentId(a.id).toLowerCase().startsWith(q) || a.role.name.toLowerCase().includes(q),
     ).slice(0, 8);
   }, [mentionQuery, mentionCandidates]);
 
@@ -183,7 +185,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
   };
 
   const insertMention = (agent: typeof agents[0]) => {
-    const shortId = agent.id.slice(0, 8);
+    const shortId = shortAgentId(agent.id);
     const cursorPos = textareaRef.current?.selectionStart ?? inputText.length;
     const before = inputText.slice(0, cursorPos);
     const after = inputText.slice(cursorPos);
@@ -201,12 +203,40 @@ export function GroupChat(_props: { api: any; ws: any }) {
     }
   }, [contextProjectId, scopedLeads, selectedProjectLeadId]);
 
-  // Filtered groups/tabs by selected project
-  const filteredGroups = selectedProjectLeadId
-    ? groups.filter((g) => (g.projectId ?? g.leadId) === selectedProjectLeadId)
+  // Build sets of lead agent IDs and project UUIDs for the selected project
+  // so we can filter groups by leadId OR projectId (since projectId is optional on ChatGroup).
+  // selectedProjectLeadId may be a lead agent ID or a project UUID depending on context.
+  const { selectedLeadIds, selectedProjectIds } = useMemo(() => {
+    if (!selectedProjectLeadId) return { selectedLeadIds: null, selectedProjectIds: null };
+    const leadIds = new Set<string>();
+    const projectIds = new Set<string>();
+    for (const l of leads) {
+      const matchesAsLeadId = l.id === selectedProjectLeadId;
+      const matchesAsProjectId = l.projectId === selectedProjectLeadId;
+      if (matchesAsLeadId || matchesAsProjectId) {
+        leadIds.add(l.id);
+        if (l.projectId) projectIds.add(l.projectId);
+      }
+    }
+    // If selectedProjectLeadId looks like a project UUID (not matching any lead ID),
+    // include it directly in projectIds
+    if (!leads.some((l) => l.id === selectedProjectLeadId)) {
+      projectIds.add(selectedProjectLeadId);
+    }
+    return {
+      selectedLeadIds: leadIds.size > 0 ? leadIds : null,
+      selectedProjectIds: projectIds.size > 0 ? projectIds : null,
+    };
+  }, [selectedProjectLeadId, leads]);
+
+  // Filtered groups/tabs by selected project — match on leadId or projectId
+  const filteredGroups = selectedLeadIds
+    ? groups.filter((g) =>
+        selectedLeadIds.has(g.leadId) ||
+        (g.projectId != null && selectedProjectIds?.has(g.projectId)))
     : groups;
-  const filteredTabs = selectedProjectLeadId
-    ? openTabs.filter((t) => t.leadId === selectedProjectLeadId)
+  const filteredTabs = selectedLeadIds
+    ? openTabs.filter((t) => selectedLeadIds.has(t.leadId))
     : openTabs;
 
   /* ---- Fetch groups for project-scoped leads ---- */
@@ -309,7 +339,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
     (id: string): string => {
       if (id === 'human') return 'You';
       const agent = agents.find((a) => a.id === id);
-      return agent?.role.name ?? id.slice(0, 8);
+      return agent?.role.name ?? shortAgentId(id);
     },
     [agents],
   );
@@ -469,7 +499,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
           className="px-3 py-1.5 border-b border-th-border/50 shrink-0 bg-th-bg/50"
           items={leads.map((lead) => ({
             value: lead.id,
-            label: lead.projectName || lead.id.slice(0, 8),
+            label: lead.projectName || shortAgentId(lead.id),
             count: groups.filter((g) => (g.projectId ?? g.leadId) === lead.id).length || undefined,
             icon: <Crown className="w-3 h-3" />,
           }))}
@@ -497,7 +527,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
 
             return Array.from(tabsByProject.entries()).map(([leadId, tabs]) => {
               const lead = leads.find((l) => l.id === leadId);
-              const projectLabel = lead?.projectName || leadId.slice(0, 8);
+              const projectLabel = lead?.projectName || shortAgentId(leadId);
               return (
                 <div key={leadId} className="flex items-center shrink-0">
                   {showProjectHeaders && (
@@ -579,7 +609,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                 }
                 return Array.from(byProject.entries()).map(([leadId, grps]) => {
                   const lead = leads.find((l) => l.id === leadId);
-                  const projectLabel = lead?.projectName || leadId.slice(0, 8);
+                  const projectLabel = lead?.projectName || shortAgentId(leadId);
                   return byProject.size > 1 ? (
                     <optgroup key={leadId} label={projectLabel}>
                       {grps.map((g) => (
@@ -659,7 +689,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                         </div>
                         <div className={`rounded-lg px-3 py-2 text-sm ${human ? 'bg-blue-600 text-white' : 'bg-th-bg-alt text-th-text-alt'}`}>
                           <div className="whitespace-pre-wrap break-words prose-sm">
-                            <MarkdownContent text={msg.content} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                            <Markdown text={msg.content} monospace mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
                           </div>
                         </div>
                         <div className={`text-xs text-th-text-muted mt-0.5 ${human ? 'text-right' : ''}`}>
@@ -765,7 +795,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
                 >
                   {leads.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.projectName ?? l.id.slice(0, 8)}
+                      {l.projectName ?? shortAgentId(l.id)}
                     </option>
                   ))}
                 </select>

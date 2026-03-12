@@ -1,4 +1,5 @@
 import type { SessionSummary } from './types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface PostSessionRetroCardProps {
   session: SessionSummary;
@@ -36,7 +37,7 @@ export function PostSessionRetroCard({ session, avgTasks, onClose }: PostSession
     <div className="bg-surface-raised border border-th-border rounded-lg p-5" data-testid="post-session-retro">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-th-text-alt">
-          📊 Session Complete — {session.projectId ?? session.leadId.slice(0, 8)}
+          📊 Session Complete — {session.projectId ?? shortAgentId(session.leadId)}
         </h3>
         <button
           onClick={onClose}

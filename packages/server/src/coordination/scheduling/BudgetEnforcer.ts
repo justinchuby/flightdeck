@@ -2,7 +2,8 @@ import { EventEmitter } from 'events';
 import type { Database } from '../../db/database.js';
 import type { CostTracker } from '../../agents/CostTracker.js';
 import { logger } from '../../utils/logger.js';
-import { INPUT_COST_PER_TOKEN, OUTPUT_COST_PER_TOKEN } from '../../constants/pricing.js';
+const INPUT_COST_PER_TOKEN = 3.0 / 1_000_000;   // ~$3/MTok
+const OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000;  // ~$15/MTok
 
 // ── Types ─────────────────────────────────────────────────────────
 

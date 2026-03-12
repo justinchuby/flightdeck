@@ -3,7 +3,8 @@ import { Send, AlertCircle, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useToastStore } from '../Toast';
 import { apiFetch } from '../../hooks/useApi';
-import { MarkdownContent, AgentIdBadge } from '../../utils/markdown';
+import { AgentIdBadge } from '../../utils/markdown';
+import { Markdown } from '../ui/Markdown';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type { AcpTextChunk, AgentInfo } from '../../types';
 
@@ -319,7 +320,7 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
           isUser ? 'rounded-tr-sm' : 'rounded-tl-sm'
         } ${compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'}`}
       >
-        <MarkdownContent text={text} />
+        <Markdown text={text} monospace />
       </div>
     </div>
   );

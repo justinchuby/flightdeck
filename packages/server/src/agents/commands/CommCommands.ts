@@ -277,7 +277,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
       resolvedIds.push(agent.id);
     }
     const group = ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds, agent.projectId, req.roles);
-    const memberNames = group.memberIds.map((id) => {
+    const memberNames = group.memberIds.map((id: string) => {
       const a = ctx.getAgent(id);
       return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
     }).join(', ');
@@ -416,7 +416,7 @@ function handleListGroups(ctx: CommandHandlerContext, agent: Agent): void {
     return;
   }
   const lines = groups.map((g) => {
-    const memberNames = g.memberIds.map((id) => {
+    const memberNames = g.memberIds.map((id: string) => {
       const a = ctx.getAgent(id);
       return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
     }).join(', ');
@@ -508,7 +508,7 @@ function handleReact(ctx: CommandHandlerContext, agent: Agent, data: string): vo
       messageId = messages[0].id;
     }
 
-    const success = ctx.chatGroupRegistry.addReaction(messageId, agent.id, req.emoji);
+    const success = ctx.chatGroupRegistry.addReaction(messageId!, agent.id, req.emoji);
     if (success) {
       logger.info({ module: 'comms', msg: 'Reaction added', groupName: req.group, emoji: req.emoji, messageId });
     } else {

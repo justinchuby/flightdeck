@@ -12,6 +12,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import type { GanttTask } from './DagGantt';
 import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface Props {
   api: any;
@@ -553,7 +554,7 @@ export function TaskQueuePanel({ api }: Props) {
                   }`}
                 >
                   <span className="font-medium max-w-[160px] truncate">
-                    {l.projectName || l.id.slice(0, 8)}
+                    {l.projectName || shortAgentId(l.id)}
                   </span>
                   {taskCount > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 rounded-full min-w-[18px] text-center ${

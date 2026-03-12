@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
 import { useAppStore } from '../../stores/appStore';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface TimerCreateFormProps {
   onClose: () => void;
@@ -73,7 +74,7 @@ export function TimerCreateForm({ onClose }: TimerCreateFormProps) {
         >
           {runningAgents.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.role.name} ({a.id.slice(0, 8)})
+              {a.role.name} ({shortAgentId(a.id)})
             </option>
           ))}
         </select>

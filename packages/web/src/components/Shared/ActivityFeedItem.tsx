@@ -12,12 +12,11 @@ export interface ActivityEntry {
 }
 
 const ACTIVITY_ICONS: Record<string, string> = {
-  progress: '📊',
+  progress_update: '📊',
   task_completed: '✅',
   task_started: '▶️',
   decision_made: '⚖️',
   delegated: '📋',
-  deferred_issue: '📌',
 };
 
 export { ACTIVITY_ICONS };

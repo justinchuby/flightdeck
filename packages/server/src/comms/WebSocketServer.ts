@@ -11,7 +11,6 @@ import { getAuthSecret } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 import { redactWsMessage } from '../utils/redaction.js';
 import { runWithWsContext } from '../middleware/requestContext.js';
-import type { AgentServerHealth, HealthStateChange } from '../agents/AgentServerHealth.js';
 
 interface ClientConnection {
   id: string;
@@ -34,7 +33,6 @@ export class WebSocketServer {
   private textBuffer = new Map<string, { texts: string[]; projectId?: string }>();
   private textFlushTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly TEXT_FLUSH_MS = 100;
-  private agentServerHealth: AgentServerHealth | null = null;
 
   constructor(
     server: HttpServer,
@@ -104,7 +102,6 @@ export class WebSocketServer {
           agents: agentManager.getAll().map((a) => a.toJSON()),
           locks: lockRegistry.getAll(),
           systemPaused: agentManager.isSystemPaused,
-          agentServerState: this.agentServerHealth?.state ?? 'connected',
         }),
       );
     });
@@ -198,6 +195,11 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:response_start', ...data }, projectId);
     });
 
+    this.track(agentManager, 'agent:model_fallback', (data: AgentManagerEvents['agent:model_fallback']) => {
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:model_fallback', ...data }, projectId);
+    });
+
     // WebSocket subscription architecture:
     // - Agent connections subscribe to specific agent IDs (project-scoped participants)
     // - UI connections subscribe to '*' (all agents) because the dashboard is an observer
@@ -238,18 +240,13 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:usage', ...data }, projectId);
     });
 
-    this.track(agentManager, 'agent:permission_request', (data: AgentManagerEvents['agent:permission_request']) => {
-      const projectId = this.resolveAgentProjectId(data.agentId);
-      this.broadcastToProject({ type: 'agent:permission_request', ...data }, projectId);
-    });
-
     this.track(agentManager, 'lead:decision', (data: AgentManagerEvents['lead:decision']) => {
       const projectId = this.resolveAgentProjectId(data.agentId);
       this.broadcastToProject({ type: 'lead:decision', ...data }, projectId);
     });
 
     this.track(agentManager, 'lead:progress', (data: AgentManagerEvents['lead:progress']) => {
-      const projectId = this.resolveAgentProjectId(data.agentId ?? data.leadId);
+      const projectId = this.resolveAgentProjectId(data.agentId);
       this.broadcastToProject({ type: 'lead:progress', ...data }, projectId);
     });
 
@@ -276,6 +273,11 @@ export class WebSocketServer {
     this.track(agentManager, 'agent:session_resume_failed', (data: AgentManagerEvents['agent:session_resume_failed']) => {
       const projectId = this.resolveAgentProjectId(data.agentId);
       this.broadcastToProject({ type: 'agent:session_resume_failed', ...data }, projectId);
+    });
+
+    this.track(agentManager, 'agent:spawn_error', (data: AgentManagerEvents['agent:spawn_error']) => {
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:spawn_error', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:context_compacted', (data: AgentManagerEvents['agent:context_compacted']) => {
@@ -473,12 +475,6 @@ export class WebSocketServer {
         // resize is no longer supported (PTY mode removed)
         break;
 
-      case 'permission_response':
-        if (msg.agentId) {
-          this.agentManager.resolvePermission(msg.agentId, msg.approved);
-        }
-        break;
-
       case 'queue_open':
         // User opened the approval queue — pause auto-approve timers
         this.decisionLog.pauseTimers();
@@ -525,32 +521,6 @@ export class WebSocketServer {
   /** Public broadcast for external event sources (e.g., AlertEngine, TimerRegistry) */
   broadcastEvent(msg: Record<string, unknown>, projectId?: string): void {
     this.broadcastToProject(msg, projectId);
-  }
-
-  /**
-   * Wire AgentServerHealth state changes → WS 'agentServerStatus' events.
-   * Broadcasts to all clients (global, not project-scoped) so the UI connection
-   * status banner (AS19) can show degraded/disconnected state.
-   */
-  wireAgentServerHealth(health: AgentServerHealth): () => void {
-    this.agentServerHealth = health;
-    const unsub = health.onStateChange((change: HealthStateChange) => {
-      let detail: string | undefined;
-      if (change.current === 'degraded') {
-        detail = `${change.missedPongs} missed pong(s)`;
-      } else if (change.current === 'disconnected') {
-        detail = 'Agent server unreachable';
-      }
-
-      this.broadcastAll({
-        type: 'agentServerStatus',
-        state: change.current,
-        detail,
-      });
-    });
-
-    this.eventCleanups.push(unsub);
-    return unsub;
   }
 
   /** Flush buffered agent:text events — coalesces rapid text chunks into single WS messages */

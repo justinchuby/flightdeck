@@ -2,13 +2,13 @@
  * AnalysisPage — Project visualization dashboard.
  *
  * Hosts all the chart/visualization components removed from OverviewPage:
- * CumulativeFlow, CostCurve, KeyStats, AgentHeatmap.
+ * CumulativeFlow, CostCurve, KeyStats.
  * ProgressTimeline stays in the Overview → integrated into progress feed.
  *
  * Data fetching mirrors the old OverviewPage keyframes-based approach
  * but only runs when this tab is active (performance win).
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
@@ -17,10 +17,9 @@ import { POLL_INTERVAL_MS } from '../../constants/timing';
 import { CumulativeFlow } from './TaskBurndown';
 import { CostCurve } from './CostCurve';
 import { KeyStats } from './KeyStats';
-import { AgentHeatmap } from './AgentHeatmap';
+import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import type { FlowPoint } from './TaskBurndown';
 import type { CostPoint } from './CostCurve';
-import type { HeatmapBucket } from './AgentHeatmap';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
 import type { AgentInfo } from '../../types';
 
@@ -31,7 +30,6 @@ export function AnalysisPage() {
   // ── Data state ─────────────────────────────────────────────────
   const [flowData, setFlowData] = useState<FlowPoint[]>([]);
   const [costData, setCostData] = useState<CostPoint[]>([]);
-  const [heatmapBuckets, setHeatmapBuckets] = useState<HeatmapBucket[]>([]);
   const [historicalAgents, setHistoricalAgents] = useState<AgentInfo[]>([]);
   const [totalTokens, setTotalTokens] = useState(0);
   const [sessionStart, setSessionStart] = useState<string | undefined>();
@@ -39,6 +37,15 @@ export function AnalysisPage() {
   const fetchIdRef = useRef(0);
 
   const displayAgents = agents.length > 0 ? agents : historicalAgents;
+
+  // Derive session title from the lead agent's task
+  const sessionTitle = useMemo(() => {
+    if (!effectiveId) return null;
+    const lead = agents.find(
+      (a) => a.projectId === effectiveId && a.role?.id === 'lead' && (a.status === 'running' || a.status === 'idle'),
+    );
+    return lead?.task ?? null;
+  }, [agents, effectiveId]);
 
   // ── Fetch visualization data ───────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -67,10 +74,9 @@ export function AnalysisPage() {
       if (mountedRef.current) {
         if (kf.length > 0) {
           setSessionStart(kf[0].timestamp);
-          let completed = 0, inProgress = 0, taskTotal = 0, spawnIdx = 0;
+          let completed = 0, inProgress = 0, taskTotal = 0;
           const fPoints: FlowPoint[] = [];
           const cPoints: CostPoint[] = [];
-          const hBuckets: HeatmapBucket[] = [];
 
           const totalInput = currentAgents.reduce((s, a) => s + (a.inputTokens ?? 0), 0);
           const totalOutput = currentAgents.reduce((s, a) => s + (a.outputTokens ?? 0), 0);
@@ -78,27 +84,25 @@ export function AnalysisPage() {
 
           for (const frame of kf) {
             const t = new Date(frame.timestamp).getTime();
-            if (frame.type === 'spawn') {
-              const matchAgent = currentAgents[spawnIdx];
-              hBuckets.push({ agentId: matchAgent?.id ?? `agent-${spawnIdx}`, time: t, intensity: 0.8 });
-              spawnIdx++;
-            }
             if (frame.type === 'delegation') { taskTotal++; inProgress++; }
             if (frame.type === 'milestone' || frame.type === 'task') { completed++; inProgress = Math.max(0, inProgress - 1); }
 
             const progress = (fPoints.length + 1) / kf.length;
-            cPoints.push({ time: t, cumulativeCost: realTokens * progress });
+            cPoints.push({
+              time: t,
+              cumulativeCost: realTokens * progress,
+              cumulativeInput: totalInput * progress,
+              cumulativeOutput: totalOutput * progress,
+            });
             fPoints.push({ time: t, created: taskTotal, inProgress, completed });
           }
 
           setFlowData(fPoints);
           setCostData(cPoints);
-          setHeatmapBuckets(hBuckets);
           setTotalTokens(realTokens);
         } else {
           setFlowData([]);
           setCostData([]);
-          setHeatmapBuckets([]);
           setTotalTokens(0);
           setSessionStart(undefined);
         }
@@ -128,7 +132,14 @@ export function AnalysisPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-6" data-testid="analysis-page">
-      <h2 className="text-sm font-medium text-th-text">Project Analysis</h2>
+      <div>
+        <h2 className="text-sm font-medium text-th-text">Project Analysis</h2>
+        {sessionTitle && (
+          <p className="text-xs text-th-text-muted mt-0.5 truncate" title={sessionTitle} data-testid="session-title">
+            {sessionTitle}
+          </p>
+        )}
+      </div>
 
       {/* Key Stats */}
       <KeyStats agents={displayAgents} totalTokens={totalTokens} sessionStart={sessionStart} />
@@ -139,8 +150,8 @@ export function AnalysisPage() {
         <CostCurve data={costData} />
       </div>
 
-      {/* Agent Activity Heatmap */}
-      <AgentHeatmap agents={displayAgents} buckets={heatmapBuckets} />
+      {/* Token Attribution — scoped to this project */}
+      <CostBreakdown projectId={effectiveId} />
     </div>
   );
 }

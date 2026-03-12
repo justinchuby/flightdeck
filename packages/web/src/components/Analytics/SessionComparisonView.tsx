@@ -1,4 +1,5 @@
 import type { SessionComparison } from './types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface SessionComparisonViewProps {
   comparison: SessionComparison;
@@ -72,8 +73,8 @@ export function SessionComparisonView({ comparison, onClose }: SessionComparison
         <thead>
           <tr className="text-th-text-muted border-b border-th-border">
             <th className="pb-2 text-left">Metric</th>
-            <th className="pb-2 text-right">{a.projectId ?? a.leadId.slice(0, 8)}</th>
-            <th className="pb-2 text-right">{b.projectId ?? b.leadId.slice(0, 8)}</th>
+            <th className="pb-2 text-right">{a.projectId ?? shortAgentId(a.leadId)}</th>
+            <th className="pb-2 text-right">{b.projectId ?? shortAgentId(b.leadId)}</th>
             <th className="pb-2 text-right">Delta</th>
           </tr>
         </thead>

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { CheckCircle2, Users, Clock } from 'lucide-react';
+import { CheckCircle2, Users, Clock, Zap } from 'lucide-react';
 import type { AgentInfo } from '../../types';
 
 interface KeyStatsProps {
@@ -15,6 +15,12 @@ interface StatItem {
   color: string;
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+  return String(n);
+}
+
 export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
   const stats = useMemo((): StatItem[] => {
     const running = agents.filter((a) => a.status === 'running').length;
@@ -28,10 +34,8 @@ export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
     const elapsedStr = elapsed >= 60 ? `${Math.floor(elapsed / 60)}h ${elapsed % 60}m` : `${elapsed}m`;
 
     const hasTokenData = agents.some((a) => (a.inputTokens ?? 0) > 0 || (a.outputTokens ?? 0) > 0);
-    const tokenCount = totalTokens ?? agents.reduce((s, a) => s + (a.inputTokens ?? 0) + (a.outputTokens ?? 0), 0);
-    const tokenStr = tokenCount >= 1_000_000 ? `~${(tokenCount / 1_000_000).toFixed(1)}M` : tokenCount >= 1_000 ? `~${(tokenCount / 1_000).toFixed(0)}k` : `~${tokenCount}`;
 
-    return [
+    const items: StatItem[] = [
       {
         label: 'Agents',
         value: `${running} active / ${total} total`,
@@ -51,6 +55,19 @@ export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
         color: completed > 0 ? 'text-green-400' : 'text-th-text-muted',
       },
     ];
+
+    if (hasTokenData) {
+      const inputTotal = agents.reduce((s, a) => s + (a.inputTokens ?? 0), 0);
+      const outputTotal = agents.reduce((s, a) => s + (a.outputTokens ?? 0), 0);
+      items.push({
+        label: 'Tokens',
+        value: `${formatTokens(inputTotal)} in / ${formatTokens(outputTotal)} out`,
+        icon: <Zap size={14} />,
+        color: 'text-amber-400',
+      });
+    }
+
+    return items;
   }, [agents, totalTokens, sessionStart]);
 
   return (

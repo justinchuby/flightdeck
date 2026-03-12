@@ -102,7 +102,6 @@ const makeAgent = (id: string, role: string, status: string = 'running'): AgentI
   childIds: [],
   createdAt: new Date().toISOString(),
   outputPreview: '',
-  autopilot: true,
 });
 
 // ── Tests ──────────────────────────────────────────────────────────

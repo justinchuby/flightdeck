@@ -87,7 +87,6 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       cancelTask: vi.fn(),
       resetDAG: vi.fn().mockReturnValue(0),
     } as any,
-    deferredIssueRegistry: { add: vi.fn().mockReturnValue({ id: 'issue-1' }), list: vi.fn().mockReturnValue([]), resolve: vi.fn().mockReturnValue(true), dismiss: vi.fn().mockReturnValue(true) } as any,
     timerRegistry: {
       create: vi.fn().mockReturnValue({ id: 'tmr-1', label: 'test', repeat: false }),
       cancel: vi.fn().mockReturnValue(true),

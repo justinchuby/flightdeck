@@ -10,7 +10,7 @@ export type PredictionType =
   | 'agent_stall'
   | 'task_duration'
   | 'completion_estimate'
-  | 'file_conflict';
+;
 
 export interface PredictionAction {
   label: string;
@@ -96,7 +96,6 @@ const DEFAULT_CONFIG: PredictionConfig = {
     agent_stall: { enabled: true },
     task_duration: { enabled: true },
     completion_estimate: { enabled: true },
-    file_conflict: { enabled: true },
   },
 };
 
@@ -232,10 +231,6 @@ export class PredictionService {
     if (this.config.types.agent_stall.enabled) {
       newPredictions.push(...this.predictAgentStall(agents));
     }
-    if (this.config.types.file_conflict.enabled) {
-      newPredictions.push(...this.predictFileConflict(agents));
-    }
-
     // TODO: task_duration predictions — requires task history data
     // TODO: completion_estimate predictions — requires task history data
 
@@ -453,15 +448,6 @@ export class PredictionService {
     }
 
     return results;
-  }
-
-  /**
-   * File Conflict: not implemented in V1.
-   * Requires FileLockRegistry integration for meaningful predictions.
-   */
-  private predictFileConflict(_agents: AgentSnapshot[]): Prediction[] {
-    // TODO: integrate with FileLockRegistry to detect overlapping file access patterns
-    return [];
   }
 
   // ── Private: Persistence ──────────────────────────────────────

@@ -3,7 +3,8 @@ import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import YAML from 'yaml';
 import type { StorageManager } from './StorageManager.js';
-import { atomicWriteFile, assertWithinDir } from './StorageManager.js';
+import { atomicWriteFile } from './StorageManager.js';
+import { validatePathWithinDir } from '../utils/pathValidation.js';
 import type { ProjectMetadata, SyncManifest } from './types.js';
 import { SYNC_SCHEMA_VERSION } from './types.js';
 import { logger } from '../utils/logger.js';
@@ -189,7 +190,7 @@ export class SyncEngine {
     const existingHash = manifest.files[relPath];
 
     if (hash !== existingHash) {
-      assertWithinDir(projectDir, relPath);
+      validatePathWithinDir(projectDir, relPath);
       atomicWriteFile(join(projectDir, relPath), content);
     }
     newFiles[relPath] = hash;
@@ -209,7 +210,7 @@ export class SyncEngine {
 
     for (const [relPath, lastHash] of Object.entries(manifest.files)) {
       // Validate that the manifest path doesn't escape the project directory
-      const absPath = assertWithinDir(projectDir, relPath);
+      const absPath = validatePathWithinDir(projectDir, relPath);
       if (!existsSync(absPath)) {
         // File was deleted by user
         modified.push(relPath);

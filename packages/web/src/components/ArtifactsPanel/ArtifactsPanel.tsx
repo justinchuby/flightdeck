@@ -1,10 +1,10 @@
 /**
  * ArtifactsPanel — browse agent-produced artifacts (specs, reports, audits).
  *
- * Shows markdown files from .flightdeck/shared/ grouped by agent.
- * Right pane: markdown preview (reused from DesignPanel).
+ * Shows markdown files grouped by session (newest first).
+ * Right pane: markdown preview.
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   FileText,
   Copy,
@@ -15,11 +15,11 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  User,
+  Layers,
 } from 'lucide-react';
 import { useProjectId } from '../../contexts/ProjectContext';
 import { apiFetch } from '../../hooks/useApi';
-import { MarkdownContent } from '../../utils/markdown';
+import { Markdown } from '../ui/Markdown';
 import { getRoleIcon } from '../../utils/getRoleIcon';
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -36,7 +36,21 @@ interface ArtifactGroup {
   agentDir: string;
   role: string;
   agentId: string;
+  sessionId?: string;
   files: ArtifactFile[];
+}
+
+interface SessionArtifact extends ArtifactFile {
+  role: string;
+  agentId: string;
+  agentDir: string;
+}
+
+interface SessionGroup {
+  sessionId: string;
+  label: string;
+  latestAt: string;
+  artifacts: SessionArtifact[];
 }
 
 interface FileData {
@@ -72,8 +86,6 @@ export function ArtifactsPanel() {
       );
       setGroups(data.groups);
       if (data.sharedPath) setSharedPath(data.sharedPath);
-      // Auto-expand all groups
-      setExpandedGroups(new Set(data.groups.map(g => g.agentDir)));
     } catch (err: any) {
       setError(err.message || 'Failed to load artifacts');
     } finally {
@@ -121,6 +133,46 @@ export function ArtifactsPanel() {
       setTimeout(() => setPathCopied(false), 2000);
     } catch { /* clipboard unavailable */ }
   }, [sharedPath]);
+
+  // Derive session-grouped view from flat agent groups
+  const sessionGroups = useMemo(() => {
+    const map = new Map<string, SessionArtifact[]>();
+    for (const g of groups) {
+      const sid = g.sessionId || '__workspace__';
+      if (!map.has(sid)) map.set(sid, []);
+      const bucket = map.get(sid)!;
+      for (const f of g.files) {
+        bucket.push({ ...f, role: g.role, agentId: g.agentId, agentDir: g.agentDir });
+      }
+    }
+
+    const result: SessionGroup[] = [];
+    for (const [sid, artifacts] of map) {
+      artifacts.sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
+      const latestAt = artifacts[0]?.modifiedAt || '';
+      let label: string;
+      if (sid === '__workspace__') {
+        label = 'Workspace';
+      } else if (sid === 'unknown') {
+        label = 'Untracked';
+      } else if (/^[0-9a-f-]{20,}$/i.test(sid)) {
+        label = sid.replace(/-/g, '').slice(0, 8);
+      } else {
+        label = sid;
+      }
+      result.push({ sessionId: sid, label, latestAt, artifacts });
+    }
+
+    result.sort((a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime());
+    return result;
+  }, [groups]);
+
+  // Auto-expand all session groups when data loads
+  useEffect(() => {
+    if (sessionGroups.length > 0) {
+      setExpandedGroups(new Set(sessionGroups.map(s => s.sessionId)));
+    }
+  }, [sessionGroups]);
 
   const toggleGroup = (dir: string) => {
     setExpandedGroups(prev => {
@@ -191,36 +243,49 @@ export function ArtifactsPanel() {
             </div>
           )}
 
-          {groups.map(group => (
-            <div key={group.agentDir}>
+          {sessionGroups.map(session => (
+            <div key={session.sessionId}>
+              {/* Session header */}
               <button
-                onClick={() => toggleGroup(group.agentDir)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-th-bg-alt/80 transition-colors"
+                onClick={() => toggleGroup(session.sessionId)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs border-b border-th-border/50 bg-th-bg-alt/40 hover:bg-th-bg-alt/60 transition-colors"
               >
-                {expandedGroups.has(group.agentDir)
+                {expandedGroups.has(session.sessionId)
                   ? <ChevronDown size={12} className="shrink-0 text-th-text-muted" />
                   : <ChevronRight size={12} className="shrink-0 text-th-text-muted" />
                 }
-                <span>{getRoleIcon(group.role)}</span>
-                <span className="font-medium text-th-text capitalize truncate">{group.role}</span>
-                <span className="text-th-text-muted ml-auto">{group.files.length}</span>
+                <Layers size={12} className="shrink-0 text-th-text-muted" />
+                <span className="font-semibold text-th-text truncate">{session.label}</span>
+                <span className="text-th-text-muted ml-auto flex items-center gap-1.5 shrink-0">
+                  {session.latestAt && (
+                    <>
+                      <Clock size={9} />
+                      <span>{new Date(session.latestAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                      <span className="mx-0.5">·</span>
+                    </>
+                  )}
+                  <span>{session.artifacts.length}</span>
+                </span>
               </button>
 
-              {expandedGroups.has(group.agentDir) && group.files.map(file => (
+              {expandedGroups.has(session.sessionId) && session.artifacts.map(art => (
                 <button
-                  key={file.path}
-                  onClick={() => loadFile(file.path)}
-                  className={`w-full text-left flex items-center gap-2 pl-8 pr-3 py-1.5 text-xs hover:bg-th-bg-alt/80 transition-colors ${
-                    selectedPath === file.path ? 'bg-accent/10 text-accent' : 'text-th-text-alt'
+                  key={art.path}
+                  onClick={() => loadFile(art.path)}
+                  className={`w-full text-left flex items-center gap-2 pl-7 pr-3 py-1.5 text-xs hover:bg-th-bg-alt/80 transition-colors ${
+                    selectedPath === art.path ? 'bg-accent/10 text-accent' : 'text-th-text-alt'
                   }`}
-                  title={file.path}
+                  title={art.path}
                 >
                   <FileText size={12} className="shrink-0 text-blue-400" />
                   <div className="flex-1 min-w-0">
-                    <div className="truncate">{file.title || file.name}</div>
-                    <div className="flex items-center gap-1 text-[10px] text-th-text-muted mt-0.5">
+                    <div className="truncate">{art.title || art.name}</div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-th-text-muted mt-0.5">
+                      <span>{getRoleIcon(art.role)}</span>
+                      <span className="capitalize">{art.role}</span>
+                      <span>·</span>
                       <Clock size={9} />
-                      {new Date(file.modifiedAt).toLocaleDateString()}
+                      {new Date(art.modifiedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                 </button>
@@ -274,8 +339,8 @@ export function ArtifactsPanel() {
 
           {!fileLoading && !fileError && fileData && (
             <div className="max-w-4xl mx-auto">
-              <div className="prose prose-sm dark:prose-invert max-w-none" data-testid="markdown-preview">
-                <MarkdownContent text={fileData.content} />
+              <div data-testid="markdown-preview">
+                <Markdown text={fileData.content} />
               </div>
             </div>
           )}

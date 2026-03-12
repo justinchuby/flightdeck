@@ -1,5 +1,6 @@
 import React from 'react';
 import { AgentMentionTooltip, type MentionAgent } from '../components/AgentMentionTooltip';
+import { shortAgentId } from './agentLabel';
 export type { MentionAgent } from '../components/AgentMentionTooltip';
 
 /** Generate a consistent HSL color from a string (agent ID) */
@@ -20,7 +21,7 @@ export function AgentIdBadge({ id, className = '' }: { id: string; className?: s
       style={{ color: idColor(id) }}
       title={id}
     >
-      {id.slice(0, 8)}
+      {shortAgentId(id)}
     </span>
   );
 }
@@ -89,7 +90,7 @@ export function MentionText({ text, agents, onClickAgent }: {
               tabIndex={0}
               onClick={(e) => { e.stopPropagation(); onClickAgent?.(agent.id); }}
             >
-              @{`${agent.role.name.toLowerCase()}-${agent.id.slice(0, 6)}`}
+              @{`${agent.role.name.toLowerCase()}-${shortAgentId(agent.id)}`}
             </span>
           </AgentMentionTooltip>,
         );

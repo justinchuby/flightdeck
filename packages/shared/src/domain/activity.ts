@@ -19,9 +19,9 @@ export const ActionTypeSchema = z.enum([
   'status_change',
   'heartbeat_halted',
   'limit_change_requested',
-  'deferred_issue',
   'group_message',
   'agent_interrupted',
+  'progress_update',
   'error',
 ]);
 export type ActionType = z.infer<typeof ActionTypeSchema>;

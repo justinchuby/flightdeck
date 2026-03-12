@@ -1,9 +1,11 @@
 # Multi-Backend Adapter Architecture
 
+> **⚠️ SUPERSEDED:** The system has been simplified to ACP-only. The SDK adapter approach (ClaudeSdkAdapter, CopilotSdkAdapter) described in this research was not implemented. All providers now use the AcpAdapter over stdio — there is no SDK direct backend, no daemon adapter, and no multi-backend factory. This document is retained as research history.
+>
 > **Author**: Architect (e7f14c5e)  
 > **Date**: 2026-03-07  
-> **Depends on**: R9 AgentAdapter (done), Multi-CLI Research (done), Daemon Design Doc (done)  
-> **Status**: Canonical reference for AdapterStartOptions (reconciled across multi-cli-acp-research.md and claude-adapter-design.md)
+> **Depends on**: R9 AgentAdapter (done), Multi-CLI Research (done)  
+> **Status**: Superseded — system is ACP-only (see `.github/skills/adapter-architecture-pattern/SKILL.md` for current architecture)
 
 ---
 

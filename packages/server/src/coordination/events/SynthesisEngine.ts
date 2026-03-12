@@ -16,7 +16,7 @@ const CRITICAL_PATTERNS: RegExp[] = [
   /test fail/i,
   /compil(?:e|ation)\s+(?:error|fail)/i,
   /crash(?:ed|ing)?/i,
-  /agent (?:stuck|hung|failed|crashed)/i,
+  /agent (?:stuck|failed|crashed)/i,
   /\bblocked\b/i,
   /\bP0\b/,
   /\bURGENT\b/i,

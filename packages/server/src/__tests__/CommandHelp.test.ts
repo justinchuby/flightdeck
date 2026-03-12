@@ -24,7 +24,6 @@ beforeAll(async () => {
     agentMemory: { get: vi.fn(), set: vi.fn() },
     chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
     taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
-    deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
     timerRegistry: { create: vi.fn(), cancel: vi.fn(), getAgentTimers: vi.fn().mockReturnValue([]), getAllTimers: vi.fn().mockReturnValue([]) },
     maxConcurrent: 10,
     markHumanInterrupt: vi.fn(),
@@ -36,7 +35,7 @@ describe('CommandHelp', () => {
   describe('buildCommandHelp', () => {
     it('includes expected command categories', () => {
       const help = buildCommandHelp();
-      const expectedCategories = ['Agent Lifecycle', 'Communication', 'Groups', 'Task DAG', 'Coordination', 'System', 'Capabilities', 'Deferred Issues'];
+      const expectedCategories = ['Agent Lifecycle', 'Communication', 'Groups', 'Task DAG', 'Coordination', 'System', 'Capabilities'];
       for (const cat of expectedCategories) {
         expect(help).toContain(`== ${cat} ==`);
       }
@@ -132,7 +131,6 @@ describe('CommandHelp', () => {
         agentMemory: { get: vi.fn(), set: vi.fn() },
         chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
         taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
-        deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
         timerRegistry: { create: vi.fn(), cancel: vi.fn(), getAgentTimers: vi.fn().mockReturnValue([]), getAllTimers: vi.fn().mockReturnValue([]) },
         maxConcurrent: 10, markHumanInterrupt: vi.fn(),
       } as any;
@@ -237,7 +235,6 @@ describe('CommandDispatcher error handling', () => {
       agentMemory: { get: vi.fn(), set: vi.fn() },
       chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
       taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
-      deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
       maxConcurrent: 10,
       markHumanInterrupt: vi.fn(),
     } as any;
@@ -286,7 +283,6 @@ describe('CommandDispatcher error handling', () => {
       agentMemory: { get: vi.fn(), set: vi.fn() },
       chatGroupRegistry: { create: vi.fn(), addMember: vi.fn(), removeMember: vi.fn(), getGroupsForAgent: vi.fn().mockReturnValue([]) },
       taskDAG: { getStatus: vi.fn().mockReturnValue({ tasks: [], summary: {} }), getTasksForAgent: vi.fn().mockReturnValue([]) },
-      deferredIssueRegistry: { add: vi.fn(), getAll: vi.fn().mockReturnValue([]) },
       maxConcurrent: 10,
       markHumanInterrupt: vi.fn(),
     } as any;
@@ -341,20 +337,6 @@ describe('Lead role system prompt policies', () => {
 });
 
 describe('Command examples parse against Zod schemas', () => {
-  it('DEFER_ISSUE example parses without title field', async () => {
-    const { deferIssueSchema } = await import('../agents/commands/commandSchemas.js');
-    const example = { description: 'Tech debt: refactor later', severity: 'low' };
-    const result = deferIssueSchema.safeParse(example);
-    expect(result.success).toBe(true);
-  });
-
-  it('DEFER_ISSUE rejects example with title instead of description', async () => {
-    const { deferIssueSchema } = await import('../agents/commands/commandSchemas.js');
-    const badExample = { title: 'Tech debt', description: undefined };
-    const result = deferIssueSchema.safeParse(badExample);
-    expect(result.success).toBe(false);
-  });
-
   it('REQUEST_LIMIT_CHANGE example uses limit (not newLimit)', async () => {
     const { requestLimitChangeSchema } = await import('../agents/commands/commandSchemas.js');
     const example = { limit: 10, reason: 'need more agents' };
@@ -377,12 +359,5 @@ describe('Command examples parse against Zod schemas', () => {
     if (result.success) {
       expect(result.data.actionType).toBe('milestone');
     }
-  });
-
-  it('DEFER_ISSUE schema accepts file field', async () => {
-    const { deferIssueSchema } = await import('../agents/commands/commandSchemas.js');
-    const example = { description: 'Fix later', file: 'src/utils.ts' };
-    const result = deferIssueSchema.safeParse(example);
-    expect(result.success).toBe(true);
   });
 });

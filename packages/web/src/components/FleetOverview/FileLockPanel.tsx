@@ -1,6 +1,7 @@
 import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Lock } from 'lucide-react';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface Props {
   locks: FileLock[];
@@ -20,7 +21,7 @@ export function FileLockPanel({ locks, agents }: Props) {
   const getAgentLabel = (agentId: string) => {
     const agent = agents.find((a) => a.id === agentId);
     if (agent) return `${agent.role.icon} ${agent.role.name}`;
-    return agentId.slice(0, 8);
+    return shortAgentId(agentId);
   };
 
   return (

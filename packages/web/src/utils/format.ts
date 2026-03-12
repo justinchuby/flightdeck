@@ -1,6 +1,7 @@
 /**
  * Shared formatting utilities for the Flightdeck UI.
  */
+import { shortAgentId } from './agentLabel';
 
 /**
  * Format an agent identifier as `role-xxxx` (role prefix + first 4 hex chars).
@@ -9,7 +10,7 @@
 export function formatAgentId(role: string | undefined, id: string): string {
   if (!id) return 'unknown';
   const short = id.slice(0, 4);
-  if (!role) return id.slice(0, 8);
+  if (!role) return shortAgentId(id);
   return `${role.toLowerCase().split(' ')[0]}-${short}`;
 }
 

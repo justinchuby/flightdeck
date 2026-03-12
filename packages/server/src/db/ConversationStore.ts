@@ -16,6 +16,7 @@ export interface ThreadMessage {
   conversationId: string;
   sender: string;
   content: string;
+  fromRole?: string;
   timestamp: string;
 }
 
@@ -32,16 +33,17 @@ export class ConversationStore {
     return { id, agentId, taskId, createdAt: new Date().toISOString() };
   }
 
-  addMessage(conversationId: string, sender: string, content: string): ThreadMessage {
+  addMessage(conversationId: string, sender: string, content: string, fromRole?: string): ThreadMessage {
     const result = this.db.drizzle
       .insert(messages)
-      .values({ conversationId, sender, content: redact(content).text })
+      .values({ conversationId, sender, content: redact(content).text, fromRole: fromRole ?? null })
       .run();
     return {
       id: Number(result.lastInsertRowid),
       conversationId,
       sender,
       content,
+      fromRole,
       timestamp: new Date().toISOString(),
     };
   }
@@ -74,6 +76,7 @@ export class ConversationStore {
       conversationId: r.conversationId,
       sender: r.sender,
       content: r.content,
+      fromRole: r.fromRole ?? undefined,
       timestamp: r.timestamp!,
     }));
   }
@@ -85,6 +88,7 @@ export class ConversationStore {
         conversationId: messages.conversationId,
         sender: messages.sender,
         content: messages.content,
+        fromRole: messages.fromRole,
         timestamp: messages.timestamp,
       })
       .from(messages)
@@ -98,6 +102,7 @@ export class ConversationStore {
       conversationId: r.conversationId,
       sender: r.sender,
       content: r.content,
+      fromRole: r.fromRole ?? undefined,
       timestamp: r.timestamp!,
     }));
   }

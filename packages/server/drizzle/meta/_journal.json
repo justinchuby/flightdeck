@@ -1,202 +1,223 @@
 {
-    "version": "7",
-    "dialect": "sqlite",
-    "entries": [
-        {
-            "idx": 0,
-            "version": "6",
-            "when": 1772246634783,
-            "tag": "0000_red_titania",
-            "breakpoints": true
-        },
-        {
-            "idx": 1,
-            "version": "6",
-            "when": 1772247582261,
-            "tag": "0001_tearful_shiva",
-            "breakpoints": true
-        },
-        {
-            "idx": 2,
-            "version": "6",
-            "when": 1772253068714,
-            "tag": "0002_omniscient_shape",
-            "breakpoints": true
-        },
-        {
-            "idx": 3,
-            "version": "6",
-            "when": 1772265437622,
-            "tag": "0003_woozy_banshee",
-            "breakpoints": true
-        },
-        {
-            "idx": 4,
-            "version": "6",
-            "when": 1772288549963,
-            "tag": "0004_opposite_daredevil",
-            "breakpoints": true
-        },
-        {
-            "idx": 5,
-            "version": "6",
-            "when": 1772290871456,
-            "tag": "0005_archived_groups",
-            "breakpoints": true
-        },
-        {
-            "idx": 6,
-            "version": "6",
-            "when": 1772292677490,
-            "tag": "0006_agent_file_history",
-            "breakpoints": true
-        },
-        {
-            "idx": 7,
-            "version": "6",
-            "when": 1772292871319,
-            "tag": "0007_violet_tyrannus",
-            "breakpoints": true
-        },
-        {
-            "idx": 8,
-            "version": "6",
-            "when": 1772293066015,
-            "tag": "0008_collective_memory",
-            "breakpoints": true
-        },
-        {
-            "idx": 9,
-            "version": "6",
-            "when": 1772380026866,
-            "tag": "0009_group_roles",
-            "breakpoints": true
-        },
-        {
-            "idx": 10,
-            "version": "6",
-            "when": 1772381244000,
-            "tag": "0010_dag_task_title",
-            "breakpoints": true
-        },
-        {
-            "idx": 11,
-            "version": "6",
-            "when": 1772382868738,
-            "tag": "0011_chilly_ego",
-            "breakpoints": true
-        },
-        {
-            "idx": 12,
-            "version": "6",
-            "when": 1772383775715,
-            "tag": "0012_curved_hedge_knight",
-            "breakpoints": true
-        },
-        {
-            "idx": 13,
-            "version": "6",
-            "when": 1772600143000,
-            "tag": "0013_dag_task_started_at",
-            "breakpoints": true
-        },
-        {
-            "idx": 14,
-            "version": "6",
-            "when": 1772618400000,
-            "tag": "0014_group_message_reactions",
-            "breakpoints": true
-        },
-        {
-            "idx": 15,
-            "version": "6",
-            "when": 1772621000000,
-            "tag": "0015_timers_table",
-            "breakpoints": true
-        },
-        {
-            "idx": 16,
-            "version": "6",
-            "when": 1772726336000,
-            "tag": "0016_project_isolation_supporting",
-            "breakpoints": true
-        },
-        {
-            "idx": 17,
-            "version": "6",
-            "when": 1772729795000,
-            "tag": "0017_project_model_config",
-            "breakpoints": true
-        },
-        {
-            "idx": 18,
-            "version": "6",
-            "when": 1772844025000,
-            "tag": "0018_dag_task_project_id",
-            "breakpoints": true
-        },
-        {
-            "idx": 19,
-            "version": "6",
-            "when": 1772964000000,
-            "tag": "0019_message_queue",
-            "breakpoints": true
-        },
-        {
-            "idx": 20,
-            "version": "6",
-            "when": 1772964100000,
-            "tag": "0020_agent_roster_delegations",
-            "breakpoints": true
-        },
-        {
-            "idx": 21,
-            "version": "6",
-            "when": 1773094578000,
-            "tag": "0021_knowledge",
-            "breakpoints": true
-        },
-        {
-            "idx": 22,
-            "version": "6",
-            "when": 1773108000000,
-            "tag": "0022_team_id",
-            "breakpoints": true
-        },
-        {
-            "idx": 23,
-            "version": "6",
-            "when": 1773200000000,
-            "tag": "0023_dag_task_failure_reason",
-            "breakpoints": true
-        },
-        {
-            "idx": 24,
-            "version": "6",
-            "when": 1773300000000,
-            "tag": "0024_dag_task_archived_at",
-            "breakpoints": true
-        },
-        {
-            "idx": 25,
-            "version": "6",
-            "when": 1773400000000,
-            "tag": "0025_dag_task_overridden_by",
-            "breakpoints": true
-        },
-        {
-            "idx": 26,
-            "version": "6",
-            "when": 1773500000000,
-            "tag": "0026_cost_tracking_expanded",
-            "breakpoints": true
-        },
-        {
-            "idx": 27,
-            "version": "6",
-            "when": 1773600000000,
-            "tag": "0027_cost_tracking_project_id",
-            "breakpoints": true
-        }
-    ]
+        "version": "7",
+        "dialect": "sqlite",
+        "entries": [
+                {
+                        "idx": 0,
+                        "version": "6",
+                        "when": 1772246634783,
+                        "tag": "0000_red_titania",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 1,
+                        "version": "6",
+                        "when": 1772247582261,
+                        "tag": "0001_tearful_shiva",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 2,
+                        "version": "6",
+                        "when": 1772253068714,
+                        "tag": "0002_omniscient_shape",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 3,
+                        "version": "6",
+                        "when": 1772265437622,
+                        "tag": "0003_woozy_banshee",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 4,
+                        "version": "6",
+                        "when": 1772288549963,
+                        "tag": "0004_opposite_daredevil",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 5,
+                        "version": "6",
+                        "when": 1772290871456,
+                        "tag": "0005_archived_groups",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 6,
+                        "version": "6",
+                        "when": 1772292677490,
+                        "tag": "0006_agent_file_history",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 7,
+                        "version": "6",
+                        "when": 1772292871319,
+                        "tag": "0007_violet_tyrannus",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 8,
+                        "version": "6",
+                        "when": 1772293066015,
+                        "tag": "0008_collective_memory",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 9,
+                        "version": "6",
+                        "when": 1772380026866,
+                        "tag": "0009_group_roles",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 10,
+                        "version": "6",
+                        "when": 1772381244000,
+                        "tag": "0010_dag_task_title",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 11,
+                        "version": "6",
+                        "when": 1772382868738,
+                        "tag": "0011_chilly_ego",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 12,
+                        "version": "6",
+                        "when": 1772383775715,
+                        "tag": "0012_curved_hedge_knight",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 13,
+                        "version": "6",
+                        "when": 1772600143000,
+                        "tag": "0013_dag_task_started_at",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 14,
+                        "version": "6",
+                        "when": 1772618400000,
+                        "tag": "0014_group_message_reactions",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 15,
+                        "version": "6",
+                        "when": 1772621000000,
+                        "tag": "0015_timers_table",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 16,
+                        "version": "6",
+                        "when": 1772726336000,
+                        "tag": "0016_project_isolation_supporting",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 17,
+                        "version": "6",
+                        "when": 1772729795000,
+                        "tag": "0017_project_model_config",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 18,
+                        "version": "6",
+                        "when": 1772844025000,
+                        "tag": "0018_dag_task_project_id",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 19,
+                        "version": "6",
+                        "when": 1772964000000,
+                        "tag": "0019_message_queue",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 20,
+                        "version": "6",
+                        "when": 1772964100000,
+                        "tag": "0020_agent_roster_delegations",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 21,
+                        "version": "6",
+                        "when": 1773094578000,
+                        "tag": "0021_knowledge",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 22,
+                        "version": "6",
+                        "when": 1773108000000,
+                        "tag": "0022_team_id",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 23,
+                        "version": "6",
+                        "when": 1773200000000,
+                        "tag": "0023_dag_task_failure_reason",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 24,
+                        "version": "6",
+                        "when": 1773300000000,
+                        "tag": "0024_dag_task_archived_at",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 25,
+                        "version": "6",
+                        "when": 1773400000000,
+                        "tag": "0025_dag_task_overridden_by",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 26,
+                        "version": "6",
+                        "when": 1773500000000,
+                        "tag": "0026_cost_tracking_expanded",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 27,
+                        "version": "6",
+                        "when": 1773600000000,
+                        "tag": "0027_cost_tracking_project_id",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 28,
+                        "version": "6",
+                        "when": 1773700000000,
+                        "tag": "0028_project_oversight_level",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 29,
+                        "version": "6",
+                        "when": 1773800000000,
+                        "tag": "0029_agent_roster_provider",
+                        "breakpoints": true
+                },
+                {
+                        "idx": 30,
+                        "version": "6",
+                        "when": 1773900000000,
+                        "tag": "0030_message_from_role",
+                        "breakpoints": true
+                }
+        ]
 }

@@ -103,12 +103,6 @@ function makeContext(taskDAG: TaskDAG, overrides: Partial<CommandContext> = {}):
       getMessages: vi.fn().mockReturnValue([]),
     } as any,
     taskDAG,
-    deferredIssueRegistry: {
-      add: vi.fn().mockReturnValue({ id: 'issue-1' }),
-      list: vi.fn().mockReturnValue([]),
-      resolve: vi.fn().mockReturnValue(true),
-      dismiss: vi.fn().mockReturnValue(true),
-    } as any,
     timerRegistry: {
       create: vi.fn().mockReturnValue({ id: 'tmr-1', label: 'test', repeat: false }),
       cancel: vi.fn().mockReturnValue(true),
@@ -539,7 +533,7 @@ describe('Auto-DAG integration', () => {
         const tasks = dag.getTasks(lead.id);
         const autoTask = tasks.find(t => t.id.startsWith('auto-'));
         expect(autoTask).toBeDefined();
-        const depCount = autoTask!.dependsOn.filter(d => d === 'task-1').length;
+        const depCount = autoTask!.dependsOn.filter((d: string) => d === 'task-1').length;
         expect(depCount).toBe(1);
       });
 

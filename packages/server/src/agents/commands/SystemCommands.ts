@@ -1,7 +1,7 @@
 /**
  * System-level command handlers.
  *
- * Commands: QUERY_CREW, HALT_HEARTBEAT, REQUEST_LIMIT_CHANGE
+ * Commands: QUERY_CREW, HALT_HEARTBEAT, REQUEST_LIMIT_CHANGE, QUERY_PROVIDERS
  */
 import { isTerminalStatus } from '../Agent.js';
 import type { Agent } from '../Agent.js';
@@ -12,12 +12,14 @@ import { parseCommandPayload, requestLimitChangeSchema } from './commandSchemas.
 import { deriveArgs } from './CommandHelp.js';
 import { formatQueryCrew } from '../../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../../coordination/agents/CrewFormatter.js';
+import { PROVIDER_PRESETS } from '../../adapters/presets.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
 const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
 const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*⟧⟧/s;
 const REQUEST_LIMIT_CHANGE_REGEX = /⟦⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*⟧⟧/s;
+const QUERY_PROVIDERS_REGEX = /⟦⟦\s*QUERY_PROVIDERS\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -158,10 +160,63 @@ function handleRequestLimitChange(ctx: CommandHandlerContext, agent: Agent, data
 
 // ── Module export ─────────────────────────────────────────────────────
 
+function handleQueryProviders(ctx: CommandHandlerContext, agent: Agent): void {
+  if (agent.role.id !== 'lead') {
+    agent.sendMessage('[System] Only the Project Lead can query providers.');
+    return;
+  }
+
+  const pm = ctx.providerManager;
+  if (!pm) {
+    agent.sendMessage('[System] Provider information is not available yet.');
+    return;
+  }
+
+  const ranking = pm.getProviderRanking();
+  const lines: string[] = ['== AVAILABLE PROVIDERS (ranked by preference) =='];
+
+  for (let i = 0; i < ranking.length; i++) {
+    const id = ranking[i];
+    const preset = PROVIDER_PRESETS[id as keyof typeof PROVIDER_PRESETS];
+    if (!preset) continue;
+    const status = pm.getProviderStatus(id);
+    const enabled = status?.enabled ?? false;
+    const installed = status?.installed ?? false;
+    const flag = enabled && installed ? '✓' : enabled ? '⚠ not installed' : '✗ disabled';
+    lines.push(`  ${i + 1}. ${preset.name} (${id}) — ${flag}`);
+    if (preset.defaultModel) {
+      lines.push(`     Default model: ${preset.defaultModel}`);
+    }
+    lines.push(`     Resume support: ${preset.supportsResume ? 'yes' : 'no'}`);
+  }
+
+  // Include project model config if available
+  const projectId = ctx.getProjectIdForAgent(agent.id);
+  if (projectId && ctx.projectRegistry) {
+    const { config } = ctx.projectRegistry.getModelConfig(projectId);
+    const roles = Object.keys(config);
+    if (roles.length > 0) {
+      lines.push('');
+      lines.push('== PROJECT MODEL CONFIGURATION ==');
+      for (const role of roles) {
+        const allowed = config[role];
+        if (allowed && allowed.length > 0) {
+          lines.push(`  ${role}: ${allowed.join(', ')}`);
+        }
+      }
+    }
+  }
+
+  const response = `[System]\n${lines.join('\n')}`;
+  logger.info('agent', `QUERY_PROVIDERS response sent to ${agent.role.name} (${agent.id.slice(0, 8)})`);
+  agent.sendMessage(response);
+}
+
 export function getSystemCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a), help: { description: 'Get current crew status', example: 'QUERY_CREW {}', category: 'System' } },
     { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a), help: { description: 'Stop heartbeat reminder nudges', example: 'HALT_HEARTBEAT {}', category: 'System' } },
     { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d), help: { description: 'Request a change to concurrency limits', example: 'REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "need more agents"}', category: 'System', args: deriveArgs(requestLimitChangeSchema) } },
+    { regex: QUERY_PROVIDERS_REGEX, name: 'QUERY_PROVIDERS', handler: (a, _d) => handleQueryProviders(ctx, a), help: { description: 'Get available providers, models, and ranking', example: 'QUERY_PROVIDERS {}', category: 'System' } },
   ];
 }

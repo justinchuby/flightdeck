@@ -82,9 +82,9 @@ describe('Persistence Repository Integration', () => {
       expect(agent?.role).toBe('developer');
 
       // Busy (received task)
-      rosterRepo.updateStatus('agent-1', 'busy');
+      rosterRepo.updateStatus('agent-1', 'running');
       agent = rosterRepo.getAgent('agent-1');
-      expect(agent?.status).toBe('busy');
+      expect(agent?.status).toBe('running');
 
       // Idle (task complete)
       rosterRepo.updateStatus('agent-1', 'idle');
@@ -153,7 +153,7 @@ describe('Persistence Repository Integration', () => {
 
       // Delegate task → agent goes busy
       delegationRepo.create('del-100', 'dev-1', 'build feature');
-      rosterRepo.updateStatus('dev-1', 'busy');
+      rosterRepo.updateStatus('dev-1', 'running');
 
       // Queue a message while agent is busy (write-on-enqueue)
       const mqId = mqStore.enqueue('dev-1', 'agent_message', '{"text":"status update"}', 'lead-1', 'proj-1');

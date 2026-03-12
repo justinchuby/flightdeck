@@ -1,9 +1,6 @@
 import { Check, CheckCircle } from 'lucide-react';
 import { formatTokens } from '../../utils/format';
 
-// Re-export for backward compatibility
-export { formatTokens };
-
 /** Parse [Agent Report] or [Agent ACK] formatted content into structured parts */
 export function parseAgentReport(content: string): { header: string; task: string; output: string; sessionId: string; isReport: boolean; isAck: boolean } {
   // Check for ACK first

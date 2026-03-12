@@ -152,6 +152,8 @@ describe('ResumeSessionDialog', () => {
       expect(body.agents).not.toContain('arch-001');
       expect(body.agents).toContain('dev-001');
       expect(body.agents).toContain('cr-001');
+      // Lead should never be in agents array
+      expect(body.agents).not.toContain('lead-001');
     });
   });
 

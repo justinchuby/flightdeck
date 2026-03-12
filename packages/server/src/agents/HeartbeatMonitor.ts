@@ -1,4 +1,5 @@
 import type { Agent } from './Agent.js';
+import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { logger } from '../utils/logger.js';
 
@@ -19,13 +20,36 @@ export interface HeartbeatContext {
   getDagSummary(leadId: string): DagSummary | null;
   getRemainingTasks(leadId: string): RemainingTask[];
   getTaskByAgent(leadId: string, agentId: string): { id: string; dagStatus: string } | null;
-  emit(event: string, ...args: any[]): void;
+  emit(event: string, ...args: unknown[]): void;
+}
+
+/** How often (ms) to send command reminders — default 2 hours */
+const COMMAND_REMINDER_INTERVAL_MS = 2 * 60 * 60 * 1000;
+
+export function buildCommandReminderMessage(): string {
+  return [
+    '[System] Command Reference Reminder — available commands:',
+    '',
+    '  COMMIT {"message": "..."} — Commit your locked files',
+    '  LOCK_FILE {"filePath": "..."} — Lock a file before editing',
+    '  UNLOCK_FILE {"filePath": "..."} — Release a file lock',
+    '  COMPLETE_TASK {"summary": "..."} — Mark your current task done',
+    '  AGENT_MESSAGE {"to": "agent-id", "content": "..."} — Message the lead or another agent',
+    '  DIRECT_MESSAGE {"to": "agent-id", "content": "..."} — Peer-to-peer message (queued)',
+    '  GROUP_MESSAGE {"groupId": "...", "content": "..."} — Message a group chat',
+    '  PROGRESS {"status": "...", "percentComplete": N} — Report progress on your task',
+    '  DECISION {"decision": "...", "alternatives": [...]} — Record an architectural decision',
+    '  SET_TIMER {"label": "...", "delay": N, "message": "..."} — Set a reminder',
+    '',
+    'Use these commands directly in your text response (not inside tool calls).',
+  ].join('\n');
 }
 
 export class HeartbeatMonitor {
   private leadIdleSince: Map<string, number> = new Map();
   private leadNudgeCount: Map<string, number> = new Map();
   private humanInterrupted: Set<string> = new Set();
+  private lastCommandReminder: Map<string, number> = new Map();
   private timer: ReturnType<typeof setInterval> | null = null;
   private ctx: HeartbeatContext;
 
@@ -62,6 +86,7 @@ export class HeartbeatMonitor {
     this.leadIdleSince.delete(agentId);
     this.leadNudgeCount.delete(agentId);
     this.humanInterrupted.delete(agentId);
+    this.lastCommandReminder.delete(agentId);
   }
 
   /** Called when a human interrupts a lead — suppress nudges until it resumes */
@@ -181,6 +206,44 @@ export class HeartbeatMonitor {
         to: lead.id,
         toRole: lead.role.name,
         content: nudge,
+      });
+    }
+
+    // ── Second pass: periodic command reminders for ALL agents ────────
+    this.sendCommandReminders();
+  }
+
+  /** Send periodic command reference reminders to agents that have been running >2 hours */
+  private sendCommandReminders(): void {
+    const now = Date.now();
+    const allAgents = this.ctx.getAllAgents();
+
+    for (const agent of allAgents) {
+      // Skip agents in terminal states
+      if (isTerminalStatus(agent.status)) continue;
+
+      const lastReminder = this.lastCommandReminder.get(agent.id);
+      const agentCreatedAt = agent.createdAt.getTime();
+
+      // Use last reminder time, or agent creation time if never reminded
+      const sinceTimestamp = lastReminder ?? agentCreatedAt;
+      const elapsed = now - sinceTimestamp;
+
+      if (elapsed < COMMAND_REMINDER_INTERVAL_MS) continue;
+
+      // Send the reminder via queueMessage (waits for idle, non-interrupting)
+      const message = buildCommandReminderMessage();
+      agent.queueMessage(message);
+      this.lastCommandReminder.set(agent.id, now);
+
+      logger.info('heartbeat', `Command reminder → ${agent.role.name} (${agent.id.slice(0, 8)})`);
+
+      this.ctx.emit('agent:message_sent', {
+        from: 'system',
+        fromRole: 'System',
+        to: agent.id,
+        toRole: agent.role.name,
+        content: message,
       });
     }
   }

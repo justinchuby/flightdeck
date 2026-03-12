@@ -32,7 +32,7 @@ describe('ProjectOversightPicker', () => {
     fireEvent.click(screen.getByTestId('project-oversight-toggle'));
     expect(screen.getByTestId('project-oversight-picker')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('project-oversight-detailed'));
+    fireEvent.click(screen.getByTestId('project-oversight-supervised'));
     expect(useSettingsStore.getState().projectOverrides['proj-1']).toBe('supervised');
   });
 

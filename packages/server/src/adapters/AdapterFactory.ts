@@ -1,27 +1,21 @@
 /**
  * Unified adapter factory for multi-backend support.
  *
- * Single entry point for creating agent adapters. Resolves the correct
- * adapter type based on provider config with graceful fallback when
- * SDK is unavailable.
+ * Single entry point for creating agent adapters. All providers use the
+ * AcpAdapter (subprocess via ACP stdio protocol).
  *
  * Decision logic:
- *   provider='copilot' → CopilotSdkAdapter (in-process SDK)
- *   provider='claude'  → ClaudeSdkAdapter  (in-process SDK)
+ *   provider='mock' → MockAdapter
  *   all other providers → AcpAdapter with provider preset (subprocess)
  *
- * Session resume is handled at the adapter level:
- *   - AcpAdapter: uses ACP protocol's session/load RPC (standard ACP)
- *   - CopilotSdkAdapter: uses SDK's resumeSession() method
- *   - ClaudeSdkAdapter: uses SDK's resume mechanism
- *
- * Adapter classes are dynamically imported to avoid eagerly loading SDKs.
+ * Session resume is handled via ACP protocol's session/load RPC.
  */
 import { getPreset } from './presets.js';
 import { resolveModel } from './ModelResolver.js';
+import type { ModelResolution } from './ModelResolver.js';
 import { cloudProviderToEnv } from '../config/configSchema.js';
 import type { CloudProvider } from '../config/configSchema.js';
-import type { ProviderId } from './presets.js';
+import { getProvider, type ProviderId } from '@flightdeck/shared';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -34,8 +28,6 @@ import { logger } from '../utils/logger.js';
 export interface AdapterConfig {
   /** Provider ID (e.g., 'copilot', 'claude', 'gemini') */
   provider: string;
-  /** Run in autopilot mode (auto-approve tool calls) */
-  autopilot?: boolean;
   /** Model name or tier alias */
   model?: string;
 
@@ -67,20 +59,25 @@ export interface AdapterResult {
 
 // ── Backend Resolution ──────────────────────────────────────
 
-export type BackendType = 'acp' | 'claude-sdk' | 'copilot-sdk' | 'mock';
+export type BackendType = 'acp' | 'mock';
 
 /**
  * Determine which backend to use based on provider.
- * Each provider maps directly to its designed adapter — no config toggles.
+ * All providers use ACP (subprocess) by default.
  */
 export function resolveBackend(provider: string): BackendType {
   if (provider === 'mock') return 'mock';
-  if (provider === 'copilot') return 'copilot-sdk';
-  if (provider === 'claude') return 'claude-sdk';
   return 'acp';
 }
 
 // ── Start Options Builder ───────────────────────────────────
+
+/** Result from buildStartOptions including model resolution metadata */
+export interface BuildStartResult {
+  options: AdapterStartOptions;
+  /** Full model resolution metadata (undefined if no model was specified) */
+  modelResolution?: ModelResolution;
+}
 
 /**
  * Build AdapterStartOptions from provider config + agent-level params.
@@ -96,7 +93,7 @@ export function buildStartOptions(
     maxTurns?: number;
     systemPrompt?: string;
   },
-): AdapterStartOptions {
+): BuildStartResult {
   const providerId = (config.provider || 'copilot') as ProviderId;
   const preset = getPreset(providerId);
 
@@ -117,30 +114,53 @@ export function buildStartOptions(
   // Merge env: cloudProvider → preset → explicit envOverride (last wins)
   const cloudEnv = cloudProviderToEnv(config.cloudProvider);
   const rawEnv = { ...cloudEnv, ...preset?.env, ...config.envOverride };
+
+  // NOTE: Gemini system prompt delivery is handled by the RoleFileWriter which
+  // writes .gemini/agents/flightdeck-<role>.md before the process spawns.
+  // GEMINI_SYSTEM_MD env var is NOT used here — it expects a file path (not raw
+  // prompt text) and overrides the core system prompt, which is not what we want.
+
   const env = Object.fromEntries(
     Object.entries(rawEnv).filter(([, v]) => v),
   );
 
-  // NOTE: Session resume is NOT handled via CLI flags. AcpAdapter uses the
-  // ACP protocol's session/load RPC (opts.sessionId below). The --resume CLI
-  // flag was a Copilot CLI-specific mechanism that doesn't apply to generic
-  // ACP adapters. Copilot now uses CopilotSdkAdapter exclusively.
+  // NOTE: Session resume is handled via the ACP protocol's session/load RPC
+  // (opts.sessionId below). All providers now use AcpAdapter.
+  // The --agent flag is only supported by Copilot CLI. Other providers
+  // (gemini, claude, etc.) use agent files instead (preset.agentFileFormat).
   const cliArgs = [
     ...(config.cliArgs ?? []),
-    ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
-    ...(resolution ? ['--model', resolution.model] : []),
+    ...(preset?.supportsAgentFlag && agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
   ];
 
+  // Model args — strategy is defined in the ProviderRegistry
+  if (resolution) {
+    const providerDef = getProvider(providerId);
+    if (providerDef?.modelArgStrategy === 'config' && providerDef.configModelPrefix) {
+      // Config-based model arg (e.g., codex: `-c model=X`)
+      const [flag, prefix] = providerDef.configModelPrefix;
+      cliArgs.push(flag, `${prefix}${resolution.model}`);
+    } else if (preset?.modelFlag) {
+      cliArgs.push(preset.modelFlag, resolution.model);
+    } else if (providerDef?.modelArgStrategy === 'flag') {
+      cliArgs.push('--model', resolution.model);
+    }
+  }
+
   return {
-    cliCommand: binary,
-    baseArgs,
-    cliArgs,
-    cwd: agentOpts.cwd ?? process.cwd(),
-    env: Object.keys(env).length > 0 ? env : undefined,
-    sessionId: agentOpts.sessionId,
-    model: resolution?.model,
-    maxTurns: agentOpts.maxTurns,
-    systemPrompt: agentOpts.systemPrompt,
+    options: {
+      cliCommand: binary,
+      baseArgs,
+      cliArgs,
+      cwd: agentOpts.cwd ?? process.cwd(),
+      env: Object.keys(env).length > 0 ? env : undefined,
+      sessionId: agentOpts.sessionId,
+      model: resolution?.model,
+      maxTurns: agentOpts.maxTurns,
+      systemPrompt: agentOpts.systemPrompt,
+      provider: providerId,
+    },
+    modelResolution: resolution,
   };
 }
 
@@ -149,10 +169,8 @@ export function buildStartOptions(
 /**
  * Create an adapter for the given provider configuration.
  *
- * This is the single entry point for adapter creation. It handles:
- * - Backend resolution (ACP vs Claude SDK vs Mock)
- * - Graceful fallback when SDK is unavailable
- * - Logging of backend decisions
+ * This is the single entry point for adapter creation. All providers
+ * use AcpAdapter (subprocess via ACP stdio protocol).
  */
 export async function createAdapterForProvider(config: AdapterConfig): Promise<AdapterResult> {
   const preferredBackend = resolveBackend(config.provider);
@@ -162,62 +180,8 @@ export async function createAdapterForProvider(config: AdapterConfig): Promise<A
     return { adapter: new MockAdapter(), backend: 'mock', fallback: false };
   }
 
-  if (preferredBackend === 'claude-sdk') {
-    try {
-      const { ClaudeSdkAdapter } = await import('./ClaudeSdkAdapter.js');
-      const adapter = new ClaudeSdkAdapter({
-        autopilot: config.autopilot,
-        model: config.model,
-      });
-      logger.info({
-        module: 'adapter-factory',
-        msg: 'Created ClaudeSdkAdapter (in-process SDK mode)',
-        provider: config.provider,
-      });
-      return { adapter, backend: 'claude-sdk', fallback: false };
-    } catch (err) {
-      // SDK construction failed — fall back to ACP
-      const reason = `Claude SDK unavailable: ${(err as Error)?.message || String(err)}`;
-      logger.warn({
-        module: 'adapter-factory',
-        msg: `SDK fallback: ${reason}. Using ACP adapter instead.`,
-        provider: config.provider,
-      });
-      const { AcpAdapter } = await import('./AcpAdapter.js');
-      const adapter = new AcpAdapter({ autopilot: config.autopilot });
-      return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
-    }
-  }
-
-  if (preferredBackend === 'copilot-sdk') {
-    try {
-      const { CopilotSdkAdapter } = await import('./CopilotSdkAdapter.js');
-      const adapter = new CopilotSdkAdapter({
-        autopilot: config.autopilot,
-        model: config.model,
-      });
-      logger.info({
-        module: 'adapter-factory',
-        msg: 'Created CopilotSdkAdapter (in-process SDK mode)',
-        provider: config.provider,
-      });
-      return { adapter, backend: 'copilot-sdk', fallback: false };
-    } catch (err) {
-      // SDK unavailable — fall back to ACP
-      const reason = `Copilot SDK unavailable: ${(err as Error)?.message || String(err)}`;
-      logger.warn({
-        module: 'adapter-factory',
-        msg: `SDK fallback: ${reason}. Using ACP adapter instead.`,
-        provider: config.provider,
-      });
-      const { AcpAdapter } = await import('./AcpAdapter.js');
-      const adapter = new AcpAdapter({ autopilot: config.autopilot });
-      return { adapter, backend: 'acp', fallback: true, fallbackReason: reason };
-    }
-  }
-
   // Default: ACP adapter for all subprocess-based CLIs
   const { AcpAdapter } = await import('./AcpAdapter.js');
-  const adapter = new AcpAdapter({ autopilot: config.autopilot });
+  const adapter = new AcpAdapter();
   return { adapter, backend: 'acp', fallback: false };
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { formatTokens } from '../../utils/format';
+import { shortAgentId } from '../../utils/agentLabel';
 import type { AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -14,7 +15,11 @@ function useAgentMap(): Map<string, AgentInfo> {
 
 type CostView = 'by-agent' | 'by-task';
 
-export function CostBreakdown() {
+interface CostBreakdownProps {
+  projectId?: string | null;
+}
+
+export function CostBreakdown({ projectId }: CostBreakdownProps = {}) {
   const [view, setView] = useState<CostView>('by-agent');
   const [agentCosts, setAgentCosts] = useState<AgentCostSummary[]>([]);
   const [taskCosts, setTaskCosts] = useState<TaskCostSummary[]>([]);
@@ -23,11 +28,12 @@ export function CostBreakdown() {
 
   useEffect(() => {
     let cancelled = false;
+    const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
     const fetchCosts = async () => {
       try {
         const [agentRes, taskRes] = await Promise.all([
-          fetch('/api/costs/by-agent'),
-          fetch('/api/costs/by-task'),
+          fetch(`/api/costs/by-agent${params}`),
+          fetch(`/api/costs/by-task${params}`),
         ]);
         if (cancelled) return;
         const agentData = await agentRes.json();
@@ -43,7 +49,7 @@ export function CostBreakdown() {
     fetchCosts();
     const interval = setInterval(fetchCosts, 10_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [projectId]);
 
   const totalInput = useMemo(
     () => agentCosts.reduce((s, c) => s + c.totalInputTokens, 0),
@@ -159,10 +165,10 @@ function AgentCostTable({
                 <div className="flex items-center gap-1.5">
                   {agent && <span>{agent.role.icon}</span>}
                   <span className="text-th-text-alt font-medium">
-                    {agent?.role.name ?? 'Unknown'}
+                    {agent?.role.name ?? cost.agentRole ?? 'Unknown'}
                   </span>
                   <span className="text-th-text-muted font-mono">
-                    ({cost.agentId.slice(0, 8)})
+                    ({shortAgentId(cost.agentId)})
                   </span>
                 </div>
               </td>
@@ -248,10 +254,10 @@ function TaskCostTable({
                       <span
                         key={a.agentId}
                         className="inline-flex items-center gap-0.5 rounded bg-th-bg-alt px-1.5 py-0.5 text-th-text-muted"
-                        title={`${formatTokens(a.inputTokens)} in / ${formatTokens(a.outputTokens)} out`}
+                        title={`${agent?.role.name ?? a.agentRole ?? shortAgentId(a.agentId)}: ${formatTokens(a.inputTokens)} in / ${formatTokens(a.outputTokens)} out`}
                       >
                         {agent?.role.icon ?? '🤖'}
-                        <span className="font-mono">{a.agentId.slice(0, 6)}</span>
+                        <span className="font-mono">{shortAgentId(a.agentId)}</span>
                       </span>
                     );
                   })}

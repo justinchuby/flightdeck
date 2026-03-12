@@ -16,7 +16,6 @@ const ALL_TYPES: PredictionType[] = [
   'agent_stall',
   'task_duration',
   'completion_estimate',
-  'file_conflict',
 ];
 
 export function PredictionSettingsPanel() {

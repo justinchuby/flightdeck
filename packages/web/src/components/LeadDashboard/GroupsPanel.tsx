@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
 import { MentionText } from '../../utils/markdown';
+import { shortAgentId } from '../../utils/agentLabel';
 import type { ChatGroup, GroupMessage } from '../../types';
 import { roleColor } from './CommsPanel';
 
@@ -129,7 +130,7 @@ export function GroupsPanelContent({
                   ) : (
                     msgs.map((m) => {
                       const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                      const shortId = m.fromAgentId?.slice(0, 6) ?? '';
+                      const shortId = m.fromAgentId ? shortAgentId(m.fromAgentId) : '';
                       return (
                         <div key={m.id} className="px-2 py-1 rounded bg-th-bg-alt/50 text-xs font-mono">
                           <div className="flex items-center gap-1">

@@ -46,29 +46,10 @@ describe('AgentLifecycle', () => {
     expect(screen.getByText(/developer/)).toBeInTheDocument();
   });
 
-  it('shows three action buttons', () => {
+  it('shows two action buttons', () => {
     render(<AgentLifecycle {...defaultProps} />);
-    expect(screen.getByTestId('action-retire')).toBeInTheDocument();
     expect(screen.getByTestId('action-clone')).toBeInTheDocument();
     expect(screen.getByTestId('action-retrain')).toBeInTheDocument();
-  });
-
-  it('disables retire and retrain for already retired agents', () => {
-    const retiredAgent = { ...MOCK_AGENT, status: 'retired' };
-    render(<AgentLifecycle {...defaultProps} agent={retiredAgent} />);
-
-    expect(screen.getByTestId('action-retire')).toBeDisabled();
-    expect(screen.getByTestId('action-retrain')).toBeDisabled();
-    expect(screen.getByTestId('action-clone')).not.toBeDisabled();
-  });
-
-  it('shows confirmation dialog on retire click', () => {
-    render(<AgentLifecycle {...defaultProps} />);
-    fireEvent.click(screen.getByTestId('action-retire'));
-
-    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
-    expect(screen.getByText('Retire Agent')).toBeInTheDocument();
-    expect(screen.getByTestId('retire-reason-input')).toBeInTheDocument();
   });
 
   it('shows confirmation dialog on clone click', () => {
@@ -81,29 +62,11 @@ describe('AgentLifecycle', () => {
 
   it('cancels confirmation dialog', () => {
     render(<AgentLifecycle {...defaultProps} />);
-    fireEvent.click(screen.getByTestId('action-retire'));
+    fireEvent.click(screen.getByTestId('action-clone'));
     expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
-  });
-
-  it('executes retire action on confirm', async () => {
-    mockApiFetch.mockResolvedValue({ ok: true });
-    render(<AgentLifecycle {...defaultProps} />);
-
-    fireEvent.click(screen.getByTestId('action-retire'));
-    fireEvent.click(screen.getByTestId('confirm-button'));
-
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith(
-        '/teams/team-1/agents/agent-001-full-id/retire',
-        expect.objectContaining({ method: 'POST' }),
-      );
-    });
-
-    expect(screen.getByTestId('action-result')).toHaveTextContent(/retired successfully/i);
-    expect(defaultProps.onActionComplete).toHaveBeenCalled();
   });
 
   it('executes clone action on confirm', async () => {
@@ -124,31 +87,11 @@ describe('AgentLifecycle', () => {
     expect(defaultProps.onActionComplete).toHaveBeenCalled();
   });
 
-  it('sends retire reason when provided', async () => {
-    mockApiFetch.mockResolvedValue({ ok: true });
-    render(<AgentLifecycle {...defaultProps} />);
-
-    fireEvent.click(screen.getByTestId('action-retire'));
-    fireEvent.change(screen.getByTestId('retire-reason-input'), {
-      target: { value: 'No longer needed' },
-    });
-    fireEvent.click(screen.getByTestId('confirm-button'));
-
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: JSON.stringify({ reason: 'No longer needed' }),
-        }),
-      );
-    });
-  });
-
   it('shows error on API failure', async () => {
     mockApiFetch.mockRejectedValue(new Error('Server error'));
     render(<AgentLifecycle {...defaultProps} />);
 
-    fireEvent.click(screen.getByTestId('action-retire'));
+    fireEvent.click(screen.getByTestId('action-clone'));
     fireEvent.click(screen.getByTestId('confirm-button'));
 
     await waitFor(() => {

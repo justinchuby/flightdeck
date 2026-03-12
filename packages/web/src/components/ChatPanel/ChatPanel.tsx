@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
@@ -10,6 +10,7 @@ import { useFileDrop } from '../../hooks/useFileDrop';
 import { useAttachments } from '../../hooks/useAttachments';
 import { AttachmentBar } from '../AttachmentBar';
 import { DropOverlay } from '../DropOverlay';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface Props {
   agentId: string;
@@ -33,13 +34,8 @@ export function ChatPanel({ agentId, ws }: Props) {
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const agent = agents.find((a) => a.id === agentId);
 
-  const handleFileInsert = useCallback((text: string) => {
-    setInputText((prev) => (prev ? prev + ' ' + text : text));
-    inputRef.current?.focus();
-  }, []);
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
   const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handlePaste, dropZoneClassName } = useFileDrop({
-    onInsertText: handleFileInsert,
     onAttach: addAttachment,
   });
 
@@ -53,7 +49,7 @@ export function ChatPanel({ agentId, ws }: Props) {
     const q = mentionQuery.toLowerCase();
     return activeAgents.filter(
       (a) =>
-        a.id.slice(0, 8).toLowerCase().startsWith(q) ||
+        shortAgentId(a.id).toLowerCase().startsWith(q) ||
         a.role.name.toLowerCase().includes(q),
     );
   }, [mentionQuery, activeAgents]);
@@ -84,7 +80,7 @@ export function ChatPanel({ agentId, ws }: Props) {
   };
 
   const insertMention = (mentionAgent: typeof agents[0]) => {
-    const shortId = mentionAgent.id.slice(0, 8);
+    const shortId = shortAgentId(mentionAgent.id);
     const cursorPos = inputRef.current?.selectionStart ?? inputText.length;
     const before = inputText.slice(0, cursorPos);
     const after = inputText.slice(cursorPos);
@@ -148,7 +144,7 @@ export function ChatPanel({ agentId, ws }: Props) {
     const mentionPattern = /@([a-f0-9]{4,8})\b/g;
     let m;
     while ((m = mentionPattern.exec(inputText)) !== null) {
-      const fullId = useAppStore.getState().agents.find((a) => a.id.startsWith(m![1]))?.id;
+      const fullId = resolveShortId(m![1]);
       if (fullId && fullId !== agentId) {
         sendToAgent(fullId, inputText, mode);
       }
@@ -171,7 +167,7 @@ export function ChatPanel({ agentId, ws }: Props) {
         <div className="flex items-center gap-2">
           <span>{agent?.role.icon}</span>
           <span className="text-sm font-medium">{agent?.role.name}</span>
-          <span className="text-xs text-th-text-muted font-mono">{agentId.slice(0, 8)}</span>
+          <span className="text-xs text-th-text-muted font-mono">{shortAgentId(agentId)}</span>
         </div>
         <div className="flex items-center gap-1">
           <button

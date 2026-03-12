@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
 import { spawnLimiter } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
+import { getModelsByProvider } from '../adapters/ModelResolver.js';
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
@@ -146,7 +147,14 @@ export function projectsRoutes(ctx: AppContext): Router {
           const meta = a.metadata ?? {};
           return meta.parentId === session.leadId;
         })
-        .map(a => ({ role: a.role, model: a.model || 'unknown', agentId: a.agentId, sessionId: a.sessionId || null }));
+        .map(a => ({
+          role: a.role,
+          model: a.model || 'unknown',
+          agentId: a.agentId,
+          sessionId: a.sessionId || null,
+          lastTaskSummary: a.lastTaskSummary || null,
+          provider: a.provider || null,
+        }));
 
       // Task summary from DAG
       const tasks = taskDAG.getTasks(session.leadId);
@@ -409,7 +417,6 @@ export function projectsRoutes(ctx: AppContext): Router {
         ok: true,
         taskId,
         tasks: result.tasks,
-        conflicts: result.conflicts,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -526,6 +533,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         conversationId: messages.conversationId,
         sender: messages.sender,
         content: messages.content,
+        fromRole: messages.fromRole,
         timestamp: messages.timestamp,
       })
       .from(messages)
@@ -654,13 +662,31 @@ export function projectsRoutes(ctx: AppContext): Router {
     const project = projectRegistry.get(req.params.id);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    const { name, description, cwd, status } = req.body;
+    const { name, description, cwd, status, oversightLevel } = req.body;
 
     // Validate CWD if provided
     const cwdError = validateCwd(cwd);
     if (cwdError) return res.status(400).json({ error: cwdError });
 
-    projectRegistry.update(req.params.id, { name, description, cwd, status });
+    // Validate oversight level if provided
+    if (oversightLevel !== undefined && oversightLevel !== null &&
+        !['supervised', 'balanced', 'autonomous'].includes(oversightLevel)) {
+      return res.status(400).json({ error: 'Invalid oversight level. Must be supervised, balanced, or autonomous.' });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (cwd !== undefined) updates.cwd = cwd;
+    if (status !== undefined) updates.status = status;
+
+    projectRegistry.update(req.params.id, updates as Partial<Pick<typeof project, 'name' | 'description' | 'cwd' | 'status'>>);
+
+    // Set per-project oversight level separately (null clears override)
+    if (oversightLevel !== undefined) {
+      projectRegistry.setOversightLevel(req.params.id, oversightLevel);
+    }
+
     logger.info({ module: 'project', msg: 'Project updated', projectId: project.id, name: project.name });
     res.json(projectRegistry.get(req.params.id));
   });
@@ -707,7 +733,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Preserve task from previous session if none provided
       const task = requestTask || (lastSession ? lastSession.task : undefined);
 
-      const agent = agentManager.spawn(role, task, undefined, true, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
+      const agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
 
       // Verify the invariant: spawn must reuse the same agent ID on resume
       if (lastSession && agent.id !== lastSession.leadId) {
@@ -734,7 +760,10 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
 
       if (task) {
-        const TASK_DELIVERY_DELAY_MS = 5000;
+        // Delay task delivery so the lead receives crew roster before the task.
+        // Scale with team size: base 5s + 2s per agent (batched in groups of 3).
+        const teamSize = agentIds?.length ?? (resumeAll && lastSession ? 6 : 0);
+        const TASK_DELIVERY_DELAY_MS = 5000 + Math.ceil(teamSize / 3) * 2000;
         setTimeout(() => {
           agent.sendMessage(task);
         }, TASK_DELIVERY_DELAY_MS);
@@ -778,7 +807,6 @@ export function projectsRoutes(ctx: AppContext): Router {
                   prevRole,
                   prev.lastTaskSummary || undefined,
                   agent.id,
-                  true,
                   prev.model,
                   project.cwd ?? undefined,
                   prev.sessionId || undefined,
@@ -800,6 +828,42 @@ export function projectsRoutes(ctx: AppContext): Router {
         spawnTeam().catch((err) => logger.warn({ module: 'project', msg: 'Batch spawn error', err: String(err) }));
         respawnedCount = toResume.length;
         secretaryResumed = toResume.some((a) => a.role === 'secretary');
+
+        // Send crew roster to lead BEFORE the task arrives, so it knows which
+        // agents already exist and doesn't re-create them via CREATE_AGENT
+        const BATCH_COUNT = Math.ceil(toResume.length / BATCH_SIZE);
+        const CREW_NOTIFY_DELAY = INITIAL_DELAY + (BATCH_COUNT * BATCH_DELAY) + 1000;
+        setTimeout(() => {
+          const children = agentManager.getAll().filter(a => a.parentId === agent.id && a.status !== 'terminated' && a.status !== 'failed');
+          if (children.length > 0) {
+            const roster = children.map(a => `- ${a.role.name || a.role.id} (${a.id.slice(0, 8)}) [${a.status}]`).join('\n');
+            agent.sendMessage(
+              `[System — Session Resumed]\n` +
+              `Your team has been restored from the previous session:\n${roster}\n\n` +
+              `⚠ Do NOT create new agents for these roles — delegate to the existing agents above. ` +
+              `Use QUERY_CREW to see the full roster at any time.`
+            );
+          }
+        }, CREW_NOTIFY_DELAY);
+
+        // Inform the lead which agents were excluded so it doesn't re-create them
+        if (Array.isArray(agentIds)) {
+          const excludedAgents = previousAgents.filter((a) => !agentIds.includes(a.agentId));
+          if (excludedAgents.length > 0) {
+            const excludedRoles = excludedAgents.map((a) => a.role).join(', ');
+            const resumedRoles = toResume.map((a) => a.role).join(', ');
+            const TEAM_MSG_DELAY = 2500;
+            setTimeout(() => {
+              agent.sendMessage(
+                `[System — Resume Agent Selection]\n` +
+                `The user chose to resume specific agents only.\n` +
+                `Resumed: ${resumedRoles || 'none'}\n` +
+                `Excluded by user: ${excludedRoles}\n` +
+                `Do NOT re-create or delegate to the excluded roles unless the user explicitly asks.`
+              );
+            }, TEAM_MSG_DELAY);
+          }
+        }
       }
 
       // Auto-spawn Secretary for DAG tracking — only if not already resumed from previous session
@@ -871,6 +935,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.json({
       models: KNOWN_MODEL_IDS,
       defaults: DEFAULT_MODEL_CONFIG,
+      modelsByProvider: getModelsByProvider(),
     });
   });
 

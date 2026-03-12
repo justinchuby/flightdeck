@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, Loader2, MessageSquare } from 'lucide-react';
-import { MentionText, MarkdownContent } from '../../utils/markdown';
+import { MentionText } from '../../utils/markdown';
+import { Markdown } from '../ui/Markdown';
 import { CollapsibleReasoningBlock, RichContentBlock, AgentTextBlock } from './ChatRenderers';
 import { PromptNav, hasUserMention } from '../PromptNav';
 import { useAppStore } from '../../stores/appStore';
@@ -35,11 +36,15 @@ export function ChatMessages({
   onDismissCatchUp,
   onScrollToBottom,
 }: ChatMessagesProps) {
+  // Track message indices consumed by forward-merge so they don't render twice
+  const mergedIndices = new Set<number>();
+
   return (
     <div className="flex-1 relative min-h-0">
       <div ref={chatContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-1">
         {messages.filter((msg) => msg.text).map((msg, i, filtered) => {
           if (msg.queued) return null;
+          if (mergedIndices.has(i)) return null;
           const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
           if (msg.sender === 'user') {
@@ -76,7 +81,7 @@ export function ChatMessages({
                     <MessageSquare className="w-3 h-3" />
                     {msg.fromRole || 'Agent'}
                   </div>
-                  <MarkdownContent text={msg.text} mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
+                  <Markdown text={msg.text} monospace mentionAgents={agents} onMentionClick={(id) => useAppStore.getState().setSelectedAgent(id)} />
                 </div>
                 <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
               </div>
@@ -86,7 +91,7 @@ export function ChatMessages({
           if (msg.sender === 'system') {
             const sysText = typeof msg.text === 'string' ? msg.text : '';
             if (sysText.startsWith('📤')) return null;
-            if (sysText.startsWith('📨')) return null;
+
             if (sysText.startsWith('💬')) return null;
             if (sysText.startsWith('📢')) return null;
             if (sysText.startsWith('🗣️')) return null;
@@ -120,15 +125,15 @@ export function ChatMessages({
             for (let j = i + 1; j < filtered.length; j++) {
               const next = filtered[j];
               if (next.sender !== 'agent' || next.queued || (next.contentType && next.contentType !== 'text')) {
-                // If the merged text so far has an unclosed ⟦⟦ command block, keep merging
-                // past non-agent messages (e.g. thinking) to rejoin split commands from history
-                if (hasUnclosedCommandBlock(mergedText) && next.sender === 'agent' && !next.queued) {
-                  mergedText += next.text;
+                // If merged text has an unclosed command block, skip non-agent messages
+                // to rejoin split commands (e.g. external DMs interleaved mid-command)
+                if (hasUnclosedCommandBlock(mergedText)) {
                   continue;
                 }
                 break;
               }
               mergedText += next.text;
+              mergedIndices.add(j);
             }
           }
 

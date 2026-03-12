@@ -6,7 +6,7 @@ import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
-import type { UsageInfo, CompactionInfo } from './AgentEvents.js';
+import type { UsageInfo, CompactionInfo, ModelFallbackInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
 import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
@@ -39,7 +39,6 @@ export interface AgentJSON {
   id: string;
   role: Role;
   status: AgentStatus;
-  autopilot: boolean;
   task?: string;
   dagTaskId?: string;
   parentId?: string;
@@ -51,7 +50,7 @@ export interface AgentJSON {
   sessionId?: string | null;
   projectName?: string;
   projectId?: string;
-  model?: string;
+  model: string;
   cwd?: string;
   inputTokens: number;
   outputTokens: number;
@@ -65,15 +64,27 @@ export interface AgentJSON {
   isSystemAgent?: boolean;
   /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
   provider?: string;
-  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  /** Adapter backend type (e.g. 'acp') */
   backend?: string;
+  /** Error message if agent failed to start or crashed */
+  exitError?: string;
+  /** Model resolution metadata when the requested model differs from the resolved model */
+  modelResolution?: {
+    /** Model originally requested before cross-provider resolution */
+    requested: string;
+    /** Model actually used by the CLI after resolution */
+    resolved: string;
+    /** Whether the model was translated to a different model for the target provider */
+    translated: boolean;
+    /** Human-readable reason for model translation */
+    reason: string;
+  };
 }
 
 export class Agent {
   public readonly id: string;
   public readonly role: Role;
   public readonly createdAt: Date;
-  public readonly autopilot: boolean;
   public status: AgentStatus = 'creating';
   public task?: string;
   public dagTaskId?: string;
@@ -84,15 +95,31 @@ export class Agent {
   public messages: string[] = [];
   /** Index into messages[] marking the start of the current task's output */
   public taskOutputStartIndex: number = 0;
-  public sessionId: string | null = null;
+  private _sessionId: string | null = null;
+  /** ACP session ID — set once when the session starts, immutable thereafter. */
+  get sessionId(): string | null { return this._sessionId; }
+  set sessionId(value: string | null) {
+    if (this._sessionId !== null && value !== this._sessionId) {
+      logger.warn({ module: 'agent', msg: 'Ignoring sessionId overwrite', agentId: this.id, current: this._sessionId, attempted: value });
+      return;
+    }
+    this._sessionId = value;
+  }
   public projectName?: string;
   public projectId?: string;
-  /** Model override for this agent (e.g. "claude-opus-4.6"). Overrides role default. */
-  public model?: string;
+  /** Model for this agent (e.g. "claude-opus-4.6"). Always set during spawn. */
+  public model = '';
   /** Working directory for this agent's CLI process */
   public cwd?: string;
   /** Error message if agent failed to start (e.g., CLI binary not found) */
   public exitError?: string;
+  /** Model resolution metadata when the requested model differs from the resolved model */
+  public modelResolution?: {
+    requested: string;
+    resolved: string;
+    translated: boolean;
+    reason: string;
+  };
   /** Summary from COMPLETE_TASK command, used for knowledge extraction */
   public completionSummary?: string;
   /** Tracks when the last human message was received (for leads) */
@@ -107,7 +134,7 @@ export class Agent {
   public isSystemAgent: boolean = false;
   /** CLI provider used to spawn this agent (e.g. 'copilot', 'claude', 'cursor') */
   public provider?: string;
-  /** Adapter backend type (e.g. 'acp', 'claude-sdk', 'copilot-sdk') */
+  /** Adapter backend type (e.g. 'acp') */
   public backend?: string;
   /** Organized artifact storage path (~/.flightdeck/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
   public artifactDir?: string;
@@ -155,14 +182,13 @@ export class Agent {
   /** @internal */ readonly _maxToolCalls = 200;
   /** @internal */ get _isTerminated(): boolean { return this.terminated; }
 
-  constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], autopilot?: boolean, id?: string) {
+  constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], id?: string) {
     this.id = id || uuid();
     this.role = role;
     this.config = config;
     this.task = task;
     this.parentId = parentId;
     this.createdAt = new Date();
-    this.autopilot = autopilot ?? false;
     this.peers = peers;
   }
 
@@ -188,16 +214,15 @@ export class Agent {
   /** @internal */ _notifyContent(content: any): void { this.events.notifyContent(content); }
   /** @internal */ _notifyThinking(text: string): void { this.events.notifyThinking(text); }
   /** @internal */ _notifyExit(code: number): void { this.events.notifyExit(code); }
-  /** @internal */ _notifyHung(elapsedMs: number): void { this.events.notifyHung(elapsedMs); }
   /** @internal */ _notifyStatusChange(status: AgentStatus): void { this.events.notifyStatus(status); }
   /** @internal */ _notifyToolCall(info: ToolCallInfo): void { this.events.notifyToolCall(info); }
   /** @internal */ _notifyPlan(entries: PlanEntry[]): void { this.events.notifyPlan(entries); }
-  /** @internal */ _notifyPermissionRequest(request: any): void { this.events.notifyPermissionRequest(request); }
   /** @internal */ _notifySessionReady(sessionId: string): void { this.events.notifySessionReady(sessionId); }
   /** @internal */ _notifySessionResumeFailed(info: { requestedSessionId: string; error: string }): void { this.events.notifySessionResumeFailed(info); }
   /** @internal */ _notifyContextCompacted(info: CompactionInfo): void { this.events.notifyContextCompacted(info); }
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
   /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
+  /** @internal */ _notifyModelFallback(info: ModelFallbackInfo): void { this.events.notifyModelFallback(info); }
   /** @internal */ _drainOneMessage(): void {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
@@ -314,9 +339,6 @@ Tools (bash, view, edit, grep, glob) are for filesystem work. Commands are for c
 12. When referencing other agents in messages, always use the @ prefix (e.g., @568c3298, not 568c3298). This enables clickable @mention tooltips in the UI.
 13. Log important decisions by outputting:
 \`⟦⟦ ACTIVITY {"action": "decision_made", "summary": "what you decided"} ⟧⟧\`
-14. To defer a non-blocking issue for later:
-\`⟦⟦ DEFER_ISSUE {"description": "issue details", "severity": "low"} ⟧⟧\`
-\`⟦⟦ QUERY_DEFERRED {} ⟧⟧\`
 
 == SKILLS (reusable knowledge for future work) ==
 Skills are reusable instructions that Copilot CLI loads automatically when relevant. Use them to capture REUSABLE KNOWLEDGE — patterns, techniques, and approaches that will benefit future work sessions.
@@ -601,12 +623,6 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     }
   }
 
-  resolvePermission(approved: boolean): void {
-    if (this.acpConnection) {
-      this.acpConnection.resolvePermission(approved);
-    }
-  }
-
   async terminate(): Promise<void> {
     if (this.terminated) return;
     this.terminated = true;
@@ -632,11 +648,9 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onData(listener: (data: string) => void): void { this.events.onData(listener); }
   onContent(listener: (content: any) => void): void { this.events.onContent(listener); }
   onExit(listener: (code: number) => void): void { this.events.onExit(listener); }
-  onHung(listener: (elapsedMs: number) => void): void { this.events.onHung(listener); }
   onStatus(listener: (status: AgentStatus) => void): void { this.events.onStatus(listener); }
   onToolCall(listener: (info: ToolCallInfo) => void): void { this.events.onToolCall(listener); }
   onPlan(listener: (entries: PlanEntry[]) => void): void { this.events.onPlan(listener); }
-  onPermissionRequest(listener: (request: any) => void): void { this.events.onPermissionRequest(listener); }
   onSessionReady(listener: (sessionId: string) => void): void { this.events.onSessionReady(listener); }
   onSessionResumeFailed(listener: (info: { requestedSessionId: string; error: string }) => void): void { this.events.onSessionResumeFailed(listener); }
   onContextCompacted(listener: (info: { previousUsed: number; currentUsed: number; percentDrop: number }) => void): void { this.events.onContextCompacted(listener); }
@@ -644,6 +658,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onUsage(listener: (info: UsageInfo) => void): void { this.events.onUsage(listener); }
   onThinking(listener: (text: string) => void): void { this.events.onThinking(listener); }
   onResponseStart(listener: () => void): void { this.events.onResponseStart(listener); }
+  onModelFallback(listener: (info: ModelFallbackInfo) => void): void { this.events.onModelFallback(listener); }
 
   getBufferedOutput(): string {
     return this.messages.join('');
@@ -720,7 +735,6 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       id: this.id,
       role: this.role,
       status: this.status,
-      autopilot: this.autopilot,
       task: this.task,
       dagTaskId: this.dagTaskId,
       parentId: this.parentId,
@@ -732,7 +746,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       sessionId: this.sessionId,
       projectName: this.projectName,
       projectId: this.projectId,
-      model: this.model || this.role.model,
+      model: this.model,
       cwd: this.cwd,
       inputTokens: this.inputTokens,
       outputTokens: this.outputTokens,
@@ -746,6 +760,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       isSystemAgent: this.isSystemAgent || undefined,
       provider: this.provider,
       backend: this.backend,
+      exitError: this.exitError,
+      modelResolution: this.modelResolution,
     };
   }
 }

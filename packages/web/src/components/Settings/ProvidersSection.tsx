@@ -4,9 +4,14 @@
  * Shows which CLI providers are installed, authenticated, and enabled.
  * Includes per-provider configuration: binary override, default model,
  * required environment variables, and default CLI arguments.
+ * Drag-and-drop reordering via @dnd-kit/sortable.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Star, Terminal, Key, Settings2 } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Key, Settings2, GripVertical } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { EmptyState } from '../ui/EmptyState';
@@ -48,22 +53,30 @@ const PROVIDER_AUTH_LABELS: Record<string, string> = {
   codex: 'Authenticated via OpenAI',
 };
 
-const PROVIDER_DOCS: Record<string, string> = {
-  copilot: 'https://docs.github.com/en/copilot',
-  claude: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-agent-sdk',
-  gemini: 'https://ai.google.dev/gemini-api/docs/api-key',
-  opencode: 'https://opencode.ai/docs/providers/',
-  cursor: 'https://docs.cursor.com',
-  codex: 'https://platform.openai.com/docs/api-reference',
+interface ProviderLink {
+  label: string;
+  url: string;
+}
+
+const PROVIDER_LINKS: Record<string, ProviderLink[]> = {
+  copilot: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
+  claude: [{ label: 'Installation guide', url: 'https://github.com/zed-industries/claude-agent-acp#installation' }],
+  gemini: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
+  opencode: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
+  cursor: [{ label: 'Documentation', url: 'https://docs.cursor.com' }],
+  codex: [
+    { label: 'ACP adapter', url: 'https://github.com/zed-industries/codex-acp' },
+    { label: 'CLI quickstart', url: 'https://developers.openai.com/codex/quickstart/?setup=cli' },
+  ],
 };
 
 /** Default CLI arguments per provider (mirrors server presets.ts). */
 const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
-  copilot: [],  // Copilot uses in-process SDK — no CLI args needed
-  claude: [],   // Claude uses in-process SDK — no CLI args needed
-  gemini: ['--experimental-acp'],
+  copilot: ['--acp', '--stdio'],
+  claude: [],
+  gemini: ['--acp'],
   cursor: ['acp'],
-  codex: ['--acp'],
+  codex: [],
   opencode: ['acp'],
 };
 
@@ -77,24 +90,14 @@ const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
   opencode: [],
 };
 
-/** Whether the provider supports in-process SDK mode. */
-const PROVIDER_SDK_CAPABLE: Record<string, boolean> = {
-  copilot: true,
-  claude: true,
-  gemini: false,
-  cursor: false,
-  codex: false,
-  opencode: false,
-};
-
 /** Whether the provider supports session resume. */
 const PROVIDER_RESUME_SUPPORT: Record<string, boolean> = {
   copilot: true,
   claude: true,
-  gemini: false,
+  gemini: true,
   cursor: true,
   codex: false,
-  opencode: false,
+  opencode: true,
 };
 
 /** Whether the provider is in preview (not production-ready). Copilot is GA. */
@@ -103,7 +106,7 @@ const PROVIDER_PREVIEW: Record<string, boolean> = {
   claude: true,
   gemini: true,
   cursor: true,
-  codex: true,
+  codex: false,
   opencode: true,
 };
 
@@ -123,18 +126,25 @@ function PreviewBadge() {
 
 function ProviderCard({
   provider,
-  isActive,
+  rank,
   onToggle,
-  onSetActive,
 }: {
   provider: ProviderStatus;
-  isActive: boolean;
+  rank: number;
   onToggle: (id: string, enabled: boolean) => void;
-  onSetActive: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: provider.id });
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -153,17 +163,25 @@ function ProviderCard({
   }, [provider.id]);
 
   const icon = PROVIDER_ICONS[provider.id] ?? '🔌';
-  const docsUrl = PROVIDER_DOCS[provider.id];
+  const links = PROVIDER_LINKS[provider.id] ?? [];
   const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
   const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
   const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
-  const sdkCapable = PROVIDER_SDK_CAPABLE[provider.id] ?? false;
   const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={`bg-surface-raised border rounded-lg overflow-hidden transition-colors hover:border-th-border-hover ${
-        isActive ? 'border-accent/50 ring-1 ring-accent/20' : 'border-th-border'
+        provider.enabled ? 'border-th-border' : 'border-th-border opacity-60'
       }`}
       data-testid={`provider-card-${provider.id}`}
     >
@@ -175,19 +193,26 @@ function ProviderCard({
         aria-expanded={expanded}
         aria-label={`${provider.name} provider details`}
       >
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          className="touch-none p-0.5 text-th-text-muted/40 hover:text-th-text-muted cursor-grab active:cursor-grabbing transition-colors shrink-0"
+          aria-label={`Drag to reorder ${provider.name}`}
+          title="Drag to reorder"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
         <span className="text-lg" role="img" aria-label={provider.name}>
           {icon}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-th-text-muted w-4 text-center">{rank}</span>
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
             {PROVIDER_PREVIEW[provider.id] && <PreviewBadge />}
             <StatusBadge {...providerStatusProps(provider)} />
-            {isActive && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
-                <Star className="w-2.5 h-2.5" /> Active
-              </span>
-            )}
           </div>
           <div className="text-xs text-th-text-muted">
             {provider.installed
@@ -225,15 +250,12 @@ function ProviderCard({
         <div className="border-t border-th-border px-4 py-3 bg-th-bg-alt/30 space-y-3">
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-3 text-xs">
-            {/* Binary — only show for non-SDK providers */}
-            {!sdkCapable && (
-              <div>
-                <span className="text-th-text-muted flex items-center gap-1"><Terminal className="w-3 h-3" /> Binary:</span>
-                <code className="font-mono text-th-text-alt">
-                  {provider.binaryPath ?? provider.id}
-                </code>
-              </div>
-            )}
+            <div>
+              <span className="text-th-text-muted flex items-center gap-1"><Terminal className="w-3 h-3" /> Binary:</span>
+              <code className="font-mono text-th-text-alt">
+                {provider.binaryPath ?? provider.id}
+              </code>
+            </div>
             <div>
               <span className="text-th-text-muted">Status:</span>{' '}
               <span className={provider.installed ? 'text-green-400' : 'text-th-text-muted'}>
@@ -241,8 +263,7 @@ function ProviderCard({
                 {provider.version && ` (${provider.version})`}
               </span>
             </div>
-            {/* Default Args — only show for non-SDK providers that have args */}
-            {!sdkCapable && defaultArgs.length > 0 && (
+            {defaultArgs.length > 0 && (
               <div>
                 <span className="text-th-text-muted flex items-center gap-1"><Settings2 className="w-3 h-3" /> Default Args:</span>
                 <code className="font-mono text-th-text-alt">
@@ -254,9 +275,9 @@ function ProviderCard({
               <span className="text-th-text-muted">Features:</span>{' '}
               <span className="text-th-text-alt">
                 {[
-                  sdkCapable && 'In-process SDK',
+                  'ACP',
                   supportsResume && 'Resume',
-                ].filter(Boolean).join(', ') || 'CLI mode'}
+                ].filter(Boolean).join(', ')}
               </span>
             </div>
           </div>
@@ -283,20 +304,27 @@ function ProviderCard({
             </div>
           )}
 
-          {/* Setup instructions if not installed */}
-          {!provider.installed && docsUrl && (
+          {/* Setup links and documentation */}
+          {links.length > 0 && (
             <div className="bg-th-bg-alt border border-th-border rounded-md p-3 text-xs">
-              <p className="text-th-text-muted mb-1.5">
-                Install the CLI to use this provider:
-              </p>
-              <a
-                href={docsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-accent hover:text-accent-muted transition-colors"
-              >
-                <ExternalLink size={10} /> Installation docs
-              </a>
+              {!provider.installed && (
+                <p className="text-th-text-muted mb-1.5">
+                  Install the CLI to use this provider:
+                </p>
+              )}
+              <div className="flex flex-col gap-1" data-testid={`provider-links-${provider.id}`}>
+                {links.map((link) => (
+                  <a
+                    key={link.url}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-accent hover:text-accent-muted transition-colors"
+                  >
+                    <ExternalLink size={10} /> {link.label}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 
@@ -316,17 +344,6 @@ function ProviderCard({
                   <Zap size={12} />
                 )}
                 {testing ? 'Testing…' : 'Test Connection'}
-              </button>
-            )}
-
-            {/* Set as Active */}
-            {provider.installed && provider.enabled && !isActive && (
-              <button
-                onClick={() => onSetActive(provider.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 rounded-md transition-colors"
-                data-testid={`set-active-${provider.id}`}
-              >
-                <Star size={12} /> Set as Active
               </button>
             )}
 
@@ -352,22 +369,31 @@ function ProviderCard({
 
 // ── ProvidersSection ────────────────────────────────────────────────
 
-export function ProvidersSection({ activeProviderId }: { activeProviderId?: string }) {
+export function ProvidersSection() {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  const [ranking, setRanking] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState(activeProviderId ?? 'copilot');
 
   useEffect(() => {
-    if (activeProviderId) setActiveId(activeProviderId);
-  }, [activeProviderId]);
-
-  useEffect(() => {
-    apiFetch<ProviderStatus[]>('/settings/providers')
-      .then(setProviders)
+    Promise.all([
+      apiFetch<ProviderStatus[]>('/settings/providers'),
+      apiFetch<{ ranking: string[] }>('/settings/provider-ranking'),
+    ])
+      .then(([provs, { ranking: r }]) => {
+        setProviders(provs);
+        setRanking(r);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  // Sort providers by ranking
+  const sortedProviders = [...providers].sort((a, b) => {
+    const ai = ranking.indexOf(a.id);
+    const bi = ranking.indexOf(b.id);
+    return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+  });
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
     setProviders((prev) =>
@@ -385,18 +411,30 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
     }
   }, []);
 
-  const handleSetActive = useCallback(async (id: string) => {
-    const prevId = activeId;
-    setActiveId(id);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = ranking.indexOf(active.id as string);
+    const newIndex = ranking.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newRanking = arrayMove(ranking, oldIndex, newIndex);
+    setRanking(newRanking);
     try {
-      await apiFetch('/settings/provider', {
+      await apiFetch('/settings/provider-ranking', {
         method: 'PUT',
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ ranking: newRanking }),
       });
     } catch {
-      setActiveId(prevId);
+      setRanking(ranking);
     }
-  }, [activeId]);
+  }, [ranking]);
 
   const installedCount = providers.filter((p) => p.installed).length;
 
@@ -405,6 +443,9 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider flex items-center gap-2">
           <Cpu className="w-3.5 h-3.5" /> CLI Providers
+          <span className="text-[10px] font-normal normal-case tracking-normal text-th-text-muted/60">
+            — drag to reorder
+          </span>
         </h3>
         {!loading && (
           <span className="text-[10px] text-th-text-muted">
@@ -426,7 +467,7 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
         </div>
       )}
 
-      {!loading && !error && providers.length === 0 && (
+      {!loading && !error && sortedProviders.length === 0 && (
         <EmptyState
           icon={<Cpu className="w-10 h-10 opacity-50" />}
           title="No providers configured"
@@ -435,18 +476,25 @@ export function ProvidersSection({ activeProviderId }: { activeProviderId?: stri
         />
       )}
 
-      {!loading && !error && providers.length > 0 && (
-        <div className="space-y-2" data-testid="providers-list">
-          {providers.map((provider) => (
-            <ProviderCard
-              key={provider.id}
-              provider={provider}
-              isActive={provider.id === activeId}
-              onToggle={handleToggle}
-              onSetActive={handleSetActive}
-            />
-          ))}
-        </div>
+      {!loading && !error && sortedProviders.length > 0 && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={ranking} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2" data-testid="providers-list">
+              {sortedProviders.map((provider, idx) => (
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  rank={idx + 1}
+                  onToggle={handleToggle}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </section>
   );

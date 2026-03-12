@@ -20,7 +20,7 @@ const CRITICAL_PATTERNS = [
   /\bP0\b/,
   /\bURGENT\b/i,
   /\b(?:type|syntax|runtime)error\b/i,
-  /\bagent (?:stuck|hung|failed|crashed)/i,
+  /\bagent (?:stuck|failed|crashed)/i,
   /\bdecision (?:needed|pending|required)/i,
   /\bneeds(?:Confirmation| confirmation| your (?:input|decision))/i,
   /\bbreaking change/i,

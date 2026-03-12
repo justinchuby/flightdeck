@@ -11,11 +11,12 @@
  * All visualization charts moved to AnalysisPage.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useProjects } from '../../hooks/useProjects';
-import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
+import { useProjectId } from '../../contexts/ProjectContext';
 import { formatDateTime } from '../../utils/format';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
@@ -42,6 +43,8 @@ import {
 } from 'lucide-react';
 import type { Decision, DagStatus } from '../../types';
 import { TokenUsageSection } from './TokenUsageSection';
+import { FileLockPanel } from '../FleetOverview/FileLockPanel';
+import type { FileLock } from '../FleetOverview/FleetOverview';
 
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -73,7 +76,8 @@ interface Props {
 export function OverviewPage(_props: Props) {
   const agents = useAppStore((s) => s.agents);
   const { projects } = useProjects();
-  const effectiveId = useEffectiveProjectId();
+  const effectiveId = useProjectId();
+  const navigate = useNavigate();
 
   const projectName = useMemo(() => {
     if (!effectiveId) return '';
@@ -176,7 +180,7 @@ export function OverviewPage(_props: Props) {
     mountedRef.current = true;
     const poll = async () => {
       try {
-        const data = await apiFetch<Decision[]>(`/lead/${effectiveId}/decisions`);
+        const data = await apiFetch<Decision[]>(`/decisions?projectId=${effectiveId}`);
         if (mountedRef.current) setDecisions(Array.isArray(data) ? data : []);
       } catch { /* API may not be ready */ }
     };
@@ -193,12 +197,30 @@ export function OverviewPage(_props: Props) {
   // ── Progress feed (activity only — lead-emitted progress reports) ──
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
+  // ── File locks ──
+  const [locks, setLocks] = useState<FileLock[]>([]);
+
+  useEffect(() => {
+    if (!effectiveId) return;
+    const poll = async () => {
+      try {
+        const data = await apiFetch<{ locks: FileLock[] }>(
+          `/coordination/status?projectId=${effectiveId}`,
+        );
+        if (mountedRef.current) setLocks(Array.isArray(data.locks) ? data.locks : []);
+      } catch { /* ignore */ }
+    };
+    poll();
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [effectiveId]);
+
   useEffect(() => {
     if (!effectiveId) return;
     const poll = async () => {
       try {
         const data = await apiFetch<ActivityEntry[]>(
-          `/coordination/activity?projectId=${effectiveId}&type=progress`,
+          `/coordination/activity?projectId=${effectiveId}&type=progress_update`,
         );
         if (mountedRef.current) setActivity(Array.isArray(data) ? data : []);
       } catch { /* ignore */ }
@@ -258,7 +280,11 @@ export function OverviewPage(_props: Props) {
 
       {/* ── Session Controls ───────────────────────────────────── */}
       {effectiveId && hasActiveLead && activeLeadAgent && (
-        <div className="bg-surface-raised border border-th-border rounded-lg p-4" data-testid="active-session-banner">
+        <div
+          className="bg-surface-raised border border-th-border rounded-lg p-4 cursor-pointer hover:border-yellow-500/50 transition-colors"
+          data-testid="active-session-banner"
+          onClick={() => navigate(`/projects/${effectiveId}/session`)}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -286,7 +312,7 @@ export function OverviewPage(_props: Props) {
             </div>
             <button
               type="button"
-              onClick={handleStopSession}
+              onClick={(e) => { e.stopPropagation(); handleStopSession(); }}
               disabled={stopping}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500/20 text-red-600 dark:text-red-400 rounded-md hover:bg-red-500/30 transition-colors font-medium disabled:opacity-50"
               data-testid="stop-session-btn"
@@ -392,6 +418,13 @@ export function OverviewPage(_props: Props) {
             </div>
           ))}
         </section>
+      )}
+
+      {/* ── File Locks ──────────────────────────────────────────── */}
+      {locks.length > 0 && (
+        <SectionErrorBoundary name="File locks">
+          <FileLockPanel locks={locks} agents={projectAgents} />
+        </SectionErrorBoundary>
       )}
 
       {/* ── Two-Column Feed ────────────────────────────────────── */}

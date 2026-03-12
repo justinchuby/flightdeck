@@ -10,6 +10,7 @@ import { CommHeatmap } from './CommHeatmap';
 import type { HeatmapMessage } from './CommHeatmap';
 import type { AgentInfo } from '../../types';
 import { ProjectTabs } from '../ProjectTabs';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface CoordinationStatus {
   locks: FileLock[];
@@ -125,7 +126,7 @@ export function FleetOverview({ api, ws }: Props) {
       projectAgents.map((a) => ({
         id:   a.id,
         role: a.role.id,
-        name: `${a.role.icon}${a.id.slice(0, 5)}`,
+        name: `${a.role.icon}${shortAgentId(a.id)}`,
       })),
     [projectAgents],
   );
@@ -182,7 +183,7 @@ export function FleetOverview({ api, ws }: Props) {
               <option value="">All agents</option>
               {projectAgents.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.role.icon} {a.role.name} ({a.id.slice(0, 8)})
+                  {a.role.icon} {a.role.name} ({shortAgentId(a.id)})
                 </option>
               ))}
             </select>

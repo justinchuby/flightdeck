@@ -10,6 +10,7 @@ import { Users, Clock, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { formatElapsed } from './dagCriticalPath';
 import { EmptyState } from '../Shared';
 import type { DagStatus, DagTask } from '../../types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -101,7 +102,7 @@ export function DagResourceView({ dagStatus }: DagResourceViewProps) {
             <div className="flex items-center gap-2">
               <span className="text-blue-400 text-xs">🤖</span>
               <span className="text-xs font-mono text-th-text" data-testid="agent-id">
-                {agentId.length > 16 ? agentId.slice(0, 8) + '…' : agentId}
+                {agentId.length > 16 ? shortAgentId(agentId) + '…' : agentId}
               </span>
               <span className="text-[10px] text-th-text-muted">
                 {tasks[0]?.role}

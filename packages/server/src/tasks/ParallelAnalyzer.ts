@@ -94,7 +94,7 @@ export class ParallelAnalyzer {
         depths.set(id, 0);
         return 0;
       }
-      const maxDep = Math.max(...task.dependsOn.map(d => getDepth(d)));
+      const maxDep = Math.max(...task.dependsOn.map((d: string) => getDepth(d)));
       depths.set(id, maxDep + 1);
       return maxDep + 1;
     };

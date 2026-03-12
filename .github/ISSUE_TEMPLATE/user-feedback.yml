@@ -38,15 +38,6 @@ body:
     validations:
       required: false
 
-  - type: input
-    id: session-id
-    attributes:
-      label: Session ID
-      description: If applicable, paste your session ID (from the session header or URL)
-      placeholder: "e.g., proj-auth-refactor-1709912345"
-    validations:
-      required: false
-
   - type: textarea
     id: expected
     attributes:

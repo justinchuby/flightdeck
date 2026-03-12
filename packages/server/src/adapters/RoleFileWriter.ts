@@ -68,7 +68,7 @@ export class CopilotRoleFileWriter implements RoleFileWriter {
         FLIGHTDECK_MARKER,
         '---',
         `name: flightdeck-${role.role}`,
-        `description: "${escapeYamlString(role.description)}"`,
+        `description: "Flightdeck ${capitalize(role.role)}: ${escapeYamlString(role.description)}"`,
         'tools:',
         toolsList,
         '---',
@@ -113,7 +113,7 @@ export class ClaudeRoleFileWriter implements RoleFileWriter {
         FLIGHTDECK_MARKER,
         '---',
         `name: flightdeck-${role.role}`,
-        `description: "${escapeYamlString(role.description)}"`,
+        `description: "Flightdeck ${capitalize(role.role)}: ${escapeYamlString(role.description)}"`,
         '---',
         '',
         `# ${capitalize(role.role)}`,
@@ -156,7 +156,7 @@ export class GeminiRoleFileWriter implements RoleFileWriter {
         '',
         `# ${capitalize(role.role)}`,
         '',
-        `> ${role.description}`,
+        `> Flightdeck ${capitalize(role.role)}: ${role.description}`,
         '',
         role.instructions,
         '',
@@ -195,7 +195,7 @@ export class CursorRoleFileWriter implements RoleFileWriter {
       const content = [
         FLIGHTDECK_MARKER,
         '---',
-        `description: "${escapeYamlString(role.description)}"`,
+        `description: "Flightdeck ${capitalize(role.role)}: ${escapeYamlString(role.description)}"`,
         'alwaysApply: true',
         '---',
         '',
@@ -233,7 +233,7 @@ export class CodexRoleFileWriter implements RoleFileWriter {
 
     const sections = roles.map(
       (role) =>
-        [`## ${capitalize(role.role)}`, '', `> ${role.description}`, '', role.instructions].join(
+        [`## ${capitalize(role.role)}`, '', `> Flightdeck ${capitalize(role.role)}: ${role.description}`, '', role.instructions].join(
           '\n',
         ),
     );
@@ -284,7 +284,7 @@ export class OpenCodeRoleFileWriter implements RoleFileWriter {
     const agents: Record<string, unknown> = {};
     for (const role of roles) {
       const entry: Record<string, unknown> = {
-        description: role.description,
+        description: `Flightdeck ${capitalize(role.role)}: ${role.description}`,
         prompt: role.instructions,
       };
       if (role.tools?.length) {

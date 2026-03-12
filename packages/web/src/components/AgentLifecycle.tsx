@@ -2,13 +2,13 @@ import { useState, useCallback } from 'react';
 import { apiFetch } from '../hooks/useApi';
 import {
   X,
-  UserMinus,
   Copy,
   RotateCcw,
   AlertTriangle,
   CheckCircle,
 } from 'lucide-react';
 import type { AgentHealthInfo } from '../pages/CrewPage';
+import { shortAgentId } from '../utils/agentLabel';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ interface Props {
   onActionComplete: () => void;
 }
 
-type ActionType = 'retire' | 'clone' | 'retrain';
+type ActionType = 'clone' | 'retrain';
 
 interface ConfirmState {
   action: ActionType;
@@ -35,7 +35,6 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [retireReason, setRetireReason] = useState('');
 
   const executeAction = useCallback(async (action: ActionType) => {
     setLoading(true);
@@ -46,19 +45,11 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
       const encodedAgent = encodeURIComponent(agentId);
 
       switch (action) {
-        case 'retire': {
-          await apiFetch(`/teams/${encodedTeam}/agents/${encodedAgent}/retire`, {
-            method: 'POST',
-            body: JSON.stringify({ reason: retireReason || undefined }),
-          });
-          setResult({ ok: true, message: 'Agent retired successfully' });
-          break;
-        }
         case 'clone': {
           const data = await apiFetch(`/teams/${encodedTeam}/agents/${encodedAgent}/clone`, {
             method: 'POST',
           });
-          setResult({ ok: true, message: `Agent cloned: ${data.clone?.agentId?.slice(0, 8) ?? 'new agent'}` });
+          setResult({ ok: true, message: `Agent cloned: ${data.clone?.agentId ? shortAgentId(data.clone.agentId) : 'new agent'}` });
           break;
         }
         case 'retrain': {
@@ -75,34 +66,26 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
       setLoading(false);
       setConfirm(null);
     }
-  }, [agentId, teamId, retireReason, onActionComplete]);
+  }, [agentId, teamId, onActionComplete]);
 
   const requestAction = useCallback((action: ActionType) => {
     const configs: Record<ActionType, ConfirmState> = {
-      retire: {
-        action: 'retire',
-        title: 'Retire Agent',
-        message: `This will gracefully shut down agent ${agentId.slice(0, 8)} and mark it as retired. Its knowledge will be preserved. This is reversible.`,
-        destructive: true,
-      },
       clone: {
         action: 'clone',
         title: 'Clone Agent',
-        message: `This will create a new agent with the same role, model, and knowledge as ${agentId.slice(0, 8)}.`,
+        message: `This will create a new agent with the same role, model, and knowledge as ${shortAgentId(agentId)}.`,
         destructive: false,
       },
       retrain: {
         action: 'retrain',
         title: 'Retrain Agent',
-        message: `This will reset the procedural knowledge for agent ${agentId.slice(0, 8)}. Core and semantic knowledge will be preserved.`,
+        message: `This will reset the procedural knowledge for agent ${shortAgentId(agentId)}. Core and semantic knowledge will be preserved.`,
         destructive: true,
       },
     };
     setConfirm(configs[action]);
     setResult(null);
   }, [agentId]);
-
-  const isRetired = agent?.status === 'retired';
 
   return (
     <div
@@ -115,7 +98,7 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
         <div className="flex items-center justify-between px-5 py-4 border-b border-th-border">
           <div>
             <h2 className="text-base font-semibold text-th-text">Agent Lifecycle</h2>
-            <span className="text-xs text-th-text-muted font-mono">{agentId.slice(0, 8)}</span>
+            <span className="text-xs text-th-text-muted font-mono">{shortAgentId(agentId)}</span>
             {agent && (
               <span className="ml-2 text-xs text-th-text-muted">
                 {agent.role} • {agent.status}
@@ -158,17 +141,6 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
               <h3 className="text-sm font-semibold text-th-text">{confirm.title}</h3>
               <p className="text-xs text-th-text-muted">{confirm.message}</p>
 
-              {confirm.action === 'retire' && (
-                <input
-                  type="text"
-                  placeholder="Reason (optional)"
-                  value={retireReason}
-                  onChange={(e) => setRetireReason(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs bg-th-bg-alt border border-th-border rounded text-th-text placeholder-th-text-muted"
-                  data-testid="retire-reason-input"
-                />
-              )}
-
               <div className="flex items-center gap-2 justify-end">
                 <button
                   onClick={() => setConfirm(null)}
@@ -197,15 +169,6 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
           {!confirm && (
             <div className="space-y-2">
               <ActionButton
-                icon={<UserMinus className="w-4 h-4" />}
-                label="Retire Agent"
-                description="Gracefully shut down, preserve knowledge"
-                onClick={() => requestAction('retire')}
-                disabled={isRetired}
-                destructive
-                testId="action-retire"
-              />
-              <ActionButton
                 icon={<Copy className="w-4 h-4" />}
                 label="Clone Agent"
                 description="Create new agent with same config & knowledge"
@@ -217,7 +180,6 @@ export function AgentLifecycle({ agentId, teamId, agent, onClose, onActionComple
                 label="Retrain Agent"
                 description="Reset procedural knowledge, keep core/semantic"
                 onClick={() => requestAction('retrain')}
-                disabled={isRetired}
                 destructive
                 testId="action-retrain"
               />

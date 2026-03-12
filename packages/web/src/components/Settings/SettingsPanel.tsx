@@ -5,15 +5,13 @@ import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
 import { apiFetch } from '../../hooks/useApi';
 import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
-import { NotificationPreferencesPanel, NotificationActivityLog } from '../Notifications';
-import { ConflictSettingsPanel } from '../Conflicts';
 import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';
 
 const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; description: string }> = [
-  { level: 'supervised', label: 'Supervised', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
-  { level: 'balanced', label: 'Balanced', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
-  { level: 'autonomous', label: 'Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
+  { level: 'supervised', label: '🔍 Supervised', description: 'Review all agent actions — new agents, commits, and task changes require your approval' },
+  { level: 'balanced', label: '⚖️ Balanced', description: 'Review key decisions — new agents and first few commits need approval, routine work runs automatically' },
+  { level: 'autonomous', label: '🚀 Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
 ];
 
 interface Props {
@@ -248,26 +246,11 @@ export function SettingsPanel({ api }: Props) {
       </section>
 
       {/* Providers (includes CLI configuration per provider) */}
-      <ProvidersSection activeProviderId={config?.provider} />
+      <ProvidersSection />
 
       {/* Telegram Integration */}
       <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
         <TelegramSettings />
-      </section>
-
-      {/* Conflict Detection */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <ConflictSettingsPanel />
-      </section>
-
-      {/* Notification Preferences */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <NotificationPreferencesPanel />
-      </section>
-
-      {/* Notification Activity Log */}
-      <section className="bg-surface-raised border border-th-border rounded-lg p-4 mb-6">
-        <NotificationActivityLog />
       </section>
 
       {/* Data Management */}

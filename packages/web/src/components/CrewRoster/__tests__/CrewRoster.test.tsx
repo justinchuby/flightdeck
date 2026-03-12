@@ -38,7 +38,7 @@ const rosterAgents = [
     agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900',
     role: 'architect',
     model: 'claude-sonnet-4-6',
-    status: 'busy',
+    status: 'running',
     liveStatus: 'running',
     teamId: 'default',
     projectId: 'proj-1',
@@ -98,7 +98,7 @@ const profileData = {
   agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900',
   role: 'architect',
   model: 'claude-sonnet-4-6',
-  status: 'busy',
+  status: 'running',
   liveStatus: 'running',
   teamId: 'default',
   projectId: 'proj-1',
@@ -109,7 +109,6 @@ const profileData = {
   live: {
     task: 'Security architecture',
     outputPreview: 'Working on JWT...',
-    autopilot: true,
     model: 'claude-sonnet-4-6',
   },
 };
@@ -303,7 +302,7 @@ describe('CrewRoster', () => {
     // Click Settings tab
     fireEvent.click(screen.getByText('Settings'));
     await waitFor(() => {
-      expect(screen.getByText('Autopilot:')).toBeInTheDocument();
+      expect(screen.getByText('Model')).toBeInTheDocument();
     });
   });
 
@@ -502,7 +501,7 @@ describe('CrewRoster', () => {
       agentId: 'ee55ff66-7788-9900-1122-334455667788',
       role: 'lead',
       model: 'claude-sonnet-4-6',
-      status: 'busy',
+      status: 'running',
       liveStatus: 'running',
       teamId: 'team-alpha',
       projectId: 'proj-2',

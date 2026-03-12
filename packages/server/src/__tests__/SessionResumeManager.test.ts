@@ -39,10 +39,10 @@ function makeAgentJSON(overrides: Partial<AgentJSON> = {}): AgentJSON {
     id: 'agent-1',
     role: testRole,
     status: 'running',
-    autopilot: false,
     childIds: [],
     createdAt: new Date().toISOString(),
     outputPreview: '',
+    model: 'claude-opus-4.6',
     inputTokens: 0,
     outputTokens: 0,
     contextWindowSize: 200000,
@@ -67,7 +67,6 @@ class MockAgentManager extends EventEmitter {
     role: Role,
     task?: string,
     parentId?: string,
-    _autopilot?: boolean,
     _model?: string,
     _cwd?: string,
     resumeSessionId?: string,
@@ -140,7 +139,7 @@ describe('SessionResumeManager', () => {
       expect(record).toBeDefined();
       expect(record!.role).toBe('developer');
       expect(record!.model).toBe('claude-sonnet');
-      expect(record!.status).toBe('busy'); // running → busy
+      expect(record!.status).toBe('running'); // running → running
       expect(record!.projectId).toBe('project-1');
       expect(record!.metadata).toEqual({
         task: 'Build API',
@@ -177,7 +176,7 @@ describe('SessionResumeManager', () => {
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('idle');
 
       mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'running' });
-      expect(rosterRepo.getAgent('agent-1')!.status).toBe('busy');
+      expect(rosterRepo.getAgent('agent-1')!.status).toBe('running');
     });
 
     it('ignores creating status (transient)', () => {
@@ -185,7 +184,7 @@ describe('SessionResumeManager', () => {
       mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'creating' });
 
       // Status should not change from the spawn state
-      expect(rosterRepo.getAgent('agent-1')!.status).toBe('busy');
+      expect(rosterRepo.getAgent('agent-1')!.status).toBe('running');
     });
 
     it('marks agent terminated on terminated event', () => {
@@ -206,8 +205,8 @@ describe('SessionResumeManager', () => {
       mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1' }));
       mockAgentManager.emit('agent:exit', { agentId: 'agent-1', code: 0 });
 
-      // Should still be busy (from running spawn status)
-      expect(rosterRepo.getAgent('agent-1')!.status).toBe('busy');
+      // Should still be running (from running spawn status)
+      expect(rosterRepo.getAgent('agent-1')!.status).toBe('running');
     });
   });
 
@@ -279,7 +278,7 @@ describe('SessionResumeManager', () => {
   describe('resumeAll', () => {
     it('resumes all non-terminated agents with sessionIds', async () => {
       rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1', 'proj-1', { task: 'Task A' });
-      rosterRepo.upsertAgent('agent-2', 'lead', 'gpt-4', 'busy', 'session-2', 'proj-1', { task: 'Task B' });
+      rosterRepo.upsertAgent('agent-2', 'lead', 'gpt-4', 'running', 'session-2', 'proj-1', { task: 'Task B' });
       rosterRepo.upsertAgent('agent-3', 'developer', 'claude-haiku', 'terminated');
 
       mockAgentManager.spawnResult = { id: 'agent-x', sessionId: 'new-session' };
@@ -390,12 +389,12 @@ describe('SessionResumeManager', () => {
       expect(manager.providerSupportsResume).toBe(true);
     });
 
-    it('reports supportsResume=false for gemini', () => {
+    it('reports supportsResume=true for gemini', () => {
       const geminiManager = new SessionResumeManager(
         mockAgentManager as any, rosterRepo, delegationRepo,
         mockRoleRegistry as any, { ...testConfig, provider: 'gemini' } as ServerConfig,
       );
-      expect(geminiManager.providerSupportsResume).toBe(false);
+      expect(geminiManager.providerSupportsResume).toBe(true);
       geminiManager.dispose();
     });
 
@@ -447,7 +446,7 @@ describe('SessionResumeManager', () => {
     it('persists through spawn → session_ready → status_change → terminate', () => {
       // 1. Agent spawned
       mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1', status: 'running', model: 'claude-sonnet' }));
-      expect(rosterRepo.getAgent('agent-1')!.status).toBe('busy');
+      expect(rosterRepo.getAgent('agent-1')!.status).toBe('running');
 
       // 2. Session ready
       mockAgentManager.emit('agent:session_ready', { agentId: 'agent-1', sessionId: 'sess-123' });
@@ -457,9 +456,9 @@ describe('SessionResumeManager', () => {
       mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'idle' });
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('idle');
 
-      // 4. Back to busy
+      // 4. Back to running
       mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'running' });
-      expect(rosterRepo.getAgent('agent-1')!.status).toBe('busy');
+      expect(rosterRepo.getAgent('agent-1')!.status).toBe('running');
 
       // 5. Terminated
       mockAgentManager.emit('agent:terminated', 'agent-1');

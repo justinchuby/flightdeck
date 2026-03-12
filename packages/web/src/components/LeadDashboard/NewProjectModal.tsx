@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { ModelConfigPanel } from './ModelConfigPanel';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
+import { useModels, deriveModelName } from '../../hooks/useModels';
 
 interface RoleInfo { id: string; name: string; icon: string; description: string; model: string; }
 
@@ -18,12 +19,13 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
   const [newProjectTask, setNewProjectTask] = useState('');
   const [newProjectModel, setNewProjectModel] = useState('');
   const [newProjectCwd, setNewProjectCwd] = useState('');
-  const [resumeSessionId, setResumeSessionId] = useState('');
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [showModelConfig, setShowModelConfig] = useState(false);
   const [newProjectModelConfig, setNewProjectModelConfig] = useState<Record<string, string[]> | null>(null);
+  const [error, setError] = useState('');
+  const { models: availableModels } = useModels();
 
   // Fetch available roles on mount
   useEffect(() => {
@@ -35,6 +37,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
   const handleCreate = useCallback(async () => {
     if (!newProjectName.trim()) { setNewProjectNameTouched(true); return; }
     setStarting(true);
+    setError('');
     try {
       const task = newProjectTask.trim() || undefined;
       let fullTask = task;
@@ -44,7 +47,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
       }
       const data = await apiFetch<{ id?: string; projectId?: string }>('/lead/start', {
         method: 'POST',
-        body: JSON.stringify({ name: newProjectName.trim(), task: fullTask, model: newProjectModel || undefined, cwd: newProjectCwd.trim() || undefined, sessionId: resumeSessionId.trim() || undefined }),
+        body: JSON.stringify({ name: newProjectName.trim(), task: fullTask, model: newProjectModel || undefined, cwd: newProjectCwd.trim() || undefined }),
       });
       if (data.id) {
         useLeadStore.getState().addProject(data.id);
@@ -60,12 +63,12 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
         }
         onClose();
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      setError(err?.message || 'Failed to start project');
     } finally {
       setStarting(false);
     }
-  }, [newProjectName, newProjectTask, newProjectModel, newProjectCwd, resumeSessionId, selectedRoles, newProjectModelConfig, onClose]);
+  }, [newProjectName, newProjectTask, newProjectModel, newProjectCwd, selectedRoles, newProjectModelConfig, onClose]);
 
   return (
     <>
@@ -123,15 +126,9 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
                   className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-yellow-500"
                 >
                   <option value="">Default</option>
-                  <option value="claude-opus-4.6">Claude Opus 4.6</option>
-                  <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
-                  <option value="claude-sonnet-4.5">Claude Sonnet 4.5</option>
-                  <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
-                  <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
-                  <option value="gpt-5.2-codex">GPT-5.2 Codex</option>
-                  <option value="gpt-5.2">GPT-5.2</option>
-                  <option value="gpt-5.1-codex">GPT-5.1 Codex</option>
-                  <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                  {availableModels.map((m) => (
+                    <option key={m} value={m}>{deriveModelName(m)}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -153,16 +150,6 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
                     <FolderOpen className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs text-th-text-muted mb-1 font-medium">Resume Session <span className="text-th-text-muted">(optional — paste a session ID to continue previous work)</span></label>
-                <input
-                  type="text"
-                  value={resumeSessionId}
-                  onChange={(e) => setResumeSessionId(e.target.value)}
-                  placeholder="session-id-from-previous-lead"
-                  className="w-full bg-th-bg border border-th-border rounded-md px-3 py-2 text-sm font-mono text-th-text-alt focus:outline-none focus:border-blue-500"
-                />
               </div>
             </div>
             {/* Initial Crew Selection */}
@@ -215,6 +202,11 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
               )}
             </div>
           </div>
+          {error && (
+            <div className="mx-5 mb-0 p-3 bg-red-500/10 border border-red-500/30 rounded-md text-sm text-red-400">
+              {error}
+            </div>
+          )}
           <div className="flex justify-end gap-2 px-5 py-3 border-t border-th-border">
             <button
               onClick={onClose}
@@ -228,7 +220,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
               className="px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-th-bg-hover disabled:text-th-text-muted text-black text-sm font-semibold rounded-md flex items-center gap-1.5 transition-colors"
             >
               {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-              {starting ? 'Starting...' : resumeSessionId.trim() ? 'Resume Project' : 'Create Project'}
+              {starting ? 'Starting...' : 'Create Project'}
             </button>
           </div>
         </div>

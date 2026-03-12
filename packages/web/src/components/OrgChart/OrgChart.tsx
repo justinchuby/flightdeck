@@ -3,11 +3,14 @@ import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type AgentComm } from '../../stores/leadStore';
 import type { AgentInfo } from '../../types';
 import { EmptyState } from '../Shared';
-import { Network, MessageSquare, Grid3X3, Users, BarChart3 } from 'lucide-react';
+import { Network, MessageSquare, Grid3X3, Users, BarChart3, Share2 } from 'lucide-react';
 import { idColor } from '../../utils/markdown';
+import { shortAgentId } from '../../utils/agentLabel';
 import { CommHeatmap } from '../FleetOverview/CommHeatmap';
 import type { HeatmapMessage, CommType as HeatmapCommType } from '../FleetOverview/CommHeatmap';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
+import { CommFlowGraph } from '../CommFlow/CommFlowGraph';
+import { AgentDetailPanel } from '../AgentDetailPanel';
 
 // Unified message entry covering both 1:1 comms and group messages
 interface CommEntry {
@@ -38,19 +41,32 @@ const fallbackStatus = { border: 'border-th-border', badge: 'bg-gray-500/20 text
 // ---------------------------------------------------------------------------
 // AgentNode — a single card in the tree
 // ---------------------------------------------------------------------------
-function AgentNode({ agent }: { agent: AgentInfo }) {
+function AgentNode({ agent, onClick }: { agent: AgentInfo; onClick?: () => void }) {
   const s = statusStyle[agent.status] ?? fallbackStatus;
   const roleName = agent.role?.name ?? agent.role?.id ?? 'Unknown';
-  const shortId = agent.id.slice(0, 8);
+  const shortId = shortAgentId(agent.id);
   // Show last segment of model string (e.g. "sonnet-4" from "claude-sonnet-4")
   const modelLabel = agent.model?.split('/').pop()?.split('-').slice(-2).join('-') ?? '';
 
   return (
-    <div className={`border-2 rounded-lg px-3 py-2 text-center min-w-[140px] ${s.border}`}>
+    <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      className={`border-2 rounded-lg px-3 py-2 text-center min-w-[140px] transition-all ${s.border} ${
+        onClick ? 'cursor-pointer hover:brightness-125 hover:shadow-lg hover:scale-[1.03] active:scale-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none' : ''
+      }`}
+    >
       {agent.role?.icon && <span className="mr-1">{agent.role.icon}</span>}
       <span className="text-sm font-medium text-th-text">{roleName}</span>
       <div className="text-xs font-mono" style={{ color: idColor(agent.id) }}>{shortId}</div>
-      {modelLabel && <div className="text-xs text-th-text-muted mt-0.5">{modelLabel}</div>}
+      {(agent.provider || modelLabel) && (
+        <div className="text-xs text-th-text-muted mt-0.5">
+          {agent.provider && <span className="text-[10px] bg-blue-500/15 text-blue-400 px-1 py-px rounded mr-1">{agent.provider}</span>}
+          {modelLabel}
+        </div>
+      )}
       <div className={`text-[10px] mt-1 px-1.5 py-0.5 rounded-full inline-block ${s.badge}`}>
         {agent.status}
       </div>
@@ -61,7 +77,7 @@ function AgentNode({ agent }: { agent: AgentInfo }) {
 // ---------------------------------------------------------------------------
 // HierarchyTree — top-down tree of agents
 // ---------------------------------------------------------------------------
-function HierarchyTree({ agents }: { agents: AgentInfo[] }) {
+function HierarchyTree({ agents, onAgentClick }: { agents: AgentInfo[]; onAgentClick?: (agentId: string) => void }) {
   // Index children by parentId
   const byParent = new Map<string, AgentInfo[]>();
   const rootAgents: AgentInfo[] = [];
@@ -80,7 +96,7 @@ function HierarchyTree({ agents }: { agents: AgentInfo[] }) {
     const children = byParent.get(parent.id);
     return (
       <div key={parent.id} className="flex flex-col items-center gap-2">
-        <AgentNode agent={parent} />
+        <AgentNode agent={parent} onClick={onAgentClick ? () => onAgentClick(parent.id) : undefined} />
         {children && children.length > 0 && (
           <>
             <div className="w-px h-4 bg-th-bg-hover" />
@@ -173,7 +189,7 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
               <div className="flex items-center gap-1">
                 <span className="text-th-text-muted shrink-0">[{time}]</span>
                 <span className={`shrink-0 ${roleColor(c.fromRole)}`}>
-                  {c.fromRole} ({c.fromId?.slice(0, 6)})
+                  {c.fromRole} ({c.fromId ? shortAgentId(c.fromId) : ''})
                 </span>
                 {c.groupName ? (
                   <>
@@ -187,7 +203,7 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
                   <>
                     <span className="text-th-text-muted"> → </span>
                     <span className={`shrink-0 ${roleColor(c.toRole)}`}>
-                      {c.toRole} ({c.toId?.slice(0, 6)})
+                      {c.toRole} ({c.toId ? shortAgentId(c.toId) : ''})
                     </span>
                   </>
                 )}
@@ -222,11 +238,11 @@ function CommsMatrix({ entries, agents }: { entries: CommEntry[]; agents: AgentI
   // Build a deduplicated list of participants
   const seen = new Map<string, AgentLabel>();
   for (const a of agents) {
-    seen.set(a.id, { id: a.id, role: a.role?.name ?? 'Unknown', shortId: a.id.slice(0, 6) });
+    seen.set(a.id, { id: a.id, role: a.role?.name ?? 'Unknown', shortId: shortAgentId(a.id) });
   }
   for (const c of directComms) {
-    if (!seen.has(c.fromId)) seen.set(c.fromId, { id: c.fromId, role: c.fromRole, shortId: c.fromId.slice(0, 6) });
-    if (!seen.has(c.toId)) seen.set(c.toId, { id: c.toId, role: c.toRole, shortId: c.toId.slice(0, 6) });
+    if (!seen.has(c.fromId)) seen.set(c.fromId, { id: c.fromId, role: c.fromRole, shortId: shortAgentId(c.fromId) });
+    if (!seen.has(c.toId)) seen.set(c.toId, { id: c.toId, role: c.toRole, shortId: shortAgentId(c.toId) });
   }
 
   const participants = Array.from(seen.values());
@@ -304,7 +320,8 @@ export function OrgChart({ api, ws }: Props) {
   const agents = useAppStore((s) => s.agents);
   const projects = useLeadStore((s) => s.projects);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(contextProjectId);
-  const [commView, setCommView] = useState<'list' | 'matrix' | 'heatmap'>('list');
+  const [commView, setCommView] = useState<'graph' | 'list' | 'matrix' | 'heatmap'>('graph');
+  const [detailAgentId, setDetailAgentId] = useState<string | null>(null);
 
   // Identify leads (role.id === 'lead' with no parent)
   const leads = agents.filter((a) => a.role?.id === 'lead' && !a.parentId);
@@ -371,7 +388,7 @@ export function OrgChart({ api, ws }: Props) {
     () => teamAgents.map(a => ({
       id: a.id,
       role: a.role?.name ?? 'Unknown',
-      name: `${a.role?.icon ?? ''}${a.id.slice(0, 5)}`,
+      name: `${a.role?.icon ?? ''}${shortAgentId(a.id)}`,
     })),
     [teamAgents],
   );
@@ -412,7 +429,7 @@ export function OrgChart({ api, ws }: Props) {
                   : 'border-transparent text-th-text-muted hover:text-th-text hover:border-th-border'
               }`}
             >
-              {l.projectName || l.role?.name || l.id.slice(0, 8)}
+              {l.projectName || l.role?.name || shortAgentId(l.id)}
             </button>
           ))}
         </nav>
@@ -431,7 +448,7 @@ export function OrgChart({ api, ws }: Props) {
           <h3 className="text-sm font-medium text-th-text">Agent Hierarchy</h3>
           <span className="text-xs text-th-text-muted">{teamAgents.length} agents</span>
         </div>
-        <HierarchyTree agents={teamAgents} />
+        <HierarchyTree agents={teamAgents} onAgentClick={setDetailAgentId} />
       </section>
 
       {/* Communication section */}
@@ -444,6 +461,15 @@ export function OrgChart({ api, ws }: Props) {
             {groupMsgCount > 0 && <> ({groupMsgCount} group)</>}
           </span>
           <div className="ml-auto flex gap-1">
+            <button
+              onClick={() => setCommView('graph')}
+              className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 transition-colors ${
+                commView === 'graph' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-300' : 'text-th-text-muted hover:text-th-text'
+              }`}
+            >
+              <Share2 className="w-3 h-3" />
+              Graph
+            </button>
             <button
               onClick={() => setCommView('list')}
               className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 transition-colors ${
@@ -473,7 +499,13 @@ export function OrgChart({ api, ws }: Props) {
             </button>
           </div>
         </div>
-        {commView === 'list' ? (
+        {commView === 'graph' ? (
+          selectedLeadId ? (
+            <CommFlowGraph leadId={selectedLeadId} width={700} height={500} agents={teamAgents} />
+          ) : (
+            <EmptyState icon="📡" title="No session selected" description="Select a session above to view the communication graph" compact />
+          )
+        ) : commView === 'list' ? (
           <CommsList entries={allEntries} />
         ) : commView === 'matrix' ? (
           <CommsMatrix entries={allEntries} agents={teamAgents} />
@@ -482,6 +514,10 @@ export function OrgChart({ api, ws }: Props) {
         )}
       </section>
       </div>
+
+      {detailAgentId && (
+        <AgentDetailPanel agentId={detailAgentId} mode="modal" onClose={() => setDetailAgentId(null)} />
+      )}
     </div>
   );
 }

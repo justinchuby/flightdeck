@@ -4,6 +4,7 @@ import { decisionStatusText } from '../../utils/statusColors';
 import { SkeletonCard } from '../Shared';
 import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface DbStats {
   memory: number;
@@ -133,11 +134,11 @@ function MemoryPanel({ onCountChange }: { onCountChange: () => void }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium text-th-text-alt">{row.key}</span>
-              <span className="text-[10px] text-th-text-muted font-mono">{row.agentId?.slice(0, 8)}</span>
+              <span className="text-[10px] text-th-text-muted font-mono">{shortAgentId(row.agentId)}</span>
               <span className="text-[10px] text-th-text-muted">{row.createdAt}</span>
             </div>
             <div className="text-xs text-th-text-muted whitespace-pre-wrap break-words">{row.value}</div>
-            <div className="text-[10px] text-th-text-muted mt-1">Lead: {row.leadId?.slice(0, 8)}</div>
+            <div className="text-[10px] text-th-text-muted mt-1">Lead: {shortAgentId(row.leadId)}</div>
           </div>
           <button
             onClick={() => handleDelete(row.id)}
@@ -267,9 +268,9 @@ function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
             </div>
             {row.rationale && <div className="text-xs text-th-text-muted mb-1">{row.rationale}</div>}
             <div className="flex gap-3 text-[10px] text-th-text-muted">
-              <span>Agent: {row.agentId?.slice(0, 8)}</span>
+              <span>Agent: {shortAgentId(row.agentId)}</span>
               <span>Role: {row.agentRole}</span>
-              {row.leadId && <span>Lead: {row.leadId.slice(0, 8)}</span>}
+              {row.leadId && <span>Lead: {shortAgentId(row.leadId)}</span>}
               <span>{row.createdAt}</span>
             </div>
           </div>

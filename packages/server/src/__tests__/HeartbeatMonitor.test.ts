@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HeartbeatMonitor } from '../agents/HeartbeatMonitor.js';
+import { HeartbeatMonitor, buildCommandReminderMessage } from '../agents/HeartbeatMonitor.js';
 import type { HeartbeatContext, DagSummary } from '../agents/HeartbeatMonitor.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Delegation } from '../agents/CommandDispatcher.js';
@@ -11,13 +11,16 @@ function makeAgent(overrides: Partial<{
   role: { id: string; name: string };
   status: string;
   parentId: string | null;
+  createdAt: Date;
 }> = {}) {
   return {
     id: overrides.id ?? 'agent-1',
     role: overrides.role ?? { id: 'dev', name: 'Developer' },
     status: overrides.status ?? 'idle',
     parentId: overrides.parentId ?? null,
+    createdAt: overrides.createdAt ?? new Date(),
     sendMessage: vi.fn(),
+    queueMessage: vi.fn(),
   } as unknown as Agent;
 }
 
@@ -570,5 +573,215 @@ describe('HeartbeatMonitor', () => {
 
     // Nudges 1, 2, 3, 4 fire; nudge 5 is skipped → 4 messages total
     expect((lead.sendMessage as ReturnType<typeof vi.fn>).mock.calls.length).toBe(4);
+  });
+
+  // ── Periodic command reminders ──────────────────────────────────────
+
+  describe('periodic command reminders', () => {
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+
+    it('sends command reminder to agent after 2 hours', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        role: { id: 'dev', name: 'Developer' },
+        status: 'running',
+        createdAt: new Date(Date.now()), // created "now" (fake-timer start)
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      // Not yet 2 hours — no reminder
+      vi.advanceTimersByTime(TWO_HOURS - 1000);
+      triggerCheck();
+      expect(agent.queueMessage).not.toHaveBeenCalled();
+
+      monitor.stop();
+
+      // Cross the 2-hour mark
+      vi.advanceTimersByTime(2000);
+      triggerCheck();
+      expect(agent.queueMessage).toHaveBeenCalledTimes(1);
+      expect(agent.queueMessage).toHaveBeenCalledWith(expect.stringContaining('Command Reference Reminder'));
+    });
+
+    it('uses queueMessage, not sendMessage, for reminders', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        role: { id: 'dev', name: 'Developer' },
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      triggerCheck();
+
+      expect(agent.queueMessage).toHaveBeenCalledTimes(1);
+      // sendMessage should NOT have been called for the reminder
+      // (it may be called for lead nudges, but this agent is not a lead)
+      expect(agent.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not remind agents younger than 2 hours', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        role: { id: 'dev', name: 'Developer' },
+        status: 'running',
+        createdAt: new Date(Date.now()), // just created
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      vi.advanceTimersByTime(60 * 60 * 1000); // 1 hour
+      triggerCheck();
+
+      expect(agent.queueMessage).not.toHaveBeenCalled();
+    });
+
+    it('sends reminders to ALL agents regardless of role', () => {
+      const lead = makeAgent({
+        id: 'lead-1',
+        role: { id: 'lead', name: 'Team Lead' },
+        status: 'idle',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      const dev = makeAgent({
+        id: 'dev-1',
+        role: { id: 'dev', name: 'Developer' },
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      const reviewer = makeAgent({
+        id: 'rev-1',
+        role: { id: 'reviewer', name: 'Reviewer' },
+        status: 'idle',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([lead, dev, reviewer]);
+
+      triggerCheck();
+
+      expect(lead.queueMessage).toHaveBeenCalledTimes(1);
+      expect(dev.queueMessage).toHaveBeenCalledTimes(1);
+      expect(reviewer.queueMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips terminal agents (completed, failed, terminated)', () => {
+      const terminated = makeAgent({
+        id: 'term-1',
+        status: 'terminated',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      const completed = makeAgent({
+        id: 'done-1',
+        status: 'completed',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      const running = makeAgent({
+        id: 'run-1',
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([terminated, completed, running]);
+
+      triggerCheck();
+
+      expect(terminated.queueMessage).not.toHaveBeenCalled();
+      expect(completed.queueMessage).not.toHaveBeenCalled();
+      expect(running.queueMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('repeats reminder every 2 hours (not every check)', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      // First check — should remind
+      triggerCheck();
+      expect(agent.queueMessage).toHaveBeenCalledTimes(1);
+      monitor.stop();
+
+      // Second check shortly after — should NOT remind again
+      vi.advanceTimersByTime(1000);
+      triggerCheck();
+      expect(agent.queueMessage).toHaveBeenCalledTimes(1);
+      monitor.stop();
+
+      // After another 2 hours — should remind again
+      vi.advanceTimersByTime(TWO_HOURS);
+      triggerCheck();
+      expect(agent.queueMessage).toHaveBeenCalledTimes(2);
+    });
+
+    it('resets reminder tracking when agent is removed', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      // First reminder
+      triggerCheck();
+      expect(agent.queueMessage).toHaveBeenCalledTimes(1);
+      monitor.stop();
+
+      // Remove agent
+      monitor.trackRemoved('dev-1');
+
+      // Re-add same agent (simulating respawn) — should use createdAt again
+      const respawned = makeAgent({
+        id: 'dev-1',
+        status: 'running',
+        createdAt: new Date(Date.now()), // fresh creation time
+      });
+      ctx.getAllAgents.mockReturnValue([respawned]);
+
+      triggerCheck();
+      // Should NOT remind since fresh agent is <2h old
+      expect(respawned.queueMessage).not.toHaveBeenCalled();
+    });
+
+    it('emits agent:message_sent event for reminders', () => {
+      const agent = makeAgent({
+        id: 'dev-1',
+        role: { id: 'dev', name: 'Developer' },
+        status: 'running',
+        createdAt: new Date(Date.now() - TWO_HOURS - 1000),
+      });
+      ctx.getAllAgents.mockReturnValue([agent]);
+
+      triggerCheck();
+
+      expect(ctx.emit).toHaveBeenCalledWith('agent:message_sent', expect.objectContaining({
+        from: 'system',
+        fromRole: 'System',
+        to: 'dev-1',
+        toRole: 'Developer',
+      }));
+    });
+  });
+
+  // ── buildCommandReminderMessage ─────────────────────────────────────
+
+  describe('buildCommandReminderMessage', () => {
+    it('includes key commands', () => {
+      const msg = buildCommandReminderMessage();
+      expect(msg).toContain('COMMIT');
+      expect(msg).toContain('LOCK_FILE');
+      expect(msg).toContain('UNLOCK_FILE');
+      expect(msg).toContain('COMPLETE_TASK');
+      expect(msg).toContain('AGENT_MESSAGE');
+      expect(msg).toContain('DIRECT_MESSAGE');
+      expect(msg).toContain('GROUP_MESSAGE');
+      expect(msg).toContain('PROGRESS');
+      expect(msg).toContain('DECISION');
+      expect(msg).toContain('SET_TIMER');
+    });
+
+    it('includes usage hint about text response', () => {
+      const msg = buildCommandReminderMessage();
+      expect(msg).toContain('directly in your text response');
+    });
   });
 });

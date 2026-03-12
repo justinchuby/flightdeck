@@ -38,6 +38,7 @@ export interface TimelineAgent {
   shortId: string;
   role: string;
   model?: string;
+  provider?: string;
   sessionId?: string;
   createdAt: string;
   endedAt?: string;

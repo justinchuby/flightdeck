@@ -13,13 +13,21 @@ export type ProjectModelConfig = Record<string, string[]>;
  * Sourced from AVAILABLE_MODELS (ModelSelector) + RoleRegistry documented list.
  */
 export const KNOWN_MODEL_IDS: readonly string[] = [
+  // Anthropic
   'claude-opus-4.6',
   'claude-opus-4.5',
   'claude-sonnet-4.6',
   'claude-sonnet-4.5',
   'claude-sonnet-4',
   'claude-haiku-4.5',
+  // Google
   'gemini-3-pro-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  // OpenAI
+  'gpt-5.4',
   'gpt-5.3-codex',
   'gpt-5.2-codex',
   'gpt-5.2',
@@ -32,6 +40,9 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
 ] as const;
 
 const knownSet = new Set<string>(KNOWN_MODEL_IDS);
+
+/** Fallback model when no project config or role default is available. */
+export const DEFAULT_MODEL = 'claude-sonnet-4.6';
 
 /** Default model config used when a project has no custom config. */
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {

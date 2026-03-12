@@ -30,7 +30,6 @@ const agentList = [
     id: 'aaa-111',
     role: { id: 'architect', name: 'Architect', icon: '🏗', model: 'sonnet', color: 'blue' },
     status: 'running',
-    autopilot: true,
     task: 'Design auth module',
     sessionId: 'sess-abc-123-456',
     projectName: 'MyProject',
@@ -42,7 +41,6 @@ const agentList = [
     id: 'bbb-222',
     role: { id: 'developer', name: 'Developer', icon: '👨‍💻', model: 'sonnet', color: 'green' },
     status: 'idle',
-    autopilot: false,
     task: null,
     sessionId: null,
     projectName: null,
@@ -54,7 +52,6 @@ const agentList = [
     id: 'ccc-333',
     role: { id: 'reviewer', name: 'Reviewer', icon: '🔍', model: 'opus', color: 'red' },
     status: 'terminated',
-    autopilot: false,
     task: 'Final review',
     sessionId: 'sess-xyz-789',
     projectName: 'OtherProject',
@@ -200,9 +197,8 @@ describe('GlobalAgentsPage', () => {
     // Click the architect card to expand
     fireEvent.click(screen.getByText('Architect'));
     await waitFor(() => {
-      expect(screen.getByText('Autopilot:')).toBeInTheDocument();
+      expect(screen.getByText('Model:')).toBeInTheDocument();
     });
-    expect(screen.getByText('On')).toBeInTheDocument();
   });
 
   it('shows action buttons for live agents', async () => {

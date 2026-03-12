@@ -20,6 +20,26 @@ import { NewProjectModal } from './NewProjectModal';
 import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailModal';
 import { useLeadWebSocket } from './useLeadWebSocket';
 import { useDragResize } from './useDragResize';
+import type { useApi } from '../../hooks/useApi';
+import type { useWebSocket } from '../../hooks/useWebSocket';
+
+/** Shape returned by /api/agents/:id/messages and /api/projects/:id/messages */
+interface MessageHistoryResponse {
+  messages: Array<{
+    content: string;
+    sender: string;
+    timestamp: string;
+    fromRole?: string;
+  }>;
+}
+
+/** Shape returned by /api/lead — list of active lead agents */
+interface LeadListItem {
+  id: string;
+  status: string;
+  role?: string;
+  projectId?: string;
+}
 
 // Stable empty references — avoids new [] / {} on every render (zustand equality trap)
 const EMPTY_MESSAGES: AcpTextChunk[] = [];
@@ -34,8 +54,8 @@ const EMPTY_DELEGATIONS: Delegation[] = [];
 const EMPTY_CREW_AGENTS: LeadProgress['crewAgents'] = [];
 
 interface Props {
-  api: any;
-  ws: any;
+  api: ReturnType<typeof useApi>;
+  ws: ReturnType<typeof useWebSocket>;
   readOnly?: boolean;
 }
 
@@ -70,12 +90,8 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
   const setInput = useCallback((text: string) => {
     if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
   }, [selectedLeadId]);
-  const handleLeadFileInsert = useCallback((text: string) => {
-    setInput(input ? input + ' ' + text : text);
-  }, [input, setInput]);
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
   const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, handlePaste: leadPaste, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
-    onInsertText: handleLeadFileInsert,
     onAttach: addAttachment,
   });
   const [showNewProject, setShowNewProject] = useState(false);
@@ -157,7 +173,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     if (!project) return;
     const currentCounts = {
       tasks: agents.filter(a => a.parentId === effectiveLeadId && (a.status === 'completed' || a.status === 'failed')).length,
-      decisions: (project.decisions ?? EMPTY_DECISIONS).filter((d: any) => d.needsConfirmation && d.status === 'recorded').length,
+      decisions: (project.decisions ?? EMPTY_DECISIONS).filter((d) => d.needsConfirmation && d.status === 'recorded').length,
       comms: (project.comms ?? EMPTY_COMMS).length,
       reports: (project.agentReports ?? EMPTY_REPORTS).length,
     };
@@ -193,7 +209,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     if (readOnly) return;
     const controller = new AbortController();
     // Load active leads
-    fetch('/api/lead', { signal: controller.signal }).then((r) => r.json()).then((leads: any[]) => {
+    fetch('/api/lead', { signal: controller.signal }).then((r) => r.json()).then((leads: LeadListItem[]) => {
       if (controller.signal.aborted) return;
       if (Array.isArray(leads)) {
         leads.forEach((l) => {
@@ -201,10 +217,10 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
           // Pre-load message history for each lead
           fetch(`/api/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
             .then((r) => r.json())
-            .then((data: any) => {
+            .then((data: MessageHistoryResponse) => {
               if (controller.signal.aborted) return;
               if (Array.isArray(data?.messages) && data.messages.length > 0) {
-                const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+                const msgs: AcpTextChunk[] = data.messages.map((m) => ({
                   type: 'text' as const,
                   text: m.content,
                   sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
@@ -252,13 +268,14 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
         : `/api/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
       fetch(url, { signal: controller.signal })
         .then((r) => r.json())
-        .then((data: any) => {
+        .then((data: MessageHistoryResponse) => {
           if (controller.signal.aborted) return;
           if (Array.isArray(data?.messages) && data.messages.length > 0) {
-            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
               type: 'text' as const,
               text: m.content,
-              sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
+              sender: m.sender as 'agent' | 'user' | 'system' | 'external' | 'thinking',
+              ...(m.fromRole ? { fromRole: m.fromRole } : {}),
               timestamp: new Date(m.timestamp).getTime(),
             }));
             // Re-check: only set if WS hasn't delivered messages while we were fetching
@@ -363,13 +380,13 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
       fetch(`/api/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((r) => {
         if (r.status === 404) { stopped = true; return null; }
         return r.json();
-      }).then((data: any) => {
+      }).then((data: DagStatus | null) => {
         if (!controller.signal.aborted && data && data.tasks) {
           const store = useLeadStore.getState();
-          store.setDagStatus(selectedLeadId, data as DagStatus);
+          store.setDagStatus(selectedLeadId, data);
           // Also store under projectId so DagMinimap can find it by either key
           if (historicalProjectId && historicalProjectId !== selectedLeadId) {
-            store.setDagStatus(historicalProjectId, data as DagStatus);
+            store.setDagStatus(historicalProjectId, data);
           }
         }
       }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] DAG poll failed:', err); });
@@ -433,7 +450,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
       const msgs = proj?.messages ?? EMPTY_MESSAGES;
       const last = msgs[msgs.length - 1];
       if (last?.sender === 'agent') {
-        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       }
     }
     store.addMessage(selectedLeadId, {
@@ -550,7 +567,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
 
   const messages = currentProject?.messages ?? EMPTY_MESSAGES;
   const decisions = currentProject?.decisions ?? EMPTY_DECISIONS;
-  const pendingConfirmations = decisions.filter((d: any) => d.needsConfirmation && d.status === 'recorded');
+  const pendingConfirmations = decisions.filter((d) => d.needsConfirmation && d.status === 'recorded');
   const progress = currentProject?.progress ?? null;
   const progressSummary = currentProject?.progressSummary ?? null;
   const progressHistory = currentProject?.progressHistory ?? EMPTY_PROGRESS_HISTORY;
@@ -568,7 +585,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     return progressTeam.length > 0 ? progressTeam : derivedAgents;
   })();
 
-  const teamAgentIds = useMemo(() => new Set(teamAgents.map((a: any) => a.id)), [teamAgents]);
+  const teamAgentIds = useMemo(() => new Set(teamAgents.map((a) => a.id)), [teamAgents]);
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -726,7 +743,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
                 </button>
                 {pendingBannerExpanded && (
                   <div className="px-4 pb-3 space-y-2">
-                    {pendingConfirmations.map((d: any) => (
+                    {pendingConfirmations.map((d) => (
                       <div key={d.id} className="bg-th-bg-alt/80 border border-amber-700/40 rounded-lg p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">

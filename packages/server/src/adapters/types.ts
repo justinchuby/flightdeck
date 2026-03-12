@@ -74,15 +74,6 @@ export interface AdapterCapabilities {
   supportsPlans: boolean;
 }
 
-// ── Permission Types ────────────────────────────────────────────────
-
-export interface PermissionRequest {
-  id: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  timestamp: string;
-}
-
 // ── Start Options ───────────────────────────────────────────────────
 
 export interface AdapterStartOptions {
@@ -97,10 +88,12 @@ export interface AdapterStartOptions {
   sessionId?: string;
   /** Model name or tier alias (resolved by ModelResolver before use) */
   model?: string;
-  /** Maximum turns before auto-stop (SDK adapters only) */
+  /** Maximum turns before auto-stop */
   maxTurns?: number;
-  /** System prompt override (SDK adapters only) */
+  /** System prompt to inject via provider-specific mechanism */
   systemPrompt?: string;
+  /** Provider ID for provider-specific session setup */
+  provider?: string;
 }
 
 // ── Core Interface ──────────────────────────────────────────────────
@@ -120,7 +113,6 @@ export interface AdapterStartOptions {
  *   'prompting'       (active: boolean)
  *   'prompt_complete'  (reason: string)
  *   'response_start'  ()
- *   'permission_request' (req: PermissionRequest)
  *   'exit'            (code: number)
  *   'usage'           (usage: UsageInfo)
  */
@@ -136,14 +128,12 @@ export interface AgentAdapter extends EventEmitter {
   prompt(content: PromptContent, opts?: PromptOptions): Promise<PromptResult>;
   cancel(): Promise<void>;
   terminate(): void | Promise<void>;
-  resolvePermission(approved: boolean): void;
 }
 
 // ── Factory Types ───────────────────────────────────────────────────
 
 export interface AdapterFactoryOptions {
-  type: 'acp' | 'mock' | 'claude-sdk' | 'copilot-sdk' | 'daemon';
-  autopilot?: boolean;
+  type: 'acp' | 'mock';
   model?: string;
 }
 

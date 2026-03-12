@@ -12,7 +12,6 @@ import { LeadDashboard, ReadOnlySession } from './components/LeadDashboard';
 import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
-import { PermissionDialog } from './components/PermissionDialog';
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play, Bug } from 'lucide-react';
@@ -25,13 +24,13 @@ import { PulseStrip } from './components/Pulse';
 import { AttentionBar } from './components/AttentionBar';
 import { ApprovalBadge, ApprovalSlideOver } from './components/ApprovalQueue';
 import { CatchUpBanner } from './components/CatchUp';
-import { AgentServerStatus } from './components/AgentServerStatus';
 import { StatusPopover } from './components/StatusPopover/StatusPopover';
 import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
 import { apiFetch } from './hooks/useApi';
 import { ProjectLayout } from './layouts/ProjectLayout';
+import { shortAgentId } from './utils/agentLabel';
 
 // Lazy-loaded route components (~40-50% initial bundle reduction)
 const TaskQueuePanel = lazy(() => import('./components/TaskQueue/TaskQueuePanel').then(m => ({ default: m.TaskQueuePanel })));
@@ -47,7 +46,6 @@ const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(
 const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => ({ default: m.ProjectsPanel })));
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
 const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel').then(m => ({ default: m.ArtifactsPanel })));
-const AgentServerPanel = lazy(() => import('./components/AgentServerPanel').then(m => ({ default: m.AgentServerPanel })));
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
 const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
 const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
@@ -182,23 +180,21 @@ export function App() {
         const failed = msg.code !== 0;
         // Failures are critical — ALWAYS toast regardless of level
         if (failed) {
-          addToast('error', `Agent ${msg.agentId.slice(0, 8)} failed`);
+          addToast('error', `Agent ${shortAgentId(msg.agentId)} failed`);
         } else if (shouldNotify('info')) {
-          addToast('success', `Agent ${msg.agentId.slice(0, 8)} completed`);
+          addToast('success', `Agent ${shortAgentId(msg.agentId)} completed`);
         }
       } else if (msg.type === 'agent:sub_spawned') {
-        if (shouldNotify('info')) addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${msg.parentId.slice(0, 8)}`);
-      } else if (msg.type === 'agent:permission_request' && soundEnabled) {
-        playAttentionSound();
+        if (shouldNotify('info')) addToast('info', `${msg.child.role.icon} Sub-agent spawned by ${shortAgentId(msg.parentId)}`);
       } else if (msg.type === 'agent:context_compacted') {
         if (shouldNotify('info')) {
           const pct = msg.percentDrop ? ` (${msg.percentDrop}% reduction)` : '';
-          addToast('info', `🔄 Context compacted for agent ${msg.agentId.slice(0, 8)}${pct}`);
+          addToast('info', `🔄 Context compacted for agent ${shortAgentId(msg.agentId)}${pct}`);
         }
       } else if (msg.type === 'activity') {
         const e = msg.entry;
         if (e?.action === 'heartbeat_halted') {
-          if (shouldNotify('exception')) addToast('info', `⏸️ Heartbeat halted by ${e.agentId?.slice(0, 8) ?? 'agent'}`);
+          if (shouldNotify('exception')) addToast('info', `⏸️ Heartbeat halted by ${e.agentId ? shortAgentId(e.agentId) : 'agent'}`);
         } else if (e?.action === 'limit_change_requested') {
           if (shouldNotify('info')) addToast('info', `⚙️ Agent limit change requested: ${e.details ?? ''}`);
         }
@@ -304,6 +300,17 @@ export function App() {
               <VersionBadge />
             </div>
             <div className="flex items-center gap-3">
+              <a
+                href={buildFeedbackUrl({ title: 'User feedback' })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
+                title="Submit Issue"
+                data-testid="top-bar-submit-issue"
+              >
+                <Bug className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Submit Issue</span>
+              </a>
               <button
                 onClick={togglePause}
                 title={systemPaused ? 'Resume system' : 'Pause system'}
@@ -327,17 +334,6 @@ export function App() {
                 <kbd className="text-[10px] text-th-text-muted border border-th-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
               </button>
               <StatusPopover />
-              <a
-                href={buildFeedbackUrl({ title: 'User feedback' })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-th-bg-alt border border-th-border text-th-text-muted hover:text-th-text hover:border-th-border-hover transition-colors text-xs"
-                title="Submit Issue"
-                data-testid="top-bar-submit-issue"
-              >
-                <Bug className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Submit Issue</span>
-              </a>
               <span className="text-sm text-th-text-muted">{agents.length} agents</span>
             </div>
           </header>
@@ -345,7 +341,6 @@ export function App() {
 
           <AttentionBar />
           <div data-tour="pulse-strip"><PulseStrip /></div>
-          <AgentServerStatus />
 
           <main id="main-content" className="flex-1 overflow-hidden flex flex-col">
           <ErrorBoundary>
@@ -373,16 +368,15 @@ export function App() {
             {/* ── Global (non-project-scoped) routes ───────────── */}
             <Route path="/projects" element={<RouteErrorBoundary name="Projects"><ProjectsPanel /></RouteErrorBoundary>} />
             <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel api={api} /></RouteErrorBoundary>} />
-            <Route path="/agent-server" element={<RouteErrorBoundary name="Agent Server"><AgentServerPanel /></RouteErrorBoundary>} />
             <Route path="/shared/:token" element={<RouteErrorBoundary name="Shared Replay"><SharedReplayViewer /></RouteErrorBoundary>} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}
             <Route path="/" element={<RouteErrorBoundary name="Home"><HomeDashboard /></RouteErrorBoundary>} />
             <Route path="/lead" element={<ProjectRedirect page="session" />} />
             <Route path="/overview" element={<ProjectRedirect page="overview" />} />
-            <Route path="/agents" element={<Navigate to="/crews" replace />} />
-            <Route path="/crews" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Crews"><UnifiedCrewPage scope="global" /></RouteErrorBoundary></Suspense>} />
-            <Route path="/team" element={<Navigate to="/crews" replace />} />
+            <Route path="/agents" element={<Suspense fallback={<RouteSpinner />}><RouteErrorBoundary name="Agents"><UnifiedCrewPage scope="global" /></RouteErrorBoundary></Suspense>} />
+            <Route path="/crews" element={<Navigate to="/agents" replace />} />
+            <Route path="/team" element={<Navigate to="/agents" replace />} />
             <Route path="/tasks" element={<ProjectRedirect page="tasks" />} />
             <Route path="/knowledge" element={<ProjectRedirect page="knowledge" />} />
             <Route path="/timeline" element={<ProjectRedirect page="timeline" />} />
@@ -409,7 +403,6 @@ export function App() {
         )}
       </div>
       <ToastContainer />
-      <PermissionDialog />
       <ApprovalSlideOver />
       <CatchUpBanner />
       <SearchDialog open={searchOpen} onClose={closeSearch} />

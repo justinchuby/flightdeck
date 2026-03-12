@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, MessageSquare, Users, ListChecks, Scale, Activity } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface SearchResult {
   source: 'conversation' | 'group' | 'task' | 'decision' | 'activity';
@@ -118,7 +119,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
     if (!id) return role ?? 'Unknown';
     if (id === 'human') return 'You';
     const agent = agents.find((a) => a.id === id);
-    return agent?.role.name ?? role ?? id.slice(0, 8);
+    return agent?.role.name ?? role ?? shortAgentId(id);
   }, [agents]);
 
   // Click result → open agent chat panel

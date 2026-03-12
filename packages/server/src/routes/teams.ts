@@ -119,7 +119,7 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     const teamId = paramStr(req.params.teamId);
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
-    const validStatuses = new Set(['idle', 'busy', 'terminated', 'retired']);
+    const validStatuses = new Set(['idle', 'running', 'terminated', 'failed']);
 
     if (statusFilter && !validStatuses.has(statusFilter)) {
       return res.status(400).json({ error: `Invalid status filter: ${statusFilter}` });
@@ -127,7 +127,7 @@ export function teamsRoutes(ctx: AppContext): Router {
 
     try {
       const agents = agentRoster.getAllAgents(
-        statusFilter as 'idle' | 'busy' | 'terminated' | 'retired' | undefined,
+        statusFilter as 'idle' | 'running' | 'terminated' | 'failed' | undefined,
         teamId,
       );
 
@@ -135,6 +135,7 @@ export function teamsRoutes(ctx: AppContext): Router {
       const allLive = agentManager.getAll();
       const enriched = agents.map(a => {
         const live = allLive.find(l => l.id === a.agentId);
+        const liveJson = live?.toJSON();
         return {
           agentId: a.agentId,
           role: a.role,
@@ -148,7 +149,13 @@ export function teamsRoutes(ctx: AppContext): Router {
           lastTaskSummary: a.lastTaskSummary ?? null,
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
-          provider: live?.provider ?? null,
+          provider: live?.provider ?? a.provider ?? null,
+          inputTokens: liveJson?.inputTokens ?? null,
+          outputTokens: liveJson?.outputTokens ?? null,
+          contextWindowSize: liveJson?.contextWindowSize ?? null,
+          contextWindowUsed: liveJson?.contextWindowUsed ?? null,
+          task: liveJson?.task ?? null,
+          outputPreview: liveJson?.outputPreview?.slice(-200) ?? null,
         };
       });
 
@@ -205,11 +212,11 @@ export function teamsRoutes(ctx: AppContext): Router {
       live: liveJson ? {
         task: liveJson.task ?? null,
         outputPreview: liveJson.outputPreview ?? null,
-        autopilot: liveJson.autopilot ?? false,
         model: liveJson.model ?? null,
         sessionId: liveJson.sessionId ?? null,
         provider: liveJson.provider ?? null,
         backend: liveJson.backend ?? null,
+        exitError: liveJson.exitError ?? null,
       } : null,
     });
   });
@@ -242,56 +249,18 @@ export function teamsRoutes(ctx: AppContext): Router {
           status: a.status,
           uptimeMs,
           lastTaskSummary: a.lastTaskSummary,
-          retiredAt: (meta as any).retiredAt,
           clonedFromId: (meta as any).clonedFromId,
         };
       });
-
-      // Mass failure status from context (if available)
-      const massFailurePaused = ctx.massFailureDetector?.isPaused ?? false;
 
       res.json({
         teamId,
         totalAgents: agents.length,
         statusCounts,
-        massFailurePaused,
         agents: agentDetails,
       });
     } catch (err: any) {
       logger.error({ module: 'teams', msg: 'Failed to get team health', teamId, err: err.message });
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // ── POST /teams/:teamId/agents/:agentId/retire ─────────────────
-
-  router.post('/teams/:teamId/agents/:agentId/retire', writeLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
-
-    const agentId = Array.isArray(req.params.agentId) ? req.params.agentId[0] : req.params.agentId;
-    const { reason } = req.body ?? {};
-
-    try {
-      const agent = agentRoster.getAgent(agentId);
-      if (!agent) {
-        return res.status(404).json({ error: `Agent ${agentId} not found` });
-      }
-
-      if (agent.status === 'retired') {
-        return res.status(409).json({ error: `Agent ${agentId} is already retired` });
-      }
-
-      const ok = agentRoster.retireAgent(agentId, reason);
-      if (!ok) {
-        return res.status(500).json({ error: 'Failed to retire agent' });
-      }
-
-      logger.info({ module: 'teams', msg: 'Agent retired', agentId, reason });
-      res.json({ ok: true, agentId, status: 'retired' });
-    } catch (err: any) {
-      logger.error({ module: 'teams', msg: 'Failed to retire agent', agentId, err: err.message });
       res.status(500).json({ error: err.message });
     }
   });
@@ -406,11 +375,11 @@ export function teamsRoutes(ctx: AppContext): Router {
   router.delete('/crews/:leadId', writeLimiter, (req, res) => {
     if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
 
-    const { leadId } = req.params;
+    const leadId = paramStr(req.params.leadId);
     const lead = agentRoster.getAgent(leadId);
     if (!lead) return res.status(404).json({ error: 'Crew not found — lead agent not in roster' });
 
-    // Don't allow deleting active crews — only terminated/retired
+    // Don't allow deleting active crews — only terminated
     const liveAgents = agentManager.getAll();
     const liveLeadAgent = liveAgents.find(a => a.id === leadId);
     if (liveLeadAgent && (liveLeadAgent.status === 'running' || liveLeadAgent.status === 'idle')) {
@@ -447,18 +416,18 @@ export function teamsRoutes(ctx: AppContext): Router {
     // Don't allow deleting lead agents that have children (defense in depth)
     if (agent.role === 'lead' || !agent.metadata?.parentId) {
       // Check if this agent has any children in the roster
-      const allAgents = agent.projectId 
+      const allAgents = agent.projectId
         ? agentRoster.getByProject(agent.projectId)
         : agentRoster.getAllAgents();
-      
+
       const hasChildren = allAgents.some(a => {
         const meta = a.metadata as Record<string, unknown> | undefined;
         return meta?.parentId === agentId && a.agentId !== agentId;
       });
 
       if (hasChildren) {
-        return res.status(409).json({ 
-          error: 'Cannot delete a lead agent that has children. Delete the crew instead to remove the lead and all descendants.' 
+        return res.status(409).json({
+          error: 'Cannot delete a lead agent that has children. Delete the crew instead to remove the lead and all descendants.'
         });
       }
     }

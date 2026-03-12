@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useId } from 'react';
 import { idColor } from '../utils/markdown';
 import { agentStatusDot } from '../utils/statusColors';
+import { shortAgentId } from '../utils/agentLabel';
 
 export interface MentionAgent {
   id: string;
@@ -8,6 +9,7 @@ export interface MentionAgent {
   status?: string;
   task?: string;
   model?: string;
+  provider?: string;
 }
 
 /**
@@ -93,7 +95,7 @@ export function AgentMentionTooltip({
               {agent.role.icon && <span>{agent.role.icon}</span>}
               <span className="font-semibold text-th-text">{agent.role.name}</span>
               <span className="font-mono text-[10px] text-th-text-muted">
-                {agent.id.slice(0, 8)}
+                {shortAgentId(agent.id)}
               </span>
             </div>
             {/* Status + model row */}
@@ -102,6 +104,12 @@ export function AgentMentionTooltip({
                 <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusDot}`} />
                 {agent.status ?? 'unknown'}
               </span>
+              {agent.provider && (
+                <>
+                  <span className="text-th-border">·</span>
+                  <span className="text-blue-400 truncate">{agent.provider}</span>
+                </>
+              )}
               {agent.model && (
                 <>
                   <span className="text-th-border">·</span>

@@ -83,10 +83,10 @@ export function useApi() {
     setConfig(config);
   }, [setConfig]);
 
-  const spawnAgent = useCallback(async (roleId: string, task?: string, autopilot?: boolean) => {
+  const spawnAgent = useCallback(async (roleId: string, task?: string, options?: { model?: string; provider?: string }) => {
     return apiFetch('/agents', {
       method: 'POST',
-      body: JSON.stringify({ roleId, task, autopilot }),
+      body: JSON.stringify({ roleId, task, ...options }),
     });
   }, []);
 
@@ -155,13 +155,6 @@ export function useApi() {
     });
   }, []);
 
-  const resolvePermission = useCallback(async (agentId: string, approved: boolean) => {
-    return apiFetch(`/agents/${agentId}/permission`, {
-      method: 'POST',
-      body: JSON.stringify({ approved }),
-    });
-  }, []);
-
   const fetchGroups = useCallback(async (leadId: string) => {
     return apiFetch(`/lead/${leadId}/groups`);
   }, []);
@@ -184,7 +177,6 @@ export function useApi() {
     updateConfig,
     createRole,
     deleteRole,
-    resolvePermission,
     fetchGroups,
     fetchGroupMessages,
     fetchDagStatus,

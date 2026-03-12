@@ -41,11 +41,9 @@ describe('CommHeatmap', () => {
   it('renders column headers for every agent', () => {
     render(<CommHeatmap agents={AGENTS} messages={[]} />);
 
-    // Each agent name appears at least once (column header + row label = ×2).
-    AGENTS.forEach(agent => {
-      const els = screen.getAllByText(agent.name);
-      expect(els.length).toBeGreaterThanOrEqual(1);
-    });
+    expect(screen.getAllByText('Lead lead-1').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Developer dev-1').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Reviewer rev-1').length).toBeGreaterThanOrEqual(1);
   });
 
   it('applies bg-accent intensity classes when message counts exist', () => {
@@ -105,8 +103,8 @@ describe('CommHeatmap', () => {
     // Tooltip renders inside a fixed overlay — use the tooltip element directly.
     const tooltip = container.querySelector('.fixed.z-50');
     expect(tooltip).not.toBeNull();
-    expect(tooltip!.textContent).toContain('Lead');
-    expect(tooltip!.textContent).toContain('Dev');
+    expect(tooltip!.textContent).toContain('Lead lead-1');
+    expect(tooltip!.textContent).toContain('Developer dev-1');
     expect(tooltip!.textContent).toContain('7 message');
   });
 

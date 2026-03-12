@@ -397,16 +397,6 @@ describe('PredictionService', () => {
     });
   });
 
-  // ── File Conflict ───────────────────────────────────────────
-
-  describe('predictFileConflict', () => {
-    it('returns no predictions (V1 stub)', () => {
-      const agents = [makeAgent({ id: 'a1' }), makeAgent({ id: 'a2' })];
-      const predictions = service.generatePredictions(agents);
-      expect(predictions.find(p => p.type === 'file_conflict')).toBeUndefined();
-    });
-  });
-
   // ── Persistence ─────────────────────────────────────────────
 
   describe('persistence', () => {

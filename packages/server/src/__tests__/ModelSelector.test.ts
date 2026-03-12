@@ -143,15 +143,15 @@ describe('ModelSelector', () => {
   // ── 5. Keyword scoring selects the best-fit model ───────────────────
 
   it('scores keyword matches to pick the best model in tier', () => {
-    // "code-generation" maps to gpt-5.1-codex bestFor tags
+    // "code-generation" maps to gpt-5.3-codex bestFor tags
     const task: TaskProfile = {
       role: 'developer',
       description: 'code generation for new module',
       estimatedComplexity: 'high',
     };
     const model = selector.selectModel(task);
-    // gpt-5.1-codex has bestFor: ['code-generation', 'implementation', 'testing']
-    expect(model.id).toBe('gpt-5.1-codex');
+    // gpt-5.3-codex has bestFor: ['code-generation', 'implementation', 'testing']
+    expect(model.id).toBe('gpt-5.3-codex');
   });
 
   it('falls back to first candidate when no keywords match', () => {

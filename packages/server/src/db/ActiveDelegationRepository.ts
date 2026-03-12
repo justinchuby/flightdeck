@@ -1,8 +1,7 @@
 import { eq, and, isNull } from 'drizzle-orm';
 import type { Database } from './database.js';
 import { activeDelegations } from './schema.js';
-
-export type DelegationStatus = 'active' | 'completed' | 'failed' | 'cancelled';
+import type { DelegationStatus } from '@flightdeck/shared';
 
 export interface DelegationRecord {
   delegationId: string;

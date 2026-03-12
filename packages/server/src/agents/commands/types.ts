@@ -15,7 +15,6 @@ import type { DecisionLog } from '../../coordination/decisions/DecisionLog.js';
 import type { AgentMemory } from '../AgentMemory.js';
 import type { ChatGroupRegistry } from '../../comms/ChatGroupRegistry.js';
 import type { TaskDAG } from '../../tasks/TaskDAG.js';
-import type { DeferredIssueRegistry } from '../../tasks/DeferredIssueRegistry.js';
 import type { TimerRegistry } from '../../coordination/scheduling/TimerRegistry.js';
 import type { CapabilityInjector } from '../capabilities/CapabilityInjector.js';
 import type { TaskTemplateRegistry } from '../../tasks/TaskTemplates.js';
@@ -36,9 +35,9 @@ export interface CommandContext {
   getAllAgents(): Agent[];
   getProjectIdForAgent(agentId: string): string | undefined;
   getRunningCount(): number;
-  spawnAgent(role: Role, task?: string, parentId?: string, autopilot?: boolean, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string }): Agent;
+  spawnAgent(role: Role, task?: string, parentId?: string, model?: string, cwd?: string, options?: { projectName?: string; projectId?: string; provider?: string }): Agent;
   terminateAgent(id: string): boolean | Promise<boolean>;
-  emit(event: string, ...args: any[]): boolean;
+  emit(event: string, ...args: unknown[]): boolean;
   roleRegistry: RoleRegistry;
   config: ServerConfig;
   lockRegistry: FileLockRegistry;
@@ -48,7 +47,6 @@ export interface CommandContext {
   agentMemory: AgentMemory;
   chatGroupRegistry: ChatGroupRegistry;
   taskDAG: TaskDAG;
-  deferredIssueRegistry: DeferredIssueRegistry;
   timerRegistry?: TimerRegistry;
   capabilityInjector?: CapabilityInjector;
   taskTemplateRegistry?: TaskTemplateRegistry;
@@ -59,6 +57,8 @@ export interface CommandContext {
   activeDelegationRepository?: ActiveDelegationRepository;
   agentRosterRepository?: AgentRosterRepository;
   integrationRouter?: import('../../integrations/IntegrationRouter.js').IntegrationRouter;
+  providerManager?: import('../../providers/ProviderManager.js').ProviderManager;
+  projectRegistry?: import('../../projects/ProjectRegistry.js').ProjectRegistry;
 }
 
 // ── CommandHandlerContext — CommandContext + shared mutable state ──────

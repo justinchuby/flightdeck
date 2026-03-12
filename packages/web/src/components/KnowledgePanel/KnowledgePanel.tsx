@@ -27,6 +27,7 @@ import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { useToastStore } from '../Toast';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
+import { shortAgentId } from '../../utils/agentLabel';
 
 const MemoryBrowser = lazy(() => import('./MemoryBrowser').then(m => ({ default: m.MemoryBrowser })));
 
@@ -350,7 +351,7 @@ function TrainingOverview({ summary }: { summary: TrainingSummary }) {
           <div className="space-y-1">
             {summary.agentStats.map((a) => (
               <div key={a.agentId} className="flex items-center gap-2 text-xs">
-                <span className="font-mono text-th-text-muted w-20 truncate" title={a.agentId}>{a.agentId.slice(0, 8)}</span>
+                <span className="font-mono text-th-text-muted w-20 truncate" title={a.agentId}>{shortAgentId(a.agentId)}</span>
                 <span className="text-th-text-alt">{a.corrections} corrections</span>
                 <span className="text-green-500">{a.positive}+</span>
                 <span className="text-red-500">{a.negative}−</span>

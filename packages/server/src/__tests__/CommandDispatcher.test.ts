@@ -122,12 +122,6 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       cancelTask: vi.fn(),
       resetDAG: vi.fn().mockReturnValue(0),
     } as any,
-    deferredIssueRegistry: {
-      add: vi.fn().mockReturnValue({ id: 'issue-1' }),
-      list: vi.fn().mockReturnValue([]),
-      resolve: vi.fn().mockReturnValue(true),
-      dismiss: vi.fn().mockReturnValue(true),
-    } as any,
     timerRegistry: {
       create: vi.fn().mockReturnValue({ id: 'tmr-1', label: 'test', repeat: false }),
       cancel: vi.fn().mockReturnValue(true),
@@ -300,7 +294,6 @@ describe('CommandDispatcher', () => {
         devRole,
         'build feature',
         leadAgent.id,
-        true,
         undefined, // model
         leadAgent.cwd,
         undefined, // options (non-lead, no projectName)
@@ -420,11 +413,11 @@ describe('CommandDispatcher', () => {
 
       expect(dispatcher.getDelegationsMap().size).toBe(0);
       expect((devAgent.sendMessage as any)).toHaveBeenCalledWith(
-        expect.stringContaining('Only the Project Lead and Architects'),
+        expect.stringContaining('Only the Project Lead can delegate'),
       );
     });
 
-    it('allows architect agents to delegate to their children', () => {
+    it('rejects architect agents attempting to delegate', () => {
       const architectAgent = makeAgent({
         id: 'agent-arch-0009-0000-000000000009',
         role: makeRole({ id: 'architect', name: 'Architect' }),
@@ -437,8 +430,10 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, architectAgent, `⟦⟦ DELEGATE {"to": "${child.id}", "task": "implement API"} ⟧⟧`);
 
-      expect(dispatcher.getDelegationsMap().size).toBe(1);
-      expect((child.sendMessage as any)).toHaveBeenCalledWith('implement API');
+      expect(dispatcher.getDelegationsMap().size).toBe(0);
+      expect((architectAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('Only the Project Lead can delegate'),
+      );
     });
 
     it('warns about similar active delegations', () => {
@@ -712,7 +707,6 @@ describe('CommandDispatcher', () => {
         devRole,
         'build',
         leadAgent.id,
-        true,
         'claude-opus-4',
         leadAgent.cwd,
         undefined, // options (non-lead, no projectName)
@@ -940,7 +934,7 @@ describe('CommandDispatcher', () => {
 
       // projectName is now passed through spawn options, not set after
       expect(ctx.spawnAgent).toHaveBeenCalledWith(
-        leadRole, 'Handle deployment', leadAgent.id, true, undefined, leadAgent.cwd,
+        leadRole, 'Handle deployment', leadAgent.id, undefined, leadAgent.cwd,
         { projectName: 'Handle deployment' },
       );
     });
@@ -960,7 +954,7 @@ describe('CommandDispatcher', () => {
       dispatch(dispatcher, leadAgent, '⟦⟦ CREATE_AGENT {"role": "lead", "task": "Handle deployment", "name": "Deploy v2"} ⟧⟧');
 
       expect(ctx.spawnAgent).toHaveBeenCalledWith(
-        leadRole, 'Handle deployment', leadAgent.id, true, undefined, leadAgent.cwd,
+        leadRole, 'Handle deployment', leadAgent.id, undefined, leadAgent.cwd,
         { projectName: 'Deploy v2' },
       );
     });
@@ -975,7 +969,7 @@ describe('CommandDispatcher', () => {
 
       // Non-lead roles should NOT get projectName in options
       expect(ctx.spawnAgent).toHaveBeenCalledWith(
-        devRole, 'Fix bug', leadAgent.id, true, undefined, leadAgent.cwd,
+        devRole, 'Fix bug', leadAgent.id, undefined, leadAgent.cwd,
         undefined,
       );
     });
@@ -990,7 +984,7 @@ describe('CommandDispatcher', () => {
       dispatch(dispatcher, leadWithProject, '⟦⟦ CREATE_AGENT {"role": "developer", "task": "Build API"} ⟧⟧');
 
       expect(ctx.spawnAgent).toHaveBeenCalledWith(
-        devRole, 'Build API', leadWithProject.id, true, undefined, leadWithProject.cwd,
+        devRole, 'Build API', leadWithProject.id, undefined, leadWithProject.cwd,
         { projectId: 'proj-abc-123' },
       );
     });
@@ -1005,7 +999,7 @@ describe('CommandDispatcher', () => {
       dispatch(dispatcher, leadWithProject, '⟦⟦ CREATE_AGENT {"role": "lead", "task": "Deploy v2"} ⟧⟧');
 
       expect(ctx.spawnAgent).toHaveBeenCalledWith(
-        leadRole, 'Deploy v2', leadWithProject.id, true, undefined, leadWithProject.cwd,
+        leadRole, 'Deploy v2', leadWithProject.id, undefined, leadWithProject.cwd,
         { projectName: 'Deploy v2', projectId: 'proj-abc-123' },
       );
     });
@@ -1224,6 +1218,7 @@ describe('CommandDispatcher', () => {
 
       dispatch(dispatcher, architectAgent, `⟦⟦ DELEGATE {"to": "${child.id}", "task": "implement API"} ⟧⟧`);
 
+      // Architect can no longer delegate, so no DAG task should start
       expect(ctx.taskDAG.startTask).not.toHaveBeenCalled();
     });
   });

@@ -60,7 +60,7 @@ function loadOversightLevel(): OversightLevel {
     const saved = localStorage.getItem(OVERSIGHT_KEY);
     if (saved === 'supervised' || saved === 'balanced' || saved === 'autonomous') return saved;
   } catch {}
-  return 'balanced';
+  return 'autonomous';
 }
 
 function loadProjectOverrides(): Record<string, OversightLevel> {

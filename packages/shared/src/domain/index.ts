@@ -1,4 +1,10 @@
 // Domain types — barrel export
+export {
+  PROVIDER_REGISTRY, PROVIDER_IDS,
+  getProvider, getAllProviders, isValidProviderId,
+  type ProviderId, type ProviderDefinition, type ProviderColors,
+  type ProviderLink, type ProviderTierModels,
+} from './provider.js';
 export { AgentStatusSchema, type AgentStatus } from './agent.js';
 export { RoleSchema, type Role } from './role.js';
 export {

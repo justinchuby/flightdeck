@@ -12,6 +12,7 @@ import { execSync } from 'node:child_process';
 import type { Database } from '../db/database.js';
 import type { ConfigStore } from '../config/ConfigStore.js';
 import { PROVIDER_PRESETS, type ProviderId } from '../adapters/presets.js';
+import { PROVIDER_REGISTRY, PROVIDER_IDS } from '@flightdeck/shared';
 import { logger } from '../utils/logger.js';
 
 // ── Types ────────────────────────────────────────────────────────
@@ -46,10 +47,12 @@ export interface ModelPreferences {
 // we verify the binary is functional with a safe, quick command.
 // Some CLIs (e.g. claude) crash on --version, so we only check what works.
 
-const AUTH_COMMANDS: Partial<Record<ProviderId, string>> = {
-  copilot: 'gh auth status',
-  gemini:  'gemini --version',
-};
+// Auth commands derived from the central ProviderRegistry
+const AUTH_COMMANDS: Partial<Record<ProviderId, string>> = Object.fromEntries(
+  PROVIDER_IDS
+    .filter((id) => PROVIDER_REGISTRY[id].authCommand)
+    .map((id) => [id, PROVIDER_REGISTRY[id].authCommand!]),
+) as Partial<Record<ProviderId, string>>;
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -106,18 +109,8 @@ export class ProviderManager {
     const preset = PROVIDER_PRESETS[provider];
     if (!preset) return null;
 
-    // Version commands vary by provider
-    const versionCommands: Partial<Record<ProviderId, string>> = {
-      copilot: `${preset.binary} --version`,
-      claude: `${preset.binary} --version`,
-      gemini: `${preset.binary} --version`,
-      codex: `${preset.binary} --version`,
-      cursor: `${preset.binary} --version`,
-      opencode: `${preset.binary} --version`,
-    };
-
-    const cmd = versionCommands[provider];
-    if (!cmd) return null;
+    // All providers support --version for version detection
+    const cmd = `${preset.binary} --version`;
 
     try {
       const raw = this.exec(cmd);
@@ -170,7 +163,7 @@ export class ProviderManager {
   setProviderEnabled(provider: ProviderId, enabled: boolean): void {
     if (this.configStore) {
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: false, models: [] };
-      this.configStore.writePartial({ providerSettings: { [provider]: { ...current, enabled } } }).catch(err => logger.warn('Failed to persist provider enabled state', { provider, error: err }));
+      this.configStore.writePartial({ providerSettings: { [provider]: { ...current, enabled } } }).catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
       return;
     }
     if (!this.db) return;
@@ -195,7 +188,7 @@ export class ProviderManager {
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: false, models: [] };
       this.configStore.writePartial({
         providerSettings: { [provider]: { ...current, models: prefs.preferredModels ?? [] } },
-      }).catch(err => logger.warn('Failed to persist model preferences', { provider, error: err }));
+      }).catch(err => logger.warn({ msg: 'Failed to persist model preferences', provider, error: err }));
       return;
     }
     if (!this.db) return;
@@ -206,7 +199,7 @@ export class ProviderManager {
 
   getActiveProviderId(): ProviderId {
     if (this.configStore) {
-      return this.configStore.current.provider.id;
+      return this.configStore.current.provider.id as ProviderId;
     }
     if (!this.db) return 'copilot';
     const raw = this.db.getSetting(`${SETTING_PREFIX}active`);
@@ -216,10 +209,43 @@ export class ProviderManager {
 
   setActiveProviderId(provider: ProviderId): void {
     if (this.configStore) {
-      this.configStore.writePartial({ provider: { ...this.configStore.current.provider, id: provider } }).catch(err => logger.warn('Failed to persist active provider', { provider, error: err }));
+      this.configStore.writePartial({ provider: { ...this.configStore.current.provider, id: provider } }).catch(err => logger.warn({ msg: 'Failed to persist active provider', provider, error: err }));
       return;
     }
     if (!this.db) return;
     this.db.setSetting(`${SETTING_PREFIX}active`, provider);
+  }
+
+  // ── Provider Ranking ───────────────────────────────────────
+
+  /**
+   * Get the user's preferred provider ordering.
+   * Returns all provider IDs in preference order (most preferred first).
+   * Missing providers are appended at the end in default order.
+   */
+  getProviderRanking(): ProviderId[] {
+    const allIds = Object.keys(PROVIDER_PRESETS) as ProviderId[];
+    let stored: string[] = [];
+    if (this.configStore) {
+      stored = this.configStore.current.providerRanking ?? [];
+    } else if (this.db) {
+      const raw = this.db.getSetting(`${SETTING_PREFIX}ranking`);
+      if (raw) { try { stored = JSON.parse(raw); } catch { /* ignore */ } }
+    }
+    // Filter to valid IDs, then append any missing in default order
+    const ranked = stored.filter((id): id is ProviderId => id in PROVIDER_PRESETS);
+    const missing = allIds.filter(id => !ranked.includes(id));
+    return [...ranked, ...missing];
+  }
+
+  setProviderRanking(ranking: ProviderId[]): void {
+    if (this.configStore) {
+      this.configStore.writePartial({ providerRanking: ranking }).catch(err =>
+        logger.warn({ msg: 'Failed to persist provider ranking', error: err }),
+      );
+      return;
+    }
+    if (!this.db) return;
+    this.db.setSetting(`${SETTING_PREFIX}ranking`, JSON.stringify(ranking));
   }
 }

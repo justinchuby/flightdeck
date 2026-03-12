@@ -5,6 +5,7 @@ import { DiffPreview } from '../DiffPreview';
 import { EmptyState, SkeletonCard } from '../Shared';
 import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
+import { shortAgentId } from '../../utils/agentLabel';
 
 /** Safely convert any API value to a human-readable string */
 function safeText(val: unknown): string {
@@ -66,7 +67,7 @@ export function FocusPanel({ agentId, onClose }: FocusPanelProps) {
         {agent?.role?.icon && <span className="text-lg">{agent.role.icon}</span>}
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-th-text-alt truncate">
-            {agent?.role?.name ?? 'Agent'} ({agentId.slice(0, 8)})
+            {agent?.role?.name ?? 'Agent'} ({shortAgentId(agentId)})
           </h3>
           <p className="text-[10px] text-th-text-muted capitalize">{agent?.status ?? 'unknown'}</p>
         </div>
@@ -99,6 +100,12 @@ export function FocusPanel({ agentId, onClose }: FocusPanelProps) {
         {activeTab === 'overview' && agent && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
+              {agent.provider && (
+                <div className="text-[11px]">
+                  <span className="text-th-text-muted">Provider:</span>{' '}
+                  <span className="text-blue-400">{agent.provider}</span>
+                </div>
+              )}
               <div className="text-[11px]">
                 <span className="text-th-text-muted">Model:</span>{' '}
                 <span className="text-th-text-alt">{agent.model ?? 'default'}</span>

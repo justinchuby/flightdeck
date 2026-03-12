@@ -18,7 +18,7 @@ import type { AppContext } from './context.js';
 
 export function settingsRoutes(ctx: AppContext): Router {
   const router = Router();
-  const pm = new ProviderManager({ db: ctx.db, configStore: ctx.configStore });
+  const pm = ctx.providerManager ?? new ProviderManager({ db: ctx.db, configStore: ctx.configStore });
 
   /**
    * GET /settings/providers — list all providers with installed/auth status.
@@ -97,6 +97,29 @@ export function settingsRoutes(ctx: AppContext): Router {
     }
     pm.setActiveProviderId(id as ProviderId);
     res.json({ activeProvider: id });
+  });
+
+  /**
+   * GET /settings/provider-ranking — get provider preference order.
+   */
+  router.get('/settings/provider-ranking', (_req, res) => {
+    res.json({ ranking: pm.getProviderRanking() });
+  });
+
+  /**
+   * PUT /settings/provider-ranking — set provider preference order.
+   */
+  router.put('/settings/provider-ranking', (req, res) => {
+    const { ranking } = req.body as { ranking?: string[] };
+    if (!ranking || !Array.isArray(ranking)) {
+      return res.status(400).json({ error: 'ranking must be an array of provider IDs' });
+    }
+    const valid = ranking.filter(isValidProviderId) as ProviderId[];
+    if (valid.length === 0) {
+      return res.status(400).json({ error: 'No valid provider IDs in ranking' });
+    }
+    pm.setProviderRanking(valid);
+    res.json({ ranking: pm.getProviderRanking() });
   });
 
   return router;

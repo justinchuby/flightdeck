@@ -21,7 +21,7 @@ export type PredictionType =
   | 'agent_stall'
   | 'task_duration'
   | 'completion_estimate'
-  | 'file_conflict';
+;
 
 export interface PredictionAction {
   label: string;
@@ -56,7 +56,6 @@ export const PREDICTION_TYPE_LABELS: Record<PredictionType, string> = {
   agent_stall: 'Agent Stall',
   task_duration: 'Task Duration',
   completion_estimate: 'Completion Estimate',
-  file_conflict: 'File Conflict',
 };
 
 export const SEVERITY_COLORS: Record<string, string> = {
@@ -77,7 +76,6 @@ export const PREDICTION_ICONS: Record<PredictionType, string> = {
   agent_stall: '🐌',
   task_duration: '⏱',
   completion_estimate: '📊',
-  file_conflict: '⚠',
 };
 
 export function confidenceLabel(confidence: number): { text: string; color: string } {

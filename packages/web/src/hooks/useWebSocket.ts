@@ -4,9 +4,10 @@ import { useGroupStore, groupKey } from '../stores/groupStore';
 import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
 import { hasUnclosedCommandBlock } from '../utils/commandParser';
-import type { WsMessage } from '../types';
+import type { AcpTextChunk, WsMessage } from '../types';
 import { getAuthToken, apiFetch } from './useApi';
 import { useSettingsStore } from '../stores/settingsStore';
+import { shortAgentId } from '../utils/agentLabel';
 
 // Module-level WS ref for global access (e.g., timer pause from ApprovalSlideOver)
 let globalWs: WebSocket | null = null;
@@ -28,7 +29,6 @@ export function useWebSocket() {
   const setAgents = useAppStore((s) => s.setAgents);
   const addAgent = useAppStore((s) => s.addAgent);
   const updateAgent = useAppStore((s) => s.updateAgent);
-  const removeAgent = useAppStore((s) => s.removeAgent);
 
   const connect = useCallback(() => {
     // Close any existing connection first
@@ -79,13 +79,19 @@ export function useWebSocket() {
           addAgent(msg.agent);
           break;
         case 'agent:terminated':
-          removeAgent(msg.agentId);
+          updateAgent(msg.agentId, { status: 'terminated' });
           break;
-        case 'agent:exit':
+        case 'agent:exit': {
+          // Don't overwrite 'terminated' with 'failed' — explicit termination takes precedence
+          const exitPrev = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+          if (exitPrev?.status === 'terminated') break;
           updateAgent(msg.agentId, {
             status: msg.code === 0 ? 'completed' : 'failed',
+            exitError: msg.error,
+            exitCode: msg.code ?? null,
           });
           break;
+        }
         case 'agent:status': {
           const prev = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
           const wasIdle = prev && (prev.status === 'idle' || prev.status === 'completed');
@@ -100,7 +106,7 @@ export function useWebSocket() {
               const msgs = [...existing.messages];
               const last = msgs[msgs.length - 1];
               if (last?.sender === 'agent') {
-                const separator = { type: 'text' as const, text: '---', sender: 'system' as any };
+                const separator: AcpTextChunk = { type: 'text', text: '---', sender: 'system' };
                 // If the last agent message was just created (< 2s ago), text from the new
                 // turn already arrived — insert separator before it, not after.
                 if (last.timestamp && Date.now() - last.timestamp < 2000 && msgs.length >= 2) {
@@ -128,6 +134,25 @@ export function useWebSocket() {
             ],
           });
           break;
+        case 'agent:spawn_error': {
+          const parentAgent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+          const label = parentAgent?.role?.name ?? shortAgentId(msg.agentId) ?? 'Agent';
+          useToastStore.getState().add('error', `Spawn failed (${label}): ${msg.message}`);
+          break;
+        }
+        case 'agent:model_fallback': {
+          updateAgent(msg.agentId, {
+            model: msg.resolved,
+            modelResolution: {
+              requested: msg.requested,
+              resolved: msg.resolved,
+              translated: true,
+              reason: msg.reason,
+            },
+          });
+          useToastStore.getState().add('info', `🔄 ${msg.agentRole}: ${msg.requested} → ${msg.resolved} (${msg.provider})`);
+          break;
+        }
         case 'agent:text': {
           const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
           const state = useAppStore.getState();
@@ -215,14 +240,7 @@ export function useWebSocket() {
         case 'agent:plan':
           updateAgent(msg.agentId, { plan: msg.plan });
           break;
-        case 'agent:permission_request':
-          updateAgent(msg.agentId, { pendingPermission: msg.request });
-          {
-            const agent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
-            const roleName = agent?.role?.name ?? msg.agentId.slice(0, 8);
-            useToastStore.getState().add('info', `🛡️ Agent ${roleName} requests permission`);
-          }
-          break;
+
         case 'agent:session_ready':
           updateAgent(msg.agentId, { sessionId: msg.sessionId });
           break;
@@ -242,8 +260,8 @@ export function useWebSocket() {
           const fromId = msg.from;
           const isFromSystem = fromId === 'system';
           const senderLabel = msg.fromRole
-            ? `${msg.fromRole} (${(fromId ?? '').slice(0, 8)})`
-            : fromId?.slice(0, 8) || 'System';
+            ? `${msg.fromRole} (${shortAgentId(fromId ?? '')})`
+            : (fromId ? shortAgentId(fromId) : '') || 'System';
           const preview = (msg.content ?? '').slice(0, 2000);
 
           // Show in recipient's panel
@@ -255,7 +273,7 @@ export function useWebSocket() {
               msgs.push({
                 type: 'text',
                 text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
-                sender: isFromSystem ? 'system' as any : 'user' as any,
+                sender: isFromSystem ? 'system' : 'user',
                 timestamp: Date.now(),
               });
               updateAgent(toId, { messages: msgs });
@@ -273,14 +291,14 @@ export function useWebSocket() {
                 : (() => {
                     const toAgent = state.agents.find((a) => a.id === toId);
                     return toAgent?.role?.name
-                      ? `${toAgent.role.name} (${(toId ?? '').slice(0, 8)})`
-                      : (toId ?? '').slice(0, 8);
+                      ? `${toAgent.role.name} (${shortAgentId(toId ?? '')})`
+                      : shortAgentId(toId ?? '');
                   })();
               const msgs = [...(sender.messages ?? [])];
               msgs.push({
                 type: 'text',
                 text: `📤 [To ${recipientLabel}] ${preview}`,
-                sender: 'system' as any,
+                sender: 'system',
                 timestamp: Date.now(),
               });
               updateAgent(fromId, { messages: msgs });
@@ -404,7 +422,7 @@ export function useWebSocket() {
           break;
         }
         case 'agent:session_resume_failed': {
-          const agentId = (msg.agentId ?? '').slice(0, 8);
+          const agentId = shortAgentId(msg.agentId ?? '');
           const error = msg.error ?? 'Unknown error';
           useToastStore.getState().add('error', `Session resume failed (agent ${agentId}): ${error}`);
           break;
@@ -414,7 +432,7 @@ export function useWebSocket() {
         console.error('[useWebSocket] Failed to parse message:', err);
       }
     };
-  }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);
+  }, [setConnected, setAgents, addAgent, updateAgent]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;

@@ -1,6 +1,8 @@
 # Hot-Reload with Agent Process Preservation
 
-> **Status:** Design Document (PROPOSAL — Security Model Added) | **Author:** Architect (e7f14c5e) | **Security Review:** Architect (cc29bb0d) | **Date:** 2026-03-07
+> **Status:** ⚠️ SUPERSEDED — The agent server/daemon approach described in this document was not implemented. The system now uses a single-process architecture where agents are spawned as direct child processes. Agent preservation across server restarts is handled via session resume (AcpAdapter + `loadSession()`). The EventBuffer, MassFailureDetector, ForkTransport, IPC protocol, and two-process model discussed here were never built. This document is retained as design history.
+>
+> **Original Status:** Design Document (PROPOSAL — Security Model Added) | **Author:** Architect (e7f14c5e) | **Security Review:** Architect (cc29bb0d) | **Date:** 2026-03-07
 
 ## Problem Statement
 

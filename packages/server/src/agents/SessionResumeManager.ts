@@ -14,12 +14,12 @@
  * Lifecycle persistence (write-on-mutation):
  *   - agent:spawned   → upsert into agentRoster
  *   - agent:session_ready → update sessionId
- *   - agent:status    → update status (running→busy, idle→idle)
+ *   - agent:status    → update status (running→running, idle→idle)
  *   - agent:terminated → mark as terminated
  */
 import { EventEmitter } from 'events';
 import type { AgentManager } from './AgentManager.js';
-import type { AgentRosterRepository, AgentStatus as RosterStatus } from '../db/AgentRosterRepository.js';
+import type { AgentRosterRepository, RosterAgentStatus as RosterStatus } from '../db/AgentRosterRepository.js';
 import type { ActiveDelegationRepository, DelegationRecord } from '../db/ActiveDelegationRepository.js';
 import type { RoleRegistry } from './RoleRegistry.js';
 import type { AgentJSON } from './Agent.js';
@@ -48,11 +48,11 @@ export interface ResumeAllResult {
 
 function toRosterStatus(agentStatus: string): RosterStatus | null {
   switch (agentStatus) {
-    case 'running': return 'busy';
+    case 'running': return 'running';
     case 'idle': return 'idle';
     case 'completed':
-    case 'failed':
     case 'terminated': return 'terminated';
+    case 'failed': return 'failed';
     case 'creating': return null; // transient — don't persist yet
     default: return null;
   }
@@ -244,12 +244,11 @@ export class SessionResumeManager {
         role,
         metadata?.task,
         metadata?.parentId,
-        undefined,           // autopilot — use default
         record.model !== 'default' ? record.model : undefined,
         metadata?.cwd,
         record.sessionId,    // resumeSessionId — triggers resume flow
         agentId,             // reuse same agent ID
-        { projectId: record.projectId },
+        { projectId: record.projectId, provider: record.provider },
       );
 
       return {
@@ -284,12 +283,11 @@ export class SessionResumeManager {
         role,
         metadata?.task,
         metadata?.parentId,
-        undefined,
         record.model !== 'default' ? record.model : undefined,
         metadata?.cwd,
         undefined,           // no resumeSessionId — fresh start
         agentId,
-        { projectId: record.projectId },
+        { projectId: record.projectId, provider: record.provider },
       );
 
       return { agentId: agent.id, success: true };

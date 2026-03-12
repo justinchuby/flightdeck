@@ -1,8 +1,10 @@
 /**
  * AdapterFactory tests.
  *
- * Covers: backend resolution, adapter creation, SDK fallback,
+ * Covers: backend resolution, adapter creation,
  * start options building, and configuration handling.
+ *
+ * All providers now resolve to ACP backend (no SDK adapters active).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -22,12 +24,6 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
-// Mock Claude SDK (for ClaudeSdkAdapter's dynamic import)
-vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
-  query: vi.fn(),
-  listSessions: vi.fn(),
-}));
-
 describe('AdapterFactory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,12 +32,12 @@ describe('AdapterFactory', () => {
   // ── resolveBackend() ─────────────────────────────────────
 
   describe('resolveBackend()', () => {
-    it('returns copilot-sdk for copilot', () => {
-      expect(resolveBackend('copilot')).toBe('copilot-sdk');
+    it('returns acp for copilot', () => {
+      expect(resolveBackend('copilot')).toBe('acp');
     });
 
-    it('returns claude-sdk for claude', () => {
-      expect(resolveBackend('claude')).toBe('claude-sdk');
+    it('returns acp for claude', () => {
+      expect(resolveBackend('claude')).toBe('acp');
     });
 
     it('returns acp for gemini', () => {
@@ -73,10 +69,17 @@ describe('AdapterFactory', () => {
   // ── createAdapterForProvider() ───────────────────────────
 
   describe('createAdapterForProvider()', () => {
-    it('creates CopilotSdkAdapter for copilot (always SDK)', async () => {
+    it('creates AcpAdapter for copilot', async () => {
       const result = await createAdapterForProvider({ provider: 'copilot' });
-      expect(result.adapter.type).toBe('copilot-sdk');
-      expect(result.backend).toBe('copilot-sdk');
+      expect(result.adapter.type).toBe('acp');
+      expect(result.backend).toBe('acp');
+      expect(result.fallback).toBe(false);
+    });
+
+    it('creates AcpAdapter for claude', async () => {
+      const result = await createAdapterForProvider({ provider: 'claude' });
+      expect(result.adapter.type).toBe('acp');
+      expect(result.backend).toBe('acp');
       expect(result.fallback).toBe(false);
     });
 
@@ -101,99 +104,10 @@ describe('AdapterFactory', () => {
       expect(result.backend).toBe('acp');
     });
 
-    it('creates ClaudeSdkAdapter for claude', async () => {
-      const result = await createAdapterForProvider({ provider: 'claude' });
-      expect(result.adapter.type).toBe('claude-sdk');
-      expect(result.backend).toBe('claude-sdk');
-      expect(result.fallback).toBe(false);
-    });
-
     it('creates MockAdapter for mock provider', async () => {
       const result = await createAdapterForProvider({ provider: 'mock' });
       expect(result.adapter.type).toBe('mock');
       expect(result.backend).toBe('mock');
-    });
-
-    it('passes autopilot to CopilotSdkAdapter', async () => {
-      const result = await createAdapterForProvider({
-        provider: 'copilot',
-        autopilot: true,
-      });
-      expect(result.adapter.type).toBe('copilot-sdk');
-      expect(result.backend).toBe('copilot-sdk');
-    });
-
-    it('passes autopilot and model to ClaudeSdkAdapter', async () => {
-      const result = await createAdapterForProvider({
-        provider: 'claude',
-        autopilot: true,
-        model: 'claude-opus-4',
-      });
-      expect(result.adapter.type).toBe('claude-sdk');
-      expect(result.backend).toBe('claude-sdk');
-    });
-
-    it('falls back to ACP when ClaudeSdkAdapter constructor throws', async () => {
-      // Clear module cache so doMock takes effect on re-import
-      vi.resetModules();
-
-      // Re-mock logger (cleared by resetModules)
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-
-      // Mock a broken ClaudeSdkAdapter
-      vi.doMock('./ClaudeSdkAdapter.js', () => ({
-        ClaudeSdkAdapter: class {
-          constructor() {
-            throw new Error('SDK package not installed');
-          }
-        },
-      }));
-
-      // Re-import factory to pick up the mock
-      const { createAdapterForProvider: createWithBrokenSdk } = await import('./AdapterFactory.js');
-      const result = await createWithBrokenSdk({
-        provider: 'claude',
-      });
-
-      expect(result.backend).toBe('acp');
-      expect(result.fallback).toBe(true);
-      expect(result.fallbackReason).toContain('SDK package not installed');
-      expect(result.adapter.type).toBe('acp');
-
-      // Clean up: reset modules and remove doMock so subsequent dynamic imports get real modules
-      vi.resetModules();
-      vi.unmock('./ClaudeSdkAdapter.js');
-      vi.unmock('../utils/logger.js');
-    });
-
-    it('falls back to ACP when CopilotSdkAdapter constructor throws', async () => {
-      vi.resetModules();
-
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-
-      vi.doMock('./CopilotSdkAdapter.js', () => ({
-        CopilotSdkAdapter: class {
-          constructor() {
-            throw new Error('Copilot SDK not installed');
-          }
-        },
-      }));
-
-      const { createAdapterForProvider: createWithBrokenSdk } = await import('./AdapterFactory.js');
-      const result = await createWithBrokenSdk({ provider: 'copilot' });
-
-      expect(result.backend).toBe('acp');
-      expect(result.fallback).toBe(true);
-      expect(result.fallbackReason).toContain('Copilot SDK not installed');
-      expect(result.adapter.type).toBe('acp');
-
-      vi.resetModules();
-      vi.unmock('./CopilotSdkAdapter.js');
-      vi.unmock('../utils/logger.js');
     });
 
     it('handles unknown provider gracefully (defaults to ACP)', async () => {
@@ -213,7 +127,7 @@ describe('AdapterFactory', () => {
     };
 
     it('resolves binary from preset when no override', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'gemini' },
         { cwd: '/test' },
       );
@@ -222,7 +136,7 @@ describe('AdapterFactory', () => {
     });
 
     it('uses binaryOverride when provided', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, binaryOverride: '/usr/local/bin/my-copilot' },
         { cwd: '/test' },
       );
@@ -230,15 +144,27 @@ describe('AdapterFactory', () => {
     });
 
     it('includes --agent flag from agentFlag', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         baseConfig,
         { cwd: '/test', agentFlag: 'developer' },
       );
       expect(opts.cliArgs).toContain('--agent=developer');
     });
 
+    it.each(['gemini', 'claude', 'codex', 'opencode', 'cursor'] as const)(
+      'skips --agent flag for %s provider (unsupported)',
+      (provider) => {
+        const { options: opts } = buildStartOptions(
+          { ...baseConfig, provider },
+          { cwd: '/test', agentFlag: 'flightdeck-developer' },
+        );
+        const agentArgs = (opts.cliArgs ?? []).filter((a: string) => a.startsWith('--agent='));
+        expect(agentArgs).toHaveLength(0);
+      },
+    );
+
     it('includes --model flag when model provided', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, model: 'claude-sonnet-4' },
         { cwd: '/test' },
       );
@@ -247,7 +173,7 @@ describe('AdapterFactory', () => {
     });
 
     it('passes sessionId through opts without --resume CLI flag', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         baseConfig,
         { cwd: '/test', sessionId: 'session-abc-123' },
       );
@@ -257,7 +183,7 @@ describe('AdapterFactory', () => {
     });
 
     it('uses argsOverride when provided', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, argsOverride: ['--custom-flag'] },
         { cwd: '/test' },
       );
@@ -265,7 +191,7 @@ describe('AdapterFactory', () => {
     });
 
     it('merges env from preset and envOverride, filtering empty values', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         {
           ...baseConfig,
           provider: 'gemini',
@@ -281,38 +207,47 @@ describe('AdapterFactory', () => {
     });
 
     it('returns undefined env when all values are empty', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, envOverride: { EMPTY: '' } },
         { cwd: '/test' },
       );
       expect(opts.env).toBeUndefined();
     });
 
+    it('does not set GEMINI_SYSTEM_MD env var (system prompt delivered via role files)', () => {
+      const { options: opts } = buildStartOptions(
+        { ...baseConfig, provider: 'gemini' },
+        { cwd: '/test', systemPrompt: 'You are a helpful agent.' },
+      );
+      // System prompt is now delivered by RoleFileWriter (.gemini/agents/*.md)
+      expect(opts.env?.GEMINI_SYSTEM_MD).toBeUndefined();
+      expect(opts.env?.GEMINI_WRITE_SYSTEM_MD).toBeUndefined();
+    });
+
     it('sets cwd from agentOpts', () => {
-      const opts = buildStartOptions(baseConfig, { cwd: '/custom/path' });
+      const { options: opts } = buildStartOptions(baseConfig, { cwd: '/custom/path' });
       expect(opts.cwd).toBe('/custom/path');
     });
 
     it('falls back to cliCommand config when no preset binary', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'unknown-provider', cliCommand: 'my-binary' },
         { cwd: '/test' },
       );
       expect(opts.cliCommand).toBe('my-binary');
     });
 
-    it('passes through maxTurns and systemPrompt', () => {
-      const opts = buildStartOptions(
+    it('passes through maxTurns', () => {
+      const { options: opts } = buildStartOptions(
         baseConfig,
-        { cwd: '/test', maxTurns: 10, systemPrompt: 'You are a helper.' },
+        { cwd: '/test', maxTurns: 10 },
       );
       expect(opts.maxTurns).toBe(10);
-      expect(opts.systemPrompt).toBe('You are a helper.');
     });
 
     it('resolves model via ModelResolver', () => {
       // 'standard' tier alias for copilot should resolve to a specific model
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, model: 'standard' },
         { cwd: '/test' },
       );
@@ -322,7 +257,7 @@ describe('AdapterFactory', () => {
     });
 
     it('passes through base cliArgs from config', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, cliArgs: ['--verbose', '--no-color'] },
         { cwd: '/test', agentFlag: 'lead' },
       );
@@ -330,83 +265,86 @@ describe('AdapterFactory', () => {
       expect(opts.cliArgs).toContain('--no-color');
       expect(opts.cliArgs).toContain('--agent=lead');
     });
+
+    it('resolves claude preset with claude-agent-acp binary', () => {
+      const { options: opts } = buildStartOptions(
+        { ...baseConfig, provider: 'claude' },
+        { cwd: '/test' },
+      );
+      expect(opts.cliCommand).toBe('claude-agent-acp');
+    });
+
+    it('resolves codex preset with codex-acp binary and empty args', () => {
+      const { options: opts } = buildStartOptions(
+        { ...baseConfig, provider: 'codex' },
+        { cwd: '/test' },
+      );
+      expect(opts.cliCommand).toBe('codex-acp');
+      expect(opts.baseArgs).toEqual([]);
+    });
+
+    it('uses -c model=X for codex instead of --model', () => {
+      const { options: opts } = buildStartOptions(
+        { ...baseConfig, provider: 'codex', model: 'gpt-5' },
+        { cwd: '/test' },
+      );
+      expect(opts.cliArgs).toContain('-c');
+      expect(opts.cliArgs).toContain('model=gpt-5');
+      expect(opts.cliArgs).not.toContain('--model');
+    });
+
+    it('returns modelResolution metadata when model is translated', () => {
+      // claude-opus-4.6 on gemini should translate to a gemini-native model
+      const result = buildStartOptions(
+        { ...baseConfig, provider: 'gemini', model: 'claude-opus-4.6' },
+        { cwd: '/test' },
+      );
+      expect(result.modelResolution).toBeDefined();
+      expect(result.modelResolution!.translated).toBe(true);
+      expect(result.modelResolution!.original).toBe('claude-opus-4.6');
+      expect(result.modelResolution!.model).not.toBe('claude-opus-4.6');
+    });
+
+    it('returns non-translated modelResolution for native models', () => {
+      const result = buildStartOptions(
+        { ...baseConfig, provider: 'copilot', model: 'claude-sonnet-4' },
+        { cwd: '/test' },
+      );
+      expect(result.modelResolution).toBeDefined();
+      expect(result.modelResolution!.translated).toBe(false);
+      expect(result.modelResolution!.model).toBe('claude-sonnet-4');
+    });
+
+    it('returns undefined modelResolution when no model specified', () => {
+      const result = buildStartOptions(baseConfig, { cwd: '/test' });
+      expect(result.modelResolution).toBeUndefined();
+    });
   });
 
   // ── Integration: Factory + Start Options ──────────────────
 
   describe('integration', () => {
-    it('copilot: always creates CopilotSdkAdapter (never ACP)', async () => {
-      // Fresh import needed since earlier fallback tests reset modules
-      vi.resetModules();
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-      // Restore real CopilotSdkAdapter (may have been broken-mocked by fallback test)
-      vi.doMock('./CopilotSdkAdapter.js', () => vi.importActual('./CopilotSdkAdapter.js'));
-      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
-
+    it('copilot: creates AcpAdapter', async () => {
       const config: AdapterConfig = {
         provider: 'copilot',
         cliCommand: 'copilot',
         cliArgs: [],
       };
 
-      const { adapter, backend } = await freshFactory(config);
+      const { adapter, backend } = await createAdapterForProvider(config);
 
-      expect(backend).toBe('copilot-sdk');
-      expect(adapter.type).toBe('copilot-sdk');
-
-      vi.resetModules();
-      vi.unmock('./CopilotSdkAdapter.js');
-      vi.unmock('../utils/logger.js');
-    });
-
-    it('claude SDK mode: creates SDK adapter', async () => {
-      // Reset and re-import to ensure clean module state after fallback test's doMock
-      vi.resetModules();
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-      vi.doMock('@anthropic-ai/claude-agent-sdk', () => ({
-        query: vi.fn(),
-        listSessions: vi.fn(),
-      }));
-      // Restore real ClaudeSdkAdapter (overrides the broken mock from fallback test)
-      vi.doMock('./ClaudeSdkAdapter.js', () => vi.importActual('./ClaudeSdkAdapter.js'));
-      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
-
-      const config: AdapterConfig = {
-        provider: 'claude',
-        model: 'claude-opus-4',
-      };
-
-      const result = await freshFactory(config);
-      expect(result.backend).toBe('claude-sdk');
-      expect(result.adapter.type).toBe('claude-sdk');
-    });
-
-    it('claude falls back to ACP if SDK unavailable', async () => {
-      vi.resetModules();
-      vi.doMock('../utils/logger.js', () => ({
-        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-      }));
-      vi.doMock('./ClaudeSdkAdapter.js', () => ({
-        ClaudeSdkAdapter: class {
-          constructor() { throw new Error('SDK not installed'); }
-        },
-      }));
-      const { createAdapterForProvider: freshFactory } = await import('./AdapterFactory.js');
-
-      const config: AdapterConfig = {
-        provider: 'claude',
-        cliCommand: 'claude',
-        cliArgs: [],
-      };
-
-      const { adapter, backend, fallback } = await freshFactory(config);
       expect(backend).toBe('acp');
       expect(adapter.type).toBe('acp');
-      expect(fallback).toBe(true);
+    });
+
+    it('claude: creates AcpAdapter', async () => {
+      const config: AdapterConfig = {
+        provider: 'claude',
+      };
+
+      const result = await createAdapterForProvider(config);
+      expect(result.backend).toBe('acp');
+      expect(result.adapter.type).toBe('acp');
     });
 
     it('config overrides take precedence over presets', () => {
@@ -418,7 +356,7 @@ describe('AdapterFactory', () => {
         cliArgs: [],
       };
 
-      const startOpts = buildStartOptions(config, { cwd: '/project' });
+      const { options: startOpts } = buildStartOptions(config, { cwd: '/project' });
 
       expect(startOpts.cliCommand).toBe('/custom/copilot');
       expect(startOpts.baseArgs).toEqual(['--custom-arg']);

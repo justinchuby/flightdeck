@@ -4,6 +4,10 @@ import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
 import { Square, RefreshCw, Terminal, Zap, Check, Play } from 'lucide-react';
 import { EmptyState } from '../Shared';
+import { formatTokens } from '../../utils/format';
+import { useModels } from '../../hooks/useModels';
+import { ProviderBadge } from '../ProviderBadge';
+import { shortAgentId } from '../../utils/agentLabel';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -15,19 +19,6 @@ function shortModelName(model?: string): string {
   if (m.includes('gpt')) return m.replace('gpt-', 'GPT-').replace('-codex', ' Codex');
   return model;
 }
-
-const AVAILABLE_MODELS = [
-  'claude-opus-4.6',
-  'claude-sonnet-4.6',
-  'claude-sonnet-4.5',
-  'claude-haiku-4.5',
-  'gpt-5.3-codex',
-  'gpt-5.2-codex',
-  'gpt-5.2',
-  'gpt-5.1-codex',
-  'gemini-3-pro-preview',
-  'gpt-4.1',
-];
 
 /** Flatten agents into a depth-first hierarchy. Parents first, children indented below. */
 function flattenHierarchy(agents: AgentInfo[]): { agent: AgentInfo; depth: number; isLastChild: boolean }[] {
@@ -126,6 +117,7 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
 export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [confirmTerminateIds, setConfirmTerminateIds] = useState<Set<string>>(new Set());
+  const { models: availableModels } = useModels();
 
   const handleSelect = (id: string) => {
     if (onSelectAgent) onSelectAgent(id);
@@ -144,19 +136,19 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
 
   return (
     <div className="border border-th-border rounded-lg bg-surface-raised overflow-hidden">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm table-fixed">
         <thead>
           <tr className="border-b border-th-border text-th-text-muted text-xs uppercase tracking-wider">
-            <th className="text-left px-3 py-2">Agent</th>
-            <th className="text-left px-3 py-2">Status</th>
-            <th className="text-left px-3 py-2 hidden md:table-cell">Model</th>
-            <th className="text-left px-3 py-2 hidden md:table-cell">Task</th>
-            <th className="text-left px-3 py-2">Current Activity</th>
-            <th className="text-left px-3 py-2 hidden lg:table-cell">Progress</th>
-            <th className="text-left px-3 py-2 hidden xl:table-cell">Tokens</th>
-            <th className="text-left px-3 py-2 hidden lg:table-cell">Locks</th>
-            <th className="text-left px-3 py-2 hidden sm:table-cell">Uptime</th>
-            <th className="text-right px-3 py-2">Actions</th>
+            <th className="text-left px-3 py-2 w-[14%]">Agent</th>
+            <th className="text-left px-3 py-2 w-[7%]">Status</th>
+            <th className="text-left px-3 py-2 hidden md:table-cell w-[12%]">Provider / Model</th>
+            <th className="text-left px-3 py-2 hidden md:table-cell w-[14%]">Task</th>
+            <th className="text-left px-3 py-2 w-[16%]">Current Activity</th>
+            <th className="text-left px-3 py-2 hidden lg:table-cell w-[8%]">Progress</th>
+            <th className="text-left px-3 py-2 hidden xl:table-cell w-[10%]">Tokens</th>
+            <th className="text-left px-3 py-2 hidden lg:table-cell w-[9%]">Locks</th>
+            <th className="text-left px-3 py-2 hidden sm:table-cell w-[5%]">Uptime</th>
+            <th className="text-right px-3 py-2 w-[5%]">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -166,7 +158,7 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
             const planTotal = agent.plan?.length ?? 0;
             const planDone = agent.plan?.filter((p) => p.status === 'completed').length ?? 0;
             const isActive = agent.status === 'running' || agent.status === 'idle';
-            const currentModel = agent.model || agent.role.model || '';
+            const currentModel = agent.model || '';
 
             return (
               <tr
@@ -185,10 +177,10 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                     <div className="min-w-0">
                       <button
                         onClick={() => handleSelect(agent.id)}
-                        className="font-medium text-th-text-alt text-xs hover:text-accent transition-colors text-left truncate block max-w-[160px]"
-                        title={`${agent.role.name} (${agent.id.slice(0, 8)}) — click to open chat`}
+                        className="font-medium text-th-text-alt text-xs hover:text-accent transition-colors text-left truncate block"
+                        title={`${agent.role.name} (${shortAgentId(agent.id)}) — click to open chat`}
                       >
-                        {agent.role.name} <span className="text-th-text-muted font-mono">({agent.id.slice(0, 8)})</span>
+                        {agent.role.name} <span className="text-th-text-muted font-mono">({shortAgentId(agent.id)})</span>
                       </button>
                       <div className="text-[10px] text-th-text-muted font-mono flex items-center gap-1 flex-wrap">
                         {agent.childIds.length > 0 && (
@@ -207,40 +199,48 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                     <span className={`w-2 h-2 rounded-full ${STATUS_DOT[agent.status] ?? 'bg-gray-400'}`} />
                     <span className="text-xs text-th-text-alt capitalize">{agent.status}</span>
                   </div>
-                </td>
-
-                {/* Model */}
-                <td className="px-3 py-2.5 hidden md:table-cell">
-                  {isActive ? (
-                    <select
-                      value={currentModel}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        api.updateAgent(agent.id, { model: e.target.value });
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer max-w-[120px]"
-                    >
-                      {(() => {
-                        const options = AVAILABLE_MODELS.includes(currentModel)
-                          ? AVAILABLE_MODELS
-                          : [currentModel, ...AVAILABLE_MODELS];
-                        return options.map((m) => (
-                          <option key={m} value={m}>{shortModelName(m) || m}</option>
-                        ));
-                      })()}
-                    </select>
-                  ) : (
-                    <span className="text-[10px] text-th-text-muted">
-                      {currentModel ? shortModelName(currentModel) : '—'}
-                    </span>
+                  {agent.status === 'failed' && agent.exitError && (
+                    <div className="text-[10px] text-red-400 mt-0.5 truncate max-w-[140px]" title={agent.exitError}>
+                      {agent.exitError}
+                    </div>
                   )}
                 </td>
 
-                {/* Task */}
+                {/* Provider + Model */}
                 <td className="px-3 py-2.5 hidden md:table-cell">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <ProviderBadge provider={agent.provider} />
+                    {isActive ? (
+                      <select
+                        value={currentModel}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          api.updateAgent(agent.id, { model: e.target.value });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] bg-th-bg-alt border border-th-border text-th-text-alt rounded px-1 py-0.5 focus:outline-none focus:border-accent cursor-pointer max-w-[120px]"
+                      >
+                        {(() => {
+                          const options = availableModels.includes(currentModel)
+                            ? availableModels
+                            : [currentModel, ...availableModels];
+                          return options.map((m) => (
+                            <option key={m} value={m}>{shortModelName(m) || m}</option>
+                          ));
+                        })()}
+                      </select>
+                    ) : (
+                      <span className="text-[10px] text-th-text-muted">
+                        {currentModel ? shortModelName(currentModel) : '—'}
+                      </span>
+                    )}
+                  </div>
+                </td>
+
+                {/* Task */}
+                <td className="px-3 py-2.5 hidden md:table-cell overflow-hidden">
                   {agent.task ? (
-                    <div className="max-w-[180px]">
+                    <div>
                       <div className="text-xs text-th-text-alt truncate" title={agent.task}>
                         {agent.task}
                       </div>
@@ -251,8 +251,8 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                 </td>
 
                 {/* Current Activity */}
-                <td className="px-3 py-2.5">
-                  <div className="max-w-[250px]">
+                <td className="px-3 py-2.5 overflow-hidden">
+                  <div>
                     <div className="text-xs text-th-text-alt truncate" title={activity.text}>
                       {activity.text}
                     </div>
@@ -281,23 +281,49 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                   )}
                 </td>
 
-                {/* Token sparkline — hidden (issue #106) */}
+                {/* Tokens */}
                 <td className="px-3 py-2.5 hidden xl:table-cell">
-                  <span className="text-xs text-th-text-muted">—</span>
+                  {(agent.inputTokens || agent.outputTokens) ? (
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-[10px] text-th-text-muted">
+                        <span title="Input tokens">↓{formatTokens(agent.inputTokens)}</span>
+                        <span title="Output tokens">↑{formatTokens(agent.outputTokens)}</span>
+                      </div>
+                      {(agent.cacheReadTokens != null && agent.cacheReadTokens > 0) && (
+                        <div className="text-[10px] text-green-500/70" title="Cache read tokens">⚡{formatTokens(agent.cacheReadTokens)}</div>
+                      )}
+                      {agent.contextWindowSize && agent.contextWindowUsed ? (() => {
+                        const pct = Math.min(100, Math.round((agent.contextWindowUsed / agent.contextWindowSize) * 100));
+                        const color = pct > 85 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : 'bg-blue-500';
+                        return (
+                          <div className="flex items-center gap-1">
+                            <div className="flex-1 bg-th-bg-muted rounded-full h-1 max-w-[60px]">
+                              <div className={`${color} h-1 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-[9px] text-th-text-muted">{pct}%</span>
+                          </div>
+                        );
+                      })() : null}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-th-text-muted">—</span>
+                  )}
                 </td>
 
                 {/* Locks */}
                 <td className="px-3 py-2.5 hidden lg:table-cell">
                   {agentLocks.length > 0 ? (
-                    <div className="flex items-center gap-1">
+                    <div className="space-y-0.5">
                       <span className="text-[10px] text-purple-400">🔒 {agentLocks.length}</span>
-                      <span
-                        className="text-[10px] text-th-text-muted truncate max-w-[100px]"
-                        title={agentLocks.map((l) => l.filePath).join(', ')}
-                      >
-                        {agentLocks[0].filePath.split('/').pop()}
-                        {agentLocks.length > 1 && ` +${agentLocks.length - 1}`}
-                      </span>
+                      {agentLocks.map((l) => (
+                        <div
+                          key={l.filePath}
+                          className="text-[10px] text-th-text-muted font-mono truncate"
+                          title={l.filePath}
+                        >
+                          {l.filePath.split('/').pop()}
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <span className="text-xs text-th-text-muted">—</span>

@@ -106,7 +106,7 @@ describe('CapabilityInjector', () => {
     it('checks across multiple acquired capabilities', () => {
       injector.acquire(agent, 'code-review', 'review stuff', ledger);
       injector.acquire(agent, 'devops', 'deploy stuff', ledger);
-      expect(injector.hasCommand('agent-001', 'DEFER_ISSUE')).toBe(true);
+      expect(injector.hasCommand('agent-001', 'DELEGATE')).toBe(false);
       expect(injector.hasCommand('agent-001', 'COMMIT')).toBe(true);
     });
   });
@@ -170,7 +170,7 @@ describe('CapabilityInjector', () => {
 
       expect(injector.getAgentCapabilities('agent-001')).toEqual([]);
       expect(injector.hasCapability('agent-001', 'code-review')).toBe(false);
-      expect(injector.hasCommand('agent-001', 'DEFER_ISSUE')).toBe(false);
+      expect(injector.hasCommand('agent-001', 'DELEGATE')).toBe(false);
     });
 
     it('is a no-op for unknown agent', () => {

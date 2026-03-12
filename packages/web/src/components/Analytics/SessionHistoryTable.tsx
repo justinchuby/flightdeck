@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { SessionSummary } from './types';
+import { shortAgentId } from '../../utils/agentLabel';
 
 interface SessionHistoryTableProps {
   sessions: SessionSummary[];
@@ -118,10 +119,10 @@ export function SessionHistoryTable({
                   title={`Session: ${s.leadId} — click to copy`}
                   onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.leadId); }}
                 >
-                  {s.leadId.slice(0, 8)}
+                  {shortAgentId(s.leadId)}
                 </td>
                 <td className="py-2 text-th-text-alt">{formatDate(s.startedAt)}</td>
-                <td className="py-2 text-th-text-muted truncate max-w-[120px]">{s.projectId ?? s.leadId.slice(0, 8)}</td>
+                <td className="py-2 text-th-text-muted truncate max-w-[120px]">{s.projectId ?? shortAgentId(s.leadId)}</td>
                 <td className="py-2 text-th-text-muted">{formatDuration(s)}</td>
                 <td className="py-2 text-right text-th-text-alt">{((s.totalInputTokens + s.totalOutputTokens) / 1000).toFixed(0)}k</td>
                 <td className="py-2 text-right text-th-text-alt">{s.taskCount}</td>

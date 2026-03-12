@@ -15,15 +15,12 @@ describe('buildFeedbackUrl', () => {
     expect(url).toContain('title=Session+resume+failed');
   });
 
-  it('includes error message and session ID in body', () => {
+  it('includes error message in URL fields', () => {
     const url = buildFeedbackUrl({
       errorMessage: 'Connection refused',
-      sessionId: 'abc-123',
     });
-    expect(url).toContain('Error');
+    expect(url).toContain('error-message');
     expect(url).toContain('Connection+refused');
-    expect(url).toContain('abc-123');
-    expect(url).toContain('Timestamp');
   });
 });
 

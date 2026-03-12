@@ -8,10 +8,9 @@ This guide covers deploying Flightdeck in production. For local development, see
 - **npm 10+** — For dependency management
 - **At least one CLI provider** — Install one of: [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli), [Claude Code](https://docs.anthropic.com/en/docs/agents/claude-code), Gemini CLI, OpenCode, Cursor, or Codex
 
-### Optional
+### Provider-Specific
 
-- **@anthropic-ai/claude-agent-sdk** — For native Claude adapter with session resume
-- **@github/copilot-sdk** — For native Copilot adapter with session resume
+- **@zed-industries/claude-agent-acp** — Required for the Claude provider. Install globally: `npm install -g @zed-industries/claude-agent-acp`
 
 ## Quick Start (Single Machine)
 
@@ -26,7 +25,7 @@ flightdeck
 flightdeck --port=4000 --host=0.0.0.0 --no-browser
 ```
 
-This starts both the orchestration server and agent server as a single unit. The agent server runs as a detached child process that survives orchestrator restarts.
+This starts the orchestration server as a single process. Agents run in-process via the AcpAdapter.
 
 ## Configuration
 
@@ -79,9 +78,6 @@ All runtime files are stored in `~/.flightdeck/` (or `FLIGHTDECK_STATE_DIR`):
 ~/.flightdeck/
   config.yaml                 # User-level config (auto-created)
   flightdeck.db               # SQLite database
-  agent-server.pid            # PID of running agent server
-  agent-server.port           # TCP port for reconnection
-  agent-server.token          # 256-bit hex auth token
   artifacts/                  # Agent work artifacts
     {projectId}/
       sessions/
@@ -98,7 +94,7 @@ All paths use `path.join()` and `os.homedir()` for cross-platform compatibility.
 | `FLIGHTDECK_PORT` | `3000` | HTTP server port |
 | `FLIGHTDECK_HOST` | `127.0.0.1` | Bind address (`0.0.0.0` for all interfaces) |
 | `FLIGHTDECK_CONFIG` | `./flightdeck.config.yaml` | Path to config file |
-| `FLIGHTDECK_STATE_DIR` | `~/.flightdeck` | State directory (PID files, agent server state) |
+| `FLIGHTDECK_STATE_DIR` | `~/.flightdeck` | State directory |
 | `FLIGHTDECK_DB_PATH` | `~/.flightdeck/flightdeck.db` | SQLite database path |
 | `AUTH` | (auto-generated) | Auth mode: `'none'` to disable, or env var name containing token |
 | `SERVER_SECRET` | (auto-generated) | Fixed auth token (overrides random generation) |
@@ -119,7 +115,7 @@ Each CLI provider may need its own API key:
 
 ### HTTP Request Logging
 
-Flightdeck uses structured HTTP request logging via the `httpLogger` middleware, which runs on both the main API server and the agent server.
+Flightdeck uses structured HTTP request logging via the `httpLogger` middleware.
 
 **Default behavior (optimized for low noise):**
 
@@ -258,7 +254,7 @@ pm2 start packages/server/dist/index.js --name flightdeck \
   --env NODE_ENV=production
 ```
 
-> **Note:** The agent server is a detached child process that survives orchestrator restarts. If you restart Flightdeck via systemd/PM2, running agents will continue and the orchestrator will reconnect on startup.
+> **Note:** Flightdeck runs as a single process. If you restart it via systemd/PM2, running agents will be terminated. Use session resume to pick up where you left off after a restart.
 
 ### Resource Requirements
 
@@ -276,7 +272,6 @@ Each running agent spawns a CLI subprocess that consumes its own memory (~100-50
 Flightdeck provides built-in monitoring through the web UI:
 
 - **AttentionBar** — System-wide health at a glance (green/yellow/red)
-- **Agent Server panel** — Agent process status, health, restart controls
 - **Token Economics** — Per-agent token usage tracking
 - **Activity Log** — Full audit trail of agent actions
 
@@ -286,15 +281,6 @@ curl http://localhost:3000/api/health
 ```
 
 ## Troubleshooting
-
-### Agent Server Won't Start
-
-Check for stale PID files:
-```bash
-ls -la ~/.flightdeck/agent-server.*
-# Remove stale files if the process is not running
-rm ~/.flightdeck/agent-server.pid ~/.flightdeck/agent-server.port ~/.flightdeck/agent-server.token
-```
 
 ### Agents Fail to Spawn
 

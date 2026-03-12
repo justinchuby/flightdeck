@@ -204,7 +204,7 @@ export class TaskDAG extends EventEmitter {
         // because resolveReady() is only called reactively inside completeTask/skipTask.
         let dagStatus: DagTaskStatus = 'ready';
         if (task.dependsOn && task.dependsOn.length > 0) {
-          const allDepsSatisfied = task.dependsOn.every(depId => {
+          const allDepsSatisfied = task.dependsOn.every((depId: string) => {
             const dep = this.getTask(leadId, depId);
             return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
           });
@@ -295,7 +295,7 @@ export class TaskDAG extends EventEmitter {
 
     const ready: DagTask[] = [];
     for (const task of pendingTasks) {
-      const allDepsDone = task.dependsOn.every(depId => {
+      const allDepsDone = task.dependsOn.every((depId: string) => {
         const dep = this.getTask(leadId, depId);
         // null means dep was cancelled (deleted) — treat as satisfied
         return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
@@ -324,7 +324,7 @@ export class TaskDAG extends EventEmitter {
 
     for (const running of runningTasks) {
       const overlap = files.some(f =>
-        running.files.some(rf => {
+        running.files.some((rf: string) => {
           const nf = f.replace(/\\/g, '/');
           const nrf = rf.replace(/\\/g, '/');
           return nf === nrf || nf.startsWith(nrf + '/') || nrf.startsWith(nf + '/');
@@ -479,7 +479,7 @@ export class TaskDAG extends EventEmitter {
     const error = this.validateTransition(leadId, taskId, 'resume');
     if (error) return false;
     const task = this.getTask(leadId, taskId)!;
-    const newStatus = task.dependsOn.every(depId => {
+    const newStatus = task.dependsOn.every((depId: string) => {
       const dep = this.getTask(leadId, depId);
       // null means dep was cancelled (deleted) — treat as satisfied, consistent with resolveReady
       return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
@@ -522,7 +522,7 @@ export class TaskDAG extends EventEmitter {
     const error = this.validateTransition(leadId, taskId, 'reopen');
     if (error) return null;
     const task = this.getTask(leadId, taskId)!;
-    const depsOk = task.dependsOn.every(depId => {
+    const depsOk = task.dependsOn.every((depId: string) => {
       const dep = this.getTask(leadId, depId);
       // null means dep was cancelled (deleted) — treat as satisfied, consistent with resolveReady
       return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';

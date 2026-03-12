@@ -5,9 +5,12 @@ import type { AgentInfo, Delegation } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { MentionText } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
+import { shortAgentId } from '../../utils/agentLabel';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
-import { AgentReportBlock, formatTokens } from './AgentReportBlock';
+import { AgentReportBlock } from './AgentReportBlock';
+import { ProviderBadge } from '../ProviderBadge';
+import { formatTokens } from '../../utils/format';
 
 /** Minimal agent shape accepted by CrewStatusContent — compatible with AgentInfo, LeadProgress.crewAgents, and DerivedAgent */
 export interface CrewAgent {
@@ -15,6 +18,7 @@ export interface CrewAgent {
   role: { name: string; icon: string; model?: string };
   status: string;
   model?: string;
+  provider?: string;
   sessionId?: string | null;
   outputPreview?: string;
   contextWindowSize?: number;
@@ -99,20 +103,22 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                       <MessageSquare size={10} /> Chat
                     </button>
                   )}
-                  <span className="text-[10px] font-mono text-th-text-muted shrink-0">{agent.id.slice(0, 8)}</span>
+                  <span className="text-[10px] font-mono text-th-text-muted shrink-0">{shortAgentId(agent.id)}</span>
                 </div>
                 {delegation && (
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <p className="text-[10px] font-mono text-th-text-muted truncate flex-1 min-w-0" title={delegation.task}>{delegation.task}</p>
-                    {(agent.model || agent.role.model) && (
-                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
+                    <ProviderBadge provider={agent.provider} />
+                    {(agent.model) && (
+                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model}</span>
                     )}
                   </div>
                 )}
-                {!delegation && (agent.model || agent.role.model) && (
+                {!delegation && (agent.model || agent.provider) && (
                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                    {(agent.model || agent.role.model) && (
-                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model || agent.role.model}</span>
+                    <ProviderBadge provider={agent.provider} />
+                    {(agent.model) && (
+                      <span className="text-[9px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1 rounded shrink-0">{agent.model}</span>
                     )}
                   </div>
                 )}
@@ -153,20 +159,21 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mt-0.5 text-xs text-th-text-muted font-mono">
-                  <span>{selectedAgent.id.slice(0, 8)}</span>
+                  <span>{shortAgentId(selectedAgent.id)}</span>
+                  <ProviderBadge provider={selectedAgent.provider} size="md" />
                   {(selectedAgent.model || selectedAgent.role.model) && (
                     <span className="bg-th-bg-muted/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
                   )}
-                  {selectedAgent.sessionId && (
-                    <button
-                      className="bg-th-bg-muted/50 px-1.5 rounded hover:bg-th-bg-muted transition-colors"
-                      title={`Session: ${selectedAgent.sessionId} — click to copy`}
-                      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(selectedAgent.sessionId!); }}
-                    >
-                      sess:{selectedAgent.sessionId.slice(0, 8)}
-                    </button>
-                  )}
                 </div>
+                {selectedAgent.sessionId && (
+                  <button
+                    className="mt-1 text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1.5 py-0.5 rounded hover:bg-th-bg-muted transition-colors block truncate max-w-full"
+                    title={`Session: ${selectedAgent.sessionId} — click to copy`}
+                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(selectedAgent.sessionId!); }}
+                  >
+                    Session: {selectedAgent.sessionId}
+                  </button>
+                )}
               </div>
               {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
                 <div className="flex items-center gap-1 mr-2">
