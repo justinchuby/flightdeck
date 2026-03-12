@@ -34,7 +34,7 @@ export function AgentDashboard({ api, ws }: Props) {
   // Derive historical agents from keyframe events when no live agents
   const { agents: historicalAgents } = useHistoricalAgents(liveAgents.length);
 
-  const agents = liveAgents.length > 0 ? liveAgents : (historicalAgents as any[]);
+  const agents = liveAgents.length > 0 ? liveAgents : historicalAgents;
 
   // Keyboard shortcut: 'n' to spawn new agent
   useEffect(() => {

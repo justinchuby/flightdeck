@@ -68,7 +68,7 @@ function CanvasInner() {
   // Historical data fallback: derive agents from keyframes when no live agents
   const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(projectAgents.length, effectiveLeadId);
 
-  const agents = projectAgents.length > 0 ? projectAgents : (historicalAgents as any[]);
+  const agents = projectAgents.length > 0 ? projectAgents : historicalAgents;
 
   const [layout, updateLayout] = useCanvasLayout(effectiveLeadId);
   const { nodes: graphNodes, edges: graphEdges } = useCanvasGraph(agents, comms, layout);

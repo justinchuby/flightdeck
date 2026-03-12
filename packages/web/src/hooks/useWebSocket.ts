@@ -4,7 +4,7 @@ import { useGroupStore, groupKey } from '../stores/groupStore';
 import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
 import { hasUnclosedCommandBlock } from '../utils/commandParser';
-import type { WsMessage } from '../types';
+import type { AcpTextChunk, WsMessage } from '../types';
 import { getAuthToken, apiFetch } from './useApi';
 import { useSettingsStore } from '../stores/settingsStore';
 import { shortAgentId } from '../utils/agentLabel';
@@ -106,7 +106,7 @@ export function useWebSocket() {
               const msgs = [...existing.messages];
               const last = msgs[msgs.length - 1];
               if (last?.sender === 'agent') {
-                const separator = { type: 'text' as const, text: '---', sender: 'system' as any };
+                const separator: AcpTextChunk = { type: 'text', text: '---', sender: 'system' };
                 // If the last agent message was just created (< 2s ago), text from the new
                 // turn already arrived — insert separator before it, not after.
                 if (last.timestamp && Date.now() - last.timestamp < 2000 && msgs.length >= 2) {
@@ -273,7 +273,7 @@ export function useWebSocket() {
               msgs.push({
                 type: 'text',
                 text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
-                sender: isFromSystem ? 'system' as any : 'user' as any,
+                sender: isFromSystem ? 'system' : 'user',
                 timestamp: Date.now(),
               });
               updateAgent(toId, { messages: msgs });
@@ -298,7 +298,7 @@ export function useWebSocket() {
               msgs.push({
                 type: 'text',
                 text: `📤 [To ${recipientLabel}] ${preview}`,
-                sender: 'system' as any,
+                sender: 'system',
                 timestamp: Date.now(),
               });
               updateAgent(fromId, { messages: msgs });
