@@ -38,16 +38,16 @@ export function AgentCard({ agent, api }: Props) {
               <span className={`text-xs ${agentStatusText(agent.status)}`}>
                 {agent.status}
               </span>
-              {agent.sessionId && (
-                <button
-                  className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors"
-                  title={`Session: ${agent.sessionId} — click to copy`}
-                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
-                >
-                  sess:{agent.sessionId.slice(0, 8)}
-                </button>
-              )}
             </div>
+            {agent.sessionId && (
+              <button
+                className="text-[10px] font-mono text-th-text-muted bg-th-bg-alt/60 px-1 rounded hover:bg-th-bg-alt transition-colors block mt-0.5 truncate max-w-[220px]"
+                title={`Session: ${agent.sessionId} — click to copy`}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+              >
+                sess:{agent.sessionId}
+              </button>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1">

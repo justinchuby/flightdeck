@@ -149,7 +149,7 @@ export function teamsRoutes(ctx: AppContext): Router {
           lastTaskSummary: a.lastTaskSummary ?? null,
           createdAt: a.createdAt,
           updatedAt: a.updatedAt,
-          provider: live?.provider ?? null,
+          provider: live?.provider ?? a.provider ?? null,
           inputTokens: liveJson?.inputTokens ?? null,
           outputTokens: liveJson?.outputTokens ?? null,
           contextWindowSize: liveJson?.contextWindowSize ?? null,

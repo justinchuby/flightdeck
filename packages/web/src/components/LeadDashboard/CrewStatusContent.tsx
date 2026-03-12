@@ -168,16 +168,16 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                   {(selectedAgent.model || selectedAgent.role.model) && (
                     <span className="bg-th-bg-muted/50 px-1.5 rounded">{selectedAgent.model || selectedAgent.role.model}</span>
                   )}
-                  {selectedAgent.sessionId && (
-                    <button
-                      className="bg-th-bg-muted/50 px-1.5 rounded hover:bg-th-bg-muted transition-colors"
-                      title={`Session: ${selectedAgent.sessionId} — click to copy`}
-                      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(selectedAgent.sessionId!); }}
-                    >
-                      sess:{selectedAgent.sessionId.slice(0, 8)}
-                    </button>
-                  )}
                 </div>
+                {selectedAgent.sessionId && (
+                  <button
+                    className="mt-1 text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1.5 py-0.5 rounded hover:bg-th-bg-muted transition-colors block truncate max-w-full"
+                    title={`Session: ${selectedAgent.sessionId} — click to copy`}
+                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(selectedAgent.sessionId!); }}
+                  >
+                    Session: {selectedAgent.sessionId}
+                  </button>
+                )}
               </div>
               {(selectedAgent.status === 'running' || selectedAgent.status === 'idle') && (
                 <div className="flex items-center gap-1 mr-2">

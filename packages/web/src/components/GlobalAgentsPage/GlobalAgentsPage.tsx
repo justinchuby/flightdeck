@@ -162,6 +162,18 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
             {agent.projectId && (
               <div><span className="text-th-text-alt">Project:</span> <span className="text-th-text">{agent.projectName ?? agent.projectId}</span></div>
             )}
+            {agent.sessionId && (
+              <div className="col-span-2">
+                <span className="text-th-text-alt">Session: </span>
+                <button
+                  className="font-mono text-th-text hover:text-th-accent transition-colors"
+                  title="Click to copy session ID"
+                  onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+                >
+                  {agent.sessionId}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

@@ -28,7 +28,6 @@ export function useWebSocket() {
   const setAgents = useAppStore((s) => s.setAgents);
   const addAgent = useAppStore((s) => s.addAgent);
   const updateAgent = useAppStore((s) => s.updateAgent);
-  const removeAgent = useAppStore((s) => s.removeAgent);
 
   const connect = useCallback(() => {
     // Close any existing connection first
@@ -79,15 +78,19 @@ export function useWebSocket() {
           addAgent(msg.agent);
           break;
         case 'agent:terminated':
-          removeAgent(msg.agentId);
+          updateAgent(msg.agentId, { status: 'terminated' });
           break;
-        case 'agent:exit':
+        case 'agent:exit': {
+          // Don't overwrite 'terminated' with 'failed' — explicit termination takes precedence
+          const exitPrev = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
+          if (exitPrev?.status === 'terminated') break;
           updateAgent(msg.agentId, {
             status: msg.code === 0 ? 'completed' : 'failed',
             exitError: msg.error,
-            exitCode: msg.code ?? null,
+            exitCode: msg.code ?? undefined,
           });
           break;
+        }
         case 'agent:status': {
           const prev = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
           const wasIdle = prev && (prev.status === 'idle' || prev.status === 'completed');
@@ -134,6 +137,17 @@ export function useWebSocket() {
           const parentAgent = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
           const label = parentAgent?.role?.name ?? msg.agentId?.slice(0, 8) ?? 'Agent';
           useToastStore.getState().add('error', `Spawn failed (${label}): ${msg.message}`);
+          break;
+        }
+        case 'agent:model_fallback': {
+          updateAgent(msg.agentId, {
+            model: msg.resolvedModel,
+            requestedModel: msg.requestedModel,
+            resolvedModel: msg.resolvedModel,
+            modelTranslated: true,
+            modelResolutionReason: msg.reason,
+          });
+          useToastStore.getState().add('info', `🔄 ${msg.agentRole}: ${msg.requestedModel} → ${msg.resolvedModel} (${msg.provider})`);
           break;
         }
         case 'agent:text': {
@@ -415,7 +429,7 @@ export function useWebSocket() {
         console.error('[useWebSocket] Failed to parse message:', err);
       }
     };
-  }, [setConnected, setAgents, addAgent, updateAgent, removeAgent]);
+  }, [setConnected, setAgents, addAgent, updateAgent]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;
