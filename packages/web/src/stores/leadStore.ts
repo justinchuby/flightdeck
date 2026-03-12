@@ -6,7 +6,7 @@ export interface ActivityEvent {
   id: string;
   agentId: string;
   agentRole: string;
-  type: 'tool_call' | 'delegation' | 'completion' | 'message_sent' | 'progress';
+  type: 'tool_call' | 'delegation' | 'completion' | 'message_sent' | 'progress_update';
   summary: string;
   detail?: string;
   status?: string;

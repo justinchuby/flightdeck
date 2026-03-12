@@ -54,7 +54,7 @@ function AgentNode({ agent, onClick }: { agent: AgentInfo; onClick?: () => void 
       onClick={onClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       className={`border-2 rounded-lg px-3 py-2 text-center min-w-[140px] transition-all ${s.border} ${
-        onClick ? 'cursor-pointer hover:brightness-125 hover:shadow-lg hover:scale-[1.03] active:scale-100' : ''
+        onClick ? 'cursor-pointer hover:brightness-125 hover:shadow-lg hover:scale-[1.03] active:scale-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none' : ''
       }`}
     >
       {agent.role?.icon && <span className="mr-1">{agent.role.icon}</span>}

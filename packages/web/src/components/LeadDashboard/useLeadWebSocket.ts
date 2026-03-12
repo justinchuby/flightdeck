@@ -138,7 +138,7 @@ function handleProgress(msg: WsMsg, store: StoreApi) {
     id: `progress-${Date.now()}`,
     agentId: leadId,
     agentRole: 'Project Lead',
-    type: 'progress',
+    type: 'progress_update',
     summary: parts.join(' · ') || 'Progress update',
     timestamp: Date.now(),
   });
