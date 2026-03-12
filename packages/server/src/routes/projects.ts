@@ -971,9 +971,14 @@ export function projectsRoutes(ctx: AppContext): Router {
    * Resolve a path with symlink resolution and verify it stays within root.
    * Uses realpathSync to follow symlinks before comparison — prevents
    * symlink-based escapes (e.g., symlink inside project dir → /etc/).
+   *
+   * `allowedRoots` optionally lists additional directories the resolved path
+   * may land in. This covers .flightdeck/shared/ symlinks that point to
+   * organized storage under ~/.flightdeck/artifacts/.
+   *
    * Returns { resolved, rootReal } on success, or null if path escapes.
    */
-  function resolveAndValidate(root: string, subPath: string): { resolved: string; rootReal: string } | null {
+  function resolveAndValidate(root: string, subPath: string, allowedRoots?: string[]): { resolved: string; rootReal: string } | null {
     try {
       const rootReal = realpathSync(root);
       const candidate = join(rootReal, subPath);
@@ -981,6 +986,18 @@ export function projectsRoutes(ctx: AppContext): Router {
       const normRoot = normalize(rootReal) + sep;
       const normResolved = normalize(resolved);
       if (normResolved !== normalize(rootReal) && !normResolved.startsWith(normRoot)) {
+        // Check additional allowed roots (e.g., ~/.flightdeck/ for symlinked artifacts)
+        if (allowedRoots) {
+          for (const extra of allowedRoots) {
+            try {
+              const extraReal = realpathSync(extra);
+              const normExtra = normalize(extraReal) + sep;
+              if (normResolved === normalize(extraReal) || normResolved.startsWith(normExtra)) {
+                return { resolved, rootReal };
+              }
+            } catch { /* skip inaccessible roots */ }
+          }
+        }
         return null;
       }
       return { resolved, rootReal };
@@ -988,6 +1005,9 @@ export function projectsRoutes(ctx: AppContext): Router {
       return null; // Path doesn't exist or is inaccessible
     }
   }
+
+  /** ~/.flightdeck/ — additional allowed root for symlinked artifact files */
+  const flightdeckHome = join(homedir(), '.flightdeck');
 
   /**
    * GET /projects/:id/files?path=relative/dir
@@ -1002,7 +1022,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     const subPath = typeof req.query.path === 'string' ? req.query.path : '';
     if (subPath.includes('\0')) return res.status(400).json({ error: 'Invalid path' });
 
-    const result = resolveAndValidate(project.cwd, subPath);
+    const result = resolveAndValidate(project.cwd, subPath, [flightdeckHome]);
     if (!result) {
       return res.status(403).json({ error: 'Path outside project directory' });
     }
@@ -1042,7 +1062,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     if (!filePath) return res.status(400).json({ error: 'path query parameter required' });
     if (filePath.includes('\0')) return res.status(400).json({ error: 'Invalid path' });
 
-    const result = resolveAndValidate(project.cwd, filePath);
+    const result = resolveAndValidate(project.cwd, filePath, [flightdeckHome]);
     if (!result) {
       return res.status(403).json({ error: 'Path outside project directory' });
     }
