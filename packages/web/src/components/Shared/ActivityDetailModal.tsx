@@ -4,7 +4,7 @@ import type { ActivityEntry } from './ActivityFeedItem';
 import { ACTIVITY_ICONS } from './ActivityFeedItem';
 
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
-  progress: 'Progress Update',
+  progress_update: 'Progress Update',
   task_completed: 'Task Completed',
   task_started: 'Task Started',
   decision_made: 'Decision Made',

@@ -38,6 +38,7 @@ const PRIORITY_MAP: Record<ActionType, ActivityPriority> = {
   lock_released: 'low',
   lock_denied: 'low',
   file_read: 'low',
+  progress_update: 'high',
 };
 
 /** Action types where we keep only the latest entry per agent */
