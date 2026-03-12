@@ -20,6 +20,7 @@ export const messages = sqliteTable('messages', {
   conversationId: text('conversation_id').notNull().references(() => conversations.id),
   sender: text('sender').notNull(),
   content: text('content').notNull(),
+  fromRole: text('from_role'),
   timestamp: text('timestamp').default(utcNow),
 }, (table) => [
   index('idx_messages_conversation').on(table.conversationId),

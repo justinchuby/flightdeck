@@ -254,7 +254,8 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
             const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
               type: 'text' as const,
               text: m.content,
-              sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
+              sender: m.sender as 'agent' | 'user' | 'system' | 'external' | 'thinking',
+              ...(m.fromRole ? { fromRole: m.fromRole } : {}),
               timestamp: new Date(m.timestamp).getTime(),
             }));
             // Re-check: only set if WS hasn't delivered messages while we were fetching

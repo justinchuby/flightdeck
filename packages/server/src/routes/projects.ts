@@ -533,6 +533,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         conversationId: messages.conversationId,
         sender: messages.sender,
         content: messages.content,
+        fromRole: messages.fromRole,
         timestamp: messages.timestamp,
       })
       .from(messages)

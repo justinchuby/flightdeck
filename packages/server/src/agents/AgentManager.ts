@@ -80,12 +80,13 @@ export interface AgentManagerEvents {
   'agent:delegate_error': { agentId: string; message: string };
   'agent:completion_reported': { childId: string; parentId: string | undefined; status: string };
   'lead:decision': { id: number; agentId: string; agentRole: string; leadId: string; title: string; rationale: string; needsConfirmation: boolean; status: string };
-  'lead:progress': Record<string, any>;
+  'lead:progress': { agentId: string; summary?: string; percent?: number; status?: string; completed?: string[]; in_progress?: string[]; blocked?: string[]; dag?: { summary: string; completed: string[]; in_progress: string[]; blocked: string[] } };
   'lead:stalled': { leadId: string; nudgeCount: number; idleDuration: number };
   'dag:updated': { leadId: string };
   'group:created': { group: ChatGroup; leadId: string };
   'group:message': { message: GroupMessage; groupName: string; leadId: string };
   'system:paused': { paused: boolean };
+  'oversight:changed': { level: string };
 }
 
 export class AgentManager extends TypedEmitter<AgentManagerEvents> {
@@ -243,6 +244,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const fromLabel = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
         logger.info({ module: 'comms', msg: 'Delivering message', targetAgentId: msg.to, targetRole: target.role.name, fromAgentId: msg.from, contentPreview: msg.content.slice(0, 80) });
         target.sendMessage(`[Message from ${fromLabel}]: ${msg.content}`);
+
+        // Persist DMs to the target's conversation as 'external' messages so they survive page reload
+        const fromRole = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
+        this.persistExternalMessage(msg.to, msg.content, fromRole);
       } else {
         logger.warn({ module: 'comms', msg: 'Delivery failed — target not found/running', targetAgentId: msg.to });
       }
@@ -301,7 +306,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         agentCount: [...this.agents.values()].filter(a => !isTerminalStatus(a.status)).length,
       });
 
-      this.emit('oversight:changed' as any, { level });
+      this.emit('oversight:changed', { level });
     });
   }
 
@@ -1216,6 +1221,14 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const threadId = this.agentThreads.get(agentId);
     if (threadId && this.conversationStore) {
       this.conversationStore.addMessage(threadId, 'system', text);
+    }
+  }
+
+  /** Persist an external (inter-agent DM) message to the target's conversation history */
+  persistExternalMessage(agentId: string, content: string, fromRole: string): void {
+    const threadId = this.agentThreads.get(agentId);
+    if (threadId && this.conversationStore) {
+      this.conversationStore.addMessage(threadId, 'external', content, fromRole);
     }
   }
 
