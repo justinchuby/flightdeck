@@ -94,11 +94,14 @@ export function CollapsibleCommandBlock({ text }: { text: string }) {
   if (jsonMatch) {
     try {
       const obj = JSON.parse(jsonMatch[0]);
-      const parts: string[] = [];
+      // Show only the first string field as a short one-line preview
       for (const [k, v] of Object.entries(obj)) {
-        if (typeof v === 'string') parts.push(`${k}: ${v.length > 60 ? v.slice(0, 57) + '...' : v}`);
+        if (typeof v === 'string') {
+          const flat = v.replace(/[\n\r]+/g, ' ');
+          preview = `${k}: ${flat.length > 80 ? flat.slice(0, 77) + '...' : flat}`;
+          break;
+        }
       }
-      preview = parts.join(', ');
     } catch {
       preview = jsonMatch[0].replace(/[\n\r]+/g, ' ').slice(0, 80);
     }
@@ -111,7 +114,7 @@ export function CollapsibleCommandBlock({ text }: { text: string }) {
       <div className="flex items-start gap-1 min-w-0">
         {expanded ? <ChevronDown className="w-3 h-3 shrink-0 mt-0.5" /> : <ChevronRight className="w-3 h-3 shrink-0 mt-0.5" />}
         <span className="font-mono text-th-text-alt shrink-0">{label}</span>
-        {!expanded && preview && <span className="font-mono text-th-text-muted ml-1 break-words">— {preview}</span>}
+        {!expanded && preview && <span className="font-mono text-th-text-muted ml-1 truncate">— {preview}</span>}
       </div>
       {expanded && <pre className="mt-1 whitespace-pre-wrap break-words text-th-text-muted">{text}</pre>}
     </div>
