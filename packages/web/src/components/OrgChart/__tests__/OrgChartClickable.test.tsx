@@ -38,10 +38,10 @@ vi.mock('../../CommFlow/CommFlowGraph', () => ({
   CommFlowGraph: () => <div data-testid="comm-flow-graph" />,
 }));
 
-// Mock AgentDetailModal to verify it receives correct props
-const mockDetailModal = vi.fn().mockReturnValue(<div data-testid="agent-detail-modal" />);
-vi.mock('../../AgentDetailModal', () => ({
-  AgentDetailModal: (props: any) => mockDetailModal(props),
+// Mock AgentDetailPanel to verify it receives correct props
+const mockDetailPanel = vi.fn().mockReturnValue(<div data-testid="agent-detail-modal" />);
+vi.mock('../../AgentDetailPanel', () => ({
+  AgentDetailPanel: (props: any) => mockDetailPanel(props),
 }));
 
 // Mock apiFetch and Toast used by AgentDetailModal
@@ -81,7 +81,7 @@ function makeAgent(overrides: Record<string, any> = {}) {
 
 describe('OrgChart clickable agent nodes', () => {
   beforeEach(() => {
-    mockDetailModal.mockClear();
+    mockDetailPanel.mockClear();
     mockAgents = [];
   });
 
@@ -112,7 +112,7 @@ describe('OrgChart clickable agent nodes', () => {
 
     // Modal should appear with the correct agentId
     expect(screen.getByTestId('agent-detail-modal')).toBeInTheDocument();
-    expect(mockDetailModal).toHaveBeenCalledWith(
+    expect(mockDetailPanel).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: lead.id }),
     );
   });
@@ -128,7 +128,7 @@ describe('OrgChart clickable agent nodes', () => {
     expect(screen.getByTestId('agent-detail-modal')).toBeInTheDocument();
 
     // Invoke the onClose callback that was passed to AgentDetailModal
-    const lastCall = mockDetailModal.mock.calls[mockDetailModal.mock.calls.length - 1];
+    const lastCall = mockDetailPanel.mock.calls[mockDetailPanel.mock.calls.length - 1];
     act(() => { lastCall[0].onClose(); });
 
     // Modal should disappear after re-render
@@ -149,7 +149,7 @@ describe('OrgChart clickable agent nodes', () => {
     // Click the child developer node
     fireEvent.click(screen.getByRole('button', { name: /Developer/i }));
 
-    expect(mockDetailModal).toHaveBeenCalledWith(
+    expect(mockDetailPanel).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: dev.id }),
     );
   });

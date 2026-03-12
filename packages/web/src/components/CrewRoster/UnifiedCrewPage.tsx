@@ -13,22 +13,11 @@ import {
   ChevronRight,
   RefreshCw,
   AlertTriangle,
-  Cpu,
   Activity,
   Heart,
   X,
-  CheckCircle,
   CheckCircle2,
-  Info,
   PauseCircle,
-  MessageSquare,
-  Zap,
-  Square,
-  Send,
-  User,
-  Clock,
-  Settings,
-  ArrowLeft,
   Trash2,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
@@ -38,19 +27,14 @@ import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
 import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
-import { Tabs } from '../ui/Tabs';
-import type { TabItem } from '../ui/Tabs';
 import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
-import { AgentChatPanel } from '../AgentChatPanel';
 import { useAppStore } from '../../stores/appStore';
-import { AgentDetailModal } from '../AgentDetailModal';
-import { AVAILABLE_MODELS } from '../../constants/models';
+import { AgentDetailPanel } from '../AgentDetailPanel';
 
 // ── Types (shared with CrewRoster) ─────────────────────────
 
 type RosterStatus = 'idle' | 'running' | 'terminated' | 'failed';
 type LiveStatus = 'creating' | 'running' | 'idle' | 'completed' | 'failed' | 'terminated' | null;
-type ProfileTab = 'overview' | 'chat' | 'settings';
 
 interface RosterAgent {
   agentId: string;
@@ -72,29 +56,6 @@ interface RosterAgent {
   contextWindowUsed: number | null;
   task: string | null;
   outputPreview: string | null;
-}
-
-interface AgentProfile {
-  agentId: string;
-  role: string;
-  model: string;
-  status: RosterStatus;
-  liveStatus: LiveStatus;
-  teamId: string;
-  projectId: string | null;
-  lastTaskSummary: string | null;
-  createdAt: string;
-  updatedAt: string;
-  knowledgeCount: number;
-  live: {
-    task: string | null;
-    outputPreview: string | null;
-    model: string | null;
-    sessionId: string | null;
-    provider: string | null;
-    backend: string | null;
-    exitError: string | null;
-  } | null;
 }
 
 interface TeamInfo {
@@ -441,225 +402,6 @@ function AgentRow({ agent, isLead, isSelected, onSelect, onRemove, crewAgents }:
   );
 }
 
-// ── Profile Panel ─────────────────────────────────────────
-
-function ProfilePanel({ agentId, teamId, onClose }: { agentId: string; teamId: string; onClose: () => void }) {
-  const addToast = useToastStore(s => s.add);
-  const [profile, setProfile] = useState<AgentProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
-  const [confirmStop, setConfirmStop] = useState(false);
-  const [messageText, setMessageText] = useState('');
-  const [showMessageInput, setShowMessageInput] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const ActivityIcon = Activity;
-  const liveAgent = useAppStore(s => s.agents.find(a => a.id === agentId));
-
-  useEffect(() => {
-    setLoading(true);
-    apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`)
-      .then(data => setProfile(data))
-      .catch(() => setProfile(null))
-      .finally(() => setLoading(false));
-  }, [agentId, teamId]);
-
-  const isAlive = profile?.liveStatus === 'running' || profile?.liveStatus === 'creating' || profile?.liveStatus === 'idle';
-
-  const handleAction = async (action: string, endpoint: string, method = 'POST', body?: string) => {
-    setActionLoading(action);
-    try {
-      await apiFetch(endpoint, { method, ...(body ? { body, headers: { 'Content-Type': 'application/json' } } : {}) });
-      addToast('success', action === 'stop' ? 'Agent terminated' : action === 'interrupt' ? 'Interrupt sent' : 'Message sent');
-      if (action === 'stop') {
-        const data = await apiFetch<AgentProfile>(`/teams/${teamId}/agents/${agentId}/profile`);
-        setProfile(data);
-        setConfirmStop(false);
-      }
-      if (action === 'message') { setMessageText(''); setShowMessageInput(false); }
-    } catch (err: any) {
-      addToast('error', `Failed: ${err.message}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  if (loading) return <div className="flex items-center justify-center h-48 text-th-text-alt"><RefreshCw className="w-4 h-4 animate-spin mr-2" />Loading profile…</div>;
-  if (!profile) return <div className="flex items-center justify-center h-48 text-red-400"><AlertTriangle className="w-4 h-4 mr-2" />Profile not found</div>;
-
-  const tabs: TabItem[] = [
-    { id: 'overview', label: 'Overview', icon: <User className="w-3.5 h-3.5" /> },
-    { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-3.5 h-3.5" /> },
-    { id: 'settings', label: 'Settings', icon: <Settings className="w-3.5 h-3.5" /> },
-  ];
-
-  return (
-    <div className="bg-surface-raised rounded-lg border border-th-border w-full">
-      <div className="p-4 border-b border-th-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-th-bg-alt flex items-center justify-center">
-              <span className="text-xl">{getRoleIcon(profile.role)}</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-th-text capitalize">{profile.role}</h2>
-                <StatusBadge {...agentStatusProps(profile.status, profile.liveStatus)} />
-              </div>
-              <span className="text-xs font-mono text-th-text-alt">{profile.agentId.slice(0, 12)}</span>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-th-bg-alt text-th-text-alt"><X className="w-4 h-4" /></button>
-        </div>
-
-        {isAlive && (
-          <div className="flex items-center gap-2 mt-3">
-            <button onClick={() => setShowMessageInput(v => !v)} disabled={actionLoading !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors disabled:opacity-50">
-              <MessageSquare className="w-3.5 h-3.5" />Message
-            </button>
-            <button onClick={() => handleAction('interrupt', `/agents/${agentId}/interrupt`)} disabled={actionLoading !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors disabled:opacity-50">
-              {actionLoading === 'interrupt' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}Interrupt
-            </button>
-            <button onClick={() => setConfirmStop(true)} disabled={actionLoading !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50">
-              <Square className="w-3.5 h-3.5" />Stop
-            </button>
-          </div>
-        )}
-
-        {confirmStop && (
-          <div className="mt-2 p-3 rounded bg-red-500/10 border border-red-500/30">
-            <p className="text-xs text-red-300 mb-2">Terminate this agent? This cannot be undone.</p>
-            <div className="flex gap-2">
-              <button onClick={() => handleAction('stop', `/agents/${agentId}/terminate`)} disabled={actionLoading === 'stop'}
-                className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50">
-                {actionLoading === 'stop' ? 'Stopping...' : 'Confirm'}
-              </button>
-              <button onClick={() => setConfirmStop(false)} className="px-3 py-1 text-xs rounded bg-th-bg-alt text-th-text-alt hover:bg-th-border transition-colors">Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {showMessageInput && (
-          <div className="mt-2 flex gap-2">
-            <input type="text" value={messageText} onChange={e => setMessageText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAction('message', `/agents/${agentId}/message`, 'POST', JSON.stringify({ content: messageText.trim() })); } }}
-              placeholder="Type a message…" className="flex-1 px-3 py-1.5 text-sm rounded bg-th-bg-alt border border-th-border text-th-text placeholder:text-th-text-alt" autoFocus />
-            <button onClick={() => handleAction('message', `/agents/${agentId}/message`, 'POST', JSON.stringify({ content: messageText.trim() }))}
-              disabled={!messageText.trim() || actionLoading === 'message'}
-              className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1">
-              {actionLoading === 'message' ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}Send
-            </button>
-          </div>
-        )}
-      </div>
-
-      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={(id) => setActiveTab(id as ProfileTab)} className="px-4" />
-
-      <div className="p-4">
-        {activeTab === 'overview' && (
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-th-text-alt">Model:</span> <span className="text-th-text">{profile.model}</span></div>
-              <div><span className="text-th-text-alt">Project:</span> <span className="text-th-text">{profile.projectId ?? '—'}</span></div>
-              <div><span className="text-th-text-alt">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
-              <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleString()}</span></div>
-              <div><span className="text-th-text-alt">Last Active:</span> <span className="text-th-text">{new Date(profile.updatedAt).toLocaleString()} ({formatRelativeTime(profile.updatedAt)})</span></div>
-              {profile.live?.provider && (
-                <div><span className="text-th-text-alt">CLI:</span> <span className="text-th-text capitalize">{profile.live.provider}{profile.live.backend && profile.live.backend !== 'acp' ? ` (${profile.live.backend})` : ''}</span></div>
-              )}
-              {profile.live?.sessionId && (
-                <div className="col-span-2">
-                  <span className="text-th-text-alt">Session:</span>{' '}
-                  <button className="font-mono text-xs text-th-text bg-th-bg-alt/60 px-1.5 py-0.5 rounded hover:bg-th-bg-alt transition-colors"
-                    title="Click to copy" onClick={() => navigator.clipboard.writeText(profile.live!.sessionId!)}>
-                    {profile.live.sessionId.slice(0, 12)}…
-                  </button>
-                </div>
-              )}
-            </div>
-            {/* Token Usage */}
-            {liveAgent && (liveAgent.inputTokens || liveAgent.outputTokens) && (
-              <div className="p-3 rounded bg-th-bg-alt/50 border border-th-border/50">
-                <div className="flex items-center gap-2 text-th-text-alt text-xs mb-2">
-                  <Zap className="w-3.5 h-3.5" />Token Usage
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div><span className="text-th-text-alt">Input:</span> <span className="text-th-text font-medium">{(liveAgent.inputTokens ?? 0).toLocaleString()}</span></div>
-                  <div><span className="text-th-text-alt">Output:</span> <span className="text-th-text font-medium">{(liveAgent.outputTokens ?? 0).toLocaleString()}</span></div>
-                  {(liveAgent.cacheReadTokens ?? 0) > 0 && (
-                    <div><span className="text-th-text-alt">Cache Read:</span> <span className="text-th-text font-medium">{liveAgent.cacheReadTokens!.toLocaleString()}</span></div>
-                  )}
-                  {(liveAgent.cacheWriteTokens ?? 0) > 0 && (
-                    <div><span className="text-th-text-alt">Cache Write:</span> <span className="text-th-text font-medium">{liveAgent.cacheWriteTokens!.toLocaleString()}</span></div>
-                  )}
-                  <div className="col-span-2"><span className="text-th-text-alt">Total:</span> <span className="text-th-text font-medium">{((liveAgent.inputTokens ?? 0) + (liveAgent.outputTokens ?? 0)).toLocaleString()}</span></div>
-                </div>
-              </div>
-            )}
-            {profile.lastTaskSummary && (
-              <div><span className="text-th-text-alt">Last Task:</span><p className="text-th-text mt-1">{profile.lastTaskSummary}</p></div>
-            )}
-            {profile.live?.exitError && (
-              <div className="mt-3 p-3 rounded bg-red-500/10 border border-red-500/20">
-                <div className="flex items-center gap-2 text-red-400 text-xs font-medium mb-1"><AlertTriangle className="w-3.5 h-3.5" />Exit Error</div>
-                <pre className="text-xs font-mono text-red-400 whitespace-pre-wrap break-words">{profile.live.exitError}</pre>
-              </div>
-            )}
-            {profile.live && (
-              <div className="mt-3 p-3 rounded bg-green-500/10 border border-green-500/20">
-                <div className="flex items-center gap-2 text-green-400 text-xs mb-1"><ActivityIcon className="w-3.5 h-3.5" />Live Session</div>
-                {profile.live.task && <p className="text-sm text-th-text">{profile.live.task}</p>}
-              </div>
-            )}
-          </div>
-        )}
-        {activeTab === 'chat' && (
-          <div className="flex-1 min-h-0" style={{ minHeight: 200 }}>
-            <AgentChatPanel agentId={agentId} readOnly={!isAlive} maxHeight="400px" />
-          </div>
-        )}
-        {activeTab === 'settings' && (
-          <div className="space-y-3 text-sm">
-            <div className="space-y-3">
-              <div>
-                <label className="text-th-text-alt text-xs block mb-1">Model</label>
-                {isAlive ? (
-                  <select
-                    value={profile.live?.model || profile.model}
-                    onChange={async (e) => {
-                      try {
-                        await apiFetch(`/agents/${agentId}`, { method: 'PATCH', body: JSON.stringify({ model: e.target.value }) });
-                        setProfile(p => p ? { ...p, model: e.target.value, live: p.live ? { ...p.live, model: e.target.value } : p.live } : p);
-                        addToast('success', 'Model updated');
-                      } catch (err: any) {
-                        addToast('error', `Failed to update model: ${err.message}`);
-                      }
-                    }}
-                    className="w-full text-sm bg-th-bg-alt border border-th-border text-th-text rounded px-2 py-1.5 focus:outline-none focus:border-accent cursor-pointer"
-                  >
-                    {(() => {
-                      const current = profile.live?.model || profile.model;
-                      const options = AVAILABLE_MODELS.includes(current) ? AVAILABLE_MODELS : [current, ...AVAILABLE_MODELS];
-                      return options.map(m => <option key={m} value={m}>{m}</option>);
-                    })()}
-                  </select>
-                ) : (
-                  <span className="text-th-text">{profile.model}</span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {profile.live?.provider && <div><span className="text-th-text-alt">CLI Provider:</span> <span className="text-th-text capitalize">{profile.live.provider}</span></div>}
-                {profile.live?.backend && <div><span className="text-th-text-alt">Backend:</span> <span className="text-th-text">{profile.live.backend}</span></div>}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Health Strip (collapsible footer) ─────────────────────
 
@@ -970,10 +712,10 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           ))}
         </div>
 
-        {/* Agent Detail — global: centered modal; project: side panel */}
+        {/* Agent Detail — global: centered modal; project: inline side panel */}
         {scope === 'global' ? (
           selectedAgent && (
-            <AgentDetailModal agentId={selectedAgent} onClose={() => setSelectedAgent(null)} />
+            <AgentDetailPanel agentId={selectedAgent} mode="modal" onClose={() => setSelectedAgent(null)} />
           )
         ) : (
           <div
@@ -987,13 +729,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           >
             {selectedAgent && (
               <div className="h-full overflow-y-auto">
-                <button
-                  onClick={() => setSelectedAgent(null)}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs text-th-text-alt hover:text-th-text transition-colors md:hidden"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />Back
-                </button>
-                <ProfilePanel agentId={selectedAgent} teamId={selectedAgentTeamId} onClose={() => setSelectedAgent(null)} />
+                <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
               </div>
             )}
           </div>

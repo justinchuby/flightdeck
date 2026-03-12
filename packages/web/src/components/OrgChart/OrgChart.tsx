@@ -9,7 +9,7 @@ import { CommHeatmap } from '../FleetOverview/CommHeatmap';
 import type { HeatmapMessage, CommType as HeatmapCommType } from '../FleetOverview/CommHeatmap';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import { CommFlowGraph } from '../CommFlow/CommFlowGraph';
-import { AgentDetailModal } from '../AgentDetailModal';
+import { AgentDetailPanel } from '../AgentDetailPanel';
 
 // Unified message entry covering both 1:1 comms and group messages
 interface CommEntry {
@@ -515,7 +515,7 @@ export function OrgChart({ api, ws }: Props) {
       </div>
 
       {detailAgentId && (
-        <AgentDetailModal agentId={detailAgentId} onClose={() => setDetailAgentId(null)} />
+        <AgentDetailPanel agentId={detailAgentId} mode="modal" onClose={() => setDetailAgentId(null)} />
       )}
     </div>
   );
