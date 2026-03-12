@@ -158,7 +158,7 @@ export function Markdown({ text, mentionAgents, onMentionClick, className }: Mar
   }, [hasMentions, mentionAgents, onMentionClick]);
 
   return (
-    <div className={`markdown-content text-xs text-th-text-alt leading-relaxed ${className ?? ''}`}>
+    <div className={`markdown-content text-xs text-th-text-alt leading-relaxed font-mono ${className ?? ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
