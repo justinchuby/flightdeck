@@ -183,7 +183,7 @@ function handleMessageSent(msg: WsMsg, store: StoreApi, agents: AgentInfo[], lea
   } else if (isBroadcast) {
     // Broadcasts tracked in comms panel — don't duplicate in chat
   } else if (msg.to === leadId) {
-    store.addMessage(leadId, { type: 'text', text: `📨 [From ${senderRole} ${senderId}] ${preview}`, sender: 'system', timestamp: Date.now() });
+    store.addMessage(leadId, { type: 'text', text: msg.content ?? '', sender: 'external', fromRole: `${senderRole} (${senderId})`, timestamp: Date.now() });
   } else if (msg.from === leadId) {
     const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
     const recipientId = shortAgentId(msg.to ?? '');

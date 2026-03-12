@@ -63,18 +63,18 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
     const msg = item.msg;
     const sender = msg.sender ?? 'agent';
 
-    // User messages always flush and render standalone
-    // Exception: 📨 DM notifications are transparent (don't break agent groups)
-    if (sender === 'user') {
-      const text = typeof msg.text === 'string' ? msg.text : '';
-      if (text.startsWith('📨')) {
-        if (currentGroup) {
-          currentGroup.systemEvents.push(item);
-        } else {
-          result.push(item);
-        }
-        continue;
+    // External messages (agent DMs) are transparent — don't break agent groups
+    if (sender === 'external') {
+      if (currentGroup) {
+        currentGroup.systemEvents.push(item);
+      } else {
+        result.push(item);
       }
+      continue;
+    }
+
+    // User messages always flush and render standalone
+    if (sender === 'user') {
       flush();
       result.push(item);
       continue;

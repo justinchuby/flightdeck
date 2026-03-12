@@ -87,7 +87,7 @@ export function ChatMessages({
           if (msg.sender === 'system') {
             const sysText = typeof msg.text === 'string' ? msg.text : '';
             if (sysText.startsWith('📤')) return null;
-            if (sysText.startsWith('📨')) return null;
+
             if (sysText.startsWith('💬')) return null;
             if (sysText.startsWith('📢')) return null;
             if (sysText.startsWith('🗣️')) return null;
