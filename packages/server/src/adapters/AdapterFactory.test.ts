@@ -127,7 +127,7 @@ describe('AdapterFactory', () => {
     };
 
     it('resolves binary from preset when no override', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'gemini' },
         { cwd: '/test' },
       );
@@ -136,7 +136,7 @@ describe('AdapterFactory', () => {
     });
 
     it('uses binaryOverride when provided', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, binaryOverride: '/usr/local/bin/my-copilot' },
         { cwd: '/test' },
       );
@@ -144,7 +144,7 @@ describe('AdapterFactory', () => {
     });
 
     it('includes --agent flag from agentFlag', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         baseConfig,
         { cwd: '/test', agentFlag: 'developer' },
       );
@@ -154,7 +154,7 @@ describe('AdapterFactory', () => {
     it.each(['gemini', 'claude', 'codex', 'opencode', 'cursor'] as const)(
       'skips --agent flag for %s provider (unsupported)',
       (provider) => {
-        const opts = buildStartOptions(
+        const { options: opts } = buildStartOptions(
           { ...baseConfig, provider },
           { cwd: '/test', agentFlag: 'flightdeck-developer' },
         );
@@ -164,7 +164,7 @@ describe('AdapterFactory', () => {
     );
 
     it('includes --model flag when model provided', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, model: 'claude-sonnet-4' },
         { cwd: '/test' },
       );
@@ -173,7 +173,7 @@ describe('AdapterFactory', () => {
     });
 
     it('passes sessionId through opts without --resume CLI flag', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         baseConfig,
         { cwd: '/test', sessionId: 'session-abc-123' },
       );
@@ -183,7 +183,7 @@ describe('AdapterFactory', () => {
     });
 
     it('uses argsOverride when provided', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, argsOverride: ['--custom-flag'] },
         { cwd: '/test' },
       );
@@ -191,7 +191,7 @@ describe('AdapterFactory', () => {
     });
 
     it('merges env from preset and envOverride, filtering empty values', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         {
           ...baseConfig,
           provider: 'gemini',
@@ -207,7 +207,7 @@ describe('AdapterFactory', () => {
     });
 
     it('returns undefined env when all values are empty', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, envOverride: { EMPTY: '' } },
         { cwd: '/test' },
       );
@@ -215,12 +215,12 @@ describe('AdapterFactory', () => {
     });
 
     it('sets cwd from agentOpts', () => {
-      const opts = buildStartOptions(baseConfig, { cwd: '/custom/path' });
+      const { options: opts } = buildStartOptions(baseConfig, { cwd: '/custom/path' });
       expect(opts.cwd).toBe('/custom/path');
     });
 
     it('falls back to cliCommand config when no preset binary', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'unknown-provider', cliCommand: 'my-binary' },
         { cwd: '/test' },
       );
@@ -228,7 +228,7 @@ describe('AdapterFactory', () => {
     });
 
     it('passes through maxTurns', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         baseConfig,
         { cwd: '/test', maxTurns: 10 },
       );
@@ -237,7 +237,7 @@ describe('AdapterFactory', () => {
 
     it('resolves model via ModelResolver', () => {
       // 'standard' tier alias for copilot should resolve to a specific model
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, model: 'standard' },
         { cwd: '/test' },
       );
@@ -247,7 +247,7 @@ describe('AdapterFactory', () => {
     });
 
     it('passes through base cliArgs from config', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, cliArgs: ['--verbose', '--no-color'] },
         { cwd: '/test', agentFlag: 'lead' },
       );
@@ -257,7 +257,7 @@ describe('AdapterFactory', () => {
     });
 
     it('resolves claude preset with claude-agent-acp binary', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'claude' },
         { cwd: '/test' },
       );
@@ -265,7 +265,7 @@ describe('AdapterFactory', () => {
     });
 
     it('resolves codex preset with codex-acp binary and empty args', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'codex' },
         { cwd: '/test' },
       );
@@ -274,13 +274,40 @@ describe('AdapterFactory', () => {
     });
 
     it('uses -c model=X for codex instead of --model', () => {
-      const opts = buildStartOptions(
+      const { options: opts } = buildStartOptions(
         { ...baseConfig, provider: 'codex', model: 'gpt-5' },
         { cwd: '/test' },
       );
       expect(opts.cliArgs).toContain('-c');
       expect(opts.cliArgs).toContain('model=gpt-5');
       expect(opts.cliArgs).not.toContain('--model');
+    });
+
+    it('returns modelResolution metadata when model is translated', () => {
+      // claude-opus-4.6 on gemini should translate to a gemini-native model
+      const result = buildStartOptions(
+        { ...baseConfig, provider: 'gemini', model: 'claude-opus-4.6' },
+        { cwd: '/test' },
+      );
+      expect(result.modelResolution).toBeDefined();
+      expect(result.modelResolution!.translated).toBe(true);
+      expect(result.modelResolution!.original).toBe('claude-opus-4.6');
+      expect(result.modelResolution!.model).not.toBe('claude-opus-4.6');
+    });
+
+    it('returns non-translated modelResolution for native models', () => {
+      const result = buildStartOptions(
+        { ...baseConfig, provider: 'copilot', model: 'claude-sonnet-4' },
+        { cwd: '/test' },
+      );
+      expect(result.modelResolution).toBeDefined();
+      expect(result.modelResolution!.translated).toBe(false);
+      expect(result.modelResolution!.model).toBe('claude-sonnet-4');
+    });
+
+    it('returns undefined modelResolution when no model specified', () => {
+      const result = buildStartOptions(baseConfig, { cwd: '/test' });
+      expect(result.modelResolution).toBeUndefined();
     });
   });
 
@@ -319,7 +346,7 @@ describe('AdapterFactory', () => {
         cliArgs: [],
       };
 
-      const startOpts = buildStartOptions(config, { cwd: '/project' });
+      const { options: startOpts } = buildStartOptions(config, { cwd: '/project' });
 
       expect(startOpts.cliCommand).toBe('/custom/copilot');
       expect(startOpts.baseArgs).toEqual(['--custom-arg']);

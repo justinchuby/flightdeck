@@ -12,6 +12,7 @@
  */
 import { getPreset } from './presets.js';
 import { resolveModel } from './ModelResolver.js';
+import type { ModelResolution } from './ModelResolver.js';
 import { cloudProviderToEnv } from '../config/configSchema.js';
 import type { CloudProvider } from '../config/configSchema.js';
 import type { ProviderId } from './presets.js';
@@ -71,6 +72,13 @@ export function resolveBackend(provider: string): BackendType {
 
 // ── Start Options Builder ───────────────────────────────────
 
+/** Result from buildStartOptions including model resolution metadata */
+export interface BuildStartResult {
+  options: AdapterStartOptions;
+  /** Full model resolution metadata (undefined if no model was specified) */
+  modelResolution?: ModelResolution;
+}
+
 /**
  * Build AdapterStartOptions from provider config + agent-level params.
  * Encapsulates preset resolution, model resolution, env merging,
@@ -85,7 +93,7 @@ export function buildStartOptions(
     maxTurns?: number;
     systemPrompt?: string;
   },
-): AdapterStartOptions {
+): BuildStartResult {
   const providerId = (config.provider || 'copilot') as ProviderId;
   const preset = getPreset(providerId);
 
@@ -137,16 +145,19 @@ export function buildStartOptions(
   }
 
   return {
-    cliCommand: binary,
-    baseArgs,
-    cliArgs,
-    cwd: agentOpts.cwd ?? process.cwd(),
-    env: Object.keys(env).length > 0 ? env : undefined,
-    sessionId: agentOpts.sessionId,
-    model: resolution?.model,
-    maxTurns: agentOpts.maxTurns,
-    systemPrompt: agentOpts.systemPrompt,
-    provider: providerId,
+    options: {
+      cliCommand: binary,
+      baseArgs,
+      cliArgs,
+      cwd: agentOpts.cwd ?? process.cwd(),
+      env: Object.keys(env).length > 0 ? env : undefined,
+      sessionId: agentOpts.sessionId,
+      model: resolution?.model,
+      maxTurns: agentOpts.maxTurns,
+      systemPrompt: agentOpts.systemPrompt,
+      provider: providerId,
+    },
+    modelResolution: resolution,
   };
 }
 

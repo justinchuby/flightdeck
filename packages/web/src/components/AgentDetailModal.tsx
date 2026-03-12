@@ -110,18 +110,26 @@ export function AgentDetailModal({ agentId, onClose }: AgentDetailModalProps) {
                 <span className="bg-blue-500/15 text-blue-400 px-1.5 rounded">{agent.provider}</span>
               )}
               {agent.model && (
-                <span className="bg-th-bg-muted/50 px-1.5 rounded">{agent.model}</span>
-              )}
-              {agent.sessionId && (
-                <button
-                  className="bg-th-bg-muted/50 px-1.5 rounded hover:bg-th-bg-muted transition-colors text-[10px]"
-                  title={`Click to copy session ID: ${agent.sessionId}`}
-                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
-                >
-                  sess:{agent.sessionId}
-                </button>
+                agent.modelTranslated && agent.requestedModel ? (
+                  <span className="bg-th-bg-muted/50 px-1.5 rounded" title={agent.modelResolutionReason}>
+                    <span className="line-through text-th-text-muted/60">{agent.requestedModel}</span>
+                    {' → '}
+                    <span className="text-yellow-400">{agent.resolvedModel ?? agent.model}</span>
+                  </span>
+                ) : (
+                  <span className="bg-th-bg-muted/50 px-1.5 rounded">{agent.model}</span>
+                )
               )}
             </div>
+            {agent.sessionId && (
+              <button
+                className="mt-1 text-[10px] font-mono text-th-text-muted bg-th-bg-muted/50 px-1.5 py-0.5 rounded hover:bg-th-bg-muted transition-colors block truncate max-w-full"
+                title={`Click to copy session ID: ${agent.sessionId}`}
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(agent.sessionId!); }}
+              >
+                Session: {agent.sessionId}
+              </button>
+            )}
           </div>
           {(agent.status === 'running' || agent.status === 'idle') && (
             <div className="flex items-center gap-1 mr-2">

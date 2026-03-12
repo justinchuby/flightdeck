@@ -110,12 +110,32 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   agent.status = 'running';
   wireAcpEvents(agent, conn);
 
-  const startOpts = buildStartOptions(adapterConfig, {
+  const { options: startOpts, modelResolution } = buildStartOptions(adapterConfig, {
     cwd: agent.cwd || process.cwd(),
     sessionId: agent.resumeSessionId,
     agentFlag: agentFlagForRole(agent.role.id),
     systemPrompt: agent.role.systemPrompt,
   });
+
+  // Store model resolution metadata on the agent
+  if (modelResolution) {
+    agent.requestedModel = modelResolution.original;
+    agent.resolvedModel = modelResolution.model;
+    agent.modelTranslated = modelResolution.translated;
+    agent.modelResolutionReason = modelResolution.reason;
+    // Update displayed model to the actual resolved model
+    agent.model = modelResolution.model;
+  }
+
+  // Notify listeners when the model was translated to a different model
+  if (modelResolution?.translated) {
+    agent._notifyModelFallback({
+      requestedModel: modelResolution.original,
+      resolvedModel: modelResolution.model,
+      reason: modelResolution.reason ?? 'cross-provider equivalence',
+      provider: effectiveProvider,
+    });
+  }
 
   conn.start(startOpts).then((sessionId) => {
     agent.sessionId = sessionId;

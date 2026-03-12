@@ -121,7 +121,15 @@ export interface AgentInfo {
   /** Error message if agent failed to start or crashed */
   exitError?: string;
   /** Process exit code (non-zero indicates failure) */
-  exitCode?: number | null;
+  exitCode?: number;
+  /** Model originally requested before cross-provider resolution */
+  requestedModel?: string;
+  /** Model actually used by the CLI after resolution */
+  resolvedModel?: string;
+  /** Whether the model was translated to a different model for the target provider */
+  modelTranslated?: boolean;
+  /** Human-readable reason for model translation */
+  modelResolutionReason?: string;
 }
 
 export interface ServerConfig {

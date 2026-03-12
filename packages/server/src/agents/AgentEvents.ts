@@ -34,6 +34,14 @@ export interface CompactionInfo {
   percentDrop: number;
 }
 
+/** Info emitted when a model was translated/resolved to a different model for the target provider */
+export interface ModelFallbackInfo {
+  requestedModel: string;
+  resolvedModel: string;
+  reason: string;
+  provider: string;
+}
+
 /**
  * Manages all event listener arrays for Agent.
  * Instantiated inside Agent; methods are exposed via Agent's public API.
@@ -51,6 +59,7 @@ export class AgentEventEmitter {
   private contextCompactedListeners: Array<(info: CompactionInfo) => void> = [];
   private usageListeners: Array<(info: UsageInfo) => void> = [];
   private responseStartListeners: Array<() => void> = [];
+  private modelFallbackListeners: Array<(info: ModelFallbackInfo) => void> = [];
 
   private _idleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly IDLE_DEBOUNCE_MS = 500;
@@ -69,6 +78,7 @@ export class AgentEventEmitter {
   onContextCompacted(listener: (info: CompactionInfo) => void): void { this.contextCompactedListeners.push(listener); }
   onUsage(listener: (info: UsageInfo) => void): void { this.usageListeners.push(listener); }
   onResponseStart(listener: () => void): void { this.responseStartListeners.push(listener); }
+  onModelFallback(listener: (info: ModelFallbackInfo) => void): void { this.modelFallbackListeners.push(listener); }
 
   // ── Notification (called by AgentAcpBridge and Agent internals) ─────────
 
@@ -83,6 +93,7 @@ export class AgentEventEmitter {
   notifyContextCompacted(info: CompactionInfo): void { for (const l of this.contextCompactedListeners) l(info); }
   notifyUsage(info: UsageInfo): void { for (const l of this.usageListeners) l(info); }
   notifyResponseStart(): void { for (const l of this.responseStartListeners) l(); }
+  notifyModelFallback(info: ModelFallbackInfo): void { for (const l of this.modelFallbackListeners) l(info); }
 
   /**
    * Debounced status notification. Idle transitions are delayed to avoid

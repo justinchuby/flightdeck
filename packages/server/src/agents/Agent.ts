@@ -6,7 +6,7 @@ import type { ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
-import type { UsageInfo, CompactionInfo } from './AgentEvents.js';
+import type { UsageInfo, CompactionInfo, ModelFallbackInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
 import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
@@ -68,6 +68,14 @@ export interface AgentJSON {
   backend?: string;
   /** Error message if agent failed to start or crashed */
   exitError?: string;
+  /** Model originally requested before cross-provider resolution */
+  requestedModel?: string;
+  /** Model actually used by the CLI after resolution */
+  resolvedModel?: string;
+  /** Whether the model was translated to a different model for the target provider */
+  modelTranslated?: boolean;
+  /** Human-readable reason for model translation */
+  modelResolutionReason?: string;
 }
 
 export class Agent {
@@ -102,6 +110,14 @@ export class Agent {
   public cwd?: string;
   /** Error message if agent failed to start (e.g., CLI binary not found) */
   public exitError?: string;
+  /** Model originally requested before cross-provider resolution */
+  public requestedModel?: string;
+  /** Model actually used by the CLI after resolution */
+  public resolvedModel?: string;
+  /** Whether the model was translated to a different model for the target provider */
+  public modelTranslated?: boolean;
+  /** Human-readable reason for model translation */
+  public modelResolutionReason?: string;
   /** Summary from COMPLETE_TASK command, used for knowledge extraction */
   public completionSummary?: string;
   /** Tracks when the last human message was received (for leads) */
@@ -204,6 +220,7 @@ export class Agent {
   /** @internal */ _notifyContextCompacted(info: CompactionInfo): void { this.events.notifyContextCompacted(info); }
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
   /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
+  /** @internal */ _notifyModelFallback(info: ModelFallbackInfo): void { this.events.notifyModelFallback(info); }
   /** @internal */ _drainOneMessage(): void {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
@@ -642,6 +659,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onUsage(listener: (info: UsageInfo) => void): void { this.events.onUsage(listener); }
   onThinking(listener: (text: string) => void): void { this.events.onThinking(listener); }
   onResponseStart(listener: () => void): void { this.events.onResponseStart(listener); }
+  onModelFallback(listener: (info: ModelFallbackInfo) => void): void { this.events.onModelFallback(listener); }
 
   getBufferedOutput(): string {
     return this.messages.join('');
@@ -744,6 +762,10 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       provider: this.provider,
       backend: this.backend,
       exitError: this.exitError,
+      requestedModel: this.requestedModel,
+      resolvedModel: this.resolvedModel,
+      modelTranslated: this.modelTranslated || undefined,
+      modelResolutionReason: this.modelResolutionReason,
     };
   }
 }

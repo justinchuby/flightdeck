@@ -187,4 +187,39 @@ describe('AgentDetailModal', () => {
     expect(screen.getByText('Agent Failed')).toBeInTheDocument();
     expect(screen.getByText('Submit GitHub Issue')).toBeInTheDocument();
   });
+
+  it('shows requested vs resolved model when model was translated', () => {
+    mockAgents = [
+      makeAgent({
+        status: 'running',
+        model: 'gemini-2.5-pro',
+        requestedModel: 'claude-opus-4.6',
+        resolvedModel: 'gemini-2.5-pro',
+        modelTranslated: true,
+        modelResolutionReason: 'claude-opus-4.6 → gemini-2.5-pro (gemini equivalent)',
+        provider: 'gemini',
+      }),
+    ];
+    render(<AgentDetailModal agentId={mockAgents[0].id} onClose={onClose} />);
+
+    expect(screen.getByText('claude-opus-4.6')).toBeInTheDocument();
+    expect(screen.getByText('gemini-2.5-pro')).toBeInTheDocument();
+    // The arrow separator
+    expect(screen.getByText(/→/)).toBeInTheDocument();
+  });
+
+  it('shows plain model when no translation occurred', () => {
+    mockAgents = [
+      makeAgent({
+        status: 'running',
+        model: 'claude-sonnet-4',
+        modelTranslated: false,
+      }),
+    ];
+    render(<AgentDetailModal agentId={mockAgents[0].id} onClose={onClose} />);
+
+    expect(screen.getByText('claude-sonnet-4')).toBeInTheDocument();
+    // No arrow separator
+    expect(screen.queryByText(/→/)).not.toBeInTheDocument();
+  });
 });

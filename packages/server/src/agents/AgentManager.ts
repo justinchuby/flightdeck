@@ -76,6 +76,7 @@ export interface AgentManagerEvents {
   // Events emitted via CommandDispatcher pass-through
   'agent:sub_spawned': { parentId: string; child: ReturnType<Agent['toJSON']> };
   'agent:spawn_error': { agentId: string; message: string };
+  'agent:model_fallback': { agentId: string; agentRole: string; requestedModel: string; resolvedModel: string; reason: string; provider: string };
   'agent:delegated': { parentId: string; childId: string; delegation: Delegation };
   'agent:delegate_error': { agentId: string; message: string };
   'agent:completion_reported': { childId: string; parentId: string | undefined; status: string };
@@ -603,6 +604,21 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onResponseStart(() => {
       this.emit('agent:response_start', { agentId: agent.id });
+    });
+
+    agent.onModelFallback((info) => {
+      this.emit('agent:model_fallback', {
+        agentId: agent.id,
+        agentRole: agent.role.name,
+        ...info,
+      });
+      // Notify the lead agent (parent) with a system message about the fallback
+      if (agent.parentId) {
+        const parent = this.agents.get(agent.parentId);
+        if (parent && (parent.status === 'running' || parent.status === 'idle')) {
+          parent.sendMessage(`[System] Model fallback for ${agent.role.name}: "${info.requestedModel}" not available on ${info.provider}. Using "${info.resolvedModel}" instead.`);
+        }
+      }
     });
 
     agent.onContent((content) => {

@@ -33,15 +33,18 @@ vi.mock('../adapters/AdapterFactory.js', () => ({
     fallback: false,
   })),
   buildStartOptions: vi.fn((config: any, agentOpts: any) => ({
-    cliCommand: config.binaryOverride || config.cliCommand || 'copilot',
-    cliArgs: [
-      ...(config.cliArgs ?? []),
-      ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
-      ...(config.model ? ['--model', config.model] : []),
-    ],
-    cwd: agentOpts.cwd ?? process.cwd(),
-    sessionId: agentOpts.sessionId,
-    model: config.model,
+    options: {
+      cliCommand: config.binaryOverride || config.cliCommand || 'copilot',
+      cliArgs: [
+        ...(config.cliArgs ?? []),
+        ...(agentOpts.agentFlag ? [`--agent=${agentOpts.agentFlag}`] : []),
+        ...(config.model ? ['--model', config.model] : []),
+      ],
+      cwd: agentOpts.cwd ?? process.cwd(),
+      sessionId: agentOpts.sessionId,
+      model: config.model,
+    },
+    modelResolution: config.model ? { model: config.model, translated: false, original: config.model } : undefined,
   })),
 }));
 
@@ -65,6 +68,8 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
+    _notifyModelFallback: vi.fn(),
+    _notifyStatusChange: vi.fn(),
     ...overrides,
   } as any;
 }

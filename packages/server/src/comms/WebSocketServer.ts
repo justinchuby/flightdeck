@@ -195,6 +195,11 @@ export class WebSocketServer {
       this.broadcastToProject({ type: 'agent:response_start', ...data }, projectId);
     });
 
+    this.track(agentManager, 'agent:model_fallback', (data: AgentManagerEvents['agent:model_fallback']) => {
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:model_fallback', ...data }, projectId);
+    });
+
     // WebSocket subscription architecture:
     // - Agent connections subscribe to specific agent IDs (project-scoped participants)
     // - UI connections subscribe to '*' (all agents) because the dashboard is an observer
