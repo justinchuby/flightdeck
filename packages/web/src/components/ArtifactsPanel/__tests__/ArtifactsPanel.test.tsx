@@ -15,8 +15,8 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
 }));
 
-vi.mock('../../../utils/markdown', () => ({
-  MarkdownContent: ({ text }: { text: string }) => <div data-testid="md-render">{text}</div>,
+vi.mock('../../ui/Markdown', () => ({
+  Markdown: ({ text }: { text: string }) => <div data-testid="md-render">{text}</div>,
 }));
 
 function renderPanel() {
@@ -36,6 +36,7 @@ const artifactGroups = {
       agentDir: 'architect-3973583e',
       role: 'architect',
       agentId: '3973583e',
+      sessionId: 'abc12345-6789-0abc-def0-123456789abc',
       files: [
         {
           name: 'codebase-audit-report.md',
@@ -57,6 +58,7 @@ const artifactGroups = {
       agentDir: 'designer-8baab941',
       role: 'designer',
       agentId: '8baab941',
+      sessionId: 'def67890-1234-5678-9abc-def012345678',
       files: [
         {
           name: 'navigation-redesign-spec.md',
@@ -92,13 +94,14 @@ describe('ArtifactsPanel', () => {
     expect(screen.getByTestId('artifacts-empty')).toBeInTheDocument();
   });
 
-  it('renders agent groups with file counts', async () => {
+  it('renders session groups with file counts', async () => {
     mockApiFetch.mockResolvedValue(artifactGroups);
     renderPanel();
     await waitFor(() => {
-      expect(screen.getByText('architect')).toBeInTheDocument();
+      // Session labels are truncated UUIDs (first 8 hex chars, dashes removed)
+      expect(screen.getByText('abc12345')).toBeInTheDocument();
     });
-    expect(screen.getByText('designer')).toBeInTheDocument();
+    expect(screen.getByText('def67890')).toBeInTheDocument();
   });
 
   it('shows file titles instead of raw filenames', async () => {
@@ -162,31 +165,32 @@ describe('ArtifactsPanel', () => {
     });
   });
 
-  it('can collapse and expand agent groups', async () => {
+  it('can collapse and expand session groups', async () => {
     mockApiFetch.mockResolvedValue(artifactGroups);
     renderPanel();
     await waitFor(() => {
       expect(screen.getByText('Codebase Audit Report')).toBeInTheDocument();
     });
 
-    // Collapse architect group
-    fireEvent.click(screen.getByText('architect'));
+    // Collapse architect session group (abc12345)
+    fireEvent.click(screen.getByText('abc12345'));
     expect(screen.queryByText('Codebase Audit Report')).not.toBeInTheDocument();
 
     // Re-expand
-    fireEvent.click(screen.getByText('architect'));
+    fireEvent.click(screen.getByText('abc12345'));
     expect(screen.getByText('Codebase Audit Report')).toBeInTheDocument();
   });
 
-  it('shows role emojis for agent groups', async () => {
+  it('shows role icons for artifacts', async () => {
     mockApiFetch.mockResolvedValue(artifactGroups);
     renderPanel();
     await waitFor(() => {
-      // Architect emoji
-      expect(screen.getByText('\u{1F3D7}')).toBeInTheDocument();
-      // Designer emoji
-      expect(screen.getByText('\u{1F3A8}')).toBeInTheDocument();
+      expect(screen.getByText('Codebase Audit Report')).toBeInTheDocument();
     });
+    // Architect emoji (🏗) appears per-artifact row
+    expect(screen.getAllByText('\u{1F3D7}').length).toBeGreaterThanOrEqual(1);
+    // Designer emoji (🎨)
+    expect(screen.getAllByText('\u{1F3A8}').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows error state on API failure', async () => {
