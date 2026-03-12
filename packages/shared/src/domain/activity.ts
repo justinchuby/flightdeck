@@ -22,6 +22,7 @@ export const ActionTypeSchema = z.enum([
   'deferred_issue',
   'group_message',
   'agent_interrupted',
+  'progress_update',
   'error',
 ]);
 export type ActionType = z.infer<typeof ActionTypeSchema>;

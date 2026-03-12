@@ -206,5 +206,5 @@ export interface TaskCostSummary {
   totalInputTokens: number;
   totalOutputTokens: number;
   agentCount: number;
-  agents: Array<{ agentId: string; inputTokens: number; outputTokens: number }>;
+  agents: Array<{ agentId: string; agentRole?: string; inputTokens: number; outputTokens: number }>;
 }

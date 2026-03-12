@@ -531,7 +531,7 @@ describe('HomeDashboard', () => {
         if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
         if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
         if (path.includes('/coordination/activity')) return Promise.resolve([
-          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress', summary: 'Implemented auth module', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
+          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress_update', summary: 'Implemented auth module', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
         ]);
         return Promise.resolve([]);
       });
@@ -557,7 +557,7 @@ describe('HomeDashboard', () => {
         if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
         if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
         if (path.includes('/coordination/activity')) return Promise.resolve([
-          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress', summary: 'Done', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
+          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress_update', summary: 'Done', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
         ]);
         return Promise.resolve([]);
       });

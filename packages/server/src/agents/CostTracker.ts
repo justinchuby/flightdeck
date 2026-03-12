@@ -205,12 +205,23 @@ export class CostTracker {
       .where(condition)
       .all();
 
-    const agentsByTask = new Map<string, Array<{ agentId: string; inputTokens: number; outputTokens: number; costUsd: number }>>();
+    // Look up agent roles for the breakdown
+    const agentRoleMap = new Map<string, string>();
+    const rosterRows = this.db.drizzle
+      .select({ agentId: agentRoster.agentId, role: agentRoster.role })
+      .from(agentRoster)
+      .all();
+    for (const row of rosterRows) {
+      if (row.role) agentRoleMap.set(row.agentId, row.role);
+    }
+
+    const agentsByTask = new Map<string, Array<{ agentId: string; agentRole?: string; inputTokens: number; outputTokens: number; costUsd: number }>>();
     for (const r of allRecords) {
       const key = `${r.leadId}:${r.dagTaskId}`;
       if (!agentsByTask.has(key)) agentsByTask.set(key, []);
       agentsByTask.get(key)!.push({
         agentId: r.agentId,
+        agentRole: agentRoleMap.get(r.agentId),
         inputTokens: r.inputTokens ?? 0,
         outputTokens: r.outputTokens ?? 0,
         costUsd: r.costUsd ?? 0,

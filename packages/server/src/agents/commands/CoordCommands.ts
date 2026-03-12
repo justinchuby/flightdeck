@@ -187,7 +187,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
     ctx.activityLedger.log(
       agent.id,
       agent.role?.id ?? 'unknown',
-      'progress_update' as any,
+      'progress_update',
       (progress.summary as string) ?? 'Progress update',
       progress,
       ctx.getProjectIdForAgent(agent.id) ?? '',

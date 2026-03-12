@@ -170,7 +170,7 @@ function ActiveAgentRow({ agent, projectName }: { agent: AgentInfo; projectName:
 
 /** Only explicit PROGRESS commands from the lead — nothing else */
 const PROGRESS_ACTION_TYPES = new Set([
-  'progress',
+  'progress_update',
 ]);
 
 
