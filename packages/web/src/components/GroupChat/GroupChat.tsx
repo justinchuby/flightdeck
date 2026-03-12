@@ -201,12 +201,30 @@ export function GroupChat(_props: { api: any; ws: any }) {
     }
   }, [contextProjectId, scopedLeads, selectedProjectLeadId]);
 
+  // Build a set of lead agent IDs for the selected project so we can filter
+  // groups by either projectId OR leadId (since projectId is optional on ChatGroup)
+  const selectedProjectLeadIds = useMemo(() => {
+    if (!selectedProjectLeadId) return null;
+    const ids = new Set<string>();
+    // If selectedProjectLeadId is itself a lead agent ID, include it
+    if (leads.some((l) => l.id === selectedProjectLeadId)) {
+      ids.add(selectedProjectLeadId);
+    }
+    // Also include any leads whose projectId matches (covers project UUID case)
+    for (const l of leads) {
+      if (l.projectId === selectedProjectLeadId || l.id === selectedProjectLeadId) {
+        ids.add(l.id);
+      }
+    }
+    return ids.size > 0 ? ids : null;
+  }, [selectedProjectLeadId, leads]);
+
   // Filtered groups/tabs by selected project
-  const filteredGroups = selectedProjectLeadId
-    ? groups.filter((g) => (g.projectId ?? g.leadId) === selectedProjectLeadId)
+  const filteredGroups = selectedProjectLeadIds
+    ? groups.filter((g) => g.projectId === selectedProjectLeadId || selectedProjectLeadIds.has(g.leadId))
     : groups;
-  const filteredTabs = selectedProjectLeadId
-    ? openTabs.filter((t) => t.leadId === selectedProjectLeadId)
+  const filteredTabs = selectedProjectLeadIds
+    ? openTabs.filter((t) => selectedProjectLeadIds.has(t.leadId))
     : openTabs;
 
   /* ---- Fetch groups for project-scoped leads ---- */

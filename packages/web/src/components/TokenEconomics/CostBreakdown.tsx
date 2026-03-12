@@ -14,12 +14,27 @@ function useAgentMap(): Map<string, AgentInfo> {
 
 type CostView = 'by-agent' | 'by-task';
 
-export function CostBreakdown() {
+interface CostBreakdownProps {
+  projectId?: string | null;
+}
+
+export function CostBreakdown({ projectId }: CostBreakdownProps = {}) {
   const [view, setView] = useState<CostView>('by-agent');
   const [agentCosts, setAgentCosts] = useState<AgentCostSummary[]>([]);
   const [taskCosts, setTaskCosts] = useState<TaskCostSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const agentMap = useAgentMap();
+  const agents = useAppStore((s) => s.agents);
+
+  // Build set of agent IDs belonging to this project for client-side filtering
+  const projectAgentIds = useMemo(() => {
+    if (!projectId) return null;
+    const ids = new Set<string>();
+    for (const a of agents) {
+      if (a.projectId === projectId) ids.add(a.id);
+    }
+    return ids;
+  }, [agents, projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,13 +60,23 @@ export function CostBreakdown() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
+  // Filter costs to project scope when projectId is provided
+  const filteredAgentCosts = useMemo(
+    () => projectAgentIds ? agentCosts.filter((c) => projectAgentIds.has(c.agentId)) : agentCosts,
+    [agentCosts, projectAgentIds],
+  );
+  const filteredTaskCosts = useMemo(
+    () => projectAgentIds ? taskCosts.filter((c) => c.agents.some((a) => projectAgentIds.has(a.agentId))) : taskCosts,
+    [taskCosts, projectAgentIds],
+  );
+
   const totalInput = useMemo(
-    () => agentCosts.reduce((s, c) => s + c.totalInputTokens, 0),
-    [agentCosts],
+    () => filteredAgentCosts.reduce((s, c) => s + c.totalInputTokens, 0),
+    [filteredAgentCosts],
   );
   const totalOutput = useMemo(
-    () => agentCosts.reduce((s, c) => s + c.totalOutputTokens, 0),
-    [agentCosts],
+    () => filteredAgentCosts.reduce((s, c) => s + c.totalOutputTokens, 0),
+    [filteredAgentCosts],
   );
   const total = totalInput + totalOutput;
 
@@ -59,7 +84,7 @@ export function CostBreakdown() {
     return <div className="p-4 text-sm text-th-text-muted">Loading token data…</div>;
   }
 
-  if (agentCosts.length === 0 && taskCosts.length === 0) {
+  if (filteredAgentCosts.length === 0 && filteredTaskCosts.length === 0) {
     return (
       <div className="p-4 text-sm text-th-text-muted">
         No token attribution data yet. Token usage is tracked when agents work on DAG tasks.
@@ -105,9 +130,9 @@ export function CostBreakdown() {
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-th-border/50">
         {view === 'by-agent' ? (
-          <AgentCostTable costs={agentCosts} agentMap={agentMap} total={total} />
+          <AgentCostTable costs={filteredAgentCosts} agentMap={agentMap} total={total} />
         ) : (
-          <TaskCostTable costs={taskCosts} agentMap={agentMap} total={total} />
+          <TaskCostTable costs={filteredTaskCosts} agentMap={agentMap} total={total} />
         )}
       </div>
     </div>
