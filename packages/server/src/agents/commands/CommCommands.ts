@@ -28,6 +28,7 @@ const QUERY_GROUPS_REGEX = /⟦⟦\s*QUERY_GROUPS\s*⟧⟧/s;
 const INTERRUPT_REGEX = /⟦⟦\s*INTERRUPT\s*(\{.*?\})\s*⟧⟧/s;
 const REACT_REGEX = /⟦⟦\s*REACT\s*(\{.*?\})\s*⟧⟧/s;
 const TELEGRAM_REPLY_REGEX = /⟦⟦\s*TELEGRAM_REPLY\s*(\{.*?\})\s*⟧⟧/s;
+const TELEGRAM_SEND_REGEX = /⟦⟦\s*TELEGRAM_SEND\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Exported: command entry list ─────────────────────────────────────
 
@@ -44,6 +45,7 @@ export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: INTERRUPT_REGEX, name: 'INTERRUPT', handler: (a, d) => handleInterrupt(ctx, a, d), help: { description: 'Interrupt an agent with an urgent message', example: 'INTERRUPT {"to": "agent-id", "content": "urgent: stop current work"}', category: 'Communication', args: deriveArgs(interruptSchema) } },
     { regex: REACT_REGEX, name: 'REACT', handler: (a, d) => handleReact(ctx, a, d) },
     { regex: TELEGRAM_REPLY_REGEX, name: 'TELEGRAM_REPLY', handler: (a, d) => handleTelegramReply(ctx, a, d), help: { description: 'Reply to a Telegram message', example: 'TELEGRAM_REPLY {"messageId": "12345", "content": "response text"}', category: 'Communication' } },
+    { regex: TELEGRAM_SEND_REGEX, name: 'TELEGRAM_SEND', handler: (a, d) => handleTelegramSend(ctx, a, d), help: { description: 'Send a message to the bound Telegram chat', example: 'TELEGRAM_SEND {"content": "Build complete, all tests pass"}', category: 'Communication' } },
   ];
 }
 
@@ -545,5 +547,40 @@ function handleTelegramReply(ctx: CommandHandlerContext, agent: Agent, data: str
     }
   } catch (err) {
     logger.debug({ module: 'command', msg: 'Parse failed', command: 'TELEGRAM_REPLY', err: (err as Error).message });
+  }
+}
+
+// ── TELEGRAM_SEND ──────────────────────────────────────────────────
+
+function handleTelegramSend(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  try {
+    const parsed = JSON.parse(data);
+    const content = parsed.content ?? parsed.text;
+
+    if (!content) {
+      agent.sendMessage('[System] TELEGRAM_SEND requires a "content" field.');
+      return;
+    }
+
+    if (!ctx.integrationRouter) {
+      agent.sendMessage('[System] Telegram integration is not configured.');
+      return;
+    }
+
+    // Find the project ID for this agent
+    const projectId = agent.projectId;
+    if (!projectId) {
+      agent.sendMessage('[System] Cannot determine project for this agent. No Telegram session can be resolved.');
+      return;
+    }
+
+    const sent = ctx.integrationRouter.sendToProject(projectId, String(content));
+    if (sent) {
+      logger.info({ module: 'comms', msg: 'Telegram message sent to project chat', projectId, agentId: agent.id });
+    } else {
+      agent.sendMessage('[System] No Telegram chat is bound to this project. Ask the user to bind a chat via the Telegram bot or Settings UI.');
+    }
+  } catch (err) {
+    logger.debug({ module: 'command', msg: 'Parse failed', command: 'TELEGRAM_SEND', err: (err as Error).message });
   }
 }

@@ -65,6 +65,12 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
 
   static readonly BATCH_WINDOW_MS = 5_000;
 
+  /** Categories that bypass the batch window and deliver immediately. */
+  static readonly CRITICAL_CATEGORIES: ReadonlySet<string> = new Set([
+    'agent_crashed',
+    'decision_needs_approval',
+  ]);
+
   /** Register a messaging adapter for outbound delivery. */
   addAdapter(adapter: MessagingAdapter): void {
     this.adapters.push(adapter);
@@ -197,9 +203,19 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
     logger.info({ module: 'notification-batcher', msg: 'Wired to AgentManager events' });
   }
 
-  /** Queue an event for batched delivery. */
+  /** Queue an event for batched delivery. Critical events bypass the batch window. */
   queueEvent(event: NotificationEvent): void {
     const { projectId } = event;
+
+    // Critical events (crashes, decisions needing approval) skip batching
+    if (NotificationBatcher.CRITICAL_CATEGORIES.has(event.category)) {
+      if (!this.pendingEvents.has(projectId)) {
+        this.pendingEvents.set(projectId, []);
+      }
+      this.pendingEvents.get(projectId)!.push({ event, queuedAt: Date.now() });
+      this.flushProject(projectId);
+      return;
+    }
 
     if (!this.pendingEvents.has(projectId)) {
       this.pendingEvents.set(projectId, []);

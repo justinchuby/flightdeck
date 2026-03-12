@@ -18,8 +18,8 @@ import { TelegramAdapter } from './TelegramAdapter.js';
 import { NotificationBatcher } from './NotificationBatcher.js';
 import type { ConfigStore } from '../config/ConfigStore.js';
 
-/** Session TTL: 1 hour. */
-const SESSION_TTL_MS = 60 * 60 * 1000;
+/** Session TTL: 8 hours (AI crew sessions run for extended periods). */
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 /**
  * IntegrationRouter — Layer 2 of the 3-layer messaging architecture.
@@ -461,6 +461,54 @@ export class IntegrationRouter {
     // Consume the pending reply
     this.pendingReplies.delete(messageId);
     return true;
+  }
+
+  /**
+   * Send a message to the Telegram chat bound to a project.
+   * Used by the TELEGRAM_SEND command for proactive lead→Telegram messaging
+   * without requiring a prior inbound messageId.
+   */
+  sendToProject(projectId: string, text: string): boolean {
+    // Find the session for this project
+    const session = this.getSessionByProject(projectId);
+    if (!session) {
+      logger.warn({ module: 'integration-router', msg: 'No active session for project', projectId });
+      return false;
+    }
+
+    const adapter = this.adapters.get(session.platform);
+    if (!adapter) {
+      logger.warn({ module: 'integration-router', msg: 'No adapter for platform', platform: session.platform });
+      return false;
+    }
+
+    adapter.sendMessage({
+      platform: session.platform,
+      chatId: session.chatId,
+      text,
+    }).catch((err) => {
+      logger.warn({ module: 'integration-router', msg: 'sendToProject delivery failed', projectId, error: (err as Error).message });
+    });
+
+    return true;
+  }
+
+  /** Find the active session bound to a given project ID. */
+  private getSessionByProject(projectId: string): ChatSession | undefined {
+    const now = Date.now();
+    for (const [chatId, session] of this.sessions) {
+      if (session.expiresAt <= now) {
+        this.sessions.delete(chatId);
+        this.notificationBatcher.unsubscribe(chatId, session.projectId);
+        continue;
+      }
+      if (session.projectId === projectId) {
+        // Refresh TTL on access
+        session.expiresAt = now + SESSION_TTL_MS;
+        return session;
+      }
+    }
+    return undefined;
   }
 
   /** Remove expired entries and enforce max size (FIFO eviction). */
