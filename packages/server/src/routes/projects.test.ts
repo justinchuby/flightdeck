@@ -451,6 +451,9 @@ describe('GET /projects/:id/files — symlinked .flightdeck/shared paths', () =>
     mkdirSync(artifactAgentDir, { recursive: true });
     writeFileSync(join(artifactAgentDir, 'report.md'), '# Test Report\nHello');
 
+    // Sensitive file outside artifacts/ — must NOT be accessible
+    writeFileSync(join(tmpBase, '.flightdeck', 'config.yaml'), 'secret: do-not-expose');
+
     // Legacy shared dir with symlink pointing to organized storage
     const sharedDir = join(projectDir, '.flightdeck', 'shared');
     mkdirSync(sharedDir, { recursive: true });
@@ -521,6 +524,15 @@ describe('GET /projects/:id/files — symlinked .flightdeck/shared paths', () =>
   it('still rejects paths that escape the project entirely', async () => {
     const res = await fetch(
       `${baseUrl}/projects/test-proj/file-contents?path=../../etc/passwd`,
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe('Path outside project directory');
+  });
+
+  it('rejects traversal to ~/.flightdeck/config.yaml (outside artifacts/)', async () => {
+    const res = await fetch(
+      `${baseUrl}/projects/test-proj/file-contents?path=../../../.flightdeck/config.yaml`,
     );
     expect(res.status).toBe(403);
     const body = await res.json();

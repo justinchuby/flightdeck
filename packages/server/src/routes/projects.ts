@@ -1007,7 +1007,7 @@ export function projectsRoutes(ctx: AppContext): Router {
   }
 
   /** ~/.flightdeck/ — additional allowed root for symlinked artifact files */
-  const flightdeckHome = join(homedir(), '.flightdeck');
+  const flightdeckHome = join(homedir(), '.flightdeck', 'artifacts');
 
   /**
    * GET /projects/:id/files?path=relative/dir
