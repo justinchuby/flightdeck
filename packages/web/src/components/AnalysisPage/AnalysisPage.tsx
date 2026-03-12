@@ -18,6 +18,7 @@ import { CumulativeFlow } from './TaskBurndown';
 import { CostCurve } from './CostCurve';
 import { KeyStats } from './KeyStats';
 import { AgentHeatmap } from './AgentHeatmap';
+import { CostBreakdown } from '../TokenEconomics/CostBreakdown';
 import type { FlowPoint } from './TaskBurndown';
 import type { CostPoint } from './CostCurve';
 import type { HeatmapBucket } from './AgentHeatmap';
@@ -146,6 +147,9 @@ export function AnalysisPage() {
 
       {/* Agent Activity Heatmap */}
       <AgentHeatmap agents={displayAgents} buckets={heatmapBuckets} />
+
+      {/* Token Attribution */}
+      <CostBreakdown />
     </div>
   );
 }
