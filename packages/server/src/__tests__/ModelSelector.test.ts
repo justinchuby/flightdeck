@@ -81,18 +81,18 @@ describe('ModelSelector', () => {
   // ── 3. Role overrides take highest priority ──────────────────────────
 
   it('returns the pinned model when a role override is set', () => {
-    selector.setRoleOverride('architect', 'claude-opus-4-6');
+    selector.setRoleOverride('architect', 'claude-opus-4.6');
     const task: TaskProfile = {
       role: 'architect',
       description: 'design the database schema',
       estimatedComplexity: 'low', // would normally pick fast tier
     };
     const model = selector.selectModel(task);
-    expect(model.id).toBe('claude-opus-4-6');
+    expect(model.id).toBe('claude-opus-4.6');
   });
 
   it('ignores override for other roles', () => {
-    selector.setRoleOverride('architect', 'claude-opus-4-6');
+    selector.setRoleOverride('architect', 'claude-opus-4.6');
     const task: TaskProfile = {
       role: 'developer',
       description: 'write tests',
@@ -103,7 +103,7 @@ describe('ModelSelector', () => {
   });
 
   it('falls back to complexity selection after removeRoleOverride', () => {
-    selector.setRoleOverride('architect', 'claude-opus-4-6');
+    selector.setRoleOverride('architect', 'claude-opus-4.6');
     selector.removeRoleOverride('architect');
 
     const task: TaskProfile = {
@@ -169,12 +169,12 @@ describe('ModelSelector', () => {
   // ── 6. getRoleOverrides / getModels ─────────────────────────────────
 
   it('getRoleOverrides returns all set overrides', () => {
-    selector.setRoleOverride('lead', 'claude-opus-4-6');
-    selector.setRoleOverride('tester', 'claude-3-5-haiku');
+    selector.setRoleOverride('lead', 'claude-opus-4.6');
+    selector.setRoleOverride('tester', 'claude-haiku-4.5');
     const overrides = selector.getRoleOverrides();
     expect(overrides).toEqual({
-      lead: 'claude-opus-4-6',
-      tester: 'claude-3-5-haiku',
+      lead: 'claude-opus-4.6',
+      tester: 'claude-haiku-4.5',
     });
   });
 

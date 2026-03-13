@@ -8,12 +8,12 @@
 // ── Model shortname mapping ───────────────────────────────────────────
 
 const MODEL_SHORT: Record<string, string> = {
-  'claude-opus-4-6': 'opus-4.6',
-  'claude-opus-4-6-1m': 'opus-4.6-1m',
-  'claude-opus-4-5': 'opus-4.5',
-  'claude-sonnet-4-5': 'sonnet-4.5',
-  'claude-3-5-sonnet': 'sonnet-3.5',
-  'claude-3-5-haiku': 'haiku',
+  'claude-opus-4.6': 'opus',
+  'claude-opus-4.5': 'opus-4.5',
+  'claude-sonnet-4.6': 'sonnet',
+  'claude-sonnet-4.5': 'sonnet-4.5',
+  'claude-sonnet-4': 'sonnet-4',
+  'claude-haiku-4.5': 'haiku',
   'gemini-3-pro-preview': 'gemini-pro',
   'gemini-3-flash-preview': 'gemini-flash',
   'gpt-5.4': 'gpt5.4',
@@ -239,7 +239,7 @@ export function formatQueryCrew(members: CrewMember[], opts: QueryCrewOptions): 
 To assign a task to an agent, use their ID:
 \`⟦⟦ DELEGATE {"to": "agent-id", "task": "your task"} ⟧⟧\`
 To create a new agent:
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4-6", "task": "optional task"} ⟧⟧\`
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "optional task"} ⟧⟧\`
 To terminate an agent and free a slot:
 \`⟦⟦ TERMINATE_AGENT {"agentId": "agent-id", "reason": "no longer needed"} ⟧⟧\``
   );

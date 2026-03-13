@@ -15,7 +15,7 @@ function makeRole(overrides: Partial<Role> = {}): Role {
     color: '#00ff00',
     icon: '💻',
     builtIn: true,
-    model: 'claude-3-5-sonnet',
+    model: 'claude-sonnet-4.5',
     ...overrides,
   };
 }
@@ -919,7 +919,7 @@ describe('CommandDispatcher', () => {
 
   describe('CREATE_AGENT sets projectName for sub-leads', () => {
     it('passes projectName from task when creating a sub-lead', () => {
-      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-3-5-sonnet' };
+      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
       (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
       const subLead = makeAgent({
         id: 'agent-sublead-0000-000000000009',
@@ -940,7 +940,7 @@ describe('CommandDispatcher', () => {
     });
 
     it('passes projectName from explicit name when provided', () => {
-      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-3-5-sonnet' };
+      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
       (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
       const subLead = makeAgent({
         id: 'agent-sublead-0000-000000000010',
@@ -991,7 +991,7 @@ describe('CommandDispatcher', () => {
 
     it('propagates projectId + projectName for sub-leads', () => {
       const leadWithProject = makeAgent({ projectId: 'proj-abc-123' });
-      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-3-5-sonnet' };
+      const leadRole = { id: 'lead', name: 'Project Lead', description: '', systemPrompt: '', color: '', icon: '', builtIn: true, model: 'claude-sonnet-4.5' };
       (ctx.roleRegistry.get as any).mockReturnValue(leadRole);
       const subLead = makeAgent({ id: 'agent-sublead-proj', role: leadRole, parentId: leadWithProject.id, hierarchyLevel: 0 });
       (ctx.spawnAgent as any).mockReturnValue(subLead);

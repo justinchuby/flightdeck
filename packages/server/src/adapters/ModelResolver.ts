@@ -58,12 +58,15 @@ const TIER_MAP: Record<ModelTier, Record<ProviderId, string>> = {
   premium: Object.fromEntries(PROVIDER_IDS.map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].tierModels.premium])) as Record<ProviderId, string>,
 };
 
+/** Claude SDK CLI accepts short aliases instead of full model names — derived from registry */
+const CLAUDE_ALIASES: Record<string, string> = PROVIDER_REGISTRY.claude.modelAliases ?? {};
+
 /** OpenCode provider prefixes — derived from registry */
 const OPENCODE_PREFIXES: Record<string, string> = PROVIDER_REGISTRY.opencode.modelPrefixes ?? {};
 
 /** Detect which model provider a model name belongs to */
 function detectModelProvider(model: string): string {
-  if (model.startsWith('claude-')) return 'anthropic';
+  if (model.startsWith('claude-') || model === 'opus' || model === 'sonnet' || model === 'haiku') return 'anthropic';
   if (model.startsWith('gpt-') || model.startsWith('o3') || model.startsWith('o4')) return 'openai';
   if (model.startsWith('gemini-')) return 'google';
   if (model.startsWith('grok-')) return 'xai';
@@ -74,31 +77,32 @@ function detectModelProvider(model: string): string {
 
 const EQUIVALENCES: Record<string, Record<string, string>> = {
   // Anthropic → others
-  'claude-opus-4-6': { openai: 'gpt-5.2-codex', google: 'gemini-2.5-pro' },
-  'claude-opus-4-5': { openai: 'gpt-5.1-codex-max', google: 'gemini-2.5-pro' },
-  'claude-sonnet-4-5': { openai: 'gpt-5.3-codex', google: 'gemini-2.5-flash' },
-  'claude-3-5-sonnet': { openai: 'gpt-4.1', google: 'gemini-2.5-flash' },
-  'claude-3-5-haiku': { openai: 'gpt-5.1-codex-mini', google: 'gemini-2.5-flash-lite' },
+  'claude-opus-4.6': { openai: 'gpt-5.2-codex', google: 'gemini-2.5-pro' },
+  'claude-opus-4.5': { openai: 'gpt-5.1-codex-max', google: 'gemini-2.5-pro' },
+  'claude-sonnet-4.6': { openai: 'gpt-5.3-codex', google: 'gemini-2.5-flash' },
+  'claude-sonnet-4.5': { openai: 'gpt-5.3-codex', google: 'gemini-2.5-flash' },
+  'claude-sonnet-4': { openai: 'gpt-4.1', google: 'gemini-2.5-flash' },
+  'claude-haiku-4.5': { openai: 'gpt-5.1-codex-mini', google: 'gemini-2.5-flash-lite' },
 
   // OpenAI → others
-  'gpt-5.4': { anthropic: 'claude-opus-4-6', google: 'gemini-2.5-pro' },
-  'gpt-5.3-codex': { anthropic: 'claude-opus-4-6', google: 'gemini-2.5-pro' },
-  'gpt-5.2-codex': { anthropic: 'claude-opus-4-6', google: 'gemini-2.5-pro' },
-  'gpt-5.2': { anthropic: 'claude-sonnet-4-5', google: 'gemini-2.5-flash' },
-  'gpt-5.1-codex-max': { anthropic: 'claude-opus-4-5', google: 'gemini-2.5-pro' },
-  'gpt-5.1-codex': { anthropic: 'claude-sonnet-4-5', google: 'gemini-2.5-flash' },
+  'gpt-5.4': { anthropic: 'claude-opus-4.6', google: 'gemini-2.5-pro' },
+  'gpt-5.3-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-2.5-pro' },
+  'gpt-5.2-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-2.5-pro' },
+  'gpt-5.2': { anthropic: 'claude-sonnet-4.6', google: 'gemini-2.5-flash' },
+  'gpt-5.1-codex-max': { anthropic: 'claude-opus-4.5', google: 'gemini-2.5-pro' },
+  'gpt-5.1-codex': { anthropic: 'claude-sonnet-4.6', google: 'gemini-2.5-flash' },
 
-  'gpt-5.1-codex-mini': { anthropic: 'claude-3-5-haiku', google: 'gemini-2.5-flash-lite' },
-  'gpt-5.1': { anthropic: 'claude-sonnet-4-5', google: 'gemini-2.5-flash' },
-  'gpt-5-mini': { anthropic: 'claude-3-5-haiku', google: 'gemini-2.5-flash-lite' },
-  'gpt-4.1': { anthropic: 'claude-sonnet-4-5', google: 'gemini-2.5-flash' },
+  'gpt-5.1-codex-mini': { anthropic: 'claude-haiku-4.5', google: 'gemini-2.5-flash-lite' },
+  'gpt-5.1': { anthropic: 'claude-sonnet-4.6', google: 'gemini-2.5-flash' },
+  'gpt-5-mini': { anthropic: 'claude-haiku-4.5', google: 'gemini-2.5-flash-lite' },
+  'gpt-4.1': { anthropic: 'claude-sonnet-4', google: 'gemini-2.5-flash' },
 
   // Google → others
-  'gemini-3-pro-preview': { anthropic: 'claude-opus-4-6', openai: 'gpt-5.2-codex' },
-  'gemini-3-flash-preview': { anthropic: 'claude-sonnet-4-5', openai: 'gpt-5.3-codex' },
-  'gemini-2.5-pro': { anthropic: 'claude-opus-4-6', openai: 'gpt-5.2-codex' },
-  'gemini-2.5-flash': { anthropic: 'claude-sonnet-4-5', openai: 'gpt-5.3-codex' },
-  'gemini-2.5-flash-lite': { anthropic: 'claude-3-5-haiku', openai: 'gpt-5.1-codex-mini' },
+  'gemini-3-pro-preview': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
+  'gemini-3-flash-preview': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
+  'gemini-2.5-pro': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
+  'gemini-2.5-flash': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
+  'gemini-2.5-flash-lite': { anthropic: 'claude-haiku-4.5', openai: 'gpt-5.1-codex-mini' },
 };
 
 // ── Core Resolution ─────────────────────────────────────────
@@ -142,6 +146,9 @@ export function resolveModel(
       // Model family is supported but this specific model is not — fall through to equivalence mapping
     } else {
       // Model's provider is available on this CLI — apply CLI-specific transforms
+      if (provider === 'claude' && modelSpec in CLAUDE_ALIASES) {
+        return { model: CLAUDE_ALIASES[modelSpec], translated: true, original, reason: 'alias for Claude CLI' };
+      }
       if (provider === 'opencode') {
         const prefix = OPENCODE_PREFIXES[modelProvider];
         if (prefix) {
@@ -159,6 +166,10 @@ export function resolveModel(
       if (equivalences[cliProv]) {
         let resolved = equivalences[cliProv];
 
+        // Apply Claude aliases to the resolved model
+        if (provider === 'claude' && resolved in CLAUDE_ALIASES) {
+          resolved = CLAUDE_ALIASES[resolved];
+        }
         // Apply OpenCode prefix to the resolved model
         if (provider === 'opencode') {
           const prefix = OPENCODE_PREFIXES[cliProv];

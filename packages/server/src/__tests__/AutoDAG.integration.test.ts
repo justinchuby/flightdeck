@@ -26,7 +26,7 @@ function makeRole(overrides: Partial<Role> = {}): Role {
     color: '#00ff00',
     icon: '💻',
     builtIn: true,
-    model: 'claude-3-5-sonnet',
+    model: 'claude-sonnet-4.5',
     ...overrides,
   };
 }

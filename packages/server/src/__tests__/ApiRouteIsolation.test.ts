@@ -46,12 +46,12 @@ vi.mock('../utils/logger.js', () => ({
 function createMockAgent(id: string, projectId: string | undefined, parentId: string | null = null) {
   return {
     id,
-    role: { id: parentId ? 'developer' : 'lead', name: parentId ? 'Developer' : 'Project Lead', model: 'claude-3-5-sonnet' },
+    role: { id: parentId ? 'developer' : 'lead', name: parentId ? 'Developer' : 'Project Lead', model: 'claude-sonnet-4.5' },
     status: 'running' as string,
     parentId,
     projectId,
     plan: null,
-    model: 'claude-3-5-sonnet',
+    model: 'claude-sonnet-4.5',
     task: 'test task',
     projectName: `Project ${projectId}`,
     cwd: '/tmp/test',
@@ -134,7 +134,7 @@ const mockAgentManager = {
 };
 
 const mockRoleRegistry = {
-  get: vi.fn().mockReturnValue({ id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '#888', icon: '🤖', model: 'claude-3-5-sonnet' }),
+  get: vi.fn().mockReturnValue({ id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '#888', icon: '🤖', model: 'claude-sonnet-4.5' }),
   getAll: vi.fn().mockReturnValue([]),
   register: vi.fn((role: any) => role),
   remove: vi.fn().mockReturnValue(true),

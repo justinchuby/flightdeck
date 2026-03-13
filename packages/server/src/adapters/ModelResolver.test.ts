@@ -25,28 +25,28 @@ describe('ModelResolver', () => {
 
   describe('tier alias resolution', () => {
     it('resolves "fast" to provider-specific models', () => {
-      expect(resolveModel('fast', 'copilot')?.model).toBe('claude-3-5-haiku');
-      expect(resolveModel('fast', 'claude')?.model).toBe('claude-3-5-haiku');
+      expect(resolveModel('fast', 'copilot')?.model).toBe('claude-haiku-4.5');
+      expect(resolveModel('fast', 'claude')?.model).toBe('haiku');
       expect(resolveModel('fast', 'gemini')?.model).toBe('gemini-2.5-flash-lite');
-      expect(resolveModel('fast', 'cursor')?.model).toBe('claude-3-5-haiku');
+      expect(resolveModel('fast', 'cursor')?.model).toBe('claude-haiku-4.5');
       expect(resolveModel('fast', 'codex')?.model).toBe('gpt-5.1-codex-mini');
-      expect(resolveModel('fast', 'opencode')?.model).toBe('anthropic/claude-3-5-haiku');
+      expect(resolveModel('fast', 'opencode')?.model).toBe('anthropic/claude-haiku-4-5');
     });
 
     it('resolves "standard" to provider-specific models', () => {
-      expect(resolveModel('standard', 'copilot')?.model).toBe('claude-sonnet-4-5');
-      expect(resolveModel('standard', 'claude')?.model).toBe('claude-sonnet-4-5');
+      expect(resolveModel('standard', 'copilot')?.model).toBe('claude-sonnet-4.6');
+      expect(resolveModel('standard', 'claude')?.model).toBe('sonnet');
       expect(resolveModel('standard', 'gemini')?.model).toBe('gemini-2.5-flash');
-      expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-4-5');
+      expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-4.6');
       expect(resolveModel('standard', 'codex')?.model).toBe('gpt-5.3-codex');
-      expect(resolveModel('standard', 'opencode')?.model).toBe('anthropic/claude-sonnet-4-5');
+      expect(resolveModel('standard', 'opencode')?.model).toBe('anthropic/claude-sonnet-4-6');
     });
 
     it('resolves "premium" to provider-specific models', () => {
-      expect(resolveModel('premium', 'copilot')?.model).toBe('claude-opus-4-6');
-      expect(resolveModel('premium', 'claude')?.model).toBe('claude-opus-4-6');
+      expect(resolveModel('premium', 'copilot')?.model).toBe('claude-opus-4.6');
+      expect(resolveModel('premium', 'claude')?.model).toBe('opus');
       expect(resolveModel('premium', 'gemini')?.model).toBe('gemini-2.5-pro');
-      expect(resolveModel('premium', 'cursor')?.model).toBe('claude-opus-4-6');
+      expect(resolveModel('premium', 'cursor')?.model).toBe('claude-opus-4.6');
       expect(resolveModel('premium', 'codex')?.model).toBe('gpt-5.4');
       expect(resolveModel('premium', 'opencode')?.model).toBe('anthropic/claude-opus-4-6');
     });
@@ -63,8 +63,8 @@ describe('ModelResolver', () => {
 
   describe('native model passthrough', () => {
     it('passes Anthropic models through on Copilot (multi-gateway)', () => {
-      const result = resolveModel('claude-opus-4-6', 'copilot')!;
-      expect(result.model).toBe('claude-opus-4-6');
+      const result = resolveModel('claude-opus-4.6', 'copilot')!;
+      expect(result.model).toBe('claude-opus-4.6');
       expect(result.translated).toBe(false);
     });
 
@@ -93,31 +93,32 @@ describe('ModelResolver', () => {
     });
   });
 
-  // ── Claude CLI passthrough (official model IDs) ─────────
+  // ── Claude CLI Aliases ─────────────────────────────────
 
-  describe('Claude CLI passthrough', () => {
-    it('passes claude-opus-4-6 through directly for Claude CLI', () => {
-      const result = resolveModel('claude-opus-4-6', 'claude')!;
-      expect(result.model).toBe('claude-opus-4-6');
-      expect(result.translated).toBe(false);
+  describe('Claude CLI short aliases', () => {
+    it('translates claude-opus-4.6 to "opus" for Claude CLI', () => {
+      const result = resolveModel('claude-opus-4.6', 'claude')!;
+      expect(result.model).toBe('opus');
+      expect(result.translated).toBe(true);
+      expect(result.reason).toContain('alias');
     });
 
-    it('passes claude-sonnet-4-5 through directly for Claude CLI', () => {
-      const result = resolveModel('claude-sonnet-4-5', 'claude')!;
-      expect(result.model).toBe('claude-sonnet-4-5');
-      expect(result.translated).toBe(false);
+    it('translates claude-sonnet-4.6 to "sonnet" for Claude CLI', () => {
+      const result = resolveModel('claude-sonnet-4.6', 'claude')!;
+      expect(result.model).toBe('sonnet');
+      expect(result.translated).toBe(true);
     });
 
-    it('passes claude-3-5-haiku through directly for Claude CLI', () => {
-      const result = resolveModel('claude-3-5-haiku', 'claude')!;
-      expect(result.model).toBe('claude-3-5-haiku');
-      expect(result.translated).toBe(false);
+    it('translates claude-haiku-4.5 to "haiku" for Claude CLI', () => {
+      const result = resolveModel('claude-haiku-4.5', 'claude')!;
+      expect(result.model).toBe('haiku');
+      expect(result.translated).toBe(true);
     });
 
-    it('passes claude-opus-4-5 through directly for Claude CLI', () => {
-      const result = resolveModel('claude-opus-4-5', 'claude')!;
-      expect(result.model).toBe('claude-opus-4-5');
-      expect(result.translated).toBe(false);
+    it('translates older claude-sonnet-4 to "sonnet"', () => {
+      const result = resolveModel('claude-sonnet-4', 'claude')!;
+      expect(result.model).toBe('sonnet');
+      expect(result.translated).toBe(true);
     });
   });
 
@@ -125,8 +126,8 @@ describe('ModelResolver', () => {
 
   describe('OpenCode provider prefix', () => {
     it('adds anthropic/ prefix for Anthropic models', () => {
-      const result = resolveModel('claude-opus-4-6', 'opencode')!;
-      expect(result.model).toBe('anthropic/claude-opus-4-6');
+      const result = resolveModel('claude-opus-4.6', 'opencode')!;
+      expect(result.model).toBe('anthropic/claude-opus-4.6');
       expect(result.translated).toBe(true);
       expect(result.reason).toContain('OpenCode');
     });
@@ -147,22 +148,22 @@ describe('ModelResolver', () => {
   // ── Cross-Provider Equivalences ────────────────────────
 
   describe('cross-provider equivalence mapping', () => {
-    it('maps claude-opus-4-6 to gemini-2.5-pro on Gemini', () => {
-      const result = resolveModel('claude-opus-4-6', 'gemini')!;
+    it('maps claude-opus-4.6 to gemini-2.5-pro on Gemini', () => {
+      const result = resolveModel('claude-opus-4.6', 'gemini')!;
       expect(result.model).toBe('gemini-2.5-pro');
       expect(result.translated).toBe(true);
       expect(result.reason).toContain('equivalent');
     });
 
-    it('maps claude-opus-4-6 to gpt-5.2-codex on Codex', () => {
-      const result = resolveModel('claude-opus-4-6', 'codex')!;
+    it('maps claude-opus-4.6 to gpt-5.2-codex on Codex', () => {
+      const result = resolveModel('claude-opus-4.6', 'codex')!;
       expect(result.model).toBe('gpt-5.2-codex');
       expect(result.translated).toBe(true);
     });
 
-    it('maps gpt-5.2-codex to claude-opus-4-6 on Claude', () => {
+    it('maps gpt-5.2-codex to claude-opus-4.6 on Claude (as "opus")', () => {
       const result = resolveModel('gpt-5.2-codex', 'claude')!;
-      expect(result.model).toBe('claude-opus-4-6');
+      expect(result.model).toBe('opus');
       expect(result.translated).toBe(true);
     });
 
@@ -181,7 +182,7 @@ describe('ModelResolver', () => {
     it('maps gemini-2.5-pro to equivalent on Copilot (not in restricted catalog)', () => {
       // Copilot only supports gemini-3-pro-preview from Google's catalog
       const result = resolveModel('gemini-2.5-pro', 'copilot')!;
-      expect(result.model).toBe('claude-opus-4-6');
+      expect(result.model).toBe('claude-opus-4.6');
       expect(result.translated).toBe(true);
     });
 
@@ -191,22 +192,22 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('maps gemini-3-pro-preview to claude-opus-4-6 on Claude', () => {
+    it('maps gemini-3-pro-preview to opus on Claude', () => {
       const result = resolveModel('gemini-3-pro-preview', 'claude')!;
-      expect(result.model).toBe('claude-opus-4-6');
+      expect(result.model).toBe('opus');
       expect(result.translated).toBe(true);
     });
 
-    it('maps claude-3-5-haiku to gpt-5.1-codex-mini on Codex', () => {
-      const result = resolveModel('claude-3-5-haiku', 'codex')!;
+    it('maps claude-haiku-4.5 to gpt-5.1-codex-mini on Codex', () => {
+      const result = resolveModel('claude-haiku-4.5', 'codex')!;
       expect(result.model).toBe('gpt-5.1-codex-mini');
       expect(result.translated).toBe(true);
     });
 
     it('maps cross-provider models with OpenCode prefix', () => {
-      // claude-opus-4-6 on OpenCode → passthrough with prefix (Anthropic is native)
-      const result = resolveModel('claude-opus-4-6', 'opencode')!;
-      expect(result.model).toBe('anthropic/claude-opus-4-6');
+      // claude-opus-4.6 on OpenCode → passthrough with prefix (Anthropic is native)
+      const result = resolveModel('claude-opus-4.6', 'opencode')!;
+      expect(result.model).toBe('anthropic/claude-opus-4.6');
     });
   });
 
@@ -228,7 +229,7 @@ describe('ModelResolver', () => {
 
     it('falls back for unknown model on Claude', () => {
       const result = resolveModel('mystery-model', 'claude')!;
-      expect(result.model).toBe('claude-sonnet-4-5');
+      expect(result.model).toBe('sonnet');
       expect(result.translated).toBe(true);
     });
   });
@@ -251,8 +252,8 @@ describe('ModelResolver', () => {
 
   describe('resolution metadata', () => {
     it('always includes original model name', () => {
-      const result = resolveModel('claude-opus-4-6', 'gemini')!;
-      expect(result.original).toBe('claude-opus-4-6');
+      const result = resolveModel('claude-opus-4.6', 'gemini')!;
+      expect(result.original).toBe('claude-opus-4.6');
     });
 
     it('includes reason for translated models', () => {
@@ -262,7 +263,7 @@ describe('ModelResolver', () => {
     });
 
     it('has no reason for passthrough models', () => {
-      const result = resolveModel('claude-opus-4-6', 'copilot')!;
+      const result = resolveModel('claude-opus-4.6', 'copilot')!;
       expect(result.reason).toBeUndefined();
     });
   });
@@ -271,10 +272,10 @@ describe('ModelResolver', () => {
 
   describe('real-world role model mapping', () => {
     const roleModels: Record<string, string> = {
-      architect: 'claude-opus-4-6',
-      developer: 'claude-opus-4-6',
+      architect: 'claude-opus-4.6',
+      developer: 'claude-opus-4.6',
       'code-reviewer': 'gemini-3-pro-preview',
-      'qa-tester': 'claude-sonnet-4-5',
+      'qa-tester': 'claude-sonnet-4.6',
       secretary: 'gpt-4.1',
       'product-manager': 'gpt-5.3-codex',
     };
@@ -291,18 +292,18 @@ describe('ModelResolver', () => {
       }
     });
 
-    it('architect (claude-opus-4-6) maps correctly across providers', () => {
-      expect(resolveModel('claude-opus-4-6', 'copilot')?.model).toBe('claude-opus-4-6');
-      expect(resolveModel('claude-opus-4-6', 'claude')?.model).toBe('claude-opus-4-6');
-      expect(resolveModel('claude-opus-4-6', 'gemini')?.model).toBe('gemini-2.5-pro');
-      expect(resolveModel('claude-opus-4-6', 'cursor')?.model).toBe('claude-opus-4-6');
-      expect(resolveModel('claude-opus-4-6', 'codex')?.model).toBe('gpt-5.2-codex');
-      expect(resolveModel('claude-opus-4-6', 'opencode')?.model).toBe('anthropic/claude-opus-4-6');
+    it('architect (claude-opus-4.6) maps correctly across providers', () => {
+      expect(resolveModel('claude-opus-4.6', 'copilot')?.model).toBe('claude-opus-4.6');
+      expect(resolveModel('claude-opus-4.6', 'claude')?.model).toBe('opus');
+      expect(resolveModel('claude-opus-4.6', 'gemini')?.model).toBe('gemini-2.5-pro');
+      expect(resolveModel('claude-opus-4.6', 'cursor')?.model).toBe('claude-opus-4.6');
+      expect(resolveModel('claude-opus-4.6', 'codex')?.model).toBe('gpt-5.2-codex');
+      expect(resolveModel('claude-opus-4.6', 'opencode')?.model).toBe('anthropic/claude-opus-4.6');
     });
 
     it('secretary (gpt-4.1) maps correctly across providers', () => {
       expect(resolveModel('gpt-4.1', 'copilot')?.model).toBe('gpt-4.1');
-      expect(resolveModel('gpt-4.1', 'claude')?.model).toBe('claude-sonnet-4-5');
+      expect(resolveModel('gpt-4.1', 'claude')?.model).toBe('sonnet');
       expect(resolveModel('gpt-4.1', 'gemini')?.model).toBe('gemini-2.5-flash');
       expect(resolveModel('gpt-4.1', 'cursor')?.model).toBe('gpt-4.1');
       expect(resolveModel('gpt-4.1', 'codex')?.model).toBe('gpt-4.1');
@@ -320,7 +321,7 @@ describe('ModelResolver', () => {
     });
 
     it('returns false for model names', () => {
-      expect(isTierAlias('claude-opus-4-6')).toBe(false);
+      expect(isTierAlias('claude-opus-4.6')).toBe(false);
       expect(isTierAlias('gpt-5.2')).toBe(false);
     });
 
@@ -334,7 +335,7 @@ describe('ModelResolver', () => {
     it('returns provider map for valid tier', () => {
       const models = getTierModels('premium');
       expect(models).toBeDefined();
-      expect(models!['copilot']).toBe('claude-opus-4-6');
+      expect(models!['copilot']).toBe('claude-opus-4.6');
       expect(models!['gemini']).toBe('gemini-2.5-pro');
       expect(models!['codex']).toBe('gpt-5.4');
     });
@@ -369,13 +370,13 @@ describe('ModelResolver', () => {
     });
 
     it('returns true for native models', () => {
-      expect(isValidModel('claude-opus-4-6', 'copilot')).toBe(true);
+      expect(isValidModel('claude-opus-4.6', 'copilot')).toBe(true);
       expect(isValidModel('gpt-5.2-codex', 'codex')).toBe(true);
       expect(isValidModel('gemini-2.5-pro', 'gemini')).toBe(true);
     });
 
     it('returns true for models with equivalence mappings', () => {
-      expect(isValidModel('claude-opus-4-6', 'gemini')).toBe(true);
+      expect(isValidModel('claude-opus-4.6', 'gemini')).toBe(true);
       expect(isValidModel('gpt-5.2-codex', 'claude')).toBe(true);
     });
 
@@ -412,7 +413,7 @@ describe('ModelResolver', () => {
   describe('getModelsForProvider()', () => {
     it('copilot returns Claude, GPT, and only gemini-3-pro-preview', () => {
       const models = getModelsForProvider('copilot');
-      expect(models).toContain('claude-opus-4-6');
+      expect(models).toContain('claude-opus-4.6');
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('gpt-5.1-codex');
       expect(models).toContain('gemini-3-pro-preview');
@@ -426,8 +427,8 @@ describe('ModelResolver', () => {
     it('claude returns only Anthropic models', () => {
       const models = getModelsForProvider('claude');
       expect(models.every(m => m.startsWith('claude-'))).toBe(true);
-      expect(models).toContain('claude-opus-4-6');
-      expect(models).toContain('claude-3-5-haiku');
+      expect(models).toContain('claude-opus-4.6');
+      expect(models).toContain('claude-haiku-4.5');
     });
 
     it('gemini returns only Google models', () => {

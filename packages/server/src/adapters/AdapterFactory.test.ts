@@ -165,11 +165,11 @@ describe('AdapterFactory', () => {
 
     it('includes --model flag when model provided', () => {
       const { options: opts } = buildStartOptions(
-        { ...baseConfig, model: 'claude-sonnet-4-5' },
+        { ...baseConfig, model: 'claude-sonnet-4' },
         { cwd: '/test' },
       );
       expect(opts.cliArgs).toContain('--model');
-      expect(opts.cliArgs).toContain('claude-sonnet-4-5');
+      expect(opts.cliArgs).toContain('claude-sonnet-4');
     });
 
     it('passes sessionId through opts without --resume CLI flag', () => {
@@ -294,25 +294,25 @@ describe('AdapterFactory', () => {
     });
 
     it('returns modelResolution metadata when model is translated', () => {
-      // claude-opus-4-6 on gemini should translate to a gemini-native model
+      // claude-opus-4.6 on gemini should translate to a gemini-native model
       const result = buildStartOptions(
-        { ...baseConfig, provider: 'gemini', model: 'claude-opus-4-6' },
+        { ...baseConfig, provider: 'gemini', model: 'claude-opus-4.6' },
         { cwd: '/test' },
       );
       expect(result.modelResolution).toBeDefined();
       expect(result.modelResolution!.translated).toBe(true);
-      expect(result.modelResolution!.original).toBe('claude-opus-4-6');
-      expect(result.modelResolution!.model).not.toBe('claude-opus-4-6');
+      expect(result.modelResolution!.original).toBe('claude-opus-4.6');
+      expect(result.modelResolution!.model).not.toBe('claude-opus-4.6');
     });
 
     it('returns non-translated modelResolution for native models', () => {
       const result = buildStartOptions(
-        { ...baseConfig, provider: 'copilot', model: 'claude-sonnet-4-5' },
+        { ...baseConfig, provider: 'copilot', model: 'claude-sonnet-4' },
         { cwd: '/test' },
       );
       expect(result.modelResolution).toBeDefined();
       expect(result.modelResolution!.translated).toBe(false);
-      expect(result.modelResolution!.model).toBe('claude-sonnet-4-5');
+      expect(result.modelResolution!.model).toBe('claude-sonnet-4');
     });
 
     it('returns undefined modelResolution when no model specified', () => {

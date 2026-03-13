@@ -47,11 +47,11 @@ vi.mock('../utils/logger.js', () => ({
 function createMockAgent(overrides: Record<string, any> = {}) {
   const base = {
     id: 'agent-123',
-    role: { id: 'developer', name: 'Developer', model: 'claude-3-5-sonnet' },
+    role: { id: 'developer', name: 'Developer', model: 'claude-sonnet-4.5' },
     status: 'idle' as string,
     parentId: null as string | null,
     plan: null,
-    model: 'claude-3-5-sonnet',
+    model: 'claude-sonnet-4.5',
     task: 'test task',
     projectName: 'Test Project',
     cwd: '/tmp/test',
@@ -76,7 +76,7 @@ function createMockAgent(overrides: Record<string, any> = {}) {
 function createLeadAgent(overrides: Record<string, any> = {}) {
   return createMockAgent({
     id: 'lead-001',
-    role: { id: 'lead', name: 'Project Lead', model: 'claude-3-5-sonnet' },
+    role: { id: 'lead', name: 'Project Lead', model: 'claude-sonnet-4.5' },
     parentId: null,
     toJSON: vi.fn().mockReturnValue({ id: 'lead-001', role: 'lead', status: 'idle' }),
     ...overrides,
@@ -128,7 +128,7 @@ const mockAgentManager = {
   autoSpawnSecretary: vi.fn().mockReturnValue(null),
 };
 
-const mockRole = { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '#888', icon: '🤖', model: 'claude-3-5-sonnet' };
+const mockRole = { id: 'developer', name: 'Developer', description: '', systemPrompt: '', color: '#888', icon: '🤖', model: 'claude-sonnet-4.5' };
 const mockRoleRegistry = {
   get: vi.fn().mockReturnValue(mockRole),
   getAll: vi.fn().mockReturnValue([mockRole]),
@@ -715,7 +715,7 @@ describe('GET /api/browse — security', () => {
       mockAgentManager.spawn.mockReturnValue(leadAgent);
       mockAgentManager.autoSpawnSecretary.mockReturnValue(secretaryAgent);
 
-      const leadRole = { id: 'lead', name: 'Project Lead', model: 'claude-3-5-sonnet' };
+      const leadRole = { id: 'lead', name: 'Project Lead', model: 'claude-sonnet-4.5' };
       mockRoleRegistry.get.mockImplementation((id: string) => {
         if (id === 'lead') return leadRole;
         return mockRole;
@@ -733,7 +733,7 @@ describe('GET /api/browse — security', () => {
       mockAgentManager.spawn.mockReturnValue(leadAgent);
       mockAgentManager.autoSpawnSecretary.mockReturnValue(null);
 
-      const leadRole = { id: 'lead', name: 'Project Lead', model: 'claude-3-5-sonnet' };
+      const leadRole = { id: 'lead', name: 'Project Lead', model: 'claude-sonnet-4.5' };
       mockRoleRegistry.get.mockImplementation((id: string) => {
         if (id === 'lead') return leadRole;
         return mockRole;

@@ -439,7 +439,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     });
   }, []);
 
-  const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue', options?: { broadcast?: boolean }) => {
+  const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
     setInput('');
@@ -466,7 +466,6 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
         : undefined,
     });
     const payload: Record<string, unknown> = { text, mode };
-    if (options?.broadcast) payload.broadcast = true;
     if (attachments.length > 0) {
       payload.attachments = attachments
         .filter((a) => a.data)

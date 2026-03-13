@@ -83,12 +83,12 @@ describe('Model Config API Routes', () => {
 
     it('reflects custom config after PUT', async () => {
       await put(`/projects/${projectId}/model-config`, {
-        config: { developer: ['claude-sonnet-4-5'] },
+        config: { developer: ['claude-sonnet-4.6'] },
       });
 
       const res = await get(`/projects/${projectId}/model-config`);
       const data = await res.json();
-      expect(data.config.developer).toEqual(['claude-sonnet-4-5']);
+      expect(data.config.developer).toEqual(['claude-sonnet-4.6']);
       expect(data.config.architect).toEqual(DEFAULT_MODEL_CONFIG.architect);
     });
   });
@@ -96,11 +96,11 @@ describe('Model Config API Routes', () => {
   describe('PUT /projects/:id/model-config', () => {
     it('updates config and returns merged result', async () => {
       const res = await put(`/projects/${projectId}/model-config`, {
-        config: { secretary: ['claude-3-5-haiku'] },
+        config: { secretary: ['claude-haiku-4.5'] },
       });
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.config.secretary).toEqual(['claude-3-5-haiku']);
+      expect(data.config.secretary).toEqual(['claude-haiku-4.5']);
       expect(data.config.developer).toEqual(DEFAULT_MODEL_CONFIG.developer);
     });
 
@@ -122,7 +122,7 @@ describe('Model Config API Routes', () => {
 
     it('rejects invalid shape — non-array values', async () => {
       const res = await put(`/projects/${projectId}/model-config`, {
-        config: { developer: 'claude-opus-4-6' },
+        config: { developer: 'claude-opus-4.6' },
       });
       expect(res.status).toBe(400);
     });
@@ -136,14 +136,14 @@ describe('Model Config API Routes', () => {
 
     it('returns 404 for unknown project', async () => {
       const res = await put('/projects/nonexistent/model-config', {
-        config: { developer: ['claude-opus-4-6'] },
+        config: { developer: ['claude-opus-4.6'] },
       });
       expect(res.status).toBe(404);
     });
 
     it('accepts empty config to restore defaults', async () => {
       await put(`/projects/${projectId}/model-config`, {
-        config: { developer: ['claude-3-5-haiku'] },
+        config: { developer: ['claude-haiku-4.5'] },
       });
       const res = await put(`/projects/${projectId}/model-config`, {
         config: {},

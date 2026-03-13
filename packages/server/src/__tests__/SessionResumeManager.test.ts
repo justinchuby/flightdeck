@@ -42,7 +42,7 @@ function makeAgentJSON(overrides: Partial<AgentJSON> = {}): AgentJSON {
     childIds: [],
     createdAt: new Date().toISOString(),
     outputPreview: '',
-    model: 'claude-opus-4-6',
+    model: 'claude-opus-4.6',
     inputTokens: 0,
     outputTokens: 0,
     contextWindowSize: 200000,

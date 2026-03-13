@@ -68,7 +68,7 @@ const rosterAgents = [
   {
     agentId: 'cc33dd44-ee55-ff66-7788-990011223344',
     role: 'reviewer',
-    model: 'claude-opus-4-6',
+    model: 'claude-opus-4.6',
     status: 'terminated',
     liveStatus: null,
     teamId: 'default',
@@ -87,7 +87,7 @@ const healthData = {
   agents: [
     { agentId: 'aa11bb22-cc33-dd44-ee55-ff6677889900', role: 'architect', model: 'claude-sonnet-4-6', status: 'running', uptimeMs: 540_000_000, lastTaskSummary: 'Designing auth module' },
     { agentId: 'bb22cc33-dd44-ee55-ff66-778899001122', role: 'developer', model: 'claude-sonnet-4-6', status: 'idle', uptimeMs: 450_000_000 },
-    { agentId: 'cc33dd44-ee55-ff66-7788-990011223344', role: 'reviewer', model: 'claude-opus-4-6', status: 'terminated', uptimeMs: 550_000_000, clonedFromId: 'original-123' },
+    { agentId: 'cc33dd44-ee55-ff66-7788-990011223344', role: 'reviewer', model: 'claude-opus-4.6', status: 'terminated', uptimeMs: 550_000_000, clonedFromId: 'original-123' },
   ],
 };
 

@@ -68,7 +68,7 @@ function makeAgent(overrides: Record<string, any> = {}) {
     childIds: [],
     createdAt: '2026-01-01T00:00:00Z',
     outputPreview: '',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4',
     provider: 'copilot',
     sessionId: 'sess-1234-5678',
     inputTokens: 0,

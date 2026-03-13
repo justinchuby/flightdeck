@@ -12,7 +12,7 @@ import {
 describe('ModelConfigDefaults', () => {
   describe('validateModelConfigShape', () => {
     it('accepts valid config', () => {
-      expect(validateModelConfigShape({ developer: ['claude-opus-4-6'] })).toBeNull();
+      expect(validateModelConfigShape({ developer: ['claude-opus-4.6'] })).toBeNull();
     });
 
     it('accepts empty object', () => {
@@ -32,7 +32,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('rejects non-array values', () => {
-      const err = validateModelConfigShape({ developer: 'claude-opus-4-6' });
+      const err = validateModelConfigShape({ developer: 'claude-opus-4.6' });
       expect(err).toContain('developer');
       expect(err).toContain('array');
     });
@@ -50,7 +50,7 @@ describe('ModelConfigDefaults', () => {
 
     it('rejects config where one role has empty array among valid ones', () => {
       const err = validateModelConfigShape({
-        developer: ['claude-opus-4-6'],
+        developer: ['claude-opus-4.6'],
         architect: [],
       });
       expect(err).toBe('Each role must have at least one model selected.');
@@ -59,12 +59,12 @@ describe('ModelConfigDefaults', () => {
 
   describe('validateModelConfig', () => {
     it('returns empty for valid config', () => {
-      expect(validateModelConfig({ developer: ['claude-opus-4-6'] })).toEqual([]);
+      expect(validateModelConfig({ developer: ['claude-opus-4.6'] })).toEqual([]);
     });
 
     it('returns unknown model IDs', () => {
       const unknown = validateModelConfig({
-        developer: ['claude-opus-4-6', 'fake-model'],
+        developer: ['claude-opus-4.6', 'fake-model'],
         architect: ['also-fake'],
       });
       expect(unknown).toContain('fake-model');
@@ -80,7 +80,7 @@ describe('ModelConfigDefaults', () => {
 
   describe('KNOWN_MODEL_IDS', () => {
     it('includes all AVAILABLE_MODELS IDs', () => {
-      const available = ['claude-3-5-haiku', 'claude-sonnet-4-5', 'claude-opus-4-6', 'gemini-3-pro-preview', 'gpt-5.1-codex'];
+      const available = ['claude-haiku-4.5', 'claude-sonnet-4.6', 'claude-opus-4.6', 'gemini-3-pro-preview', 'gpt-5.1-codex'];
       for (const id of available) {
         expect(KNOWN_MODEL_IDS).toContain(id);
       }
@@ -96,15 +96,15 @@ describe('ModelConfigDefaults', () => {
 
   describe('DEFAULT_MODEL_CONFIG', () => {
     it('has developer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.developer).toEqual(['claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG.developer).toEqual(['claude-opus-4.6']);
     });
 
     it('has architect defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.architect).toEqual(['claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG.architect).toEqual(['claude-opus-4.6']);
     });
 
     it('has code-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gemini-3-pro-preview', 'claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gemini-3-pro-preview', 'claude-opus-4.6']);
     });
 
     it('has critical-reviewer defaults', () => {
@@ -116,7 +116,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has tech-writer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['claude-sonnet-4-5', 'gpt-5.2', 'claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6']);
     });
 
     it('has secretary defaults', () => {
@@ -124,11 +124,11 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has qa-tester defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['qa-tester']).toEqual(['claude-sonnet-4-5']);
+      expect(DEFAULT_MODEL_CONFIG['qa-tester']).toEqual(['claude-sonnet-4.6']);
     });
 
     it('has designer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.designer).toEqual(['claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG.designer).toEqual(['claude-opus-4.6']);
     });
 
     it('has product-manager defaults', () => {
@@ -136,7 +136,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has generalist defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.generalist).toEqual(['claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG.generalist).toEqual(['claude-opus-4.6']);
     });
 
     it('has radical-thinker defaults', () => {
@@ -144,11 +144,11 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has agent defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.agent).toEqual(['claude-sonnet-4-5']);
+      expect(DEFAULT_MODEL_CONFIG.agent).toEqual(['claude-sonnet-4.6']);
     });
 
     it('has lead defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.lead).toEqual(['claude-opus-4-6']);
+      expect(DEFAULT_MODEL_CONFIG.lead).toEqual(['claude-opus-4.6']);
     });
 
     it('has defaults for all 14 built-in roles', () => {
@@ -186,11 +186,11 @@ describe('ProjectRegistry model config', () => {
 
     it('merges custom config over defaults', () => {
       const project = registry.create('Test');
-      const custom: ProjectModelConfig = { developer: ['claude-sonnet-4-5'] };
+      const custom: ProjectModelConfig = { developer: ['claude-sonnet-4.6'] };
       registry.setModelConfig(project.id, custom);
 
       const result = registry.getModelConfig(project.id);
-      expect(result.config.developer).toEqual(['claude-sonnet-4-5']);
+      expect(result.config.developer).toEqual(['claude-sonnet-4.6']);
       // Other roles still use defaults
       expect(result.config.architect).toEqual(DEFAULT_MODEL_CONFIG.architect);
       expect(result.config.secretary).toEqual(DEFAULT_MODEL_CONFIG.secretary);
@@ -199,23 +199,23 @@ describe('ProjectRegistry model config', () => {
     it('custom config fully overrides a role', () => {
       const project = registry.create('Test');
       const custom: ProjectModelConfig = {
-        architect: ['claude-3-5-haiku'],
+        architect: ['claude-haiku-4.5'],
       };
       registry.setModelConfig(project.id, custom);
 
       const result = registry.getModelConfig(project.id);
-      expect(result.config.architect).toEqual(['claude-3-5-haiku']);
+      expect(result.config.architect).toEqual(['claude-haiku-4.5']);
     });
 
     it('supports adding custom roles not in defaults', () => {
       const project = registry.create('Test');
       const custom: ProjectModelConfig = {
-        'my-custom-role': ['claude-opus-4-6'],
+        'my-custom-role': ['claude-opus-4.6'],
       };
       registry.setModelConfig(project.id, custom);
 
       const result = registry.getModelConfig(project.id);
-      expect(result.config['my-custom-role']).toEqual(['claude-opus-4-6']);
+      expect(result.config['my-custom-role']).toEqual(['claude-opus-4.6']);
       // Defaults still present
       expect(result.config.developer).toEqual(DEFAULT_MODEL_CONFIG.developer);
     });
@@ -226,7 +226,7 @@ describe('ProjectRegistry model config', () => {
       const project = registry.create('Test');
       const custom: ProjectModelConfig = {
         developer: ['gemini-3-pro-preview'],
-        secretary: ['claude-3-5-haiku'],
+        secretary: ['claude-haiku-4.5'],
       };
       registry.setModelConfig(project.id, custom);
 
@@ -234,12 +234,12 @@ describe('ProjectRegistry model config', () => {
       const registry2 = new ProjectRegistry(db);
       const result = registry2.getModelConfig(project.id);
       expect(result.config.developer).toEqual(['gemini-3-pro-preview']);
-      expect(result.config.secretary).toEqual(['claude-3-5-haiku']);
+      expect(result.config.secretary).toEqual(['claude-haiku-4.5']);
     });
 
     it('replaces previous config entirely', () => {
       const project = registry.create('Test');
-      registry.setModelConfig(project.id, { developer: ['claude-3-5-haiku'] });
+      registry.setModelConfig(project.id, { developer: ['claude-haiku-4.5'] });
       registry.setModelConfig(project.id, { architect: ['gpt-4.1'] });
 
       const result = registry.getModelConfig(project.id);
@@ -250,7 +250,7 @@ describe('ProjectRegistry model config', () => {
 
     it('can set empty config to restore all defaults', () => {
       const project = registry.create('Test');
-      registry.setModelConfig(project.id, { developer: ['claude-3-5-haiku'] });
+      registry.setModelConfig(project.id, { developer: ['claude-haiku-4.5'] });
       registry.setModelConfig(project.id, {});
 
       const result = registry.getModelConfig(project.id);

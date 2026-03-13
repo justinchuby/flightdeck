@@ -22,7 +22,7 @@ function createMockProvider(overrides?: Partial<SyncDataProvider>): SyncDataProv
       updatedAt: '2026-03-07T15:00:00Z',
     }),
     getAgentRoster: () => [
-      { id: 'agent-1', role: 'lead', status: 'running', model: 'claude-sonnet-4-5', task: 'Build the app' },
+      { id: 'agent-1', role: 'lead', status: 'running', model: 'claude-sonnet-4', task: 'Build the app' },
       { id: 'agent-2', role: 'developer', status: 'idle', task: 'Implement feature X' },
     ],
     ...overrides,

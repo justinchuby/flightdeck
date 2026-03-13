@@ -9,13 +9,13 @@ export { deriveModelName } from '../hooks/useModels';
 
 /** @deprecated Use useModels() hook instead — this is a static fallback only */
 export const AVAILABLE_MODELS: string[] = [
-  // Anthropic (official Claude CLI model IDs)
-  'claude-opus-4-6',
-  'claude-opus-4-6-1m',
-  'claude-opus-4-5',
-  'claude-sonnet-4-5',
-  'claude-3-5-sonnet',
-  'claude-3-5-haiku',
+  // Anthropic
+  'claude-opus-4.6',
+  'claude-opus-4.5',
+  'claude-sonnet-4.6',
+  'claude-sonnet-4.5',
+  'claude-sonnet-4',
+  'claude-haiku-4.5',
   // Google
   'gemini-3-pro-preview',
   'gemini-3-flash-preview',

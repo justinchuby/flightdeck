@@ -43,22 +43,12 @@ export interface ModelsData {
  * Uses a deterministic transform so no hardcoded map is needed.
  *
  * Examples:
- *   claude-opus-4-6    → "Claude Opus 4.6"
+ *   claude-opus-4.6    → "Claude Opus 4.6"
  *   gpt-5.3-codex      → "GPT 5.3 Codex"
  *   gemini-3-pro-preview → "Gemini 3 Pro Preview"
  *   gpt-5.1-codex-mini → "GPT 5.1 Codex Mini"
  */
-const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  'claude-opus-4-6': 'Claude Opus 4.6',
-  'claude-opus-4-6-1m': 'Claude Opus 4.6 (1M)',
-  'claude-opus-4-5': 'Claude Opus 4.5',
-  'claude-sonnet-4-5': 'Claude Sonnet 4.5',
-  'claude-3-5-sonnet': 'Claude 3.5 Sonnet',
-  'claude-3-5-haiku': 'Claude 3.5 Haiku',
-};
-
 export function deriveModelName(id: string): string {
-  if (MODEL_DISPLAY_NAMES[id]) return MODEL_DISPLAY_NAMES[id];
   return id
     .split('-')
     .map((part) => {

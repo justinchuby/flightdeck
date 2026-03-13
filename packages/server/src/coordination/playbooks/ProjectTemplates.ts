@@ -26,10 +26,10 @@ const BUILT_IN_TEMPLATES: ProjectTemplate[] = [
     name: 'Full-Stack Feature',
     description: 'Complete feature implementation with architect, 2 developers, code reviewer, and tester',
     roles: [
-      { role: 'architect',      model: 'claude-opus-4-6',         count: 1 },
-      { role: 'developer',      model: 'claude-sonnet-4-5',       count: 2 },
+      { role: 'architect',      model: 'claude-opus-4.6',         count: 1 },
+      { role: 'developer',      model: 'claude-sonnet-4.6',       count: 2 },
       { role: 'code-reviewer',  model: 'gemini-3-pro-preview',    count: 1 },
-      { role: 'qa-tester',      model: 'claude-sonnet-4-5',       count: 1 },
+      { role: 'qa-tester',      model: 'claude-sonnet-4.6',       count: 1 },
     ],
     initialTasks: [
       { description: 'Architecture review and design',   dependencies: [] },
@@ -46,9 +46,9 @@ const BUILT_IN_TEMPLATES: ProjectTemplate[] = [
     name: 'Bug Investigation & Fix',
     description: 'Targeted bug fix with architect exploration and developer fix',
     roles: [
-      { role: 'architect',     model: 'claude-sonnet-4-5', count: 1 },
-      { role: 'developer',     model: 'claude-sonnet-4-5', count: 1 },
-      { role: 'code-reviewer', model: 'claude-3-5-haiku',  count: 1 },
+      { role: 'architect',     model: 'claude-sonnet-4.6', count: 1 },
+      { role: 'developer',     model: 'claude-sonnet-4.6', count: 1 },
+      { role: 'code-reviewer', model: 'claude-haiku-4.5',  count: 1 },
     ],
     initialTasks: [
       { description: 'Investigate root cause',      dependencies: [] },
@@ -64,8 +64,8 @@ const BUILT_IN_TEMPLATES: ProjectTemplate[] = [
     name: 'Documentation Sprint',
     description: 'Parallel documentation with tech writer and reviewer',
     roles: [
-      { role: 'tech-writer',   model: 'claude-sonnet-4-5', count: 2 },
-      { role: 'code-reviewer', model: 'claude-3-5-haiku',  count: 1 },
+      { role: 'tech-writer',   model: 'claude-sonnet-4.6', count: 2 },
+      { role: 'code-reviewer', model: 'claude-haiku-4.5',  count: 1 },
     ],
     initialTasks: [
       { description: 'Audit existing documentation',  dependencies: [] },
@@ -81,10 +81,10 @@ const BUILT_IN_TEMPLATES: ProjectTemplate[] = [
     name: 'Major Refactoring',
     description: 'Systematic refactoring with architect-led design and parallel implementation',
     roles: [
-      { role: 'architect',         model: 'claude-opus-4-6',      count: 1 },
-      { role: 'developer',         model: 'claude-sonnet-4-5',    count: 3 },
+      { role: 'architect',         model: 'claude-opus-4.6',      count: 1 },
+      { role: 'developer',         model: 'claude-sonnet-4.6',    count: 3 },
       { role: 'code-reviewer',     model: 'gemini-3-pro-preview', count: 1 },
-      { role: 'critical-reviewer', model: 'claude-opus-4-6',      count: 1 },
+      { role: 'critical-reviewer', model: 'claude-opus-4.6',      count: 1 },
     ],
     initialTasks: [
       { description: 'Design refactoring plan',             dependencies: [] },
@@ -102,8 +102,8 @@ const BUILT_IN_TEMPLATES: ProjectTemplate[] = [
     name: 'Security Audit',
     description: 'Security-focused review with critical reviewer and developer fixes',
     roles: [
-      { role: 'critical-reviewer', model: 'claude-opus-4-6',   count: 1 },
-      { role: 'developer',         model: 'claude-sonnet-4-5', count: 1 },
+      { role: 'critical-reviewer', model: 'claude-opus-4.6',   count: 1 },
+      { role: 'developer',         model: 'claude-sonnet-4.6', count: 1 },
     ],
     initialTasks: [
       { description: 'Scan for vulnerabilities', dependencies: [] },
