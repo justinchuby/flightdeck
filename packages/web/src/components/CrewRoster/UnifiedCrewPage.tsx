@@ -510,9 +510,8 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
       setCrewSummaries(summaries);
 
       const teamList = teamsResult.status === 'fulfilled' ? (teamsResult.value.teams ?? []) : [];
-      const statusQ = statusFilter !== 'all' && statusFilter !== 'active' ? `?status=${statusFilter}` : '';
       const agentResults = await Promise.allSettled(
-        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents${statusQ}`))
+        teamList.map(t => apiFetch<RosterAgent[]>(`/teams/${t.teamId}/agents`))
       );
 
       const allAgents: RosterAgent[] = [];
@@ -551,7 +550,7 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, projectId]);
+  }, [projectId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -734,11 +733,11 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
             md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
             ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
             ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
-            md:self-start md:sticky md:top-0 md:max-h-full
+            md:self-start md:sticky md:top-0 md:max-h-screen
           `}
         >
           {selectedAgent && (
-            <div className="h-full overflow-y-auto">
+            <div className="h-full md:max-h-screen overflow-hidden">
               <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
             </div>
           )}

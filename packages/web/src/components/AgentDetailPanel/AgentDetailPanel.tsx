@@ -34,6 +34,7 @@ import { formatTokens } from '../../utils/format';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { getRoleIcon } from '../../utils/getRoleIcon';
 import { MentionText } from '../../utils/markdown';
+import { buildFeedbackUrl } from '../ProvideFeedback';
 import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
 import { AgentChatPanel } from '../AgentChatPanel';
@@ -212,25 +213,17 @@ function AgentDetailPanelContent({ agentId, teamId, mode, onClose }: AgentDetail
 
   const openGitHubIssue = () => {
     const title = `Agent failure: ${roleName} ${provider ?? 'unknown'} ${model} - exit code ${exitCode ?? 'unknown'}`;
-    const bodyParts = [
-      '## Agent Failure Report', '',
-      '| Field | Value |', '|-------|-------|',
-      `| **Agent ID** | \`${agentId}\` |`,
-      `| **Role** | ${roleName} |`,
-      `| **Provider** | ${provider ?? 'N/A'} |`,
-      `| **Model** | ${model} |`,
-      `| **Exit Code** | ${exitCode ?? 'N/A'} |`,
-      `| **Session ID** | \`${sessionId ?? 'N/A'}\` |`, '',
-    ];
-    if (task) bodyParts.push('## Task', '', task, '');
+    const errorParts: string[] = [];
+    errorParts.push(`Agent: ${roleName} (${agentId})`);
+    errorParts.push(`Provider: ${provider ?? 'N/A'}, Model: ${model}`);
+    errorParts.push(`Exit Code: ${exitCode ?? 'N/A'}, Session: ${sessionId ?? 'N/A'}`);
+    if (task) errorParts.push(`Task: ${task}`);
     if (exitError) {
       const truncated = exitError.length > 1000 ? exitError.slice(0, 1000) + '\n… (truncated)' : exitError;
-      bodyParts.push('## Error Output', '', '```', truncated, '```', '');
+      errorParts.push(`Error:\n${truncated}`);
     }
-    bodyParts.push('## Environment', '', `- **Timestamp**: ${new Date().toISOString()}`, `- **Agent Status**: ${status}`);
-    const body = bodyParts.join('\n');
-    const params = new URLSearchParams({ title, body, labels: 'bug,agent-failure' });
-    window.open(`https://github.com/justinchuby/flightdeck/issues/new?${params.toString()}`, '_blank');
+    const url = buildFeedbackUrl({ title, errorMessage: errorParts.join('\n') });
+    window.open(url, '_blank');
   };
 
   return (
