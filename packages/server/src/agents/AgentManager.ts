@@ -722,11 +722,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (this.costTracker) {
       const tracker = this.costTracker;
       agent.onUsage(({ agentId, inputTokens, outputTokens, dagTaskId, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize }) => {
-        if (dagTaskId && agent.parentId) {
-          tracker.recordUsage(agentId, dagTaskId, agent.parentId, inputTokens, outputTokens, {
-            cacheReadTokens, cacheWriteTokens, costUsd,
-          });
-        }
+        const effectiveTaskId = dagTaskId || '_unattributed';
+        const effectiveLeadId = agent.parentId || agentId;
+        tracker.recordUsage(agentId, effectiveTaskId, effectiveLeadId, inputTokens, outputTokens, {
+          cacheReadTokens, cacheWriteTokens, costUsd,
+        });
         this.emit('agent:usage', { agentId, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize });
       });
     } else {
