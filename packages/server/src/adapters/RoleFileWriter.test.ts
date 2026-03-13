@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readFile, writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { tmpdir } from 'os';
 import {
   CopilotRoleFileWriter,
@@ -325,8 +325,8 @@ describe('CursorRoleFileWriter', () => {
     const files = await writer.writeRoleFiles(sampleRoles, tempDir);
 
     expect(files).toHaveLength(2);
-    expect(files[0]).toContain('.cursor/rules/flightdeck-developer.mdc');
-    expect(files[1]).toContain('.cursor/rules/flightdeck-architect.mdc');
+    expect(files[0]).toContain(join('.cursor', 'rules', 'flightdeck-developer.mdc'));
+    expect(files[1]).toContain(join('.cursor', 'rules', 'flightdeck-architect.mdc'));
   });
 
   it('produces YAML frontmatter with description and alwaysApply', async () => {
@@ -804,6 +804,52 @@ describe('Cross-writer consistency', () => {
       const writer = createRoleFileWriter(provider);
       expect(writer.getFormat()).toBeTruthy();
       expect(typeof writer.getFormat()).toBe('string');
+    }
+  });
+});
+
+// ── Cross-platform path safety ─────────────────────────────────────
+
+describe('Cross-platform path construction', () => {
+  it('user-level writers use path.join for all paths (no hardcoded separators)', async () => {
+    const fakeHome = await mkdtemp(join(tmpdir(), 'xplat-'));
+    try {
+      const writers = [
+        { writer: new CopilotRoleFileWriter(fakeHome), label: 'copilot' },
+        { writer: new ClaudeRoleFileWriter(fakeHome), label: 'claude' },
+        { writer: new GeminiRoleFileWriter(fakeHome), label: 'gemini' },
+        { writer: new CodexRoleFileWriter(fakeHome), label: 'codex' },
+      ];
+
+      for (const { writer, label } of writers) {
+        const files = await writer.writeRoleFiles(singleRole, '/should/be/ignored');
+        for (const filePath of files) {
+          // Every returned path must start with the injected home dir
+          expect(filePath, `${label}: path should start with homeDir`).toMatch(
+            new RegExp(`^${fakeHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+          );
+          // Path should use the platform separator, never a mix
+          const afterHome = filePath.slice(fakeHome.length);
+          const wrongSep = sep === '/' ? '\\' : '/';
+          expect(afterHome, `${label}: path should not contain wrong separator '${wrongSep}'`).not.toContain(wrongSep);
+        }
+      }
+    } finally {
+      await rm(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  it('returned paths contain platform-appropriate separators', async () => {
+    const fakeHome = await mkdtemp(join(tmpdir(), 'xplat-sep-'));
+    try {
+      const writer = new CopilotRoleFileWriter(fakeHome);
+      const files = await writer.writeRoleFiles(singleRole, '/ignored');
+
+      // The path should contain the expected directory structure joined by platform sep
+      const expectedFragment = ['.copilot', 'agents', 'flightdeck-reviewer.agent.md'].join(sep);
+      expect(files[0]).toContain(expectedFragment);
+    } finally {
+      await rm(fakeHome, { recursive: true, force: true });
     }
   });
 });
