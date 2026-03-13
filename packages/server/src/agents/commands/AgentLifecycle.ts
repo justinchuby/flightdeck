@@ -268,8 +268,9 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       : `${dagPrefix}${req.task}`;
     ctx.reportedCompletions.delete(`${child.id}:idle`);
     ctx.reportedCompletions.delete(`${child.id}:exit`);
-    child.sendMessage(taskPrompt);
+    // Check status before sending prompt to avoid reporting an idle agent as busy
     const statusNote = child.status === 'running' ? ' (task queued)' : '';
+    child.sendMessage(taskPrompt);
     const dupMatch = findSimilarActiveDelegation(ctx, req.task, child.id);
     const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
     const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote}${dagNote} — ${req.task.slice(0, 120)}${dupNote}`;
