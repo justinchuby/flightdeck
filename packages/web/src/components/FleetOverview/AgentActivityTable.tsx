@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 import type { FileLock } from './FleetOverview';
-import { Square, RefreshCw, Terminal, Zap, Check, Play } from 'lucide-react';
+import { Square, RefreshCw, Terminal, Zap, Check } from 'lucide-react';
 import { EmptyState } from '../Shared';
 import { formatTokens } from '../../utils/format';
 import { useModels } from '../../hooks/useModels';
@@ -358,18 +358,6 @@ export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props)
                         title="Restart agent"
                       >
                         <RefreshCw size={14} />
-                      </button>
-                    )}
-                    {(agent.status === 'completed' || agent.status === 'failed' || agent.status === 'terminated') && agent.sessionId && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          api.resumeAgent(agent.id, agent.sessionId!);
-                        }}
-                        className="p-1 text-th-text-muted hover:text-green-600 dark:hover:text-green-400"
-                        title="Resume session — continue from where the agent left off"
-                      >
-                        <Play size={14} />
                       </button>
                     )}
                     {isActive && (

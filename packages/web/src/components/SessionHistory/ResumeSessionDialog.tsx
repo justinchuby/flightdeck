@@ -113,6 +113,7 @@ export function ResumeSessionDialog({ projectId, lastSession, onClose, onResume 
           freshStart: mode === 'fresh',
           resumeAll: mode === 'resume-all',
           agents: mode === 'select' ? Array.from(selectedAgents) : undefined,
+          sessionId: lastSession.id,
         }),
       });
       onResume();

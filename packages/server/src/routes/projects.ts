@@ -702,7 +702,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     res.json({ ...briefing, formatted: projectRegistry.formatBriefing(briefing) });
   });
 
-  // Resume a project — finds the latest session and resumes it (same sessionId + leadId)
+  // Resume a project — resumes a specific session (or the latest) with optional team respawn
   router.post('/projects/:id/resume', spawnLimiter, (req, res) => {
     if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
     const project = projectRegistry.get(String(req.params.id));
@@ -716,11 +716,20 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
     }
 
-    const { task: requestTask, model, freshStart, resumeAll, agents: agentIds } = req.body;
+    const { task: requestTask, model, freshStart, resumeAll, agents: agentIds, sessionId: targetSessionId } = req.body;
     try {
-      // Find the last session for resume continuity
+      // Find session to resume: use explicit sessionId if provided, otherwise latest
       const lastSessions = projectRegistry.getSessions(project.id);
-      const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
+      let lastSession = null;
+      if (!freshStart) {
+        if (targetSessionId != null) {
+          // Resume a specific session selected by the user
+          lastSession = lastSessions.find((s) => s.id === Number(targetSessionId)) ?? null;
+          if (!lastSession) return res.status(404).json({ error: 'Specified session not found for this project' });
+        } else {
+          lastSession = lastSessions.length > 0 ? lastSessions[0] : null;
+        }
+      }
 
       let agent: ReturnType<typeof agentManager.spawn>;
       let task: string | undefined;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
-import { RefreshCw, Square, Terminal, Zap, Check, Play } from 'lucide-react';
+import { RefreshCw, Square, Terminal, Zap, Check } from 'lucide-react';
 import { AgentIdBadge } from '../../utils/markdown';
 import { agentStatusText } from '../../utils/statusColors';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -75,18 +75,6 @@ export function AgentCard({ agent, api }: Props) {
               title="Restart agent"
             >
               <RefreshCw size={14} />
-            </button>
-          )}
-          {(agent.status === 'completed' || agent.status === 'failed' || agent.status === 'terminated') && agent.sessionId && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                api.resumeAgent(agent.id, agent.sessionId!);
-              }}
-              className="p-1 text-th-text-muted hover:text-green-600 dark:hover:text-green-400"
-              title="Resume session — continue from where the agent left off"
-            >
-              <Play size={14} />
             </button>
           )}
           {(agent.status === 'running' || agent.status === 'idle') && (
