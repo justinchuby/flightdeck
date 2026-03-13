@@ -396,6 +396,43 @@ describe('HeartbeatMonitor', () => {
     }));
   });
 
+  // ── 11b. haltHeartbeat suppresses lead nudges ──────────────────────
+
+  it('does not nudge lead when haltHeartbeat is active', () => {
+    const lead = makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Team Lead' }, status: 'idle' });
+    const child = makeAgent({ id: 'child-1', parentId: 'lead-1', status: 'idle' });
+    ctx.getAllAgents.mockReturnValue([lead, child]);
+    ctx.getDelegationsMap.mockReturnValue(
+      new Map([['d1', makeDelegation({ fromAgentId: 'lead-1', status: 'active' })]])
+    );
+    ctx.getDagSummary.mockReturnValue(null);
+
+    monitor.trackIdle('lead-1');
+    monitor.haltHeartbeat('lead-1');
+    vi.advanceTimersByTime(90_000);
+    triggerCheck();
+
+    expect(lead.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('resumes lead nudges after resumeHeartbeat', () => {
+    const lead = makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Team Lead' }, status: 'idle' });
+    const child = makeAgent({ id: 'child-1', parentId: 'lead-1', status: 'idle' });
+    ctx.getAllAgents.mockReturnValue([lead, child]);
+    ctx.getDelegationsMap.mockReturnValue(
+      new Map([['d1', makeDelegation({ fromAgentId: 'lead-1', status: 'active' })]])
+    );
+    ctx.getDagSummary.mockReturnValue(null);
+
+    monitor.trackIdle('lead-1');
+    monitor.haltHeartbeat('lead-1');
+    monitor.resumeHeartbeat('lead-1');
+    vi.advanceTimersByTime(90_000);
+    triggerCheck();
+
+    expect(lead.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
   // ── 12. start/stop manages timer ──────────────────────────────────
 
   it('start creates an interval and stop clears it', () => {

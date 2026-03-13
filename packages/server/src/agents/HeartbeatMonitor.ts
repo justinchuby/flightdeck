@@ -163,8 +163,8 @@ export class HeartbeatMonitor {
       const idleSince = this.leadIdleSince.get(lead.id);
       if (!idleSince) continue;
 
-      // Don't nudge if the lead went idle after a human interrupt
-      if (this.humanInterrupted.has(lead.id)) continue;
+      // Don't nudge if the lead went idle after a human interrupt or has halted heartbeat
+      if (this.humanInterrupted.has(lead.id) || this.haltedAgents.has(lead.id)) continue;
 
       // Don't nudge if lead went idle less than 60s ago
       const idleDuration = Date.now() - idleSince;
