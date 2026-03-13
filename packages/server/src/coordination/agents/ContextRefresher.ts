@@ -300,9 +300,11 @@ export class ContextRefresher {
     this.periodicHandle = setTimeout(() => {
       this.periodicHandle = null;
       if (!this.running) return;
-      if (this.hasActiveSubLeads()) {
-        this.refreshStatusReceivers();
-      }
+      try {
+        if (this.hasActiveSubLeads()) {
+          this.refreshStatusReceivers();
+        }
+      } catch { /* best-effort periodic refresh */ }
       this.schedulePeriodicRefresh();
     }, this.currentIntervalMs);
   }

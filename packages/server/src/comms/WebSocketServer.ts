@@ -96,14 +96,16 @@ export class WebSocketServer {
 
       // Send full state on connect — browser UI needs all data; agent clients
       // that call subscribe-project will get re-filtered data at that point.
-      ws.send(
-        JSON.stringify({
-          type: 'init',
-          agents: agentManager.getAll().map((a) => a.toJSON()),
-          locks: lockRegistry.getAll(),
-          systemPaused: agentManager.isSystemPaused,
-        }),
-      );
+      try {
+        ws.send(
+          JSON.stringify({
+            type: 'init',
+            agents: agentManager.getAll().map((a) => a.toJSON()),
+            locks: lockRegistry.getAll(),
+            systemPaused: agentManager.isSystemPaused,
+          }),
+        );
+      } catch { /* connection closed during send */ }
     });
 
     // Wire events by domain
@@ -117,7 +119,7 @@ export class WebSocketServer {
     this.heartbeatTimer = setInterval(() => {
       for (const [id, client] of this.clients) {
         if (client.ws.readyState === WebSocket.OPEN) {
-          client.ws.ping();
+          try { client.ws.ping(); } catch { this.clients.delete(id); }
         } else {
           this.clients.delete(id);
         }
@@ -216,7 +218,9 @@ export class WebSocketServer {
         this.textBuffer.set(agentId, { texts: [text], projectId });
       }
       if (!this.textFlushTimer) {
-        this.textFlushTimer = setInterval(() => this.flushTextBuffer(), WebSocketServer.TEXT_FLUSH_MS);
+        this.textFlushTimer = setInterval(() => {
+          try { this.flushTextBuffer(); } catch { /* broadcast errors handled inside */ }
+        }, WebSocketServer.TEXT_FLUSH_MS);
       }
     });
 
@@ -425,13 +429,15 @@ export class WebSocketServer {
         if (msg.agentId && msg.agentId !== '*') {
           const agent = this.agentManager.get(msg.agentId);
           if (agent) {
-            client.ws.send(
-              JSON.stringify({
-                type: 'agent:buffer',
-                agentId: msg.agentId,
-                data: agent.getBufferedOutput(),
-              }),
-            );
+            try {
+              client.ws.send(
+                JSON.stringify({
+                  type: 'agent:buffer',
+                  agentId: msg.agentId,
+                  data: agent.getBufferedOutput(),
+                }),
+              );
+            } catch { /* connection broken */ }
           }
         }
         break;

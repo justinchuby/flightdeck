@@ -56,6 +56,15 @@ app.get('/health', (_req, res) => {
 app.use('/api', authMiddleware);
 app.use('/api', apiRouter(container));
 
+// Global error handler — catches unhandled route/middleware errors so they
+// return a 500 instead of crashing the process.
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ module: 'api', msg: 'Unhandled route error', err: err.message, stack: err.stack });
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Serve built web frontend in production
 const webDistPath = path.resolve(__dirname, '../../web/dist');
 if (fs.existsSync(webDistPath)) {
@@ -185,7 +194,17 @@ async function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Log unhandled rejections but do NOT crash — the server can continue serving.
+// Before this fix, any stray unhandled rejection (e.g. a network hiccup in an
+// agent adapter) would kill the entire process, leaving Vite with ECONNREFUSED.
 process.on('unhandledRejection', (reason: unknown) => {
-  logger.error({ module: 'api', msg: 'Unhandled promise rejection', err: String(reason) });
-  gracefulShutdown('unhandledRejection');
+  logger.error({ module: 'api', msg: 'Unhandled promise rejection (non-fatal)', err: String(reason) });
+});
+
+// Synchronous exceptions in timer callbacks / event handlers are truly fatal —
+// state may be corrupted, so we must shut down.
+process.on('uncaughtException', (err: Error) => {
+  logger.error({ module: 'api', msg: 'Uncaught exception', err: err.message, stack: err.stack });
+  gracefulShutdown('uncaughtException');
 });

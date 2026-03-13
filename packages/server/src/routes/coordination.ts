@@ -387,18 +387,27 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Keepalive every 30s to prevent proxy/load-balancer timeouts
     const keepaliveTimer = setInterval(() => {
       if (!res.writableEnded) {
-        res.write(': keepalive\n\n');
+        try {
+          res.write(': keepalive\n\n');
+        } catch {
+          clearInterval(keepaliveTimer);
+        }
       }
     }, 30_000);
 
-    // Cleanup on client disconnect
-    req.on('close', () => {
+    const cleanup = () => {
       activityLedger.off('activity', onActivity);
       lockRegistry.off('lock:acquired', onLockAcquired);
       lockRegistry.off('lock:released', onLockReleased);
       lockRegistry.off('lock:expired', onLockExpired);
       clearInterval(keepaliveTimer);
-    });
+    };
+
+    // Handle broken connections — cleanup before 'close' fires
+    res.on('error', cleanup);
+
+    // Cleanup on client disconnect
+    req.on('close', cleanup);
   });
 
   return router;

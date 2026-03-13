@@ -43,7 +43,9 @@ export class HeartbeatMonitor {
 
   start(intervalMs = 120_000): void {
     this.stop();
-    this.timer = setInterval(() => this.check(), intervalMs);
+    this.timer = setInterval(() => {
+      try { this.check(); } catch { /* best-effort heartbeat check */ }
+    }, intervalMs);
   }
 
   stop(): void {
