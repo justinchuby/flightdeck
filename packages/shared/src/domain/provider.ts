@@ -96,9 +96,8 @@ export interface ProviderDefinition {
   restrictedModels?: Record<string, string[]>;
   /** Concrete model for each quality tier */
   tierModels: ProviderTierModels;
-  /** CLI-specific model name aliases (e.g. Claude: 'claude-opus-4.6' → 'opus').
-   *  Only needed when a CLI requires short names instead of full model IDs.
-   *  Other providers accept full model names directly, so they don't need aliases. */
+  /** CLI-specific model name aliases — maps full model IDs to CLI-accepted short names.
+   *  Currently unused: all providers now accept official model IDs directly. */
   modelAliases?: Record<string, string>;
   /** CLI-specific model name prefix per backend (e.g. OpenCode: { anthropic: 'anthropic' }) */
   modelPrefixes?: Record<string, string>;
@@ -138,7 +137,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     modelArgStrategy: 'flag',
     nativeModelProviders: ['anthropic', 'openai', 'google', 'xai'],
     restrictedModels: { google: ['gemini-3-pro-preview'] },
-    tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.6' },
+    tierModels: { fast: 'claude-3-5-haiku', standard: 'claude-sonnet-4-5', premium: 'claude-opus-4-6' },
     authCommand: 'gh auth status',
     authLabel: 'Authenticated via GitHub',
     color: { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-l-purple-500', tab: 'text-purple-400 border-purple-400' },
@@ -180,21 +179,11 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     requiredEnvVars: ['ANTHROPIC_API_KEY'],
     supportsResume: true,
     modelFlag: '--model',
-    defaultModel: 'claude-sonnet-4',
+    defaultModel: 'claude-sonnet-4-5',
     agentFileFormat: 'CLAUDE.md',
     modelArgStrategy: 'flag',
     nativeModelProviders: ['anthropic'],
-    tierModels: { fast: 'haiku', standard: 'sonnet', premium: 'opus' },
-    // Claude CLI requires short model names (opus/sonnet/haiku) instead of full IDs.
-    // Other providers accept full model names directly, so they don't need aliases.
-    modelAliases: {
-      'claude-opus-4.6': 'opus',
-      'claude-opus-4.5': 'opus',
-      'claude-sonnet-4.6': 'sonnet',
-      'claude-sonnet-4.5': 'sonnet',
-      'claude-sonnet-4': 'sonnet',
-      'claude-haiku-4.5': 'haiku',
-    },
+    tierModels: { fast: 'claude-3-5-haiku', standard: 'claude-sonnet-4-5', premium: 'claude-opus-4-6' },
     authLabel: 'Authenticated via Anthropic API key',
     color: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-l-amber-500', tab: 'text-orange-400 border-orange-400' },
     docsUrl: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview',
@@ -238,7 +227,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     agentFileFormat: '.cursorrules',
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google'],
-    tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.6' },
+    tierModels: { fast: 'claude-3-5-haiku', standard: 'claude-sonnet-4-5', premium: 'claude-opus-4-6' },
     authLabel: 'Authenticated via Cursor',
     color: { bg: 'bg-cyan-500/15', text: 'text-cyan-400', border: 'border-l-cyan-500', tab: 'text-cyan-400 border-cyan-400' },
     docsUrl: 'https://www.cursor.com/',
@@ -257,7 +246,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     supportsResume: true,
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google', 'local'],
-    tierModels: { fast: 'anthropic/claude-haiku-4-5', standard: 'anthropic/claude-sonnet-4-6', premium: 'anthropic/claude-opus-4-6' },
+    tierModels: { fast: 'anthropic/claude-3-5-haiku', standard: 'anthropic/claude-sonnet-4-5', premium: 'anthropic/claude-opus-4-6' },
     modelPrefixes: { anthropic: 'anthropic', openai: 'openai', google: 'google' },
     authLabel: 'Manages own keys',
     color: { bg: 'bg-zinc-500/15', text: 'text-zinc-400', border: 'border-l-zinc-500', tab: 'text-zinc-400 border-zinc-400' },

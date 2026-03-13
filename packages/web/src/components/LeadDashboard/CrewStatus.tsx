@@ -17,7 +17,7 @@ const STATUS_ICON: Record<string, typeof CheckCircle> = {
   terminated: XCircle,
 };
 
-/** Shorten model ID for display (e.g. "claude-sonnet-4.6" → "Sonnet 4.6") */
+/** Shorten model ID for display (e.g. "claude-sonnet-4-5" → "Sonnet 4.6") */
 function shortModel(model?: string): string {
   if (!model) return '';
   const m = model.toLowerCase();

@@ -107,9 +107,9 @@ function makeStandardTestData(): TimelineData {
     makeSegment('completed', 108, 120),
   ];
 
-  const lead = makeAgent('lead-agent-001', 'lead', leadSegments, { model: 'claude-sonnet-4' });
+  const lead = makeAgent('lead-agent-001', 'lead', leadSegments, { model: 'claude-sonnet-4-5' });
   const dev = makeAgent('dev-agent-002', 'developer', devSegments, {
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-4-5',
     endedAt: ts(120),
   });
 

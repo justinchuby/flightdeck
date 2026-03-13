@@ -45,12 +45,12 @@ vi.mock('../../AgentChatPanel', () => ({
 }));
 
 vi.mock('../../../constants/models', () => ({
-  AVAILABLE_MODELS: ['claude-sonnet-4', 'gpt-5.1'],
+  AVAILABLE_MODELS: ['claude-sonnet-4-5', 'gpt-5.1'],
 }));
 
 vi.mock('../../../hooks/useModels', () => ({
   useModels: () => ({
-    models: ['claude-sonnet-4', 'gpt-5.1'],
+    models: ['claude-sonnet-4-5', 'gpt-5.1'],
     defaults: {},
     modelsByProvider: {},
     modelName: (id: string) => id,
@@ -80,7 +80,7 @@ function makeAgent(overrides: Record<string, any> = {}) {
     childIds: [],
     createdAt: '2026-01-01T00:00:00Z',
     outputPreview: 'Processing files...',
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-4-5',
     provider: 'copilot',
     sessionId: 'sess-abcd-1234',
     inputTokens: 1000,
@@ -148,7 +148,7 @@ describe('AgentDetailPanel', () => {
     mockAgents = [makeAgent()];
     render(<AgentDetailPanel agentId={mockAgents[0].id} mode="modal" onClose={onClose} />);
     expect(screen.getByText('copilot')).toBeInTheDocument();
-    expect(screen.getByText('claude-sonnet-4')).toBeInTheDocument();
+    expect(screen.getByText('claude-sonnet-4-5')).toBeInTheDocument();
   });
 
   it('renders copyable session ID', () => {
@@ -215,7 +215,7 @@ describe('AgentDetailPanel', () => {
     render(<AgentDetailPanel agentId={mockAgents[0].id} mode="modal" onClose={onClose} />);
     fireEvent.click(screen.getByTestId('tab-settings'));
     // Model dropdown should be present for alive agent
-    expect(screen.getByDisplayValue('claude-sonnet-4')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('claude-sonnet-4-5')).toBeInTheDocument();
   });
 
   // ── Error states ─────────────────────────────────────────────
@@ -293,21 +293,21 @@ describe('AgentDetailPanel', () => {
     mockAgents = [makeAgent({
       model: 'gemini-2.5-pro',
       modelResolution: {
-        requested: 'claude-sonnet-4',
+        requested: 'claude-sonnet-4-5',
         resolved: 'gemini-2.5-pro',
         translated: true,
         reason: 'claude-sonnet-4 not available on gemini provider',
       },
     })];
     render(<AgentDetailPanel agentId={mockAgents[0].id} mode="modal" onClose={onClose} />);
-    expect(screen.getByText('claude-sonnet-4')).toHaveClass('line-through');
+    expect(screen.getByText('claude-sonnet-4-5')).toHaveClass('line-through');
     expect(screen.getByText('gemini-2.5-pro')).toHaveClass('text-yellow-400');
   });
 
   it('shows plain model when no translation occurred', () => {
     mockAgents = [makeAgent({ modelResolution: undefined })];
     render(<AgentDetailPanel agentId={mockAgents[0].id} mode="modal" onClose={onClose} />);
-    expect(screen.getByText('claude-sonnet-4')).not.toHaveClass('line-through');
+    expect(screen.getByText('claude-sonnet-4-5')).not.toHaveClass('line-through');
   });
 
   // ── Empty state ───────────────────────────────────────────
@@ -334,7 +334,7 @@ describe('AgentDetailPanel', () => {
     mockApiFetch.mockResolvedValueOnce({
       agentId: mockAgents[0].id,
       role: 'Developer',
-      model: 'claude-sonnet-4',
+      model: 'claude-sonnet-4-5',
       status: 'running',
       liveStatus: 'running',
       teamId: 'team-1',

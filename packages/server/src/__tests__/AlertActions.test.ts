@@ -35,11 +35,11 @@ describe('AlertEngine — Actionable Alerts', () => {
       actionType: 'api_call',
       endpoint: '/api/agents/123',
       method: 'POST',
-      body: { model: 'claude-opus-4.6-1m' },
+      body: { model: 'claude-opus-4-6-1m' },
       confidence: 70,
     };
 
-    expect(action.body).toEqual({ model: 'claude-opus-4.6-1m' });
+    expect(action.body).toEqual({ model: 'claude-opus-4-6-1m' });
     expect(action.confidence).toBe(70);
   });
 

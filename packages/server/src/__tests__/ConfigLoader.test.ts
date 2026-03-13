@@ -13,13 +13,13 @@ heartbeat:
   staleTimerCleanupDays: 3
 models:
   known:
-    - claude-opus-4.6
+    - claude-opus-4-6
     - gpt-5.2
   defaults:
-    developer: [claude-opus-4.6]
+    developer: [claude-opus-4-6]
 roles:
   developer:
-    model: claude-sonnet-4.6
+    model: claude-sonnet-4-5
 budget:
   limit: 100
   thresholds:
@@ -30,9 +30,9 @@ budget:
     const result = loadConfig(yaml, null);
     expect(result.config.server.maxConcurrentAgents).toBe(25);
     expect(result.config.heartbeat.idleThresholdMs).toBe(30000);
-    expect(result.config.models.known).toEqual(['claude-opus-4.6', 'gpt-5.2']);
-    expect(result.config.models.defaults.developer).toEqual(['claude-opus-4.6']);
-    expect(result.config.roles.developer?.model).toBe('claude-sonnet-4.6');
+    expect(result.config.models.known).toEqual(['claude-opus-4-6', 'gpt-5.2']);
+    expect(result.config.models.defaults.developer).toEqual(['claude-opus-4-6']);
+    expect(result.config.roles.developer?.model).toBe('claude-sonnet-4-5');
     expect(result.config.budget.limit).toBe(100);
     expect(result.config.budget.thresholds?.warning).toBe(0.5);
     expect(result.diffs).toEqual([]); // no previous → no diffs

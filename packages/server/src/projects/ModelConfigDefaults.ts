@@ -13,13 +13,13 @@ export type ProjectModelConfig = Record<string, string[]>;
  * Sourced from AVAILABLE_MODELS (ModelSelector) + RoleRegistry documented list.
  */
 export const KNOWN_MODEL_IDS: readonly string[] = [
-  // Anthropic
-  'claude-opus-4.6',
-  'claude-opus-4.5',
-  'claude-sonnet-4.6',
-  'claude-sonnet-4.5',
-  'claude-sonnet-4',
-  'claude-haiku-4.5',
+  // Anthropic (official Claude CLI model IDs)
+  'claude-opus-4-6',
+  'claude-opus-4-6-1m',
+  'claude-opus-4-5',
+  'claude-sonnet-4-5',
+  'claude-3-5-sonnet',
+  'claude-3-5-haiku',
   // Google
   'gemini-3-pro-preview',
   'gemini-3-flash-preview',
@@ -42,24 +42,24 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
 const knownSet = new Set<string>(KNOWN_MODEL_IDS);
 
 /** Fallback model when no project config or role default is available. */
-export const DEFAULT_MODEL = 'claude-sonnet-4.6';
+export const DEFAULT_MODEL = 'claude-sonnet-4-5';
 
 /** Default model config used when a project has no custom config. */
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
-  developer: ['claude-opus-4.6'],
-  architect: ['claude-opus-4.6'],
-  'code-reviewer': ['gemini-3-pro-preview', 'claude-opus-4.6'],
+  developer: ['claude-opus-4-6'],
+  architect: ['claude-opus-4-6'],
+  'code-reviewer': ['gemini-3-pro-preview', 'claude-opus-4-6'],
   'critical-reviewer': ['gemini-3-pro-preview'],
   'readability-reviewer': ['gemini-3-pro-preview'],
-  'tech-writer': ['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6'],
+  'tech-writer': ['claude-sonnet-4-5', 'gpt-5.2', 'claude-opus-4-6'],
   secretary: ['gpt-4.1', 'gpt-5.2', 'gpt-5.1'],
-  'qa-tester': ['claude-sonnet-4.6'],
-  designer: ['claude-opus-4.6'],
+  'qa-tester': ['claude-sonnet-4-5'],
+  designer: ['claude-opus-4-6'],
   'product-manager': ['gpt-5.3-codex'],
-  generalist: ['claude-opus-4.6'],
+  generalist: ['claude-opus-4-6'],
   'radical-thinker': ['gemini-3-pro-preview'],
-  agent: ['claude-sonnet-4.6'],
-  lead: ['claude-opus-4.6'],
+  agent: ['claude-sonnet-4-5'],
+  lead: ['claude-opus-4-6'],
 };
 
 /** Validate that all model IDs in a config are known. Returns unknown IDs. */

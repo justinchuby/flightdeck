@@ -29,12 +29,12 @@ describe('Message Handling — Command Parsing', () => {
 
     it('matches with model and task', () => {
       const input =
-        '⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Fix tests"} ⟧⟧';
+        '⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4-6", "task": "Fix tests"} ⟧⟧';
       const match = input.match(TBL_CREATE_AGENT);
       expect(match).toBeTruthy();
       const parsed = JSON.parse(match![1]);
       expect(parsed.role).toBe('developer');
-      expect(parsed.model).toBe('claude-opus-4.6');
+      expect(parsed.model).toBe('claude-opus-4-6');
       expect(parsed.task).toBe('Fix tests');
     });
 

@@ -188,7 +188,7 @@ describe('AgentAcpBridge — startAcp', () => {
   });
 
   it('passes correct cliArgs to AcpConnection.start', async () => {
-    const agent = createFakeAgent({ model: 'claude-sonnet-4' });
+    const agent = createFakeAgent({ model: 'claude-sonnet-4-5' });
     mockStart.mockResolvedValue('session-123');
 
     await startAcp(agent, fakeConfig);
@@ -197,7 +197,7 @@ describe('AgentAcpBridge — startAcp', () => {
       expect.objectContaining({
         cliCommand: 'copilot',
         cwd: '/test/project',
-        cliArgs: expect.arrayContaining(['--agent=lead', '--model', 'claude-sonnet-4']),
+        cliArgs: expect.arrayContaining(['--agent=lead', '--model', 'claude-sonnet-4-5']),
       }),
     );
   });

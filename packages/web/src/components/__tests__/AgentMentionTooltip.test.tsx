@@ -14,7 +14,7 @@ const baseAgent: MentionAgent = {
   role: { name: 'Developer', icon: '💻', id: 'developer' },
   status: 'running',
   task: 'Implement auth module',
-  model: 'claude-sonnet-4',
+  model: 'claude-sonnet-4-5',
 };
 
 describe('AgentMentionTooltip', () => {
@@ -95,7 +95,7 @@ describe('AgentMentionTooltip', () => {
     fireEvent.mouseEnter(screen.getByText('@dev').parentElement!);
     act(() => { vi.advanceTimersByTime(200); });
     expect(screen.getByText('running')).toBeInTheDocument();
-    expect(screen.getByText('claude-sonnet-4')).toBeInTheDocument();
+    expect(screen.getByText('claude-sonnet-4-5')).toBeInTheDocument();
   });
 
   it('displays current task', () => {

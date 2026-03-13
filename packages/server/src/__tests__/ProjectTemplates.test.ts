@@ -65,7 +65,7 @@ describe('ProjectTemplateRegistry', () => {
       id: 'my-template',
       name: 'My Template',
       description: 'Custom workflow',
-      roles: [{ role: 'developer', model: 'claude-sonnet-4.6', count: 1 }],
+      roles: [{ role: 'developer', model: 'claude-sonnet-4-5', count: 1 }],
       initialTasks: [{ description: 'Do work', dependencies: [] }],
       settings: {},
       tags: ['custom'],

@@ -13,7 +13,7 @@ function makeMember(overrides: Partial<CrewMember> = {}): CrewMember {
     roleName: 'Developer',
     status: 'running',
     task: 'Implement feature X',
-    model: 'claude-sonnet-4.6',
+    model: 'claude-sonnet-4-5',
     lockedFiles: [],
     pendingMessages: 0,
     createdAt: new Date(Date.now() - 5 * 60_000).toISOString(),
@@ -26,9 +26,9 @@ function makeMember(overrides: Partial<CrewMember> = {}): CrewMember {
 describe('CrewFormatter', () => {
   describe('shortenModel', () => {
     it('shortens known model names', () => {
-      expect(shortenModel('claude-opus-4.6')).toBe('opus');
-      expect(shortenModel('claude-sonnet-4.6')).toBe('sonnet');
-      expect(shortenModel('claude-haiku-4.5')).toBe('haiku');
+      expect(shortenModel('claude-opus-4-6')).toBe('opus-4.6');
+      expect(shortenModel('claude-sonnet-4-5')).toBe('sonnet-4.5');
+      expect(shortenModel('claude-3-5-haiku')).toBe('haiku');
       expect(shortenModel('gemini-3-pro-preview')).toBe('gemini-pro');
       expect(shortenModel('gpt-5.2-codex')).toBe('codex');
       expect(shortenModel('gpt-4.1')).toBe('gpt4.1');
@@ -48,7 +48,7 @@ describe('CrewFormatter', () => {
     it('includes CREW, FILE LOCKS, and BUDGET sections', () => {
       const members = [
         makeMember({ id: 'aaaaaaaa-0001', roleName: 'Developer', status: 'running' }),
-        makeMember({ id: 'bbbbbbbb-0002', roleName: 'QA Tester', status: 'idle', model: 'claude-haiku-4.5' }),
+        makeMember({ id: 'bbbbbbbb-0002', roleName: 'QA Tester', status: 'idle', model: 'claude-3-5-haiku' }),
       ];
 
       const result = formatCrewUpdate(members, {
@@ -132,7 +132,7 @@ describe('CrewFormatter', () => {
 
     it('shows shortened model names in table', () => {
       const members = [
-        makeMember({ id: 'aaa-1234-5678', model: 'claude-opus-4.6' }),
+        makeMember({ id: 'aaa-1234-5678', model: 'claude-opus-4-6' }),
       ];
 
       const result = formatCrewUpdate(members, {
@@ -141,7 +141,7 @@ describe('CrewFormatter', () => {
       });
 
       expect(result).toContain('opus');
-      expect(result).not.toContain('claude-opus-4.6');
+      expect(result).not.toContain('claude-opus-4-6');
     });
 
     it('shows context usage percentage', () => {

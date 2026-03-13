@@ -10,10 +10,10 @@ vi.mock('../../../hooks/useApi', () => ({
 
 vi.mock('../../../hooks/useModels', () => ({
   useModels: () => ({
-    models: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5', 'gemini-3-pro-preview'],
-    filteredModels: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5'],
-    defaults: { lead: ['claude-opus-4.6'], developer: ['claude-opus-4.6'] },
-    modelsByProvider: { claude: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5'], gemini: ['gemini-3-pro-preview'] },
+    models: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-3-5-haiku', 'gemini-3-pro-preview'],
+    filteredModels: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-3-5-haiku'],
+    defaults: { lead: ['claude-opus-4-6'], developer: ['claude-opus-4-6'] },
+    modelsByProvider: { claude: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-3-5-haiku'], gemini: ['gemini-3-pro-preview'] },
     activeProvider: 'claude',
     modelName: (id: string) => id,
     loading: false,
@@ -23,9 +23,9 @@ vi.mock('../../../hooks/useModels', () => ({
 }));
 
 const MOCK_ROLES = [
-  { id: 'lead', name: 'Lead', icon: '👑', description: 'Project lead', model: 'claude-opus-4.6' },
-  { id: 'developer', name: 'Developer', icon: '💻', description: 'Writes code', model: 'claude-opus-4.6' },
-  { id: 'architect', name: 'Architect', icon: '🏗️', description: 'System design', model: 'claude-opus-4.6' },
+  { id: 'lead', name: 'Lead', icon: '👑', description: 'Project lead', model: 'claude-opus-4-6' },
+  { id: 'developer', name: 'Developer', icon: '💻', description: 'Writes code', model: 'claude-opus-4-6' },
+  { id: 'architect', name: 'Architect', icon: '🏗️', description: 'System design', model: 'claude-opus-4-6' },
   { id: 'code-reviewer', name: 'Code Reviewer', icon: '📖', description: 'Reviews code', model: 'gemini-3-pro-preview' },
 ];
 
@@ -70,8 +70,8 @@ describe('NewSessionDialog', () => {
       const select = screen.getByTestId('new-session-model') as HTMLSelectElement;
       const options = Array.from(select.options).map(o => o.value);
       expect(options).toContain('');
-      expect(options).toContain('claude-opus-4.6');
-      expect(options).toContain('claude-sonnet-4.6');
+      expect(options).toContain('claude-opus-4-6');
+      expect(options).toContain('claude-sonnet-4-5');
       // gemini model should NOT be shown (active provider is claude)
       expect(options).not.toContain('gemini-3-pro-preview');
     });
@@ -171,7 +171,7 @@ describe('NewSessionDialog', () => {
     });
 
     fireEvent.change(screen.getByTestId('new-session-model'), {
-      target: { value: 'claude-sonnet-4.6' },
+      target: { value: 'claude-sonnet-4-5' },
     });
     fireEvent.click(screen.getByTestId('start-session-btn'));
 
@@ -180,7 +180,7 @@ describe('NewSessionDialog', () => {
         (c: any[]) => c[0] === '/projects/proj-1/resume',
       );
       const body = JSON.parse(call![1].body);
-      expect(body.model).toBe('claude-sonnet-4.6');
+      expect(body.model).toBe('claude-sonnet-4-5');
     });
   });
 

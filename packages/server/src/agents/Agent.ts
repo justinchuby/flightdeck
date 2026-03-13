@@ -107,7 +107,7 @@ export class Agent {
   }
   public projectName?: string;
   public projectId?: string;
-  /** Model for this agent (e.g. "claude-opus-4.6"). Always set during spawn. */
+  /** Model for this agent (e.g. "claude-opus-4-6"). Always set during spawn. */
   public model = '';
   /** Working directory for this agent's CLI process */
   public cwd?: string;

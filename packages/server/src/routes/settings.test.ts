@@ -212,12 +212,12 @@ describe('settings routes', () => {
 
   describe('GET /settings/providers/:provider', () => {
     it('returns single provider status with model prefs', async () => {
-      mockGetModelPrefs.mockReturnValue({ defaultModel: 'claude-sonnet-4' });
+      mockGetModelPrefs.mockReturnValue({ defaultModel: 'claude-sonnet-4-5' });
       const res = await fetch(`${baseUrl}/settings/providers/claude`);
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.id).toBe('claude');
-      expect(body.modelPreferences).toEqual({ defaultModel: 'claude-sonnet-4' });
+      expect(body.modelPreferences).toEqual({ defaultModel: 'claude-sonnet-4-5' });
     });
 
     it('returns 404 for unknown provider', async () => {
@@ -284,7 +284,7 @@ describe('settings routes', () => {
 
     it('updates model preferences', async () => {
       mockGetStatusAsync.mockResolvedValue(MOCK_STATUSES[1]);
-      const prefs = { defaultModel: 'claude-opus-4', preferredModels: ['claude-opus-4', 'claude-sonnet-4'] };
+      const prefs = { defaultModel: 'claude-opus-4', preferredModels: ['claude-opus-4', 'claude-sonnet-4-5'] };
       const res = await fetch(`${baseUrl}/settings/providers/claude`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

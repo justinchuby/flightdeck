@@ -56,7 +56,7 @@ const agentList = [
     sessionId: 'sess-xyz-789',
     projectName: 'OtherProject',
     projectId: 'proj-2',
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4-6',
     createdAt: '2026-03-01T08:00:00Z',
   },
 ];

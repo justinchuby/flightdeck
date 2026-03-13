@@ -515,8 +515,8 @@ describe('SystemCommands validation', () => {
       projectRegistry: {
         getModelConfig: vi.fn().mockReturnValue({
           config: {
-            lead: ['claude-sonnet-4', 'gpt-5.2-codex'],
-            developer: ['claude-haiku-4.5'],
+            lead: ['claude-sonnet-4-5', 'gpt-5.2-codex'],
+            developer: ['claude-3-5-haiku'],
           },
         }),
       },
@@ -527,8 +527,8 @@ describe('SystemCommands validation', () => {
 
     const response = (agent.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(response).toContain('PROJECT MODEL CONFIGURATION');
-    expect(response).toContain('lead: claude-sonnet-4, gpt-5.2-codex');
-    expect(response).toContain('developer: claude-haiku-4.5');
+    expect(response).toContain('lead: claude-sonnet-4-5, gpt-5.2-codex');
+    expect(response).toContain('developer: claude-3-5-haiku');
   });
 
   it('QUERY_PROVIDERS omits model config section when no project', () => {

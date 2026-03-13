@@ -374,13 +374,13 @@ describe('ProviderManager', () => {
     it('persists and retrieves model preferences', () => {
       const mgr = createManager();
       mgr.setModelPreferences('claude', {
-        defaultModel: 'claude-sonnet-4',
-        preferredModels: ['claude-sonnet-4', 'claude-haiku-4'],
+        defaultModel: 'claude-sonnet-4-5',
+        preferredModels: ['claude-sonnet-4-5', 'claude-haiku-4'],
       });
 
       const prefs = mgr.getModelPreferences('claude');
-      expect(prefs.defaultModel).toBe('claude-sonnet-4');
-      expect(prefs.preferredModels).toEqual(['claude-sonnet-4', 'claude-haiku-4']);
+      expect(prefs.defaultModel).toBe('claude-sonnet-4-5');
+      expect(prefs.preferredModels).toEqual(['claude-sonnet-4-5', 'claude-haiku-4']);
     });
 
     it('handles corrupted JSON gracefully', () => {

@@ -49,9 +49,9 @@ function resolveModelForRole(
 // ── Test data ────────────────────────────────────────────────────────
 
 const sampleConfig: ProjectModelConfig = {
-  developer: ['claude-opus-4.6'],
-  architect: ['claude-sonnet-4.6', 'claude-opus-4.6'],
-  'code-reviewer': ['gemini-3-pro-preview', 'claude-sonnet-4.6'],
+  developer: ['claude-opus-4-6'],
+  architect: ['claude-sonnet-4-5', 'claude-opus-4-6'],
+  'code-reviewer': ['gemini-3-pro-preview', 'claude-sonnet-4-5'],
   secretary: ['gpt-4.1'],
 };
 
@@ -60,14 +60,14 @@ const sampleConfig: ProjectModelConfig = {
 describe('resolveModelForRole (model config enforcement)', () => {
   describe('no project context', () => {
     it('returns requestedModel unchanged when no projectId', () => {
-      const result = resolveModelForRole('developer', 'claude-sonnet-4.6', undefined, sampleConfig);
-      expect(result.model).toBe('claude-sonnet-4.6');
+      const result = resolveModelForRole('developer', 'claude-sonnet-4-5', undefined, sampleConfig);
+      expect(result.model).toBe('claude-sonnet-4-5');
       expect(result.overridden).toBe(false);
     });
 
     it('returns requestedModel unchanged when no projectConfig', () => {
-      const result = resolveModelForRole('developer', 'claude-sonnet-4.6', 'proj-1', undefined);
-      expect(result.model).toBe('claude-sonnet-4.6');
+      const result = resolveModelForRole('developer', 'claude-sonnet-4-5', 'proj-1', undefined);
+      expect(result.model).toBe('claude-sonnet-4-5');
       expect(result.overridden).toBe(false);
     });
 
@@ -80,63 +80,63 @@ describe('resolveModelForRole (model config enforcement)', () => {
 
   describe('no restrictions for role', () => {
     it('returns requestedModel when role has no entry in config', () => {
-      const result = resolveModelForRole('qa-tester', 'claude-opus-4.6', 'proj-1', sampleConfig);
-      expect(result.model).toBe('claude-opus-4.6');
+      const result = resolveModelForRole('qa-tester', 'claude-opus-4-6', 'proj-1', sampleConfig);
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.overridden).toBe(false);
     });
 
     it('returns requestedModel when role has empty allowed list', () => {
       const configWithEmpty: ProjectModelConfig = { ...sampleConfig, 'qa-tester': [] };
-      const result = resolveModelForRole('qa-tester', 'claude-opus-4.6', 'proj-1', configWithEmpty);
-      expect(result.model).toBe('claude-opus-4.6');
+      const result = resolveModelForRole('qa-tester', 'claude-opus-4-6', 'proj-1', configWithEmpty);
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.overridden).toBe(false);
     });
   });
 
   describe('model in allowed list', () => {
     it('allows the requested model when it is in the allowed list', () => {
-      const result = resolveModelForRole('architect', 'claude-opus-4.6', 'proj-1', sampleConfig);
-      expect(result.model).toBe('claude-opus-4.6');
+      const result = resolveModelForRole('architect', 'claude-opus-4-6', 'proj-1', sampleConfig);
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.overridden).toBe(false);
     });
 
     it('allows the first model in the allowed list', () => {
-      const result = resolveModelForRole('architect', 'claude-sonnet-4.6', 'proj-1', sampleConfig);
-      expect(result.model).toBe('claude-sonnet-4.6');
+      const result = resolveModelForRole('architect', 'claude-sonnet-4-5', 'proj-1', sampleConfig);
+      expect(result.model).toBe('claude-sonnet-4-5');
       expect(result.overridden).toBe(false);
     });
   });
 
   describe('model NOT in allowed list (enforcement)', () => {
     it('overrides to role default when requested model is not allowed', () => {
-      const result = resolveModelForRole('developer', 'claude-haiku-4.5', 'proj-1', sampleConfig);
-      expect(result.model).toBe('claude-opus-4.6'); // developer default
+      const result = resolveModelForRole('developer', 'claude-3-5-haiku', 'proj-1', sampleConfig);
+      expect(result.model).toBe('claude-opus-4-6'); // developer default
       expect(result.overridden).toBe(true);
-      expect(result.reason).toContain('claude-haiku-4.5');
+      expect(result.reason).toContain('claude-3-5-haiku');
       expect(result.reason).toContain('not in the allowed list');
       expect(result.reason).toContain('developer');
     });
 
     it('overrides to role default for multi-model allowed list', () => {
       // architect allows sonnet and opus — requesting haiku should fall back to sonnet (first)
-      const result = resolveModelForRole('architect', 'claude-haiku-4.5', 'proj-1', sampleConfig);
-      expect(result.model).toBe('claude-sonnet-4.6');
+      const result = resolveModelForRole('architect', 'claude-3-5-haiku', 'proj-1', sampleConfig);
+      expect(result.model).toBe('claude-sonnet-4-5');
       expect(result.overridden).toBe(true);
     });
 
     it('includes allowed models in the reason message', () => {
-      const result = resolveModelForRole('code-reviewer', 'claude-opus-4.6', 'proj-1', sampleConfig);
+      const result = resolveModelForRole('code-reviewer', 'claude-opus-4-6', 'proj-1', sampleConfig);
       expect(result.model).toBe('gemini-3-pro-preview');
       expect(result.overridden).toBe(true);
       expect(result.reason).toContain('gemini-3-pro-preview');
-      expect(result.reason).toContain('claude-sonnet-4.6');
+      expect(result.reason).toContain('claude-sonnet-4-5');
     });
   });
 
   describe('no model requested (auto-assign from config)', () => {
     it('assigns role default when no model requested and config exists', () => {
       const result = resolveModelForRole('developer', undefined, 'proj-1', sampleConfig);
-      expect(result.model).toBe('claude-opus-4.6');
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.overridden).toBe(false);
       expect(result.reason).toContain('project default');
     });
@@ -156,14 +156,14 @@ describe('resolveModelForRole (model config enforcement)', () => {
 
   describe('edge cases', () => {
     it('handles single-model allowed list correctly', () => {
-      const result = resolveModelForRole('secretary', 'claude-opus-4.6', 'proj-1', sampleConfig);
+      const result = resolveModelForRole('secretary', 'claude-opus-4-6', 'proj-1', sampleConfig);
       expect(result.model).toBe('gpt-4.1'); // only allowed model
       expect(result.overridden).toBe(true);
     });
 
     it('works with custom role names', () => {
       const customConfig: ProjectModelConfig = {
-        'my-custom-role': ['gpt-5.1-codex', 'claude-sonnet-4.6'],
+        'my-custom-role': ['gpt-5.1-codex', 'claude-sonnet-4-5'],
       };
       const result = resolveModelForRole('my-custom-role', 'gpt-5.1-codex', 'proj-1', customConfig);
       expect(result.model).toBe('gpt-5.1-codex');
@@ -172,9 +172,9 @@ describe('resolveModelForRole (model config enforcement)', () => {
 
     it('is case-sensitive on model IDs', () => {
       const result = resolveModelForRole('developer', 'Claude-Opus-4.6', 'proj-1', sampleConfig);
-      // Model IDs are case-sensitive — "Claude-Opus-4.6" !== "claude-opus-4.6"
+      // Model IDs are case-sensitive — "Claude-Opus-4.6" !== "claude-opus-4-6"
       expect(result.overridden).toBe(true);
-      expect(result.model).toBe('claude-opus-4.6');
+      expect(result.model).toBe('claude-opus-4-6');
     });
   });
 });
@@ -209,21 +209,21 @@ describe('AgentManager.resolveModelForRole (integration)', () => {
 
   it('enforces allowed models from a mocked ProjectRegistry', () => {
     const registry = createMockProjectRegistry({
-      'proj-1': { developer: ['claude-opus-4.6'], architect: ['claude-sonnet-4.6'] },
+      'proj-1': { developer: ['claude-opus-4-6'], architect: ['claude-sonnet-4-5'] },
     });
     // Developer requesting haiku — should be overridden to opus
-    const result = callResolve(registry, 'developer', 'claude-haiku-4.5', 'proj-1');
-    expect(result.model).toBe('claude-opus-4.6');
+    const result = callResolve(registry, 'developer', 'claude-3-5-haiku', 'proj-1');
+    expect(result.model).toBe('claude-opus-4-6');
     expect(result.overridden).toBe(true);
-    expect(result.reason).toContain('claude-haiku-4.5');
+    expect(result.reason).toContain('claude-3-5-haiku');
   });
 
   it('allows a model that is in the configured allowed list', () => {
     const registry = createMockProjectRegistry({
-      'proj-1': { architect: ['claude-sonnet-4.6', 'claude-opus-4.6'] },
+      'proj-1': { architect: ['claude-sonnet-4-5', 'claude-opus-4-6'] },
     });
-    const result = callResolve(registry, 'architect', 'claude-opus-4.6', 'proj-1');
-    expect(result.model).toBe('claude-opus-4.6');
+    const result = callResolve(registry, 'architect', 'claude-opus-4-6', 'proj-1');
+    expect(result.model).toBe('claude-opus-4-6');
     expect(result.overridden).toBe(false);
   });
 
@@ -237,8 +237,8 @@ describe('AgentManager.resolveModelForRole (integration)', () => {
   });
 
   it('passes through when no projectRegistry is set', () => {
-    const result = callResolve(undefined, 'developer', 'claude-haiku-4.5', 'proj-1');
-    expect(result.model).toBe('claude-haiku-4.5');
+    const result = callResolve(undefined, 'developer', 'claude-3-5-haiku', 'proj-1');
+    expect(result.model).toBe('claude-3-5-haiku');
     expect(result.overridden).toBe(false);
   });
 
@@ -246,7 +246,7 @@ describe('AgentManager.resolveModelForRole (integration)', () => {
     const registry = createMockProjectRegistry({
       'proj-1': {}, // empty stored config — defaults apply
     });
-    // developer defaults to ['claude-opus-4.6'] in DEFAULT_MODEL_CONFIG
+    // developer defaults to ['claude-opus-4-6'] in DEFAULT_MODEL_CONFIG
     const result = callResolve(registry, 'developer', undefined, 'proj-1');
     expect(result.model).toBe(DEFAULT_MODEL_CONFIG['developer']?.[0]);
     expect(result.overridden).toBe(false);

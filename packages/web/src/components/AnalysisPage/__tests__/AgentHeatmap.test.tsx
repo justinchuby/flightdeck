@@ -18,7 +18,7 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
     childIds: [],
     createdAt: new Date().toISOString(),
     outputPreview: '',
-    model: 'claude-sonnet-4',
+    model: 'claude-sonnet-4-5',
     ...overrides,
   } as AgentInfo;
 }

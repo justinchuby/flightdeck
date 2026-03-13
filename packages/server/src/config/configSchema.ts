@@ -17,8 +17,8 @@ const heartbeatSchema = z.object({
 });
 
 const DEFAULT_KNOWN_MODELS = [
-  'claude-opus-4.6', 'claude-sonnet-4.6', 'claude-sonnet-4.5', 'claude-haiku-4.5',
-  'claude-opus-4.5', 'claude-sonnet-4',
+  'claude-opus-4-6', 'claude-sonnet-4-5', 'claude-3-5-sonnet', 'claude-3-5-haiku',
+  'claude-opus-4-5', 'claude-sonnet-4-5',
   'gemini-3-pro-preview', 'gemini-3-flash-preview',
   'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
   'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2',

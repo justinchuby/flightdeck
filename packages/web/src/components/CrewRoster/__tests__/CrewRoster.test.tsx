@@ -65,7 +65,7 @@ const rosterAgents = [
   {
     agentId: 'cc33dd44-ee55-ff66-7788-990011223344',
     role: 'reviewer',
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4-6',
     status: 'terminated',
     liveStatus: null,
     teamId: 'default',
