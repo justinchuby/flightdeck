@@ -427,7 +427,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         ctx.reportedCompletions.add(`${agent.id}:idle`);
         markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         ctx.emit('dag:updated', { leadId: agent.parentId });
-        notifySecretary(ctx, agent.parentId!, `[System] Task "${taskId}" completed by ${agent.role.name} (${agent.id.slice(0, 8)}): ${summary}`);
+        notifySecretary(ctx, agent.parentId!, `[System] Task "${taskId}" completed by ${agent.role.name} (${agent.id.slice(0, 8)}): ${summary}`, agent.id);
         agent.sendMessage(`[System] Task "${taskId}" marked as done in DAG.${newlyReady && newlyReady.length > 0 ? ` ${newlyReady.length} task(s) now ready.` : ''}`);
       } else {
         // No DAG task ID — fallback to message-only notification

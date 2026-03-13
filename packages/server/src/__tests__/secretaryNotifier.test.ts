@@ -96,4 +96,13 @@ describe('notifySecretary', () => {
     expect(secretary1.sendMessage).toHaveBeenCalledOnce();
     expect(secretary2.sendMessage).not.toHaveBeenCalled();
   });
+
+  it('does not notify the secretary about its own completion', () => {
+    const secretary = makeSecretary('lead-001');
+    const ctx = makeCtx([secretary]);
+
+    notifySecretary(ctx, 'lead-001', '[System] Task completed by Secretary', secretary.id);
+
+    expect(secretary.sendMessage).not.toHaveBeenCalled();
+  });
 });

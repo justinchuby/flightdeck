@@ -10,11 +10,13 @@ import type { CommandHandlerContext } from './types.js';
 /**
  * Find the secretary agent for a given lead and send it a notification.
  * No-ops silently if no secretary exists (not all sessions have one).
+ * Skips sending if the secretary is the originating agent (avoids self-notification).
  */
 export function notifySecretary(
   ctx: CommandHandlerContext,
   leadId: string,
   message: string,
+  fromAgentId?: string,
 ): void {
   const allAgents = ctx.getAllAgents?.();
   if (!allAgents) return;
@@ -24,7 +26,7 @@ export function notifySecretary(
     a.role.id === 'secretary' &&
     a.status !== 'terminated' && a.status !== 'failed' && a.status !== 'completed'
   );
-  if (secretary) {
+  if (secretary && secretary.id !== fromAgentId) {
     secretary.sendMessage(message);
   }
 }
