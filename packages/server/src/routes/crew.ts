@@ -245,11 +245,16 @@ export function crewRoutes(ctx: AppContext): Router {
       const allLive = agentManager.getAll();
       const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
 
-      // Project-scoped: query roster directly; Global: filter to active sessions
-      const dbAgents = agentRoster.getAllAgents(
-        statusFilter as 'idle' | 'running' | 'terminated' | 'failed' | undefined,
-        crewId,
-      );
+      // Project-scoped: query roster by project then filter by team/status;
+      // Global: filter to agents with an active session in agentManager.
+      const dbAgents = projectId
+        ? agentRoster.getByProject(projectId).filter(a =>
+            a.teamId === crewId
+            && (!statusFilter || a.status === statusFilter))
+        : agentRoster.getAllAgents(
+            statusFilter as 'idle' | 'running' | 'terminated' | 'failed' | undefined,
+            crewId,
+          );
       const agents = projectId ? dbAgents : filterToActiveSession(dbAgents, allLive);
 
       // Enrich with live status from AgentManager
