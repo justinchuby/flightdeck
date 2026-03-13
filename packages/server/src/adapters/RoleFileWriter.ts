@@ -44,15 +44,24 @@ const FLIGHTDECK_JSON_KEY = '_generatedByFlightdeck';
 /** Only lowercase alphanumeric characters and hyphens are allowed in role names. */
 const VALID_ROLE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
-// ── Copilot: .github/agents/<role>.agent.md ─────────────────────────
+// ── Copilot: ~/.copilot/agents/<role>.agent.md ──────────────────────
+//
+// Copilot agent definitions are written to the USER's home directory
+// (~/.copilot/agents/) to avoid polluting project directories.
 
 export class CopilotRoleFileWriter implements RoleFileWriter {
+  private readonly homeDir: string;
+
+  constructor(homeDir?: string) {
+    this.homeDir = homeDir ?? homedir();
+  }
+
   getFormat(): string {
     return 'copilot-agent-md';
   }
 
-  async writeRoleFiles(roles: RoleDefinition[], targetDir: string): Promise<string[]> {
-    const dir = join(targetDir, '.github', 'agents');
+  async writeRoleFiles(roles: RoleDefinition[], _targetDir: string): Promise<string[]> {
+    const dir = join(this.homeDir, '.copilot', 'agents');
     await mkdir(dir, { recursive: true });
 
     const writtenFiles: string[] = [];
@@ -86,21 +95,30 @@ export class CopilotRoleFileWriter implements RoleFileWriter {
     return writtenFiles;
   }
 
-  async cleanRoleFiles(targetDir: string): Promise<void> {
-    const dir = join(targetDir, '.github', 'agents');
+  async cleanRoleFiles(_targetDir: string): Promise<void> {
+    const dir = join(this.homeDir, '.copilot', 'agents');
     await removeMatchingFlightdeckFiles(dir, 'flightdeck-', '.agent.md');
   }
 }
 
-// ── Claude: .claude/agents/<role>.md ────────────────────────────────
+// ── Claude: ~/.claude/agents/<role>.md ──────────────────────────────
+//
+// Claude agent definitions are written to the USER's home directory
+// (~/.claude/agents/) to avoid polluting project directories.
 
 export class ClaudeRoleFileWriter implements RoleFileWriter {
+  private readonly homeDir: string;
+
+  constructor(homeDir?: string) {
+    this.homeDir = homeDir ?? homedir();
+  }
+
   getFormat(): string {
     return 'claude-agent-md';
   }
 
-  async writeRoleFiles(roles: RoleDefinition[], targetDir: string): Promise<string[]> {
-    const dir = join(targetDir, '.claude', 'agents');
+  async writeRoleFiles(roles: RoleDefinition[], _targetDir: string): Promise<string[]> {
+    const dir = join(this.homeDir, '.claude', 'agents');
     await mkdir(dir, { recursive: true });
 
     const writtenFiles: string[] = [];
@@ -129,8 +147,8 @@ export class ClaudeRoleFileWriter implements RoleFileWriter {
     return writtenFiles;
   }
 
-  async cleanRoleFiles(targetDir: string): Promise<void> {
-    const dir = join(targetDir, '.claude', 'agents');
+  async cleanRoleFiles(_targetDir: string): Promise<void> {
+    const dir = join(this.homeDir, '.claude', 'agents');
     await removeMatchingFlightdeckFiles(dir, 'flightdeck-', '.md');
   }
 }
@@ -228,19 +246,29 @@ export class CursorRoleFileWriter implements RoleFileWriter {
   }
 }
 
-// ── Codex: AGENTS.md (single file, all agents) ─────────────────────
+// ── Codex: ~/.codex/AGENTS.md (single file, all agents) ─────────────
+//
+// Codex agent definitions are written to the USER's home directory
+// (~/.codex/AGENTS.md) to avoid polluting project directories.
 
 export class CodexRoleFileWriter implements RoleFileWriter {
+  private readonly homeDir: string;
+
+  constructor(homeDir?: string) {
+    this.homeDir = homeDir ?? homedir();
+  }
+
   getFormat(): string {
     return 'codex-agents-md';
   }
 
-  async writeRoleFiles(roles: RoleDefinition[], targetDir: string): Promise<string[]> {
+  async writeRoleFiles(roles: RoleDefinition[], _targetDir: string): Promise<string[]> {
     for (const role of roles) {
       validateRoleName(role.role);
     }
-    await mkdir(targetDir, { recursive: true });
-    const filePath = join(targetDir, 'AGENTS.md');
+    const dir = join(this.homeDir, '.codex');
+    await mkdir(dir, { recursive: true });
+    const filePath = join(dir, 'AGENTS.md');
 
     const sections = roles.map(
       (role) =>
@@ -262,8 +290,8 @@ export class CodexRoleFileWriter implements RoleFileWriter {
     return [filePath];
   }
 
-  async cleanRoleFiles(targetDir: string): Promise<void> {
-    const filePath = join(targetDir, 'AGENTS.md');
+  async cleanRoleFiles(_targetDir: string): Promise<void> {
+    const filePath = join(this.homeDir, '.codex', 'AGENTS.md');
     await removeIfFlightdeckGenerated(filePath);
   }
 }

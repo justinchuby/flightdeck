@@ -55,24 +55,37 @@ afterEach(async () => {
 // ── Copilot Writer ──────────────────────────────────────────────────
 
 describe('CopilotRoleFileWriter', () => {
-  const writer = new CopilotRoleFileWriter();
+  let copilotHomeDir: string;
+  let writer: CopilotRoleFileWriter;
+
+  beforeEach(async () => {
+    copilotHomeDir = await mkdtemp(join(tmpdir(), 'copilot-home-'));
+    writer = new CopilotRoleFileWriter(copilotHomeDir);
+  });
+
+  afterEach(async () => {
+    await rm(copilotHomeDir, { recursive: true, force: true });
+  });
 
   it('returns correct format identifier', () => {
     expect(writer.getFormat()).toBe('copilot-agent-md');
   });
 
-  it('writes .agent.md files to .github/agents/', async () => {
+  it('writes .agent.md files to ~/.copilot/agents/ (user home, not project dir)', async () => {
     const files = await writer.writeRoleFiles(sampleRoles, tempDir);
 
     expect(files).toHaveLength(2);
-    expect(files[0]).toContain('.github/agents/flightdeck-developer.agent.md');
-    expect(files[1]).toContain('.github/agents/flightdeck-architect.agent.md');
+    expect(files[0]).toContain(join(copilotHomeDir, '.copilot', 'agents', 'flightdeck-developer.agent.md'));
+    expect(files[1]).toContain(join(copilotHomeDir, '.copilot', 'agents', 'flightdeck-architect.agent.md'));
+    // Ensure files are NOT in the project directory
+    expect(files[0]).not.toContain(tempDir);
+    expect(files[1]).not.toContain(tempDir);
   });
 
   it('produces YAML frontmatter with name, description, and tools', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
     const content = await readFile(
-      join(tempDir, '.github', 'agents', 'flightdeck-developer.agent.md'),
+      join(copilotHomeDir, '.copilot', 'agents', 'flightdeck-developer.agent.md'),
       'utf-8',
     );
 
@@ -90,7 +103,7 @@ describe('CopilotRoleFileWriter', () => {
   it('uses default tools when none specified', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
     const content = await readFile(
-      join(tempDir, '.github', 'agents', 'flightdeck-architect.agent.md'),
+      join(copilotHomeDir, '.copilot', 'agents', 'flightdeck-architect.agent.md'),
       'utf-8',
     );
 
@@ -100,11 +113,11 @@ describe('CopilotRoleFileWriter', () => {
     expect(content).toContain('  - shell');
   });
 
-  it('cleanRoleFiles removes generated files', async () => {
+  it('cleanRoleFiles removes generated files from home directory', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
     await writer.cleanRoleFiles(tempDir);
 
-    const dir = join(tempDir, '.github', 'agents');
+    const dir = join(copilotHomeDir, '.copilot', 'agents');
     const { readdir } = await import('fs/promises');
     const remaining = await readdir(dir);
     expect(remaining).toHaveLength(0);
@@ -112,7 +125,7 @@ describe('CopilotRoleFileWriter', () => {
 
   it('cleanRoleFiles does not remove non-flightdeck files', async () => {
     await writer.writeRoleFiles(singleRole, tempDir);
-    const dir = join(tempDir, '.github', 'agents');
+    const dir = join(copilotHomeDir, '.copilot', 'agents');
     await writeFile(join(dir, 'custom-agent.agent.md'), '# My custom agent');
 
     await writer.cleanRoleFiles(tempDir);
@@ -123,7 +136,8 @@ describe('CopilotRoleFileWriter', () => {
   });
 
   it('cleanRoleFiles is safe when directory does not exist', async () => {
-    await expect(writer.cleanRoleFiles(join(tempDir, 'nonexistent'))).resolves.not.toThrow();
+    const freshWriter = new CopilotRoleFileWriter(join(tempDir, 'nonexistent-home'));
+    await expect(freshWriter.cleanRoleFiles(tempDir)).resolves.not.toThrow();
   });
 
   it('handles empty roles array', async () => {
@@ -141,34 +155,56 @@ describe('CopilotRoleFileWriter', () => {
     ];
     await writer.writeRoleFiles(roles, tempDir);
     const content = await readFile(
-      join(tempDir, '.github', 'agents', 'flightdeck-tester.agent.md'),
+      join(copilotHomeDir, '.copilot', 'agents', 'flightdeck-tester.agent.md'),
       'utf-8',
     );
     expect(content).toContain('description: "Flightdeck Tester: Tests \\"everything\\" thoroughly"');
+  });
+
+  it('ignores targetDir parameter (uses home dir instead)', async () => {
+    const projectDir = join(tempDir, 'some-project');
+    await mkdir(projectDir, { recursive: true });
+    const files = await writer.writeRoleFiles(singleRole, projectDir);
+
+    expect(files[0]).toContain(copilotHomeDir);
+    expect(files[0]).not.toContain(projectDir);
   });
 });
 
 // ── Claude Writer ───────────────────────────────────────────────────
 
 describe('ClaudeRoleFileWriter', () => {
-  const writer = new ClaudeRoleFileWriter();
+  let claudeHomeDir: string;
+  let writer: ClaudeRoleFileWriter;
+
+  beforeEach(async () => {
+    claudeHomeDir = await mkdtemp(join(tmpdir(), 'claude-home-'));
+    writer = new ClaudeRoleFileWriter(claudeHomeDir);
+  });
+
+  afterEach(async () => {
+    await rm(claudeHomeDir, { recursive: true, force: true });
+  });
 
   it('returns correct format identifier', () => {
     expect(writer.getFormat()).toBe('claude-agent-md');
   });
 
-  it('writes .md files to .claude/agents/', async () => {
+  it('writes .md files to ~/.claude/agents/ (user home, not project dir)', async () => {
     const files = await writer.writeRoleFiles(sampleRoles, tempDir);
 
     expect(files).toHaveLength(2);
-    expect(files[0]).toContain('.claude/agents/flightdeck-developer.md');
-    expect(files[1]).toContain('.claude/agents/flightdeck-architect.md');
+    expect(files[0]).toContain(join(claudeHomeDir, '.claude', 'agents', 'flightdeck-developer.md'));
+    expect(files[1]).toContain(join(claudeHomeDir, '.claude', 'agents', 'flightdeck-architect.md'));
+    // Ensure files are NOT in the project directory
+    expect(files[0]).not.toContain(tempDir);
+    expect(files[1]).not.toContain(tempDir);
   });
 
   it('produces YAML frontmatter with name and description (no tools)', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
     const content = await readFile(
-      join(tempDir, '.claude', 'agents', 'flightdeck-developer.md'),
+      join(claudeHomeDir, '.claude', 'agents', 'flightdeck-developer.md'),
       'utf-8',
     );
 
@@ -180,18 +216,28 @@ describe('ClaudeRoleFileWriter', () => {
     expect(content).toContain('You are a developer. Write clean code and tests.');
   });
 
-  it('cleanRoleFiles removes generated files', async () => {
+  it('cleanRoleFiles removes generated files from home directory', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
     await writer.cleanRoleFiles(tempDir);
 
-    const dir = join(tempDir, '.claude', 'agents');
+    const dir = join(claudeHomeDir, '.claude', 'agents');
     const { readdir } = await import('fs/promises');
     const remaining = await readdir(dir);
     expect(remaining).toHaveLength(0);
   });
 
   it('cleanRoleFiles is safe when directory does not exist', async () => {
-    await expect(writer.cleanRoleFiles(join(tempDir, 'nonexistent'))).resolves.not.toThrow();
+    const freshWriter = new ClaudeRoleFileWriter(join(tempDir, 'nonexistent-home'));
+    await expect(freshWriter.cleanRoleFiles(tempDir)).resolves.not.toThrow();
+  });
+
+  it('ignores targetDir parameter (uses home dir instead)', async () => {
+    const projectDir = join(tempDir, 'some-project');
+    await mkdir(projectDir, { recursive: true });
+    const files = await writer.writeRoleFiles(singleRole, projectDir);
+
+    expect(files[0]).toContain(claudeHomeDir);
+    expect(files[0]).not.toContain(projectDir);
   });
 });
 
@@ -327,22 +373,34 @@ describe('CursorRoleFileWriter', () => {
 // ── Codex Writer ────────────────────────────────────────────────────
 
 describe('CodexRoleFileWriter', () => {
-  const writer = new CodexRoleFileWriter();
+  let codexHomeDir: string;
+  let writer: CodexRoleFileWriter;
+
+  beforeEach(async () => {
+    codexHomeDir = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    writer = new CodexRoleFileWriter(codexHomeDir);
+  });
+
+  afterEach(async () => {
+    await rm(codexHomeDir, { recursive: true, force: true });
+  });
 
   it('returns correct format identifier', () => {
     expect(writer.getFormat()).toBe('codex-agents-md');
   });
 
-  it('writes a single AGENTS.md file', async () => {
+  it('writes a single AGENTS.md file to ~/.codex/ (user home, not project dir)', async () => {
     const files = await writer.writeRoleFiles(sampleRoles, tempDir);
 
     expect(files).toHaveLength(1);
-    expect(files[0]).toContain('AGENTS.md');
+    expect(files[0]).toContain(join(codexHomeDir, '.codex', 'AGENTS.md'));
+    // Ensure file is NOT in the project directory
+    expect(files[0]).not.toContain(tempDir);
   });
 
   it('contains all roles as markdown sections', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
-    const content = await readFile(join(tempDir, 'AGENTS.md'), 'utf-8');
+    const content = await readFile(join(codexHomeDir, '.codex', 'AGENTS.md'), 'utf-8');
 
     expect(content).toContain(FLIGHTDECK_MARKER);
     expect(content).toContain('# Flightdeck Agents');
@@ -356,25 +414,27 @@ describe('CodexRoleFileWriter', () => {
 
   it('writes single role without separator', async () => {
     await writer.writeRoleFiles(singleRole, tempDir);
-    const content = await readFile(join(tempDir, 'AGENTS.md'), 'utf-8');
+    const content = await readFile(join(codexHomeDir, '.codex', 'AGENTS.md'), 'utf-8');
 
     expect(content).toContain('## Reviewer');
     expect(content).not.toContain('---\n\n##');
   });
 
-  it('cleanRoleFiles removes the AGENTS.md file', async () => {
+  it('cleanRoleFiles removes the AGENTS.md file from home directory', async () => {
     await writer.writeRoleFiles(sampleRoles, tempDir);
     await writer.cleanRoleFiles(tempDir);
 
     const { access } = await import('fs/promises');
-    await expect(access(join(tempDir, 'AGENTS.md'))).rejects.toThrow();
+    await expect(access(join(codexHomeDir, '.codex', 'AGENTS.md'))).rejects.toThrow();
   });
 
   it('cleanRoleFiles does not remove user-authored AGENTS.md', async () => {
-    await writeFile(join(tempDir, 'AGENTS.md'), '# My hand-written agents file');
+    const codexDir = join(codexHomeDir, '.codex');
+    await mkdir(codexDir, { recursive: true });
+    await writeFile(join(codexDir, 'AGENTS.md'), '# My hand-written agents file');
     await writer.cleanRoleFiles(tempDir);
 
-    const content = await readFile(join(tempDir, 'AGENTS.md'), 'utf-8');
+    const content = await readFile(join(codexDir, 'AGENTS.md'), 'utf-8');
     expect(content).toBe('# My hand-written agents file');
   });
 
@@ -385,8 +445,17 @@ describe('CodexRoleFileWriter', () => {
   it('handles empty roles array', async () => {
     const files = await writer.writeRoleFiles([], tempDir);
     expect(files).toHaveLength(1);
-    const content = await readFile(join(tempDir, 'AGENTS.md'), 'utf-8');
+    const content = await readFile(join(codexHomeDir, '.codex', 'AGENTS.md'), 'utf-8');
     expect(content).toContain('# Flightdeck Agents');
+  });
+
+  it('ignores targetDir parameter (uses home dir instead)', async () => {
+    const projectDir = join(tempDir, 'some-project');
+    await mkdir(projectDir, { recursive: true });
+    const files = await writer.writeRoleFiles(singleRole, projectDir);
+
+    expect(files[0]).toContain(codexHomeDir);
+    expect(files[0]).not.toContain(projectDir);
   });
 });
 
@@ -568,7 +637,7 @@ describe('Path traversal prevention', () => {
 
 describe('YAML injection prevention', () => {
   it('escapes newlines in description to prevent key injection', async () => {
-    const writer = createRoleFileWriter('copilot');
+    const writer = new CopilotRoleFileWriter(tempDir);
     const roles: RoleDefinition[] = [
       {
         role: 'tester',
@@ -578,7 +647,7 @@ describe('YAML injection prevention', () => {
     ];
     await writer.writeRoleFiles(roles, tempDir);
     const content = await readFile(
-      join(tempDir, '.github', 'agents', 'flightdeck-tester.agent.md'),
+      join(tempDir, '.copilot', 'agents', 'flightdeck-tester.agent.md'),
       'utf-8',
     );
 
@@ -588,7 +657,7 @@ describe('YAML injection prevention', () => {
   });
 
   it('escapes carriage returns in description', async () => {
-    const writer = createRoleFileWriter('claude');
+    const writer = new ClaudeRoleFileWriter(tempDir);
     const roles: RoleDefinition[] = [
       {
         role: 'tester',
