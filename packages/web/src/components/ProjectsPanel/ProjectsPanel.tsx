@@ -20,6 +20,7 @@ import {
   Pencil,
   Square,
   Upload,
+  ArrowRight,
 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
@@ -330,6 +331,14 @@ function ProjectCard({
 
           {/* Actions */}
           <div className="flex gap-2 pt-1">
+            <Link
+              to={`/projects/${project.id}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-th-bg-muted text-th-text-alt rounded-md hover:bg-th-border transition-colors font-medium no-underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ArrowRight className="w-3 h-3" />
+              Enter Project
+            </Link>
             {(() => {
               const effectiveStatus = projectStatusProps(project);
               const isLive = effectiveStatus.variant === 'success' || effectiveStatus.variant === 'warning';
