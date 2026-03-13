@@ -22,7 +22,7 @@ import { getRoleIcon } from '../../utils/getRoleIcon';
 // ── Constants ────────────────────────────────────────────────────────
 
 const LABEL_WIDTH = 180;
-const LANE_HEIGHT = 56;
+const LANE_HEIGHT = 28;
 const LANE_HEIGHT_EXPANDED = 160;
 
 // Stable empty set — prevents re-renders when no agents are expanded for a lead
@@ -81,7 +81,7 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick, fullRange }
 }) {
   return (
     <div
-      className={`flex flex-col justify-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 timeline-focusable timeline-lane-animate ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
+      className={`flex items-center px-3 border-b border-th-border-muted/50 cursor-pointer hover:bg-th-bg-alt/50 timeline-focusable timeline-lane-animate ${isFocused ? 'ring-1 ring-inset ring-blue-500 bg-th-bg-alt/30' : ''}`}
       style={{ height, minHeight: height, borderLeft: `3px solid ${ROLE_COLORS[agent.role] ?? 'var(--st-idle)'}`, transition: 'height 200ms ease-out, background-color 150ms ease' }}
       onClick={onClick}
       role="button"
@@ -90,15 +90,24 @@ function AgentLabel({ agent, height, isExpanded, isFocused, onClick, fullRange }
       aria-expanded={isExpanded}
       aria-roledescription="agent lane toggle"
     >
-      <span className="text-sm font-medium text-th-text-alt truncate">
-        {getRoleIcon(agent.role)} {agent.role}
-      </span>
-      <span className="text-xs font-mono text-th-text-muted">{agent.shortId}</span>
-      {isExpanded && (
-        <span className="text-xs text-th-text-muted mt-1">
-          {formatTimestamp(new Date(agent.createdAt), fullRange)}
-          {agent.endedAt ? ` – ${formatTimestamp(new Date(agent.endedAt), fullRange)}` : ' – active'}
-        </span>
+      {isExpanded ? (
+        <div className="flex flex-col justify-center min-w-0">
+          <span className="text-xs font-medium text-th-text-alt truncate">
+            {getRoleIcon(agent.role)} {agent.role}
+          </span>
+          <span className="text-[10px] font-mono text-th-text-muted">{agent.shortId}</span>
+          <span className="text-[10px] text-th-text-muted mt-0.5">
+            {formatTimestamp(new Date(agent.createdAt), fullRange)}
+            {agent.endedAt ? ` – ${formatTimestamp(new Date(agent.endedAt), fullRange)}` : ' – active'}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs font-medium text-th-text-alt truncate">
+            {getRoleIcon(agent.role)} {agent.role}
+          </span>
+          <span className="text-[10px] font-mono text-th-text-muted shrink-0">{agent.shortId}</span>
+        </div>
       )}
     </div>
   );
@@ -135,7 +144,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
             onMouseLeave={onSegmentLeave}
           >
             <rect
-              x={x1} y={y + 4} width={segWidth} height={height - 8}
+              x={x1} y={y + 2} width={segWidth} height={height - 4}
               fill={isIdle ? 'url(#idle-hatch)' : colors.fill}
               stroke={colors.border} strokeWidth={isFailed ? 2 : 1} rx={3}
               className={`cursor-pointer${isFailed ? ' timeline-error-highlight' : ''}`}
@@ -143,8 +152,8 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
             />
             {/* Task label overlay on running segments */}
             {segWidth > 60 && (seg.taskLabel || seg.status === 'running') && (
-              <foreignObject x={x1 + 4} y={y + 6} width={segWidth - 8} height={height - 16} style={{ pointerEvents: 'none' }}>
-                <div className="text-[10px] text-th-text-alt truncate leading-tight pt-0.5">
+              <foreignObject x={x1 + 4} y={y + 3} width={segWidth - 8} height={height - 6} style={{ pointerEvents: 'none' }}>
+                <div className="text-[10px] text-th-text-alt truncate leading-tight">
                   {seg.taskLabel ?? seg.status}
                 </div>
               </foreignObject>
@@ -158,7 +167,7 @@ function AgentLane({ agent, y, height, timeScale, width, locks, onSegmentHover, 
         const x = timeScale(new Date(lock.acquiredAt));
         return (
           <g key={`lock-${i}`}>
-            <text x={x} y={y + height - 4} fontSize={10} fill="var(--st-creating)">🔒</text>
+            <text x={x} y={y + height - 2} fontSize={9} fill="var(--st-creating)">🔒</text>
             <title>{lock.filePath}</title>
           </g>
         );
