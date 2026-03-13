@@ -6,11 +6,11 @@
  * 2. Status (installed, authenticated, version) loads progressively — badges fill in
  *
  * Includes per-provider configuration: binary override, default model,
- * required environment variables, and default CLI arguments.
+ * authentication guidance, and default CLI arguments.
  * Drag-and-drop reordering via @dnd-kit/sortable.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Key, Settings2, GripVertical } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -103,14 +103,14 @@ const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
   opencode: ['acp'],
 };
 
-/** Required environment variables per provider. */
-const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
-  copilot: [],
-  claude: ['ANTHROPIC_API_KEY'],
-  gemini: ['GEMINI_API_KEY'],
-  cursor: ['CURSOR_API_KEY'],
-  codex: ['OPENAI_API_KEY'],
-  opencode: [],
+/** Login instructions per provider — shown in the expanded details panel. */
+const PROVIDER_LOGIN_LABELS: Record<string, string> = {
+  copilot: 'Authenticate using the GitHub Copilot CLI',
+  claude: 'Log in with claude auth in your terminal',
+  gemini: 'Log in with gemini auth in your terminal',
+  cursor: 'Log in via the Cursor app',
+  codex: 'Log in with codex auth in your terminal',
+  opencode: 'Authentication is managed by OpenCode',
 };
 
 /** Whether the provider supports session resume. */
@@ -203,7 +203,7 @@ function ProviderCard({
   const links = PROVIDER_LINKS[provider.id] ?? [];
   const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
   const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
-  const requiredEnv = PROVIDER_REQUIRED_ENV[provider.id] ?? [];
+  const loginLabel = PROVIDER_LOGIN_LABELS[provider.id] ?? 'Log in via the provider CLI';
   const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
 
   const style: React.CSSProperties = {
@@ -321,25 +321,11 @@ function ProviderCard({
             </div>
           </div>
 
-          {/* Required Environment Variables */}
-          {requiredEnv.length > 0 && (
-            <div className="bg-th-bg-alt border border-th-border rounded-md p-2.5 text-xs">
-              <span className="text-th-text-muted flex items-center gap-1 mb-1.5">
-                <Key className="w-3 h-3" /> Required Environment Variables
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {requiredEnv.map((envVar) => (
-                  <code
-                    key={envVar}
-                    className="px-2 py-0.5 bg-th-bg rounded-md text-th-text-alt font-mono"
-                  >
-                    {envVar}
-                  </code>
-                ))}
-              </div>
-              <p className="text-th-text-muted mt-1.5">
-                Set these in your shell environment or <code className="text-th-text-muted">flightdeck.config.yaml</code> under <code className="text-th-text-muted">provider.envOverride</code>.
-              </p>
+          {/* Authentication info */}
+          {!provider.authenticated && (
+            <div className="bg-th-bg-alt border border-th-border rounded-md p-2.5 text-xs flex items-center gap-2">
+              <LogIn className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="text-th-text-alt">{loginLabel}</span>
             </div>
           )}
 
