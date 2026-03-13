@@ -44,36 +44,7 @@ export function detectAlerts(
   const alerts: Alert[] = [];
   const now = Date.now();
 
-  // 1. Context pressure — informational only, no action buttons.
-  // Copilot manages context compaction automatically.
-  for (const agent of agents) {
-    if (agent.contextWindowSize && agent.contextWindowUsed) {
-      const pct = agent.contextWindowUsed / agent.contextWindowSize;
-      const roleName = typeof agent.role === 'object' ? agent.role.name : agent.role;
-      const shortId = shortAgentId(agent.id);
-      const burnLabel = agent.contextBurnRate && agent.contextBurnRate > 0
-        ? ` • ~${Math.round(agent.contextBurnRate * 60)}k tok/min`
-        : '';
-      const timeLabel = agent.estimatedExhaustionMinutes != null && agent.estimatedExhaustionMinutes > 0
-        ? ` • ~${Math.round(agent.estimatedExhaustionMinutes)} min remaining`
-        : '';
-
-      // Only show at 95%+ (critical) — Copilot handles context management automatically
-      if (pct > 0.95) {
-        alerts.push({
-          id: `ctx-${agent.id}`,
-          severity: 'info',
-          icon: '🧠',
-          title: `${roleName} at ${Math.round(pct * 100)}% context`,
-          detail: `Agent ${shortId} nearing context limit — Copilot will compact automatically.${burnLabel}${timeLabel}`,
-          agentId: agent.id,
-          timestamp: now,
-        });
-      }
-    }
-  }
-
-  // 2. Pending decisions (>3 min old)
+  // 1. Pending decisions (>3 min old)
   for (const decision of decisions) {
     if (decision.needsConfirmation && decision.status === 'recorded') {
       const age = now - new Date(decision.timestamp).getTime();

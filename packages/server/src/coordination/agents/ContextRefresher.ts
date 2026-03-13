@@ -255,21 +255,10 @@ export class ContextRefresher {
     return `== ACTIVE FILE LOCKS ==\n${lines.join('\n')}`;
   }
 
-  /** Build actionable alerts: high context usage */
-  private buildAlerts(peers: import('../../agents/Agent.js').AgentContextInfo[]): string[] {
-    const alerts: string[] = [];
-
-    for (const p of peers) {
-      // Context usage warning at 80%
-      if (p.contextWindowSize && p.contextWindowSize > 0 && p.contextWindowUsed) {
-        const pct = Math.round((p.contextWindowUsed / p.contextWindowSize) * 100);
-        if (pct >= 80) {
-          alerts.push(`${p.id.slice(0, 8)} near context limit (${pct}%)`);
-        }
-      }
-    }
-
-    return alerts;
+  /** Build actionable alerts for CREW_UPDATE injection. */
+  private buildAlerts(_peers: import('../../agents/Agent.js').AgentContextInfo[]): string[] {
+    // Context pressure alerts removed — providers handle their own context management.
+    return [];
   }
 
   /** Build recent lock_denied activity for the secretary's CREW_UPDATE, scoped to a project. */

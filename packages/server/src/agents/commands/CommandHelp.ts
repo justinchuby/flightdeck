@@ -190,31 +190,6 @@ function formatArgs(args: CommandArg[]): string {
   }).join(' ');
 }
 
-/** Build a formatted help text listing all available commands. */
-export function buildCommandHelp(): string {
-  const ref = buildReferenceFromPatterns(registeredPatterns);
-  const lines: string[] = ['[System] Available commands:\n'];
-
-  for (const [category, commands] of Object.entries(ref)) {
-    lines.push(`== ${category} ==`);
-    for (const cmd of commands) {
-      lines.push(`  ${cmd.name} — ${cmd.description}`);
-      if (cmd.args && cmd.args.length > 0) {
-        lines.push(`    Args: ${formatArgs(cmd.args)}`);
-      }
-      lines.push(`    ${cmd.example}`);
-    }
-    lines.push('');
-  }
-
-  lines.push('All commands use the format: COMMAND_NAME {json_payload}');
-  lines.push('');
-  lines.push('== Escaping ==');
-  lines.push('Do NOT include literal command brackets in messages or task descriptions.');
-  lines.push('Refer to commands by name: "use COMMIT when done" or "run QUERY_CREW".');
-  return lines.join('\n');
-}
-
 /** Get the example for a specific command. Returns undefined if not found. */
 export function getCommandExample(commandName: string): string | undefined {
   const upper = commandName.toUpperCase();
@@ -222,4 +197,75 @@ export function getCommandExample(commandName: string): string | undefined {
     if (entry.help && entry.name.toUpperCase() === upper) return entry.help.example;
   }
   return undefined;
+}
+
+// ── Lead-only commands (excluded from non-lead output) ───────────────
+
+const LEAD_ONLY_COMMANDS = new Set([
+  'DECLARE_TASKS', 'ADD_TASK', 'ASSIGN_TASK', 'REASSIGN_TASK',
+  'CANCEL_TASK', 'RESET_DAG', 'FORCE_READY', 'PAUSE_TASK',
+  'RESUME_TASK', 'RETRY_TASK', 'REOPEN_TASK', 'SKIP_TASK',
+  'SPAWN_AGENT', 'TERMINATE_AGENT',
+]);
+
+export interface CommandHelpOptions {
+  /** Output format: 'verbose' shows args + example on separate lines; 'compact' is one-liner per command. */
+  format?: 'verbose' | 'compact';
+  /** Agent role — when set to a non-lead role, lead-only commands are excluded. */
+  role?: string;
+}
+
+/**
+ * Build formatted command help text grouped by category.
+ *
+ * - **verbose** (default): full help with args and examples on separate lines.
+ *   Used for error responses when an agent issues an unknown command.
+ * - **compact**: one-liner per command (`NAME example — description`).
+ *   Used for periodic reminders to long-running agents.
+ *
+ * When `role` is a non-lead role, lead-only commands (DAG management, spawn/terminate) are excluded.
+ */
+export function buildCommandHelp(options?: CommandHelpOptions): string {
+  const format = options?.format ?? 'verbose';
+  const isLead = !options?.role || options.role === 'lead';
+
+  const patterns = isLead
+    ? registeredPatterns
+    : registeredPatterns.filter((e) => !LEAD_ONLY_COMMANDS.has(e.name));
+
+  const ref = buildReferenceFromPatterns(patterns);
+
+  const header = format === 'verbose'
+    ? '[System] Available commands:\n'
+    : '[System] Command Reference Reminder — available commands:';
+  const lines: string[] = [header];
+  if (format === 'compact') lines.push('');
+
+  for (const [category, commands] of Object.entries(ref)) {
+    lines.push(`== ${category} ==`);
+    for (const cmd of commands) {
+      if (format === 'verbose') {
+        lines.push(`  ${cmd.name} — ${cmd.description}`);
+        if (cmd.args && cmd.args.length > 0) {
+          lines.push(`    Args: ${formatArgs(cmd.args)}`);
+        }
+        lines.push(`    ${cmd.example}`);
+      } else {
+        lines.push(`  ${cmd.name} ${cmd.example} — ${cmd.description}`);
+      }
+    }
+    lines.push('');
+  }
+
+  if (format === 'verbose') {
+    lines.push('All commands use the format: COMMAND_NAME {json_payload}');
+    lines.push('');
+    lines.push('== Escaping ==');
+    lines.push('Do NOT include literal command brackets in messages or task descriptions.');
+    lines.push('Refer to commands by name: "use COMMIT when done" or "run QUERY_CREW".');
+  } else {
+    lines.push('Use these commands directly in your text response (not inside tool calls).');
+  }
+
+  return lines.join('\n');
 }

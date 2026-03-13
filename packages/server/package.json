@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "cd ../shared && rm -f tsconfig.tsbuildinfo && npm run build",
     "dev": "tsx watch src/index.ts",
     "build": "tsc --build",
     "start": "node dist/index.js",

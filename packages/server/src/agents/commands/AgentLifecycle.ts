@@ -11,6 +11,7 @@ import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
 import { deriveArgs } from './CommandHelp.js';
+import { notifySecretary } from './secretaryNotifier.js';
 import {
   parseCommandPayload,
   createAgentSchema,
@@ -145,6 +146,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
         toAgentId: agent.id, toRole: agent.role.id,
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
       ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
+      notifySecretary(ctx, agent.id, `[System] Task delegated to ${role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 120)}`);
 
       ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Created & delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
         toAgentId: child.id, toRole: role.id, childId: child.id, childRole: role.id, delegationId: delegation.id,
@@ -291,6 +293,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
+    notifySecretary(ctx, agent.id, `[System] Task delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 120)}`);
 
     maybeAutoCreateGroup(ctx, agent, ctx.delegations);
     maybeSuggestDagGroup(ctx, agent.id);

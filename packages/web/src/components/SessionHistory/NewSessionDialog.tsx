@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
-import { deriveModelName } from '../../hooks/useModels';
+import { useModels, deriveModelName } from '../../hooks/useModels';
 import { Plus, Loader2, Check, Sparkles } from 'lucide-react';
 
 interface RoleInfo {
@@ -10,11 +10,6 @@ interface RoleInfo {
   icon: string;
   description: string;
   model: string;
-}
-
-interface ModelsListResponse {
-  models: string[];
-  defaults: Record<string, string[]>;
 }
 
 export interface NewSessionDialogProps {
@@ -28,7 +23,7 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
   const [task, setTask] = useState('');
   const [leadModel, setLeadModel] = useState('');
   const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const { filteredModels: availableModels } = useModels();
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,9 +32,6 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
     apiFetch<RoleInfo[]>('/roles')
       .then((roles) => setAvailableRoles(roles.filter((r) => r.id !== 'lead')))
       .catch(() => { /* role fetch failure is non-critical */ });
-    apiFetch<ModelsListResponse>('/models')
-      .then((data) => setAvailableModels(data.models ?? []))
-      .catch(() => { /* model fetch failure is non-critical */ });
   }, []);
 
   useEffect(() => {

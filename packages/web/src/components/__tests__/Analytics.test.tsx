@@ -9,6 +9,7 @@ import { generateInsights } from '../Analytics/types';
 
 vi.mock('@visx/responsive', () => ({
   useParentSize: () => ({ parentRef: { current: null }, width: 400, height: 200 }),
+  ParentSize: ({ children }: any) => children({ width: 400, height: 250 }),
 }));
 
 vi.mock('@visx/group', () => ({

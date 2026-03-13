@@ -17,9 +17,6 @@ const MAX_ALERTS = 100;
 const STUCK_AGENT_MS = 10 * 60 * 1000;       // 10 minutes
 const NEW_AGENT_GRACE_MS = 5 * 60 * 1000;   // 5 minutes grace for newly created agents
 const MAX_PROMPTING_MS = 30 * 60 * 1000;     // 30 minutes max before prompting is considered stuck
-const CONTEXT_WARN_THRESHOLD = 0.70;            // 70% — first warning
-const CONTEXT_ALERT_THRESHOLD = 0.85;           // 85% — action needed
-const CONTEXT_CRITICAL_THRESHOLD = 0.95;        // 95% — imminent exhaustion
 const STALE_DECISION_MS = 10 * 60 * 1000;     // 10 minutes
 const CHECK_INTERVAL_MS = 60 * 1000;           // 1 minute
 
@@ -91,7 +88,6 @@ export class AlertEngine extends EventEmitter {
   private runChecks(): void {
     this.checkStuckAgents();
     this.checkLongRunningPrompts();
-    this.checkContextPressure();
     this.checkDuplicateFileEdits();
     this.checkIdleAgentsWithReadyTasks();
     this.checkStaleDecisions();
@@ -141,59 +137,6 @@ export class AlertEngine extends EventEmitter {
         severity: 'warning',
         message: `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) has been prompting for ${Math.round(elapsed / 60_000)}min — may be stalled`,
         agentId: agent.id,
-      });
-    }
-  }
-
-  /** 2. Agent's context window usage — tiered thresholds at 70/85/95% */
-  private checkContextPressure(): void {
-    for (const agent of this.agentManager.getAll()) {
-      if (agent.status !== 'running' && agent.status !== 'idle') continue;
-      if (agent.contextWindowSize === 0) continue;
-      const usage = agent.contextWindowUsed / agent.contextWindowSize;
-      if (usage < CONTEXT_WARN_THRESHOLD) continue;
-
-      const pct = Math.round(usage * 100);
-      const exhaustionMin = agent.estimatedExhaustionMinutes;
-      const timeWarning = exhaustionMin != null ? ` (~${Math.round(exhaustionMin)} min remaining)` : '';
-
-      const severity: AlertSeverity = usage >= CONTEXT_CRITICAL_THRESHOLD ? 'critical'
-        : usage >= CONTEXT_ALERT_THRESHOLD ? 'warning'
-        : 'info';
-
-      const actions: AlertAction[] = [
-        {
-          label: 'Compact context',
-          description: 'Compress context to free space',
-          actionType: 'api_call',
-          endpoint: `/api/agents/${agent.id}/compact`,
-          method: 'POST',
-          confidence: usage >= CONTEXT_ALERT_THRESHOLD ? 90 : 60,
-        },
-        {
-          label: 'Restart agent',
-          description: 'Restart with full context handoff',
-          actionType: 'api_call',
-          endpoint: `/api/agents/${agent.id}/restart`,
-          method: 'POST',
-          confidence: usage >= CONTEXT_CRITICAL_THRESHOLD ? 95 : 50,
-        },
-        {
-          label: 'Dismiss',
-          description: 'Ignore this alert',
-          actionType: 'dismiss',
-          endpoint: '',
-          method: 'POST',
-          confidence: 10,
-        },
-      ];
-
-      this.addAlert({
-        type: 'context_pressure',
-        severity,
-        message: `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) context window at ${pct}%${timeWarning}${severity === 'critical' ? ' — imminent exhaustion' : severity === 'warning' ? ' — quality may degrade' : ' — approaching limit'}`,
-        agentId: agent.id,
-        actions,
       });
     }
   }

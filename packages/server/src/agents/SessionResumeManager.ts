@@ -109,6 +109,8 @@ export class SessionResumeManager {
           parentId: agentJson.parentId,
           cwd: agentJson.cwd,
         },
+        undefined,
+        agentJson.provider,
       );
     } catch (err) {
       logger.error({ module: 'resume', msg: 'Failed to persist agent spawn', agentId: agentJson.id, err: String(err) });

@@ -120,6 +120,19 @@ export interface ServiceContainer extends AppContext {
   };
 }
 
+// ── Helpers ─────────────────────────────────────────────────
+
+/** Map YAML provider config to the flat ServerConfig fields. */
+function toProviderConfig(cfg: { id: string; binaryOverride?: string; argsOverride?: string[]; envOverride?: Record<string, string>; cloudProvider?: ServerConfig['cloudProvider'] }) {
+  return {
+    provider: cfg.id,
+    providerBinaryOverride: cfg.binaryOverride,
+    providerArgsOverride: cfg.argsOverride,
+    providerEnvOverride: cfg.envOverride,
+    cloudProvider: cfg.cloudProvider,
+  };
+}
+
 // ── Factory ────────────────────────────────────────────────
 
 export async function createContainer(opts: ContainerConfig): Promise<ServiceContainer> {
@@ -148,6 +161,10 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   if (yamlMaxAgents) {
     updateConfig({ maxConcurrentAgents: yamlMaxAgents });
   }
+
+  // Bridge YAML provider config → ServerConfig so all services see the configured provider
+  const yamlProvider = configStore.current.provider;
+  updateConfig(toProviderConfig(yamlProvider));
   // Re-read config so all services see restored values
   const effectiveConfig = getConfig();
 
@@ -242,6 +259,25 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   agentManager.setCollectiveMemory(collectiveMemory);
   agentManager.setConfigStore(configStore);
   agentManager.setProviderManager(providerManager);
+
+  // Resolve the best available provider at startup — if the configured provider
+  // (from YAML or default 'copilot') isn't installed, fall back to the first
+  // available one from the provider ranking.
+  const resolvedProvider = providerManager.resolveAndPersistProvider();
+  if (resolvedProvider !== configStore.current.provider.id) {
+    // Falling back to a different provider — clear YAML overrides so the
+    // original provider's binary/args/env/cloud settings don't bleed through.
+    updateConfig({
+      provider: resolvedProvider,
+      providerBinaryOverride: undefined,
+      providerArgsOverride: undefined,
+      providerEnvOverride: undefined,
+      cloudProvider: undefined,
+    });
+  } else {
+    updateConfig({ provider: resolvedProvider });
+  }
+
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
   skillsLoader.loadAll();
   skillsLoader.startWatching();
@@ -510,6 +546,26 @@ function wireEvents(c: ServiceContainer): void {
     if (serverCfg.maxConcurrentAgents != null) {
       agentManager.setMaxConcurrent(serverCfg.maxConcurrentAgents);
       updateConfig({ maxConcurrentAgents: serverCfg.maxConcurrentAgents });
+    }
+  });
+
+  configStore.on('config:provider:changed', ({ config: providerCfg }: any) => {
+    updateConfig(toProviderConfig(providerCfg));
+    // Re-resolve in case the new provider isn't installed
+    if (c.providerManager) {
+      const resolved = c.providerManager.resolveAndPersistProvider();
+      if (resolved !== providerCfg.id) {
+        // Falling back — clear overrides from the unreachable provider
+        updateConfig({
+          provider: resolved,
+          providerBinaryOverride: undefined,
+          providerArgsOverride: undefined,
+          providerEnvOverride: undefined,
+          cloudProvider: undefined,
+        });
+      } else {
+        updateConfig({ provider: resolved });
+      }
     }
   });
 

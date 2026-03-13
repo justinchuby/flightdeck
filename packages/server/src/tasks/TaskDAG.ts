@@ -849,7 +849,7 @@ export class TaskDAG extends EventEmitter {
       // Auto-resolve: if task is pending but deps are already satisfied, promote to ready.
       // This is a safety net for any code path that missed calling resolveReady().
       if (task && task.dagStatus === 'pending') {
-        const allDepsSatisfied = task.dependsOn.every(depId => {
+        const allDepsSatisfied = task.dependsOn.every((depId: string) => {
           const dep = this.getTask(leadId, depId);
           return !dep || dep.dagStatus === 'done' || dep.dagStatus === 'skipped';
         });

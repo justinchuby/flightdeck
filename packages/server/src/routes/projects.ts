@@ -76,7 +76,7 @@ function validateCwd(cwd: unknown): string | null {
 }
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro, costTracker } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -88,11 +88,13 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     // Enrich with storage info and per-status agent counts
     const allAgents = agentManager.getAll();
+    const projectCosts = costTracker ? new Map(costTracker.getProjectCosts().map((c) => [c.projectId, c])) : new Map();
     const enriched = projects.map((p) => {
       const projectAgents = allAgents.filter((a) => a.projectId === p.id);
       const runningCount = projectAgents.filter((a) => a.status === 'running').length;
       const idleCount = projectAgents.filter((a) => a.status === 'idle').length;
       const failedCount = projectAgents.filter((a) => a.status === 'failed').length;
+      const costs = projectCosts.get(p.id);
       return {
         ...p,
         activeAgentCount: runningCount + idleCount,
@@ -100,6 +102,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         idleAgentCount: idleCount,
         failedAgentCount: failedCount,
         storageMode: storageManager?.getStorageMode(p.id) ?? 'user',
+        tokenUsage: costs ? { inputTokens: costs.totalInputTokens, outputTokens: costs.totalOutputTokens, costUsd: costs.totalCostUsd } : undefined,
       };
     });
     res.json(enriched);
@@ -750,8 +753,12 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Gather context from previous session
       const briefing = projectRegistry.buildBriefing(project.id);
 
-      // Send project briefing
-      if (briefing && briefing.sessions.length > 1) {
+      // When resuming an existing session, send NO messages to agents.
+      // The lead picks up context from the restored ACP session.
+      const isResume = !!lastSession;
+
+      // Send project briefing (fresh start only — resume gets context from ACP session)
+      if (!isResume && briefing && briefing.sessions.length > 1) {
         const briefingText = projectRegistry.formatBriefing(briefing);
         const BRIEFING_DELAY_MS = 3000;
         setTimeout(() => {
@@ -759,7 +766,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         }, BRIEFING_DELAY_MS);
       }
 
-      if (task) {
+      if (!isResume && task) {
         // Delay task delivery so the lead receives crew roster before the task.
         // Scale with team size: base 5s + 2s per agent (batched in groups of 3).
         const teamSize = agentIds?.length ?? (resumeAll && lastSession ? 6 : 0);
@@ -829,41 +836,8 @@ export function projectsRoutes(ctx: AppContext): Router {
         respawnedCount = toResume.length;
         secretaryResumed = toResume.some((a) => a.role === 'secretary');
 
-        // Send crew roster to lead BEFORE the task arrives, so it knows which
-        // agents already exist and doesn't re-create them via CREATE_AGENT
-        const BATCH_COUNT = Math.ceil(toResume.length / BATCH_SIZE);
-        const CREW_NOTIFY_DELAY = INITIAL_DELAY + (BATCH_COUNT * BATCH_DELAY) + 1000;
-        setTimeout(() => {
-          const children = agentManager.getAll().filter(a => a.parentId === agent.id && a.status !== 'terminated' && a.status !== 'failed');
-          if (children.length > 0) {
-            const roster = children.map(a => `- ${a.role.name || a.role.id} (${a.id.slice(0, 8)}) [${a.status}]`).join('\n');
-            agent.sendMessage(
-              `[System — Session Resumed]\n` +
-              `Your team has been restored from the previous session:\n${roster}\n\n` +
-              `⚠ Do NOT create new agents for these roles — delegate to the existing agents above. ` +
-              `Use QUERY_CREW to see the full roster at any time.`
-            );
-          }
-        }, CREW_NOTIFY_DELAY);
-
-        // Inform the lead which agents were excluded so it doesn't re-create them
-        if (Array.isArray(agentIds)) {
-          const excludedAgents = previousAgents.filter((a) => !agentIds.includes(a.agentId));
-          if (excludedAgents.length > 0) {
-            const excludedRoles = excludedAgents.map((a) => a.role).join(', ');
-            const resumedRoles = toResume.map((a) => a.role).join(', ');
-            const TEAM_MSG_DELAY = 2500;
-            setTimeout(() => {
-              agent.sendMessage(
-                `[System — Resume Agent Selection]\n` +
-                `The user chose to resume specific agents only.\n` +
-                `Resumed: ${resumedRoles || 'none'}\n` +
-                `Excluded by user: ${excludedRoles}\n` +
-                `Do NOT re-create or delegate to the excluded roles unless the user explicitly asks.`
-              );
-            }, TEAM_MSG_DELAY);
-          }
-        }
+        // During resume, agents pick up context from restored ACP session — no messages needed.
+        // The crew roster is discoverable via QUERY_CREW.
       }
 
       // Auto-spawn Secretary for DAG tracking — only if not already resumed from previous session
@@ -932,10 +906,12 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   // List all known models and default config
   router.get('/models', (_req, res) => {
+    const { providerManager } = ctx;
     res.json({
       models: KNOWN_MODEL_IDS,
       defaults: DEFAULT_MODEL_CONFIG,
       modelsByProvider: getModelsByProvider(),
+      activeProvider: providerManager?.getActiveProviderId() ?? 'copilot',
     });
   });
 

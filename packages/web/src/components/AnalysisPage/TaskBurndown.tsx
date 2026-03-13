@@ -4,6 +4,7 @@ import { AreaClosed, LinePath, Line } from '@visx/shape';
 import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
 import { curveMonotoneX } from '@visx/curve';
+import { ParentSize } from '@visx/responsive';
 import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
 
 export interface FlowPoint {
@@ -20,7 +21,8 @@ interface CumulativeFlowProps {
 }
 
 const MARGIN = { top: 12, right: 12, bottom: 28, left: 36 };
-const SVG_HEADER_OFFSET = 24;
+/** Vertical space reserved for card padding (32px) + title/legend row (~24px) */
+const SVG_HEADER_OFFSET = 56;
 
 const SERIES = [
   { key: 'created' as const, color: 'rgb(239, 68, 68)', label: 'Created' },
@@ -28,7 +30,21 @@ const SERIES = [
   { key: 'completed' as const, color: 'rgb(168, 85, 247)', label: 'Done' },
 ];
 
-export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFlowProps) {
+const CARD_HEIGHT = 250;
+
+export function CumulativeFlow({ data }: { data: FlowPoint[] }) {
+  return (
+    <div className="bg-surface-raised border border-th-border rounded-lg p-4 relative" style={{ height: CARD_HEIGHT }} data-testid="cumulative-flow">
+      <ParentSize debounceTime={100}>
+        {({ width: parentWidth }) => (
+          <CumulativeFlowInner data={data} width={Math.max(parentWidth, 100)} height={CARD_HEIGHT} />
+        )}
+      </ParentSize>
+    </div>
+  );
+}
+
+function CumulativeFlowInner({ data, width, height }: CumulativeFlowProps) {
   const svgH = height - SVG_HEADER_OFFSET;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = svgH - MARGIN.top - MARGIN.bottom;
@@ -57,14 +73,14 @@ export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFl
 
   if (data.length === 0) {
     return (
-      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] flex items-center justify-center" data-testid="cumulative-flow">
+      <div className="flex items-center justify-center h-full">
         <p className="text-xs text-th-text-muted opacity-60">No task data</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] relative" data-testid="cumulative-flow">
+    <div className="relative">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider">
           Task Flow
@@ -143,35 +159,37 @@ export function CumulativeFlow({ data, width = 260, height = 210 }: CumulativeFl
           <AxisBottom
             top={innerH}
             scale={xScale}
-            numTicks={3}
+            numTicks={4}
             hideZero
             tickFormat={(d) => {
               const date = d instanceof Date ? d : new Date(d as number);
               return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }}
-            stroke="#6b7280"
-            tickStroke="#6b7280"
+            stroke="var(--th-border)"
+            tickStroke="var(--th-border)"
             tickLabelProps={() => ({
-              fill: '#9ca3af',
+              fill: 'var(--th-text-muted)',
               fontSize: 9,
               textAnchor: 'middle' as const,
+              dy: '0.25em',
             })}
           />
           <AxisLeft
             scale={yScale}
-            numTicks={3}
+            numTicks={4}
             hideZero
             tickFormat={(v) => {
               const n = typeof v === 'number' ? v : v.valueOf();
               return Number.isInteger(n) ? String(n) : '';
             }}
-            stroke="#6b7280"
-            tickStroke="#6b7280"
+            stroke="var(--th-border)"
+            tickStroke="var(--th-border)"
             tickLabelProps={() => ({
-              fill: '#9ca3af',
+              fill: 'var(--th-text-muted)',
               fontSize: 9,
               textAnchor: 'end' as const,
-              dx: -4,
+              dx: '-0.25em',
+              dy: '0.33em',
             })}
           />
         </Group>

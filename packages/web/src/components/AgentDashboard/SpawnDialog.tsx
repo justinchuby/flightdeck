@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useModels, deriveModelName } from '../../hooks/useModels';
 import { X, ChevronDown } from 'lucide-react';
 
 interface ProviderStatus {
@@ -18,31 +19,24 @@ interface Props {
 export function SpawnDialog({ api, onClose }: Props) {
   const roles = useAppStore((s) => s.roles);
   const config = useAppStore((s) => s.config);
+  const { filteredModels: models } = useModels();
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
   const [selectedProvider, setSelectedProvider] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
-  const [models, setModels] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch available providers and models
+  // Fetch available providers
   useEffect(() => {
     const baseUrl = (config as any)?.baseUrl || '';
     const fetchData = async () => {
       try {
-        const [provRes, modelRes] = await Promise.all([
-          fetch(`${baseUrl}/settings/providers`),
-          fetch(`${baseUrl}/models`),
-        ]);
+        const provRes = await fetch(`${baseUrl}/settings/providers`);
         if (provRes.ok) {
           const data = await provRes.json();
           setProviders(data.filter((p: ProviderStatus) => p.installed));
-        }
-        if (modelRes.ok) {
-          const data = await modelRes.json();
-          setModels(data.models || []);
         }
       } catch { /* ignore — advanced options just won't be available */ }
     };
@@ -144,7 +138,7 @@ export function SpawnDialog({ api, onClose }: Props) {
                 >
                   <option value="">Default (role config)</option>
                   {models.map((m) => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m} value={m}>{deriveModelName(m)}</option>
                   ))}
                 </select>
               </div>

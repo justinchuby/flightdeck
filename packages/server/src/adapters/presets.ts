@@ -69,7 +69,7 @@ function toPreset(def: ProviderDefinition): ProviderPreset {
 }
 
 export const PROVIDER_PRESETS: Record<ProviderId, ProviderPreset> = Object.fromEntries(
-  PROVIDER_IDS.map((id) => [id, toPreset(PROVIDER_REGISTRY[id])]),
+  PROVIDER_IDS.map((id: ProviderId) => [id, toPreset(PROVIDER_REGISTRY[id])]),
 ) as Record<ProviderId, ProviderPreset>;
 
 // ── Lookup Functions ────────────────────────────────────────

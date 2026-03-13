@@ -14,15 +14,20 @@ interface ModelsResponse {
   models: string[];
   defaults: Record<string, string[]>;
   modelsByProvider?: Record<string, string[]>;
+  activeProvider?: string;
 }
 
 export interface ModelsData {
   /** All known model IDs (ordered) */
   models: string[];
+  /** Models filtered to only the active provider (use in model selectors) */
+  filteredModels: string[];
   /** Default model config per role */
   defaults: Record<string, string[]>;
   /** Models grouped by provider (copilot, claude, gemini, codex, cursor, opencode) */
   modelsByProvider: Record<string, string[]>;
+  /** The currently active provider ID from server config */
+  activeProvider: string;
   /** Human-readable display name for a model ID */
   modelName: (id: string) => string;
   /** Whether data has loaded */
@@ -56,7 +61,7 @@ export function deriveModelName(id: string): string {
 
 // ── Module-level cache (shared across all hook instances) ────
 
-let cachedData: { models: string[]; defaults: Record<string, string[]>; modelsByProvider: Record<string, string[]> } | null = null;
+let cachedData: { models: string[]; defaults: Record<string, string[]>; modelsByProvider: Record<string, string[]>; activeProvider: string } | null = null;
 let fetchPromise: Promise<void> | null = null;
 
 function fetchModels(): Promise<void> {
@@ -68,6 +73,7 @@ function fetchModels(): Promise<void> {
         models: data.models ?? [],
         defaults: data.defaults ?? {},
         modelsByProvider: data.modelsByProvider ?? {},
+        activeProvider: data.activeProvider ?? 'copilot',
       };
     })
     .catch(() => {
@@ -106,10 +112,19 @@ export function useModels(): ModelsData {
     return () => { mounted = false; };
   }, []);
 
+  const models = cachedData?.models ?? [];
+  const activeProvider = cachedData?.activeProvider ?? 'copilot';
+  const providerModels = cachedData?.modelsByProvider[activeProvider];
+  const filteredModels = providerModels
+    ? models.filter((m) => providerModels.includes(m))
+    : models;
+
   return {
-    models: cachedData?.models ?? [],
+    models,
+    filteredModels,
     defaults: cachedData?.defaults ?? {},
     modelsByProvider: cachedData?.modelsByProvider ?? {},
+    activeProvider,
     modelName: deriveModelName,
     loading,
     error,

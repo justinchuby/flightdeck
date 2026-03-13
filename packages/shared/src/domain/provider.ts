@@ -96,7 +96,9 @@ export interface ProviderDefinition {
   restrictedModels?: Record<string, string[]>;
   /** Concrete model for each quality tier */
   tierModels: ProviderTierModels;
-  /** CLI-specific model name aliases (e.g. Claude: 'claude-opus-4.6' → 'opus') */
+  /** CLI-specific model name aliases (e.g. Claude: 'claude-opus-4.6' → 'opus').
+   *  Only needed when a CLI requires short names instead of full model IDs.
+   *  Other providers accept full model names directly, so they don't need aliases. */
   modelAliases?: Record<string, string>;
   /** CLI-specific model name prefix per backend (e.g. OpenCode: { anthropic: 'anthropic' }) */
   modelPrefixes?: Record<string, string>;
@@ -165,7 +167,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     color: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-l-blue-500', tab: 'text-blue-400 border-blue-400' },
     docsUrl: 'https://github.com/google-gemini/gemini-cli',
     setupLinks: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
-    isPreview: true,
+    isPreview: false,
   },
 
   claude: {
@@ -182,20 +184,20 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     agentFileFormat: 'CLAUDE.md',
     modelArgStrategy: 'flag',
     nativeModelProviders: ['anthropic'],
-    tierModels: { fast: 'haiku', standard: 'sonnet', premium: 'opus' },
+    tierModels: { fast: 'haiku', standard: 'default', premium: 'opus' },
+    // Maps our model IDs to Claude CLI's ACP availableModels names.
+    // These 3 IDs come from the CLI's newSession response: 'default', 'opus', 'haiku'.
+    // Other providers accept full model names directly, so they don't need aliases.
     modelAliases: {
       'claude-opus-4.6': 'opus',
-      'claude-opus-4.5': 'opus',
-      'claude-sonnet-4.6': 'sonnet',
-      'claude-sonnet-4.5': 'sonnet',
-      'claude-sonnet-4': 'sonnet',
+      'claude-sonnet-4.6': 'default',
       'claude-haiku-4.5': 'haiku',
     },
     authLabel: 'Authenticated via Anthropic API key',
     color: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-l-amber-500', tab: 'text-orange-400 border-orange-400' },
     docsUrl: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview',
     setupLinks: [{ label: 'Installation guide', url: 'https://github.com/zed-industries/claude-agent-acp#installation' }],
-    isPreview: true,
+    isPreview: false,
   },
 
   codex: {

@@ -48,7 +48,7 @@ export interface DagStatus {
 export interface AcpTextChunk {
   type: 'text';
   text: string;
-  sender?: 'agent' | 'user' | 'system' | 'external' | 'thinking';
+  sender?: 'agent' | 'user' | 'system' | 'external' | 'thinking' | 'tool';
   /** Role name of external sender (e.g. "Developer", "Architect") */
   fromRole?: string;
   timestamp?: number;
@@ -219,5 +219,7 @@ export interface TaskCostSummary {
   totalInputTokens: number;
   totalOutputTokens: number;
   agentCount: number;
+  /** ISO 8601 timestamp of last token usage update for this task */
+  lastUpdatedAt?: string | null;
   agents: Array<{ agentId: string; agentRole?: string; inputTokens: number; outputTokens: number }>;
 }

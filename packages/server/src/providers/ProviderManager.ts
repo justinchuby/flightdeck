@@ -74,8 +74,8 @@ interface CachedDetection {
 // Auth commands derived from the central ProviderRegistry
 const AUTH_COMMANDS: Partial<Record<ProviderId, string>> = Object.fromEntries(
   PROVIDER_IDS
-    .filter((id) => PROVIDER_REGISTRY[id].authCommand)
-    .map((id) => [id, PROVIDER_REGISTRY[id].authCommand!]),
+    .filter((id: ProviderId) => PROVIDER_REGISTRY[id].authCommand)
+    .map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].authCommand!]),
 ) as Partial<Record<ProviderId, string>>;
 
 // ── Constants ────────────────────────────────────────────────────
@@ -331,7 +331,7 @@ export class ProviderManager {
   isProviderEnabled(provider: ProviderId): boolean {
     if (this.configStore) {
       const settings = this.configStore.current.providerSettings[provider];
-      return settings?.enabled ?? false;
+      return settings?.enabled ?? true;
     }
     if (!this.db) return true;
     return this.db.getSetting(`${SETTING_PREFIX}${provider}:enabled`) !== 'false';
@@ -339,7 +339,7 @@ export class ProviderManager {
 
   setProviderEnabled(provider: ProviderId, enabled: boolean): void {
     if (this.configStore) {
-      const current = this.configStore.current.providerSettings[provider] ?? { enabled: false, models: [] };
+      const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
       this.configStore.writePartial({ providerSettings: { [provider]: { ...current, enabled } } }).catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
       return;
     }
@@ -362,7 +362,7 @@ export class ProviderManager {
 
   setModelPreferences(provider: ProviderId, prefs: ModelPreferences): void {
     if (this.configStore) {
-      const current = this.configStore.current.providerSettings[provider] ?? { enabled: false, models: [] };
+      const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
       this.configStore.writePartial({
         providerSettings: { [provider]: { ...current, models: prefs.preferredModels ?? [] } },
       }).catch(err => logger.warn({ msg: 'Failed to persist model preferences', provider, error: err }));
@@ -378,15 +378,69 @@ export class ProviderManager {
     if (this.configStore) {
       return this.configStore.current.provider.id as ProviderId;
     }
-    if (!this.db) return 'copilot';
+    if (!this.db) return this.findFirstInstalledProvider();
     const raw = this.db.getSetting(`${SETTING_PREFIX}active`);
     if (raw && raw in PROVIDER_PRESETS) return raw as ProviderId;
-    return 'copilot';
+    return this.findFirstInstalledProvider();
+  }
+
+  /**
+   * Resolve the best available provider: checks if the configured provider is
+   * actually installed and enabled, and falls back to the first available one
+   * from the provider ranking if not.
+   *
+   * Call this during startup after the ProviderManager is created to ensure
+   * the active provider is actually usable.
+   */
+  resolveAndPersistProvider(): ProviderId {
+    const configured = this.getActiveProviderId();
+
+    // Check if the configured provider is installed and enabled
+    const { installed } = this.detectInstalled(configured);
+    if (installed && this.isProviderEnabled(configured)) {
+      logger.info({ module: 'provider', msg: 'Configured provider is available', provider: configured });
+      return configured;
+    }
+
+    logger.warn({ module: 'provider', msg: 'Configured provider not available, searching for fallback', provider: configured, installed });
+
+    // Walk the provider ranking to find the first installed+enabled provider
+    const ranking = this.getProviderRanking();
+    for (const candidateId of ranking) {
+      if (candidateId === configured) continue; // already checked
+      const { installed: candidateInstalled } = this.detectInstalled(candidateId);
+      if (candidateInstalled && this.isProviderEnabled(candidateId)) {
+        logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: candidateId });
+        this.setActiveProviderId(candidateId);
+        return candidateId;
+      }
+    }
+
+    // No provider found — keep the configured one and let downstream handle the error
+    logger.warn({ module: 'provider', msg: 'No installed+enabled provider found, keeping configured', provider: configured });
+    return configured;
+  }
+
+  /**
+   * Find the first installed provider from the ranking, used as a last-resort
+   * fallback when no DB or ConfigStore is available.
+   */
+  private findFirstInstalledProvider(): ProviderId {
+    const allIds = Object.keys(PROVIDER_PRESETS) as ProviderId[];
+    for (const id of allIds) {
+      try {
+        const { installed } = this.detectInstalled(id);
+        if (installed) return id;
+      } catch { /* skip */ }
+    }
+    return 'copilot'; // absolute last resort
   }
 
   setActiveProviderId(provider: ProviderId): void {
     if (this.configStore) {
-      this.configStore.writePartial({ provider: { ...this.configStore.current.provider, id: provider } }).catch(err => logger.warn({ msg: 'Failed to persist active provider', provider, error: err }));
+      // Only update the provider id — don't spread the current provider config,
+      // which may contain overrides (binary, args, env, cloud) for a different provider.
+      this.configStore.writePartial({ provider: { id: provider } }).catch(err => logger.warn({ msg: 'Failed to persist active provider', provider, error: err }));
       return;
     }
     if (!this.db) return;

@@ -25,30 +25,6 @@ const config = getConfig();
 // ── Build service container (restores persisted settings internally) ──
 const container = await createContainer({ config, repoRoot });
 
-// ── Startup reconciliation ──────────────────────────────────
-// After a crash/restart, sessions and roster entries may be stuck in
-// stale states. Reconcile before accepting requests.
-{
-  const isAgentAlive = (agentId: string) => {
-    const agent = container.agentManager.get(agentId);
-    return !!agent && (agent.status === 'running' || agent.status === 'idle');
-  };
-
-  let staleSessions = 0;
-  let staleAgents = 0;
-
-  if (container.projectRegistry) {
-    staleSessions = container.projectRegistry.reconcileStaleSessions(isAgentAlive);
-  }
-  if (container.agentRoster) {
-    staleAgents = container.agentRoster.reconcileStaleAgents(isAgentAlive);
-  }
-
-  if (staleSessions > 0 || staleAgents > 0) {
-    console.log(`🔧 Reconciled ${staleSessions} stale session(s), ${staleAgents} stale agent(s) on startup`);
-  }
-}
-
 // ── Express app ────────────────────────────────────────────
 const app = express();
 app.use(cors({
@@ -140,13 +116,34 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
   container.internal.contextRefresher.start();
   container.escalationManager!.start();
 
-  // Attempt to resume agents from previous session (async, non-blocking)
+  // Attempt to resume agents from previous session, then reconcile stale state.
+  // Reconciliation runs AFTER resume so isAgentAlive() correctly reflects
+  // which agents were successfully restarted vs which are truly dead.
   container.internal.sessionResumeManager.resumeAll().then((result) => {
     if (result.total > 0) {
       console.log(`🔄 Agent resume: ${result.succeeded}/${result.total} resumed, ${result.failed} failed, ${result.skipped} skipped`);
     }
   }).catch((err) => {
     console.warn(`⚠️  Agent resume failed: ${err.message}`);
+  }).finally(() => {
+    const isAgentAlive = (agentId: string) => {
+      const agent = container.agentManager.get(agentId);
+      return !!agent && (agent.status === 'running' || agent.status === 'idle');
+    };
+
+    let staleSessions = 0;
+    let staleAgents = 0;
+
+    if (container.projectRegistry) {
+      staleSessions = container.projectRegistry.reconcileStaleSessions(isAgentAlive);
+    }
+    if (container.agentRoster) {
+      staleAgents = container.agentRoster.reconcileStaleAgents(isAgentAlive);
+    }
+
+    if (staleSessions > 0 || staleAgents > 0) {
+      console.log(`🔧 Reconciled ${staleSessions} stale session(s), ${staleAgents} stale agent(s)`);
+    }
   });
 }).catch((err) => {
   console.error(`❌ Failed to start server: ${err.message}`);

@@ -27,7 +27,7 @@ import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
 import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
-import { useEffectiveProjectId } from '../../hooks/useEffectiveProjectId';
+import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import { useAppStore } from '../../stores/appStore';
 import { AgentDetailPanel } from '../AgentDetailPanel';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -478,8 +478,8 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(scope === 'project' ? 'active' : 'all');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  const effectiveProjectId = useEffectiveProjectId();
-  const projectId = scope === 'project' ? effectiveProjectId : null;
+  const contextProjectId = useOptionalProjectId();
+  const projectId = scope === 'project' ? contextProjectId : null;
 
   const selectedAgentTeamId = agents.find(a => a.agentId === selectedAgent)?.teamId ?? 'default';
 
@@ -718,28 +718,22 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           ))}
         </div>
 
-        {/* Agent Detail — global: centered modal; project: inline side panel */}
-        {scope === 'global' ? (
-          selectedAgent && (
-            <AgentDetailPanel agentId={selectedAgent} mode="modal" onClose={() => setSelectedAgent(null)} />
-          )
-        ) : (
-          <div
-            className={`
-              fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
-              md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
-              ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
-              ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
-              md:self-start md:sticky md:top-0 md:max-h-full
-            `}
-          >
-            {selectedAgent && (
-              <div className="h-full overflow-y-auto">
-                <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
-              </div>
-            )}
-          </div>
-        )}
+        {/* Agent Detail — inline side panel */}
+        <div
+          className={`
+            fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
+            md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
+            ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
+            ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
+            md:self-start md:sticky md:top-0 md:max-h-full
+          `}
+        >
+          {selectedAgent && (
+            <div className="h-full overflow-y-auto">
+              <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Health Strip (collapsed at bottom) */}

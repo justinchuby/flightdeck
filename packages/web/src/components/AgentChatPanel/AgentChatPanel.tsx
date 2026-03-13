@@ -34,6 +34,7 @@ const SENDER_STYLES: Record<string, { label: string; bg: string; text: string }>
   system: { label: 'System', bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400' },
   thinking: { label: 'Thinking', bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400' },
   external: { label: 'External', bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400' },
+  tool: { label: 'Tool', bg: 'bg-sky-500/10', text: 'text-sky-600 dark:text-sky-400' },
 };
 
 function getSenderStyle(sender?: string) {
@@ -288,6 +289,23 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
     return (
       <div className="text-[11px] text-purple-500 dark:text-purple-400 italic pl-3 border-l-2 border-purple-400/30 py-0.5">
         💭 {text.slice(0, 300)}{text.length > 300 ? '…' : ''}
+      </div>
+    );
+  }
+
+  // Tool call messages render as compact inline indicators
+  if (sender === 'tool') {
+    const text = typeof msg.text === 'string' ? msg.text : '';
+    return (
+      <div className="flex items-center gap-1.5 py-0.5">
+        <span className="text-[11px] text-sky-500 dark:text-sky-400 truncate">
+          🔧 {text.slice(0, 200)}
+        </span>
+        {msg.timestamp && (
+          <span className="text-[10px] text-th-text-muted shrink-0">
+            {formatRelativeTime(new Date(msg.timestamp).toISOString())}
+          </span>
+        )}
       </div>
     );
   }

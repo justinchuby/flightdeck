@@ -8,6 +8,11 @@
  * Caches the last resolved ID so it survives agent cleanup (when agents
  * exit, they are removed from the store but the user still expects to
  * see the same project).
+ *
+ * @deprecated Use `useProjectId()` (from ProjectContext, throws if no project)
+ * or `useOptionalProjectId()` (returns null when outside a project route) instead.
+ * This hook guesses the project ID from agent/lead stores which is unreliable
+ * when rendered inside a project-scoped route that already has the ID in context.
  */
 import { useMemo, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';

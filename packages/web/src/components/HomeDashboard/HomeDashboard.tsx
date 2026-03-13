@@ -168,11 +168,6 @@ function ActiveAgentRow({ agent, projectName }: { agent: AgentInfo; projectName:
   );
 }
 
-/** Only explicit PROGRESS commands from the lead — nothing else */
-const PROGRESS_ACTION_TYPES = new Set([
-  'progress_update',
-]);
-
 
 function ProgressBar({ summary }: { summary: DagStatus['summary'] }) {
   const total = summary.done + summary.running + summary.ready + summary.pending + summary.failed + summary.blocked + summary.paused + summary.skipped;
@@ -289,7 +284,7 @@ export function HomeDashboard() {
       const [projectsData, decisionsData, activityData] = await Promise.all([
         apiFetch<EnrichedProject[]>('/projects').catch(() => []),
         apiFetch<Decision[]>('/decisions').catch(() => []),
-        apiFetch<ActivityEntry[]>('/coordination/activity?limit=50').catch(() => []),
+        apiFetch<ActivityEntry[]>('/coordination/activity?type=progress_update&limit=15').catch(() => []),
       ]);
 
       const activeProjects = Array.isArray(projectsData)
@@ -298,9 +293,9 @@ export function HomeDashboard() {
       setProjects(activeProjects);
       setAllDecisions(Array.isArray(decisionsData) ? decisionsData : []);
 
-      // Filter to explicit PROGRESS commands from the lead only
+      // Server already filters to progress_update; keep lead-only filter client-side
       const progressActivity = (Array.isArray(activityData) ? activityData : [])
-        .filter((a) => PROGRESS_ACTION_TYPES.has(a.actionType) && a.agentRole === 'lead')
+        .filter((a) => a.agentRole === 'lead')
         .slice(0, 15);
       setRecentActivity(progressActivity);
 
@@ -332,6 +327,8 @@ export function HomeDashboard() {
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 15_000);
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   // ── Derived data ─────────────────────────────────────────────

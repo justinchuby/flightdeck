@@ -34,18 +34,18 @@ export interface ModelResolution {
 
 /** Which underlying model providers a CLI can access — derived from registry */
 const CLI_NATIVE_PROVIDERS: Record<ProviderId, string[]> = Object.fromEntries(
-  PROVIDER_IDS.map((id) => [id, PROVIDER_REGISTRY[id].nativeModelProviders]),
+  PROVIDER_IDS.map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].nativeModelProviders]),
 ) as Record<ProviderId, string[]>;
 
 /** Restricted model catalogs — derived from registry */
 const CLI_RESTRICTED_MODELS: Partial<Record<ProviderId, Record<string, Set<string>>>> = Object.fromEntries(
   PROVIDER_IDS
-    .filter((id) => PROVIDER_REGISTRY[id].restrictedModels)
-    .map((id) => [
+    .filter((id: ProviderId) => PROVIDER_REGISTRY[id].restrictedModels)
+    .map((id: ProviderId) => [
       id,
       Object.fromEntries(
         Object.entries(PROVIDER_REGISTRY[id].restrictedModels!).map(
-          ([backend, models]) => [backend, new Set(models)],
+          ([backend, models]: [string, string[]]) => [backend, new Set<string>(models)],
         ),
       ),
     ]),
@@ -53,9 +53,9 @@ const CLI_RESTRICTED_MODELS: Partial<Record<ProviderId, Record<string, Set<strin
 
 /** Tier alias → provider model mappings — derived from registry */
 const TIER_MAP: Record<ModelTier, Record<ProviderId, string>> = {
-  fast: Object.fromEntries(PROVIDER_IDS.map((id) => [id, PROVIDER_REGISTRY[id].tierModels.fast])) as Record<ProviderId, string>,
-  standard: Object.fromEntries(PROVIDER_IDS.map((id) => [id, PROVIDER_REGISTRY[id].tierModels.standard])) as Record<ProviderId, string>,
-  premium: Object.fromEntries(PROVIDER_IDS.map((id) => [id, PROVIDER_REGISTRY[id].tierModels.premium])) as Record<ProviderId, string>,
+  fast: Object.fromEntries(PROVIDER_IDS.map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].tierModels.fast])) as Record<ProviderId, string>,
+  standard: Object.fromEntries(PROVIDER_IDS.map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].tierModels.standard])) as Record<ProviderId, string>,
+  premium: Object.fromEntries(PROVIDER_IDS.map((id: ProviderId) => [id, PROVIDER_REGISTRY[id].tierModels.premium])) as Record<ProviderId, string>,
 };
 
 /** Claude SDK CLI accepts short aliases instead of full model names — derived from registry */
@@ -126,6 +126,10 @@ export function resolveModel(
   if (isTierAlias(modelSpec)) {
     const resolved = TIER_MAP[modelSpec as ModelTier]?.[provider];
     if (resolved) {
+      // Apply Claude aliases to tier-resolved models
+      if (provider === 'claude' && resolved in CLAUDE_ALIASES) {
+        return { model: CLAUDE_ALIASES[resolved], translated: true, original, reason: `tier '${modelSpec}' → ${CLAUDE_ALIASES[resolved]}` };
+      }
       return { model: resolved, translated: true, original, reason: `tier '${modelSpec}' → ${resolved}` };
     }
     // Tier alias recognized but no mapping for this provider — warn and continue to fallback
@@ -194,8 +198,12 @@ export function resolveModel(
   }
 
   // Step 4: Fallback to standard tier
-  const fallback = TIER_MAP.standard?.[provider];
+  let fallback = TIER_MAP.standard?.[provider];
   if (fallback) {
+    // Apply Claude aliases to the fallback model
+    if (provider === 'claude' && fallback in CLAUDE_ALIASES) {
+      fallback = CLAUDE_ALIASES[fallback];
+    }
     logger.warn({
       module: 'model-resolver',
       msg: `Model '${modelSpec}' has no mapping for ${provider}, falling back to standard tier: ${fallback}`,

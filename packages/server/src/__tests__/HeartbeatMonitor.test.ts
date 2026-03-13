@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HeartbeatMonitor, buildCommandReminderMessage } from '../agents/HeartbeatMonitor.js';
+import { HeartbeatMonitor } from '../agents/HeartbeatMonitor.js';
 import type { HeartbeatContext, DagSummary } from '../agents/HeartbeatMonitor.js';
+import { buildCommandHelp } from '../agents/commands/CommandHelp.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Delegation } from '../agents/CommandDispatcher.js';
+import { setRegisteredPatterns } from '../agents/commands/CommandHelp.js';
+import type { CommandEntry } from '../agents/commands/types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -978,11 +981,34 @@ describe('HeartbeatMonitor', () => {
     });
   });
 
-  // ── buildCommandReminderMessage ─────────────────────────────────────
+  // ── buildCommandHelp (compact format) ───────────────────────────────
 
-  describe('buildCommandReminderMessage', () => {
-    it('includes key commands', () => {
-      const msg = buildCommandReminderMessage();
+  describe('buildCommandHelp compact', () => {
+    const TEST_PATTERNS: CommandEntry[] = [
+      { regex: /COMMIT/, name: 'COMMIT', handler: vi.fn(), help: { description: 'Commit your locked files', example: 'COMMIT {"message": "..."}', category: 'Coordination' } },
+      { regex: /LOCK_FILE/, name: 'LOCK_FILE', handler: vi.fn(), help: { description: 'Lock a file before editing', example: 'LOCK_FILE {"filePath": "..."}', category: 'Coordination' } },
+      { regex: /UNLOCK_FILE/, name: 'UNLOCK_FILE', handler: vi.fn(), help: { description: 'Release a file lock', example: 'UNLOCK_FILE {"filePath": "..."}', category: 'Coordination' } },
+      { regex: /COMPLETE_TASK/, name: 'COMPLETE_TASK', handler: vi.fn(), help: { description: 'Mark a task as done', example: 'COMPLETE_TASK {"summary": "..."}', category: 'Task DAG' } },
+      { regex: /AGENT_MESSAGE/, name: 'AGENT_MESSAGE', handler: vi.fn(), help: { description: 'Message the lead or another agent', example: 'AGENT_MESSAGE {"to": "agent-id", "content": "..."}', category: 'Communication' } },
+      { regex: /DIRECT_MESSAGE/, name: 'DIRECT_MESSAGE', handler: vi.fn(), help: { description: 'Peer-to-peer message (queued)', example: 'DIRECT_MESSAGE {"to": "agent-id", "content": "..."}', category: 'Communication' } },
+      { regex: /GROUP_MESSAGE/, name: 'GROUP_MESSAGE', handler: vi.fn(), help: { description: 'Message a group chat', example: 'GROUP_MESSAGE {"groupId": "...", "content": "..."}', category: 'Groups' } },
+      { regex: /PROGRESS/, name: 'PROGRESS', handler: vi.fn(), help: { description: 'Report progress on your task', example: 'PROGRESS {"status": "...", "percentComplete": 50}', category: 'Coordination' } },
+      { regex: /DECISION/, name: 'DECISION', handler: vi.fn(), help: { description: 'Record an architectural decision', example: 'DECISION {"decision": "...", "alternatives": [...]}', category: 'Coordination' } },
+      { regex: /SET_TIMER/, name: 'SET_TIMER', handler: vi.fn(), help: { description: 'Set a reminder', example: 'SET_TIMER {"label": "...", "delay": 300, "message": "..."}', category: 'Timers' } },
+      { regex: /DECLARE_TASKS/, name: 'DECLARE_TASKS', handler: vi.fn(), help: { description: 'Declare a set of tasks with dependencies', example: 'DECLARE_TASKS {"tasks": [...]}', category: 'Task DAG' } },
+      { regex: /SPAWN_AGENT/, name: 'SPAWN_AGENT', handler: vi.fn(), help: { description: 'Spawn a new agent', example: 'SPAWN_AGENT {"role": "developer"}', category: 'Agent Lifecycle' } },
+    ];
+
+    beforeEach(() => {
+      setRegisteredPatterns(TEST_PATTERNS);
+    });
+
+    afterEach(() => {
+      setRegisteredPatterns([]);
+    });
+
+    it('includes key commands auto-generated from registry', () => {
+      const msg = buildCommandHelp({ format: 'compact' });
       expect(msg).toContain('COMMIT');
       expect(msg).toContain('LOCK_FILE');
       expect(msg).toContain('UNLOCK_FILE');
@@ -996,8 +1022,35 @@ describe('HeartbeatMonitor', () => {
     });
 
     it('includes usage hint about text response', () => {
-      const msg = buildCommandReminderMessage();
+      const msg = buildCommandHelp({ format: 'compact' });
       expect(msg).toContain('directly in your text response');
+    });
+
+    it('groups commands by category', () => {
+      const msg = buildCommandHelp({ format: 'compact' });
+      expect(msg).toContain('== Communication ==');
+      expect(msg).toContain('== Coordination ==');
+      expect(msg).toContain('== Task DAG ==');
+      expect(msg).toContain('== Timers ==');
+    });
+
+    it('formats entries as NAME example — description', () => {
+      const msg = buildCommandHelp({ format: 'compact' });
+      expect(msg).toContain('COMMIT COMMIT {"message": "..."} — Commit your locked files');
+    });
+
+    it('excludes lead-only commands for non-lead roles', () => {
+      const msg = buildCommandHelp({ format: 'compact', role: 'developer' });
+      expect(msg).toContain('COMMIT');
+      expect(msg).toContain('COMPLETE_TASK');
+      expect(msg).not.toContain('DECLARE_TASKS');
+      expect(msg).not.toContain('SPAWN_AGENT');
+    });
+
+    it('includes lead-only commands for lead role', () => {
+      const msg = buildCommandHelp({ format: 'compact', role: 'lead' });
+      expect(msg).toContain('DECLARE_TASKS');
+      expect(msg).toContain('SPAWN_AGENT');
     });
   });
 });

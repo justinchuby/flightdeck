@@ -41,7 +41,10 @@
   "scripts": {
     "start": "node bin/flightdeck.mjs",
     "prepublishOnly": "npm run build",
+    "predev": "npm run build:shared",
+    "build:shared": "cd packages/shared && rm -f tsconfig.tsbuildinfo && npm run build",
     "dev": "node scripts/dev.mjs",
+    "predev:server": "npm run build:shared",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web",

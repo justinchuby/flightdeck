@@ -10,6 +10,10 @@ import { CostCurve, type CostPoint } from '../CostCurve';
 
 // visx components use SVG features not fully available in jsdom.
 // Mock them to inspect props passed and test rendering logic.
+vi.mock('@visx/responsive', () => ({
+  ParentSize: ({ children }: { children: (args: { width: number; height: number }) => React.ReactNode }) =>
+    children({ width: 400, height: 250 }),
+}));
 vi.mock('@visx/group', () => ({
   Group: ({ children, ...props }: Record<string, unknown>) => (
     <g data-testid="visx-group" {...props}>{children as React.ReactNode}</g>
@@ -120,9 +124,9 @@ describe('CostCurve', () => {
     const { container } = render(<CostCurve data={data} />);
 
     const areas = container.querySelectorAll('[data-testid="area-closed"]');
-    // First area = output (full total area), second = input
-    expect(areas[0].getAttribute('data-fill')).toBe('rgb(var(--chart-success))');
-    expect(areas[1].getAttribute('data-fill')).toBe('#60a5fa');
+    // First area = input, second = output
+    expect(areas[0].getAttribute('data-fill')).toBe('#60a5fa');
+    expect(areas[1].getAttribute('data-fill')).toBe('rgb(var(--chart-success))');
   });
 
   it('renders title "Token Usage"', () => {

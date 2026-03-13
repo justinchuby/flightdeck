@@ -8,6 +8,20 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+vi.mock('../../../hooks/useModels', () => ({
+  useModels: () => ({
+    models: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5', 'gemini-3-pro-preview'],
+    filteredModels: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5'],
+    defaults: { lead: ['claude-opus-4.6'], developer: ['claude-opus-4.6'] },
+    modelsByProvider: { claude: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5'], gemini: ['gemini-3-pro-preview'] },
+    activeProvider: 'claude',
+    modelName: (id: string) => id,
+    loading: false,
+    error: null,
+  }),
+  deriveModelName: (id: string) => id,
+}));
+
 const MOCK_ROLES = [
   { id: 'lead', name: 'Lead', icon: '👑', description: 'Project lead', model: 'claude-opus-4.6' },
   { id: 'developer', name: 'Developer', icon: '💻', description: 'Writes code', model: 'claude-opus-4.6' },
@@ -15,20 +29,14 @@ const MOCK_ROLES = [
   { id: 'code-reviewer', name: 'Code Reviewer', icon: '📖', description: 'Reviews code', model: 'gemini-3-pro-preview' },
 ];
 
-const MOCK_MODELS_RESPONSE = {
-  models: ['claude-opus-4.6', 'claude-sonnet-4.6', 'claude-haiku-4.5', 'gemini-3-pro-preview'],
-  defaults: { lead: ['claude-opus-4.6'], developer: ['claude-opus-4.6'] },
-};
-
 describe('NewSessionDialog', () => {
   const onClose = vi.fn();
   const onStarted = vi.fn();
 
-  /** Default mock that handles /roles and /models; override resume path as needed */
+  /** Default mock that handles /roles; override resume path as needed */
   function mockDefaultEndpoints(resumeHandler?: (path: string) => Promise<any>) {
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      if (path === '/models') return Promise.resolve(MOCK_MODELS_RESPONSE);
       if (resumeHandler) return resumeHandler(path);
       return Promise.resolve({});
     });
@@ -56,7 +64,7 @@ describe('NewSessionDialog', () => {
     expect(screen.getByText('Cancel')).toBeInTheDocument();
   });
 
-  it('fetches models from /models API and populates dropdown', async () => {
+  it('populates model dropdown with filtered models from active provider', async () => {
     renderDialog();
     await waitFor(() => {
       const select = screen.getByTestId('new-session-model') as HTMLSelectElement;
@@ -64,9 +72,9 @@ describe('NewSessionDialog', () => {
       expect(options).toContain('');
       expect(options).toContain('claude-opus-4.6');
       expect(options).toContain('claude-sonnet-4.6');
-      expect(options).toContain('gemini-3-pro-preview');
+      // gemini model should NOT be shown (active provider is claude)
+      expect(options).not.toContain('gemini-3-pro-preview');
     });
-    expect(mockApiFetch).toHaveBeenCalledWith('/models');
   });
 
   it('fetches and displays roles (excluding lead)', async () => {
@@ -179,7 +187,6 @@ describe('NewSessionDialog', () => {
   it('shows error on API failure', async () => {
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      if (path === '/models') return Promise.resolve(MOCK_MODELS_RESPONSE);
       return Promise.reject(new Error('Server down'));
     });
     renderDialog();
@@ -215,7 +222,6 @@ describe('NewSessionDialog', () => {
     let resolveResume: (v: any) => void;
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
-      if (path === '/models') return Promise.resolve(MOCK_MODELS_RESPONSE);
       return new Promise((r) => { resolveResume = r; });
     });
     renderDialog();

@@ -197,7 +197,26 @@ export function useWebSocket() {
           const updated = idx >= 0
             ? calls.map((tc, i) => (i === idx ? msg.toolCall : tc))
             : [...calls, msg.toolCall];
-          updateAgent(msg.agentId, { toolCalls: updated });
+
+          // Inject synthetic message into agent.messages so tool calls appear
+          // chronologically in AgentChatPanel. Only inject on new tool calls or
+          // status transitions (not duplicate updates for the same status).
+          const tc = msg.toolCall;
+          const prevTc = idx >= 0 ? calls[idx] : undefined;
+          if (!prevTc || prevTc.status !== tc.status) {
+            const msgs = [...(existing?.messages ?? [])];
+            const statusIcon = tc.status === 'completed' ? '✓' : tc.status === 'cancelled' ? '✗' : '⟳';
+            const title = typeof tc.title === 'string' ? tc.title : String(tc.title);
+            msgs.push({
+              type: 'text',
+              text: `${statusIcon} ${title}`,
+              sender: 'tool',
+              timestamp: Date.now(),
+            });
+            updateAgent(msg.agentId, { toolCalls: updated, messages: msgs });
+          } else {
+            updateAgent(msg.agentId, { toolCalls: updated });
+          }
           break;
         }
         case 'agent:response_start': {

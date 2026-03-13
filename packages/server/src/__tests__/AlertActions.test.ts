@@ -82,7 +82,7 @@ describe('AlertEngine — Actionable Alerts', () => {
     expect(sorted[2].label).toBe('Dismiss');
   });
 
-  it('AlertEngine attaches actions to context pressure alerts', () => {
+  it('AlertEngine does NOT generate context pressure alerts (providers manage context)', () => {
     const highPressureAgent = {
       id: 'agent-high',
       role: { id: 'developer', name: 'Developer' },
@@ -109,22 +109,10 @@ describe('AlertEngine — Actionable Alerts', () => {
       mockTaskDAG as any,
     );
 
-    const emittedAlerts: Alert[] = [];
-    engine.on('alert', (alert: Alert) => emittedAlerts.push(alert));
     engine.start();
 
-    // Find context_pressure alerts
     const pressureAlerts = engine.getAlerts().filter(a => a.type === 'context_pressure');
-    expect(pressureAlerts.length).toBeGreaterThanOrEqual(1);
-
-    const alert = pressureAlerts[0];
-    expect(alert.actions).toBeDefined();
-    expect(alert.actions!.length).toBe(3);
-    expect(alert.actions![0].actionType).toBe('api_call');
-    expect(alert.actions![0].endpoint).toContain('/compact');
-    expect(alert.actions![1].actionType).toBe('api_call');
-    expect(alert.actions![1].endpoint).toContain('/restart');
-    expect(alert.actions![2].actionType).toBe('dismiss');
+    expect(pressureAlerts.length).toBe(0);
 
     engine.stop();
   });

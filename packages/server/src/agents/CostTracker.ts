@@ -67,7 +67,28 @@ export class CostTracker {
 
   constructor(db: Database) {
     this.db = db;
+    this.backfillProjectIds();
     this.initializeFromDb();
+  }
+
+  /**
+   * One-time backfill: derive project_id from agent_roster for any
+   * cost records that were inserted without it.
+   */
+  private backfillProjectIds(): void {
+    try {
+      this.db.drizzle.run(sql`
+        UPDATE ${taskCostRecords}
+        SET project_id = (
+          SELECT ${agentRoster.projectId}
+          FROM ${agentRoster}
+          WHERE ${agentRoster.agentId} = ${taskCostRecords.agentId}
+        )
+        WHERE ${taskCostRecords.projectId} IS NULL
+      `);
+    } catch {
+      // Non-critical — backfill can be retried on next startup
+    }
   }
 
   /**
@@ -198,6 +219,7 @@ export class CostTracker {
         totalOutputTokens: sql<number>`sum(${taskCostRecords.outputTokens})`,
         totalCostUsd: sql<number>`sum(${taskCostRecords.costUsd})`,
         agentCount: sql<number>`count(distinct ${taskCostRecords.agentId})`,
+        lastUpdatedAt: sql<string>`max(${taskCostRecords.updatedAt})`,
       })
       .from(taskCostRecords)
       .where(condition)
@@ -241,6 +263,7 @@ export class CostTracker {
       totalOutputTokens: t.totalOutputTokens ?? 0,
       totalCostUsd: t.totalCostUsd ?? 0,
       agentCount: t.agentCount ?? 0,
+      lastUpdatedAt: t.lastUpdatedAt ?? null,
       agents: agentsByTask.get(`${t.leadId}:${t.dagTaskId}`) ?? [],
     }));
   }

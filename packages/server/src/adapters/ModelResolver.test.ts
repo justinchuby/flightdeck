@@ -35,7 +35,7 @@ describe('ModelResolver', () => {
 
     it('resolves "standard" to provider-specific models', () => {
       expect(resolveModel('standard', 'copilot')?.model).toBe('claude-sonnet-4.6');
-      expect(resolveModel('standard', 'claude')?.model).toBe('sonnet');
+      expect(resolveModel('standard', 'claude')?.model).toBe('default');
       expect(resolveModel('standard', 'gemini')?.model).toBe('gemini-2.5-flash');
       expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-4.6');
       expect(resolveModel('standard', 'codex')?.model).toBe('gpt-5.3-codex');
@@ -103,9 +103,9 @@ describe('ModelResolver', () => {
       expect(result.reason).toContain('alias');
     });
 
-    it('translates claude-sonnet-4.6 to "sonnet" for Claude CLI', () => {
+    it('translates claude-sonnet-4.6 to "default" for Claude CLI', () => {
       const result = resolveModel('claude-sonnet-4.6', 'claude')!;
-      expect(result.model).toBe('sonnet');
+      expect(result.model).toBe('default');
       expect(result.translated).toBe(true);
     });
 
@@ -115,10 +115,10 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('translates older claude-sonnet-4 to "sonnet"', () => {
+    it('passes through claude-sonnet-4 (no alias defined)', () => {
       const result = resolveModel('claude-sonnet-4', 'claude')!;
-      expect(result.model).toBe('sonnet');
-      expect(result.translated).toBe(true);
+      expect(result.model).toBe('claude-sonnet-4');
+      expect(result.translated).toBe(false);
     });
   });
 
@@ -229,7 +229,7 @@ describe('ModelResolver', () => {
 
     it('falls back for unknown model on Claude', () => {
       const result = resolveModel('mystery-model', 'claude')!;
-      expect(result.model).toBe('sonnet');
+      expect(result.model).toBe('default');
       expect(result.translated).toBe(true);
     });
   });
@@ -303,7 +303,7 @@ describe('ModelResolver', () => {
 
     it('secretary (gpt-4.1) maps correctly across providers', () => {
       expect(resolveModel('gpt-4.1', 'copilot')?.model).toBe('gpt-4.1');
-      expect(resolveModel('gpt-4.1', 'claude')?.model).toBe('sonnet');
+      expect(resolveModel('gpt-4.1', 'claude')?.model).toBe('claude-sonnet-4');
       expect(resolveModel('gpt-4.1', 'gemini')?.model).toBe('gemini-2.5-flash');
       expect(resolveModel('gpt-4.1', 'cursor')?.model).toBe('gpt-4.1');
       expect(resolveModel('gpt-4.1', 'codex')?.model).toBe('gpt-4.1');

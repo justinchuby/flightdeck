@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { formatTokens } from '../../utils/format';
 import { shortAgentId } from '../../utils/agentLabel';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type { AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -193,6 +194,14 @@ function AgentCostTable({
   );
 }
 
+type TaskSortField = 'task' | 'input' | 'output' | 'total' | 'completed';
+type SortDir = 'asc' | 'desc';
+
+function SortIndicator({ field, activeField, dir }: { field: TaskSortField; activeField: TaskSortField; dir: SortDir }) {
+  if (field !== activeField) return <span className="text-th-text-muted/30 ml-0.5">↕</span>;
+  return <span className="ml-0.5">{dir === 'asc' ? '↑' : '↓'}</span>;
+}
+
 function TaskCostTable({
   costs,
   agentMap,
@@ -202,23 +211,62 @@ function TaskCostTable({
   agentMap: Map<string, AgentInfo>;
   total: number;
 }) {
-  const sorted = useMemo(
-    () =>
-      [...costs].sort(
-        (a, b) =>
-          b.totalInputTokens + b.totalOutputTokens - (a.totalInputTokens + a.totalOutputTokens),
-      ),
-    [costs],
-  );
+  const [sortField, setSortField] = useState<TaskSortField>('total');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const handleSort = (field: TaskSortField) => {
+    if (field === sortField) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir(field === 'task' ? 'asc' : 'desc');
+    }
+  };
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...costs].sort((a, b) => {
+      switch (sortField) {
+        case 'task':
+          return dir * a.dagTaskId.localeCompare(b.dagTaskId);
+        case 'input':
+          return dir * (a.totalInputTokens - b.totalInputTokens);
+        case 'output':
+          return dir * (a.totalOutputTokens - b.totalOutputTokens);
+        case 'total':
+          return dir * ((a.totalInputTokens + a.totalOutputTokens) - (b.totalInputTokens + b.totalOutputTokens));
+        case 'completed': {
+          const ta = a.lastUpdatedAt ?? '';
+          const tb = b.lastUpdatedAt ?? '';
+          return dir * ta.localeCompare(tb);
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [costs, sortField, sortDir]);
+
+  const thClass = 'px-3 py-2 font-medium cursor-pointer select-none hover:text-th-text transition-colors';
 
   return (
     <table className="w-full text-xs">
       <thead>
         <tr className="bg-th-bg-alt/40 text-th-text-muted">
-          <th className="px-3 py-2 text-left font-medium">Task</th>
-          <th className="px-3 py-2 text-right font-medium">Input</th>
-          <th className="px-3 py-2 text-right font-medium">Output</th>
-          <th className="px-3 py-2 text-right font-medium">Total</th>
+          <th className={`${thClass} text-left`} onClick={() => handleSort('task')}>
+            Task<SortIndicator field="task" activeField={sortField} dir={sortDir} />
+          </th>
+          <th className={`${thClass} text-right`} onClick={() => handleSort('input')}>
+            Input<SortIndicator field="input" activeField={sortField} dir={sortDir} />
+          </th>
+          <th className={`${thClass} text-right`} onClick={() => handleSort('output')}>
+            Output<SortIndicator field="output" activeField={sortField} dir={sortDir} />
+          </th>
+          <th className={`${thClass} text-right`} onClick={() => handleSort('total')}>
+            Total<SortIndicator field="total" activeField={sortField} dir={sortDir} />
+          </th>
+          <th className={`${thClass} text-right`} onClick={() => handleSort('completed')}>
+            Updated<SortIndicator field="completed" activeField={sortField} dir={sortDir} />
+          </th>
           <th className="px-3 py-2 text-left font-medium">Agents</th>
         </tr>
       </thead>
@@ -245,6 +293,18 @@ function TaskCostTable({
               <td className="px-3 py-2 text-right font-mono text-th-text-alt">
                 {formatTokens(taskTotal)}
                 <span className="ml-1 text-th-text-muted">({share}%)</span>
+              </td>
+              <td className="px-3 py-2 text-right text-th-text-muted">
+                {cost.lastUpdatedAt
+                  ? (() => {
+                      const d = new Date(cost.lastUpdatedAt.endsWith('Z') ? cost.lastUpdatedAt : cost.lastUpdatedAt.replace(' ', 'T') + 'Z');
+                      return (
+                        <span title={formatRelativeTime(cost.lastUpdatedAt)}>
+                          {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      );
+                    })()
+                  : '—'}
               </td>
               <td className="px-3 py-2">
                 <div className="flex flex-wrap gap-1">

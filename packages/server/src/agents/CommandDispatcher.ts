@@ -348,7 +348,7 @@ export class CommandDispatcher {
       const cmdName = match[1];
       logger.warn({ module: 'command', msg: 'Unknown command', command: cmdName });
       agent.sendMessage(
-        `[System] Unknown command: ${cmdName}. Did you mean one of the available commands?\n\n${buildCommandHelp()}`,
+        `[System] Unknown command: ${cmdName}. Did you mean one of the available commands?\n\n${buildCommandHelp({ role: agent.role?.id })}`,
       );
 
       buf = buf.slice(0, match.index) + buf.slice(match.index + match[0].length);

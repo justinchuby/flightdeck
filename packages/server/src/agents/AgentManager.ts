@@ -523,6 +523,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (options?.projectName) agent.projectName = options.projectName;
     if (options?.projectId) agent.projectId = options.projectId;
     if (options?.provider) agent.provider = options.provider;
+    // Default provider from ServerConfig so even queued agents show a provider in the UI.
+    // The post-ACP roster update (onSessionReady) overwrites with the final resolved value.
+    if (!agent.provider && this.config.provider) agent.provider = this.config.provider;
     if (role.id === 'lead') {
       agent.budget = { maxConcurrent: this.maxConcurrent, runningCount: this.getRunningCount() + 1 };
     }
@@ -658,6 +661,23 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agent.onSessionReady((sessionId) => {
       this.emit('agent:session_ready', { agentId: agent.id, sessionId });
 
+      // Update roster with provider/backend now that startAcp() has resolved them.
+      // The initial upsert at spawn time has null provider because startAcp runs async.
+      if (this.agentRosterRepository && (agent.provider || agent.backend)) {
+        try {
+          const teamId = this.getRootLeadId(agent.id);
+          this.agentRosterRepository.upsertAgent(
+            agent.id, agent.role.id, agent.model || 'default',
+            'running', sessionId, agent.projectId,
+            { parentId: agent.parentId, task: agent.task, cwd: agent.cwd, backend: agent.backend },
+            teamId,
+            agent.provider,
+          );
+        } catch (err: any) {
+          logger.warn({ module: 'agent', msg: 'Failed to update roster with provider', agentId: agent.id, error: err.message });
+        }
+      }
+
       // Track session ID for project persistence
       if (agent.role.id === 'lead' && !agent.parentId && agent.projectId && this.projectRegistry) {
         this.projectRegistry.setSessionId(agent.id, sessionId);
@@ -702,11 +722,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (this.costTracker) {
       const tracker = this.costTracker;
       agent.onUsage(({ agentId, inputTokens, outputTokens, dagTaskId, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize }) => {
-        if (dagTaskId && agent.parentId) {
-          tracker.recordUsage(agentId, dagTaskId, agent.parentId, inputTokens, outputTokens, {
-            cacheReadTokens, cacheWriteTokens, costUsd,
-          });
-        }
+        const effectiveTaskId = dagTaskId || '_unattributed';
+        const effectiveLeadId = agent.parentId || agentId;
+        tracker.recordUsage(agentId, effectiveTaskId, effectiveLeadId, inputTokens, outputTokens, {
+          cacheReadTokens, cacheWriteTokens, costUsd,
+          projectId: agent.projectId,
+        });
         this.emit('agent:usage', { agentId, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd, contextWindowUsed, contextWindowSize });
       });
     } else {

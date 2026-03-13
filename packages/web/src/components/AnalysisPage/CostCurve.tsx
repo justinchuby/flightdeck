@@ -3,6 +3,7 @@ import { Group } from '@visx/group';
 import { AreaClosed, LinePath, Line } from '@visx/shape';
 import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
+import { ParentSize } from '@visx/responsive';
 import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
 
 export interface CostPoint {
@@ -18,8 +19,9 @@ interface CostCurveProps {
   height?: number;
 }
 
-const MARGIN = { top: 12, right: 12, bottom: 28, left: 40 };
-const SVG_HEADER_OFFSET = 28;
+const MARGIN = { top: 12, right: 12, bottom: 28, left: 36 };
+/** Vertical space reserved for card padding (32px) + title/legend row (~24px) */
+const SVG_HEADER_OFFSET = 56;
 const INPUT_COLOR = '#60a5fa';   // blue-400
 const OUTPUT_COLOR = 'rgb(var(--chart-success))';
 const TOTAL_FALLBACK_COLOR = '#34d399'; // emerald-400 for non-breakdown mode
@@ -30,7 +32,21 @@ const formatTokens = (n: number) => {
   return String(Math.round(n));
 };
 
-export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
+const CARD_HEIGHT = 250;
+
+export function CostCurve({ data }: { data: CostPoint[] }) {
+  return (
+    <div className="bg-surface-raised border border-th-border rounded-lg p-4 relative" style={{ height: CARD_HEIGHT }} data-testid="cost-curve">
+      <ParentSize debounceTime={100}>
+        {({ width: parentWidth }) => (
+          <CostCurveInner data={data} width={Math.max(parentWidth, 100)} height={CARD_HEIGHT} />
+        )}
+      </ParentSize>
+    </div>
+  );
+}
+
+function CostCurveInner({ data, width, height }: CostCurveProps) {
   const svgH = height - SVG_HEADER_OFFSET;
   const innerW = width - MARGIN.left - MARGIN.right;
   const innerH = svgH - MARGIN.top - MARGIN.bottom;
@@ -47,7 +63,13 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
       };
     }
     const times = data.map((d) => d.time);
-    const maxTokens = Math.max(...data.map((d) => d.cumulativeCost), 1);
+    const maxTokens = hasBreakdown
+      ? Math.max(
+          ...data.map((d) => d.cumulativeInput ?? 0),
+          ...data.map((d) => d.cumulativeOutput ?? 0),
+          1,
+        )
+      : Math.max(...data.map((d) => d.cumulativeCost), 1);
 
     return {
       xScale: scaleTime({
@@ -67,7 +89,7 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] flex items-center justify-center" data-testid="cost-curve">
+      <div className="flex items-center justify-center h-full">
         <p className="text-xs text-th-text-muted opacity-60">No token data</p>
       </div>
     );
@@ -76,7 +98,7 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
   const maxVal = Math.max(...data.map((d) => d.cumulativeCost));
   if (maxVal === 0) {
     return (
-      <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] flex items-center justify-center" data-testid="cost-curve">
+      <div className="flex items-center justify-center h-full">
         <p className="text-xs text-th-text-muted opacity-60">Waiting for token data…</p>
       </div>
     );
@@ -90,58 +112,58 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
   };
 
   return (
-    <div className="bg-surface-raised border border-th-border rounded-lg p-4 h-[210px] relative" data-testid="cost-curve">
-      <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider mb-1">
-        Token Usage
-      </h3>
-      {hasBreakdown && (
-        <div className="flex items-center gap-3 mb-1">
-          <span className="flex items-center gap-1 text-[10px] text-th-text-muted">
-            <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: INPUT_COLOR }} />
-            Input
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-th-text-muted">
-            <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: OUTPUT_COLOR }} />
-            Output
-          </span>
-        </div>
-      )}
+    <div className="relative">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-[11px] font-medium text-th-text-muted uppercase tracking-wider">
+          Token Usage
+        </h3>
+        {hasBreakdown && (
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-[9px] text-th-text-muted">
+              <span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: INPUT_COLOR }} />
+              Input
+            </span>
+            <span className="flex items-center gap-1 text-[9px] text-th-text-muted">
+              <span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: OUTPUT_COLOR }} />
+              Output
+            </span>
+          </div>
+        )}
+      </div>
       <svg width={width} height={svgH}>
         <Group left={MARGIN.left} top={MARGIN.top}>
           {hasBreakdown ? (
             <>
-              {/* Stacked areas: output on top of input */}
-              <AreaClosed
-                data={data}
-                x={(d) => xScale(new Date(d.time)) ?? 0}
-                y={(d) => yScale(d.cumulativeCost) ?? 0}
-                yScale={yScale}
-                fill={OUTPUT_COLOR}
-                fillOpacity={0.2}
-              />
+              {/* Input area + line */}
               <AreaClosed
                 data={data}
                 x={(d) => xScale(new Date(d.time)) ?? 0}
                 y={(d) => yScale(d.cumulativeInput ?? 0) ?? 0}
                 yScale={yScale}
                 fill={INPUT_COLOR}
-                fillOpacity={0.25}
+                fillOpacity={0.15}
               />
-              {/* Total outline */}
-              <LinePath
-                data={data}
-                x={(d) => xScale(new Date(d.time)) ?? 0}
-                y={(d) => yScale(d.cumulativeCost) ?? 0}
-                stroke={OUTPUT_COLOR}
-                strokeWidth={1}
-                strokeOpacity={0.5}
-              />
-              {/* Input boundary line */}
               <LinePath
                 data={data}
                 x={(d) => xScale(new Date(d.time)) ?? 0}
                 y={(d) => yScale(d.cumulativeInput ?? 0) ?? 0}
                 stroke={INPUT_COLOR}
+                strokeWidth={1.5}
+              />
+              {/* Output area + line */}
+              <AreaClosed
+                data={data}
+                x={(d) => xScale(new Date(d.time)) ?? 0}
+                y={(d) => yScale(d.cumulativeOutput ?? 0) ?? 0}
+                yScale={yScale}
+                fill={OUTPUT_COLOR}
+                fillOpacity={0.15}
+              />
+              <LinePath
+                data={data}
+                x={(d) => xScale(new Date(d.time)) ?? 0}
+                y={(d) => yScale(d.cumulativeOutput ?? 0) ?? 0}
+                stroke={OUTPUT_COLOR}
                 strokeWidth={1.5}
               />
             </>
@@ -189,9 +211,9 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
                   />
                   <circle
                     cx={xScale(new Date(tooltipData.time)) ?? 0}
-                    cy={yScale(tooltipData.cumulativeCost) ?? 0}
+                    cy={yScale(tooltipData.cumulativeOutput ?? 0) ?? 0}
                     r={3}
-                    fill={TOTAL_FALLBACK_COLOR}
+                    fill={OUTPUT_COLOR}
                     stroke="#1a1a2e"
                     strokeWidth={1.5}
                     pointerEvents="none"
@@ -226,6 +248,7 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
             top={innerH}
             scale={xScale}
             numTicks={4}
+            hideZero
             tickFormat={(d) => {
               const date = d instanceof Date ? d : new Date(d as number);
               return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -242,6 +265,7 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
           <AxisLeft
             scale={yScale}
             numTicks={4}
+            hideZero
             tickFormat={formatTokenAxis}
             tickLabelProps={() => ({
               fill: 'var(--th-text-muted)',
@@ -271,7 +295,7 @@ export function CostCurve({ data, width = 260, height = 210 }: CostCurveProps) {
                 <span>Input: <strong>{formatTokens(tooltipData.cumulativeInput ?? 0)}</strong></span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: TOTAL_FALLBACK_COLOR, flexShrink: 0 }} />
+                <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: OUTPUT_COLOR, flexShrink: 0 }} />
                 <span>Output: <strong>{formatTokens((tooltipData.cumulativeOutput ?? 0))}</strong></span>
               </div>
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 3, paddingTop: 3, fontSize: 10, opacity: 0.7 }}>
