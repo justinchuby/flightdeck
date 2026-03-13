@@ -718,28 +718,22 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
           ))}
         </div>
 
-        {/* Agent Detail — global: centered modal; project: inline side panel */}
-        {scope === 'global' ? (
-          selectedAgent && (
-            <AgentDetailPanel agentId={selectedAgent} mode="modal" onClose={() => setSelectedAgent(null)} />
-          )
-        ) : (
-          <div
-            className={`
-              fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
-              md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
-              ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
-              ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
-              md:self-start md:sticky md:top-0 md:max-h-full
-            `}
-          >
-            {selectedAgent && (
-              <div className="h-full overflow-y-auto">
-                <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
-              </div>
-            )}
-          </div>
-        )}
+        {/* Agent Detail — inline side panel */}
+        <div
+          className={`
+            fixed inset-0 z-40 bg-th-bg transform transition-transform duration-150 ease-out
+            md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
+            ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
+            ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
+            md:self-start md:sticky md:top-0 md:max-h-full
+          `}
+        >
+          {selectedAgent && (
+            <div className="h-full overflow-y-auto">
+              <AgentDetailPanel agentId={selectedAgent} teamId={selectedAgentTeamId} mode="inline" onClose={() => setSelectedAgent(null)} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Health Strip (collapsed at bottom) */}
