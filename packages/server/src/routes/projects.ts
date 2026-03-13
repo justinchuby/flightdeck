@@ -12,6 +12,7 @@ import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMemb
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
 import { parseIntBounded } from '../utils/validation.js';
+import { resumeLeadSession, ResumeError } from './resumeHelper.js';
 
 const PROJECT_TITLE_MAX = 100;
 
@@ -715,47 +716,35 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
     }
 
-    const role = roleRegistry.get('lead');
-    if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
-
     const { task: requestTask, model, freshStart, resumeAll, agents: agentIds } = req.body;
     try {
-      // Find the last session's Copilot sessionId for resume continuity
+      // Find the last session for resume continuity
       const lastSessions = projectRegistry.getSessions(project.id);
       const lastSession = !freshStart && lastSessions.length > 0 ? lastSessions[0] : null;
 
-      // Log diagnostic when attempting to resume a crashed session
-      if (!freshStart && lastSession?.status === 'crashed') {
-        logger.warn({ module: 'project', msg: 'Attempting resume of crashed session — SDK may or may not recover it', sessionId: lastSession.sessionId, projectId: project.id });
-      }
+      let agent: ReturnType<typeof agentManager.spawn>;
+      let task: string | undefined;
+      const isResume = !!lastSession;
 
-      const resumeSessionId = lastSession
-        ? lastSession.sessionId ?? undefined
-        : undefined;
-
-      // Preserve task from previous session if none provided
-      const task = requestTask || (lastSession ? lastSession.task : undefined);
-
-      const agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, resumeSessionId, lastSession?.leadId, { projectName: project.name, projectId: project.id });
-
-      // Verify the invariant: spawn must reuse the same agent ID on resume
-      if (lastSession && agent.id !== lastSession.leadId) {
-        logger.warn({ module: 'project', msg: 'Agent ID mismatch after resume spawn — invariant violation', expected: lastSession.leadId, actual: agent.id, sessionId: lastSession.id });
-      }
-
-      // Reactivate existing session row when resuming; only INSERT for fresh/new sessions.
       if (lastSession) {
-        projectRegistry.reactivateSession(lastSession.id, task, role.id);
+        // Resume existing session via shared helper (atomic claim, spawn, reactivate)
+        const result = resumeLeadSession(
+          { session: lastSession, project, task: requestTask, model },
+          { agentManager, roleRegistry, projectRegistry },
+        );
+        agent = result.agent;
+        task = result.task;
       } else {
+        // Fresh start — create new lead + new session
+        const role = roleRegistry.get('lead');
+        if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
+        task = requestTask;
+        agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, undefined, undefined, { projectName: project.name, projectId: project.id });
         projectRegistry.startSession(project.id, agent.id, task);
       }
 
       // Gather context from previous session
       const briefing = projectRegistry.buildBriefing(project.id);
-
-      // When resuming an existing session, send NO messages to agents.
-      // The lead picks up context from the restored ACP session.
-      const isResume = !!lastSession;
 
       // Send project briefing (fresh start only — resume gets context from ACP session)
       if (!isResume && briefing && briefing.sessions.length > 1) {
@@ -772,7 +761,7 @@ export function projectsRoutes(ctx: AppContext): Router {
         const teamSize = agentIds?.length ?? (resumeAll && lastSession ? 6 : 0);
         const TASK_DELIVERY_DELAY_MS = 5000 + Math.ceil(teamSize / 3) * 2000;
         setTimeout(() => {
-          agent.sendMessage(task);
+          agent.sendMessage(task!);
         }, TASK_DELIVERY_DELAY_MS);
       }
 
@@ -849,6 +838,9 @@ export function projectsRoutes(ctx: AppContext): Router {
 
       res.status(201).json({ ...agent.toJSON(), respawning: respawnedCount });
     } catch (err: any) {
+      if (err instanceof ResumeError) {
+        return res.status(err.statusCode).json({ error: err.message });
+      }
       logger.error({ module: 'project', msg: 'Failed to resume project', err: err.message });
       // Only expose rate-limit messages; sanitize all other errors
       const isRateLimit = err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('limit');

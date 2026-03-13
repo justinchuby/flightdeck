@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import { spawnLimiter } from './context.js';
 import type { AppContext } from './context.js';
+import { resumeLeadSession, ResumeError } from './resumeHelper.js';
 
 export function sessionsRoutes(ctx: AppContext): Router {
   const { agentManager, roleRegistry, projectRegistry } = ctx;
@@ -26,43 +27,25 @@ export function sessionsRoutes(ctx: AppContext): Router {
       ? projectRegistry.getSessionByCopilotId(idParam)
       : projectRegistry.getSessionById(sessionRowId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (!session.sessionId) return res.status(400).json({ error: 'Session has no Copilot session ID — cannot resume' });
-
-    // Atomic claim prevents race condition: two concurrent resumes both passing status check
-    if (!projectRegistry.claimSessionForResume(session.id)) {
-      return res.status(409).json({ error: 'Session is still active or already being resumed' });
-    }
 
     const project = projectRegistry.get(session.projectId);
     if (!project) return res.status(404).json({ error: 'Associated project not found' });
 
-    // Use stored role from session, falling back to 'lead' for backward compatibility
-    const roleId = session.role ?? 'lead';
-    const role = roleRegistry.get(roleId);
-    if (!role) return res.status(500).json({ error: `Role "${roleId}" not found` });
-
     const { task: overrideTask, model } = req.body ?? {};
-    const task = overrideTask || session.task || undefined;
 
     try {
-      const agent = agentManager.spawn(
-        role, task, undefined, model,
-        project.cwd ?? undefined,
-        session.sessionId,
-        session.leadId,
-        { projectName: project.name, projectId: project.id },
+      const { agent } = resumeLeadSession(
+        { session, project, task: overrideTask, model },
+        { agentManager, roleRegistry, projectRegistry },
       );
 
-      projectRegistry.reactivateSession(session.id, task, roleId);
-
-      // Resume mode: no messages — agent picks up context from restored ACP session.
-      // The silence invariant ensures all agents start idle after resume.
-
-      logger.info('session', `Resumed session ${idParam} for project "${project.name}" (${agent.id.slice(0, 8)})`);
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
-      logger.error('session', `Failed to resume session: ${err.message}`);
-      res.status(429).json({ error: err.message });
+      if (err instanceof ResumeError) {
+        return res.status(err.statusCode).json({ error: err.message });
+      }
+      logger.error({ module: 'session', msg: 'Failed to resume session', err: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 

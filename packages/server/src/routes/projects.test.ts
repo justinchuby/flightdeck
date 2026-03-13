@@ -272,6 +272,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
         formatBriefing: vi.fn(),
         startSession: mockStartSession,
         reactivateSession: vi.fn(),
+        claimSessionForResume: vi.fn().mockReturnValue(true),
         getSessions: mockGetSessions,
       } as any,
       agentManager: {
@@ -311,7 +312,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     vi.useFakeTimers();
     mockSpawn.mockClear();
     mockGetSessions.mockReturnValue([
-      { id: 1, leadId: 'old-lead', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
+      { id: 1, leadId: 'old-lead', sessionId: 'copilot-ses-1', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
     ]);
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-dev1', lastTaskSummary: 'build UI', metadata: { parentId: 'old-lead' } },
@@ -355,7 +356,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     vi.useFakeTimers();
     mockSpawn.mockClear();
     mockGetSessions.mockReturnValue([
-      { id: 1, leadId: 'old-lead', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
+      { id: 1, leadId: 'old-lead', sessionId: 'copilot-ses-1', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
     ]);
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-d1', metadata: { parentId: 'old-lead' } },
@@ -384,7 +385,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
     const fakeAgent = makeFakeAgent('old-lead');
     mockSpawn.mockReturnValue(fakeAgent);
     mockGetSessions.mockReturnValue([
-      { id: 1, leadId: 'old-lead', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
+      { id: 1, leadId: 'old-lead', sessionId: 'copilot-ses-1', status: 'completed', startedAt: '2026-01-01T10:00:00Z' },
     ]);
     mockGetAllAgents.mockReturnValue([
       { agentId: 'dev-1', role: 'developer', model: 'claude', projectId: 'proj-1', sessionId: 'ses-d1', metadata: { parentId: 'old-lead' } },
