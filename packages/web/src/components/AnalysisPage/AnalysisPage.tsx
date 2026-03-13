@@ -84,8 +84,9 @@ export function AnalysisPage() {
 
           for (const frame of kf) {
             const t = new Date(frame.timestamp).getTime();
-            if (frame.type === 'delegation') { taskTotal++; inProgress++; }
-            if (frame.type === 'milestone' || frame.type === 'task') { completed++; inProgress = Math.max(0, inProgress - 1); }
+            if (frame.type === 'delegation' || frame.type === 'task') { taskTotal++; inProgress++; }
+            if (frame.type === 'milestone') { completed++; inProgress = Math.max(0, inProgress - 1); }
+            taskTotal = Math.max(taskTotal, completed);
 
             const progress = (fPoints.length + 1) / kf.length;
             cPoints.push({
