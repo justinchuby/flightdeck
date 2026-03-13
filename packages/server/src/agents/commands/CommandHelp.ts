@@ -223,3 +223,39 @@ export function getCommandExample(commandName: string): string | undefined {
   }
   return undefined;
 }
+
+// ── Lead-only commands (excluded from non-lead reminders) ────────────
+
+const LEAD_ONLY_COMMANDS = new Set([
+  'DECLARE_TASKS', 'ADD_TASK', 'ASSIGN_TASK', 'REASSIGN_TASK',
+  'CANCEL_TASK', 'RESET_DAG', 'FORCE_READY', 'PAUSE_TASK',
+  'RESUME_TASK', 'RETRY_TASK', 'REOPEN_TASK', 'SKIP_TASK',
+  'SPAWN_AGENT', 'TERMINATE_AGENT',
+]);
+
+/**
+ * Build a compact command reminder grouped by category.
+ * Each entry: `  NAME example — description`
+ *
+ * When role is provided and is not 'lead', lead-only commands are excluded.
+ */
+export function buildCommandReminder(role?: string): string {
+  const isLead = !role || role === 'lead';
+  const filtered = isLead
+    ? registeredPatterns
+    : registeredPatterns.filter((e) => !LEAD_ONLY_COMMANDS.has(e.name));
+
+  const ref = buildReferenceFromPatterns(filtered);
+  const lines: string[] = ['[System] Command Reference Reminder — available commands:', ''];
+
+  for (const [category, commands] of Object.entries(ref)) {
+    lines.push(`== ${category} ==`);
+    for (const cmd of commands) {
+      lines.push(`  ${cmd.name} ${cmd.example} — ${cmd.description}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('Use these commands directly in your text response (not inside tool calls).');
+  return lines.join('\n');
+}

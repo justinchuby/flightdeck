@@ -1,6 +1,7 @@
 import type { Agent } from './Agent.js';
 import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
+import { buildCommandReminder } from './commands/CommandHelp.js';
 import { logger } from '../utils/logger.js';
 
 export interface DagSummary {
@@ -26,23 +27,8 @@ export interface HeartbeatContext {
 /** How often (ms) to send command reminders — default 2 hours */
 const COMMAND_REMINDER_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
-export function buildCommandReminderMessage(): string {
-  return [
-    '[System] Command Reference Reminder — available commands:',
-    '',
-    '  COMMIT {"message": "..."} — Commit your locked files',
-    '  LOCK_FILE {"filePath": "..."} — Lock a file before editing',
-    '  UNLOCK_FILE {"filePath": "..."} — Release a file lock',
-    '  COMPLETE_TASK {"summary": "..."} — Mark your current task done',
-    '  AGENT_MESSAGE {"to": "agent-id", "content": "..."} — Message the lead or another agent',
-    '  DIRECT_MESSAGE {"to": "agent-id", "content": "..."} — Peer-to-peer message (queued)',
-    '  GROUP_MESSAGE {"groupId": "...", "content": "..."} — Message a group chat',
-    '  PROGRESS {"status": "...", "percentComplete": N} — Report progress on your task',
-    '  DECISION {"decision": "...", "alternatives": [...]} — Record an architectural decision',
-    '  SET_TIMER {"label": "...", "delay": N, "message": "..."} — Set a reminder',
-    '',
-    'Use these commands directly in your text response (not inside tool calls).',
-  ].join('\n');
+export function buildCommandReminderMessage(role?: string): string {
+  return buildCommandReminder(role);
 }
 
 export class HeartbeatMonitor {
@@ -135,7 +121,7 @@ export class HeartbeatMonitor {
   sendCommandReminderTo(agent: Agent): void {
     if (isTerminalStatus(agent.status)) return;
 
-    const message = buildCommandReminderMessage();
+    const message = buildCommandReminderMessage(agent.role.id);
     agent.queueMessage(message);
     this.lastCommandReminder.set(agent.id, Date.now());
 
@@ -289,7 +275,7 @@ export class HeartbeatMonitor {
       if (elapsed < COMMAND_REMINDER_INTERVAL_MS) continue;
 
       // Send the reminder via queueMessage (waits for idle, non-interrupting)
-      const message = buildCommandReminderMessage();
+      const message = buildCommandReminderMessage(agent.role.id);
       agent.queueMessage(message);
       this.lastCommandReminder.set(agent.id, now);
 
