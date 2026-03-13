@@ -104,7 +104,7 @@ const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
 };
 
 /** Login instructions per provider — shown in the expanded details panel. */
-const PROVIDER_LOGIN_LABELS: Record<string, string> = {
+const PROVIDER_LOGIN_INSTRUCTIONS: Record<string, string> = {
   copilot: 'Authenticate using the GitHub Copilot CLI',
   claude: 'Log in with claude auth in your terminal',
   gemini: 'Log in with gemini auth in your terminal',
@@ -203,7 +203,7 @@ function ProviderCard({
   const links = PROVIDER_LINKS[provider.id] ?? [];
   const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
   const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
-  const loginLabel = PROVIDER_LOGIN_LABELS[provider.id] ?? 'Log in via the provider CLI';
+  const loginLabel = PROVIDER_LOGIN_INSTRUCTIONS[provider.id] ?? 'Log in via the provider CLI';
   const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
 
   const style: React.CSSProperties = {
