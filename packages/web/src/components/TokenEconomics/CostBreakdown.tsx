@@ -296,7 +296,14 @@ function TaskCostTable({
               </td>
               <td className="px-3 py-2 text-right text-th-text-muted">
                 {cost.lastUpdatedAt
-                  ? formatRelativeTime(cost.lastUpdatedAt)
+                  ? (() => {
+                      const d = new Date(cost.lastUpdatedAt.endsWith('Z') ? cost.lastUpdatedAt : cost.lastUpdatedAt.replace(' ', 'T') + 'Z');
+                      return (
+                        <span title={formatRelativeTime(cost.lastUpdatedAt)}>
+                          {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      );
+                    })()
                   : '—'}
               </td>
               <td className="px-3 py-2">
