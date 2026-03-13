@@ -148,6 +148,16 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   if (yamlMaxAgents) {
     updateConfig({ maxConcurrentAgents: yamlMaxAgents });
   }
+
+  // Bridge YAML provider config → ServerConfig so all services see the configured provider
+  const yamlProvider = configStore.current.provider;
+  updateConfig({
+    provider: yamlProvider.id,
+    providerBinaryOverride: yamlProvider.binaryOverride,
+    providerArgsOverride: yamlProvider.argsOverride,
+    providerEnvOverride: yamlProvider.envOverride,
+    cloudProvider: yamlProvider.cloudProvider,
+  });
   // Re-read config so all services see restored values
   const effectiveConfig = getConfig();
 
@@ -206,6 +216,12 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const dependencyScanner = new DependencyScanner(repoRoot);
   const webhookManager = new WebhookManager();
   const providerManager = new ProviderManager({ db, configStore });
+
+  // Resolve the best available provider at startup — if the configured provider
+  // (from YAML or default 'copilot') isn't installed, fall back to the first
+  // available one from the provider ranking.
+  const resolvedProvider = providerManager.resolveAvailableProvider();
+  updateConfig({ provider: resolvedProvider });
 
   // ── Tier 3: Composed Services ──────────────────────────
   const taskDecomposer = new TaskDecomposer(taskTemplateRegistry);
@@ -510,6 +526,21 @@ function wireEvents(c: ServiceContainer): void {
     if (serverCfg.maxConcurrentAgents != null) {
       agentManager.setMaxConcurrent(serverCfg.maxConcurrentAgents);
       updateConfig({ maxConcurrentAgents: serverCfg.maxConcurrentAgents });
+    }
+  });
+
+  configStore.on('config:provider:changed', ({ config: providerCfg }: any) => {
+    updateConfig({
+      provider: providerCfg.id,
+      providerBinaryOverride: providerCfg.binaryOverride,
+      providerArgsOverride: providerCfg.argsOverride,
+      providerEnvOverride: providerCfg.envOverride,
+      cloudProvider: providerCfg.cloudProvider,
+    });
+    // Re-resolve in case the new provider isn't installed
+    if (c.providerManager) {
+      const resolved = c.providerManager.resolveAvailableProvider();
+      updateConfig({ provider: resolved });
     }
   });
 

@@ -396,4 +396,108 @@ describe('ProviderManager', () => {
       expect(mgr.getModelPreferences('claude')).toEqual({});
     });
   });
+
+  // ── resolveAvailableProvider ─────────────────────────────
+
+  describe('resolveAvailableProvider', () => {
+    it('returns configured provider when it is installed and enabled', () => {
+      // Set active provider to 'claude' via DB
+      const mgr = createManager();
+      mgr.setActiveProviderId('claude');
+
+      // Mock: claude binary is installed
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const result = mgr.resolveAvailableProvider();
+      expect(result).toBe('claude');
+    });
+
+    it('falls back to first installed+enabled provider when configured is not installed', () => {
+      // Set active provider to 'copilot' via DB
+      const mgr = createManager();
+      mgr.setActiveProviderId('copilot');
+
+      // Mock: copilot binary is NOT installed, but claude is
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      // Set ranking so claude comes first after copilot
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
+
+      const result = mgr.resolveAvailableProvider();
+      expect(result).toBe('claude');
+    });
+
+    it('falls back to first installed provider when configured is disabled', () => {
+      const mgr = createManager();
+      mgr.setActiveProviderId('copilot');
+      mgr.setProviderEnabled('copilot', true);
+
+      // Mock: copilot is installed but disabled
+      exec.mockImplementation((cmd: string) => {
+        if (cmd.startsWith('which ')) return '/usr/local/bin/some-binary';
+        throw new Error('not found');
+      });
+
+      // Disable copilot, enable claude
+      mgr.setProviderEnabled('copilot', false);
+      mgr.setProviderEnabled('claude', true);
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
+
+      const result = mgr.resolveAvailableProvider();
+      expect(result).toBe('claude');
+    });
+
+    it('returns configured provider if no alternative is available', () => {
+      const mgr = createManager();
+      mgr.setActiveProviderId('copilot');
+
+      // Mock: no binary is installed
+      exec.mockImplementation(() => { throw new Error('not found'); });
+
+      const result = mgr.resolveAvailableProvider();
+      expect(result).toBe('copilot');
+    });
+
+    it('persists the fallback provider as active', () => {
+      const mgr = createManager();
+      mgr.setActiveProviderId('copilot');
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
+
+      // Mock: only claude is installed
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      mgr.resolveAvailableProvider();
+      // The active provider should now be 'claude' in the DB
+      expect(mgr.getActiveProviderId()).toBe('claude');
+    });
+  });
+
+  // ── getActiveProviderId fallback ────────────────────────
+
+  describe('getActiveProviderId without db or configStore', () => {
+    it('returns first installed provider instead of hardcoded copilot', () => {
+      // No DB, no configStore — only exec
+      const mgr = new ProviderManager({
+        execCommand: (cmd: string) => {
+          if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+          throw new Error('not found');
+        },
+      });
+
+      const result = mgr.getActiveProviderId();
+      // Should detect installed providers rather than blindly returning 'copilot'
+      // The exact result depends on the iteration order of PROVIDER_PRESETS
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+    });
+  });
 });

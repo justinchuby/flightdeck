@@ -378,10 +378,62 @@ export class ProviderManager {
     if (this.configStore) {
       return this.configStore.current.provider.id as ProviderId;
     }
-    if (!this.db) return 'copilot';
+    if (!this.db) return this.findFirstInstalledProvider();
     const raw = this.db.getSetting(`${SETTING_PREFIX}active`);
     if (raw && raw in PROVIDER_PRESETS) return raw as ProviderId;
-    return 'copilot';
+    return this.findFirstInstalledProvider();
+  }
+
+  /**
+   * Resolve the best available provider: checks if the configured provider is
+   * actually installed and enabled, and falls back to the first available one
+   * from the provider ranking if not.
+   *
+   * Call this during startup after the ProviderManager is created to ensure
+   * the active provider is actually usable.
+   */
+  resolveAvailableProvider(): ProviderId {
+    const configured = this.getActiveProviderId();
+
+    // Check if the configured provider is installed and enabled
+    const { installed } = this.detectInstalled(configured);
+    if (installed && this.isProviderEnabled(configured)) {
+      logger.info({ module: 'provider', msg: 'Configured provider is available', provider: configured });
+      return configured;
+    }
+
+    logger.warn({ module: 'provider', msg: 'Configured provider not available, searching for fallback', provider: configured, installed });
+
+    // Walk the provider ranking to find the first installed+enabled provider
+    const ranking = this.getProviderRanking();
+    for (const candidateId of ranking) {
+      if (candidateId === configured) continue; // already checked
+      const { installed: candidateInstalled } = this.detectInstalled(candidateId);
+      if (candidateInstalled && this.isProviderEnabled(candidateId)) {
+        logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: candidateId });
+        this.setActiveProviderId(candidateId);
+        return candidateId;
+      }
+    }
+
+    // No provider found — keep the configured one and let downstream handle the error
+    logger.warn({ module: 'provider', msg: 'No installed+enabled provider found, keeping configured', provider: configured });
+    return configured;
+  }
+
+  /**
+   * Find the first installed provider from the ranking, used as a last-resort
+   * fallback when no DB or ConfigStore is available.
+   */
+  private findFirstInstalledProvider(): ProviderId {
+    const allIds = Object.keys(PROVIDER_PRESETS) as ProviderId[];
+    for (const id of allIds) {
+      try {
+        const { installed } = this.detectInstalled(id);
+        if (installed) return id;
+      } catch { /* skip */ }
+    }
+    return 'copilot'; // absolute last resort
   }
 
   setActiveProviderId(provider: ProviderId): void {
