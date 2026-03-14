@@ -435,6 +435,10 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
     );
   }
 
+  if (item.kind === 'tool-group') {
+    return <CollapsibleToolGroup tools={item.tools} />;
+  }
+
   if (item.kind === 'activity') {
     const evt = item.evt;
     const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -582,6 +586,35 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
       <span className={`text-[10px] font-mono ${color}`}>{title}</span>
       {kind && <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{kind}</span>}
       {ts && <span className="text-[10px] text-th-text-muted ml-auto shrink-0">{ts}</span>}
+    </div>
+  );
+}
+
+/** Collapsed-by-default group of consecutive tool calls */
+function CollapsibleToolGroup({ tools }: { tools: Array<{ msg: AcpTextChunk; index: number }> }) {
+  const [expanded, setExpanded] = useState(false);
+  const completedCount = tools.filter((t) => t.msg.toolStatus === 'completed').length;
+  const label = completedCount === tools.length
+    ? `${tools.length} tool use${tools.length !== 1 ? 's' : ''} ✓`
+    : `${tools.length} tool use${tools.length !== 1 ? 's' : ''}`;
+
+  return (
+    <div className="py-0.5">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center gap-1 text-[10px] text-th-text-muted hover:text-th-text-alt transition-colors"
+      >
+        {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <Wrench size={11} className="shrink-0" />
+        {label}
+      </button>
+      {expanded && (
+        <div className="ml-4 mt-0.5 space-y-0">
+          {tools.map((t, i) => (
+            <ToolCallBadge key={`tg-${i}`} msg={t.msg} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

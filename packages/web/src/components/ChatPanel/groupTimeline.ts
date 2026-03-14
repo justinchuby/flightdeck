@@ -15,8 +15,14 @@ export type AgentGroup = {
   systemEvents: TimelineItem[];
 };
 
-/** Items in the grouped timeline — either an agent group or a standalone item */
-export type GroupedTimelineItem = AgentGroup | TimelineItem;
+/** A group of consecutive tool call messages collapsed into one row */
+export type ToolGroup = {
+  kind: 'tool-group';
+  tools: Array<{ msg: AcpTextChunk; index: number }>;
+};
+
+/** Items in the grouped timeline — either an agent group, tool group, or a standalone item */
+export type GroupedTimelineItem = AgentGroup | ToolGroup | TimelineItem;
 
 /**
  * Groups consecutive agent text messages into continuous blocks.
@@ -39,6 +45,7 @@ export type GroupedTimelineItem = AgentGroup | TimelineItem;
 export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
   const result: GroupedTimelineItem[] = [];
   let currentGroup: { messages: Array<{ msg: AcpTextChunk; index: number }>; systemEvents: TimelineItem[] } | null = null;
+  let currentToolGroup: Array<{ msg: AcpTextChunk; index: number }> | null = null;
 
   function flush() {
     if (!currentGroup) return;
@@ -51,8 +58,20 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
     currentGroup = null;
   }
 
+  function flushTools() {
+    if (!currentToolGroup) return;
+    if (currentToolGroup.length === 1) {
+      const t = currentToolGroup[0];
+      result.push({ kind: 'message', msg: t.msg, index: t.index });
+    } else {
+      result.push({ kind: 'tool-group', tools: currentToolGroup });
+    }
+    currentToolGroup = null;
+  }
+
   for (const item of timeline) {
     if (item.kind === 'activity') {
+      flushTools();
       if (currentGroup) {
         currentGroup.systemEvents.push(item);
       } else {
@@ -66,6 +85,7 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
 
     // External messages (agent DMs) are transparent — don't break agent groups
     if (sender === 'external') {
+      flushTools();
       if (currentGroup) {
         currentGroup.systemEvents.push(item);
       } else {
@@ -77,6 +97,7 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
     // User messages always flush and render standalone
     if (sender === 'user') {
       flush();
+      flushTools();
       result.push(item);
       continue;
     }
@@ -84,12 +105,14 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
     // Rich content always flushes and renders standalone
     if (msg.contentType && msg.contentType !== 'text') {
       flush();
+      flushTools();
       result.push(item);
       continue;
     }
 
     // System messages
     if (sender === 'system') {
+      flushTools();
       const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
       // '---' separators flush the current group
       if (text === '---') {
@@ -107,12 +130,19 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
       continue;
     }
 
-    // Tool call messages — flush current group and render inline for chronological interleaving
+    // Tool call messages — flush agent group, accumulate consecutive tools
     if (sender === 'tool') {
       flush();
-      result.push(item);
+      if (!currentToolGroup) {
+        currentToolGroup = [{ msg: item.msg, index: item.index }];
+      } else {
+        currentToolGroup.push({ msg: item.msg, index: item.index });
+      }
       continue;
     }
+
+    // Non-tool message arriving — flush any accumulated tool group
+    flushTools();
 
     // Thinking messages — include in current group or start new one
     if (sender === 'thinking') {
@@ -133,5 +163,6 @@ export function groupTimeline(timeline: TimelineItem[]): GroupedTimelineItem[] {
   }
 
   flush();
+  flushTools();
   return result;
 }

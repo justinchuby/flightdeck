@@ -412,4 +412,73 @@ describe('groupTimeline', () => {
     }
     expect(result[1].kind).toBe('message');
   });
+
+  it('consecutive tool messages are grouped into a tool-group', () => {
+    const items: TimelineItem[] = [
+      msg('agent text', 'agent', 1000, 0),
+      msg('✓ Read file A', 'tool', 1500, 1),
+      msg('✓ Read file B', 'tool', 1600, 2),
+      msg('✓ Read file C', 'tool', 1700, 3),
+      msg('agent response', 'agent', 2000, 4),
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(3);
+    expect(result[0].kind).toBe('message'); // standalone agent
+    expect(result[1].kind).toBe('tool-group');
+    if (result[1].kind === 'tool-group') {
+      expect(result[1].tools).toHaveLength(3);
+      expect(result[1].tools[0].msg.text).toBe('✓ Read file A');
+      expect(result[1].tools[2].msg.text).toBe('✓ Read file C');
+    }
+    expect(result[2].kind).toBe('message'); // standalone agent
+  });
+
+  it('single tool between agent text stays standalone (no tool-group)', () => {
+    const items: TimelineItem[] = [
+      msg('agent text', 'agent', 1000, 0),
+      msg('✓ Read file', 'tool', 1500, 1),
+      msg('agent response', 'agent', 2000, 2),
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(3);
+    expect(result[0].kind).toBe('message');
+    expect(result[1].kind).toBe('message');
+    if (result[1].kind === 'message') {
+      expect(result[1].msg.sender).toBe('tool');
+    }
+    expect(result[2].kind).toBe('message');
+  });
+
+  it('tool group flushed by non-tool message', () => {
+    const items: TimelineItem[] = [
+      msg('✓ Read file A', 'tool', 1000, 0),
+      msg('✓ Read file B', 'tool', 1100, 1),
+      msg('user question', 'user', 2000, 2),
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe('tool-group');
+    if (result[0].kind === 'tool-group') {
+      expect(result[0].tools).toHaveLength(2);
+    }
+    expect(result[1].kind).toBe('message');
+    if (result[1].kind === 'message') {
+      expect(result[1].msg.sender).toBe('user');
+    }
+  });
+
+  it('consecutive tools at end of timeline are flushed as tool-group', () => {
+    const items: TimelineItem[] = [
+      msg('agent text', 'agent', 1000, 0),
+      msg('✓ Read file A', 'tool', 1500, 1),
+      msg('✓ Read file B', 'tool', 1600, 2),
+    ];
+    const result = groupTimeline(items);
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe('message'); // standalone agent
+    expect(result[1].kind).toBe('tool-group');
+    if (result[1].kind === 'tool-group') {
+      expect(result[1].tools).toHaveLength(2);
+    }
+  });
 });
