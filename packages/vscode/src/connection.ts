@@ -202,6 +202,7 @@ export class FlightdeckConnection {
   /**
    * Scan ports 3001–3010 in parallel.
    * Returns the URL of the first healthy server, or null.
+   * Uses a race pattern to return as soon as any port responds healthy.
    */
   private async scanPorts(): Promise<string | null> {
     const ports: number[] = [];
@@ -213,19 +214,24 @@ export class FlightdeckConnection {
       ports.push(p);
     }
 
-    const results = await Promise.allSettled(
-      ports.map(async (port) => {
-        const url = `http://localhost:${port}`;
-        const healthy = await this.probeHealth(url);
-        if (healthy) return url;
-        throw new Error('not healthy');
-      }),
-    );
+    // Race: resolve with the first healthy URL, or null if none respond
+    return new Promise<string | null>((resolve) => {
+      let resolved = false;
+      let pending = ports.length;
 
-    for (const result of results) {
-      if (result.status === 'fulfilled') return result.value;
-    }
-    return null;
+      for (const port of ports) {
+        const url = `http://localhost:${port}`;
+        this.probeHealth(url).then((healthy) => {
+          if (healthy && !resolved) {
+            resolved = true;
+            resolve(url);
+          }
+          if (--pending === 0 && !resolved) {
+            resolve(null);
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -245,6 +251,13 @@ export class FlightdeckConnection {
     this.setState('connecting');
 
     const discovered = await this.discoverServer(serverUrl);
+
+    // Guard: disconnect() may have been called during async discovery
+    if (!this.shouldReconnect) {
+      this.log.appendLine('Connect aborted — disconnected during discovery');
+      return;
+    }
+
     if (!discovered) {
       this.log.appendLine('No server found during connect');
       this.setState('disconnected');
@@ -255,19 +268,7 @@ export class FlightdeckConnection {
     this.shouldReconnect = true;
     this.log.appendLine(`Connecting to ${this._serverUrl}...`);
 
-    try {
-      const health = await this.fetch<{ status: string }>('/health');
-      if (health.status !== 'ok') {
-        throw new Error(`Unexpected health status: ${health.status}`);
-      }
-      this.log.appendLine('Health check passed');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.log.appendLine(`Health check failed: ${msg}`);
-      this.setState('error');
-      this.scheduleReconnect();
-      return;
-    }
+    // Note: discoverServer() already verified /health — no redundant probe needed.
 
     // Fetch server version and check API compatibility
     try {
@@ -494,6 +495,10 @@ export class FlightdeckConnection {
 
       // Re-discover in case the server restarted on a different port
       const discovered = await this.discoverServer();
+
+      // Guard: disconnect() may have been called during async discovery
+      if (!this.shouldReconnect) return;
+
       if (discovered && discovered !== this._serverUrl) {
         this.log.appendLine(`Server moved to ${discovered} (was ${this._serverUrl})`);
         this._serverUrl = discovered;

@@ -169,7 +169,7 @@ export class ServerManager {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${serverUrl}/api/health`, { signal: controller.signal });
+      const res = await fetch(`${serverUrl}/health`, { signal: controller.signal });
       clearTimeout(timeout);
       return res.ok;
     } catch {
