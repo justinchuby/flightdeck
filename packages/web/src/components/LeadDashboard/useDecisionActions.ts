@@ -1,13 +1,14 @@
 import { useCallback } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
+import type { DecisionStatus } from '../../types';
 
 export function useDecisionActions(selectedLeadId: string | null) {
   const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
     // Optimistic update — hide buttons immediately
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'confirmed', confirmedAt: new Date().toISOString() });
-    const decision = await apiFetch(`/decisions/${decisionId}/confirm`, {
+    const decision = await apiFetch<{ status: DecisionStatus; confirmedAt: string }>(`/decisions/${decisionId}/confirm`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     });
@@ -18,7 +19,7 @@ export function useDecisionActions(selectedLeadId: string | null) {
     if (!selectedLeadId) return;
     // Optimistic update — hide buttons immediately
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'rejected', confirmedAt: new Date().toISOString() });
-    const decision = await apiFetch(`/decisions/${decisionId}/reject`, {
+    const decision = await apiFetch<{ status: DecisionStatus; confirmedAt: string }>(`/decisions/${decisionId}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     });
@@ -28,7 +29,7 @@ export function useDecisionActions(selectedLeadId: string | null) {
   const handleDismissDecision = useCallback(async (decisionId: string) => {
     if (!selectedLeadId) return;
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'dismissed', confirmedAt: new Date().toISOString() });
-    const decision = await apiFetch(`/decisions/${decisionId}/dismiss`, {
+    const decision = await apiFetch<{ status: DecisionStatus; confirmedAt: string }>(`/decisions/${decisionId}/dismiss`, {
       method: 'POST',
     });
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });

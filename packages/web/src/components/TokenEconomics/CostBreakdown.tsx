@@ -34,8 +34,8 @@ export function CostBreakdown({ projectId }: CostBreakdownProps = {}) {
     const fetchCosts = async () => {
       try {
         const [agentData, taskData] = await Promise.all([
-          apiFetch(`/costs/by-agent${params}`),
-          apiFetch(`/costs/by-task${params}`),
+          apiFetch<AgentCostSummary[]>(`/costs/by-agent${params}`),
+          apiFetch<TaskCostSummary[]>(`/costs/by-task${params}`),
         ]);
         if (cancelled) return;
         setAgentCosts(agentData);

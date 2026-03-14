@@ -36,7 +36,7 @@ export function LeadSessionInfoBar({ leadAgent, selectedLeadId }: Props) {
             onClick={async (e) => {
               e.stopPropagation();
               try {
-                const data = await apiFetch(`/export/${selectedLeadId}`);
+                const data = await apiFetch<{ error?: string; outputDir?: string; files: string[]; agentCount?: number; eventCount?: number }>(`/export/${selectedLeadId}`);
                 if (data.error) {
                   alert(`Export failed: ${data.error}`);
                 } else {

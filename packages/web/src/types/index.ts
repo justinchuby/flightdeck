@@ -178,7 +178,7 @@ export interface WsMessage {
     | 'lead:decision'
     | 'lead:progress'
     | string;
-  [key: string]: any;
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any -- WS messages are dynamically typed
 }
 
 // Decision is re-exported from shared above (with proper non-optional fields)

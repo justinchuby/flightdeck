@@ -44,8 +44,8 @@ export function useLeadMessages(
       for (const l of leads) {
         store.addProject(l.id);
         // Pre-load message history for each lead (best-effort)
-        apiFetch(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal })
-          .then((data: MessageHistoryResponse) => {
+        apiFetch<MessageHistoryResponse>(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal })
+          .then((data) => {
             if (Array.isArray(data?.messages) && data.messages.length > 0) {
               const msgs: AcpTextChunk[] = data.messages.map((m) => ({
                 type: 'text' as const,

@@ -46,7 +46,7 @@ export function AgentLifecycle({ agentId, crewId, agent, onClose, onActionComple
 
       switch (action) {
         case 'clone': {
-          const data = await apiFetch(`/crews/${encodedCrew}/agents/${encodedAgent}/clone`, {
+          const data = await apiFetch<{ clone?: { agentId?: string } }>(`/crews/${encodedCrew}/agents/${encodedAgent}/clone`, {
             method: 'POST',
           });
           setResult({ ok: true, message: `Agent cloned: ${data.clone?.agentId ? shortAgentId(data.clone.agentId) : 'new agent'}` });

@@ -17,7 +17,7 @@ export interface AlertAction {
   actionType: 'api_call' | 'dismiss';
   endpoint: string;
   method: 'POST' | 'DELETE';
-  body?: Record<string, any>;
+  body?: Record<string, unknown>;
   confidence?: number;
 }
 

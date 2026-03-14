@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
-import type { DagStatus, Decision } from '../../types';
+import type { DagStatus, Decision, LeadProgress } from '../../types';
 
 /**
  * Polls progress, decisions, groups, and DAG for the selected lead agent
@@ -16,8 +16,8 @@ export function useLeadPolling(
   useQuery({
     queryKey: ['lead', 'progress', selectedLeadId],
     queryFn: async ({ signal }) => {
-      const data = await apiFetch(`/lead/${selectedLeadId}/progress`, { signal });
-      if (data && !data.error) {
+      const data = await apiFetch<LeadProgress>(`/lead/${selectedLeadId}/progress`, { signal });
+      if (data) {
         useLeadStore.getState().setProgress(selectedLeadId!, data);
       }
       return data;

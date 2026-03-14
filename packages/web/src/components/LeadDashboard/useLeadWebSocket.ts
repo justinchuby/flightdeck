@@ -361,7 +361,7 @@ function handleGroupMessage(msg: WsGroupMessage, store: StoreApi, leadId: string
 }
 
 function handleDagUpdated(store: StoreApi, leadId: string, historicalProjectId: string | null) {
-  apiFetch(`/lead/${leadId}/dag`).then((data: DagStatus) => {
+  apiFetch<DagStatus>(`/lead/${leadId}/dag`).then((data) => {
     if (data && data.tasks) {
       store.setDagStatus(leadId, data);
       if (historicalProjectId && historicalProjectId !== leadId) {

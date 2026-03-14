@@ -180,8 +180,8 @@ export function AcpOutput({ agentId }: Props) {
   // Fetch message history when agent panel opens and no messages are loaded yet
   useEffect(() => {
     if (!agentId || messages.length > 0) return;
-    apiFetch(`/agents/${agentId}/messages?limit=200`)
-      .then((data: { messages: Array<{ sender?: string; content?: string; text?: string; timestamp?: number }> }) => {
+    apiFetch<{ messages: Array<{ sender?: string; content?: string; text?: string; timestamp?: number }> }>(`/agents/${agentId}/messages?limit=200`)
+      .then((data) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
           // Only load if still no messages (avoid overwriting live data)

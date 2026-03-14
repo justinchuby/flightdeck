@@ -252,8 +252,8 @@ function AppContent() {
         const store = useLeadStore.getState();
         leads.forEach((l) => {
           store.addProject(l.id);
-          apiFetch(`/agents/${l.id}/messages?limit=200`, { signal })
-            .then((data: { messages: Array<{ sender?: string; text?: string; content?: string; timestamp?: string | number }> }) => {
+          apiFetch<{ messages: Array<{ sender?: string; text?: string; content?: string; timestamp?: string | number }> }>(`/agents/${l.id}/messages?limit=200`, { signal })
+            .then((data) => {
               if (Array.isArray(data.messages) && data.messages.length > 0) {
                 const msgs: AcpTextChunk[] = data.messages.map((m) => ({
                   type: 'text' as const,

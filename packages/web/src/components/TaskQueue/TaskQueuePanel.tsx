@@ -477,7 +477,7 @@ export function TaskQueuePanel() {
         api.fetchDagStatus(leadId),
         apiFetch<LeadProgress>(`/lead/${leadId}/progress`),
       ]);
-      if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData);
+      if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData as DagStatus);
       // Normalize server-side property names (team→crew rename, Phase 1)
       const raw = progressData as LeadProgress & { teamAgents?: LeadProgress['crewAgents']; teamSize?: number };
       setProgress({

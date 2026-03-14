@@ -27,7 +27,7 @@ function authHeaders(): Record<string, string> {
 }
 
 /** Standalone authenticated fetch — usable outside React hooks */
-export async function apiFetch<T = any>(path: string, opts?: ApiFetchOptions): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, opts?: ApiFetchOptions): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOpts } = opts ?? {};
 
   // Wire up abort controller for timeout (and caller-provided signals)

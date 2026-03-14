@@ -31,7 +31,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
 
   // Fetch available roles on mount
   useEffect(() => {
-    apiFetch('/roles').then((roles: RoleInfo[]) => {
+    apiFetch<RoleInfo[]>('/roles').then((roles) => {
       setAvailableRoles(roles.filter((r) => r.id !== 'lead'));
     }).catch(() => { /* role fetch failure is non-critical */ });
   }, []);

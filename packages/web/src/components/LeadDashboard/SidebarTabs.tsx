@@ -20,7 +20,7 @@ import { TaskDagPanelContent } from './TaskDagPanel';
 import { ModelConfigPanel } from './ModelConfigPanel';
 
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
-import type { DagStatus, AgentInfo, Decision, ChatGroup } from '../../types';
+import type { DagStatus, AgentInfo, Decision, ChatGroup, GroupMessage } from '../../types';
 import type { AgentComm } from '../../stores/leadStore';
 
 export interface SidebarLayoutProps {
@@ -59,7 +59,7 @@ interface SidebarTabsProps {
   crewTabContent: React.ReactNode;
   comms: AgentComm[];
   groups: ChatGroup[];
-  groupMessages: Record<string, any>;
+  groupMessages: Record<string, GroupMessage[]>;
   dagStatus: DagStatus | null;
   leadAgent: AgentInfo | undefined;
   selectedLeadId: string | null;

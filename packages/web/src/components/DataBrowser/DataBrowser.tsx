@@ -16,6 +16,54 @@ interface DbStats {
   dagTasks: number;
 }
 
+/** Row shape from /api/db/memory */
+interface MemoryRow {
+  id: number;
+  key: string;
+  value: string;
+  agentId: string;
+  leadId: string;
+  createdAt: string;
+}
+
+/** Row shape from /api/db/conversations */
+interface ConversationRow {
+  id: string;
+  agentId?: string;
+  taskId?: string;
+  createdAt: string;
+}
+
+/** Row shape from /api/db/conversations/:id/messages */
+interface ConversationMessage {
+  id: string;
+  sender: string;
+  content: string;
+  timestamp?: string;
+}
+
+/** Row shape from /api/db/decisions */
+interface DecisionRow {
+  id: string;
+  title: string;
+  status: string;
+  needsConfirmation?: number;
+  rationale?: string;
+  agentId: string;
+  agentRole: string;
+  leadId?: string;
+  createdAt: string;
+}
+
+/** Row shape from /api/db/activity */
+interface ActivityRow {
+  id: number;
+  agentRole: string;
+  actionType: string;
+  summary: string;
+  timestamp?: string;
+}
+
 type TabId = 'stats' | 'memory' | 'conversations' | 'decisions' | 'activity';
 
 async function dbFetch<T>(path: string, opts?: RequestInit): Promise<T> {
@@ -104,7 +152,7 @@ function StatsPanel({ stats }: { stats: DbStats | null }) {
 /* ── Memory Panel ───────────────────────────────────────────────── */
 
 function MemoryPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<MemoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -155,10 +203,10 @@ function MemoryPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Conversations Panel ────────────────────────────────────────── */
 
 function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,7 +281,7 @@ function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Decisions Panel ────────────────────────────────────────────── */
 
 function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<DecisionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -289,7 +337,7 @@ function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Activity Panel ─────────────────────────────────────────────── */
 
 function ActivityPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {

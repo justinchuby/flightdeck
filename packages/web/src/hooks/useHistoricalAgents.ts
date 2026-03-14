@@ -51,7 +51,7 @@ export function useHistoricalAgents(liveAgentCount: number, projectId?: string |
       try {
         // When no specific project requested, try /api/agents for global data
         if (!projectId) {
-          const apiAgents = await apiFetch<any[]>('/agents').catch(() => []);
+          const apiAgents = await apiFetch<AgentInfo[]>('/agents').catch(() => []);
           const arr = Array.isArray(apiAgents) ? apiAgents : [];
           if (arr.length > 0) {
             if (!cancelled && mountedRef.current) {

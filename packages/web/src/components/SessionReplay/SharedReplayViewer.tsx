@@ -22,7 +22,7 @@ export function SharedReplayViewer() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    apiFetch(`/shared/${token}`)
+    apiFetch<ShareableReplay>(`/shared/${token}`)
       .then((data) => setReplay(data))
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
