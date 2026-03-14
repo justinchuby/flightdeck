@@ -15,6 +15,7 @@ import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, us
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { getProvider } from '@flightdeck/shared';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { EmptyState } from '../ui/EmptyState';
@@ -54,56 +55,10 @@ interface TestResult {
 }
 
 // ── Provider display metadata ───────────────────────────────────────
+// Most metadata comes from PROVIDER_REGISTRY via getProvider() in @flightdeck/shared.
+// Only UI-specific strings that don't belong in the shared registry live here.
 
-const PROVIDER_ICONS: Record<string, string> = {
-  copilot: '🐙',
-  claude: '🟠',
-  gemini: '💎',
-  opencode: '🔓',
-  cursor: '↗️',
-  codex: '🤖',
-};
-
-const PROVIDER_AUTH_LABELS: Record<string, string> = {
-  copilot: 'Authenticated via GitHub',
-  claude: 'Authenticated via Anthropic API key',
-  gemini: 'Authenticated via Google',
-  opencode: 'Manages own keys',
-  cursor: 'Authenticated via Cursor',
-  codex: 'Authenticated via OpenAI',
-};
-
-interface ProviderLink {
-  label: string;
-  url: string;
-}
-
-const PROVIDER_LINKS: Record<string, ProviderLink[]> = {
-  copilot: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
-  claude: [
-    { label: 'ACP adapter', url: 'https://github.com/zed-industries/claude-agent-acp' },
-    { label: 'Claude Code CLI', url: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview' },
-  ],
-  gemini: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
-  opencode: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
-  cursor: [{ label: 'Documentation', url: 'https://docs.cursor.com' }],
-  codex: [
-    { label: 'ACP adapter', url: 'https://github.com/zed-industries/codex-acp' },
-    { label: 'CLI quickstart', url: 'https://developers.openai.com/codex/quickstart/?setup=cli' },
-  ],
-};
-
-/** Default CLI arguments per provider (mirrors server presets.ts). */
-const PROVIDER_DEFAULT_ARGS: Record<string, string[]> = {
-  copilot: ['--acp', '--stdio'],
-  claude: [],
-  gemini: ['--acp'],
-  cursor: ['acp'],
-  codex: [],
-  opencode: ['acp'],
-};
-
-/** Login instructions per provider — shown in the expanded details panel. */
+/** Login instructions per provider — shown when authenticated === false. */
 const PROVIDER_LOGIN_INSTRUCTIONS: Record<string, string> = {
   copilot: 'Authenticate using the GitHub Copilot CLI',
   claude: 'Log in with claude auth in your terminal',
@@ -111,26 +66,6 @@ const PROVIDER_LOGIN_INSTRUCTIONS: Record<string, string> = {
   cursor: 'Log in via the Cursor app',
   codex: 'Log in with codex auth in your terminal',
   opencode: 'Authentication is managed by OpenCode',
-};
-
-/** Whether the provider supports session resume. */
-const PROVIDER_RESUME_SUPPORT: Record<string, boolean> = {
-  copilot: true,
-  claude: true,
-  gemini: true,
-  cursor: true,
-  codex: false,
-  opencode: true,
-};
-
-/** Whether the provider is in preview (not production-ready). Copilot is GA. */
-const PROVIDER_PREVIEW: Record<string, boolean> = {
-  copilot: false,
-  claude: true,
-  gemini: true,
-  cursor: true,
-  codex: false,
-  opencode: true,
 };
 
 /** Small pill badge for preview providers. */
@@ -199,12 +134,13 @@ function ProviderCard({
     }
   }, [provider.id]);
 
-  const icon = PROVIDER_ICONS[provider.id] ?? '🔌';
-  const links = PROVIDER_LINKS[provider.id] ?? [];
-  const authLabel = PROVIDER_AUTH_LABELS[provider.id] ?? 'Provider-managed auth';
-  const defaultArgs = PROVIDER_DEFAULT_ARGS[provider.id] ?? [];
+  const providerDef = getProvider(provider.id);
+  const icon = providerDef?.icon ?? '🔌';
+  const links = providerDef?.setupLinks ?? [];
+  const authLabel = providerDef?.authLabel ?? 'Provider-managed auth';
+  const defaultArgs = providerDef?.args ?? [];
   const loginLabel = PROVIDER_LOGIN_INSTRUCTIONS[provider.id] ?? 'Log in via the provider CLI';
-  const supportsResume = PROVIDER_RESUME_SUPPORT[provider.id] ?? false;
+  const supportsResume = providerDef?.supportsResume ?? false;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -248,7 +184,7 @@ function ProviderCard({
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono text-th-text-muted w-4 text-center">{rank}</span>
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
-            {PROVIDER_PREVIEW[provider.id] && <PreviewBadge />}
+            {providerDef?.isPreview && <PreviewBadge />}
             {statusLoading ? <StatusBadgeSkeleton /> : <StatusBadge {...providerStatusProps(provider)} />}
           </div>
           <div className="text-xs text-th-text-muted">
