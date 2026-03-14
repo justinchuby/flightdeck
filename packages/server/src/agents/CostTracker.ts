@@ -1,6 +1,7 @@
 import type { Database } from '../db/database.js';
 import { taskCostRecords, agentRoster, utcNow } from '../db/schema.js';
 import { eq, sql, and } from 'drizzle-orm';
+import { logger } from '../utils/logger.js';
 
 export interface CostRecord {
   agentId: string;
@@ -76,21 +77,25 @@ export class CostTracker {
    * current task. Sum of stored deltas per agent ≈ last cumulative ACP value.
    */
   private initializeFromDb(): void {
-    const rows = this.db.drizzle
-      .select({
-        agentId: taskCostRecords.agentId,
-        totalInput: sql<number>`sum(${taskCostRecords.inputTokens})`,
-        totalOutput: sql<number>`sum(${taskCostRecords.outputTokens})`,
-      })
-      .from(taskCostRecords)
-      .groupBy(taskCostRecords.agentId)
-      .all();
+    try {
+      const rows = this.db.drizzle
+        .select({
+          agentId: taskCostRecords.agentId,
+          totalInput: sql<number>`sum(${taskCostRecords.inputTokens})`,
+          totalOutput: sql<number>`sum(${taskCostRecords.outputTokens})`,
+        })
+        .from(taskCostRecords)
+        .groupBy(taskCostRecords.agentId)
+        .all();
 
-    for (const row of rows) {
-      this.lastSeen.set(row.agentId, {
-        inputTokens: row.totalInput ?? 0,
-        outputTokens: row.totalOutput ?? 0,
-      });
+      for (const row of rows) {
+        this.lastSeen.set(row.agentId, {
+          inputTokens: row.totalInput ?? 0,
+          outputTokens: row.totalOutput ?? 0,
+        });
+      }
+    } catch (err) {
+      logger.error({ module: 'cost-tracker', msg: 'Failed to initialize from DB, starting with empty state', err: (err as Error).message });
     }
   }
 
@@ -125,32 +130,36 @@ export class CostTracker {
     const projectId = extras?.projectId ?? null;
 
     // Atomic upsert: insert or add delta to existing record
-    this.db.drizzle
-      .insert(taskCostRecords)
-      .values({
-        agentId,
-        dagTaskId,
-        leadId,
-        projectId,
-        inputTokens: deltaInput,
-        outputTokens: deltaOutput,
-        cacheReadTokens: cacheRead,
-        cacheWriteTokens: cacheWrite,
-        costUsd,
-      })
-      .onConflictDoUpdate({
-        target: [taskCostRecords.agentId, taskCostRecords.dagTaskId, taskCostRecords.leadId],
-        set: {
-          inputTokens: sql`${taskCostRecords.inputTokens} + ${deltaInput}`,
-          outputTokens: sql`${taskCostRecords.outputTokens} + ${deltaOutput}`,
-          cacheReadTokens: sql`${taskCostRecords.cacheReadTokens} + ${cacheRead}`,
-          cacheWriteTokens: sql`${taskCostRecords.cacheWriteTokens} + ${cacheWrite}`,
-          costUsd: sql`${taskCostRecords.costUsd} + ${costUsd}`,
-          projectId: projectId ?? sql`${taskCostRecords.projectId}`,
-          updatedAt: utcNow,
-        },
-      })
-      .run();
+    try {
+      this.db.drizzle
+        .insert(taskCostRecords)
+        .values({
+          agentId,
+          dagTaskId,
+          leadId,
+          projectId,
+          inputTokens: deltaInput,
+          outputTokens: deltaOutput,
+          cacheReadTokens: cacheRead,
+          cacheWriteTokens: cacheWrite,
+          costUsd,
+        })
+        .onConflictDoUpdate({
+          target: [taskCostRecords.agentId, taskCostRecords.dagTaskId, taskCostRecords.leadId],
+          set: {
+            inputTokens: sql`${taskCostRecords.inputTokens} + ${deltaInput}`,
+            outputTokens: sql`${taskCostRecords.outputTokens} + ${deltaOutput}`,
+            cacheReadTokens: sql`${taskCostRecords.cacheReadTokens} + ${cacheRead}`,
+            cacheWriteTokens: sql`${taskCostRecords.cacheWriteTokens} + ${cacheWrite}`,
+            costUsd: sql`${taskCostRecords.costUsd} + ${costUsd}`,
+            projectId: projectId ?? sql`${taskCostRecords.projectId}`,
+            updatedAt: utcNow,
+          },
+        })
+        .run();
+    } catch (err) {
+      logger.error({ module: 'cost-tracker', msg: 'Failed to record usage', agentId, dagTaskId, err: (err as Error).message });
+    }
   }
 
   /** Get cost breakdown per agent (across all tasks). */
