@@ -124,6 +124,28 @@ listenWithRetry(config.port, config.host).then((actualPort) => {
   }
   container.internal.contextRefresher.start();
   container.escalationManager!.start();
+
+  // Reconcile stale state from previous server run.
+  // At fresh startup no agents are alive in memory, so all DB entries
+  // still showing 'running'/'idle'/'active' are stale and must be cleaned up.
+  const isAgentAlive = (agentId: string) => {
+    const agent = container.agentManager.get(agentId);
+    return !!agent && (agent.status === 'running' || agent.status === 'idle');
+  };
+
+  let staleSessions = 0;
+  let staleAgents = 0;
+
+  if (container.projectRegistry) {
+    staleSessions = container.projectRegistry.reconcileStaleSessions(isAgentAlive);
+  }
+  if (container.agentRoster) {
+    staleAgents = container.agentRoster.reconcileStaleAgents(isAgentAlive);
+  }
+
+  if (staleSessions > 0 || staleAgents > 0) {
+    console.log(`🔧 Reconciled ${staleSessions} stale session(s), ${staleAgents} stale agent(s)`);
+  }
 }).catch((err) => {
   console.error(`❌ Failed to start server: ${err.message}`);
   if (err.message.includes('No available port')) {
