@@ -33,11 +33,11 @@ export function ReadOnlySession() {
     // Fire-and-forget historical data fetches.
     // Endpoints may 404 for old sessions — allSettled ignores individual failures.
     Promise.allSettled([
-      apiFetch<{ messages: any[] }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`, opts)
+      apiFetch<{ messages: Array<{ sender?: string; text?: string; timestamp?: number }> }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`, opts)
         .then((data) => {
           if (controller.signal.aborted) return;
           if (Array.isArray(data?.messages) && data.messages.length > 0) {
-            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
               type: 'text' as const,
               text: m.content,
               sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',

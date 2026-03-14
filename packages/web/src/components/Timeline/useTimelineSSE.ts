@@ -260,7 +260,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
 }
 
 /** Merge an incremental activity entry into existing timeline data */
-function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
+function mergeActivityEntry(prev: TimelineData, entry: { actionType: string; agentId: string; agentRole?: string; summary?: string; timestamp: number; details?: Record<string, string> }): TimelineData {
   const communications = [...prev.communications];
   const agents = prev.agents.map(a => ({ ...a, segments: [...a.segments] }));
   const locks = [...prev.locks];
@@ -332,7 +332,7 @@ function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
 }
 
 /** Merge an incremental lock event into existing timeline data */
-function mergeLockEvent(prev: TimelineData, lockEvent: any): TimelineData {
+function mergeLockEvent(prev: TimelineData, lockEvent: { type: string; agentId: string; filePath: string; timestamp?: string }): TimelineData {
   const locks = [...prev.locks];
 
   if (lockEvent.type === 'acquired') {
@@ -360,7 +360,7 @@ function mergeLockEvent(prev: TimelineData, lockEvent: any): TimelineData {
 const MAX_COMMUNICATIONS = 500;
 
 /** Merge an incremental comm:update event into existing timeline data */
-export function mergeCommEvent(prev: TimelineData, comm: any): TimelineData {
+export function mergeCommEvent(prev: TimelineData, comm: { type: string; fromAgentId: string; toAgentId?: string; groupName?: string; summary: string; timestamp: number }): TimelineData {
   const appended = [...prev.communications, {
     type: comm.type,
     fromAgentId: comm.fromAgentId,

@@ -83,7 +83,7 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
       return { text: `🔧 ${title}`, detail: typeof latest.kind === 'string' ? latest.kind : JSON.stringify(latest.kind) };
     }
     const last = agent.toolCalls[agent.toolCalls.length - 1];
-    const lastTitle = typeof last.title === 'string' ? last.title : (last.title as any)?.text ?? JSON.stringify(last.title);
+    const lastTitle = last.title;
     return { text: `✅ ${lastTitle}`, detail: 'completed' };
   }
 

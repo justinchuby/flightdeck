@@ -20,7 +20,7 @@ import { TaskDagPanelContent } from './TaskDagPanel';
 import { ModelConfigPanel } from './ModelConfigPanel';
 
 import { TimerDisplay } from '../TimerDisplay/TimerDisplay';
-import type { DagStatus, AgentInfo } from '../../types';
+import type { DagStatus, AgentInfo, Decision, ChatGroup } from '../../types';
 import type { AgentComm } from '../../stores/leadStore';
 
 export interface SidebarLayoutProps {
@@ -43,8 +43,8 @@ export interface TabStateProps {
 }
 
 export interface DecisionProps {
-  decisions: any[];
-  pendingConfirmations: any[];
+  decisions: Decision[];
+  pendingConfirmations: Decision[];
   panelHeight: number;
   onResize: (e: React.MouseEvent) => void;
   onConfirm: (id: string, reason?: string) => Promise<void>;
@@ -58,7 +58,7 @@ interface SidebarTabsProps {
   decision: DecisionProps;
   crewTabContent: React.ReactNode;
   comms: AgentComm[];
-  groups: any[];
+  groups: ChatGroup[];
   groupMessages: Record<string, any>;
   dagStatus: DagStatus | null;
   leadAgent: AgentInfo | undefined;

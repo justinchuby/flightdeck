@@ -5,7 +5,7 @@ import { NewProjectModal } from './LeadDashboard/NewProjectModal';
 import { SubmitIssueButton } from './ProvideFeedback';
 
 function NavItem({ to, icon: Icon, label, badge, end }: {
-  to: string; icon: any; label: string; badge?: number | null; end?: boolean;
+  to: string; icon: LucideIcon; label: string; badge?: number | null; end?: boolean;
 }) {
   return (
     <NavLink
