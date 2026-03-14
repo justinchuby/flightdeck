@@ -3,6 +3,7 @@ import { GitBranch, CheckCircle, MessageSquare, BarChart3, Loader2, Wrench } fro
 import { EmptyState } from '../Shared';
 import type { ActivityEvent } from '../../stores/leadStore';
 import { shortAgentId } from '../../utils/agentLabel';
+import type { AgentInfo } from '../../types';
 
 export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: AgentInfo[] }) {
   const feedRef = useRef<HTMLDivElement>(null);

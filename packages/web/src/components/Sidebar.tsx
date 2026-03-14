@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, FolderOpen, Users, Settings, Plus } from 'lucide-react';
+import { Home, FolderOpen, Users, Settings, Plus, type LucideIcon } from 'lucide-react';
 import { NewProjectModal } from './LeadDashboard/NewProjectModal';
 import { SubmitIssueButton } from './ProvideFeedback';
 

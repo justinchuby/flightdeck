@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Check, X, Lightbulb, EyeOff } from 'lucide-react';
+import type { Decision } from '../../types';
 
 /** Inline comment + action buttons for pending decisions in the banner */
 export function BannerDecisionActions({ decisionId, onConfirm, onReject, onDismiss }: {

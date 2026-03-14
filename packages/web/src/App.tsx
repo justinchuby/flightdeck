@@ -257,9 +257,9 @@ function AppContent() {
               if (Array.isArray(data.messages) && data.messages.length > 0) {
                 const msgs: AcpTextChunk[] = data.messages.map((m) => ({
                   type: 'text' as const,
-                  text: m.content,
+                  text: m.content || m.text || '',
                   sender: m.sender as 'agent' | 'user' | 'system',
-                  timestamp: new Date(m.timestamp).getTime(),
+                  timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
                 }));
                 const current = useLeadStore.getState().projects[l.id];
                 if (!current || current.messages.length === 0) {
