@@ -18,11 +18,12 @@ import { NewProjectModal } from './NewProjectModal';
 import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailModal';
 import { useLeadWebSocket } from './useLeadWebSocket';
 import { useDragResize } from './useDragResize';
-import { apiFetch } from '../../hooks/useApi';
 import { useWebSocketContext } from '../../contexts/WebSocketContext';
 import { useLeadPolling } from './useLeadPolling';
 import { useLeadMessages } from './useLeadMessages';
 import { useCatchUpSummary } from './useCatchUpSummary';
+import { useDecisionActions } from './useDecisionActions';
+import { useMessageActions } from './useMessageActions';
 import { LeadProgressBanner } from './LeadProgressBanner';
 import { LeadAgentReportsBanner } from './LeadAgentReportsBanner';
 import { LeadPendingDecisionsBanner } from './LeadPendingDecisionsBanner';
@@ -200,114 +201,11 @@ export function LeadDashboard({ readOnly = false }: Props) {
     });
   }, []);
 
-  const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue', opts: { broadcast: boolean } = { broadcast: false }) => {
-    if (!input.trim() || !selectedLeadId) return;
-    const text = input.trim();
-    setInput('');
-    const store = useLeadStore.getState();
-    // For interrupts, insert a separator so post-interrupt response appears as a new bubble
-    if (mode === 'interrupt') {
-      const proj = store.projects[selectedLeadId];
-      const msgs = proj?.messages ?? EMPTY_MESSAGES;
-      const last = msgs[msgs.length - 1];
-      if (last?.sender === 'agent') {
-        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
-      }
-    }
-    store.addMessage(selectedLeadId, {
-      type: 'text',
-      text,
-      sender: 'user',
-      queued: mode === 'queue',
-      timestamp: Date.now(),
-      attachments: attachments.length > 0
-        ? attachments
-            .filter((a) => a.kind === 'image')
-            .map((a) => ({ name: a.name, mimeType: a.mimeType, thumbnailDataUrl: a.thumbnailDataUrl }))
-        : undefined,
-    });
-    const payload: Record<string, unknown> = { text, mode };
-    if (opts.broadcast) payload.broadcast = true;
-    if (attachments.length > 0) {
-      payload.attachments = attachments
-        .filter((a) => a.data)
-        .map((a) => ({ name: a.name, mimeType: a.mimeType, data: a.data }));
-    }
-    try {
-      await apiFetch(`/lead/${selectedLeadId}/message`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      clearAttachments();
-    } catch {
-      // Network error — keep attachments so user can retry
-    }
-  }, [input, selectedLeadId, attachments, clearAttachments]);
+  const { sendMessage, removeQueuedMessage, reorderQueuedMessage } = useMessageActions(
+    selectedLeadId, input, setInput, attachments, clearAttachments,
+  );
 
-  const removeQueuedMessage = useCallback(async (queueIndex: number) => {
-    if (!selectedLeadId) return;
-    try {
-      await apiFetch(`/agents/${selectedLeadId}/queue/${queueIndex}`, { method: 'DELETE' });
-      const store = useLeadStore.getState();
-      const msgs = store.projects[selectedLeadId]?.messages || [];
-      let seen = 0;
-      const updated = msgs.filter((m: AcpTextChunk) => {
-        if (!m.queued) return true;
-        return seen++ !== queueIndex;
-      });
-      store.setMessages(selectedLeadId, updated);
-    } catch { /* ignore */ }
-  }, [selectedLeadId]);
-
-  const reorderQueuedMessage = useCallback(async (fromIndex: number, toIndex: number) => {
-    if (!selectedLeadId) return;
-    try {
-      await apiFetch(`/agents/${selectedLeadId}/queue/reorder`, {
-        method: 'POST',
-        body: JSON.stringify({ from: fromIndex, to: toIndex }),
-      });
-      const store = useLeadStore.getState();
-      const msgs = store.projects[selectedLeadId]?.messages || [];
-      const queued = msgs.filter((m: AcpTextChunk) => m.queued);
-      const nonQueued = msgs.filter((m: AcpTextChunk) => !m.queued);
-      if (fromIndex < queued.length && toIndex < queued.length) {
-        const [moved] = queued.splice(fromIndex, 1);
-        queued.splice(toIndex, 0, moved);
-        store.setMessages(selectedLeadId, [...nonQueued, ...queued]);
-      }
-    } catch { /* ignore */ }
-  }, [selectedLeadId]);
-
-  const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
-    if (!selectedLeadId) return;
-    // Optimistic update — hide buttons immediately
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'confirmed', confirmedAt: new Date().toISOString() });
-    const decision = await apiFetch(`/decisions/${decisionId}/confirm`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-  }, [selectedLeadId]);
-
-  const handleRejectDecision = useCallback(async (decisionId: string, reason?: string) => {
-    if (!selectedLeadId) return;
-    // Optimistic update — hide buttons immediately
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'rejected', confirmedAt: new Date().toISOString() });
-    const decision = await apiFetch(`/decisions/${decisionId}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-  }, [selectedLeadId]);
-
-  const handleDismissDecision = useCallback(async (decisionId: string) => {
-    if (!selectedLeadId) return;
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'dismissed', confirmedAt: new Date().toISOString() });
-    const decision = await apiFetch(`/decisions/${decisionId}/dismiss`, {
-      method: 'POST',
-    });
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-  }, [selectedLeadId]);
+  const { handleConfirmDecision, handleRejectDecision, handleDismissDecision } = useDecisionActions(selectedLeadId);
 
   const handleOpenAgentChat = useCallback((agentId: string) => {
     useAppStore.getState().setSelectedAgent(agentId);
