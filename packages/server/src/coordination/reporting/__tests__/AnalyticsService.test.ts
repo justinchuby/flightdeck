@@ -60,7 +60,7 @@ describe('AnalyticsService', () => {
   });
 
   afterEach(() => {
-    db.close();
+    if (db) db.close();
     try { unlinkSync(TEST_DB); } catch {}
     try { unlinkSync(TEST_DB + '-wal'); } catch {}
     try { unlinkSync(TEST_DB + '-shm'); } catch {}
