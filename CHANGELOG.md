@@ -41,51 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Claude agent-sdk comparison report**
 - **8 implementation specs** — Detailed specs for R1, R2, R3, R4, R5, R9, R12, R15 with migration strategies, CI verification, and integration notes
 
-### Changed
-
-- **Active session icon** — Changed from yellow AlertCircle "Active" to blue Play "Running" for clearer status indication
-- **Decisions panel newest-first** — DecisionLog queries `getAll()`, `getByLeadId()`, and `getNeedingConfirmation()` now return DESC order with `rowid` tiebreaker for deterministic ordering
-- **Provider settings use shared registry** — Replaced 6 hardcoded metadata maps with `getProvider()` from `PROVIDER_REGISTRY` in `@flightdeck/shared`
-- **Login instructions in shared registry** — `loginInstructions` field added to `ProviderDefinition`, eliminating last hardcoded map from ProvidersSection
-- **Collapsible system messages** — Long system messages (>200 chars) auto-collapse with click-to-expand
-- **Tool use display** — Smaller font (10px), in-place message updates on state transitions instead of duplicating messages
-- **Tool/text chronological interleaving** — Tool calls now flush the current agent group in `groupTimeline()`, producing text → [tool badge] → text instead of concatenated text with tools collapsed below
-- **Clickable progress items** — Recent Progress section on project overview uses shared ActivityFeedItem with detail modal on click
-- **Token usage API errors** — Return 500 with error details instead of empty arrays
-- **CostTracker error handling** — Logs errors instead of failing silently
-- **Docs landing page** — Simplified to 3 feature cards: AI Project Lead, Supported Providers, Task DAG
-- **R5 Phase 3-4** (in progress) — Structured logging call-site migration: 193 calls across 50 files converting to pino structured API
-- **Docs reorganization** — All documentation moved to `docs/` directory (`research/`, `specs/`, `reference/`)
-- **Project rename** — `ai-crew` → `flightdeck` throughout all documentation
-- **Synthesis report v3** — 8/19 recommendations marked as implemented with status tracking
-
-### Fixed
-
-- **Crew page agent filtering** — Backend `/crew/agents` endpoint and frontend HealthStrip now filter by projectId instead of showing all agents globally
-- **Crew page side panel scroll** — Changed overflow-hidden to overflow-y-auto so panel content scrolls properly
-- **Doubled Command Reference Reminder** — System messages targeted at child agents no longer leak into the lead's main chat (`msg.to === leadId` guard)
-- **DecisionLog CI test** — Added `rowid DESC` tiebreaker to prevent non-deterministic ordering when decisions share the same millisecond timestamp
-- **Windows CI** — Added missing shared types build step to Windows CI workflow
-- **FLIGHTDECK_STATE_DIR not respected** — Config now used in AgentManager, StorageManager, and project routes instead of hardcoded `homedir()`
-- **SQLite WAL checkpoint** — Changed from TRUNCATE to PASSIVE mode (prevents blocking concurrent reads)
-- **FileLockRegistry** — `lock:acquired` event no longer fires on TTL refresh (was causing spurious UI updates)
-
-### Removed
-
-- **Legacy .ai-crew migration code** — Removed 163 lines of migration logic and 2 test files for the renamed `.ai-crew/` directory
-- **Symlink-based artifact sharing** — Removed `.flightdeck/shared/` symlink system, replaced with direct absolute artifact paths injected into agent prompts
-- **TokenEconomics component** — Removed unused component and tests (264 lines)
-- **Hardcoded provider metadata** — Removed `PROVIDER_REQUIRED_ENV`, `PROVIDER_LOGIN_INSTRUCTIONS`, and 4 other stale maps from ProvidersSection
-
-### Docs
-
-- VitePress base path changed to `/` for `flightdeck.justinchuby.com`
-- CNAME file added for GitHub Pages custom domain
-- Landing page simplified to 3 feature cards
-
-## [0.5.0] - Unreleased
-
-### Added
 
 #### Multi-CLI Provider Support
 
@@ -348,6 +303,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Active session icon** — Changed from yellow AlertCircle "Active" to blue Play "Running" for clearer status indication
+- **Decisions panel newest-first** — DecisionLog queries `getAll()`, `getByLeadId()`, and `getNeedingConfirmation()` now return DESC order with `rowid` tiebreaker for deterministic ordering
+- **Provider settings use shared registry** — Replaced 6 hardcoded metadata maps with `getProvider()` from `PROVIDER_REGISTRY` in `@flightdeck/shared`
+- **Login instructions in shared registry** — `loginInstructions` field added to `ProviderDefinition`, eliminating last hardcoded map from ProvidersSection
+- **Collapsible system messages** — Long system messages (>200 chars) auto-collapse with click-to-expand
+- **Tool use display** — Smaller font (10px), in-place message updates on state transitions instead of duplicating messages
+- **Tool/text chronological interleaving** — Tool calls now flush the current agent group in `groupTimeline()`, producing text → [tool badge] → text instead of concatenated text with tools collapsed below
+- **Clickable progress items** — Recent Progress section on project overview uses shared ActivityFeedItem with detail modal on click
+- **Token usage API errors** — Return 500 with error details instead of empty arrays
+- **CostTracker error handling** — Logs errors instead of failing silently
+- **Docs landing page** — Simplified to 3 feature cards: AI Project Lead, Supported Providers, Task DAG
+- **R5 Phase 3-4** (in progress) — Structured logging call-site migration: 193 calls across 50 files converting to pino structured API
+- **Docs reorganization** — All documentation moved to `docs/` directory (`research/`, `specs/`, `reference/`)
+- **Project rename** — `ai-crew` → `flightdeck` throughout all documentation
+- **Synthesis report v3** — 8/19 recommendations marked as implemented with status tracking
+
+
 - **Daemon removal** — Removed ~7,400 lines of unnecessary daemon code after agent server migration. Daemon concept replaced by two-process agent server architecture.
 - **Frontend route rename** — `/daemon` → `/agent-server`, component `DaemonPanel` → `AgentServerPanel`, sidebar label updated.
 - **KanbanBoard decomposition** — Refactored 1,114-line monolith into 6 focused files: `KanbanColumn`, `TaskCard`, `FilterBar`, `AddTaskForm`, `kanbanConstants`, `KanbanBoard`.
@@ -367,6 +339,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Markdown rendering** — Hand-rolled markdown parser replaced with `react-markdown` + `remark-gfm` + `rehype-highlight` for proper GFM support.
 
 ### Fixed
+
+- **Crew page agent filtering** — Backend `/crew/agents` endpoint and frontend HealthStrip now filter by projectId instead of showing all agents globally
+- **Crew page side panel scroll** — Changed overflow-hidden to overflow-y-auto so panel content scrolls properly
+- **Doubled Command Reference Reminder** — System messages targeted at child agents no longer leak into the lead's main chat (`msg.to === leadId` guard)
+- **DecisionLog CI test** — Added `rowid DESC` tiebreaker to prevent non-deterministic ordering when decisions share the same millisecond timestamp
+- **Windows CI** — Added missing shared types build step to Windows CI workflow
+- **FLIGHTDECK_STATE_DIR not respected** — Config now used in AgentManager, StorageManager, and project routes instead of hardcoded `homedir()`
+- **SQLite WAL checkpoint** — Changed from TRUNCATE to PASSIVE mode (prevents blocking concurrent reads)
+- **FileLockRegistry** — `lock:acquired` event no longer fires on TTL refresh (was causing spurious UI updates)
+
 
 - **Agent server fork crash** — `ForkTransport.fork()` defaulted `execArgv` to `[]`, stripping tsx's `--import` loader args. Child process couldn't load `.ts` files in dev mode. Fix: `filterExecArgv()` inherits parent's `process.execArgv` while stripping `--watch` flags. Also pipes child stderr for crash diagnostics.
 - **Agent server routes not mounted** — `agentServerRoutes()` was never imported in `routes/index.ts`. Added import and mount.
@@ -418,10 +400,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Legacy .ai-crew migration code** — Removed 163 lines of migration logic and 2 test files for the renamed `.ai-crew/` directory
+- **Symlink-based artifact sharing** — Removed `.flightdeck/shared/` symlink system, replaced with direct absolute artifact paths injected into agent prompts
+- **TokenEconomics component** — Removed unused component and tests (264 lines)
+- **Hardcoded provider metadata** — Removed `PROVIDER_REQUIRED_ENV`, `PROVIDER_LOGIN_INSTRUCTIONS`, and 4 other stale maps from ProvidersSection
+
+
 - **AgentDetailModal** — Replaced by unified `AgentDetailPanel` supporting both inline and modal rendering modes. 328 lines of dead code deleted.
 - **ProfilePanel (inline)** — ~220 lines of inline component removed from `UnifiedCrewPage.tsx`, replaced by `AgentDetailPanel`.
 - **AgentHeatmap on Analysis page** — Removed from `AnalysisPage.tsx` because it only displayed spawn data, not actual communication patterns. Misleading visualization.
 - **DEFER_ISSUE / QUERY_DEFERRED / RESOLVE_DEFERRED** — Deferred issue system being removed. Stored in SQLite `deferred_issues` table and showed as 📌 in Activity Feed but had no dedicated UI panel. Value did not justify complexity vs. decision/progress logging.
+
+### Docs
+
+- VitePress base path changed to `/` for `flightdeck.justinchuby.com`
+- CNAME file added for GitHub Pages custom domain
+- Landing page simplified to 3 feature cards
 
 ### Stats
 
