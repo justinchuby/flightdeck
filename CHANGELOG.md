@@ -5,11 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-03-14
 
 ### Added
 
-- **VS Code extension (Phase 1)** — Sidebar tree views, dashboard webview, status bar
+- **VS Code extension** — Full Flightdeck integration for Visual Studio Code
+  - Real-time agent monitoring via sidebar tree views (agents, tasks, file locks)
+  - Dashboard webview embedding the Flightdeck UI via postMessage bridge
+  - Status bar indicators for connection state, active agents, and pending decisions
+  - Desktop notifications for decisions requiring approval, agent crashes, and task completions
+  - 10+ commands: connect, disconnect, send message, approve/reject decisions, terminate agents, start/stop server, open dashboard
+  - File lock decorations (🔒 badges) showing which files are locked by which agents
+  - Editor gutter highlights for locked files with holder info
+  - Agent terminal integration for viewing agent output and sending input
+  - Start/Stop Server commands with automatic health polling and log streaming
+  - 5-tier server discovery: explicit URL → settings → last-known URL → env var → port scan (3001–3010)
+  - Version compatibility checking between extension and server (apiVersion)
+  - CI workflow for extension (typecheck, build, test, VSIX packaging)
+- **Server `GET /version` endpoint** — Returns server version and API version for compatibility checking
+
+### Fixed
+
+- Server health endpoint path in server manager (`/health` not `/api/health`)
+- Port scan performance (returns first healthy port immediately instead of waiting for all 10)
+- Reconnect race condition with state guards after async discovery
+- Removed redundant health probes during connection (discovery already verifies)
+- Server manager `stop()` timing gap (defers cleanup to exit handler, prevents duplicate stops)
 
 ## [0.4.0] - Unreleased
 
