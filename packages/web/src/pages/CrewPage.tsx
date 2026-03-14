@@ -362,8 +362,9 @@ export function CrewPage() {
     } catch { /* teams list is non-critical */ }
   }, [selectedCrew]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (showLoading = true) => {
     try {
+      if (showLoading) setLoading(true);
       setError(null);
       const agentUrl = statusFilter === 'all'
         ? `/crews/${selectedCrew}/agents`
@@ -404,11 +405,11 @@ export function CrewPage() {
   }, [selectedCrew, statusFilter]);
 
   useEffect(() => { fetchCrews(); }, [fetchCrews]);
-  useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Polling
+  // Polling (silent — no loading spinner)
   useEffect(() => {
-    const interval = setInterval(fetchData, 10_000);
+    const interval = setInterval(() => fetchData(false), 10_000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
