@@ -1,4 +1,3 @@
-import { homedir } from 'os';
 import { join, dirname, resolve } from 'path';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import { randomBytes } from 'crypto';
@@ -6,9 +5,10 @@ import YAML from 'yaml';
 import type { ProjectMetadata, StorageMode, SyncManifest } from './types.js';
 import { PROJECT_SUBDIRS, SYNC_SCHEMA_VERSION } from './types.js';
 import { logger } from '../utils/logger.js';
+import { FLIGHTDECK_STATE_DIR } from '../config.js';
 
 /** Default root for user-mode storage */
-const USER_STORAGE_ROOT = join(homedir(), '.flightdeck', 'projects');
+const USER_STORAGE_ROOT = join(FLIGHTDECK_STATE_DIR, 'projects');
 
 /**
  * Manages the filesystem mirror for project state.

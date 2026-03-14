@@ -136,7 +136,7 @@ export class Agent {
   public provider?: string;
   /** Adapter backend type (e.g. 'acp') */
   public backend?: string;
-  /** Organized artifact storage path (~/.flightdeck/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
+  /** Organized artifact storage path ($FLIGHTDECK_STATE_DIR/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
   public artifactDir?: string;
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
