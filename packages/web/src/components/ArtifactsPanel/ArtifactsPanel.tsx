@@ -89,8 +89,9 @@ export function ArtifactsPanel() {
       );
       setGroups(data.groups);
       if (data.artifactBasePath) setArtifactBasePath(data.artifactBasePath);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load artifacts');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to load artifacts');
     } finally {
       setLoading(false);
     }
@@ -111,8 +112,9 @@ export function ArtifactsPanel() {
       setFileData(data);
       setSelectedKey(`${artifact.agentId}:${artifact.path}`);
       setSelectedPath(artifact.path);
-    } catch (err: any) {
-      setFileError(err.message || 'Failed to load file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setFileError(message || 'Failed to load file');
       setFileData(null);
     } finally {
       setFileLoading(false);

@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useWebSocket } from './hooks/useWebSocket';
-import { useApi } from './hooks/useApi';
+import { useApi, apiFetch } from './hooks/useApi';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore, shouldNotify } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
@@ -144,8 +144,9 @@ export function App() {
     try {
       const endpoint = systemPaused ? '/system/resume' : '/system/pause';
       await apiFetch(endpoint, { method: 'POST' });
-    } catch (err: any) {
-      addToast('error', `Failed to ${systemPaused ? 'resume' : 'pause'}: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to ${systemPaused ? 'resume' : 'pause'}: ${message}`);
     }
   }, [systemPaused, addToast]);
 
@@ -223,14 +224,13 @@ export function App() {
   // On app startup: load active leads + persisted projects into leadStore
   useEffect(() => {
     // Load active leads and their message history
-    fetch('/api/lead').then((r) => r.json()).then((leads: any[]) => {
+    apiFetch('/lead').then((leads: any[]) => {
       if (!Array.isArray(leads)) return;
       const store = useLeadStore.getState();
       leads.forEach((l) => {
         store.addProject(l.id);
         // Pre-load message history
-        fetch(`/api/agents/${l.id}/messages?limit=200`)
-          .then((r) => r.json())
+        apiFetch(`/agents/${l.id}/messages?limit=200`)
           .then((data: any) => {
             if (Array.isArray(data.messages) && data.messages.length > 0) {
               const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
@@ -258,7 +258,7 @@ export function App() {
     });
 
     // Load persisted projects and register them in leadStore
-    fetch('/api/projects').then((r) => r.json()).then((projects: Project[]) => {
+    apiFetch('/projects').then((projects: Project[]) => {
       if (!Array.isArray(projects)) return;
       const store = useLeadStore.getState();
       for (const proj of projects) {

@@ -395,8 +395,9 @@ export function CrewPage() {
 
       if (healthData.status === 'fulfilled') setHealth(healthData.value);
       if (crewDetailData.status === 'fulfilled') setCrewDetail(crewDetailData.value);
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to load crew data');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message ?? 'Failed to load crew data');
     } finally {
       setLoading(false);
     }

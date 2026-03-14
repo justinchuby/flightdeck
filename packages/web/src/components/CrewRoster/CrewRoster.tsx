@@ -394,8 +394,9 @@ function ProfilePanel({ agentId, crewId, onClose }: { agentId: string; crewId: s
     try {
       await apiFetch(`/agents/${agentId}/interrupt`, { method: 'POST' });
       addToast('success', 'Interrupt sent');
-    } catch (err: any) {
-      addToast('error', `Failed to interrupt agent: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to interrupt agent: ${message}`);
     } finally {
       setActionLoading(null);
     }
@@ -413,8 +414,9 @@ function ProfilePanel({ agentId, crewId, onClose }: { agentId: string; crewId: s
       addToast('success', 'Message sent');
       setMessageText('');
       setShowMessageInput(false);
-    } catch (err: any) {
-      addToast('error', `Failed to send message: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to send message: ${message}`);
     } finally {
       setActionLoading(null);
     }
@@ -429,8 +431,9 @@ function ProfilePanel({ agentId, crewId, onClose }: { agentId: string; crewId: s
       // Refresh profile to reflect new status
       const data = await apiFetch<AgentProfile>(`/crews/${crewId}/agents/${agentId}/profile`);
       setProfile(data);
-    } catch (err: any) {
-      addToast('error', `Failed to stop agent: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to stop agent: ${message}`);
     } finally {
       setActionLoading(null);
     }
@@ -640,8 +643,9 @@ function ProfilePanel({ agentId, crewId, onClose }: { agentId: string; crewId: s
                         await apiFetch(`/agents/${agentId}`, { method: 'PATCH', body: JSON.stringify({ model: e.target.value }) });
                         setProfile(p => p ? { ...p, model: e.target.value, live: p.live ? { ...p.live, model: e.target.value } : p.live } : p);
                         addToast('success', 'Model updated');
-                      } catch (err: any) {
-                        addToast('error', `Failed to update model: ${err.message}`);
+                      } catch (err: unknown) {
+                        const message = err instanceof Error ? err.message : String(err);
+                        addToast('error', `Failed to update model: ${message}`);
                       }
                     }}
                     className="w-full text-sm bg-th-bg-alt border border-th-border text-th-text rounded px-2 py-1.5 focus:outline-none focus:border-accent cursor-pointer"
@@ -726,8 +730,9 @@ export function CrewRoster() {
       }
 
       setAgents(allAgents);
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to fetch crew roster');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message ?? 'Failed to fetch crew roster');
     } finally {
       setLoading(false);
     }
@@ -755,8 +760,9 @@ export function CrewRoster() {
         }
       }
       setCrewSummaries(prev => prev.filter(s => s.leadId !== leadId));
-    } catch (err: any) {
-      addToast('error', `Failed to delete crew: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to delete crew: ${message}`);
     }
   }, [addToast, agents, selectedAgent]);
 

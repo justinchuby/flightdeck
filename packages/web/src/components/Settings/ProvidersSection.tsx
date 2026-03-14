@@ -118,8 +118,9 @@ function ProviderCard({
         { method: 'POST' },
       );
       setTestResult(result);
-    } catch (err: any) {
-      setTestResult({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setTestResult({ success: false, message: message });
     } finally {
       setTesting(false);
     }
@@ -368,8 +369,9 @@ export function ProvidersSection() {
           })
           .finally(() => setStatusLoading(false));
       })
-      .catch((err) => {
-        setError(err.message);
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
         setConfigLoading(false);
         setStatusLoading(false);
       });

@@ -72,8 +72,7 @@ export function useProgressiveRoutes() {
   }, [tier]);
 
   const expandAll = () => {
-    localStorage.setItem('sidebar-routes-expanded', 'true');
-    // Force re-render — caller should re-evaluate
+    try { localStorage.setItem('sidebar-routes-expanded', 'true'); } catch {}
   };
 
   return { tier, visibleRoutes, hiddenRoutes, expandAll, allRoutes: ALL_ROUTES };

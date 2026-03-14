@@ -103,14 +103,16 @@ export function ChatPanel({ agentId, ws: _ws }: Props) {
     apiFetch(`/agents/${targetId}/message`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }).catch((err: Error) => {
-      useToastStore.getState().add('error', `Failed to send: ${err.message}`);
+    }).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      useToastStore.getState().add('error', `Failed to send: ${message}`);
     });
   };
 
   const interruptAgent = (targetId: string) => {
-    apiFetch(`/agents/${targetId}/interrupt`, { method: 'POST' }).catch((err: Error) => {
-      useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+    apiFetch(`/agents/${targetId}/interrupt`, { method: 'POST' }).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      useToastStore.getState().add('error', `Failed to interrupt: ${message}`);
     });
   };
 
@@ -125,7 +127,7 @@ export function ChatPanel({ agentId, ws: _ws }: Props) {
     if (mode === 'interrupt' && isAgentBusy) {
       const last = msgs[msgs.length - 1];
       if (last?.sender === 'agent') {
-        msgs.push({ type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+        msgs.push({ type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       }
     }
     const imgAttachments = attachments.length > 0

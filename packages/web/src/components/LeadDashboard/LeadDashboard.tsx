@@ -21,6 +21,7 @@ import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailMod
 import { useLeadWebSocket } from './useLeadWebSocket';
 import { useDragResize } from './useDragResize';
 import type { useApi } from '../../hooks/useApi';
+import { apiFetch } from '../../hooks/useApi';
 import type { useWebSocket } from '../../hooks/useWebSocket';
 
 /** Shape returned by /api/agents/:id/messages and /api/projects/:id/messages */
@@ -209,14 +210,13 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     if (readOnly) return;
     const controller = new AbortController();
     // Load active leads
-    fetch('/api/lead', { signal: controller.signal }).then((r) => r.json()).then((leads: LeadListItem[]) => {
+    apiFetch('/lead', { signal: controller.signal }).then((leads: LeadListItem[]) => {
       if (controller.signal.aborted) return;
       if (Array.isArray(leads)) {
         leads.forEach((l) => {
           useLeadStore.getState().addProject(l.id);
           // Pre-load message history for each lead
-          fetch(`/api/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
-            .then((r) => r.json())
+          apiFetch(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
             .then((data: MessageHistoryResponse) => {
               if (controller.signal.aborted) return;
               if (Array.isArray(data?.messages) && data.messages.length > 0) {
@@ -326,12 +326,12 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     let stopped = false;
     const fetchProgress = () => {
       if (stopped) return;
-      fetch(`/api/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((r) => {
-        if (r.status === 404) { stopped = true; return null; }
-        return r.json();
-      }).then((data) => {
+      apiFetch(`/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((data) => {
         if (!controller.signal.aborted && data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
-      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Progress poll failed:', err); });
+      }).catch((err: unknown) => {
+        if (err instanceof Error && err.message.includes('404')) { stopped = true; return; }
+        if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Progress poll failed:', err);
+      });
     };
     fetchProgress();
     const interval = setInterval(fetchProgress, 5000);
@@ -345,12 +345,12 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     let stopped = false;
     const fetchDecisions = () => {
       if (stopped) return;
-      fetch(`/api/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((r) => {
-        if (r.status === 404) { stopped = true; return null; }
-        return r.json();
-      }).then((data) => {
+      apiFetch(`/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((data) => {
         if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
-      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Decisions poll failed:', err); });
+      }).catch((err: unknown) => {
+        if (err instanceof Error && err.message.includes('404')) { stopped = true; return; }
+        if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Decisions poll failed:', err);
+      });
     };
     fetchDecisions();
     const interval = setInterval(fetchDecisions, 5000);
@@ -361,10 +361,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
   useEffect(() => {
     if (!isActiveAgent || !selectedLeadId) return;
     const controller = new AbortController();
-    fetch(`/api/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((r) => {
-      if (r.status === 404) return null;
-      return r.json();
-    }).then((data) => {
+    apiFetch(`/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((data) => {
       if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
     }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Groups fetch failed:', err); });
     return () => controller.abort();
@@ -377,10 +374,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     let stopped = false;
     const fetchDag = () => {
       if (stopped) return;
-      fetch(`/api/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((r) => {
-        if (r.status === 404) { stopped = true; return null; }
-        return r.json();
-      }).then((data: DagStatus | null) => {
+      apiFetch<DagStatus>(`/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((data) => {
         if (!controller.signal.aborted && data && data.tasks) {
           const store = useLeadStore.getState();
           store.setDagStatus(selectedLeadId, data);
@@ -389,7 +383,10 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
             store.setDagStatus(historicalProjectId, data);
           }
         }
-      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] DAG poll failed:', err); });
+      }).catch((err: unknown) => {
+        if (err instanceof Error && err.message.includes('404')) { stopped = true; return; }
+        if (!(err instanceof DOMException)) console.warn('[LeadDashboard] DAG poll failed:', err);
+      });
     };
     fetchDag();
     const interval = setInterval(fetchDag, 10000);
@@ -408,7 +405,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
 
   const handleTabOrderChange = useCallback((newOrder: string[]) => {
     setTabOrder(newOrder);
-    localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder));
+    try { localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder)); } catch {}
   }, []);
 
   const handleDismissCatchUp = useCallback(() => setCatchUpSummary(null), []);
@@ -424,7 +421,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
       } else {
         next.add(tabId);
       }
-      localStorage.setItem('flightdeck-hidden-tabs', JSON.stringify([...next]));
+      try { localStorage.setItem('flightdeck-hidden-tabs', JSON.stringify([...next])); } catch {}
       // If hiding the active tab, switch to first visible tab
       if (next.has(tabId)) {
         setSidebarTab((current) => {
