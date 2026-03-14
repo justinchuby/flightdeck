@@ -32,12 +32,16 @@ jobs:
 
       - name: CLI smoke test
         run: |
-          node bin/flightdeck.mjs --version
-          node -e "
-            import('./packages/server/dist/utils/logger.js')
-              .then(() => console.log('✓ Server imports resolve'))
-              .catch(e => { console.error('✗', e.message); process.exit(1); })
-          "
+          node bin/flightdeck.mjs --no-browser &
+          SERVER_PID=$!
+          sleep 5
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo 'ERROR: Server process died — likely a missing dependency'
+            exit 1
+          fi
+          kill $SERVER_PID 2>/dev/null
+          wait $SERVER_PID 2>/dev/null || true
+          echo 'Smoke test passed — server started successfully'
 
       - name: Run tests
         run: npm test
