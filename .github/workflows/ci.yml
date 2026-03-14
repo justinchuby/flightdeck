@@ -47,6 +47,9 @@ jobs:
           done
           exit $DRIFT
 
+      - name: Lint
+        run: npm run lint
+
       - name: Unit tests with coverage
         run: npm run test:coverage --workspace=packages/server
 
