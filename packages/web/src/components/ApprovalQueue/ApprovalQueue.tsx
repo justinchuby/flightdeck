@@ -304,7 +304,7 @@ export function ApprovalQueue() {
                   return (
                     <div
                       key={decision.id}
-                      className={`border-l-2 ${urgencyBorder(urgency)} rounded-md border border-th-border/50 bg-th-bg transition-colors ${
+                      className={`cv-auto-lg border-l-2 ${urgencyBorder(urgency)} rounded-md border border-th-border/50 bg-th-bg transition-colors ${
                         isSelected ? 'ring-1 ring-accent/40 bg-accent/5' : ''
                       } ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
                     >

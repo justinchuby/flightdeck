@@ -386,7 +386,9 @@ export function GlobalAgentsPage() {
           </div>
         ) : (
           filtered.map(agent => (
-            <AgentCard key={agent.id} agent={agent} />
+            <div key={agent.id} className="cv-auto-lg">
+              <AgentCard agent={agent} />
+            </div>
           ))
         )}
       </div>

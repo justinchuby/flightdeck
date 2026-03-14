@@ -48,7 +48,7 @@ export function ChatMessages({
 
           if (msg.sender === 'user') {
             return (
-              <div key={i} data-user-prompt={i} className="flex justify-end items-start gap-2 py-1">
+              <div key={i} data-user-prompt={i} className="cv-auto flex justify-end items-start gap-2 py-1">
                 <span className="text-[10px] text-th-text-muted mt-1.5 shrink-0">{ts}</span>
                 <div className="max-w-[80%]">
                   {msg.attachments && msg.attachments.length > 0 && (
@@ -139,7 +139,7 @@ export function ChatMessages({
             );
           }
           return (
-            <div key={i} className="py-0.5" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
+            <div key={i} className="cv-auto py-0.5" {...(hasUserMention(msg.text) ? { 'data-user-prompt': i } : {})}>
               <div className="flex items-start gap-2">
                 <div className="flex-1 font-mono text-sm whitespace-pre-wrap min-w-0 text-th-text-alt">
                   <AgentTextBlock text={mergedText} />
