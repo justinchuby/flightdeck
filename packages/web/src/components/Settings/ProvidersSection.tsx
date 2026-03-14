@@ -185,6 +185,9 @@ function ProviderCard({
                 ? `${authLabel}${provider.version ? ` · ${provider.version}` : ''}`
                 : 'CLI not found on PATH'}
           </div>
+          {provider.id === 'copilot' && (
+            <div className="text-[10px] text-amber-400/80 mt-0.5">Requires Copilot ≥ 1.0.5</div>
+          )}
         </div>
         {/* Enable/disable toggle */}
         <button

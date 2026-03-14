@@ -185,6 +185,9 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                                   </span>
                                 )}
                               </div>
+                              {p.id === 'copilot' && (
+                                <div className="text-[10px] text-amber-400/80">Requires Copilot ≥ 1.0.5</div>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
