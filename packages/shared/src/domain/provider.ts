@@ -118,6 +118,8 @@ export interface ProviderDefinition {
   setupLinks: ProviderLink[];
   /** Whether this provider is in preview (non-GA) */
   isPreview: boolean;
+  /** Human-readable login/auth instructions shown when not authenticated */
+  loginInstructions: string;
 }
 
 // ── Registry ───────────────────────────────────────────────────
@@ -145,6 +147,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     docsUrl: 'https://docs.github.com/en/copilot/github-copilot-in-the-cli',
     setupLinks: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
     isPreview: false,
+    loginInstructions: 'Authenticate using the GitHub Copilot CLI',
   },
 
   gemini: {
@@ -168,6 +171,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     docsUrl: 'https://github.com/google-gemini/gemini-cli',
     setupLinks: [{ label: 'Installation guide', url: 'https://geminicli.com/docs/get-started/installation/' }],
     isPreview: false,
+    loginInstructions: 'Log in with gemini auth in your terminal',
   },
 
   claude: {
@@ -201,6 +205,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
       { label: 'Claude Code CLI', url: 'https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview' },
     ],
     isPreview: false,
+    loginInstructions: 'Log in with claude auth in your terminal',
   },
 
   codex: {
@@ -225,6 +230,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
       { label: 'CLI quickstart', url: 'https://developers.openai.com/codex/quickstart/?setup=cli' },
     ],
     isPreview: false,
+    loginInstructions: 'Log in with codex auth in your terminal',
   },
 
   cursor: {
@@ -245,6 +251,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     docsUrl: 'https://www.cursor.com/',
     setupLinks: [{ label: 'Documentation', url: 'https://docs.cursor.com' }],
     isPreview: true,
+    loginInstructions: 'Log in via the Cursor app',
   },
 
   opencode: {
@@ -265,6 +272,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     docsUrl: 'https://github.com/nicholasgriffintn/opencode',
     setupLinks: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
     isPreview: true,
+    loginInstructions: 'Authentication is managed by OpenCode',
   },
 };
 

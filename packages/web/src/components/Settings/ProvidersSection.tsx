@@ -55,18 +55,7 @@ interface TestResult {
 }
 
 // ── Provider display metadata ───────────────────────────────────────
-// Most metadata comes from PROVIDER_REGISTRY via getProvider() in @flightdeck/shared.
-// Only UI-specific strings that don't belong in the shared registry live here.
-
-/** Login instructions per provider — shown when authenticated === false. */
-const PROVIDER_LOGIN_INSTRUCTIONS: Record<string, string> = {
-  copilot: 'Authenticate using the GitHub Copilot CLI',
-  claude: 'Log in with claude auth in your terminal',
-  gemini: 'Log in with gemini auth in your terminal',
-  cursor: 'Log in via the Cursor app',
-  codex: 'Log in with codex auth in your terminal',
-  opencode: 'Authentication is managed by OpenCode',
-};
+// All metadata comes from PROVIDER_REGISTRY via getProvider() in @flightdeck/shared.
 
 /** Small pill badge for preview providers. */
 function PreviewBadge() {
@@ -139,7 +128,7 @@ function ProviderCard({
   const links = providerDef?.setupLinks ?? [];
   const authLabel = providerDef?.authLabel ?? 'Provider-managed auth';
   const defaultArgs = providerDef?.args ?? [];
-  const loginLabel = PROVIDER_LOGIN_INSTRUCTIONS[provider.id] ?? 'Log in via the provider CLI';
+  const loginLabel = providerDef?.loginInstructions ?? 'Log in via the provider CLI';
   const supportsResume = providerDef?.supportsResume ?? false;
 
   const style: React.CSSProperties = {
