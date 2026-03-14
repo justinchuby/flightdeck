@@ -37,7 +37,7 @@ All providers use a single adapter backend that implements the `AgentAdapter` in
 | **AcpAdapter** | ACP over stdio | Best-effort (`loadSession()`, falls back to `newSession()`) | All providers (Copilot, Claude, Gemini, Cursor, Codex, OpenCode) |
 | **MockAdapter** | In-memory | N/A | Testing only |
 
-See the [adapter-architecture-pattern](/skills) for details.
+See the `adapter-architecture-pattern` skill in `.github/skills/` for details.
 
 ## Tier 1: Orchestration Server
 
