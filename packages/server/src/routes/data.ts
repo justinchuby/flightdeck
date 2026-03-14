@@ -22,6 +22,10 @@ import {
   sessionRetros,
   timers,
   agentPlans,
+  messageQueue,
+  agentRoster,
+  activeDelegations,
+  knowledge,
 } from '../db/schema.js';
 
 // ── Table Cleanup Configuration ──────────────────────────────────────
@@ -73,8 +77,13 @@ const DATA_TABLES: { name: string; table: any; selectiveFilter: SelectiveFilter 
   { name: 'agent_memory', table: agentMemory, selectiveFilter: { by: 'leadId', column: agentMemory.leadId } },
   { name: 'agent_plans', table: agentPlans, selectiveFilter: { by: 'leadId', column: agentPlans.leadId, nullable: true } },
   { name: 'timers', table: timers, selectiveFilter: { by: 'leadId', column: timers.leadId, nullable: true } },
+  { name: 'message_queue', table: messageQueue, selectiveFilter: { by: 'projectId', column: messageQueue.projectId, nullable: true } },
+  // activeDelegations has FK → agentRoster, so delete delegations first
+  { name: 'active_delegations', table: activeDelegations, selectiveFilter: { by: 'allAgentIds', column: activeDelegations.agentId } },
+  { name: 'agent_roster', table: agentRoster, selectiveFilter: { by: 'allAgentIds', column: agentRoster.agentId } },
   { name: 'file_locks', table: fileLocks, selectiveFilter: { by: 'projectId', column: fileLocks.projectId } },
   { name: 'collective_memory', table: collectiveMemory, selectiveFilter: { by: 'projectId', column: collectiveMemory.projectId } },
+  { name: 'knowledge', table: knowledge, selectiveFilter: { by: 'projectId', column: knowledge.projectId } },
   { name: 'activity_log', table: activityLog, selectiveFilter: { by: 'projectId', column: activityLog.projectId } },
   // Parents last
   { name: 'project_sessions', table: projectSessions, selectiveFilter: { by: 'sessionId' } },
