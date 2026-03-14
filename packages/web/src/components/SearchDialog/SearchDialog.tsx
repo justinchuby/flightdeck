@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, MessageSquare, Users, ListChecks, Scale, Activity } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
@@ -95,11 +96,8 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=50`);
-      if (res.ok) {
-        const data: SearchResponse = await res.json();
-        setResults(data.results);
-      }
+      const data: SearchResponse  = await apiFetch(`/search?q=${encodeURIComponent(q)}&limit=50`);
+      setResults(data.results);
     } catch { /* skip */ }
     finally {
       setLoading(false);

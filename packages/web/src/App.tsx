@@ -28,7 +28,6 @@ import { StatusPopover } from './components/StatusPopover/StatusPopover';
 import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
-import { apiFetch } from './hooks/useApi';
 import { ProjectLayout } from './layouts/ProjectLayout';
 import { shortAgentId } from './utils/agentLabel';
 

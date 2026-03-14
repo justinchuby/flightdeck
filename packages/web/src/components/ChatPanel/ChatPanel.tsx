@@ -14,16 +14,9 @@ import { shortAgentId } from '../../utils/agentLabel';
 
 interface Props {
   agentId: string;
-  ws: {
-    subscribe: (id: string) => void;
-    unsubscribe: (id: string) => void;
-    sendInput: (id: string, text: string) => void;
-    resizeAgent: (id: string, cols: number, rows: number) => void;
-    send: (msg: any) => void;
-  };
 }
 
-export function ChatPanel({ agentId, ws: _ws }: Props) {
+export function ChatPanel({ agentId }: Props) {
   const [inputText, setInputText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [broadcast, setBroadcast] = useState(false);

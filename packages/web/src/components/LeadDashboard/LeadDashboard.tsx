@@ -470,12 +470,11 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
         .map((a) => ({ name: a.name, mimeType: a.mimeType, data: a.data }));
     }
     try {
-      const resp = await fetch(`/api/lead/${selectedLeadId}/message`, {
+      await apiFetch(`/lead/${selectedLeadId}/message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (resp.ok) clearAttachments();
+      clearAttachments();
     } catch {
       // Network error — keep attachments so user can retry
     }
@@ -483,8 +482,8 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
 
   const removeQueuedMessage = useCallback(async (queueIndex: number) => {
     if (!selectedLeadId) return;
-    const resp = await fetch(`/api/agents/${selectedLeadId}/queue/${queueIndex}`, { method: 'DELETE' });
-    if (resp.ok) {
+    try {
+      await apiFetch(`/agents/${selectedLeadId}/queue/${queueIndex}`, { method: 'DELETE' });
       const store = useLeadStore.getState();
       const msgs = store.projects[selectedLeadId]?.messages || [];
       let seen = 0;
@@ -493,17 +492,16 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
         return seen++ !== queueIndex;
       });
       store.setMessages(selectedLeadId, updated);
-    }
+    } catch { /* ignore */ }
   }, [selectedLeadId]);
 
   const reorderQueuedMessage = useCallback(async (fromIndex: number, toIndex: number) => {
     if (!selectedLeadId) return;
-    const resp = await fetch(`/api/agents/${selectedLeadId}/queue/reorder`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fromIndex, to: toIndex }),
-    });
-    if (resp.ok) {
+    try {
+      await apiFetch(`/agents/${selectedLeadId}/queue/reorder`, {
+        method: 'POST',
+        body: JSON.stringify({ from: fromIndex, to: toIndex }),
+      });
       const store = useLeadStore.getState();
       const msgs = store.projects[selectedLeadId]?.messages || [];
       const queued = msgs.filter((m: AcpTextChunk) => m.queued);
@@ -513,50 +511,38 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
         queued.splice(toIndex, 0, moved);
         store.setMessages(selectedLeadId, [...nonQueued, ...queued]);
       }
-    }
+    } catch { /* ignore */ }
   }, [selectedLeadId]);
 
   const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
     // Optimistic update — hide buttons immediately
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'confirmed', confirmedAt: new Date().toISOString() });
-    const resp = await fetch(`/api/decisions/${decisionId}/confirm`, {
+    const decision = await apiFetch(`/decisions/${decisionId}/confirm`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
     });
-    if (resp.ok) {
-      const decision = await resp.json();
-      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-    }
+    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
   }, [selectedLeadId]);
 
   const handleRejectDecision = useCallback(async (decisionId: string, reason?: string) => {
     if (!selectedLeadId) return;
     // Optimistic update — hide buttons immediately
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'rejected', confirmedAt: new Date().toISOString() });
-    const resp = await fetch(`/api/decisions/${decisionId}/reject`, {
+    const decision = await apiFetch(`/decisions/${decisionId}/reject`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
     });
-    if (resp.ok) {
-      const decision = await resp.json();
-      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-    }
+    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
   }, [selectedLeadId]);
 
   const handleDismissDecision = useCallback(async (decisionId: string) => {
     if (!selectedLeadId) return;
     useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'dismissed', confirmedAt: new Date().toISOString() });
-    const resp = await fetch(`/api/decisions/${decisionId}/dismiss`, {
+    const decision = await apiFetch(`/decisions/${decisionId}/dismiss`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
     });
-    if (resp.ok) {
-      const decision = await resp.json();
-      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-    }
+    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
   }, [selectedLeadId]);
 
   const handleOpenAgentChat = useCallback((agentId: string) => {
@@ -671,8 +657,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
                     onClick={async (e) => {
                       e.stopPropagation();
                       try {
-                        const res = await fetch(`/api/export/${selectedLeadId}`);
-                        const data = await res.json();
+                        const data = await apiFetch(`/export/${selectedLeadId}`);
                         if (data.error) {
                           alert(`Export failed: ${data.error}`);
                         } else {

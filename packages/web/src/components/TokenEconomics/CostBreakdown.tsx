@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { formatTokens } from '../../utils/format';
@@ -33,8 +34,8 @@ export function CostBreakdown({ projectId }: CostBreakdownProps = {}) {
     const fetchCosts = async () => {
       try {
         const [agentRes, taskRes] = await Promise.all([
-          fetch(`/api/costs/by-agent${params}`),
-          fetch(`/api/costs/by-task${params}`),
+          apiFetch(`/costs/by-agent${params}`),
+          apiFetch(`/costs/by-task${params}`),
         ]);
         if (cancelled) return;
         const agentData = await agentRes.json();

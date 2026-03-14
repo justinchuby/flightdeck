@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useAppStore } from '../../stores/appStore';
@@ -169,7 +170,7 @@ export function AcpOutput({ agentId }: Props) {
   // Fetch message history when agent panel opens and no messages are loaded yet
   useEffect(() => {
     if (!agentId || messages.length > 0) return;
-    fetch(`/api/agents/${agentId}/messages?limit=200`)
+    apiFetch(`/agents/${agentId}/messages?limit=200`)
       .then((r) => r.json())
       .then((data: any) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
@@ -287,24 +288,23 @@ export function AcpOutput({ agentId }: Props) {
   }, [messages, agentId]);
 
   const removeQueuedMessage = useCallback(async (queueIndex: number) => {
-    const resp = await fetch(`/api/agents/${agentId}/queue/${queueIndex}`, { method: 'DELETE' });
-    if (resp.ok) {
+    try {
+      await apiFetch(`/agents/${agentId}/queue/${queueIndex}`, { method: 'DELETE' });
       let seen = 0;
       const updated = messages.filter((m) => {
         if (!m.queued) return true;
         return seen++ !== queueIndex;
       });
       useAppStore.getState().updateAgent(agentId, { messages: updated });
-    }
+    } catch { /* ignore */ }
   }, [agentId, messages]);
 
   const reorderQueuedMessage = useCallback(async (fromIndex: number, toIndex: number) => {
-    const resp = await fetch(`/api/agents/${agentId}/queue/reorder`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fromIndex, to: toIndex }),
-    });
-    if (resp.ok) {
+    try {
+      await apiFetch(`/agents/${agentId}/queue/reorder`, {
+        method: 'POST',
+        body: JSON.stringify({ from: fromIndex, to: toIndex }),
+      });
       const queued = messages.filter((m) => m.queued);
       const nonQueued = messages.filter((m) => !m.queued);
       if (fromIndex < queued.length && toIndex < queued.length) {
@@ -312,7 +312,7 @@ export function AcpOutput({ agentId }: Props) {
         queued.splice(toIndex, 0, moved);
         useAppStore.getState().updateAgent(agentId, { messages: [...nonQueued, ...queued] });
       }
-    }
+    } catch { /* ignore */ }
   }, [agentId, messages]);
 
   const queuedMessages = useMemo(() => messages.filter((m) => m.queued), [messages]);

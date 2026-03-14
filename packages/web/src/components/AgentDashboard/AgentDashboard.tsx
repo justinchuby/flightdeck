@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
@@ -53,8 +54,7 @@ export function AgentDashboard({ api, ws }: Props) {
   // Fetch coordination status (locks + activity)
   const fetchCoordination = useCallback(async () => {
     try {
-      const res = await fetch('/api/coordination/status');
-      const data: CoordinationStatus = await res.json();
+      const data: CoordinationStatus  = await apiFetch('/coordination/status');
       setLocks(data.locks);
       setActivity(data.recentActivity);
     } catch {
