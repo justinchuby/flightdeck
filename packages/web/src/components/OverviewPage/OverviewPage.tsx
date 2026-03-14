@@ -18,13 +18,14 @@ import { apiFetch } from '../../hooks/useApi';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectId } from '../../contexts/ProjectContext';
 import { formatDateTime } from '../../utils/format';
-import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { POLL_INTERVAL_MS } from '../../constants/timing';
 import { SessionHistory, NewSessionDialog } from '../SessionHistory';
 import { detectAlerts, type AlertSeverity } from '../MissionControl/AlertsPanel';
 import {
   DecisionFeedItem,
   DecisionDetailModal,
+  ActivityFeedItem,
+  ActivityDetailModal,
 } from '../Shared';
 import type { ActivityEntry } from '../Shared';
 import { SectionErrorBoundary } from '../SectionErrorBoundary';
@@ -56,13 +57,6 @@ const SEVERITY_BG: Record<AlertSeverity, string> = {
 };
 
 const EMPTY_DECISIONS: Decision[] = [];
-interface ProgressItem {
-  id: string;
-  icon: string;
-  text: string;
-  detail: string;
-  timestamp: number;
-}
 
 // ── Props ──────────────────────────────────────────────────────────
 
@@ -173,6 +167,7 @@ export function OverviewPage(_props: Props) {
   // ── Decisions feed ────────────────────────────────────────────
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<{ entry: ActivityEntry; projectName: string } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -229,17 +224,6 @@ export function OverviewPage(_props: Props) {
     const interval = setInterval(poll, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [effectiveId]);
-
-  // Progress feed — only lead-emitted PROGRESS activity entries
-  const progressItems = useMemo((): ProgressItem[] => {
-    return activity.map(entry => ({
-      id: `activity-${entry.id}`,
-      icon: '📊',
-      text: entry.summary,
-      detail: `${entry.agentRole} · ${formatRelativeTime(entry.timestamp)}`,
-      timestamp: new Date(entry.timestamp).getTime(),
-    })).sort((a, b) => b.timestamp - a.timestamp);
-  }, [activity]);
 
   // ── Quick status bar data ─────────────────────────────────────
   const tasksDone = dagStatus?.summary?.done ?? 0;
@@ -461,21 +445,18 @@ export function OverviewPage(_props: Props) {
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider px-4 py-2 border-b border-th-border">
             Recent Progress
           </h3>
-          {progressItems.length === 0 ? (
+          {activity.length === 0 ? (
             <p className="text-th-text-muted text-sm px-4 py-6 text-center">No progress events yet</p>
           ) : (
-            <div className="max-h-96 overflow-y-auto">
-            <div className="divide-y divide-th-border/30">
-              {progressItems.map(item => (
-                <div key={item.id} className="flex items-start gap-2.5 px-3 py-2">
-                  <span className="text-sm shrink-0 mt-0.5">{item.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-th-text-alt truncate block">{item.text}</span>
-                    <div className="text-[10px] text-th-text-muted mt-0.5">{item.detail}</div>
-                  </div>
-                </div>
+            <div className="max-h-96 overflow-y-auto divide-y divide-th-border/30">
+              {activity.map(entry => (
+                <ActivityFeedItem
+                  key={entry.id}
+                  entry={entry}
+                  projectName={projectName}
+                  onClick={() => setSelectedActivity({ entry, projectName })}
+                />
               ))}
-            </div>
             </div>
           )}
         </section>
@@ -508,6 +489,15 @@ export function OverviewPage(_props: Props) {
           decision={selectedDecision}
           projectName={projectName}
           onClose={() => setSelectedDecision(null)}
+        />
+      )}
+
+      {/* Activity Detail Modal */}
+      {selectedActivity && (
+        <ActivityDetailModal
+          entry={selectedActivity.entry}
+          projectName={selectedActivity.projectName}
+          onClose={() => setSelectedActivity(null)}
         />
       )}
 
