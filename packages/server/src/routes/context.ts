@@ -70,6 +70,7 @@ export interface AppContext {
   integrationRouter?: import('../integrations/IntegrationRouter.js').IntegrationRouter;
   providerManager?: import('../providers/ProviderManager.js').ProviderManager;
   configStore?: import('../config/ConfigStore.js').ConfigStore;
+  sessionResumeManager?: import('../agents/SessionResumeManager.js').SessionResumeManager;
 }
 
 // Rate limiters for expensive operations

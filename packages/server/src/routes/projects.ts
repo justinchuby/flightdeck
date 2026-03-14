@@ -13,7 +13,7 @@ import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMemb
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
 import { parseIntBounded } from '../utils/validation.js';
-import { resumeLeadSession, ResumeError } from './resumeHelper.js';
+import { ResumeError } from '../agents/SessionResumeManager.js';
 
 const PROJECT_TITLE_MAX = 100;
 
@@ -78,7 +78,7 @@ function validateCwd(cwd: unknown): string | null {
 }
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro: _sessionRetro, costTracker } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro: _sessionRetro, costTracker, sessionResumeManager } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -745,10 +745,13 @@ export function projectsRoutes(ctx: AppContext): Router {
       const isResume = !!lastSession;
 
       if (lastSession) {
-        // Resume existing session via shared helper (atomic claim, spawn, reactivate)
-        const result = resumeLeadSession(
+        // Resume existing session via SessionResumeManager (atomic claim, spawn, reactivate)
+        if (!sessionResumeManager || !projectRegistry) {
+          return res.status(500).json({ error: 'Resume not available — missing session manager' });
+        }
+        const result = sessionResumeManager.resumeLeadSession(
           { session: lastSession, project, task: requestTask, model },
-          { agentManager, roleRegistry, projectRegistry },
+          projectRegistry,
         );
         agent = result.agent;
         task = result.task;

@@ -1,15 +1,10 @@
 /**
- * SessionResumeManager — orchestrates agent session resume on server startup.
+ * SessionResumeManager — orchestrates agent session lifecycle persistence
+ * and provides the core resume-a-lead-session logic for the HTTP endpoint.
  *
  * Subscribes to AgentManager lifecycle events to persist agent state into the
- * agentRoster table. On startup, reads the roster and attempts to resume all
- * non-terminated agents via their stored SDK session IDs.
- *
- * Resume flow:
- *   1. Read agentRoster for agents with status != 'terminated' and a sessionId
- *   2. For each, call agentManager.spawn() with resumeSessionId
- *   3. AcpAdapter calls connection.loadSession() (fallback: newSession)
- *   4. Agent resumes with full conversation context from disk
+ * agentRoster table. Exposes `resumeLeadSession()` for the POST /projects/:id/resume
+ * handler to call.
  *
  * Lifecycle persistence (write-on-mutation):
  *   - agent:spawned   → upsert into agentRoster
@@ -21,26 +16,36 @@ import type { AgentManager } from './AgentManager.js';
 import type { AgentRosterRepository, RosterAgentStatus as RosterStatus } from '../db/AgentRosterRepository.js';
 import type { ActiveDelegationRepository, DelegationRecord } from '../db/ActiveDelegationRepository.js';
 import type { RoleRegistry } from './RoleRegistry.js';
-import type { AgentJSON } from './Agent.js';
+import type { AgentJSON, Agent } from './Agent.js';
 import type { ServerConfig } from '../config.js';
-import { getPreset } from '../adapters/presets.js';
+import type { ProjectRegistry } from '../projects/ProjectRegistry.js';
+import type { ProjectSession } from '@flightdeck/shared';
 import { logger } from '../utils/logger.js';
 
 // ── Types ───────────────────────────────────────────────────────────
 
-export interface ResumeResult {
-  agentId: string;
-  success: boolean;
-  error?: string;
-  newSessionId?: string;
+export interface ResumeSessionOptions {
+  /** The session row to resume. */
+  session: ProjectSession;
+  /** The project owning this session. */
+  project: { id: string; name: string; cwd?: string | null };
+  /** Override task (falls back to session's stored task). */
+  task?: string;
+  /** Model override for the lead agent. */
+  model?: string;
 }
 
-export interface ResumeAllResult {
-  total: number;
-  succeeded: number;
-  failed: number;
-  skipped: number;
-  results: ResumeResult[];
+export interface ResumeSessionResult {
+  agent: Agent;
+  task: string | undefined;
+}
+
+/** Typed error with HTTP status code for resume failures. */
+export class ResumeError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+    this.name = 'ResumeError';
+  }
 }
 
 // ── Status mapping ──────────────────────────────────────────────────
@@ -61,26 +66,15 @@ function toRosterStatus(agentStatus: string): RosterStatus | null {
 
 export class SessionResumeManager {
   private disposed = false;
-  private _resumeInProgress = false;
-  private _resumeQueue: Array<{
-    resolve: (result: ResumeAllResult) => void;
-    reject: (err: Error) => void;
-  }> = [];
 
   constructor(
     private agentManager: AgentManager,
     private agentRosterRepo: AgentRosterRepository,
     private activeDelegationRepo: ActiveDelegationRepository,
     private roleRegistry: RoleRegistry,
-    private config: ServerConfig,
+    private _config: ServerConfig,
   ) {
     this.bindLifecycleEvents();
-  }
-
-  /** Check if the current CLI provider supports SDK session resume. */
-  get providerSupportsResume(): boolean {
-    const preset = getPreset(this.config.provider || 'copilot');
-    return preset?.supportsResume ?? false;
   }
 
   // ── Lifecycle event handlers (persist on mutation) ────────────────
@@ -153,150 +147,71 @@ export class SessionResumeManager {
     }
   };
 
-  // ── Resume operations ─────────────────────────────────────────────
+  // ── Lead session resume ────────────────────────────────────────────
 
-  /** Resume all persisted agents that have valid session IDs. Serialized — concurrent calls wait. */
-  async resumeAll(): Promise<ResumeAllResult> {
-    if (this._resumeInProgress) {
-      logger.info({ module: 'resume', msg: 'resumeAll already in progress — queueing' });
-      return new Promise<ResumeAllResult>((resolve, reject) => {
-        this._resumeQueue.push({ resolve, reject });
-      });
+  /**
+   * Resume a lead agent session.
+   *
+   * - Validates the session has a Copilot sessionId
+   * - Atomically claims the session to prevent double-resume
+   * - Spawns the lead agent with the same sessionId + leadId
+   * - Reactivates the session row in the DB
+   * - Enforces silence invariant: NO messages sent to the agent
+   *
+   * Throws ResumeError if session cannot be resumed.
+   */
+  resumeLeadSession(
+    opts: ResumeSessionOptions,
+    projectRegistry: ProjectRegistry,
+  ): ResumeSessionResult {
+    const { session, project, model } = opts;
+
+    if (!session.sessionId) {
+      throw new ResumeError('Session has no Copilot session ID — cannot resume', 400);
     }
 
-    this._resumeInProgress = true;
-    try {
-      const result = await this._doResumeAll();
-      return result;
-    } finally {
-      this._resumeInProgress = false;
-      this._drainQueue();
-    }
-  }
-
-  /** Drain queued resumeAll() callers by running one more pass. */
-  private _drainQueue(): void {
-    if (this._resumeQueue.length === 0) return;
-    const waiters = this._resumeQueue.splice(0);
-    // Run a fresh pass for queued callers
-    this.resumeAll().then(
-      (result) => waiters.forEach((w) => w.resolve(result)),
-      (err) => waiters.forEach((w) => w.reject(err)),
-    );
-  }
-
-  /** Internal implementation of resumeAll — no mutex guard. */
-  private async _doResumeAll(): Promise<ResumeAllResult> {
-    const candidates = this.agentRosterRepo.getAllAgents()
-      .filter((a) => a.status !== 'terminated');
-
-    if (candidates.length === 0) {
-      logger.info({ module: 'resume', msg: 'No agents to resume' });
-      return { total: 0, succeeded: 0, failed: 0, skipped: 0, results: [] };
+    // Atomic claim prevents race condition: two concurrent resumes both passing status check
+    if (!projectRegistry.claimSessionForResume(session.id)) {
+      throw new ResumeError('Session is still active or already being resumed', 409);
     }
 
-    // Check if the current CLI provider supports session resume
-    if (!this.providerSupportsResume) {
-      const provider = this.config.provider || 'copilot';
-      logger.info({
-        module: 'resume',
-        msg: `Provider '${provider}' does not support session resume — starting ${candidates.length} agent(s) fresh`,
-      });
-
-      // Start agents fresh (without resumeSessionId) so they get role + task context
-      const results = await Promise.allSettled(
-        candidates.map((agent) => this.startFresh(agent.agentId)),
-      );
-
-      const mapped = this.mapResults(results, candidates);
-      return this.summarizeResults(candidates.length, mapped);
+    // Use stored role from session, falling back to 'lead'
+    const roleId = session.role ?? 'lead';
+    const role = this.roleRegistry.get(roleId);
+    if (!role) {
+      throw new ResumeError(`Role "${roleId}" not found`, 500);
     }
 
-    logger.info({ module: 'resume', msg: `Attempting to resume ${candidates.length} agent(s)` });
+    const task = opts.task || session.task || undefined;
 
-    const results = await Promise.allSettled(
-      candidates.map((agent) => this.resumeAgent(agent.agentId)),
+    // Log diagnostic when resuming a crashed session
+    if (session.status === 'crashed') {
+      logger.warn({ module: 'resume', msg: 'Attempting resume of crashed session — SDK may or may not recover it', sessionId: session.sessionId, projectId: project.id });
+    }
+
+    const agent = this.agentManager.spawn(
+      role,
+      task,
+      undefined,
+      model,
+      project.cwd ?? undefined,
+      session.sessionId,
+      session.leadId,
+      { projectName: project.name, projectId: project.id },
     );
 
-    const mapped = this.mapResults(results, candidates);
-    return this.summarizeResults(candidates.length, mapped);
-  }
-
-  /** Resume a single agent by its roster ID. */
-  async resumeAgent(agentId: string): Promise<ResumeResult> {
-    const record = this.agentRosterRepo.getAgent(agentId);
-    if (!record) {
-      return { agentId, success: false, error: 'Agent not found in roster' };
+    // Verify invariant: spawn must reuse the same agent ID on resume
+    if (agent.id !== session.leadId) {
+      logger.warn({ module: 'resume', msg: 'Agent ID mismatch after resume spawn — invariant violation', expected: session.leadId, actual: agent.id, sessionId: session.id });
     }
 
-    if (!record.sessionId) {
-      return { agentId, success: false, error: 'No sessionId for resume' };
-    }
+    projectRegistry.reactivateSession(session.id, task, roleId);
 
-    const role = this.roleRegistry.get(record.role);
-    if (!role) {
-      return { agentId, success: false, error: `Role '${record.role}' not found in registry` };
-    }
+    // Silence invariant: NO messages sent. Agent picks up context from restored ACP session.
 
-    const metadata = record.metadata as Record<string, string> | undefined;
+    logger.info({ module: 'resume', msg: 'Session resumed', projectId: project.id, projectName: project.name, agentId: agent.id, sessionId: session.sessionId });
 
-    try {
-      const agent = this.agentManager.spawn(
-        role,
-        metadata?.task,
-        metadata?.parentId,
-        record.model !== 'default' ? record.model : undefined,
-        metadata?.cwd,
-        record.sessionId,    // resumeSessionId — triggers resume flow
-        agentId,             // reuse same agent ID
-        { projectId: record.projectId, provider: record.provider },
-      );
-
-      return {
-        agentId: agent.id,
-        success: true,
-        newSessionId: agent.sessionId ?? undefined,
-      };
-    } catch (err) {
-      // Mark agent as terminated so it's not retried on next startup
-      this.agentRosterRepo.updateStatus(agentId, 'terminated');
-      logger.warn({ module: 'resume', msg: 'Agent resume failed', agentId, err: String(err) });
-      return { agentId, success: false, error: String(err) };
-    }
-  }
-
-  /** Start an agent fresh (no session resume) — used when provider doesn't support resume. */
-  async startFresh(agentId: string): Promise<ResumeResult> {
-    const record = this.agentRosterRepo.getAgent(agentId);
-    if (!record) {
-      return { agentId, success: false, error: 'Agent not found in roster' };
-    }
-
-    const role = this.roleRegistry.get(record.role);
-    if (!role) {
-      return { agentId, success: false, error: `Role '${record.role}' not found in registry` };
-    }
-
-    const metadata = record.metadata as Record<string, string> | undefined;
-
-    try {
-      const agent = this.agentManager.spawn(
-        role,
-        metadata?.task,
-        metadata?.parentId,
-        record.model !== 'default' ? record.model : undefined,
-        metadata?.cwd,
-        undefined,           // no resumeSessionId — fresh start
-        agentId,
-        { projectId: record.projectId, provider: record.provider },
-      );
-
-      return { agentId: agent.id, success: true };
-    } catch (err) {
-      this.agentRosterRepo.updateStatus(agentId, 'terminated');
-      logger.warn({ module: 'resume', msg: 'Agent fresh start failed', agentId, err: String(err) });
-      return { agentId, success: false, error: String(err) };
-    }
+    return { agent, task };
   }
 
   // ── Recovery queries ──────────────────────────────────────────────
@@ -312,30 +227,6 @@ export class SessionResumeManager {
   }
 
   // ── Cleanup ───────────────────────────────────────────────────────
-
-  private mapResults(
-    results: PromiseSettledResult<ResumeResult>[],
-    candidates: { agentId: string }[],
-  ): ResumeResult[] {
-    return results.map((r, i) =>
-      r.status === 'fulfilled'
-        ? r.value
-        : { agentId: candidates[i].agentId, success: false, error: String(r.reason) },
-    );
-  }
-
-  private summarizeResults(total: number, mapped: ResumeResult[]): ResumeAllResult {
-    const succeeded = mapped.filter((r) => r.success).length;
-    const failed = mapped.filter((r) => !r.success && !r.error?.includes('No sessionId')).length;
-    const skipped = mapped.filter((r) => r.error?.includes('No sessionId')).length;
-
-    logger.info({
-      module: 'resume',
-      msg: `Resume complete: ${succeeded} succeeded, ${failed} failed, ${skipped} skipped (no sessionId)`,
-    });
-
-    return { total, succeeded, failed, skipped, results: mapped };
-  }
 
   /** Remove all lifecycle event listeners. */
   dispose(): void {

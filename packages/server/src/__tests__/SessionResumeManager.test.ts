@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'events';
 import { Database } from '../db/database.js';
 import { AgentRosterRepository } from '../db/AgentRosterRepository.js';
 import { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
-import { SessionResumeManager } from '../agents/SessionResumeManager.js';
+import { SessionResumeManager, ResumeError } from '../agents/SessionResumeManager.js';
 import type { AgentJSON } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
+import type { ProjectSession } from '@flightdeck/shared';
 
 // ── Test helpers ────────────────────────────────────────────────────
 
@@ -210,142 +211,120 @@ describe('SessionResumeManager', () => {
     });
   });
 
-  // ── Resume operations ───────────────────────────────────────────
+  // ── resumeLeadSession ──────────────────────────────────────────
 
-  describe('resumeAgent', () => {
-    it('resumes agent with stored sessionId', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-abc', 'proj-1', {
-        task: 'Build API',
-        parentId: 'lead-1',
-        cwd: '/code',
-      });
-      mockAgentManager.spawnResult = { id: 'agent-1', sessionId: 'session-new' };
+  describe('resumeLeadSession', () => {
+    const mockProjectRegistry = {
+      claimSessionForResume: vi.fn().mockReturnValue(true),
+      reactivateSession: vi.fn(),
+    };
 
-      const result = await manager.resumeAgent('agent-1');
+    function makeSession(overrides: Partial<ProjectSession> = {}): ProjectSession {
+      return {
+        id: 1,
+        projectId: 'proj-1',
+        leadId: 'agent-1',
+        sessionId: 'copilot-session-abc',
+        task: 'Build the API',
+        status: 'stopped',
+        role: 'lead',
+        startedAt: new Date().toISOString(),
+        ...overrides,
+      } as ProjectSession;
+    }
 
-      expect(result.success).toBe(true);
-      expect(result.agentId).toBe('agent-1');
+    const project = { id: 'proj-1', name: 'Test Project', cwd: '/code' };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockProjectRegistry.claimSessionForResume.mockReturnValue(true);
+    });
+
+    it('resumes a session and returns agent + task', () => {
+      mockAgentManager.spawnResult = { id: 'agent-1', sessionId: 'copilot-session-abc' };
+
+      const result = manager.resumeLeadSession(
+        { session: makeSession(), project },
+        mockProjectRegistry as any,
+      );
+
+      expect(result.agent).toBeDefined();
+      expect(result.task).toBe('Build the API');
       expect(mockAgentManager.spawnCalls.length).toBe(1);
-      expect(mockAgentManager.spawnCalls[0].role).toEqual(testRole);
-      expect(mockAgentManager.spawnCalls[0].task).toBe('Build API');
-      expect(mockAgentManager.spawnCalls[0].resumeSessionId).toBe('session-abc');
+      expect(mockAgentManager.spawnCalls[0].resumeSessionId).toBe('copilot-session-abc');
       expect(mockAgentManager.spawnCalls[0].id).toBe('agent-1');
+      expect(mockProjectRegistry.reactivateSession).toHaveBeenCalledWith(1, 'Build the API', 'lead');
     });
 
-    it('returns error for non-existent agent', async () => {
-      const result = await manager.resumeAgent('nonexistent');
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('not found in roster');
-    });
+    it('throws ResumeError when session has no sessionId', () => {
+      expect(() =>
+        manager.resumeLeadSession(
+          { session: makeSession({ sessionId: undefined }), project },
+          mockProjectRegistry as any,
+        ),
+      ).toThrow(ResumeError);
 
-    it('returns error when no sessionId', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle');
-
-      const result = await manager.resumeAgent('agent-1');
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('No sessionId');
-    });
-
-    it('returns error when role not found', async () => {
-      rosterRepo.upsertAgent('agent-1', 'unknown-role', 'claude-sonnet', 'idle', 'session-1');
-
-      const result = await manager.resumeAgent('agent-1');
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("Role 'unknown-role' not found");
-    });
-
-    it('marks agent terminated on spawn failure', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1');
-      mockAgentManager.shouldThrow = true;
-
-      const result = await manager.resumeAgent('agent-1');
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Spawn failed');
-      expect(rosterRepo.getAgent('agent-1')!.status).toBe('terminated');
-    });
-
-    it('does not pass "default" model to spawn', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'default', 'idle', 'session-1');
-
-      await manager.resumeAgent('agent-1');
-
-      const call = mockAgentManager.spawnCalls[0];
-      // model should be undefined (so server uses default), not 'default'
-      expect(call).toBeDefined();
-    });
-  });
-
-  describe('resumeAll', () => {
-    it('resumes all non-terminated agents with sessionIds', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1', 'proj-1', { task: 'Task A' });
-      rosterRepo.upsertAgent('agent-2', 'lead', 'gpt-4', 'running', 'session-2', 'proj-1', { task: 'Task B' });
-      rosterRepo.upsertAgent('agent-3', 'developer', 'claude-haiku', 'terminated');
-
-      mockAgentManager.spawnResult = { id: 'agent-x', sessionId: 'new-session' };
-
-      const result = await manager.resumeAll();
-
-      expect(result.total).toBe(2); // agent-3 excluded (terminated)
-      expect(result.succeeded).toBe(2);
-      expect(result.failed).toBe(0);
-      expect(mockAgentManager.spawnCalls.length).toBe(2);
-    });
-
-    it('returns empty result when no agents to resume', async () => {
-      const result = await manager.resumeAll();
-      expect(result.total).toBe(0);
-      expect(result.succeeded).toBe(0);
-      expect(result.results).toEqual([]);
-    });
-
-    it('skips agents without sessionId', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle'); // no sessionId
-      rosterRepo.upsertAgent('agent-2', 'developer', 'claude-sonnet', 'idle', 'session-2');
-
-      const result = await manager.resumeAll();
-
-      expect(result.total).toBe(2);
-      expect(result.succeeded).toBe(1);
-      expect(result.skipped).toBe(1);
-      expect(mockAgentManager.spawnCalls.length).toBe(1);
-    });
-
-    it('handles partial failures gracefully', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1');
-      rosterRepo.upsertAgent('agent-2', 'unknown-role', 'claude-sonnet', 'idle', 'session-2');
-      rosterRepo.upsertAgent('agent-3', 'developer', 'claude-sonnet', 'idle', 'session-3');
-
-      const result = await manager.resumeAll();
-
-      expect(result.total).toBe(3);
-      expect(result.succeeded).toBe(2);
-      expect(result.failed).toBe(1); // agent-2 has unknown role
-
-      // Failed agent should be marked terminated
-      expect(rosterRepo.getAgent('agent-2')!.status).toBe('idle'); // role not found doesn't terminate
-    });
-
-    it('resumes agents in parallel', async () => {
-      const spawnTimes: number[] = [];
-      const originalSpawn = mockAgentManager.spawn.bind(mockAgentManager);
-      const wrappedSpawn = (...args: Parameters<typeof originalSpawn>) => {
-        spawnTimes.push(Date.now());
-        return originalSpawn(...args);
-      };
-      mockAgentManager.spawn = wrappedSpawn as typeof mockAgentManager.spawn;
-
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1');
-      rosterRepo.upsertAgent('agent-2', 'developer', 'claude-sonnet', 'idle', 'session-2');
-      rosterRepo.upsertAgent('agent-3', 'developer', 'claude-sonnet', 'idle', 'session-3');
-
-      await manager.resumeAll();
-
-      expect(mockAgentManager.spawnCalls.length).toBe(3);
-      // All spawns should happen nearly simultaneously (within 50ms)
-      if (spawnTimes.length >= 2) {
-        const timeDiff = spawnTimes[spawnTimes.length - 1] - spawnTimes[0];
-        expect(timeDiff).toBeLessThan(50);
+      try {
+        manager.resumeLeadSession(
+          { session: makeSession({ sessionId: undefined }), project },
+          mockProjectRegistry as any,
+        );
+      } catch (err) {
+        expect((err as ResumeError).statusCode).toBe(400);
       }
+    });
+
+    it('throws ResumeError when session already claimed', () => {
+      mockProjectRegistry.claimSessionForResume.mockReturnValue(false);
+
+      expect(() =>
+        manager.resumeLeadSession(
+          { session: makeSession(), project },
+          mockProjectRegistry as any,
+        ),
+      ).toThrow(ResumeError);
+
+      try {
+        mockProjectRegistry.claimSessionForResume.mockReturnValue(false);
+        manager.resumeLeadSession(
+          { session: makeSession(), project },
+          mockProjectRegistry as any,
+        );
+      } catch (err) {
+        expect((err as ResumeError).statusCode).toBe(409);
+      }
+    });
+
+    it('throws ResumeError when role not found', () => {
+      expect(() =>
+        manager.resumeLeadSession(
+          { session: makeSession({ role: 'nonexistent-role' }), project },
+          mockProjectRegistry as any,
+        ),
+      ).toThrow(ResumeError);
+    });
+
+    it('uses task override when provided', () => {
+      mockAgentManager.spawnResult = { id: 'agent-1', sessionId: 'sess' };
+
+      const result = manager.resumeLeadSession(
+        { session: makeSession(), project, task: 'Override task' },
+        mockProjectRegistry as any,
+      );
+
+      expect(result.task).toBe('Override task');
+    });
+
+    it('falls back to lead role when session has no role', () => {
+      mockAgentManager.spawnResult = { id: 'agent-1', sessionId: 'sess' };
+
+      const result = manager.resumeLeadSession(
+        { session: makeSession({ role: undefined }), project },
+        mockProjectRegistry as any,
+      );
+
+      expect(result.agent).toBeDefined();
+      expect(mockAgentManager.spawnCalls[0].role.id).toBe('lead');
     });
   });
 
@@ -379,47 +358,6 @@ describe('SessionResumeManager', () => {
 
       const roster = manager.getPersistedRoster();
       expect(roster.length).toBe(2);
-    });
-  });
-
-  // ── Provider resume capability ─────────────────────────────────
-
-  describe('provider resume capability', () => {
-    it('reports supportsResume=true for copilot', () => {
-      expect(manager.providerSupportsResume).toBe(true);
-    });
-
-    it('reports supportsResume=true for gemini', () => {
-      const geminiManager = new SessionResumeManager(
-        mockAgentManager as any, rosterRepo, delegationRepo,
-        mockRoleRegistry as any, { ...testConfig, provider: 'gemini' } as ServerConfig,
-      );
-      expect(geminiManager.providerSupportsResume).toBe(true);
-      geminiManager.dispose();
-    });
-
-    it('starts agents fresh when provider does not support resume', async () => {
-      const noResumeManager = new SessionResumeManager(
-        mockAgentManager as any, rosterRepo, delegationRepo,
-        mockRoleRegistry as any, { ...testConfig, provider: 'codex' } as ServerConfig,
-      );
-
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-1', undefined, { task: 'Build API' });
-      mockAgentManager.spawnResult = { id: 'agent-1', sessionId: null };
-
-      const result = await noResumeManager.resumeAll();
-      expect(result.succeeded).toBe(1);
-      // Should NOT pass resumeSessionId
-      expect(mockAgentManager.spawnCalls[0].resumeSessionId).toBeUndefined();
-      noResumeManager.dispose();
-    });
-
-    it('passes resumeSessionId when provider supports resume', async () => {
-      rosterRepo.upsertAgent('agent-1', 'developer', 'claude-sonnet', 'idle', 'session-abc');
-
-      await manager.resumeAll();
-
-      expect(mockAgentManager.spawnCalls[0].resumeSessionId).toBe('session-abc');
     });
   });
 
@@ -463,149 +401,6 @@ describe('SessionResumeManager', () => {
       // 5. Terminated
       mockAgentManager.emit('agent:terminated', 'agent-1');
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('terminated');
-    });
-
-    it('persists agent, then resumes on simulated restart', async () => {
-      // Simulate initial session
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({
-        id: 'agent-1',
-        status: 'running',
-        model: 'claude-sonnet',
-        projectId: 'proj-1',
-        task: 'Build the API',
-      }));
-      mockAgentManager.emit('agent:session_ready', { agentId: 'agent-1', sessionId: 'sess-original' });
-      mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'idle' });
-
-      // Verify persisted state
-      const persisted = rosterRepo.getAgent('agent-1');
-      expect(persisted!.sessionId).toBe('sess-original');
-      expect(persisted!.status).toBe('idle');
-
-      // Simulate server restart (new SessionResumeManager, same DB)
-      manager.dispose();
-      const newMockManager = new MockAgentManager();
-      newMockManager.spawnResult = { id: 'agent-1', sessionId: 'sess-resumed' };
-      const newManager = new SessionResumeManager(
-        newMockManager as any,
-        rosterRepo,
-        delegationRepo,
-        mockRoleRegistry as any,
-        testConfig as ServerConfig,
-      );
-
-      // Resume
-      const result = await newManager.resumeAll();
-      expect(result.total).toBe(1);
-      expect(result.succeeded).toBe(1);
-      expect(newMockManager.spawnCalls[0].resumeSessionId).toBe('sess-original');
-      expect(newMockManager.spawnCalls[0].id).toBe('agent-1');
-
-      newManager.dispose();
-    });
-  });
-
-  // ── Concurrency guard ───────────────────────────────────────────
-
-  describe('resumeAll concurrency guard', () => {
-    it('serializes concurrent resumeAll() calls without corrupting state', async () => {
-      // Seed two agents in the roster
-      rosterRepo.upsertAgent('agent-a', 'developer', 'fast', 'idle', 'sess-a', 'proj-1');
-      rosterRepo.upsertAgent('agent-b', 'developer', 'fast', 'idle', 'sess-b', 'proj-1');
-
-      // Track spawn order
-      const spawnOrder: string[] = [];
-      const _spawnDelay = 0;
-
-      // Create a slow mock that introduces async delay per spawn
-      const slowManager = new MockAgentManager();
-      const originalSpawn = slowManager.spawn.bind(slowManager);
-      slowManager.spawn = ((...args: any[]) => {
-        spawnOrder.push(args[7] ?? 'unknown'); // id param
-        const result = originalSpawn.apply(slowManager, args as any);
-        return result;
-      }) as any;
-
-      const srm = new SessionResumeManager(
-        slowManager as any,
-        rosterRepo,
-        delegationRepo,
-        mockRoleRegistry as any,
-        testConfig as ServerConfig,
-      );
-
-      // Fire two concurrent resumeAll() calls
-      const [result1, result2] = await Promise.all([
-        srm.resumeAll(),
-        srm.resumeAll(),
-      ]);
-
-      // Both should succeed
-      expect(result1.total).toBe(2);
-      expect(result1.succeeded).toBe(2);
-      expect(result2.total).toBe(2);
-      expect(result2.succeeded).toBe(2);
-
-      // The first call should have spawned 2 agents
-      // The second call (queued) runs after first completes — spawns again
-      // because it re-reads the roster. The key point: no interleaving.
-      expect(spawnOrder.length).toBe(4); // 2 from first + 2 from second
-
-      srm.dispose();
-    });
-
-    it('queued call sees updated roster state', async () => {
-      rosterRepo.upsertAgent('agent-x', 'developer', 'fast', 'idle', 'sess-x', 'proj-1');
-
-      const slowManager = new MockAgentManager();
-      const srm = new SessionResumeManager(
-        slowManager as any,
-        rosterRepo,
-        delegationRepo,
-        mockRoleRegistry as any,
-        testConfig as ServerConfig,
-      );
-
-      // First call in progress, second queued
-      const p1 = srm.resumeAll();
-      const p2 = srm.resumeAll();
-
-      const [r1, r2] = await Promise.all([p1, p2]);
-
-      // Both complete without error
-      expect(r1.succeeded + r1.failed + r1.skipped).toBe(r1.total);
-      expect(r2.succeeded + r2.failed + r2.skipped).toBe(r2.total);
-
-      srm.dispose();
-    });
-
-    it('does not leave mutex locked after error', async () => {
-      rosterRepo.upsertAgent('agent-err', 'developer', 'fast', 'idle', 'sess-err', 'proj-1');
-
-      const errorManager = new MockAgentManager();
-      errorManager.shouldThrow = true;
-      errorManager.throwError = 'Simulated crash';
-
-      const srm = new SessionResumeManager(
-        errorManager as any,
-        rosterRepo,
-        delegationRepo,
-        mockRoleRegistry as any,
-        testConfig as ServerConfig,
-      );
-
-      // First call — spawn throws, but resumeAll catches it per-agent
-      const result1 = await srm.resumeAll();
-      expect(result1.failed).toBeGreaterThan(0);
-
-      // Second call should still work (mutex released)
-      errorManager.shouldThrow = false;
-      // Agent was marked terminated by the error handler, so re-add
-      rosterRepo.upsertAgent('agent-ok', 'developer', 'fast', 'idle', 'sess-ok', 'proj-1');
-      const result2 = await srm.resumeAll();
-      expect(result2.total).toBeGreaterThan(0);
-
-      srm.dispose();
     });
   });
 });
