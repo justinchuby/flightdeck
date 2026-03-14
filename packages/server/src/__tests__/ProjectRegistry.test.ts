@@ -51,7 +51,7 @@ describe('ProjectRegistry', () => {
     });
 
     it('filters by status', () => {
-      const p1 = registry.create('Active');
+      const _p1 = registry.create('Active');
       const p2 = registry.create('Archived');
       registry.update(p2.id, { status: 'archived' });
 
@@ -202,7 +202,7 @@ describe('ProjectRegistry', () => {
       registry.endSession('lead-1', 'completed');
 
       const sessions = registry.getSessions(project.id);
-      const oldStart = sessions[0].startedAt;
+      const _oldStart = sessions[0].startedAt;
       expect(sessions[0].endedAt).not.toBeNull();
 
       registry.claimSessionForResume(sessions[0].id);

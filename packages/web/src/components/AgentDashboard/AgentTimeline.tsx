@@ -1,5 +1,5 @@
 import { useAppStore } from '../../stores/appStore';
-import { MessageSquare, GitBranch } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { shortAgentId } from '../../utils/agentLabel';
 
 export function AgentTimeline() {

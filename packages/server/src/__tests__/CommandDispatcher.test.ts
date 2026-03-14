@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CommandDispatcher, type CommandContext, type Delegation } from '../agents/CommandDispatcher.js';
+import { CommandDispatcher, type CommandContext } from '../agents/CommandDispatcher.js';
 import type { Agent } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
 import { MAX_CONCURRENCY_LIMIT } from '../config.js';

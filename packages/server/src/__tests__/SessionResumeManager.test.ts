@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { Database } from '../db/database.js';
 import { AgentRosterRepository } from '../db/AgentRosterRepository.js';
 import { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
-import { SessionResumeManager, type ResumeResult } from '../agents/SessionResumeManager.js';
+import { SessionResumeManager } from '../agents/SessionResumeManager.js';
 import type { AgentJSON } from '../agents/Agent.js';
 import type { Role } from '../agents/RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
@@ -515,7 +515,7 @@ describe('SessionResumeManager', () => {
 
       // Track spawn order
       const spawnOrder: string[] = [];
-      let spawnDelay = 0;
+      const _spawnDelay = 0;
 
       // Create a slow mock that introduces async delay per spawn
       const slowManager = new MockAgentManager();

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
 import { ChatGroupRegistry } from '../comms/ChatGroupRegistry.js';
-import { existsSync, unlinkSync } from 'fs';
 
 const TEST_DB = ':memory:';
 
@@ -48,7 +47,7 @@ describe('ChatGroupRegistry', () => {
     it('is idempotent (INSERT OR IGNORE)', () => {
       registry.create('lead-1', 'team', ['agent-a']);
       // Creating again with same name + lead should not throw
-      const group2 = registry.create('lead-1', 'team', ['agent-b']);
+      const _group2 = registry.create('lead-1', 'team', ['agent-b']);
       // Should now have 3 members: lead, agent-a (from first), agent-b (from second)
       const members = registry.getMembers('team', 'lead-1');
       expect(members).toContain('lead-1');

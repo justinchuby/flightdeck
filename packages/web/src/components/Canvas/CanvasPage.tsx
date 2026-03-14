@@ -80,7 +80,7 @@ function CanvasInner() {
   const [showLabels, setShowLabels] = useState(true);
   const [showAnimations, setShowAnimations] = useState(true);
 
-  const { fitView, setViewport } = useReactFlow();
+  const { fitView, setViewport: _setViewport } = useReactFlow();
 
   // Sync graph changes from hook → local state
   useEffect(() => {

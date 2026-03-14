@@ -31,7 +31,6 @@ import { HeartbeatMonitor } from './HeartbeatMonitor.js';
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
 import { runWithAgentContext } from '../middleware/requestContext.js';
 import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExtractor.js';
 import type { SessionData, SessionMessage } from '../knowledge/types.js';
@@ -163,7 +162,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.maxConcurrent = config.maxConcurrentAgents;
     this.maxRestarts = maxRestarts;
     this.autoRestart = autoRestart;
-    const self = this;
+    const _self = this;
     this.dispatcher = new CommandDispatcher({
       getAgent: (id) => this.agents.get(id),
       getAllAgents: () => this.getAll(),

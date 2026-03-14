@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AlertEngine } from '../coordination/alerts/AlertEngine.js';
 import type { Alert, AlertAction } from '../coordination/alerts/AlertEngine.js';
 

@@ -333,7 +333,7 @@ export class CommandDispatcher {
   static detectUnknownCommands(
     agent: Agent,
     buf: string,
-    knownPatterns: CommandEntry[],
+    _knownPatterns: CommandEntry[],
   ): string {
     // Match any complete ⟦⟦ WORD ... ⟧⟧ block
     const unknownRegex = /⟦⟦\s*([A-Z][A-Z0-9_]*)\s*(?:\{[\s\S]*?\})?\s*⟧⟧/;

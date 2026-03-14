@@ -1,11 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../../db/database.js';
 import { KnowledgeStore } from '../KnowledgeStore.js';
 import {
   MemoryCategoryManager,
   DEFAULT_CATEGORY_LIMITS,
 } from '../MemoryCategoryManager.js';
-import type { KnowledgeCategory } from '../types.js';
 
 describe('MemoryCategoryManager', () => {
   let db: Database;
@@ -109,7 +108,7 @@ describe('MemoryCategoryManager', () => {
     it('pruneEpisodic removes entries older than maxAge', () => {
       // Insert entries with timestamps in the past
       const oldDate = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-      const recentDate = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      const _recentDate = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
       // Use store directly to set old timestamps
       store.put(projectId, 'episodic', 'old-session', 'Old session summary');

@@ -7,7 +7,7 @@ interface PostSessionRetroCardProps {
   onClose: () => void;
 }
 
-function DeltaIndicator({ current, average, lowerIsBetter, label, unit }: {
+function DeltaIndicator({ current, average, lowerIsBetter, label, unit: _unit }: {
   current: number; average: number; lowerIsBetter: boolean; label: string; unit: string;
 }) {
   if (average === 0) return null;

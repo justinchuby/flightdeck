@@ -26,7 +26,7 @@ async function dbFetch<T>(path: string, opts?: RequestInit): Promise<T> {
 export function DataBrowser() {
   const [tab, setTab] = useState<TabId>('stats');
   const [stats, setStats] = useState<DbStats | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
 
   const loadStats = useCallback(async () => {
     try {

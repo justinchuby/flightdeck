@@ -42,7 +42,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import type { Decision, DagStatus } from '../../types';
+import type { Decision } from '../../types';
 import { TokenUsageSection } from './TokenUsageSection';
 import { FileLockPanel } from '../FleetOverview/FileLockPanel';
 import type { FileLock } from '../FleetOverview/FleetOverview';

@@ -11,7 +11,7 @@ export interface FilterBarProps {
   availableAgents: string[];
 }
 
-export function FilterBar({ filters, onChange, availableRoles, availablePriorities, availableAgents }: FilterBarProps) {
+export function FilterBar({ filters, onChange, availableRoles, availablePriorities, availableAgents: _availableAgents }: FilterBarProps) {
   const toggleSetItem = <T,>(set: Set<T>, item: T): Set<T> => {
     const next = new Set(set);
     if (next.has(item)) next.delete(item);

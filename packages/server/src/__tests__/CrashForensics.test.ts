@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CrashForensics } from '../agents/CrashForensics.js';
-import type { CrashReport } from '../agents/CrashForensics.js';
 
 function baseParams(overrides: Partial<Parameters<CrashForensics['capture']>[0]> = {}) {
   return {

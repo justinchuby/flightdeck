@@ -6,8 +6,8 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 // ── Mocks ──────────────────────────────────────────────────────
 
 let mockAgents: any[] = [];
-const mockLeadComms: any[] = [];
-const mockLeadGroups: any[] = [];
+const _mockLeadComms: any[] = [];
+const _mockLeadGroups: any[] = [];
 
 vi.mock('../../../stores/appStore', () => ({
   useAppStore: Object.assign(

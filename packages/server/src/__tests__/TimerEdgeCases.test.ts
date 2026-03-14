@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
-import type { Timer, TimerInput } from '../coordination/scheduling/TimerRegistry.js';
+import type { Timer } from '../coordination/scheduling/TimerRegistry.js';
 import {
   setTimerSchema,
   cancelTimerSchema,

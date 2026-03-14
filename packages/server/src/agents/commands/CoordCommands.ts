@@ -163,7 +163,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
     if (!parsed) return;
     const leadId = agent.role.id === 'lead' ? agent.id : agent.parentId;
 
-    let progress: Record<string, unknown> = { ...parsed };
+    const progress: Record<string, unknown> = { ...parsed };
     if (leadId) {
       const dagStatus = ctx.taskDAG.getStatus(leadId);
       if (dagStatus.tasks.length > 0) {
@@ -299,7 +299,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
         agent.sendMessage(`[System] COMMIT failed: ${err.message?.split('\n')[0] ?? 'unknown error'}`);
         logger.warn({ module: 'command', msg: 'COMMIT exec failed', command: 'COMMIT', err: err.message });
       });
-  } catch (err: any) {
+  } catch (_err: any) {
     agent.sendMessage(`[System] COMMIT error: use {"message": "your commit message"}`);
   }
 }

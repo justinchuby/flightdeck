@@ -110,7 +110,7 @@ export class ParallelAnalyzer {
 
   /** Find the longest path through the DAG (critical path) */
   private findCriticalPath(tasks: DagTask[]): string[] {
-    const taskMap = new Map(tasks.map(t => [t.id, t]));
+    const _taskMap = new Map(tasks.map(t => [t.id, t]));
     let longestPath: string[] = [];
 
     const dfs = (id: string, path: string[]): void => {

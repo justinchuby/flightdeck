@@ -9,7 +9,7 @@ import { render, screen, act, waitFor } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
 import { AccessibilityAnnouncer } from '../AccessibilityAnnouncer';
 import { useAccessibilityAnnouncements } from '../useAccessibilityAnnouncements';
-import type { TimelineData, TimelineSegment, TimelineAgent, TimelineComm, TimelineLock } from '../useTimelineData';
+import type { TimelineData, TimelineSegment, TimelineAgent } from '../useTimelineData';
 
 // Mock @visx/responsive ParentSize
 vi.mock('@visx/responsive', () => ({

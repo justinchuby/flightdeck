@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../../db/database.js';
 import { KnowledgeStore } from '../KnowledgeStore.js';
 import { MemoryCategoryManager } from '../MemoryCategoryManager.js';
 import { HybridSearchEngine } from '../HybridSearchEngine.js';
 import { KnowledgeInjector, sanitizeContent } from '../KnowledgeInjector.js';
-import type { InjectionContext } from '../KnowledgeInjector.js';
-import type { FusedSearchResult, KnowledgeEntry, VectorSearchProvider } from '../types.js';
 
 describe('KnowledgeInjector', () => {
   let db: Database;

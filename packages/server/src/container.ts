@@ -2,7 +2,7 @@
 // DI Container — builds all services in dependency order with lifecycle management.
 // Routes receive AppContext (unchanged). Only index.ts sees ServiceContainer.
 
-import { createServer, type Server as HttpServer } from 'http';
+import { type Server as HttpServer } from 'http';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
@@ -473,7 +473,7 @@ export function wireHttpLayer(
 function wireEvents(c: ServiceContainer): void {
   const {
     eventPipeline, activityLedger, lockRegistry, decisionLog,
-    alertEngine, eagerScheduler, agentManager, webhookManager,
+    alertEngine: _alertEngine, eagerScheduler, agentManager, webhookManager,
     capabilityRegistry, decisionRecordStore,
   } = c;
   const { taskDAG, timerRegistry, configStore } = c.internal;

@@ -1,4 +1,4 @@
-import type { ActivityLedger, ActivityEntry, ActionType } from '../activity/ActivityLedger.js';
+import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import type { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { DecisionLog } from '../decisions/DecisionLog.js';
 

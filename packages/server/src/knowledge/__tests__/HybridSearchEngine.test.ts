@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Database } from '../../db/database.js';
 import { KnowledgeStore } from '../KnowledgeStore.js';
 import { HybridSearchEngine, fuseResults, fitToBudget, estimateTokens } from '../HybridSearchEngine.js';
-import type { ScoredKnowledgeEntry, VectorSearchProvider, FusedSearchResult, KnowledgeEntry } from '../types.js';
+import type { ScoredKnowledgeEntry, VectorSearchProvider, FusedSearchResult } from '../types.js';
 
 // ── Helper: create a mock ScoredKnowledgeEntry ──────────────────────
 
@@ -230,7 +230,7 @@ describe('HybridSearchEngine', () => {
 
   it('integrates a vector provider via setVectorProvider', () => {
     const mockVector: VectorSearchProvider = {
-      search: (pid, query, limit) => {
+      search: (_pid, _query, _limit) => {
         // Return a "semantic" match that FTS5 might not find
         return [
           mockEntry({

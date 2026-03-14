@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
-import { ActivityLedger, type ActionType } from '../coordination/activity/ActivityLedger.js';
+import { ActivityLedger } from '../coordination/activity/ActivityLedger.js';
 
 describe('ActivityLedger', () => {
   let db: Database;

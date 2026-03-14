@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
 import type { AppContext } from './context.js';
-import { DECISION_CATEGORIES, type DecisionCategory } from '../coordination/decisions/DecisionLog.js';
 
 export function decisionsRoutes(ctx: AppContext): Router {
   const { agentManager, decisionLog } = ctx;

@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CommHeatmap } from '../CommHeatmap';
-import type { CommHeatmapProps, HeatmapMessage, CommType } from '../CommHeatmap';
+import type { CommHeatmapProps, HeatmapMessage } from '../CommHeatmap';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { SessionReplay } from '../coordination/sessions/SessionReplay.js';
-import type { WorldState, Keyframe, ReplayAgentSource } from '../coordination/sessions/SessionReplay.js';
+import type { ReplayAgentSource } from '../coordination/sessions/SessionReplay.js';
 import type { ActivityLedger, ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 import type { TaskDAG, DagTask } from '../tasks/TaskDAG.js';
 import type { DecisionLog, Decision } from '../coordination/decisions/DecisionLog.js';

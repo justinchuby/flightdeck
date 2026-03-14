@@ -28,7 +28,7 @@ function handleAcquire(ctx: CommandHandlerContext, agent: Agent, data: string): 
   const parsed = parseCommandPayload(agent, match[1], acquireCapabilitySchema, 'ACQUIRE_CAPABILITY');
   if (!parsed) return;
   try {
-    const { ok, message } = ctx.capabilityInjector.acquire(
+    const { ok: _ok, message } = ctx.capabilityInjector.acquire(
       agent,
       parsed.capability,
       parsed.reason || 'No reason given',

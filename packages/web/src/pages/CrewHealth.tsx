@@ -9,7 +9,6 @@ import {
   Users,
   Clock,
   PauseCircle,
-  XCircle,
   Wifi,
   WifiOff,
 } from 'lucide-react';

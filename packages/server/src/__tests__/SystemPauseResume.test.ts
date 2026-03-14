@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Minimal mock of Agent for pause/resume testing
 function makeAgent(status = 'running') {

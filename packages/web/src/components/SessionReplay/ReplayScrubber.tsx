@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Zap, Users, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useSessionReplay } from '../../hooks/useSessionReplay';
 import type { ReplayKeyframe, UseSessionReplayResult } from '../../hooks/useSessionReplay';

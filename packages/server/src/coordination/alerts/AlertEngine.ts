@@ -8,7 +8,7 @@ import { logger } from '../../utils/logger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-import type { Alert, AlertSeverity, AlertAction } from '@flightdeck/shared';
+import type { Alert } from '@flightdeck/shared';
 export type { Alert, AlertSeverity, AlertAction } from '@flightdeck/shared';
 
 // ── Constants ─────────────────────────────────────────────────────

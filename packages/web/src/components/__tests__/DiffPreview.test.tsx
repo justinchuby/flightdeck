@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DiffPreview } from '../DiffPreview/DiffPreview';
-import { DiffBadge } from '../DiffPreview/DiffBadge';
 import type { DiffResult } from '../../hooks/useFocusAgent';
 
 // Mock apiFetch for DiffBadge (useDiffSummary)

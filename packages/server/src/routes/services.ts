@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { join } from 'node:path';
-import { SearchEngine, type SearchQuery } from '../coordination/knowledge/SearchEngine.js';
+import { type SearchQuery } from '../coordination/knowledge/SearchEngine.js';
 import { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
 import { ParallelAnalyzer } from '../tasks/ParallelAnalyzer.js';
 import { getRecentCommits } from './context.js';

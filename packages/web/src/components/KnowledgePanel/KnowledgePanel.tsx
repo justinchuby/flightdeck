@@ -7,7 +7,6 @@ import {
   Trash2,
   BookOpen,
   Lightbulb,
-  Clock,
   Tag,
   ChevronRight,
   ChevronDown,

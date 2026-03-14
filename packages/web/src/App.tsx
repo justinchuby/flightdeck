@@ -13,7 +13,7 @@ import { SearchDialog } from './components/SearchDialog/SearchDialog';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer, useToastStore } from './components/Toast';
 import { lazy, Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { playAttentionSound, playCompletionSound } from './utils/notificationSound';
+import { playCompletionSound } from './utils/notificationSound';
 import { Search, Pause, Play, Bug } from 'lucide-react';
 import { OnboardingWizard, useOnboarding } from './components/Onboarding/OnboardingWizard';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -47,8 +47,8 @@ const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => 
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
 const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel').then(m => ({ default: m.ArtifactsPanel })));
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
-const CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
-const CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
+const _CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
+const _CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
 const UnifiedCrewPage = lazy(() => import('./components/CrewRoster/UnifiedCrewPage').then(m => ({ default: m.UnifiedCrewPage })));
 
 function RouteSpinner() {
@@ -89,7 +89,7 @@ function ProjectRedirect({ page }: { page: string }) {
 /**
  * Home route: redirect to active project's session or projects list.
  */
-function HomeRedirect() {
+function _HomeRedirect() {
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const agents = useAppStore((s) => s.agents);
 
@@ -123,11 +123,11 @@ function NotFoundPage() {
 export function App() {
   const ws = useWebSocket();
   const api = useApi();
-  const connected = useAppStore((s) => s.connected);
+  const _connected = useAppStore((s) => s.connected);
   const agents = useAppStore((s) => s.agents);
   const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const systemPaused = useAppStore((s) => s.systemPaused);
-  const setSystemPaused = useAppStore((s) => s.setSystemPaused);
+  const _setSystemPaused = useAppStore((s) => s.setSystemPaused);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const addToast = useToastStore((s) => s.add);
   const prevAgentStatesRef = useRef<Map<string, string>>(new Map());

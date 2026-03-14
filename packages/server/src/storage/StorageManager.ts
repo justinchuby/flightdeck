@@ -1,4 +1,4 @@
-import { join, dirname, resolve } from 'path';
+import { join, dirname } from 'path';
 import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import { randomBytes } from 'crypto';
 import YAML from 'yaml';

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
 import { FileLockRegistry } from '../coordination/files/FileLockRegistry.js';
 import { ActivityLedger } from '../coordination/activity/ActivityLedger.js';

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EventEmitter } from 'events';
 
 // ── Mock logger ───────────────────────────────────────────────────
 vi.mock('../utils/logger.js', () => ({

@@ -10,7 +10,6 @@ import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import { formatTimestamp } from './formatTimestamp';
 import type { TimeRange } from './formatTimestamp';
 import { useTimelineStore } from '../../stores/timelineStore';
-import type { SortDirection } from '../../stores/timelineStore';
 import type {
   TimelineAgent,
   TimelineSegment,
@@ -221,7 +220,7 @@ interface TimelineContainerProps {
   replayProgress?: number;
 }
 
-function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange, lastSeenTimestamp, replayProgress }: TimelineContainerProps & { width: number }) {
+function TimelineContent({ data, width: containerWidth, liveMode, onLiveModeChange: _onLiveModeChange, lastSeenTimestamp, replayProgress }: TimelineContainerProps & { width: number }) {
   // Persisted view state from Zustand store
   const selectedLeadId = useTimelineStore((s) => s.selectedLeadId);
   const expandedAgents = useTimelineStore((s) => s.expandedAgents[selectedLeadId ?? ''] ?? EMPTY_EXPANDED);

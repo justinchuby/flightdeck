@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ModelSelector,
   AVAILABLE_MODELS,
-  type ModelConfig,
   type TaskProfile,
 } from '../agents/ModelSelector.js';
 

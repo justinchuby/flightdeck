@@ -568,10 +568,10 @@ describe('Auto-DAG integration', () => {
     it('review delegation auto-links to target agent by ID', () => {
       // Create a dev task first
       const devChild = createAgent({ task: 'Fix bugs' });
-      const devTask = dag.getTasks(lead.id)[0];
+      const _devTask = dag.getTasks(lead.id)[0];
 
       // Create a review task mentioning the agent ID prefix
-      const agentPrefix = devChild.id.slice(6, 14); // extract "child-00" portion
+      const _agentPrefix = devChild.id.slice(6, 14); // extract "child-00" portion
       createAgent({
         role: 'code-reviewer',
         task: `Review the fix by ${devChild.id.slice(6)}`,
@@ -1077,7 +1077,7 @@ describe('Auto-DAG integration', () => {
       expect(dag.getTask(lead.id, 'fix-api')!.dagStatus).toBe('running');
 
       // 3. Link fix-ui to another agent
-      const devChild2 = createAgent({ task: 'Fix UI bugs', dagTaskId: 'fix-ui' });
+      const _devChild2 = createAgent({ task: 'Fix UI bugs', dagTaskId: 'fix-ui' });
       expect(dag.getTask(lead.id, 'fix-ui')!.dagStatus).toBe('running');
 
       // 4. Ad-hoc delegation (auto-creates)

@@ -6,7 +6,7 @@
  * spawning a duplicate. This prevents the race condition during session resume
  * where the lead re-creates agents that were already respawned by the server.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getLifecycleCommands } from '../agents/commands/AgentLifecycle.js';
 import type { CommandHandlerContext } from '../agents/commands/types.js';
 

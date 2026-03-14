@@ -330,7 +330,7 @@ function ProfilePanel({ agentId, crewId, onClose }: {
 // ── Main Component ────────────────────────────────────────
 
 export function CrewPage() {
-  const addToast = useToastStore(s => s.add);
+  const _addToast = useToastStore(s => s.add);
 
   // Data state
   const [crews, setCrews] = useState<CrewInfo[]>([]);

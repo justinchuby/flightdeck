@@ -25,7 +25,7 @@ const PRIORITY_BADGE: Record<AcpPlanEntry['priority'], string> = {
   low: 'bg-gray-500/20 text-th-text-muted',
 };
 
-const TC_STATUS: Record<AcpToolCall['status'], string> = {
+const _TC_STATUS: Record<AcpToolCall['status'], string> = {
   pending: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400',
   in_progress: 'bg-blue-500/20 text-blue-400',
   completed: 'bg-purple-500/20 text-purple-400',
@@ -51,12 +51,12 @@ function renderContentItem(c: any): string {
 }
 
 /** Safely render tool call content — handles string, array, or object */
-function stringifyContent(content: any): string {
+function _stringifyContent(content: any): string {
   if (typeof content === 'string') {
     if (content.startsWith('{') || content.startsWith('[')) {
       try {
         const parsed = JSON.parse(content);
-        return stringifyContent(parsed);
+        return _stringifyContent(parsed);
       } catch { /* not JSON, use as-is */ }
     }
     return content.slice(0, 500);

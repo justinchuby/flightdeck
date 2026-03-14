@@ -11,7 +11,7 @@
  *
  * Supports many-to-many Teams ↔ Projects relationship by design.
  */
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -24,7 +24,6 @@ import {
   Clock,
   Activity,
   Zap,
-  Bell,
   Plus,
   ChevronRight,
   ChevronDown,
@@ -36,7 +35,7 @@ import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { EmptyState } from '../ui/EmptyState';
-import { StatusBadge, projectStatusProps } from '../ui/StatusBadge';
+import { StatusBadge } from '../ui/StatusBadge';
 import { useAttentionItems } from '../AttentionBar';
 import {
   DecisionFeedItem,

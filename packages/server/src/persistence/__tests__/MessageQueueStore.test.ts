@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../../db/database.js';
-import { MessageQueueStore, type QueuedMessage } from '../MessageQueueStore.js';
+import { MessageQueueStore } from '../MessageQueueStore.js';
 
 describe('MessageQueueStore', () => {
   let db: Database;

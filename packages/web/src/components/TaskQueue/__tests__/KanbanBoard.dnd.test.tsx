@@ -8,10 +8,10 @@
  * We trust @dnd-kit fires events correctly — we test what KanbanBoard
  * DOES with those events (API calls, toast messages, state updates).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, act, waitFor } from '@testing-library/react';
-import type { DagStatus, DagTask, DagTaskStatus } from '../../../types';
+import type { DagStatus, DagTask } from '../../../types';
 
 // ── Capture DnD handlers ────────────────────────────────────────────
 

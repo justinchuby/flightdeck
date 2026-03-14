@@ -103,7 +103,7 @@ export function AttentionBar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [oversightOpen]);
 
-  const isVisible = !dismissed || state.items.length > dismissedVersion;
+  const _isVisible = !dismissed || state.items.length > dismissedVersion;
 
   // Don't render if no agents active
   if (state.agentCount === 0) return null;

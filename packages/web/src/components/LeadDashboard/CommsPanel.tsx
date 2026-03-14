@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Users, MessageSquare, Filter } from 'lucide-react';
+import { Users, Filter } from 'lucide-react';
 import { EmptyState } from '../Shared';
 import type { AgentComm } from '../../stores/leadStore';
 import type { GroupMessage } from '../../types';

@@ -459,7 +459,7 @@ export class PredictionService {
         const parsed = JSON.parse(raw) as Prediction[];
         return Array.isArray(parsed) ? parsed : [];
       }
-    } catch (err) {
+    } catch (_err) {
       logger.warn('predictions', 'Failed to load predictions, starting fresh');
     }
     return [];
@@ -468,7 +468,7 @@ export class PredictionService {
   private savePredictions(): void {
     try {
       this.db.setSetting(SETTINGS_KEY_PREDICTIONS, JSON.stringify(this.predictions));
-    } catch (err) {
+    } catch (_err) {
       logger.error('predictions', 'Failed to save predictions');
     }
   }
@@ -488,7 +488,7 @@ export class PredictionService {
           types: { ...DEFAULT_CONFIG.types, ...parsed.types },
         };
       }
-    } catch (err) {
+    } catch (_err) {
       logger.warn('predictions', 'Failed to load config, using defaults');
     }
     return { ...DEFAULT_CONFIG, types: { ...DEFAULT_CONFIG.types } };
@@ -503,7 +503,7 @@ export class PredictionService {
     }
     try {
       this.db.setSetting(SETTINGS_KEY_CONFIG, JSON.stringify(this.config));
-    } catch (err) {
+    } catch (_err) {
       logger.error('predictions', 'Failed to save config');
     }
   }

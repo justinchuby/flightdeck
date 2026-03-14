@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { ChatMessages } from '../ChatMessages';
 import type { AcpTextChunk, AgentInfo } from '../../../types';
 

@@ -4,7 +4,7 @@
  *
  * Tests the wiring between AgentManager.onExit → extractSessionKnowledge → KnowledgeStore.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../../db/database.js';
 import { KnowledgeStore } from '../KnowledgeStore.js';
 import { SessionKnowledgeExtractor } from '../SessionKnowledgeExtractor.js';

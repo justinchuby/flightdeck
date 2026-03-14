@@ -1,6 +1,6 @@
 import type { Database } from '../../db/database.js';
-import { projectSessions, taskCostRecords, sessionRetros } from '../../db/schema.js';
-import { eq, sql, desc, and, inArray } from 'drizzle-orm';
+import { projectSessions, taskCostRecords } from '../../db/schema.js';
+import { eq, sql, desc } from 'drizzle-orm';
 import { activityLog, dagTasks } from '../../db/schema.js';
 // ── Types ─────────────────────────────────────────────────────────
 

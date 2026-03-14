@@ -24,7 +24,7 @@ function formatTokens(n: number): string {
 export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
   const stats = useMemo((): StatItem[] => {
     const running = agents.filter((a) => a.status === 'running').length;
-    const idle = agents.filter((a) => a.status === 'idle').length;
+    const _idle = agents.filter((a) => a.status === 'idle').length;
     const completed = agents.filter((a) => a.status === 'completed').length;
     const total = agents.length;
 

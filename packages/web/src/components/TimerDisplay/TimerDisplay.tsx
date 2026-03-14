@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
+import { useTimerStore } from '../../stores/timerStore';
 import { useAppStore } from '../../stores/appStore';
 import { apiFetch } from '../../hooks/useApi';
 import { TimerCreateForm } from './TimerCreateForm';

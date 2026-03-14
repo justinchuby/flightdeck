@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
-import { Readable, Writable, PassThrough } from 'stream';
+import { PassThrough } from 'stream';
 
 // ── Mock child_process ────────────────────────────────────────────
 const mockSpawn = vi.fn();
@@ -547,7 +547,7 @@ describe('AcpAdapter', () => {
       adapter.on('exit', (code: number) => exitCodes.push(code));
 
       // Don't await — it will hang due to mockInitialize
-      const startPromise = adapter.start(DEFAULT_START_OPTS).catch(() => {});
+      const _startPromise = adapter.start(DEFAULT_START_OPTS).catch(() => {});
 
       // Allow microtask to execute spawn
       await new Promise((r) => setTimeout(r, 50));

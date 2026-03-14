@@ -5,7 +5,7 @@
  * Covers: label format, time axis, responsive layout, empty state, legend.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { AgentHeatmap } from '../AgentHeatmap';
 import type { HeatmapBucket } from '../AgentHeatmap';
 import type { AgentInfo } from '../../../types';

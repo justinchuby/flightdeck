@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { Database } from './database.js';
 import { activeDelegations } from './schema.js';
 import type { DelegationStatus } from '@flightdeck/shared';

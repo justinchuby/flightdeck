@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EventPipeline, taskCompletedHandler, commitQualityGateHandler, delegationTracker, type PipelineEvent } from '../coordination/events/EventPipeline.js';
+import { EventPipeline, taskCompletedHandler, delegationTracker, type PipelineEvent } from '../coordination/events/EventPipeline.js';
 import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
 function makeEntry(overrides: Partial<ActivityEntry> = {}): ActivityEntry {

@@ -6,7 +6,7 @@
  * The critical path (longest-duration dependency chain) is highlighted.
  */
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { computeCriticalPath, type CriticalPathTask } from './dagCriticalPath';
+import { computeCriticalPath } from './dagCriticalPath';
 import { EmptyState } from '../Shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────

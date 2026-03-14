@@ -17,7 +17,7 @@ function pressureBarColor(pct: number): string {
   return 'bg-emerald-500';
 }
 
-function pressureDotColor(pct: number): string {
+function _pressureDotColor(pct: number): string {
   if (pct >= 90) return 'bg-red-400';
   if (pct >= 70) return 'bg-yellow-400';
   return 'bg-emerald-400';
@@ -38,7 +38,7 @@ export function PulseStrip() {
     let running = 0;
     let idle = 0;
     let failed = 0;
-    let stuck = 0;
+    const stuck = 0;
 
     for (const agent of agents) {
       totalInput += agent.inputTokens ?? 0;

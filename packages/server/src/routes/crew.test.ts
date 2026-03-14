@@ -4,7 +4,7 @@
  * Covers: list crews, crew details, agent profiles, health,
  * clone, crews summary, error handling, and missing dependencies.
  */
-import { describe, it, expect, vi, afterAll } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';

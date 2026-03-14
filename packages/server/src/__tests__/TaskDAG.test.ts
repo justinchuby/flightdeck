@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { Database } from '../db/database.js';
 import { dagTasks } from '../db/schema.js';
 import { TaskDAG, VALID_TRANSITIONS, descriptionSimilarity } from '../tasks/TaskDAG.js';
-import type { DagTaskInput, DagTask } from '../tasks/TaskDAG.js';
+import type { DagTaskInput } from '../tasks/TaskDAG.js';
 
 const TEST_DB = ':memory:';
 
@@ -151,7 +151,7 @@ describe('TaskDAG', () => {
       dag.startTask('lead-1', 'a', 'agent-1');
       dag.completeTask('lead-1', 'a');
 
-      const ready = dag.resolveReady('lead-1');
+      const _ready = dag.resolveReady('lead-1');
       // b was already promoted by completeTask, but if we check pending tasks directly,
       // there should be none left that are ready (they were promoted to 'ready' already)
       // Let's check the actual statuses

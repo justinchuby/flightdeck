@@ -342,7 +342,7 @@ export class NLCommandService {
   }
 
   /** Generate context-aware suggestions based on current session state */
-  getSuggestions(leadId: string): Suggestion[] {
+  getSuggestions(_leadId: string): Suggestion[] {
     const suggestions: Suggestion[] = [];
 
     // Pending decisions → suggest review
@@ -729,7 +729,7 @@ export class NLCommandService {
   }
 
   /** Execute a single action step */
-  private executeStep(step: NLActionStep, leadId: string): { success: boolean; detail?: string } {
+  private executeStep(step: NLActionStep, _leadId: string): { success: boolean; detail?: string } {
     try {
       switch (step.action) {
         // ── System-level control ────────────────────────────────

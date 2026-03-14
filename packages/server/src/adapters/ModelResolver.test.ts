@@ -8,7 +8,6 @@ import {
   getModelsForProvider,
   getModelsByProvider,
 } from './ModelResolver.js';
-import type { ModelResolution, ModelTier } from './ModelResolver.js';
 import type { ProviderId } from './presets.js';
 
 // Suppress logger output during tests
@@ -283,7 +282,7 @@ describe('ModelResolver', () => {
     const providers: ProviderId[] = ['copilot', 'claude', 'gemini', 'cursor', 'codex', 'opencode'];
 
     it('resolves all role models for all providers without errors', () => {
-      for (const [role, model] of Object.entries(roleModels)) {
+      for (const [_role, model] of Object.entries(roleModels)) {
         for (const provider of providers) {
           const result = resolveModel(model, provider);
           expect(result).toBeDefined();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
-import { AgentRosterRepository, type RosterAgentStatus } from '../db/AgentRosterRepository.js';
+import { AgentRosterRepository } from '../db/AgentRosterRepository.js';
 
 describe('AgentRosterRepository', () => {
   let db: Database;
@@ -112,7 +112,7 @@ describe('AgentRosterRepository', () => {
     });
 
     it('returns empty array when no matches', () => {
-      const result = repo.getAllAgents('idle');
+      const _result = repo.getAllAgents('idle');
       // We know agent-1 is idle, but let's test with a specific scenario
       repo.updateStatus('agent-1', 'running');
       const idleAfter = repo.getAllAgents('idle');
@@ -132,7 +132,7 @@ describe('AgentRosterRepository', () => {
 
     it('updates updatedAt timestamp', () => {
       repo.upsertAgent('agent-1', 'developer', 'claude-sonnet');
-      const before = repo.getAgent('agent-1')!.updatedAt;
+      const _before = repo.getAgent('agent-1')!.updatedAt;
 
       // Small delay to ensure timestamp differs
       repo.updateStatus('agent-1', 'running');

@@ -9,7 +9,7 @@
  */
 import { mkdir, writeFile, readdir, unlink, readFile } from 'fs/promises';
 import { homedir } from 'os';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { assertPathWithinDir } from '../utils/pathValidation.js';
 
 // ── Types ───────────────────────────────────────────────────────────

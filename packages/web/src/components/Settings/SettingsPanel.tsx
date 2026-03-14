@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
 import { apiFetch } from '../../hooks/useApi';
-import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, Terminal, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
+import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
 import { DataManagement } from './DataManagement';
 import { TelegramSettings } from './TelegramSettings';

@@ -34,7 +34,7 @@ interface CrewStatusContentProps {
   onOpenChat?: (agentId: string) => void;
 }
 
-export function CrewStatusContent({ agents, delegations, comms, activity, allAgents, onOpenChat }: CrewStatusContentProps) {
+export function CrewStatusContent({ agents, delegations, comms, activity, allAgents: _allAgents, onOpenChat }: CrewStatusContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<CrewAgent | null>(null);
   const [selectedComm, setSelectedComm] = useState<AgentComm | null>(null);
   const [agentMsg, setAgentMsg] = useState('');

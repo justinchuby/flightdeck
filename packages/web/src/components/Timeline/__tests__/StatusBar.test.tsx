@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { StatusBar } from '../StatusBar';
-import type { StatusBarProps, ConnectionHealth } from '../StatusBar';
+import type { ConnectionHealth } from '../StatusBar';
 import type { TimelineData, TimelineSegment, TimelineAgent } from '../useTimelineData';
 
 // ── Test helpers ──────────────────────────────────────────────────────

@@ -12,7 +12,6 @@ import { getSystemCommands } from '../agents/commands/SystemCommands.js';
 import { getTimerCommands } from '../agents/commands/TimerCommands.js';
 import { getCapabilityCommands } from '../agents/commands/CapabilityCommands.js';
 import { getDirectMessageCommands } from '../agents/commands/DirectMessageCommands.js';
-import { getTemplateCommands } from '../agents/commands/TemplateCommands.js';
 import { getTaskCommands } from '../agents/commands/TaskCommands.js';
 import { parseCommandPayload } from '../agents/commands/commandSchemas.js';
 import { z } from 'zod';

@@ -5,7 +5,7 @@
 
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import { logger } from '../utils/logger.js';
-import type { AgentManager, AgentManagerEvents } from '../agents/AgentManager.js';
+import type { AgentManager } from '../agents/AgentManager.js';
 import type { NotificationEvent, NotificationCategory, MessagingAdapter, OutboundMessage } from './types.js';
 import type { NotificationService, NotifiableEvent } from '../coordination/alerts/NotificationService.js';
 

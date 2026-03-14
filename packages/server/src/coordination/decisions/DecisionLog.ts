@@ -3,7 +3,7 @@ import { eq, asc, desc, and, inArray, lte, sql } from 'drizzle-orm';
 import type { Database } from '../../db/database.js';
 import { decisions } from '../../db/schema.js';
 
-import { DECISION_CATEGORIES, type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
+import { type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
 export { DECISION_CATEGORIES, type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
 
 export interface BatchResult {

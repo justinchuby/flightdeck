@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Users, Clock, Play, Pause, SkipBack, SkipForward, MapPin } from 'lucide-react';
-import type { ShareableReplay, ReplayAnnotation, ReplayHighlight } from './types';
+import type { ShareableReplay } from './types';
 import { AnnotationPin } from './AnnotationPin';
 
 /**
@@ -10,7 +10,7 @@ import { AnnotationPin } from './AnnotationPin';
  */
 export function SharedReplayViewer() {
   const { token } = useParams<{ token: string }>();
-  const [searchParams] = useSearchParams();
+  const [_searchParams] = useSearchParams();
   const [replay, setReplay] = useState<ShareableReplay | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

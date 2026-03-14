@@ -47,7 +47,7 @@ import { RoleTestDialog } from '../Roles/RoleTestDialog';
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-function makeAgent(overrides: Record<string, any> = {}) {
+function _makeAgent(overrides: Record<string, any> = {}) {
   return {
     id: 'agent-1',
     role: { id: 'r-1', icon: '🏗', name: 'Architect', description: '', systemPrompt: '', color: '#6366f1', builtIn: true },
@@ -65,7 +65,7 @@ function makeAgent(overrides: Record<string, any> = {}) {
   };
 }
 
-function makeDecision(overrides: Record<string, any> = {}) {
+function _makeDecision(overrides: Record<string, any> = {}) {
   return {
     id: 'dec-1',
     agentId: 'agent-1',

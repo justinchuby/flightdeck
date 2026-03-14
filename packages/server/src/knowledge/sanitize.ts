@@ -40,7 +40,7 @@ const INJECTION_PATTERNS: RegExp[] = [
  */
 export function sanitizeContent(content: string): string {
   // Strip control characters (keep \n and \t for readability)
-  // eslint-disable-next-line no-control-regex
+   
   let sanitized = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
   // Strip XML closing tags that could escape the <project-context> boundary.

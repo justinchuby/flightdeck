@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import type { Role, ServerConfig } from '../types';
 import { useAppStore } from '../stores/appStore';
 

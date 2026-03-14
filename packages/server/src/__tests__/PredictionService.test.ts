@@ -3,7 +3,6 @@ import {
   PredictionService,
   type AgentSnapshot,
   type BudgetSnapshot,
-  type PredictionConfig,
 } from '../coordination/predictions/PredictionService.js';
 
 // ── Mock Database ─────────────────────────────────────────────────

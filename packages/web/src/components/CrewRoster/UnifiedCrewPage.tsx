@@ -26,7 +26,7 @@ import { sessionStatusDot } from '../../utils/statusColors';
 import { useToastStore } from '../Toast';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
-import { StatusBadge, agentStatusProps, connectionStatusProps } from '../ui/StatusBadge';
+import { StatusBadge, agentStatusProps } from '../ui/StatusBadge';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 
 import { AgentDetailPanel } from '../AgentDetailPanel';

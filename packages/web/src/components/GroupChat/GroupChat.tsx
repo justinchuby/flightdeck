@@ -483,7 +483,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
     ? groups.find((g) => g.name === selectedGroup.name && g.leadId === selectedGroup.leadId)
     : null;
 
-  const memberNames = selectedGroupData
+  const _memberNames = selectedGroupData
     ? selectedGroupData.memberIds.map((id) => agentName(id)).join(', ')
     : '';
 

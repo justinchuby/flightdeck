@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SessionRetro, type SessionRetroData, type AgentScorecard, type BottleneckEntry } from '../coordination/sessions/SessionRetro.js';
+import { SessionRetro, type SessionRetroData } from '../coordination/sessions/SessionRetro.js';
 
 // ── Mock helpers ──────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ describe('SessionRetro', () => {
     });
 
     it('stores retro in database', () => {
-      const data = retro.generateRetro('lead-1');
+      const _data = retro.generateRetro('lead-1');
 
       expect(deps.db.drizzle.insert).toHaveBeenCalled();
       expect(deps.db._insertRun).toHaveBeenCalled();

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { CrewPage } from '../CrewPage';
 
@@ -128,7 +128,7 @@ function setupMocks(overrides: Partial<{
   profile: any;
   crewDetail: any;
 }> = {}) {
-  mockApiFetch.mockImplementation((path: string, opts?: any) => {
+  mockApiFetch.mockImplementation((path: string, _opts?: any) => {
     if (path === '/crews') return Promise.resolve(overrides.crews ?? crewsData);
     if (path.includes('/profile')) return Promise.resolve(overrides.profile ?? profileData);
     if (path.includes('/health')) return Promise.resolve(overrides.health ?? healthData);

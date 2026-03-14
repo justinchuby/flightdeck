@@ -78,7 +78,7 @@ function validateCwd(cwd: unknown): string | null {
 }
 
 export function projectsRoutes(ctx: AppContext): Router {
-  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro, costTracker } = ctx;
+  const { agentManager, roleRegistry, projectRegistry, db: _db, storageManager, agentRoster, sessionRetro: _sessionRetro, costTracker } = ctx;
   const router = Router();
 
   // --- Projects (persistent) ---
@@ -472,12 +472,12 @@ export function projectsRoutes(ctx: AppContext): Router {
         .from(chatGroupMembers)
         .where(eq(chatGroupMembers.groupName, g.name))
         .all()
-        .filter((m) => leadIds.includes(g.leadId));
+        .filter((_m) => leadIds.includes(g.leadId));
       const msgCount = _db.drizzle.select({ id: chatGroupMessages.id })
         .from(chatGroupMessages)
         .where(eq(chatGroupMessages.groupName, g.name))
         .all()
-        .filter((m) => true).length; // count via length
+        .filter((_m) => true).length; // count via length
       return {
         name: g.name,
         leadId: g.leadId,

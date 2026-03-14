@@ -90,7 +90,6 @@ vi.mock('../../hooks/useHistoricalAgents', () => ({
 import { CanvasPage } from '../Canvas';
 import { CanvasToolbar } from '../Canvas/CanvasToolbar';
 import { TaskPill } from '../Canvas/TaskPill';
-import { AgentNode } from '../Canvas/AgentNode';
 import { useCanvasGraph } from '../../hooks/useCanvasGraph';
 
 // ── Test Data ──────────────────────────────────────────────────────
@@ -201,7 +200,7 @@ describe('Canvas Lite', () => {
         makeAgent('dev-002', 'architect'),
       ];
       // Direct hook test via renderHook-like approach
-      const { nodes, edges } = useCanvasGraph.__test_transform?.(agents, [], null)
+      const { _nodes, _edges } = useCanvasGraph.__test_transform?.(agents, [], null)
         ?? { nodes: [], edges: [] };
       // Since __test_transform doesn't exist, test via component rendering
     });

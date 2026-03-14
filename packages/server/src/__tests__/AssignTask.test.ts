@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Database } from '../db/database.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
-import type { DagTaskInput } from '../tasks/TaskDAG.js';
 import { CommandDispatcher, type CommandContext } from '../agents/CommandDispatcher.js';
 import type { Agent } from '../agents/Agent.js';
 
@@ -368,7 +367,7 @@ describe('ASSIGN_TASK command', () => {
     dispatch(dispatcher2, leadAgent, '⟦⟦ ASSIGN_TASK {"taskId": "task-del", "agentId": "agent-del"} ⟧⟧');
 
     // Check delegation was created (access via the context's delegations map)
-    const delegations = (ctx as any).delegations || (dispatcher2 as any).delegations;
+    const _delegations = (ctx as any).delegations || (dispatcher2 as any).delegations;
     // The delegation record should have been set — verify agent got notified
     expect(targetAgent.sendMessage).toHaveBeenCalledWith(expect.stringContaining('DAG Task: task-del'));
     expect(targetAgent.task).toBe('Delegation test');

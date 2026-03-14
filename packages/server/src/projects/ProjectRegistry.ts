@@ -128,7 +128,7 @@ export class ProjectRegistry {
     const allLeadIds = sessions.map(s => s.leadId);
 
     // Task summary across all sessions for this project
-    let taskSummary = { total: 0, done: 0, failed: 0, pending: 0 };
+    const taskSummary = { total: 0, done: 0, failed: 0, pending: 0 };
     const taskRows = this.db.drizzle
       .select({
         dagStatus: dagTasks.dagStatus,

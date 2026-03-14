@@ -176,7 +176,7 @@ describe('TaskDAG E2E', () => {
 
       // Complete task-a — now task-c can proceed
       dag.completeTask(LEAD, 'task-a');
-      const readyAfter = dag.resolveReady(LEAD);
+      const _readyAfter = dag.resolveReady(LEAD);
       // task-c was promoted to ready by completeTask of task-b,
       // but it was still in pending. After task-a releases files,
       // resolveReady should find it (or it was already promoted)

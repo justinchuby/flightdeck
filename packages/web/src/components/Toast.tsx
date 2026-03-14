@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useEffect } from 'react';
 import { X, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 
 export interface Toast {

@@ -2,7 +2,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore, ESCALATION_RULES, shouldNotify } from '../settingsStore';
-import type { OversightLevel } from '../settingsStore';
 
 describe('settingsStore — Trust Dial', () => {
   beforeEach(() => {

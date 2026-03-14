@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { ReplayScrubber } from '../SessionReplay/ReplayScrubber';
 import { useSessionReplay } from '../../hooks/useSessionReplay';

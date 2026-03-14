@@ -132,11 +132,11 @@ describe('SyncEngine', () => {
     });
 
     it('continues syncing other projects if one fails', () => {
-      let callCount = 0;
+      let _callCount = 0;
       const provider = createMockProvider({
         getActiveProjectIds: () => ['proj-good', 'proj-bad', 'proj-good2'],
         getProject: (id) => {
-          callCount++;
+          _callCount++;
           if (id === 'proj-bad') throw new Error('DB error');
           return {
             id, name: 'Good', cwd: null, status: 'active',
@@ -261,7 +261,7 @@ describe('SyncEngine', () => {
       engine.syncNow();
 
       // Poison the manifest with a traversal path
-      const projectDir = storage.getProjectDir('test-proj-a1b2');
+      const _projectDir = storage.getProjectDir('test-proj-a1b2');
       const manifest = storage.readSyncManifest('test-proj-a1b2');
       manifest.files['../../../etc/passwd'] = 'deadbeef';
       storage.writeSyncManifest('test-proj-a1b2', manifest);

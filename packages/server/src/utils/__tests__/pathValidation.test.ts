@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { join, resolve, sep } from 'path';
+import { join, resolve } from 'path';
 import { isPathWithinDir, validatePathWithinDir, assertPathWithinDir } from '../pathValidation.js';
 
 const BASE = '/tmp/project';

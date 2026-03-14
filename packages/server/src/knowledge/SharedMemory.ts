@@ -72,7 +72,7 @@ function isSharedKey(key: string): boolean {
   return key.startsWith(SHARED_PREFIX);
 }
 
-function userKey(key: string): string {
+function _userKey(key: string): string {
   return key.startsWith(SHARED_PREFIX) ? key.slice(SHARED_PREFIX.length) : key;
 }
 

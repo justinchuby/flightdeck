@@ -312,8 +312,6 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
 
   // Surface DMs in the lead chat panel
   const preview = (msg.content ?? '').slice(0, 2000);
-  const senderRole = msg.fromRole || fromAgent?.role?.name || 'Agent';
-  const senderId = shortAgentId(msg.from ?? '');
   if (msg.from === 'system' && msg.to === leadId) {
     store.addMessage(leadId, { type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system', timestamp: Date.now() });
   } else if (isBroadcast) {

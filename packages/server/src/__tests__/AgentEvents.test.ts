@@ -166,7 +166,7 @@ describe('AgentEventEmitter', () => {
       emitter.dispose();
 
       // After dispose, notify should not call any listeners
-      const dataListener = vi.fn();
+      const _dataListener = vi.fn();
       // Can't add new listeners to cleared arrays since they're internal,
       // but we can verify notify doesn't throw
       emitter.notifyData('test');

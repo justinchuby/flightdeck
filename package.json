@@ -48,7 +48,7 @@
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web",
-    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "lint": "eslint packages/*/src/",
     "test:e2e": "npm run test:e2e --workspace=packages/web",
     "test": "npm run test --workspace=packages/server",
     "docs:dev": "npm run dev --workspace=packages/docs",

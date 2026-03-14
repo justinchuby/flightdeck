@@ -13,7 +13,6 @@ import { useState, useEffect } from 'react';
 import {
   Zap,
   Square,
-  Send,
   AlertTriangle,
   ExternalLink,
   RefreshCw,
@@ -21,7 +20,6 @@ import {
   Settings,
   Info,
   Activity,
-  X,
   ArrowLeft,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';

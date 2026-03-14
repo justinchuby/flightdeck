@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NotificationManager } from '../coordination/alerts/NotificationManager.js';
 import type { NotificationPreference } from '../coordination/alerts/NotificationManager.js';
 

@@ -9,7 +9,7 @@
  * Add Task form (submission, validation, errors), context menu API calls,
  * DnD cross-column status change, DnD same-column reorder, DnD invalid targets.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { KanbanBoard } from '../KanbanBoard';
 import type { DagStatus, DagTask, DagTaskStatus } from '../../../types';

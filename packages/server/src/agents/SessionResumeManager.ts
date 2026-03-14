@@ -17,7 +17,6 @@
  *   - agent:status    → update status (running→running, idle→idle)
  *   - agent:terminated → mark as terminated
  */
-import { EventEmitter } from 'events';
 import type { AgentManager } from './AgentManager.js';
 import type { AgentRosterRepository, RosterAgentStatus as RosterStatus } from '../db/AgentRosterRepository.js';
 import type { ActiveDelegationRepository, DelegationRecord } from '../db/ActiveDelegationRepository.js';

@@ -102,7 +102,7 @@ function applyFilters(
 }
 
 /** Timeline visualization page — shows agent activity over time using visx. */
-export function TimelinePage({ api, ws }: Props) {
+export function TimelinePage({ api: _api, ws: _ws }: Props) {
   const contextProjectId = useOptionalProjectId();
   const storeAgents = useAppStore((s) => s.agents);
   const announcements = useAccessibilityAnnouncements();

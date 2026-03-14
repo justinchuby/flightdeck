@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MessageBus, BusMessage } from '../comms/MessageBus.js';
+import { MessageBus } from '../comms/MessageBus.js';
 
 describe('MessageBus', () => {
   let bus: MessageBus;

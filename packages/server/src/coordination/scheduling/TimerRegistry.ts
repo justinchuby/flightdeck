@@ -6,7 +6,7 @@ import * as schema from '../../db/schema.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-import type { Timer, TimerStatus } from '@flightdeck/shared';
+import type { Timer } from '@flightdeck/shared';
 export type { Timer, TimerStatus } from '@flightdeck/shared';
 
 export interface TimerInput {

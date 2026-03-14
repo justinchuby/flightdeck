@@ -1,6 +1,6 @@
 import { eq, and, lt, sql, asc, count as drizzleCount } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
-import { messageQueue, utcNow } from '../db/schema.js';
+import { messageQueue } from '../db/schema.js';
 import { logger } from '../utils/logger.js';
 
 export type MessageType = 'agent_message' | 'delegation_result' | 'broadcast' | 'system';

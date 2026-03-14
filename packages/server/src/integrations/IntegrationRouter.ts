@@ -9,7 +9,6 @@ import type { AgentManager } from '../agents/AgentManager.js';
 import type { ProjectRegistry } from '../projects/ProjectRegistry.js';
 import type {
   InboundMessage,
-  OutboundMessage,
   ChatSession,
   MessagingAdapter,
   TelegramConfig,

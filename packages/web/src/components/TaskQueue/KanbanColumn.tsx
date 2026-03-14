@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
-import type { DagTask, DagTaskStatus } from '../../types';
+import type { DagTask } from '../../types';
 import { type ColumnDef, STATUS_BG, COLUMN_TOOLTIPS, DEFAULT_VISIBLE } from './kanbanConstants';
 import { SortableTaskCard } from './TaskCard';
 

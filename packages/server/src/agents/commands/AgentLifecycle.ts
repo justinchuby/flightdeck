@@ -5,7 +5,6 @@
  */
 import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js';
-import type { DagTask } from '../../tasks/TaskDAG.js';
 import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
@@ -851,7 +850,7 @@ export function maybeSuggestDagGroup(
     if (agents.size >= 3) {
       // Group overlapping agent sets by merging into the best keyword
       let merged = false;
-      for (const [existingKw, existingAgents] of clusters) {
+      for (const [_existingKw, existingAgents] of clusters) {
         const overlap = [...agents].filter(a => existingAgents.has(a)).length;
         if (overlap >= 2) {
           // Merge into existing cluster, keep the keyword with more agents

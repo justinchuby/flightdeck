@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, within, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import type { DagStatus, DagTask } from '../../../types';
 
 // ── Mock @xyflow/react ────────────────────────────────────────────────────
 
 let capturedOnNodeClick: ((event: unknown, node: unknown) => void) | undefined;
-let capturedOnNodeMouseEnter: ((event: unknown, node: unknown) => void) | undefined;
+let _capturedOnNodeMouseEnter: ((event: unknown, node: unknown) => void) | undefined;
 
 vi.mock('@xyflow/react', () => {
-  const ReactFlow = ({ children, onNodeClick, onNodeMouseEnter, ...rest }: Record<string, unknown>) => {
+  const ReactFlow = ({ children, onNodeClick, onNodeMouseEnter, ..._rest }: Record<string, unknown>) => {
     capturedOnNodeClick = onNodeClick as typeof capturedOnNodeClick;
-    capturedOnNodeMouseEnter = onNodeMouseEnter as typeof capturedOnNodeMouseEnter;
+    _capturedOnNodeMouseEnter = onNodeMouseEnter as typeof _capturedOnNodeMouseEnter;
     return <div data-testid="react-flow">{children as React.ReactNode}</div>;
   };
   return {

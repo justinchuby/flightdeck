@@ -59,7 +59,7 @@ interface Props {
   readOnly?: boolean;
 }
 
-export function LeadDashboard({ api, ws, readOnly = false }: Props) {
+export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
   const { projects, selectedLeadId, drafts } = useLeadStore(
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
@@ -91,7 +91,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
     if (selectedLeadId) useLeadStore.getState().setDraft(selectedLeadId, text);
   }, [selectedLeadId]);
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
-  const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, handlePaste: leadPaste, dropZoneClassName: leadDropZoneClassName } = useFileDrop({
+  const { isDragOver: isLeadDragOver, handleDragOver: leadDragOver, handleDragLeave: leadDragLeave, handleDrop: leadDrop, handlePaste: leadPaste, dropZoneClassName: _leadDropZoneClassName } = useFileDrop({
     onAttach: addAttachment,
   });
   const [showNewProject, setShowNewProject] = useState(false);
@@ -110,7 +110,7 @@ export function LeadDashboard({ api, ws, readOnly = false }: Props) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= 4) {
-          let tabs = parsed.filter((id: string) => id !== 'activity');
+          const tabs = parsed.filter((id: string) => id !== 'activity');
           // Migrate: ensure all supported tabs are present
           let changed = false;
           for (const tab of allSupportedTabs) {

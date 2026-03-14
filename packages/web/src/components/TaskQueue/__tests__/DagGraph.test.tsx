@@ -18,7 +18,7 @@ let capturedOnNodeClick: ((event: unknown, node: unknown) => void) | undefined;
 let capturedOnMoveStart: (() => void) | undefined;
 
 vi.mock('@xyflow/react', () => {
-  const ReactFlow = ({ children, onNodeMouseEnter, onNodeMouseLeave, onNodeClick, onMoveStart, ...rest }: Record<string, unknown>) => {
+  const ReactFlow = ({ children, onNodeMouseEnter, onNodeMouseLeave, onNodeClick, onMoveStart, ..._rest }: Record<string, unknown>) => {
     capturedOnNodeMouseEnter = onNodeMouseEnter as typeof capturedOnNodeMouseEnter;
     capturedOnNodeMouseLeave = onNodeMouseLeave as typeof capturedOnNodeMouseLeave;
     capturedOnNodeClick = onNodeClick as typeof capturedOnNodeClick;

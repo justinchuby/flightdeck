@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Database } from '../../db/database.js';
 import { KnowledgeStore } from '../KnowledgeStore.js';
 import { SharedMemory } from '../SharedMemory.js';
-import type { KnowledgeEntry } from '../types.js';
 
 describe('SharedMemory', () => {
   let db: Database;
@@ -170,7 +169,7 @@ describe('SharedMemory', () => {
     });
 
     it('returns empty for agent with no shared knowledge from others', () => {
-      const shared2 = new SharedMemory(store);
+      const _shared2 = new SharedMemory(store);
       // Only one agent has shared
       const freshStore = new KnowledgeStore(db);
       const freshShared = new SharedMemory(freshStore);

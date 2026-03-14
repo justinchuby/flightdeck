@@ -23,7 +23,7 @@ interface Props {
   };
 }
 
-export function ChatPanel({ agentId, ws }: Props) {
+export function ChatPanel({ agentId, ws: _ws }: Props) {
   const [inputText, setInputText] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [broadcast, setBroadcast] = useState(false);
@@ -35,7 +35,7 @@ export function ChatPanel({ agentId, ws }: Props) {
   const agent = agents.find((a) => a.id === agentId);
 
   const { attachments, addAttachment, removeAttachment, clearAttachments } = useAttachments();
-  const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handlePaste, dropZoneClassName } = useFileDrop({
+  const { isDragOver, handleDragOver, handleDragLeave, handleDrop, handlePaste, dropZoneClassName: _dropZoneClassName } = useFileDrop({
     onAttach: addAttachment,
   });
 

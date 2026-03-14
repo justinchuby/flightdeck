@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PerformanceTracker } from '../coordination/reporting/PerformanceScorecard.js';
-import type { AgentScorecard } from '../coordination/reporting/PerformanceScorecard.js';
 import type { ActivityLedger, ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 import type { AgentManager } from '../agents/AgentManager.js';
 
