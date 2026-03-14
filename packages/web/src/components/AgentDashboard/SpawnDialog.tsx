@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useModels, deriveModelName } from '../../hooks/useModels';
-import { apiFetch } from '../../hooks/useApi';
+import { apiFetch, useApi } from '../../hooks/useApi';
 import { X, ChevronDown } from 'lucide-react';
 
 interface ProviderStatus {
@@ -13,13 +13,12 @@ interface ProviderStatus {
 }
 
 interface Props {
-  api: any;
+  api: Pick<ReturnType<typeof useApi>, 'spawnAgent'>;
   onClose: () => void;
 }
 
 export function SpawnDialog({ api, onClose }: Props) {
   const roles = useAppStore((s) => s.roles);
-  const config = useAppStore((s) => s.config);
   const { filteredModels: models } = useModels();
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -31,18 +30,14 @@ export function SpawnDialog({ api, onClose }: Props) {
 
   // Fetch available providers
   useEffect(() => {
-    const baseUrl = (config as any)?.baseUrl || '';
     const fetchData = async () => {
       try {
-        const provRes = await fetch(`${baseUrl}/settings/providers`);
-        if (provRes.ok) {
-          const data = await provRes.json();
-          setProviders(data.filter((p: ProviderStatus) => p.installed));
-        }
+        const data = await apiFetch<ProviderStatus[]>('/settings/providers');
+        setProviders(data.filter((p) => p.installed));
       } catch { /* ignore — advanced options just won't be available */ }
     };
     fetchData();
-  }, [config]);
+  }, []);
 
   const handleSpawn = async () => {
     if (!selectedRole) return;

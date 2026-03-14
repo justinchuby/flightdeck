@@ -6,7 +6,7 @@
  *
  * Useful for browsing design specs, skills, and project files.
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Paintbrush,
   FileText,
@@ -54,6 +54,7 @@ export function DesignPanel() {
   const loadFile = useCallback(async (path: string) => {
     setLoading(true);
     setError(null);
+    setCopied(false);
     try {
       const data = await apiFetch<FileData>(
         `/projects/${projectId}/file-contents?path=${encodeURIComponent(path)}`,
@@ -80,9 +81,6 @@ export function DesignPanel() {
       // Clipboard might be unavailable
     }
   }, [fileData]);
-
-  // Reset copied state when file changes
-  useEffect(() => { setCopied(false); }, [selectedPath]);
 
   const isMarkdown = fileData && MARKDOWN_EXTS.has(fileData.ext);
   const isCode = fileData && CODE_EXTS.has(fileData.ext);

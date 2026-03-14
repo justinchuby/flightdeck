@@ -137,7 +137,7 @@ describe('leadStore', () => {
     it('addMessage inserts a system separator correctly', () => {
       // Simulate: agent sends a response, then interrupt adds separator + user message
       useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'agent response');
-      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'interrupt message', sender: 'user', timestamp: Date.now() });
 
       const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
@@ -151,7 +151,7 @@ describe('leadStore', () => {
 
     it('separator causes next appendToLastAgentMessage to start a new bubble', () => {
       useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'old text');
-      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'interrupt msg', sender: 'user', timestamp: Date.now() });
       // New agent response after interrupt
       useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'new response');
@@ -171,13 +171,13 @@ describe('leadStore', () => {
       useLeadStore.getState().addMessage(LEAD_ID, {
         type: 'text',
         text: '📨 [From Developer abc12345] Hello lead',
-        sender: 'system' as any,
+        sender: 'system',
         timestamp: Date.now(),
       });
       useLeadStore.getState().addMessage(LEAD_ID, {
         type: 'text',
         text: '🗣️ [design-chat: Architect def67890] Let us discuss',
-        sender: 'system' as any,
+        sender: 'system',
         timestamp: Date.now(),
       });
 

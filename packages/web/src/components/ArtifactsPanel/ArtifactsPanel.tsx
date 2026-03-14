@@ -104,6 +104,7 @@ export function ArtifactsPanel() {
   const loadFile = useCallback(async (artifact: SessionArtifact) => {
     setFileLoading(true);
     setFileError(null);
+    setCopied(false);
     try {
       const url = artifact.source === 'copilot-session'
         ? `/projects/${projectId}/session-artifact?agentId=${encodeURIComponent(artifact.agentId)}&path=${encodeURIComponent(artifact.path)}`
@@ -129,8 +130,6 @@ export function ArtifactsPanel() {
       setTimeout(() => setCopied(false), 2000);
     } catch { /* clipboard unavailable */ }
   }, [fileData]);
-
-  useEffect(() => { setCopied(false); }, [selectedKey]);
 
   const copyPath = useCallback(async () => {
     if (!artifactBasePath) return;

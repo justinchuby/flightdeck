@@ -9,11 +9,12 @@ import { formatTokens } from '../../utils/format';
 import { DiffBadge } from '../DiffPreview';
 import { useModels } from '../../hooks/useModels';
 import { getProviderColors } from '../../utils/providerColors';
+import type { useApi } from '../../hooks/useApi';
 
 interface Props {
   agent: AgentInfo;
-  api: any;
-  ws: any;
+  api: Pick<ReturnType<typeof useApi>, 'restartAgent' | 'interruptAgent' | 'terminateAgent' | 'updateAgent'>;
+  ws?: unknown;
 }
 
 export function AgentCard({ agent, api }: Props) {
@@ -193,7 +194,7 @@ export function AgentCard({ agent, api }: Props) {
         const latest = active[active.length - 1] ?? agent.toolCalls[agent.toolCalls.length - 1];
         return (
           <div className="text-[10px] text-th-text-muted mt-1 truncate">
-            🔧 {typeof latest.title === 'string' ? latest.title : (latest.title as any)?.text ?? JSON.stringify(latest.title)}
+            🔧 {typeof latest.title === 'string' ? latest.title : JSON.stringify(latest.title)}
           </div>
         );
       })()}
