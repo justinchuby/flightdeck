@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'Flightdeck',
-  description: 'Multi-Agent Copilot CLI Orchestrator',
+  description: 'Multi-Agent Orchestration Platform',
   base: '/',
   head: [['link', { rel: 'icon', href: '/favicon.ico' }]],
   themeConfig: {

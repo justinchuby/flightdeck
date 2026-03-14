@@ -4,7 +4,7 @@ Key architectural choices and their rationale.
 
 ## 1. ACP Communication
 
-**Decision:** Use the Agent Client Protocol (ACP) as the communication mode with Copilot CLI agents.
+**Decision:** Use the Agent Client Protocol (ACP) as the communication mode with all CLI agent providers.
 
 **Rationale:** ACP provides structured JSON-RPC messaging instead of raw terminal I/O. This gives us:
 - Typed session management (initialize → newSession → prompt)
