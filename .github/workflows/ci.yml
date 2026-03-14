@@ -110,3 +110,5 @@ jobs:
           files: packages/server/coverage/lcov.info
           flags: server
           fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
