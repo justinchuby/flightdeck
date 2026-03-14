@@ -75,7 +75,7 @@ class AgentPseudoterminal implements vscode.Pseudoterminal {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ text: message }),
         },
       );
       if (!res.ok) {

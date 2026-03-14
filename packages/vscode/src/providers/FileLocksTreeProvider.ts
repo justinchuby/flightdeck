@@ -39,6 +39,10 @@ export class FileLocksTreeProvider implements vscode.TreeDataProvider<LockTreeIt
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  dispose(): void {
+    this._onDidChangeTreeData.dispose();
+  }
+
   async getChildren(): Promise<LockTreeItem[]> {
     if (!this.connection.connected) return [];
 

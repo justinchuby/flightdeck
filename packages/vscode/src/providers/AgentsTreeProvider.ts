@@ -58,6 +58,10 @@ export class AgentsTreeProvider implements vscode.TreeDataProvider<AgentTreeItem
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  dispose(): void {
+    this._onDidChangeTreeData.dispose();
+  }
+
   async getChildren(element?: AgentTreeItem): Promise<AgentTreeItem[]> {
     if (!this.connection.connected) return [];
 

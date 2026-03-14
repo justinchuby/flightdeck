@@ -33,13 +33,14 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
           placeHolder: 'http://localhost:3001',
         });
         if (input === undefined) return; // cancelled
-        if (input !== serverUrl) {
+        serverUrl = input;
+        if (input !== config.get<string>('serverUrl', 'http://localhost:3001')) {
           await config.update('serverUrl', input, vscode.ConfigurationTarget.Workspace);
         }
       }
 
-      outputChannel.appendLine(`Connecting to ${connection.serverUrl}...`);
-      await connection.connect();
+      outputChannel.appendLine(`Connecting to ${serverUrl}...`);
+      await connection.connect(serverUrl);
 
       if (connection.connected) {
         vscode.window.showInformationMessage('Flightdeck: Connected');
@@ -58,10 +59,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
     // ── Dashboard ─────────────────────────────────────────────
     vscode.commands.registerCommand('flightdeck.openDashboard', () => {
       outputChannel.appendLine('Opening dashboard...');
-      DashboardPanel.createOrShow(
-        extensionUri,
-        connection.connected ? connection.serverUrl : undefined,
-      );
+      DashboardPanel.createOrShow(extensionUri, connection);
     }),
 
     // ── Refresh ───────────────────────────────────────────────
@@ -96,7 +94,7 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
         const res = await fetch(`${connection.serverUrl}/api/agents/${agentId}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: message }),
+          body: JSON.stringify({ text: message }),
         });
         if (res.ok) {
           outputChannel.appendLine(`Message sent to ${agentId.slice(0, 8)}`);

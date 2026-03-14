@@ -72,13 +72,21 @@ export class WebviewSocket {
 
   constructor() {
     onMessage((msg) => {
-      if (msg.type === 'ws:message' && this._onMessageHandler) {
-        this._onMessageHandler(JSON.stringify(msg.payload));
+      switch (msg.type) {
+        case 'ws:message':
+          this._onMessageHandler?.(JSON.stringify(msg.payload));
+          break;
+        case 'ws:open':
+          this._onOpenHandler?.();
+          break;
+        case 'ws:close':
+          this._onCloseHandler?.();
+          break;
       }
     });
 
-    // Signal "open" on next tick so callers can attach handlers first
-    setTimeout(() => this._onOpenHandler?.(), 0);
+    // Notify the extension host that the webview is ready
+    sendToExtension({ type: 'ready' });
   }
 
   send(data: string): void {

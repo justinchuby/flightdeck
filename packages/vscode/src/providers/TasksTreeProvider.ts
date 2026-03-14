@@ -55,6 +55,10 @@ export class TasksTreeProvider implements vscode.TreeDataProvider<TaskTreeItem> 
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  dispose(): void {
+    this._onDidChangeTreeData.dispose();
+  }
+
   async getChildren(element?: TaskTreeItem): Promise<TaskTreeItem[]> {
     if (!this.connection.connected) return [];
 

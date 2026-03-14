@@ -1,14 +1,13 @@
 import * as vscode from 'vscode';
-import { WebSocket } from 'ws';
-import * as path from 'path';
 import * as crypto from 'crypto';
+import type { FlightdeckConnection, ServerMessage } from './connection';
 
 /**
  * Manages the Flightdeck Dashboard webview panel.
  *
  * Creates a single webview panel that loads the React app from dist/webview/,
- * and bridges postMessage between the webview and the Flightdeck server's
- * WebSocket connection.
+ * and bridges postMessage between the webview and the extension host's
+ * FlightdeckConnection (no duplicate WebSocket).
  */
 export class DashboardPanel {
   public static readonly viewType = 'flightdeck.dashboard';
@@ -16,11 +15,10 @@ export class DashboardPanel {
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
-  private _ws: WebSocket | null = null;
   private _disposables: vscode.Disposable[] = [];
 
   /** Show the dashboard panel, creating it if it doesn't exist. */
-  static createOrShow(extensionUri: vscode.Uri, serverUrl?: string): DashboardPanel {
+  static createOrShow(extensionUri: vscode.Uri, connection: FlightdeckConnection): DashboardPanel {
     const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
 
     if (DashboardPanel._instance) {
@@ -41,14 +39,14 @@ export class DashboardPanel {
       },
     );
 
-    DashboardPanel._instance = new DashboardPanel(panel, extensionUri, serverUrl);
+    DashboardPanel._instance = new DashboardPanel(panel, extensionUri, connection);
     return DashboardPanel._instance;
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    serverUrl?: string,
+    connection: FlightdeckConnection,
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
@@ -56,14 +54,26 @@ export class DashboardPanel {
     // Set initial HTML content
     this._panel.webview.html = this._getWebviewContent(this._panel.webview);
 
-    // Connect to Flightdeck server WebSocket
-    if (serverUrl) {
-      this._connectWebSocket(serverUrl);
+    // Forward server messages to the webview
+    const msgSubscription = connection.onMessage((msg: ServerMessage) => {
+      this._panel.webview.postMessage({ type: 'ws:message', payload: msg });
+    });
+    this._disposables.push(msgSubscription);
+
+    // Notify webview of connection state
+    const connSubscription = connection.onDidChangeConnection((connected: boolean) => {
+      this._panel.webview.postMessage({ type: connected ? 'ws:open' : 'ws:close' });
+    });
+    this._disposables.push(connSubscription);
+
+    // Send initial open signal if already connected
+    if (connection.connected) {
+      this._panel.webview.postMessage({ type: 'ws:open' });
     }
 
     // Handle messages from the webview
     this._panel.webview.onDidReceiveMessage(
-      (msg) => this._handleWebviewMessage(msg),
+      (msg) => this._handleWebviewMessage(msg, connection),
       null,
       this._disposables,
     );
@@ -72,47 +82,16 @@ export class DashboardPanel {
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
   }
 
-  // ── WebSocket bridge ──────────────────────────────────────────
-
-  private _connectWebSocket(serverUrl: string): void {
-    const wsUrl = serverUrl.replace(/^http/, 'ws') + '/ws';
-    this._ws = new WebSocket(wsUrl);
-
-    this._ws.on('open', () => {
-      this._panel.webview.postMessage({ type: 'ws:open' });
-    });
-
-    this._ws.on('message', (data) => {
-      try {
-        const payload = JSON.parse(data.toString());
-        this._panel.webview.postMessage({ type: 'ws:message', payload });
-      } catch {
-        // Non-JSON message, forward as-is
-        this._panel.webview.postMessage({ type: 'ws:message', payload: data.toString() });
-      }
-    });
-
-    this._ws.on('close', () => {
-      this._panel.webview.postMessage({ type: 'ws:close' });
-    });
-
-    this._ws.on('error', (err) => {
-      console.error('[DashboardPanel] WebSocket error:', err.message);
-    });
-  }
-
-  private _handleWebviewMessage(msg: { type: string; payload?: unknown }): void {
+  private _handleWebviewMessage(msg: { type: string; payload?: unknown }, connection: FlightdeckConnection): void {
     switch (msg.type) {
       case 'ws:send':
-        if (this._ws?.readyState === WebSocket.OPEN) {
-          this._ws.send(JSON.stringify(msg.payload));
-        }
-        break;
-      case 'ws:close':
-        this._ws?.close();
+        connection.send(msg.payload as Record<string, unknown>);
         break;
       case 'ready':
-        // Webview loaded and ready — could send initial state here
+        // Webview loaded and ready
+        if (connection.connected) {
+          this._panel.webview.postMessage({ type: 'ws:open' });
+        }
         break;
     }
   }
@@ -157,9 +136,6 @@ export class DashboardPanel {
 
   dispose(): void {
     DashboardPanel._instance = undefined;
-
-    this._ws?.close();
-    this._ws = null;
 
     this._panel.dispose();
 
