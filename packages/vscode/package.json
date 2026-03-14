@@ -97,6 +97,16 @@
         "command": "flightdeck.approveDecision",
         "title": "Approve Decision",
         "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.startServer",
+        "title": "Start Server",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.stopServer",
+        "title": "Stop Server",
+        "category": "Flightdeck"
       }
     ],
     "menus": {
@@ -142,6 +152,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show notifications for agent events"
+        },
+        "flightdeck.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Flightdeck server binary. Leave empty to auto-detect (monorepo, npx, or global install)."
         }
       }
     }
@@ -150,7 +165,8 @@
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "package": "vsce package --no-dependencies",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "cd ../.. && npx vitest run packages/vscode/src/__tests__/"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",

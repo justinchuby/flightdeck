@@ -2,12 +2,14 @@ import * as vscode from 'vscode';
 import type { FlightdeckConnection } from './connection';
 import type { AgentsTreeProvider } from './providers/AgentsTreeProvider';
 import type { TasksTreeProvider } from './providers/TasksTreeProvider';
+import type { ServerManager } from './serverManager';
 import { DashboardPanel } from './webview/DashboardPanel';
 
 interface CommandDeps {
   connection: FlightdeckConnection;
   agentsProvider: AgentsTreeProvider;
   tasksProvider: TasksTreeProvider;
+  serverManager: ServerManager;
   extensionUri: vscode.Uri;
   outputChannel: vscode.OutputChannel;
 }
@@ -17,35 +19,55 @@ interface CommandDeps {
  * Returns disposables that should be added to context.subscriptions.
  */
 export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
-  const { connection, agentsProvider, tasksProvider, extensionUri, outputChannel } = deps;
+  const { connection, agentsProvider, tasksProvider, serverManager, extensionUri, outputChannel } = deps;
 
   return [
     // ── Connection ────────────────────────────────────────────
     vscode.commands.registerCommand('flightdeck.connect', async () => {
-      const config = vscode.workspace.getConfiguration('flightdeck');
-      let serverUrl = config.get<string>('serverUrl', 'http://localhost:3001');
-
-      // Prompt for URL if not default or if connection fails
-      if (!connection.connected) {
-        const input = await vscode.window.showInputBox({
-          prompt: 'Flightdeck server URL',
-          value: serverUrl,
-          placeHolder: 'http://localhost:3001',
-        });
-        if (input === undefined) return; // cancelled
-        serverUrl = input;
-        if (input !== config.get<string>('serverUrl', 'http://localhost:3001')) {
-          await config.update('serverUrl', input, vscode.ConfigurationTarget.Workspace);
-        }
+      if (connection.connected) {
+        vscode.window.showInformationMessage('Flightdeck: Already connected');
+        return;
       }
 
-      outputChannel.appendLine(`Connecting to ${serverUrl}...`);
-      await connection.connect(serverUrl);
+      // Run discovery with progress indicator
+      const serverUrl = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'Discovering Flightdeck server...',
+          cancellable: true,
+        },
+        async (_progress, token) => {
+          const discovered = await connection.discoverServer();
+          if (token.isCancellationRequested) return undefined;
+          return discovered;
+        },
+      );
 
-      if (connection.connected) {
-        vscode.window.showInformationMessage('Flightdeck: Connected');
+      if (serverUrl === undefined) return; // cancelled
+
+      if (serverUrl) {
+        outputChannel.appendLine(`Connecting to discovered server at ${serverUrl}...`);
+        await connection.connect(serverUrl);
+        if (connection.connected) {
+          vscode.window.showInformationMessage(`Flightdeck: Connected to ${serverUrl}`);
+        } else {
+          vscode.window.showWarningMessage('Flightdeck: Failed to connect');
+        }
       } else {
-        vscode.window.showWarningMessage('Flightdeck: Failed to connect');
+        // No server found — prompt for URL
+        const input = await vscode.window.showInputBox({
+          prompt: 'No Flightdeck server found. Enter server URL:',
+          value: 'http://localhost:3001',
+          placeHolder: 'http://localhost:3001',
+        });
+        if (!input) return;
+
+        await connection.connect(input);
+        if (connection.connected) {
+          vscode.window.showInformationMessage(`Flightdeck: Connected to ${input}`);
+        } else {
+          vscode.window.showWarningMessage('Flightdeck: Failed to connect');
+        }
       }
     }),
 
@@ -145,6 +167,21 @@ export function registerCommands(deps: CommandDeps): vscode.Disposable[] {
       } else {
         vscode.window.showWarningMessage(`Flightdeck: Failed to approve (${res.status})`);
       }
+    }),
+
+    // ── Server management ─────────────────────────────────────
+    vscode.commands.registerCommand('flightdeck.startServer', async () => {
+      outputChannel.appendLine('Starting server...');
+      const serverUrl = await serverManager.start();
+      if (serverUrl && !connection.connected) {
+        outputChannel.appendLine('Auto-connecting to started server...');
+        await connection.connect(serverUrl);
+      }
+    }),
+
+    vscode.commands.registerCommand('flightdeck.stopServer', () => {
+      serverManager.stop();
+      connection.disconnect();
     }),
   ];
 }

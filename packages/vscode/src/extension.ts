@@ -7,6 +7,7 @@ import { FileLockDecorationProvider, LockedFileHighlighter } from './decorations
 import { AgentTerminalManager } from './terminals';
 import { StatusBarManager } from './statusbar';
 import { NotificationManager } from './notifications';
+import { ServerManager } from './serverManager';
 import { registerCommands } from './commands';
 
 let outputChannel: vscode.OutputChannel;
@@ -58,6 +59,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // Notifications
   const notifications = new NotificationManager(outputChannel);
 
+  // Server process manager
+  const serverManager = new ServerManager();
+  context.subscriptions.push(serverManager);
+
   // Subscribe to WebSocket messages for terminals and notifications
   connection.onMessage((msg) => {
     notifications.handleMessage(msg);
@@ -69,7 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Refresh all views when connection state changes
   connection.onDidChangeConnection(async (connected) => {
     outputChannel.appendLine(`Connection state: ${connected ? 'connected' : 'disconnected'}`);
-    statusBar.updateConnection(connected);
+    statusBar.updateConnection(connected, connection.serverVersion?.version);
     agentsProvider.refresh();
     tasksProvider.refresh();
     locksProvider.refresh();
@@ -81,15 +86,23 @@ export function activate(context: vscode.ExtensionContext): void {
     connection,
     agentsProvider,
     tasksProvider,
+    serverManager,
     extensionUri: context.extensionUri,
     outputChannel,
   });
   context.subscriptions.push(...commands);
 
-  // Auto-connect if configured
+  // Auto-connect if configured — run discovery silently
   const config = vscode.workspace.getConfiguration('flightdeck');
   if (config.get<boolean>('autoConnect', true)) {
-    vscode.commands.executeCommand('flightdeck.connect');
+    connection.discoverServer().then(async (serverUrl) => {
+      if (serverUrl) {
+        outputChannel.appendLine(`Auto-connect: found server at ${serverUrl}`);
+        await connection.connect(serverUrl);
+      } else {
+        outputChannel.appendLine('Auto-connect: no server found (will retry on command)');
+      }
+    });
   }
 
   outputChannel.appendLine('Flightdeck extension ready');
