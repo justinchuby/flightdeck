@@ -876,8 +876,8 @@ export function CrewRoster() {
             </div>
           ) : (
             crewGroups.map(([leadId, groupAgents]) => (
+              <div key={leadId} className="cv-auto-lg">
               <CrewGroup
-                key={leadId}
                 leadId={leadId}
                 agents={groupAgents}
                 summary={summaryMap.get(leadId) ?? null}
@@ -886,6 +886,7 @@ export function CrewRoster() {
                 selectedAgentId={selectedAgent}
                 onDeleteCrew={handleDeleteCrew}
               />
+              </div>
             ))
           )}
         </div>

@@ -71,7 +71,7 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss
           decisions.map((d: any, i: number) => (
             <div
               key={d.id || `dec-${i}`}
-              className={`bg-th-bg-alt border rounded p-2 cursor-pointer hover:bg-th-bg-muted/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-th-border'}`}
+              className={`cv-auto-lg bg-th-bg-alt border rounded p-2 cursor-pointer hover:bg-th-bg-muted/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-th-border'}`}
               onClick={() => setSelectedDecision(d)}
             >
               <div className="flex items-start gap-2">

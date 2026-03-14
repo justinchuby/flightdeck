@@ -34,7 +34,7 @@ export function ActivityFeedContent({ activity, agents }: { activity: ActivityEv
           const label = agent?.role?.name ?? evt.agentRole;
           const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           return (
-            <div key={evt.id} className="px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
+            <div key={evt.id} className="cv-auto-sm px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
               {getIcon(evt.type, evt.status)}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">

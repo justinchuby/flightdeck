@@ -63,7 +63,7 @@ export function ActivityFeed({ activity, agents }: Props) {
             activity.map((entry) => (
               <div
                 key={entry.id}
-                className="px-3 py-2 hover:bg-surface/50 transition-colors cursor-pointer"
+                className="cv-auto-sm px-3 py-2 hover:bg-surface/50 transition-colors cursor-pointer"
                 onClick={() => setSelected(entry)}
               >
                 <div className="flex items-start gap-2">
