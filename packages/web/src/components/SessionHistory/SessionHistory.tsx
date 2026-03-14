@@ -8,7 +8,6 @@ import {
   Users,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Play,
   ListChecks,
   Eye,
@@ -45,7 +44,7 @@ interface SessionHistoryProps {
 
 const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
   completed: { icon: CheckCircle2, color: 'text-green-500', label: 'Completed' },
-  active: { icon: AlertCircle, color: 'text-yellow-500', label: 'Active' },
+  active: { icon: Play, color: 'text-blue-500', label: 'Running' },
   stopped: { icon: XCircle, color: 'text-orange-500', label: 'Stopped' },
   crashed: { icon: XCircle, color: 'text-red-500', label: 'Crashed' },
 };
