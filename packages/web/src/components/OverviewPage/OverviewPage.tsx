@@ -58,8 +58,6 @@ const SEVERITY_BG: Record<AlertSeverity, string> = {
 
 const EMPTY_DECISIONS: Decision[] = [];
 
-// ── Props ──────────────────────────────────────────────────────────
-
 // ── Component ──────────────────────────────────────────────────────
 
 export function OverviewPage() {

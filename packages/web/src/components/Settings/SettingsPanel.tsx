@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
 import { apiFetch } from '../../hooks/useApi';
+import { useApiContext } from '../../contexts/ApiContext';
 import { Trash2, Plus, Sun, Moon, Monitor, Settings, Cpu, Users, ChevronDown, ChevronRight, Zap, Volume2, Eye } from 'lucide-react';
 import { ProvidersSection } from './ProvidersSection';
 import { DataManagement } from './DataManagement';
@@ -14,11 +15,8 @@ const OVERSIGHT_OPTIONS: Array<{ level: OversightLevel; label: string; descripti
   { level: 'autonomous', label: '🚀 Autonomous', description: 'Agents work autonomously — only critical resets require your approval' },
 ];
 
-interface Props {
-  api: any;
-}
-
-export function SettingsPanel({ api }: Props) {
+export function SettingsPanel() {
+  const api = useApiContext();
   const config = useAppStore((s) => s.config);
   const roles = useAppStore((s) => s.roles);
   const { soundEnabled, toggleSound, oversightLevel, setOversightLevel } = useSettingsStore();

@@ -8,6 +8,7 @@ import { formatTokens } from '../../utils/format';
 import { useModels } from '../../hooks/useModels';
 import { ProviderBadge } from '../ProviderBadge';
 import { shortAgentId } from '../../utils/agentLabel';
+import { useApiContext } from '../../contexts/ApiContext';
 
 function shortModelName(model?: string): string {
   if (!model) return '';
@@ -48,8 +49,6 @@ function flattenHierarchy(agents: AgentInfo[]): { agent: AgentInfo; depth: numbe
 interface Props {
   agents: AgentInfo[];
   locks: FileLock[];
-  api: any;
-  ws: any;
   onSelectAgent?: (id: string) => void;
 }
 
@@ -114,7 +113,8 @@ function getCurrentActivity(agent: AgentInfo): { text: string; detail?: string }
   return { text: 'Idle' };
 }
 
-export function AgentActivityTable({ agents, locks, api, onSelectAgent }: Props) {
+export function AgentActivityTable({ agents, locks, onSelectAgent }: Props) {
+  const api = useApiContext();
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [confirmTerminateIds, setConfirmTerminateIds] = useState<Set<string>>(new Set());
   const { models: availableModels } = useModels();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Folder, FolderOpen, ChevronUp, Loader2 } from 'lucide-react';
+import { apiFetch } from '../../hooks/useApi';
 
 interface FolderEntry {
   name: string;
@@ -30,9 +31,8 @@ export function FolderPicker({ value, onChange, onClose }: Props) {
     setLoading(true);
     setError('');
     try {
-      const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse';
-      const resp = await fetch(url);
-      const data: BrowseResult = await resp.json();
+      const url = path ? `/browse?path=${encodeURIComponent(path)}` : '/browse';
+      const data: BrowseResult = await apiFetch(url);
       if (data.error) {
         setError(data.error);
       } else {

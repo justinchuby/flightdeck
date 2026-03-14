@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useModels, deriveModelName } from '../../hooks/useModels';
-import { apiFetch, useApi } from '../../hooks/useApi';
+import { apiFetch } from '../../hooks/useApi';
+import { useApiContext } from '../../contexts/ApiContext';
 import { X, ChevronDown } from 'lucide-react';
 
 interface ProviderStatus {
@@ -13,11 +14,11 @@ interface ProviderStatus {
 }
 
 interface Props {
-  api: Pick<ReturnType<typeof useApi>, 'spawnAgent'>;
   onClose: () => void;
 }
 
-export function SpawnDialog({ api, onClose }: Props) {
+export function SpawnDialog({ onClose }: Props) {
+  const api = useApiContext();
   const roles = useAppStore((s) => s.roles);
   const { filteredModels: models } = useModels();
   const [selectedRole, setSelectedRole] = useState(roles[0]?.id || '');
