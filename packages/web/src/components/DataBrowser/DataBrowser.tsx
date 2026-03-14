@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useCallback } from 'react';
 import { Database, Brain, MessageSquare, CheckCircle, Activity, Trash2, ChevronDown, ChevronRight, RefreshCw, BarChart3 } from 'lucide-react';
 import { decisionStatusText } from '../../utils/statusColors';
@@ -18,9 +19,7 @@ interface DbStats {
 type TabId = 'stats' | 'memory' | 'conversations' | 'decisions' | 'activity';
 
 async function dbFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/db${path}`, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return apiFetch(`/db${path}`, opts);
 }
 
 export function DataBrowser() {

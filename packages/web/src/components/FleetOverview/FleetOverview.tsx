@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
@@ -66,8 +67,7 @@ export function FleetOverview({ api, ws }: Props) {
 
   const fetchCoordination = useCallback(async () => {
     try {
-      const res = await fetch('/api/coordination/status');
-      const data: CoordinationStatus = await res.json();
+      const data: CoordinationStatus  = await apiFetch('/coordination/status');
       setLocks(data.locks);
       setActivity(data.recentActivity);
     } catch {

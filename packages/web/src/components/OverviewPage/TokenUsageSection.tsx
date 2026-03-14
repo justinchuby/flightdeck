@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 /**
  * TokenUsageSection — Shows token usage at project, session, and agent levels.
  *
@@ -45,9 +46,9 @@ export function TokenUsageSection({ projectId }: Props) {
     const fetchCosts = async () => {
       try {
         const [projRes, agentRes, taskRes] = await Promise.all([
-          fetch('/api/costs/by-project', { signal: controller.signal }),
-          fetch('/api/costs/by-agent', { signal: controller.signal }),
-          fetch('/api/costs/by-task', { signal: controller.signal }),
+          apiFetch('/costs/by-project', { signal: controller.signal }),
+          apiFetch('/costs/by-agent', { signal: controller.signal }),
+          apiFetch('/costs/by-task', { signal: controller.signal }),
         ]);
         if (controller.signal.aborted) return;
 

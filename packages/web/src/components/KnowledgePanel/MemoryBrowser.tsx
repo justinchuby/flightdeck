@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useCallback } from 'react';
 import { Brain, Trash2, RefreshCw } from 'lucide-react';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -18,9 +19,7 @@ interface MemoryStats {
 }
 
 async function dbFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/db${path}`, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return apiFetch(`/db${path}`, opts);
 }
 
 // ── MemoryBrowser ─────────────────────────────────────────

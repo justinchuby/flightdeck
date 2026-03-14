@@ -243,7 +243,7 @@ function DagPanel({
   const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
     id:          t.id,
     title:       t.title || t.description || t.id,
-    status:      ((new Set<string>(['pending','running','done','failed','blocked','skipped']))
+    status:      (new Set<string>(['pending','running','done','failed','blocked','skipped']))
                    .has(t.dagStatus)
                    ? t.dagStatus as GanttTask['status']
                    : 'pending',
