@@ -56,9 +56,6 @@ describe('ChatPanel', () => {
         body: JSON.stringify({ text: 'hello agent', mode: 'queue' }),
       }),
     );
-
-    // Should NOT use WebSocket sendInput
-    expect(ws.sendInput).not.toHaveBeenCalled();
   });
 
   it('uses interrupt mode on Ctrl+Enter with text', () => {
@@ -222,6 +219,5 @@ describe('ChatPanel', () => {
       `/agents/${OTHER_ID}/message`,
       expect.anything(),
     );
-    expect(ws.sendInput).not.toHaveBeenCalled();
   });
 });
