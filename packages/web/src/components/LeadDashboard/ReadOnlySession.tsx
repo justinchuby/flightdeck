@@ -5,16 +5,11 @@ import { apiFetch } from '../../hooks/useApi';
 import { LeadDashboard } from './LeadDashboard';
 import type { AcpTextChunk, DagStatus } from '../../types';
 
-interface ReadOnlySessionProps {
-  api: any;
-  ws: any;
-}
-
 /**
  * Route wrapper that renders LeadDashboard in read-only mode for a historical session.
  * Mounted at /projects/:id/sessions/:leadId
  */
-export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
+export function ReadOnlySession() {
   const { leadId } = useParams<{ leadId: string }>();
   const navigate = useNavigate();
   const previousLeadRef = useRef<string | null>(null);
@@ -88,5 +83,5 @@ export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
     return null;
   }
 
-  return <LeadDashboard api={api} ws={ws} readOnly />;
+  return <LeadDashboard readOnly />;
 }

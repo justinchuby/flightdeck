@@ -9,15 +9,14 @@ import { formatTokens } from '../../utils/format';
 import { DiffBadge } from '../DiffPreview';
 import { useModels } from '../../hooks/useModels';
 import { getProviderColors } from '../../utils/providerColors';
-import type { useApi } from '../../hooks/useApi';
+import { useApiContext } from '../../contexts/ApiContext';
 
 interface Props {
   agent: AgentInfo;
-  api: Pick<ReturnType<typeof useApi>, 'restartAgent' | 'interruptAgent' | 'terminateAgent' | 'updateAgent'>;
-  ws?: unknown;
 }
 
-export function AgentCard({ agent, api }: Props) {
+export function AgentCard({ agent }: Props) {
+  const api = useApiContext();
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const selectedAgentId = useAppStore((s) => s.selectedAgentId);
   const isSelected = selectedAgentId === agent.id;

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useApi, apiFetch } from './hooks/useApi';
+import { apiFetch } from './hooks/useApi';
+import { ApiProvider } from './contexts/ApiContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore, shouldNotify } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
@@ -120,8 +121,16 @@ function NotFoundPage() {
 }
 
 export function App() {
-  const ws = useWebSocket();
-  const api = useApi();
+  return (
+    <ApiProvider>
+      <WebSocketProvider>
+        <AppContent />
+      </WebSocketProvider>
+    </ApiProvider>
+  );
+}
+
+function AppContent() {
   const _connected = useAppStore((s) => s.connected);
   const agents = useAppStore((s) => s.agents);
   const selectedAgentId = useAppStore((s) => s.selectedAgentId);
@@ -348,17 +357,17 @@ export function App() {
             {/* ── Project-scoped nested routes ─────────────────── */}
             <Route path="/projects/:id" element={<ProjectLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
-              <Route path="overview" element={<RouteErrorBoundary name="Overview"><OverviewPage api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel api={api} /></RouteErrorBoundary>} />
+              <Route path="overview" element={<RouteErrorBoundary name="Overview"><OverviewPage /></RouteErrorBoundary>} />
+              <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard /></RouteErrorBoundary>} />
+              <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession /></RouteErrorBoundary>} />
+              <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel /></RouteErrorBoundary>} />
               <Route path="crew" element={<RouteErrorBoundary name="Crew"><UnifiedCrewPage scope="project" /></RouteErrorBoundary>} />
               <Route path="agents" element={<Navigate to="../crew" replace />} />
               <Route path="knowledge" element={<RouteErrorBoundary name="Knowledge"><KnowledgePanel /></RouteErrorBoundary>} />
               <Route path="artifacts" element={<RouteErrorBoundary name="Artifacts"><ArtifactsPanel /></RouteErrorBoundary>} />
-              <Route path="timeline" element={<RouteErrorBoundary name="Timeline"><TimelinePage api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="groups" element={<RouteErrorBoundary name="Groups"><GroupChat api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="org-chart" element={<RouteErrorBoundary name="Org Chart"><OrgChart api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="timeline" element={<RouteErrorBoundary name="Timeline"><TimelinePage /></RouteErrorBoundary>} />
+              <Route path="groups" element={<RouteErrorBoundary name="Groups"><GroupChat /></RouteErrorBoundary>} />
+              <Route path="org-chart" element={<RouteErrorBoundary name="Org Chart"><OrgChart /></RouteErrorBoundary>} />
               <Route path="analytics" element={<RouteErrorBoundary name="Analytics"><AnalyticsPage /></RouteErrorBoundary>} />
               <Route path="analysis" element={<RouteErrorBoundary name="Analysis"><AnalysisPage /></RouteErrorBoundary>} />
               <Route path="canvas" element={<RouteErrorBoundary name="Canvas"><CanvasPage /></RouteErrorBoundary>} />
@@ -366,7 +375,7 @@ export function App() {
 
             {/* ── Global (non-project-scoped) routes ───────────── */}
             <Route path="/projects" element={<RouteErrorBoundary name="Projects"><ProjectsPanel /></RouteErrorBoundary>} />
-            <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel api={api} /></RouteErrorBoundary>} />
+            <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel /></RouteErrorBoundary>} />
             <Route path="/shared/:token" element={<RouteErrorBoundary name="Shared Replay"><SharedReplayViewer /></RouteErrorBoundary>} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}
@@ -397,7 +406,7 @@ export function App() {
         {/* Desktop: sidebar panel */}
         {selectedAgentId && (
           <div className="w-full max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
-            <ChatPanel agentId={selectedAgentId} ws={ws} />
+            <ChatPanel agentId={selectedAgentId} />
           </div>
         )}
       </div>

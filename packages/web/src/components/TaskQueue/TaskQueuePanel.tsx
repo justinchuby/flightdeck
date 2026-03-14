@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
+import { useApiContext } from '../../contexts/ApiContext';
 import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock, BarChart2, Columns3, SplitSquareHorizontal } from 'lucide-react';
 import { EmptyState } from '../Shared';
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
@@ -13,10 +14,6 @@ import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import type { GanttTask } from './DagGantt';
 import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
-
-interface Props {
-  api: any;
-}
 
 /** Parse a SQLite datetime string, normalizing missing Z suffix to UTC */
 function parseDbTimestamp(ts: string): number {
@@ -396,7 +393,8 @@ function tabKey(tab: TabItem): string {
 // ---------------------------------------------------------------------------
 // Main TaskQueuePanel — tabbed by project
 // ---------------------------------------------------------------------------
-export function TaskQueuePanel({ api }: Props) {
+export function TaskQueuePanel() {
+  const api = useApiContext();
   const agents = useAppStore((s) => s.agents);
   const leadProjects = useLeadStore((s) => s.projects);
   const projectId = useOptionalProjectId();

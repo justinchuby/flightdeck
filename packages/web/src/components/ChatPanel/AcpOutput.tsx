@@ -171,7 +171,6 @@ export function AcpOutput({ agentId }: Props) {
   useEffect(() => {
     if (!agentId || messages.length > 0) return;
     apiFetch(`/agents/${agentId}/messages?limit=200`)
-      .then((r) => r.json())
       .then((data: any) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           const existing = useAppStore.getState().agents.find((a) => a.id === agentId);

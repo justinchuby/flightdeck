@@ -328,7 +328,7 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
 }
 
 function handleGroupCreated(store: StoreApi, leadId: string) {
-  apiFetch(`/lead/${leadId}/groups`).then((r) => r.json()).then((data) => {
+  apiFetch(`/lead/${leadId}/groups`).then((data) => {
     if (Array.isArray(data)) store.setGroups(leadId, data);
   }).catch(() => { /* group fetch failure is non-critical */ });
 }
@@ -361,7 +361,7 @@ function handleGroupMessage(msg: WsGroupMessage, store: StoreApi, leadId: string
 }
 
 function handleDagUpdated(store: StoreApi, leadId: string, historicalProjectId: string | null) {
-  apiFetch(`/lead/${leadId}/dag`).then((r) => r.json()).then((data: DagStatus) => {
+  apiFetch(`/lead/${leadId}/dag`).then((data: DagStatus) => {
     if (data && data.tasks) {
       store.setDagStatus(leadId, data);
       if (historicalProjectId && historicalProjectId !== leadId) {

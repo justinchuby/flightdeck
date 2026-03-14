@@ -73,7 +73,6 @@ export function GroupsPanelContent({
     } else if (leadId) {
       // Fetch from live lead endpoint
       apiFetch(`/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
-        .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
             const store = useLeadStore.getState();

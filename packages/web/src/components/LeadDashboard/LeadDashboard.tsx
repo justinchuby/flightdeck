@@ -20,9 +20,8 @@ import { NewProjectModal } from './NewProjectModal';
 import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailModal';
 import { useLeadWebSocket } from './useLeadWebSocket';
 import { useDragResize } from './useDragResize';
-import type { useApi } from '../../hooks/useApi';
 import { apiFetch } from '../../hooks/useApi';
-import type { useWebSocket } from '../../hooks/useWebSocket';
+import { useWebSocketContext } from '../../contexts/WebSocketContext';
 
 /** Shape returned by /api/agents/:id/messages and /api/projects/:id/messages */
 interface MessageHistoryResponse {
@@ -55,12 +54,11 @@ const EMPTY_DELEGATIONS: Delegation[] = [];
 const EMPTY_CREW_AGENTS: LeadProgress['crewAgents'] = [];
 
 interface Props {
-  api: ReturnType<typeof useApi>;
-  ws: ReturnType<typeof useWebSocket>;
   readOnly?: boolean;
 }
 
-export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
+export function LeadDashboard({ readOnly = false }: Props) {
+  const ws = useWebSocketContext();
   const { projects, selectedLeadId, drafts } = useLeadStore(
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
@@ -263,11 +261,10 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     if (!proj || proj.messages.length === 0) {
       // For historical projects (project:XYZ), use project messages endpoint
       const isHistorical = selectedLeadId.startsWith('project:');
-      const url = isHistorical
-        ? `/api/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-        : `/api/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
-      fetch(url, { signal: controller.signal })
-        .then((r) => r.json())
+      const apiPath = isHistorical
+        ? `/projects/${selectedLeadId.slice(8)}/messages?limit=200`
+        : `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
+      apiFetch(apiPath, { signal: controller.signal })
         .then((data: MessageHistoryResponse) => {
           if (controller.signal.aborted) return;
           if (Array.isArray(data?.messages) && data.messages.length > 0) {

@@ -45,24 +45,16 @@ export function TokenUsageSection({ projectId }: Props) {
     const controller = new AbortController();
     const fetchCosts = async () => {
       try {
-        const [projRes, agentRes, taskRes] = await Promise.all([
-          apiFetch('/costs/by-project', { signal: controller.signal }),
+        const [allProjects, agentData, taskData] = await Promise.all([
+          apiFetch<ProjectCostSummary[]>('/costs/by-project', { signal: controller.signal }),
           apiFetch('/costs/by-agent', { signal: controller.signal }),
           apiFetch('/costs/by-task', { signal: controller.signal }),
         ]);
         if (controller.signal.aborted) return;
 
-        // Propagate server errors so SectionErrorBoundary can show Report Issue UI
-        if (!projRes.ok || !agentRes.ok || !taskRes.ok) {
-          const failedEndpoint = !projRes.ok ? 'by-project' : !agentRes.ok ? 'by-agent' : 'by-task';
-          const status = !projRes.ok ? projRes.status : !agentRes.ok ? agentRes.status : taskRes.status;
-          throw new Error(`Token usage API error: ${failedEndpoint} returned ${status}`);
-        }
-
-        const allProjects: ProjectCostSummary[] = await projRes.json();
         setProjectCost(allProjects.find(c => c.projectId === projectId) ?? null);
-        setAgentCosts(await agentRes.json());
-        setTaskCosts(await taskRes.json());
+        setAgentCosts(agentData);
+        setTaskCosts(taskData);
         setError(null);
       } catch (err) {
         if (!controller.signal.aborted) {
