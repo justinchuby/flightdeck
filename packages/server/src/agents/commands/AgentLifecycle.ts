@@ -72,6 +72,18 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       return;
     }
 
+    // Soft reminder: let the lead know if idle agents of the same role exist
+    const idleSameRole = ctx.getAllAgents().filter(
+      a => a.role.id === role.id && a.status === 'idle' && a.parentId === agent.id
+    );
+    if (idleSameRole.length > 0) {
+      const ids = idleSameRole.map(a => a.id.slice(0, 8)).join(', ');
+      agent.sendMessage(
+        `[System] Note: You have ${idleSameRole.length} idle ${role.name} agent(s) in your roster (${ids}). ` +
+        `Consider reusing them with DELEGATE before creating new ones.`
+      );
+    }
+
     const subLeadName = role.id === 'lead'
       ? (req.name || req.task?.slice(0, 60) || `Sub-project ${new Date().toLocaleDateString()}`)
       : undefined;
