@@ -200,6 +200,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     this.process = spawn(opts.cliCommand, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: opts.cwd || process.cwd(),
+      shell: process.platform === 'win32',
       ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
     });
 

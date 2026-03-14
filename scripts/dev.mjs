@@ -14,6 +14,7 @@ function startServer() {
     const proc = spawn('npm', ['run', 'dev', '--workspace=packages/server'], {
       stdio: ['inherit', 'pipe', 'inherit'],
       env: { ...process.env },
+      shell: true,
     });
 
     let resolved = false;
@@ -48,6 +49,7 @@ function startVite(serverPort) {
   return spawn('npm', ['run', 'dev', '--workspace=packages/web'], {
     stdio: 'inherit',
     env: { ...process.env, SERVER_PORT: serverPort },
+    shell: true,
   });
 }
 
