@@ -1,6 +1,6 @@
 name: User Feedback / Bug Report
 description: Report a bug, suggest an improvement, or share feedback about Flightdeck
-labels: ["user-feedback"]
+labels: ["feedback"]
 body:
   - type: markdown
     attributes:
