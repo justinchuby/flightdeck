@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-03-14
+
+### Fixed
+
+- **Missing runtime dependencies** — Added `pino`, `grammy`, and `yaml` to root `package.json` production dependencies. These were only listed in `packages/server/package.json` and were not resolved when the package was installed via `npm install -g` or `npx`, causing `Cannot find module 'pino'` errors on startup.
+
+### Changed
+
+- **CLI smoke test in CI** — Added a smoke test step to both CI and release workflows that starts the Flightdeck server process and verifies it doesn't crash from missing dependencies. Catches runtime import errors that typecheck alone would miss.
+
 ## [0.4.0] - Unreleased
 
 ### Added
