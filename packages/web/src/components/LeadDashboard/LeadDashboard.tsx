@@ -205,91 +205,86 @@ export function LeadDashboard({ readOnly = false }: Props) {
   const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
   // On mount, load existing leads from server (skip in read-only mode — data pre-loaded)
-  useEffect(() => {
-    if (readOnly) return;
-    const controller = new AbortController();
-    // Load active leads
-    apiFetch('/lead', { signal: controller.signal }).then((leads: LeadListItem[]) => {
-      if (controller.signal.aborted) return;
-      if (Array.isArray(leads)) {
-        leads.forEach((l) => {
-          useLeadStore.getState().addProject(l.id);
-          // Pre-load message history for each lead
-          apiFetch(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
-            .then((data: MessageHistoryResponse) => {
-              if (controller.signal.aborted) return;
-              if (Array.isArray(data?.messages) && data.messages.length > 0) {
-                const msgs: AcpTextChunk[] = data.messages.map((m) => ({
-                  type: 'text' as const,
-                  text: m.content,
-                  sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
-                  timestamp: new Date(m.timestamp).getTime(),
-                }));
-                // Only set if WS hasn't already delivered messages (WS wins)
-                const current = useLeadStore.getState().projects[l.id];
-                if (!current || current.messages.length === 0) {
-                  useLeadStore.getState().setMessages(l.id, msgs);
-                }
+  useQuery({
+    queryKey: ['leads', 'initial'],
+    queryFn: async ({ signal }) => {
+      const leads: LeadListItem[] = await apiFetch('/lead', { signal });
+      if (!Array.isArray(leads)) return [];
+      const store = useLeadStore.getState();
+      for (const l of leads) {
+        store.addProject(l.id);
+        // Pre-load message history for each lead (best-effort)
+        apiFetch(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal })
+          .then((data: MessageHistoryResponse) => {
+            if (Array.isArray(data?.messages) && data.messages.length > 0) {
+              const msgs: AcpTextChunk[] = data.messages.map((m) => ({
+                type: 'text' as const,
+                text: m.content,
+                sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
+                timestamp: new Date(m.timestamp).getTime(),
+              }));
+              const current = useLeadStore.getState().projects[l.id];
+              if (!current || current.messages.length === 0) {
+                useLeadStore.getState().setMessages(l.id, msgs);
               }
-            })
-            .catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Message history fetch failed:', err); });
-        });
-        // Auto-select first running lead if none selected
-        if (!useLeadStore.getState().selectedLeadId) {
-          const running = leads.find((l) => l.status === 'running');
-          if (running) useLeadStore.getState().selectLead(running.id);
-        }
+            }
+          })
+          .catch(() => { /* non-critical — will load via WS */ });
       }
-    }).catch((err) => {
-      if (!controller.signal.aborted) console.warn('[LeadDashboard] Failed to load leads:', err);
-    });
-    return () => controller.abort();
-  }, [readOnly]);
+      if (!store.selectedLeadId) {
+        const running = leads.find((l) => l.status === 'running');
+        if (running) store.selectLead(running.id);
+      }
+      return leads;
+    },
+    enabled: !readOnly,
+    staleTime: 30_000,
+  });
 
-  // Subscribe to selected lead agent WS stream and load message history
+  // Subscribe to selected lead WS stream
   useEffect(() => {
     if (!selectedLeadId) return;
-    chatInitialScroll.current = false; // reset so we scroll to bottom on lead change
-
-    // In read-only mode, skip WS — data is pre-loaded by ReadOnlySession wrapper
+    chatInitialScroll.current = false;
     if (!readOnly) {
       ws.subscribe(selectedLeadId);
     }
-
-    const controller = new AbortController();
-    // Load persisted message history if we don't have any messages yet
-    const proj = useLeadStore.getState().projects[selectedLeadId];
-    if (!proj || proj.messages.length === 0) {
-      // For historical projects (project:XYZ), use project messages endpoint
-      const isHistorical = selectedLeadId.startsWith('project:');
-      const apiPath = isHistorical
-        ? `/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-        : `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
-      apiFetch(apiPath, { signal: controller.signal })
-        .then((data: MessageHistoryResponse) => {
-          if (controller.signal.aborted) return;
-          if (Array.isArray(data?.messages) && data.messages.length > 0) {
-            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
-              type: 'text' as const,
-              text: m.content,
-              sender: m.sender as 'agent' | 'user' | 'system' | 'external' | 'thinking',
-              ...(m.fromRole ? { fromRole: m.fromRole } : {}),
-              timestamp: new Date(m.timestamp).getTime(),
-            }));
-            // Re-check: only set if WS hasn't delivered messages while we were fetching
-            const current = useLeadStore.getState().projects[selectedLeadId];
-            if (!current || current.messages.length === 0) {
-              useLeadStore.getState().setMessages(selectedLeadId, msgs);
-            }
-          }
-        })
-        .catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Message history fetch failed:', err); });
-    }
     return () => {
-      controller.abort();
-      if (!readOnly) ws.unsubscribe(selectedLeadId);
+      if (!readOnly && selectedLeadId) ws.unsubscribe(selectedLeadId);
     };
   }, [selectedLeadId, ws, readOnly]);
+
+  // Load message history for selected lead (if store is empty)
+  const selectedProj = selectedLeadId ? projects[selectedLeadId] : null;
+  const needsHistory = !!selectedLeadId && (!selectedProj || selectedProj.messages.length === 0);
+  const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
+  const msgApiPath = selectedLeadId
+    ? isHistorical
+      ? `/projects/${selectedLeadId.slice(8)}/messages?limit=200`
+      : `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
+    : '';
+
+  useQuery({
+    queryKey: ['lead', 'messages', selectedLeadId],
+    queryFn: async ({ signal }) => {
+      const data: MessageHistoryResponse = await apiFetch(msgApiPath, { signal });
+      if (Array.isArray(data?.messages) && data.messages.length > 0) {
+        const msgs: AcpTextChunk[] = data.messages.map((m) => ({
+          type: 'text' as const,
+          text: m.content,
+          sender: m.sender as 'agent' | 'user' | 'system' | 'external' | 'thinking',
+          ...(m.fromRole ? { fromRole: m.fromRole } : {}),
+          timestamp: new Date(m.timestamp).getTime(),
+        }));
+        const current = useLeadStore.getState().projects[selectedLeadId!];
+        if (!current || current.messages.length === 0) {
+          useLeadStore.getState().setMessages(selectedLeadId!, msgs);
+        }
+      }
+      return data;
+    },
+    enabled: needsHistory,
+    staleTime: 60_000,
+  });
 
   // Auto-scroll on new messages only if near bottom
   const chatInitialScroll = useRef(false);
