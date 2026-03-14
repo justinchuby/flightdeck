@@ -181,16 +181,16 @@ export function AcpOutput({ agentId }: Props) {
   useEffect(() => {
     if (!agentId || messages.length > 0) return;
     apiFetch(`/agents/${agentId}/messages?limit=200`)
-      .then((data: { messages: Array<{ sender?: string; text?: string; timestamp?: number }> }) => {
+      .then((data: { messages: Array<{ sender?: string; content?: string; text?: string; timestamp?: number }> }) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
           // Only load if still no messages (avoid overwriting live data)
           if (!existing?.messages?.length) {
             const msgs: AcpTextChunk[] = data.messages.map((m) => ({
               type: 'text' as const,
-              text: m.content,
+              text: m.content || m.text || '',
               sender: (m.sender || 'agent') as 'agent' | 'user' | 'system' | 'thinking',
-              timestamp: new Date(m.timestamp).getTime(),
+              timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
             }));
             useAppStore.getState().updateAgent(agentId, { messages: msgs });
           }
