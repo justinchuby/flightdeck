@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
-import type { DagStatus } from '../../types';
+import type { DagStatus, Decision } from '../../types';
 
 /**
- * Polls progress, decisions, groups, and DAG for the selected lead agent.
- * Writes results to leadStore — no return value needed.
+ * Polls progress, decisions, groups, and DAG for the selected lead agent
+ * using TanStack Query for automatic refetching, caching, and cleanup.
  */
 export function useLeadPolling(
   selectedLeadId: string | null,
@@ -13,75 +13,74 @@ export function useLeadPolling(
   historicalProjectId: string | null,
 ) {
   // Poll progress
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    let stopped = false;
-    const fetchProgress = () => {
-      if (stopped) return;
-      apiFetch(`/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((data) => {
-        if (!controller.signal.aborted && data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
-      }).catch((err: unknown) => {
-        if (err instanceof Error && err.message.includes('404')) { stopped = true; return; }
-        if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Progress poll failed:', err);
-      });
-    };
-    fetchProgress();
-    const interval = setInterval(fetchProgress, 5000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [selectedLeadId, isActiveAgent]);
+  useQuery({
+    queryKey: ['lead', 'progress', selectedLeadId],
+    queryFn: async ({ signal }) => {
+      const data = await apiFetch(`/lead/${selectedLeadId}/progress`, { signal });
+      if (data && !data.error) {
+        useLeadStore.getState().setProgress(selectedLeadId!, data);
+      }
+      return data;
+    },
+    enabled: isActiveAgent && !!selectedLeadId,
+    refetchInterval: 5000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message.includes('404')) return false;
+      return failureCount < 2;
+    },
+  });
 
   // Poll decisions
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    let stopped = false;
-    const fetchDecisions = () => {
-      if (stopped) return;
-      apiFetch(`/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((data) => {
-        if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
-      }).catch((err: unknown) => {
-        if (err instanceof Error && err.message.includes('404')) { stopped = true; return; }
-        if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Decisions poll failed:', err);
-      });
-    };
-    fetchDecisions();
-    const interval = setInterval(fetchDecisions, 5000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [selectedLeadId, isActiveAgent]);
+  useQuery({
+    queryKey: ['lead', 'decisions', selectedLeadId],
+    queryFn: async ({ signal }) => {
+      const data: Decision[] = await apiFetch(`/lead/${selectedLeadId}/decisions`, { signal });
+      if (Array.isArray(data)) {
+        useLeadStore.getState().setDecisions(selectedLeadId!, data);
+      }
+      return data;
+    },
+    enabled: isActiveAgent && !!selectedLeadId,
+    refetchInterval: 5000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message.includes('404')) return false;
+      return failureCount < 2;
+    },
+  });
 
-  // Fetch groups
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    apiFetch(`/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((data) => {
-      if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
-    }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Groups fetch failed:', err); });
-    return () => controller.abort();
-  }, [selectedLeadId, isActiveAgent]);
+  // Fetch groups (one-shot per lead, no polling)
+  useQuery({
+    queryKey: ['lead', 'groups', selectedLeadId],
+    queryFn: async ({ signal }) => {
+      const data = await apiFetch(`/lead/${selectedLeadId}/groups`, { signal });
+      if (Array.isArray(data)) {
+        useLeadStore.getState().setGroups(selectedLeadId!, data);
+      }
+      return data;
+    },
+    enabled: isActiveAgent && !!selectedLeadId,
+    staleTime: 30_000,
+  });
 
   // Poll DAG status
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    let stopped = false;
-    const fetchDag = () => {
-      if (stopped) return;
-      apiFetch<DagStatus>(`/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((data) => {
-        if (!controller.signal.aborted && data && data.tasks) {
-          const store = useLeadStore.getState();
-          store.setDagStatus(selectedLeadId, data);
-          if (historicalProjectId && historicalProjectId !== selectedLeadId) {
-            store.setDagStatus(historicalProjectId, data);
-          }
+  useQuery({
+    queryKey: ['lead', 'dag', selectedLeadId],
+    queryFn: async ({ signal }) => {
+      const data = await apiFetch<DagStatus>(`/lead/${selectedLeadId}/dag`, { signal });
+      if (data && data.tasks) {
+        const store = useLeadStore.getState();
+        store.setDagStatus(selectedLeadId!, data);
+        if (historicalProjectId && historicalProjectId !== selectedLeadId) {
+          store.setDagStatus(historicalProjectId, data);
         }
-      }).catch((err: unknown) => {
-        if (err instanceof Error && err.message.includes('404')) { stopped = true; return; }
-        if (!(err instanceof DOMException)) console.warn('[LeadDashboard] DAG poll failed:', err);
-      });
-    };
-    fetchDag();
-    const interval = setInterval(fetchDag, 10000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [selectedLeadId, historicalProjectId, isActiveAgent]);
+      }
+      return data;
+    },
+    enabled: isActiveAgent && !!selectedLeadId,
+    refetchInterval: 10000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message.includes('404')) return false;
+      return failureCount < 2;
+    },
+  });
 }
