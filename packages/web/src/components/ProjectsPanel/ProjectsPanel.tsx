@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { FolderOpen, Plus } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
@@ -9,23 +9,15 @@ import { ProjectCard, type EnrichedProject } from './ProjectCard';
 import { ProjectFilters } from './ProjectFilters';
 import { ImportProjectDialog } from './ImportProjectDialog';
 import { BatchActionBar } from './BatchActionBar';
+import { useProjectActions } from './useProjectActions';
 
 export function ProjectsPanel() {
   const [projects, setProjects] = useState<EnrichedProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'archived'>('active');
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [showNewProject, setShowNewProject] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [editingCwdId, setEditingCwdId] = useState<string | null>(null);
-  const [cwdValue, setCwdValue] = useState('');
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importPath, setImportPath] = useState('');
-  const [importLoading, setImportLoading] = useState(false);
   const [viewSession, setViewSession] = useState<ViewableSession | null>(null);
   const addToast = useToastStore((s) => s.add);
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Consume ?action=new param — auto-open the new project modal
@@ -76,200 +68,11 @@ export function ProjectsPanel() {
     fetchProgress();
   }, [projects.length]);
 
-  // Fetch detailed project info when expanding
-  const handleToggle = useCallback(
-    async (id: string) => {
-      if (expandedId === id) {
-        setExpandedId(null);
-        return;
-      }
-      setExpandedId(id);
-      try {
-        const detail = await apiFetch<EnrichedProject>(`/projects/${id}`);
-        setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...detail } : p)));
-      } catch {
-        // Non-critical — the list data is still valid
-      }
-    },
-    [expandedId],
-  );
-
-  const handleResume = useCallback(
-    async (id: string) => {
-      try {
-        const response = await apiFetch<{ id: string }>(`/projects/${id}/resume`, { method: 'POST', body: JSON.stringify({ resumeAll: true }) });
-        addToast('success', 'Project resumed — lead agent spawned');
-        if (response?.id) {
-          navigate(`/projects/${id}/session`);
-        } else {
-          await fetchProjects();
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        addToast('error', `Failed to resume: ${msg}`);
-      }
-    },
-    [addToast, fetchProjects, navigate],
-  );
-
-  const handleArchive = useCallback(
-    async (id: string) => {
-      try {
-        await apiFetch(`/projects/${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'archived' }),
-        });
-        addToast('success', 'Project archived');
-        await fetchProjects();
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        addToast('error', `Failed to archive: ${message}`);
-      }
-    },
-    [addToast, fetchProjects],
-  );
-
-  const handleStop = useCallback(
-    async (id: string) => {
-      try {
-        const data = await apiFetch<{ terminated: number }>(`/projects/${id}/stop`, { method: 'POST' });
-        addToast('success', `Stopped ${data.terminated ?? 0} agent(s)`);
-        await fetchProjects();
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        addToast('error', `Failed to stop agents: ${message}`);
-      }
-    },
-    [addToast, fetchProjects],
-  );
-
-  // Step 1: Show confirmation UI
-  const handleRequestDelete = useCallback((id: string) => {
-    setConfirmingDeleteId(id);
-  }, []);
-
-  // Step 2: Actually delete after confirmation
-  const handleConfirmDelete = useCallback(
-    async (id: string) => {
-      try {
-        await apiFetch(`/projects/${id}`, { method: 'DELETE' });
-        addToast('success', 'Project deleted');
-        setProjects((prev) => prev.filter((p) => p.id !== id));
-        if (expandedId === id) setExpandedId(null);
-        setConfirmingDeleteId(null);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        addToast('error', `Failed to delete: ${message}`);
-      }
-    },
-    [addToast, expandedId],
-  );
-
-  const handleCancelDelete = useCallback(() => {
-    setConfirmingDeleteId(null);
-  }, []);
-
-  // ── Batch operations ──────────────────────────────────────
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const selectAllVisible = useCallback(() => {
-    const visible = projects.filter(p => {
-      if (filter === 'active') return p.status === 'active';
-      if (filter === 'archived') return p.status === 'archived';
-      return true;
-    });
-    setSelectedIds(new Set(visible.map(p => p.id)));
-  }, [projects, filter]);
-
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
-
-  const handleBatchArchive = useCallback(async () => {
-    const ids = Array.from(selectedIds);
-    const results = await Promise.allSettled(
-      ids.map(id => apiFetch(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'archived' }) })),
-    );
-    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    addToast('success', `Archived ${succeeded} project(s)`);
-    clearSelection();
-    await fetchProjects();
-  }, [selectedIds, addToast, clearSelection, fetchProjects]);
-
-  const handleBatchDelete = useCallback(async () => {
-    const ids = Array.from(selectedIds);
-    // Only delete projects that are archived
-    const archiveOnly = ids.filter(id => projects.find(p => p.id === id)?.status === 'archived');
-    if (archiveOnly.length === 0) {
-      addToast('error', 'Only archived projects can be batch-deleted');
-      return;
-    }
-    const results = await Promise.allSettled(
-      archiveOnly.map(id => apiFetch(`/projects/${id}`, { method: 'DELETE' })),
-    );
-    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    addToast('success', `Deleted ${succeeded} project(s)`);
-    clearSelection();
-    await fetchProjects();
-  }, [selectedIds, projects, addToast, clearSelection, fetchProjects]);
-
-  const allSelectedArchived = Array.from(selectedIds).every(
-    id => projects.find(p => p.id === id)?.status === 'archived',
-  );
-
-  // ── Edit CWD ──────────────────────────────────────────────
-  const handleEditCwd = useCallback((id: string, currentCwd: string) => {
-    setEditingCwdId(id);
-    setCwdValue(currentCwd);
-  }, []);
-
-  const handleSaveCwd = useCallback(async (id: string) => {
-    try {
-      await apiFetch(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify({ cwd: cwdValue }) });
-      setProjects(prev => prev.map(p => p.id === id ? { ...p, cwd: cwdValue } : p));
-      setEditingCwdId(null);
-      addToast('success', 'Working directory updated');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      addToast('error', `Failed to update path: ${message}`);
-    }
-  }, [cwdValue, addToast]);
-
-  const handleCancelCwdEdit = useCallback(() => {
-    setEditingCwdId(null);
-  }, []);
-
-  // ── Import project ────────────────────────────────────────
-  const handleImportProject = useCallback(async () => {
-    if (!importPath.trim()) return;
-    setImportLoading(true);
-    try {
-      const result = await apiFetch<{ id: string; name: string; imported?: { hasShared: boolean; sharedAgentCount: number } }>('/projects/import', {
-        method: 'POST',
-        body: JSON.stringify({ cwd: importPath.trim() }),
-      });
-      const extra = result.imported?.sharedAgentCount
-        ? ` (${result.imported.sharedAgentCount} shared artifacts found)`
-        : '';
-      addToast('success', `Imported "${result.name}"${extra}`);
-      setShowImportDialog(false);
-      setImportPath('');
-      await fetchProjects();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      addToast('error', `Import failed: ${message}`);
-    } finally {
-      setImportLoading(false);
-    }
-  }, [importPath, addToast, fetchProjects]);
-
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  const actions = useProjectActions(fetchProjects, projects);
 
   const filtered = projects.filter((p) => {
     if (filter === 'active') return p.status === 'active';
@@ -292,7 +95,7 @@ export function ProjectsPanel() {
         archivedCt={projects.filter((p) => p.status === 'archived').length}
         loading={loading}
         onNewProject={() => setShowNewProject(true)}
-        onImport={() => setShowImportDialog(true)}
+        onImport={() => actions.setShowImportDialog(true)}
         onRefresh={fetchProjects}
       />
 
@@ -322,34 +125,34 @@ export function ProjectsPanel() {
       ) : (
         <div className="space-y-2">
           <BatchActionBar
-            selectedCount={selectedIds.size}
-            allSelectedArchived={allSelectedArchived}
-            onSelectAll={selectAllVisible}
-            onArchive={handleBatchArchive}
-            onDelete={handleBatchDelete}
-            onClear={clearSelection}
+            selectedCount={actions.selectedIds.size}
+            allSelectedArchived={actions.allSelectedArchived}
+            onSelectAll={() => actions.selectAllVisible(filter)}
+            onArchive={actions.handleBatchArchive}
+            onDelete={actions.handleBatchDelete}
+            onClear={actions.clearSelection}
           />
           {filtered.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
-              isExpanded={expandedId === project.id}
-              isSelected={selectedIds.has(project.id)}
-              onToggle={() => handleToggle(project.id)}
-              onSelect={() => toggleSelect(project.id)}
-              onResume={handleResume}
-              onArchive={handleArchive}
-              onStop={handleStop}
-              onDelete={handleRequestDelete}
-              confirmingDeleteId={confirmingDeleteId}
-              onConfirmDelete={handleConfirmDelete}
-              onCancelDelete={handleCancelDelete}
-              editingCwdId={editingCwdId}
-              cwdValue={cwdValue}
-              onEditCwd={handleEditCwd}
-              onCwdChange={setCwdValue}
-              onSaveCwd={handleSaveCwd}
-              onCancelCwdEdit={handleCancelCwdEdit}
+              isExpanded={actions.expandedId === project.id}
+              isSelected={actions.selectedIds.has(project.id)}
+              onToggle={() => actions.handleToggle(project.id, setProjects)}
+              onSelect={() => actions.toggleSelect(project.id)}
+              onResume={actions.handleResume}
+              onArchive={actions.handleArchive}
+              onStop={actions.handleStop}
+              onDelete={actions.handleRequestDelete}
+              confirmingDeleteId={actions.confirmingDeleteId}
+              onConfirmDelete={actions.handleConfirmDelete}
+              onCancelDelete={actions.handleCancelDelete}
+              editingCwdId={actions.editingCwdId}
+              cwdValue={actions.cwdValue}
+              onEditCwd={actions.handleEditCwd}
+              onCwdChange={actions.setCwdValue}
+              onSaveCwd={(id) => actions.handleSaveCwd(id, setProjects)}
+              onCancelCwdEdit={actions.handleCancelCwdEdit}
               onViewSession={setViewSession}
             />
           ))}
@@ -358,13 +161,13 @@ export function ProjectsPanel() {
     </div>
     {showNewProject && <NewProjectModal onClose={() => { setShowNewProject(false); fetchProjects(); }} />}
 
-    {showImportDialog && (
+    {actions.showImportDialog && (
       <ImportProjectDialog
-        importPath={importPath}
-        onPathChange={setImportPath}
-        onImport={handleImportProject}
-        onClose={() => setShowImportDialog(false)}
-        loading={importLoading}
+        importPath={actions.importPath}
+        onPathChange={actions.setImportPath}
+        onImport={actions.handleImportProject}
+        onClose={() => actions.setShowImportDialog(false)}
+        loading={actions.importLoading}
       />
     )}
 
@@ -374,7 +177,7 @@ export function ProjectsPanel() {
         onClose={() => setViewSession(null)}
         onResume={viewSession.projectId ? () => {
           setViewSession(null);
-          if (viewSession.projectId) handleResume(viewSession.projectId);
+          if (viewSession.projectId) actions.handleResume(viewSession.projectId);
         } : undefined}
       />
     )}
