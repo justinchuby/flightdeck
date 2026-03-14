@@ -243,8 +243,8 @@ function DagPanel({
   const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
     id:          t.id,
     title:       t.title || t.description || t.id,
-    status:      (['pending','running','done','failed','blocked','skipped'] as const)
-                   .includes(t.dagStatus as any)
+    status:      ((new Set<string>(['pending','running','done','failed','blocked','skipped']))
+                   .has(t.dagStatus)
                    ? t.dagStatus as GanttTask['status']
                    : 'pending',
     assignee:    t.role,
@@ -481,7 +481,7 @@ export function TaskQueuePanel({ api }: Props) {
       ]);
       if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData);
       // Normalize server-side property names (team→crew rename, Phase 1)
-      const raw = progressData as any;
+      const raw = progressData as LeadProgress & { teamAgents?: LeadProgress['crewAgents']; teamSize?: number };
       setProgress({
         ...progressData,
         crewAgents: progressData.crewAgents ?? raw.teamAgents ?? [],
