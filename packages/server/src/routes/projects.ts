@@ -1168,7 +1168,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       if (sessionFiles.length > 0) {
         sessionFiles.sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
         groups.push({
-          agentDir, role: agent.role, agentId: shortId,
+          agentDir, role: agent.role, agentId: agent.agentId,
           sessionId: agent.sessionId, source: 'copilot-session',
           files: sessionFiles,
         });

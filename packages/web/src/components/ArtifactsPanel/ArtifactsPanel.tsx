@@ -37,6 +37,7 @@ interface ArtifactGroup {
   role: string;
   agentId: string;
   sessionId?: string;
+  source?: 'flightdeck' | 'copilot-session';
   files: ArtifactFile[];
 }
 
@@ -44,6 +45,7 @@ interface SessionArtifact extends ArtifactFile {
   role: string;
   agentId: string;
   agentDir: string;
+  source?: 'flightdeck' | 'copilot-session';
 }
 
 interface SessionGroup {
@@ -70,6 +72,7 @@ export function ArtifactsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
@@ -97,15 +100,17 @@ export function ArtifactsPanel() {
     fetchArtifacts();
   }, [fetchArtifacts]);
 
-  const loadFile = useCallback(async (path: string) => {
+  const loadFile = useCallback(async (artifact: SessionArtifact) => {
     setFileLoading(true);
     setFileError(null);
     try {
-      const data = await apiFetch<FileData>(
-        `/projects/${projectId}/artifact-contents?path=${encodeURIComponent(path)}`,
-      );
+      const url = artifact.source === 'copilot-session'
+        ? `/projects/${projectId}/session-artifact?agentId=${encodeURIComponent(artifact.agentId)}&path=${encodeURIComponent(artifact.path)}`
+        : `/projects/${projectId}/artifact-contents?path=${encodeURIComponent(artifact.path)}`;
+      const data = await apiFetch<FileData>(url);
       setFileData(data);
-      setSelectedPath(path);
+      setSelectedKey(`${artifact.agentId}:${artifact.path}`);
+      setSelectedPath(artifact.path);
     } catch (err: any) {
       setFileError(err.message || 'Failed to load file');
       setFileData(null);
@@ -123,7 +128,7 @@ export function ArtifactsPanel() {
     } catch { /* clipboard unavailable */ }
   }, [fileData]);
 
-  useEffect(() => { setCopied(false); }, [selectedPath]);
+  useEffect(() => { setCopied(false); }, [selectedKey]);
 
   const copyPath = useCallback(async () => {
     if (!artifactBasePath) return;
@@ -142,7 +147,7 @@ export function ArtifactsPanel() {
       if (!map.has(sid)) map.set(sid, []);
       const bucket = map.get(sid)!;
       for (const f of g.files) {
-        bucket.push({ ...f, role: g.role, agentId: g.agentId, agentDir: g.agentDir });
+        bucket.push({ ...f, role: g.role, agentId: g.agentId, agentDir: g.agentDir, source: g.source });
       }
     }
 
@@ -270,16 +275,23 @@ export function ArtifactsPanel() {
 
               {expandedGroups.has(session.sessionId) && session.artifacts.map(art => (
                 <button
-                  key={art.path}
-                  onClick={() => loadFile(art.path)}
+                  key={`${art.agentId}-${art.path}`}
+                  onClick={() => loadFile(art)}
                   className={`w-full text-left flex items-center gap-2 pl-7 pr-3 py-1.5 text-xs hover:bg-th-bg-alt/80 transition-colors ${
-                    selectedPath === art.path ? 'bg-accent/10 text-accent' : 'text-th-text-alt'
+                    selectedKey === `${art.agentId}:${art.path}` ? 'bg-accent/10 text-accent' : 'text-th-text-alt'
                   }`}
                   title={art.path}
                 >
                   <FileText size={12} className="shrink-0 text-blue-400" />
                   <div className="flex-1 min-w-0">
-                    <div className="truncate">{art.title || art.name}</div>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span>{art.title || art.name}</span>
+                      {art.source === 'copilot-session' && (
+                        <span className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-purple-500/15 text-purple-400 shrink-0">
+                          Session
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-th-text-muted mt-0.5">
                       <span>{getRoleIcon(art.role)}</span>
                       <span className="capitalize">{art.role}</span>
