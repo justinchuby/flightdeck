@@ -19,7 +19,7 @@ import { Tabs } from '../ui/Tabs';
 import type { TabItem } from '../ui/Tabs';
 import { useModels, deriveModelName } from '../../hooks/useModels';
 import type { AgentProfile } from './types';
-import { statusBadge } from './types';
+import { statusBadge } from './utils';
 
 type ProfileTab = 'overview' | 'history' | 'settings';
 

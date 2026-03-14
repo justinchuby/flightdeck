@@ -7,7 +7,7 @@ import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { formatTokens } from '../../utils/format';
 import { shortAgentId } from '../../utils/agentLabel';
 import type { RosterAgent, CrewSummary, SessionDetail } from './types';
-import { statusBadge, formatDuration } from './types';
+import { statusBadge, formatDuration } from './utils';
 
 // ── Crew Group (collapsible) ──────────────────────────────
 
