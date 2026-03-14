@@ -57,17 +57,11 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   if (ctx.reportedCompletions.has(dedupKey)) return;
   ctx.reportedCompletions.add(dedupKey);
 
-  for (const [, del] of ctx.delegations) {
-    if (del.toAgentId === agent.id && del.status === 'active') {
-      del.status = 'completed';
-      del.completedAt = new Date().toISOString();
-      del.result = redact(agent.getTaskOutput(16000)).text;
-      // Persist completion to DB
-      if (ctx.activeDelegationRepository) {
-        try { ctx.activeDelegationRepository.complete(del.id); } catch { /* non-critical */ }
-      }
-    }
-  }
+  // NOTE: We intentionally do NOT mark the delegation as completed here.
+  // The agent's ACP state (running/idle) is the source of truth for display
+  // status. Delegation completion only happens on agent exit (see
+  // notifyParentOfCompletion). This prevents the UI from showing "completed"
+  // while the agent is still actively processing between idle/running cycles.
 
   const rawOutput = agent.getTaskOutput(16000);
   const sentMessages = /⟦⟦\s*(AGENT_MESSAGE|BROADCAST|GROUP_MESSAGE|COMPLETE_TASK)\s*\{/.test(rawOutput);

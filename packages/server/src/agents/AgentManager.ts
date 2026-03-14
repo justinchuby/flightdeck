@@ -761,6 +761,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           }
         }
 
+        // When agent resumes work, clear the idle dedup key so the next
+        // idle transition properly re-notifies the parent.
+        if (status === 'running') {
+          this.dispatcher.clearCompletionTracking(agent.id);
+        }
+
         // Suppress the first idle notification for resumed agents — their prior
         // work was already reported.
         if (status === 'idle' && agent.parentId && !agent._isResuming) {
