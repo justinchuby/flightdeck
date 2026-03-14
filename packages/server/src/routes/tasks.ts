@@ -1,15 +1,13 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
-import { projectSessions } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
 
 /**
  * Global task routes — cross-project task queries and the attention items
  * endpoint used by the KanbanBoard, AttentionBar, and HomeDashboard.
  */
 export function tasksRoutes(ctx: AppContext): Router {
-  const { agentManager, decisionLog, db } = ctx;
+  const { agentManager, decisionLog } = ctx;
   const router = Router();
 
   // ── Global task query ─────────────────────────────────────────────
@@ -24,9 +22,12 @@ export function tasksRoutes(ctx: AppContext): Router {
    *   &limit=200              (max results, default 200, capped at 1000)
    *   &offset=0               (skip N results for pagination)
    *
-   * scope=global filters to live agents, or active session leads after restart.
-   * scope=project returns ALL tasks for a project across all sessions.
-   * scope=lead returns only tasks owned by the specified leadId.
+   * Filtering semantics:
+   * - scope=global: During an active session (live agents in memory), show
+   *   only that session's tasks. When no session is running, show all
+   *   historical tasks across sessions so the user can see past work.
+   * - scope=project: ALL tasks for a project across all sessions.
+   * - scope=lead: Only tasks owned by the specified leadId.
    */
   router.get('/tasks', (req, res) => {
     const taskDAG = agentManager.getTaskDAG();
@@ -56,30 +57,15 @@ export function tasksRoutes(ctx: AppContext): Router {
       const allTasks = taskDAG.getAll({ includeArchived });
       tasks = allTasks.filter(t => t.leadId === leadId);
     } else {
-      // Global scope (default): filter to current session's tasks.
-      // When live agents exist, use their IDs directly. After a server
-      // restart (no live agents yet), derive active lead IDs from the
-      // project_sessions table — no client-supplied sessionId needed.
+      // Global scope (default):
+      // During an active session (live agents in memory), show only that
+      // session's tasks. When no session is running, show all historical
+      // tasks across sessions so the user can see past work.
       const allTasks = taskDAG.getAll({ includeArchived });
       const liveAgents = agentManager.getAll();
       if (liveAgents.length > 0) {
         const liveAgentIds = new Set(liveAgents.map(a => a.id));
         tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
-      } else if (db) {
-        // Derive active session leadIds from project_sessions table —
-        // the server already knows which sessions are active, no client
-        // input needed.
-        const activeRows = db.drizzle
-          .select({ leadId: projectSessions.leadId })
-          .from(projectSessions)
-          .where(eq(projectSessions.status, 'active'))
-          .all();
-        if (activeRows.length > 0) {
-          const activeLeadIds = new Set(activeRows.map(r => r.leadId));
-          tasks = allTasks.filter(t => t.leadId && activeLeadIds.has(t.leadId));
-        } else {
-          tasks = allTasks; // no active sessions tracked → show all (fresh install)
-        }
       } else {
         tasks = allTasks;
       }
