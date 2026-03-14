@@ -726,11 +726,11 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
             md:static md:inset-auto md:z-auto md:bg-transparent md:transform-none md:transition-none
             ${selectedAgent ? 'translate-x-0' : 'translate-x-full'}
             ${selectedAgent ? 'md:w-[400px] lg:w-[480px] md:shrink-0' : 'md:w-0 md:hidden'}
-            md:self-start md:sticky md:top-0 md:max-h-screen
+            md:min-h-0
           `}
         >
           {selectedAgent && (
-            <div className="h-full md:max-h-screen overflow-y-auto">
+            <div className="h-full overflow-y-auto">
               <AgentDetailPanel agentId={selectedAgent} crewId={selectedAgentCrewId} mode="inline" onClose={() => setSelectedAgent(null)} />
             </div>
           )}
