@@ -42,10 +42,11 @@ export class StatusBarManager {
   }
 
   /** Update the connection status indicator. */
-  updateConnection(connected: boolean): void {
+  updateConnection(connected: boolean, serverVersion?: string): void {
     if (connected) {
+      const versionSuffix = serverVersion ? ` (v${serverVersion})` : '';
       this._connectionItem.text = '$(plug) Flightdeck: Connected';
-      this._connectionItem.tooltip = 'Connected to Flightdeck server — click to disconnect';
+      this._connectionItem.tooltip = `Connected to Flightdeck server${versionSuffix} — click to disconnect`;
       this._connectionItem.command = 'flightdeck.disconnect';
       this._connectionItem.backgroundColor = undefined;
     } else {

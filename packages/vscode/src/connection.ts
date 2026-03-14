@@ -8,6 +8,14 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'err
 
 export { ServerMessage };
 
+/** Bump this when the extension requires a new server API version. */
+export const EXPECTED_API_VERSION = 1;
+
+export interface ServerVersionInfo {
+  version: string;
+  apiVersion: number;
+}
+
 /**
  * Manages the WebSocket + REST connection to the Flightdeck server.
  *
@@ -25,6 +33,7 @@ export class FlightdeckConnection {
   private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   private _state: ConnectionState = 'disconnected';
   private _serverUrl = '';
+  private _serverVersion: ServerVersionInfo | null = null;
   private shouldReconnect = false;
 
   private readonly _onStateChange = new vscode.EventEmitter<ConnectionState>();
@@ -57,6 +66,11 @@ export class FlightdeckConnection {
     return this._serverUrl;
   }
 
+  /** Server version info from the last successful connect, or null. */
+  get serverVersion(): ServerVersionInfo | null {
+    return this._serverVersion;
+  }
+
   private setState(state: ConnectionState): void {
     if (this._state === state) return;
     this._state = state;
@@ -77,39 +91,168 @@ export class FlightdeckConnection {
     });
   }
 
-  /**
-   * Resolve the server URL from (in priority order):
-   * 1. Explicit `serverUrl` parameter
-   * 2. VS Code setting `flightdeck.serverUrl`
-   * 3. Environment variable `FLIGHTDECK_PORT` → `http://localhost:{port}`
-   * 4. Default: `http://localhost:3001`
-   */
-  resolveServerUrl(serverUrl?: string): string {
-    if (serverUrl) return serverUrl;
+  private static readonly DISCOVERY_PORT_START = 3001;
+  private static readonly DISCOVERY_PORT_END = 3010;
+  private static readonly DISCOVERY_TIMEOUT_MS = 2000;
+  private static readonly GLOBAL_STATE_LAST_URL = 'flightdeck.lastServerUrl';
 
+  /**
+   * Discover a running Flightdeck server.
+   *
+   * Priority:
+   * 1. Explicit `serverUrl` parameter
+   * 2. VS Code setting `flightdeck.serverUrl` (if user has changed it)
+   * 3. Last successful URL from globalState (fast reconnect)
+   * 4. `FLIGHTDECK_PORT` environment variable → `http://localhost:{port}`
+   * 5. Parallel port scan of localhost:3001–3010
+   * 6. null (not found — caller decides whether to prompt)
+   */
+  async discoverServer(serverUrl?: string): Promise<string | null> {
+    // 1. Explicit URL
+    if (serverUrl) {
+      this.log.appendLine(`Discovery: using explicit URL ${serverUrl}`);
+      return serverUrl;
+    }
+
+    // 2. VS Code setting (only if user has customized it)
     const configUrl = vscode.workspace
       .getConfiguration('flightdeck')
       .get<string>('serverUrl');
-    if (configUrl) return configUrl;
+    if (configUrl) {
+      if (await this.probeHealth(configUrl)) {
+        this.log.appendLine(`Discovery: found server at configured URL ${configUrl}`);
+        return configUrl;
+      }
+      this.log.appendLine(`Discovery: configured URL ${configUrl} not responding`);
+    }
 
+    // 3. Last successful URL (persisted in globalState)
+    const lastUrl = this.context.globalState.get<string>(
+      FlightdeckConnection.GLOBAL_STATE_LAST_URL,
+    );
+    if (lastUrl) {
+      if (await this.probeHealth(lastUrl)) {
+        this.log.appendLine(`Discovery: found server at last-known URL ${lastUrl}`);
+        return lastUrl;
+      }
+      this.log.appendLine(`Discovery: last-known URL ${lastUrl} not responding`);
+    }
+
+    // 4. FLIGHTDECK_PORT env var
     const envPort = process.env.FLIGHTDECK_PORT;
-    if (envPort) return `http://localhost:${envPort}`;
+    if (envPort) {
+      const envUrl = `http://localhost:${envPort}`;
+      if (await this.probeHealth(envUrl)) {
+        this.log.appendLine(`Discovery: found server via FLIGHTDECK_PORT=${envPort}`);
+        return envUrl;
+      }
+      this.log.appendLine(`Discovery: FLIGHTDECK_PORT=${envPort} not responding`);
+    }
 
-    return 'http://localhost:3001';
+    // 5. Parallel port scan
+    this.log.appendLine(
+      `Discovery: scanning ports ${FlightdeckConnection.DISCOVERY_PORT_START}–${FlightdeckConnection.DISCOVERY_PORT_END}...`,
+    );
+    const found = await this.scanPorts();
+    if (found) {
+      this.log.appendLine(`Discovery: found server at ${found}`);
+      return found;
+    }
+
+    this.log.appendLine('Discovery: no server found');
+    return null;
+  }
+
+  /**
+   * Probe a single URL's /health endpoint. Returns true if status is 'ok'.
+   */
+  private async probeHealth(url: string): Promise<boolean> {
+    try {
+      const urlObj = new URL('/health', url);
+      const lib = urlObj.protocol === 'https:' ? https : http;
+      return await new Promise<boolean>((resolve) => {
+        const req = lib.get(urlObj, (res) => {
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+            res.resume();
+            resolve(false);
+            return;
+          }
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => { body += chunk; });
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(body).status === 'ok');
+            } catch {
+              resolve(false);
+            }
+          });
+        });
+        req.on('error', () => resolve(false));
+        req.setTimeout(FlightdeckConnection.DISCOVERY_TIMEOUT_MS, () => {
+          req.destroy();
+          resolve(false);
+        });
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Scan ports 3001–3010 in parallel.
+   * Returns the URL of the first healthy server, or null.
+   */
+  private async scanPorts(): Promise<string | null> {
+    const ports: number[] = [];
+    for (
+      let p = FlightdeckConnection.DISCOVERY_PORT_START;
+      p <= FlightdeckConnection.DISCOVERY_PORT_END;
+      p++
+    ) {
+      ports.push(p);
+    }
+
+    const results = await Promise.allSettled(
+      ports.map(async (port) => {
+        const url = `http://localhost:${port}`;
+        const healthy = await this.probeHealth(url);
+        if (healthy) return url;
+        throw new Error('not healthy');
+      }),
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') return result.value;
+    }
+    return null;
   }
 
   /**
    * Connect to the Flightdeck server.
-   * Performs a health check via GET /health, then establishes a WebSocket.
+   *
+   * Runs discovery (port scan, env vars, settings, last-known URL) then
+   * health-checks and establishes a WebSocket. Stores the successful URL
+   * in globalState for faster reconnect next time.
+   *
+   * If `serverUrl` is provided it is used directly (skips discovery).
    */
   async connect(serverUrl?: string): Promise<void> {
     if (this._state === 'connecting' || this._state === 'connected') {
       return;
     }
 
-    this._serverUrl = this.resolveServerUrl(serverUrl);
-    this.shouldReconnect = true;
     this.setState('connecting');
+
+    const discovered = await this.discoverServer(serverUrl);
+    if (!discovered) {
+      this.log.appendLine('No server found during connect');
+      this.setState('disconnected');
+      return;
+    }
+
+    this._serverUrl = discovered;
+    this.shouldReconnect = true;
     this.log.appendLine(`Connecting to ${this._serverUrl}...`);
 
     try {
@@ -125,6 +268,28 @@ export class FlightdeckConnection {
       this.scheduleReconnect();
       return;
     }
+
+    // Fetch server version and check API compatibility
+    try {
+      this._serverVersion = await this.fetch<ServerVersionInfo>('/version');
+      this.log.appendLine(`Server version: ${this._serverVersion.version}, API version: ${this._serverVersion.apiVersion}`);
+
+      if (this._serverVersion.apiVersion !== EXPECTED_API_VERSION) {
+        vscode.window.showWarningMessage(
+          `Flightdeck server v${this._serverVersion.version} may not be compatible with this extension. ` +
+          `Expected API version ${EXPECTED_API_VERSION}, got ${this._serverVersion.apiVersion}. Some features may not work.`,
+        );
+      }
+    } catch {
+      this._serverVersion = null;
+      this.log.appendLine('Server does not support /version endpoint — skipping compatibility check');
+    }
+
+    // Persist successful URL for faster reconnect
+    await this.context.globalState.update(
+      FlightdeckConnection.GLOBAL_STATE_LAST_URL,
+      this._serverUrl,
+    );
 
     this.connectWebSocket();
   }
@@ -150,7 +315,7 @@ export class FlightdeckConnection {
    * @returns Parsed JSON response body
    */
   async fetch<T>(path: string): Promise<T> {
-    const baseUrl = this._serverUrl || this.resolveServerUrl();
+    const baseUrl = this._serverUrl || 'http://localhost:3001';
     const url = new URL(path, baseUrl);
     const lib = url.protocol === 'https:' ? https : http;
 
@@ -206,7 +371,7 @@ export class FlightdeckConnection {
     path: string,
     options: { method?: string; body?: unknown } = {},
   ): Promise<{ ok: boolean; status: number; data?: T }> {
-    const baseUrl = this._serverUrl || this.resolveServerUrl();
+    const baseUrl = this._serverUrl || 'http://localhost:3001';
     const url = new URL(`/api${path}`, baseUrl);
     const lib = url.protocol === 'https:' ? https : http;
     const method = options.method ?? 'POST';
@@ -323,9 +488,22 @@ export class FlightdeckConnection {
     this.log.appendLine(
       `Reconnecting in ${this.RECONNECT_INTERVAL / 1000}s...`,
     );
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
-      if (this.shouldReconnect) {
+      if (!this.shouldReconnect) return;
+
+      // Re-discover in case the server restarted on a different port
+      const discovered = await this.discoverServer();
+      if (discovered && discovered !== this._serverUrl) {
+        this.log.appendLine(`Server moved to ${discovered} (was ${this._serverUrl})`);
+        this._serverUrl = discovered;
+        await this.context.globalState.update(
+          FlightdeckConnection.GLOBAL_STATE_LAST_URL,
+          discovered,
+        );
+      }
+
+      if (this._serverUrl) {
         this.connectWebSocket();
       }
     }, this.RECONNECT_INTERVAL);
