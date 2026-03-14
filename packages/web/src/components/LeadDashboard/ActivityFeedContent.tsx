@@ -4,7 +4,7 @@ import { EmptyState } from '../Shared';
 import type { ActivityEvent } from '../../stores/leadStore';
 import { shortAgentId } from '../../utils/agentLabel';
 
-export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
+export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: AgentInfo[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -30,7 +30,7 @@ export function ActivityFeedContent({ activity, agents }: { activity: ActivityEv
         <EmptyState icon="📡" title="No activity yet" compact />
       ) : (
         recent.map((evt) => {
-          const agent = agents.find((a: any) => a.id === evt.agentId);
+          const agent = agents.find((a) => a.id === evt.agentId);
           const label = agent?.role?.name ?? evt.agentRole;
           const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           return (

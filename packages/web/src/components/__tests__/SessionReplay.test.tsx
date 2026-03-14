@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReplayScrubber } from '../SessionReplay/ReplayScrubber';
 import { useSessionReplay } from '../../hooks/useSessionReplay';
 
@@ -9,6 +10,13 @@ const mockApiFetch = vi.fn();
 vi.mock('../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
 }));
+
+function createWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+}
 
 const sampleKeyframes = {
   keyframes: [
@@ -26,28 +34,28 @@ describe('useSessionReplay', () => {
 
   it('loads keyframes on mount', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
-    const { result } = renderHook(() => useSessionReplay('lead-1'));
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.keyframes).toHaveLength(4);
     expect(result.current.duration).toBeGreaterThan(0);
-    expect(mockApiFetch).toHaveBeenCalledWith('/replay/lead-1/keyframes');
+    expect(mockApiFetch).toHaveBeenCalledWith('/replay/lead-1/keyframes', expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
   it('returns empty state when leadId is null', () => {
-    const { result } = renderHook(() => useSessionReplay(null));
+    const { result } = renderHook(() => useSessionReplay(null), { wrapper: createWrapper() });
     expect(result.current.keyframes).toHaveLength(0);
     expect(result.current.duration).toBe(0);
   });
 
   it('sets error on fetch failure', async () => {
     mockApiFetch.mockRejectedValue(new Error('Not found'));
-    const { result } = renderHook(() => useSessionReplay('lead-1'));
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.error).toBe('Not found'));
   });
 
   it('starts at time 0 and not playing', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
-    const { result } = renderHook(() => useSessionReplay('lead-1'));
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.currentTime).toBe(0);
     expect(result.current.playing).toBe(false);
@@ -55,7 +63,7 @@ describe('useSessionReplay', () => {
 
   it('seek clamps to valid range', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
-    const { result } = renderHook(() => useSessionReplay('lead-1'));
+    const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.duration).toBeGreaterThan(0));
     const dur = result.current.duration;
 
@@ -70,9 +78,10 @@ describe('useSessionReplay', () => {
 
   it('resets currentTime and playing when leadId changes', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
+    const wrapper = createWrapper();
     const { result, rerender } = renderHook(
       ({ id }) => useSessionReplay(id),
-      { initialProps: { id: 'lead-1' as string | null } },
+      { initialProps: { id: 'lead-1' as string | null }, wrapper },
     );
     await waitFor(() => expect(result.current.duration).toBeGreaterThan(0));
 
@@ -100,13 +109,13 @@ describe('ReplayScrubber', () => {
 
   it('shows loading state', () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<ReplayScrubber leadId="lead-1" />);
+    render(<ReplayScrubber leadId="lead-1" />, { wrapper: createWrapper() });
     expect(screen.getByText(/Loading session replay/)).toBeDefined();
   });
 
   it('shows error state', async () => {
     mockApiFetch.mockRejectedValue(new Error('Unavailable'));
-    render(<ReplayScrubber leadId="lead-1" />);
+    render(<ReplayScrubber leadId="lead-1" />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(screen.getByText(/Replay unavailable/)).toBeDefined();
     });
@@ -114,7 +123,7 @@ describe('ReplayScrubber', () => {
 
   it('shows empty state when no keyframes in replay mode', async () => {
     mockApiFetch.mockResolvedValue({ keyframes: [] });
-    render(<ReplayScrubber leadId="lead-1" />);
+    render(<ReplayScrubber leadId="lead-1" />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(screen.getByText(/No replay data available/)).toBeDefined();
     });
@@ -122,7 +131,7 @@ describe('ReplayScrubber', () => {
 
   it('shows live scrub bar even with no keyframes in live mode', async () => {
     mockApiFetch.mockResolvedValue({ keyframes: [] });
-    render(<ReplayScrubber leadId="lead-1" liveMode={true} />);
+    render(<ReplayScrubber leadId="lead-1" liveMode={true} />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(screen.getByTestId('replay-scrubber')).toBeDefined();
     });
@@ -131,7 +140,7 @@ describe('ReplayScrubber', () => {
 
   it('renders scrubber with controls when keyframes exist', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
-    render(<ReplayScrubber leadId="lead-1" />);
+    render(<ReplayScrubber leadId="lead-1" />, { wrapper: createWrapper() });
     await waitFor(() => {
       expect(screen.getByTestId('replay-scrubber')).toBeDefined();
     });
@@ -144,7 +153,7 @@ describe('ReplayScrubber', () => {
 
   it('has speed selector buttons', async () => {
     mockApiFetch.mockResolvedValue(sampleKeyframes);
-    render(<ReplayScrubber leadId="lead-1" />);
+    render(<ReplayScrubber leadId="lead-1" />, { wrapper: createWrapper() });
     await waitFor(() => expect(screen.getByTestId('replay-scrubber')).toBeDefined());
     expect(screen.getByText('4×')).toBeDefined();
     expect(screen.getByText('32×')).toBeDefined();

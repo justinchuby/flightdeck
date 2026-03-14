@@ -12,7 +12,7 @@ import { DagResourceView } from './DagResourceView';
 import { KanbanBoard } from './KanbanBoard';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import type { GanttTask } from './DagGantt';
-import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
+import type { DagStatus, DagTask, LeadProgress, AgentInfo, Project } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
 
 /** Parse a SQLite datetime string, normalizing missing Z suffix to UTC */
@@ -155,21 +155,21 @@ function DagPanel({
     let cancelled = false;
     const fetchGlobal = async () => {
       try {
-        const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=0${archivedParam}`);
+        const data = await apiFetch<{ tasks: DagTask[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=0${archivedParam}`);
         if (!cancelled && data) {
           const tasks = data.tasks;
           setGlobalDagStatus({
             tasks,
             fileLockMap: {},
             summary: {
-              pending: tasks.filter((t: any) => t.dagStatus === 'pending').length,
-              ready: tasks.filter((t: any) => t.dagStatus === 'ready').length,
-              running: tasks.filter((t: any) => t.dagStatus === 'running').length,
-              blocked: tasks.filter((t: any) => t.dagStatus === 'blocked').length,
-              done: tasks.filter((t: any) => t.dagStatus === 'done').length,
-              failed: tasks.filter((t: any) => t.dagStatus === 'failed').length,
-              paused: tasks.filter((t: any) => t.dagStatus === 'paused').length,
-              skipped: tasks.filter((t: any) => t.dagStatus === 'skipped').length,
+              pending: tasks.filter((t: DagTask) => t.dagStatus === 'pending').length,
+              ready: tasks.filter((t: DagTask) => t.dagStatus === 'ready').length,
+              running: tasks.filter((t: DagTask) => t.dagStatus === 'running').length,
+              blocked: tasks.filter((t: DagTask) => t.dagStatus === 'blocked').length,
+              done: tasks.filter((t: DagTask) => t.dagStatus === 'done').length,
+              failed: tasks.filter((t: DagTask) => t.dagStatus === 'failed').length,
+              paused: tasks.filter((t: DagTask) => t.dagStatus === 'paused').length,
+              skipped: tasks.filter((t: DagTask) => t.dagStatus === 'skipped').length,
             },
           });
           setGlobalHasMore(data.hasMore);
@@ -200,21 +200,21 @@ function DagPanel({
   const loadMoreGlobalTasks = async () => {
     if (!globalHasMore || !globalDagStatus) return;
     try {
-      const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=${globalOffset}${archivedParam}`);
+      const data = await apiFetch<{ tasks: DagTask[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=${globalOffset}${archivedParam}`);
       if (data) {
         const merged = [...globalDagStatus.tasks, ...data.tasks];
         setGlobalDagStatus({
           tasks: merged,
           fileLockMap: {},
           summary: {
-            pending: merged.filter((t: any) => t.dagStatus === 'pending').length,
-            ready: merged.filter((t: any) => t.dagStatus === 'ready').length,
-            running: merged.filter((t: any) => t.dagStatus === 'running').length,
-            blocked: merged.filter((t: any) => t.dagStatus === 'blocked').length,
-            done: merged.filter((t: any) => t.dagStatus === 'done').length,
-            failed: merged.filter((t: any) => t.dagStatus === 'failed').length,
-            paused: merged.filter((t: any) => t.dagStatus === 'paused').length,
-            skipped: merged.filter((t: any) => t.dagStatus === 'skipped').length,
+            pending: merged.filter((t: DagTask) => t.dagStatus === 'pending').length,
+            ready: merged.filter((t: DagTask) => t.dagStatus === 'ready').length,
+            running: merged.filter((t: DagTask) => t.dagStatus === 'running').length,
+            blocked: merged.filter((t: DagTask) => t.dagStatus === 'blocked').length,
+            done: merged.filter((t: DagTask) => t.dagStatus === 'done').length,
+            failed: merged.filter((t: DagTask) => t.dagStatus === 'failed').length,
+            paused: merged.filter((t: DagTask) => t.dagStatus === 'paused').length,
+            skipped: merged.filter((t: DagTask) => t.dagStatus === 'skipped').length,
           },
         });
         setGlobalHasMore(data.hasMore);

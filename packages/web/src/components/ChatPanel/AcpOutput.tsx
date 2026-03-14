@@ -119,7 +119,17 @@ function AcpVirtuosoFooter({ context }: { context?: AcpVirtuosoContext }) {
 }
 
 /** Render a single content item — handles text, resource, image, audio, or unknown */
-function renderContentItem(c: any): string {
+/** ACP content block — can be text, image, audio, resource, or a plain string */
+interface ContentItem {
+  type?: string;
+  text?: string;
+  data?: string;
+  content?: unknown;
+  mimeType?: string;
+  resource?: { uri?: string; text?: string };
+}
+
+function renderContentItem(c: ContentItem | string): string {
   if (typeof c === 'string') return c;
   if (c == null) return '';
   if (typeof c.text === 'string' && (c.type === 'text' || !c.type || c.type === undefined)) return c.text;
@@ -137,7 +147,7 @@ function renderContentItem(c: any): string {
 }
 
 /** Safely render tool call content — handles string, array, or object */
-function _stringifyContent(content: any): string {
+function _stringifyContent(content: unknown): string {
   if (typeof content === 'string') {
     if (content.startsWith('{') || content.startsWith('[')) {
       try {
@@ -171,12 +181,12 @@ export function AcpOutput({ agentId }: Props) {
   useEffect(() => {
     if (!agentId || messages.length > 0) return;
     apiFetch(`/agents/${agentId}/messages?limit=200`)
-      .then((data: any) => {
+      .then((data: { messages: Array<{ sender?: string; text?: string; timestamp?: number }> }) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
           // Only load if still no messages (avoid overwriting live data)
           if (!existing?.messages?.length) {
-            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
               type: 'text' as const,
               text: m.content,
               sender: (m.sender || 'agent') as 'agent' | 'user' | 'system' | 'thinking',

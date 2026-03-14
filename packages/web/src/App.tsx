@@ -247,15 +247,15 @@ function AppContent() {
     queryKey: ['app', 'leads'],
     queryFn: async ({ signal }) => {
       try {
-        const leads: any[] = await apiFetch('/lead', { signal });
+        const leads: Array<{ id: string; status: string; task?: string }> = await apiFetch('/lead', { signal });
         if (!Array.isArray(leads)) return [];
         const store = useLeadStore.getState();
         leads.forEach((l) => {
           store.addProject(l.id);
           apiFetch(`/agents/${l.id}/messages?limit=200`, { signal })
-            .then((data: any) => {
+            .then((data: { messages: Array<{ sender?: string; text?: string; content?: string; timestamp?: string | number }> }) => {
               if (Array.isArray(data.messages) && data.messages.length > 0) {
-                const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+                const msgs: AcpTextChunk[] = data.messages.map((m) => ({
                   type: 'text' as const,
                   text: m.content,
                   sender: m.sender as 'agent' | 'user' | 'system',
