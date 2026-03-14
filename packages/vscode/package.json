@@ -154,7 +154,27 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.24.0"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  },
+  "icon": "resources/icon.png",
+  "homepage": "https://flightdeck.justinchuby.com",
+  "bugs": {
+    "url": "https://github.com/justinchuby/flightdeck/issues"
+  },
+  "keywords": [
+    "ai",
+    "multi-agent",
+    "orchestration",
+    "copilot",
+    "flightdeck"
+  ],
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
   }
 }
