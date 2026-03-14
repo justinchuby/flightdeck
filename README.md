@@ -1,4 +1,4 @@
-# Flightdeck — Multi-Agent Copilot CLI Orchestrator
+# Flightdeck — Multi-Agent Orchestration Platform
 
 [![npm](https://img.shields.io/npm/v/%40flightdeck-ai%2Fflightdeck)](https://www.npmjs.com/package/@flightdeck-ai/flightdeck)
 
@@ -7,7 +7,7 @@
 
 **One command. A whole engineering crew.**
 
-Flightdeck orchestrates crews of [Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
+Flightdeck orchestrates crews of AI coding agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. It supports multiple providers including **GitHub Copilot**, **Claude Code**, **Google Gemini CLI**, **Codex**, **Cursor**, and **OpenCode**. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
 
 ```bash
 npm install -g @flightdeck-ai/flightdeck
@@ -62,7 +62,7 @@ That's it. This installs Flightdeck globally and starts the server, opening the 
 
 1. **Create a project** — Click **Create Project**, describe what you want built, and point it at your repo
 2. **Watch the lead plan** — The Project Lead agent analyzes your task, breaks it into a task DAG, and assembles a crew
-3. **Agents get to work** — Developers, reviewers, architects spin up in parallel — each in their own Copilot CLI session
+3. **Agents get to work** — Developers, reviewers, architects spin up in parallel — each in their own CLI session with your configured provider
 4. **Stay in the loop** — Message any agent directly, approve decisions, and watch progress in real time
 
 > **Example:** *"Refactor the auth module to use JWT tokens, add tests, and update the docs"* → The lead creates a developer (implementation), a code reviewer (quality), and a tech writer (docs), sets up dependencies so the reviewer waits for the developer, and coordinates the whole flow.
@@ -142,7 +142,7 @@ npm run dev
 - **Security** — Challenge-response auth, prompt injection sanitization (4-layer), default-deny allowlists, secret redaction, CORS lockdown, rate limiting, archived-only project deletion, CWD path validation
 
 ### 💾 Persistence & Recovery
-- **Session Resume** — Resume from a previous Copilot session ID with full context recovery. Native SDK resume for Claude and Copilot adapters
+- **Session Resume** — Resume from a previous session ID with full context recovery. Native SDK resume for providers that support it (Claude, Copilot)
 - **Knowledge Pipeline** — Automatic knowledge injection on agent spawn (KnowledgeInjector), session knowledge extraction on agent exit, SkillsLoader for `.github/skills/` with hot-reload via `fs.watch`, and AgentReconciliation on reconnect
 - **CollectiveMemory** — Cross-session `remember()` / `recall()` for persistent agent knowledge
 - **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
@@ -170,7 +170,7 @@ Flightdeck uses a **three-tier architecture** with clear separation of concerns:
 ┌───────────────────────▼──────────────────────────────────────────┐
 │                    Agent Server (Daemon)                          │
 │  Spawns & manages CLI agent processes via ACP protocol           │
-│  Copilot CLI · Claude CLI · Gemini CLI · Codex · Cursor          │
+│  Copilot · Claude · Gemini · Codex · Cursor · OpenCode          │
 │  Per-agent lifecycle · Auto-restart · Heartbeat monitoring        │
 └──────────────────────────────────────────────────────────────────┘
 ```

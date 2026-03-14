@@ -1,6 +1,6 @@
 # Introduction
 
-Flightdeck is a web-based orchestration framework that coordinates multiple [GitHub Copilot CLI](https://docs.github.com/en/copilot) agents. Give it a task, and it assembles a team of specialists — developers, architects, reviewers, and more — that collaborate like a real engineering team, working in parallel and checking each other's work.
+Flightdeck is a web-based orchestration framework that coordinates multiple AI coding agents across providers — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, and OpenCode. Give it a task, and it assembles a team of specialists — developers, architects, reviewers, and more — that collaborate like a real engineering team, working in parallel and checking each other's work.
 
 > [!WARNING]
 > This is AI-generated code. Use the project with this understanding in mind.

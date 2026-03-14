@@ -6,7 +6,7 @@ Get a multi-agent team running in under 2 minutes.
 
 - Node.js 20+
 - npm 10+
-- [GitHub Copilot CLI](https://docs.github.com/en/copilot) installed and authenticated
+- At least one CLI provider installed and authenticated — [GitHub Copilot CLI](https://docs.github.com/en/copilot), [Claude Code](https://docs.anthropic.com/en/docs/agents/claude-code), Gemini CLI, Codex, Cursor, or OpenCode
 
 ## Launch
 

@@ -2,18 +2,18 @@
 
 ## Overview
 
-Flightdeck uses the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging with Copilot CLI agents.
+Flightdeck uses the **Agent Client Protocol (ACP)** for structured JSON-RPC messaging with CLI agents across all supported providers.
 
 ## ACP Mode (Default)
 
-Each agent spawns a Copilot CLI process with `copilot --acp --stdio`. Communication uses [JSON-RPC 2.0](https://www.jsonrpc.org/specification) over NDJSON streams via the [`@agentclientprotocol/sdk`](https://www.npmjs.com/package/@agentclientprotocol/sdk).
+Each agent spawns a CLI process (e.g., `copilot --acp --stdio`, `claude --acp --stdio`, `gemini --acp --stdio`). Communication uses [JSON-RPC 2.0](https://www.jsonrpc.org/specification) over NDJSON streams via the [`@agentclientprotocol/sdk`](https://www.npmjs.com/package/@agentclientprotocol/sdk).
 
 ### Connection Lifecycle
 
 ```
-Client (Flightdeck)              Agent (Copilot CLI)
+Client (Flightdeck)              Agent (CLI Provider)
      │                              │
-     │── spawn copilot --acp ──────>│
+     │── spawn <cli> --acp ────────>│
      │                              │
      │── initialize ───────────────>│
      │<──────────── capabilities ───│
