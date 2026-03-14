@@ -6,7 +6,8 @@ import { apiFetch } from '../../hooks/useApi';
  * Agent/task breakdown fetched separately, filtered at render time.
  * Works even when sessions are not active — reads from persisted DB data.
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../stores/appStore';
 import { formatTokens } from '../../utils/format';
 import { shortAgentId } from '../../utils/agentLabel';
@@ -18,13 +19,29 @@ interface Props {
 }
 
 export function TokenUsageSection({ projectId }: Props) {
-  const [projectCost, setProjectCost] = useState<ProjectCostSummary | null>(null);
-  const [agentCosts, setAgentCosts] = useState<AgentCostSummary[]>([]);
-  const [taskCosts, setTaskCosts] = useState<TaskCostSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [expanded, setExpanded] = useState(false);
   const agents = useAppStore((s) => s.agents);
+
+  const { data: costData, isLoading: loading, error } = useQuery({
+    queryKey: ['costs', projectId],
+    queryFn: async ({ signal }) => {
+      const [allProjects, agentData, taskData] = await Promise.all([
+        apiFetch<ProjectCostSummary[]>('/costs/by-project', { signal }),
+        apiFetch<AgentCostSummary[]>('/costs/by-agent', { signal }),
+        apiFetch<TaskCostSummary[]>('/costs/by-task', { signal }),
+      ]);
+      return {
+        projectCost: allProjects.find(c => c.projectId === projectId) ?? null,
+        agentCosts: agentData,
+        taskCosts: taskData,
+      };
+    },
+    refetchInterval: 15_000,
+  });
+
+  const projectCost = costData?.projectCost ?? null;
+  const agentCosts = costData?.agentCosts ?? [];
+  const taskCosts = costData?.taskCosts ?? [];
 
   const agentMap = useMemo(
     () => new Map(agents.map((a) => [a.id, a])),
@@ -39,36 +56,6 @@ export function TokenUsageSection({ projectId }: Props) {
     }
     return ids;
   }, [agents, projectId]);
-
-  // Effect depends only on projectId (stable string prop)
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchCosts = async () => {
-      try {
-        const [allProjects, agentData, taskData] = await Promise.all([
-          apiFetch<ProjectCostSummary[]>('/costs/by-project', { signal: controller.signal }),
-          apiFetch('/costs/by-agent', { signal: controller.signal }),
-          apiFetch('/costs/by-task', { signal: controller.signal }),
-        ]);
-        if (controller.signal.aborted) return;
-
-        setProjectCost(allProjects.find(c => c.projectId === projectId) ?? null);
-        setAgentCosts(agentData);
-        setTaskCosts(taskData);
-        setError(null);
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          console.warn('[TokenUsage] Failed to fetch costs:', err);
-          setError(err as Error);
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-    fetchCosts();
-    const interval = setInterval(fetchCosts, 15_000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [projectId]);
 
   // Filter to this project's agents at render time (not in effect)
   const filteredAgentCosts = useMemo(

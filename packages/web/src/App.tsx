@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './hooks/useApi';
 import { ApiProvider } from './contexts/ApiContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
@@ -120,13 +121,25 @@ function NotFoundPage() {
   );
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export function App() {
   return (
-    <ApiProvider>
-      <WebSocketProvider>
-        <AppContent />
-      </WebSocketProvider>
-    </ApiProvider>
+    <QueryClientProvider client={queryClient}>
+      <ApiProvider>
+        <WebSocketProvider>
+          <AppContent />
+        </WebSocketProvider>
+      </ApiProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -229,60 +242,66 @@ function AppContent() {
     }
   }, [agents, soundEnabled]);
 
-  // On app startup: load active leads + persisted projects into leadStore
-  useEffect(() => {
-    // Load active leads and their message history
-    apiFetch('/lead').then((leads: any[]) => {
-      if (!Array.isArray(leads)) return;
-      const store = useLeadStore.getState();
-      leads.forEach((l) => {
-        store.addProject(l.id);
-        // Pre-load message history
-        apiFetch(`/agents/${l.id}/messages?limit=200`)
-          .then((data: any) => {
-            if (Array.isArray(data.messages) && data.messages.length > 0) {
-              const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
-                type: 'text' as const,
-                text: m.content,
-                sender: m.sender as 'agent' | 'user' | 'system',
-                timestamp: new Date(m.timestamp).getTime(),
-              }));
-              const current = useLeadStore.getState().projects[l.id];
-              if (!current || current.messages.length === 0) {
-                useLeadStore.getState().setMessages(l.id, msgs);
+  // On app startup: load active leads + pre-load their message history
+  useQuery({
+    queryKey: ['app', 'leads'],
+    queryFn: async ({ signal }) => {
+      try {
+        const leads: any[] = await apiFetch('/lead', { signal });
+        if (!Array.isArray(leads)) return [];
+        const store = useLeadStore.getState();
+        leads.forEach((l) => {
+          store.addProject(l.id);
+          apiFetch(`/agents/${l.id}/messages?limit=200`, { signal })
+            .then((data: any) => {
+              if (Array.isArray(data.messages) && data.messages.length > 0) {
+                const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+                  type: 'text' as const,
+                  text: m.content,
+                  sender: m.sender as 'agent' | 'user' | 'system',
+                  timestamp: new Date(m.timestamp).getTime(),
+                }));
+                const current = useLeadStore.getState().projects[l.id];
+                if (!current || current.messages.length === 0) {
+                  useLeadStore.getState().setMessages(l.id, msgs);
+                }
               }
-            }
-          })
-          .catch(() => { /* message history fetch — non-critical, will load via WS */ });
-      });
-      // Auto-select first running lead
-      if (!store.selectedLeadId) {
-        const running = leads.find((l) => l.status === 'running');
-        if (running) store.selectLead(running.id);
+            })
+            .catch(() => { /* message history fetch — non-critical, will load via WS */ });
+        });
+        if (!store.selectedLeadId) {
+          const running = leads.find((l) => l.status === 'running');
+          if (running) store.selectLead(running.id);
+        }
+        return leads;
+      } catch (err) {
+        addToast('error', 'Failed to load sessions — check server connection');
+        throw err;
       }
-    }).catch((err) => {
-      console.warn('[App] Failed to load active leads:', err);
-      addToast('error', 'Failed to load sessions — check server connection');
-    });
+    },
+    staleTime: 30_000,
+  });
 
-    // Load persisted projects and register them in leadStore
-    apiFetch('/projects').then((projects: Project[]) => {
-      if (!Array.isArray(projects)) return;
+  // On app startup: load persisted projects and register them in leadStore
+  useQuery({
+    queryKey: ['app', 'projects'],
+    queryFn: async ({ signal }) => {
+      const projects: Project[] = await apiFetch('/projects', { signal });
+      if (!Array.isArray(projects)) return [];
       const store = useLeadStore.getState();
       for (const proj of projects) {
         if (proj.status === 'archived') continue;
         const key = `project:${proj.id}`;
         store.addProject(key);
       }
-      // If no lead is selected yet, select the first project
       if (!store.selectedLeadId && projects.length > 0) {
         const first = projects.find((p) => p.status !== 'archived');
         if (first) store.selectLead(`project:${first.id}`);
       }
-    }).catch((err) => {
-      console.warn('[App] Failed to load projects:', err);
-    });
-  }, [addToast]);
+      return projects;
+    },
+    staleTime: 30_000,
+  });
 
   return (
     <div className="flex h-screen bg-surface text-th-text-alt">

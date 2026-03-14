@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './useApi';
 import {
   PLAYBACK_TICK_MS,
@@ -53,62 +54,48 @@ export interface UseSessionReplayResult {
  * On seek, fetches GET /api/replay/:leadId/state?at=<iso>
  */
 export function useSessionReplay(leadId: string | null): UseSessionReplayResult {
-  const [keyframes, setKeyframes] = useState<ReplayKeyframe[]>([]);
   const [worldState, setWorldState] = useState<ReplayWorldState | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(4);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mountedRef = useRef(true);
   const sessionStartRef = useRef<number>(0);
 
-  // Load keyframes on mount / leadId change
-  useEffect(() => {
-    mountedRef.current = true;
+  // Load keyframes via TanStack Query
+  const { data: keyframeData, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['replay', 'keyframes', leadId],
+    queryFn: async ({ signal }) => {
+      const data = await apiFetch<{ keyframes: ReplayKeyframe[] }>(
+        `/replay/${leadId}/keyframes`,
+        { signal },
+      );
+      return data.keyframes ?? [];
+    },
+    enabled: !!leadId,
+  });
 
+  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
+  const keyframes = keyframeData ?? [];
+
+  // Derive duration and sessionStart from keyframes
+  useEffect(() => {
     // Reset playback state when switching projects
     setCurrentTime(0);
     setPlaying(false);
     setWorldState(null);
     sessionStartRef.current = 0;
 
-    if (!leadId) {
-      setKeyframes([]);
+    if (keyframes.length > 0) {
+      const start = new Date(keyframes[0].timestamp).getTime();
+      const end = new Date(keyframes[keyframes.length - 1].timestamp).getTime();
+      sessionStartRef.current = start;
+      setDuration(Math.max(end - start, MIN_SESSION_DURATION_MS));
+    } else {
       setDuration(0);
-      return;
     }
-
-    const loadKeyframes = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await apiFetch<{ keyframes: ReplayKeyframe[] }>(
-          `/replay/${leadId}/keyframes`,
-        );
-        if (!mountedRef.current) return;
-        const kf = data.keyframes ?? [];
-        setKeyframes(kf);
-        if (kf.length > 0) {
-          const start = new Date(kf[0].timestamp).getTime();
-          const end = new Date(kf[kf.length - 1].timestamp).getTime();
-          sessionStartRef.current = start;
-          setDuration(Math.max(end - start, MIN_SESSION_DURATION_MS));
-        }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (mountedRef.current) setError(message ?? 'Failed to load keyframes');
-      } finally {
-        if (mountedRef.current) setLoading(false);
-      }
-    };
-
-    loadKeyframes();
-    return () => { mountedRef.current = false; };
-  }, [leadId]);
+  }, [leadId, keyframes]);
 
   // Fetch world state at a given time offset
   const fetchStateAt = useCallback(async (timeMs: number) => {
@@ -118,7 +105,7 @@ export function useSessionReplay(leadId: string | null): UseSessionReplayResult 
       const state = await apiFetch<ReplayWorldState>(
         `/replay/${leadId}/state?at=${encodeURIComponent(iso)}`,
       );
-      if (mountedRef.current) setWorldState(state);
+      setWorldState(state);
     } catch {
       // Best-effort — don't interrupt playback
     }

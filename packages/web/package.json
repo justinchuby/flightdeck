@@ -19,6 +19,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@flightdeck/shared": "*",
+    "@tanstack/react-query": "^5.90.21",
     "@visx/axis": "^3.12.0",
     "@visx/brush": "^3.12.0",
     "@visx/event": "^3.12.0",

@@ -8,7 +8,7 @@
  * For short inline text (single line, no blocks), continue using
  * InlineMarkdown / InlineMarkdownWithMentions from utils/markdown.tsx.
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, type JSX } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -60,7 +60,7 @@ export function Markdown({ text, mentionAgents, onMentionClick, className, monos
   const hasMentions = mentionAgents && mentionAgents.length > 0;
 
   const components = useMemo(() => {
-    type HtmlProps<T extends keyof JSX.IntrinsicElements> = JSX.IntrinsicElements[T] & ExtraProps;
+    type HtmlProps<T extends keyof React.JSX.IntrinsicElements> = React.JSX.IntrinsicElements[T] & ExtraProps;
 
     const base: Components = {
       // Code blocks: use highlight.js classes, add copy-friendly styling
