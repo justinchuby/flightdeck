@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Check, X, Lightbulb, EyeOff } from 'lucide-react';
 import type { Decision } from '../../types';
 
+/** Decision with optional detail fields that may arrive from the API */
+type DecisionDetail = Decision & { alternatives?: string[]; impact?: string };
+
 /** Inline comment + action buttons for pending decisions in the banner */
 export function BannerDecisionActions({ decisionId, onConfirm, onReject, onDismiss }: {
   decisionId: string;
@@ -55,7 +58,7 @@ export function BannerDecisionActions({ decisionId, onConfirm, onReject, onDismi
 
 export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss }: { decisions: Decision[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void; onDismiss?: (id: string) => void }) {
   const feedRef = useRef<HTMLDivElement>(null);
-  const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<DecisionDetail | null>(null);
   const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
   useEffect(() => {
     requestAnimationFrame(() => {
