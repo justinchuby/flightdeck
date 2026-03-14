@@ -80,8 +80,9 @@ export function CrewHealth({ crewId = 'default' }: Props) {
       setError(null);
       const data = await apiFetch<CrewHealthData>(`/crews/${encodeURIComponent(crewId)}/health`);
       setHealth(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load crew health');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to load crew health');
     } finally {
       setLoading(false);
     }

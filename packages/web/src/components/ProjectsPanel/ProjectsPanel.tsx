@@ -450,8 +450,9 @@ export function ProjectsPanel() {
       setLoading(true);
       const data = await apiFetch<EnrichedProject[]>('/projects');
       setProjects(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      addToast('error', `Failed to load projects: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to load projects: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -529,8 +530,9 @@ export function ProjectsPanel() {
         });
         addToast('success', 'Project archived');
         await fetchProjects();
-      } catch (err: any) {
-        addToast('error', `Failed to archive: ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        addToast('error', `Failed to archive: ${message}`);
       }
     },
     [addToast, fetchProjects],
@@ -542,8 +544,9 @@ export function ProjectsPanel() {
         const data = await apiFetch<{ terminated: number }>(`/projects/${id}/stop`, { method: 'POST' });
         addToast('success', `Stopped ${data.terminated ?? 0} agent(s)`);
         await fetchProjects();
-      } catch (err: any) {
-        addToast('error', `Failed to stop agents: ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        addToast('error', `Failed to stop agents: ${message}`);
       }
     },
     [addToast, fetchProjects],
@@ -563,8 +566,9 @@ export function ProjectsPanel() {
         setProjects((prev) => prev.filter((p) => p.id !== id));
         if (expandedId === id) setExpandedId(null);
         setConfirmingDeleteId(null);
-      } catch (err: any) {
-        addToast('error', `Failed to delete: ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        addToast('error', `Failed to delete: ${message}`);
       }
     },
     [addToast, expandedId],
@@ -638,8 +642,9 @@ export function ProjectsPanel() {
       setProjects(prev => prev.map(p => p.id === id ? { ...p, cwd: cwdValue } : p));
       setEditingCwdId(null);
       addToast('success', 'Working directory updated');
-    } catch (err: any) {
-      addToast('error', `Failed to update path: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to update path: ${message}`);
     }
   }, [cwdValue, addToast]);
 
@@ -663,8 +668,9 @@ export function ProjectsPanel() {
       setShowImportDialog(false);
       setImportPath('');
       await fetchProjects();
-    } catch (err: any) {
-      addToast('error', `Import failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Import failed: ${message}`);
     } finally {
       setImportLoading(false);
     }

@@ -68,8 +68,9 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
           navigate(`/projects/${data.projectId}/session`);
         }
       }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to start project');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to start project');
     } finally {
       setStarting(false);
     }

@@ -60,8 +60,9 @@ export function AgentLifecycle({ agentId, crewId, agent, onClose, onActionComple
       }
 
       onActionComplete();
-    } catch (err: any) {
-      setResult({ ok: false, message: err.message || `Failed to ${action} agent` });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setResult({ ok: false, message: message || `Failed to ${action} agent` });
     } finally {
       setLoading(false);
       setConfirm(null);

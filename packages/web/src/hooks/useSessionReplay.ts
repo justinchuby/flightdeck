@@ -98,8 +98,9 @@ export function useSessionReplay(leadId: string | null): UseSessionReplayResult 
           sessionStartRef.current = start;
           setDuration(Math.max(end - start, MIN_SESSION_DURATION_MS));
         }
-      } catch (err: any) {
-        if (mountedRef.current) setError(err.message ?? 'Failed to load keyframes');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (mountedRef.current) setError(message ?? 'Failed to load keyframes');
       } finally {
         if (mountedRef.current) setLoading(false);
       }

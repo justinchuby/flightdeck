@@ -69,7 +69,8 @@ const STORAGE_KEY = 'onboarding-complete';
 // ── Hook ─────────────────────────────────────────────────────────────
 
 export function useOnboarding() {
-  const isComplete = !!localStorage.getItem(STORAGE_KEY);
+  let isComplete = false;
+  try { isComplete = !!localStorage.getItem(STORAGE_KEY); } catch {}
   return { shouldShow: !isComplete };
 }
 
@@ -85,7 +86,7 @@ export function OnboardingWizard({ onComplete }: Props) {
   const isLast = step === STEPS.length - 1;
 
   const handleComplete = () => {
-    localStorage.setItem(STORAGE_KEY, 'true');
+    try { localStorage.setItem(STORAGE_KEY, 'true'); } catch {}
     onComplete();
   };
 

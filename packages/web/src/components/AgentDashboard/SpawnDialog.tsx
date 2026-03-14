@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useModels, deriveModelName } from '../../hooks/useModels';
+import { apiFetch } from '../../hooks/useApi';
 import { X, ChevronDown } from 'lucide-react';
 
 interface ProviderStatus {
@@ -53,8 +54,9 @@ export function SpawnDialog({ api, onClose }: Props) {
       if (selectedModel) options.model = selectedModel;
       await api.spawnAgent(selectedRole, undefined, Object.keys(options).length ? options : undefined);
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to spawn agent');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to spawn agent');
     } finally {
       setLoading(false);
     }

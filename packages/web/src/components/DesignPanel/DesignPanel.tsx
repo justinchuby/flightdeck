@@ -60,8 +60,9 @@ export function DesignPanel() {
       );
       setFileData(data);
       setSelectedPath(path);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to load file');
       setFileData(null);
     } finally {
       setLoading(false);
