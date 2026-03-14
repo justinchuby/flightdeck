@@ -226,7 +226,8 @@ async function processDroppedFilesAsAttachments(
 ): Promise<void> {
   for (const file of files) {
     const kind = classifyFileExtension(file.name);
-    const filePath = (file as any).path || file.name;
+    // Electron/VS Code webviews add a `path` property to File objects
+    const filePath = (file as File & { path?: string }).path || file.name;
 
     if (kind === 'image') {
       if (file.size > MAX_IMAGE_SIZE) {

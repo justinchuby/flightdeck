@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useCallback } from 'react';
 import { Database, Brain, MessageSquare, CheckCircle, Activity, Trash2, ChevronDown, ChevronRight, RefreshCw, BarChart3 } from 'lucide-react';
 import { decisionStatusText } from '../../utils/statusColors';
@@ -15,12 +16,58 @@ interface DbStats {
   dagTasks: number;
 }
 
+/** Row shape from /api/db/memory */
+interface MemoryRow {
+  id: number;
+  key: string;
+  value: string;
+  agentId: string;
+  leadId: string;
+  createdAt: string;
+}
+
+/** Row shape from /api/db/conversations */
+interface ConversationRow {
+  id: string;
+  agentId?: string;
+  taskId?: string;
+  createdAt: string;
+}
+
+/** Row shape from /api/db/conversations/:id/messages */
+interface ConversationMessage {
+  id: string;
+  sender: string;
+  content: string;
+  timestamp?: string;
+}
+
+/** Row shape from /api/db/decisions */
+interface DecisionRow {
+  id: string;
+  title: string;
+  status: string;
+  needsConfirmation?: number;
+  rationale?: string;
+  agentId: string;
+  agentRole: string;
+  leadId?: string;
+  createdAt: string;
+}
+
+/** Row shape from /api/db/activity */
+interface ActivityRow {
+  id: number;
+  agentRole: string;
+  actionType: string;
+  summary: string;
+  timestamp?: string;
+}
+
 type TabId = 'stats' | 'memory' | 'conversations' | 'decisions' | 'activity';
 
 async function dbFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(`/api/db${path}`, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return apiFetch(`/db${path}`, opts);
 }
 
 export function DataBrowser() {
@@ -105,7 +152,7 @@ function StatsPanel({ stats }: { stats: DbStats | null }) {
 /* ── Memory Panel ───────────────────────────────────────────────── */
 
 function MemoryPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<MemoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -156,10 +203,10 @@ function MemoryPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Conversations Panel ────────────────────────────────────────── */
 
 function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -214,7 +261,7 @@ function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
             <div className="border-t border-th-border px-4 py-2 bg-th-bg-alt/30 max-h-80 overflow-y-auto space-y-1.5">
               {messages.length === 0 ? (
                 <div className="text-xs text-th-text-muted py-2">No messages</div>
-              ) : messages.map((m: any) => (
+              ) : messages.map((m) => (
                 <div key={m.id} className="flex gap-2">
                   <span className={`text-[10px] font-medium shrink-0 w-12 ${
                     m.sender === 'user' ? 'text-accent' : m.sender === 'system' ? 'text-yellow-500' : 'text-th-text-muted'
@@ -234,7 +281,7 @@ function ConversationsPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Decisions Panel ────────────────────────────────────────────── */
 
 function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<DecisionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -290,7 +337,7 @@ function DecisionsPanel({ onCountChange }: { onCountChange: () => void }) {
 /* ── Activity Panel ─────────────────────────────────────────────── */
 
 function ActivityPanel({ onCountChange }: { onCountChange: () => void }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {

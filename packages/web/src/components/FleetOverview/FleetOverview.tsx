@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
@@ -36,12 +37,7 @@ export interface ActivityEntry {
   timestamp: string;
 }
 
-interface Props {
-  api: any;
-  ws: any;
-}
-
-export function FleetOverview({ api, ws }: Props) {
+export function FleetOverview() {
   const agents = useAppStore((s) => s.agents);
   const [locks, setLocks] = useState<FileLock[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
@@ -66,8 +62,7 @@ export function FleetOverview({ api, ws }: Props) {
 
   const fetchCoordination = useCallback(async () => {
     try {
-      const res = await fetch('/api/coordination/status');
-      const data: CoordinationStatus = await res.json();
+      const data: CoordinationStatus  = await apiFetch('/coordination/status');
       setLocks(data.locks);
       setActivity(data.recentActivity);
     } catch {
@@ -193,7 +188,7 @@ export function FleetOverview({ api, ws }: Props) {
 
       <FleetStats agents={projectAgents} locks={locks} />
 
-      <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} />
+      <AgentActivityTable agents={filteredAgents} locks={locks} />
 
       {/* ── Communication Heatmap ── */}
       {projectAgents.length >= 2 && (

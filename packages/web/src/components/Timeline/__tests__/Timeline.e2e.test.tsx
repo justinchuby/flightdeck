@@ -222,7 +222,8 @@ describe('Timeline Data Pipeline', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
-      text: () => Promise.resolve('Internal Server Error'),
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({ error: 'Internal Server Error' }),
     }) as any;
 
     const { result } = renderHook(() => useTimelineData('lead-001'));

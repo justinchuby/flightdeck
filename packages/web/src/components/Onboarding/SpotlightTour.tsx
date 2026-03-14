@@ -60,7 +60,7 @@ export function SpotlightTour({ onComplete }: Props) {
 
   const next = useCallback(() => {
     if (step >= TOUR_STEPS.length - 1) {
-      localStorage.setItem(STORAGE_KEY, 'true');
+      try { localStorage.setItem(STORAGE_KEY, 'true'); } catch {}
       onComplete();
     } else {
       setStep(s => s + 1);
@@ -72,7 +72,7 @@ export function SpotlightTour({ onComplete }: Props) {
   }, [step]);
 
   const skip = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, 'true');
+    try { localStorage.setItem(STORAGE_KEY, 'true'); } catch {}
     onComplete();
   }, [onComplete]);
 
@@ -171,9 +171,9 @@ export function SpotlightTour({ onComplete }: Props) {
 }
 
 export function isTourComplete(): boolean {
-  return localStorage.getItem(STORAGE_KEY) === 'true';
+  try { return localStorage.getItem(STORAGE_KEY) === 'true'; } catch { return false; }
 }
 
 export function resetTour(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
 }

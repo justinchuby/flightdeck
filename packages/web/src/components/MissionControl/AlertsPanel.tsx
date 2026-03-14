@@ -17,7 +17,7 @@ export interface AlertAction {
   actionType: 'api_call' | 'dismiss';
   endpoint: string;
   method: 'POST' | 'DELETE';
-  body?: Record<string, any>;
+  body?: Record<string, unknown>;
   confidence?: number;
 }
 
@@ -94,7 +94,7 @@ export function detectAlerts(
     }
   }
 
-  return alerts.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  return [...alerts].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }
 
 // ── Rendering ────────────────────────────────────────────────────────
@@ -143,8 +143,9 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
         body: action.body ? JSON.stringify(action.body) : undefined,
       });
       addToast('success', `${action.label}: done`);
-    } catch (err: any) {
-      addToast('error', `${action.label} failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `${action.label} failed: ${message}`);
     } finally {
       setExecutingAction(null);
     }

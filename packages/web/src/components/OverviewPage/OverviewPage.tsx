@@ -58,16 +58,9 @@ const SEVERITY_BG: Record<AlertSeverity, string> = {
 
 const EMPTY_DECISIONS: Decision[] = [];
 
-// ── Props ──────────────────────────────────────────────────────────
-
-interface Props {
-  api?: any;
-  ws?: any;
-}
-
 // ── Component ──────────────────────────────────────────────────────
 
-export function OverviewPage(_props: Props) {
+export function OverviewPage() {
   const agents = useAppStore((s) => s.agents);
   const { projects } = useProjects();
   const effectiveId = useProjectId();

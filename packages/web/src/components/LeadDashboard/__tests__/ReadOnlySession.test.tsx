@@ -47,9 +47,6 @@ vi.mock('../../../hooks/useApi', () => ({
 }));
 
 describe('ReadOnlySession', () => {
-  const mockApi = {};
-  const mockWs = { subscribe: vi.fn(), unsubscribe: vi.fn() };
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockApiFetch.mockResolvedValue({ messages: [] });
@@ -61,7 +58,7 @@ describe('ReadOnlySession', () => {
         <Routes>
           <Route
             path="/projects/:id/sessions/:leadId"
-            element={<ReadOnlySession api={mockApi} ws={mockWs} />}
+            element={<ReadOnlySession />}
           />
         </Routes>
       </MemoryRouter>

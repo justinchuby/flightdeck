@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useEffect } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
@@ -327,7 +328,7 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
 }
 
 function handleGroupCreated(store: StoreApi, leadId: string) {
-  fetch(`/api/lead/${leadId}/groups`).then((r) => r.json()).then((data) => {
+  apiFetch(`/lead/${leadId}/groups`).then((data) => {
     if (Array.isArray(data)) store.setGroups(leadId, data);
   }).catch(() => { /* group fetch failure is non-critical */ });
 }
@@ -360,7 +361,7 @@ function handleGroupMessage(msg: WsGroupMessage, store: StoreApi, leadId: string
 }
 
 function handleDagUpdated(store: StoreApi, leadId: string, historicalProjectId: string | null) {
-  fetch(`/api/lead/${leadId}/dag`).then((r) => r.json()).then((data: DagStatus) => {
+  apiFetch<DagStatus>(`/lead/${leadId}/dag`).then((data) => {
     if (data && data.tasks) {
       store.setDagStatus(leadId, data);
       if (historicalProjectId && historicalProjectId !== leadId) {

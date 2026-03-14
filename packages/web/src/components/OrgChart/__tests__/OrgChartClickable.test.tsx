@@ -91,7 +91,7 @@ describe('OrgChart clickable agent nodes', () => {
     const lead = makeAgent();
     mockAgents = [lead];
 
-    render(<OrgChart api="" ws="" />);
+    render(<OrgChart />);
 
     const node = screen.getByRole('button', { name: /Project Lead/i });
     expect(node).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('OrgChart clickable agent nodes', () => {
     const lead = makeAgent();
     mockAgents = [lead];
 
-    render(<OrgChart api="" ws="" />);
+    render(<OrgChart />);
 
     // No modal initially
     expect(screen.queryByTestId('agent-detail-modal')).not.toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('OrgChart clickable agent nodes', () => {
     const lead = makeAgent();
     mockAgents = [lead];
 
-    render(<OrgChart api="" ws="" />);
+    render(<OrgChart />);
 
     // Open modal
     fireEvent.click(screen.getByRole('button', { name: /Project Lead/i }));
@@ -144,7 +144,7 @@ describe('OrgChart clickable agent nodes', () => {
     });
     mockAgents = [lead, dev];
 
-    render(<OrgChart api="" ws="" />);
+    render(<OrgChart />);
 
     // Click the child developer node
     fireEvent.click(screen.getByRole('button', { name: /Developer/i }));
@@ -158,7 +158,7 @@ describe('OrgChart clickable agent nodes', () => {
     const lead = makeAgent();
     mockAgents = [lead];
 
-    render(<OrgChart api="" ws="" />);
+    render(<OrgChart />);
 
     const node = screen.getByRole('button', { name: /Project Lead/i });
     fireEvent.keyDown(node, { key: 'Enter' });
@@ -170,7 +170,7 @@ describe('OrgChart clickable agent nodes', () => {
     const lead = makeAgent();
     mockAgents = [lead];
 
-    render(<OrgChart api="" ws="" />);
+    render(<OrgChart />);
 
     const node = screen.getByRole('button', { name: /Project Lead/i });
     fireEvent.keyDown(node, { key: ' ' });

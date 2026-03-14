@@ -26,13 +26,13 @@ export function useRecentCommands() {
         0,
         MAX_RECENT,
       );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
   }, []);
 
   const clearRecent = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
     setRecent([]);
   }, []);
 

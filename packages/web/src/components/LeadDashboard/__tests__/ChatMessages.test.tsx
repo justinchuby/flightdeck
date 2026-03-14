@@ -1,8 +1,26 @@
 // @vitest-environment jsdom
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { ChatMessages } from '../ChatMessages';
 import type { AcpTextChunk, AgentInfo } from '../../../types';
+
+// Mock react-virtuoso to avoid layout measurement issues in jsdom
+vi.mock('react-virtuoso', () => {
+  return {
+    Virtuoso: React.forwardRef(({ data, itemContent, components }: any, ref: any) => {
+      const Footer = components?.Footer;
+      return (
+        <div ref={ref} data-testid="virtuoso-container">
+          {data?.map((item: any, index: number) => (
+            <div key={index}>{itemContent(index, item)}</div>
+          ))}
+          {Footer && <Footer />}
+        </div>
+      );
+    }),
+  };
+});
 
 // Mock PromptNav to avoid complex rendering dependencies
 vi.mock('../../PromptNav', () => ({

@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FolderOpen, Check, X } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { apiFetch } from '../../hooks/useApi';
 
 export function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(cwd || '');
   const updateAgent = useAppStore((s) => s.updateAgent);
 
-  useEffect(() => { setValue(cwd || ''); }, [cwd]);
+  const startEditing = () => {
+    setValue(cwd || '');
+    setEditing(true);
+  };
 
   const save = async () => {
     const trimmed = value.trim();
-    await fetch(`/api/lead/${leadId}`, {
+    await apiFetch(`/lead/${leadId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cwd: trimmed || undefined }),
     });
     updateAgent(leadId, { cwd: trimmed || undefined });
@@ -41,7 +44,7 @@ export function CwdBar({ leadId, cwd }: { leadId: string; cwd?: string }) {
         <>
           <span className="text-th-text-muted truncate flex-1" title={cwd}>{cwd || '(server default)'}</span>
           <button
-            onClick={() => setEditing(true)}
+            onClick={() => startEditing()}
             className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0"
           >
             edit

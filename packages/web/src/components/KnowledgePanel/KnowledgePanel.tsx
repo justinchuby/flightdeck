@@ -258,8 +258,9 @@ function NewEntryForm({
       });
       addToast('success', 'Knowledge entry created');
       onCreated();
-    } catch (err: any) {
-      addToast('error', `Failed to create: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to create: ${message}`);
     } finally {
       setSubmitting(false);
     }
@@ -419,8 +420,9 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
       setEntries(Array.isArray(entriesData) ? entriesData : []);
       setStats(Array.isArray(statsData) ? statsData : []);
       setTrainingSummary(trainingData);
-    } catch (err: any) {
-      addToast('error', `Failed to load knowledge: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to load knowledge: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -439,8 +441,9 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
         `/projects/${effectiveProjectId}/knowledge/search?q=${encodeURIComponent(searchQuery.trim())}`,
       );
       setSearchResults(Array.isArray(results) ? results : []);
-    } catch (err: any) {
-      addToast('error', `Search failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Search failed: ${message}`);
     } finally {
       setSearching(false);
     }
@@ -462,8 +465,9 @@ export function KnowledgePanel({ projectId: propProjectId }: Props) {
         setEntries((prev) => prev.filter((e) => e.id !== id));
         setConfirmingDeleteId(null);
         if (expandedId === id) setExpandedId(null);
-      } catch (err: any) {
-        addToast('error', `Failed to delete: ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        addToast('error', `Failed to delete: ${message}`);
       }
     },
     [entries, effectiveProjectId, addToast, expandedId],

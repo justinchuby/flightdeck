@@ -147,8 +147,9 @@ export function ApprovalQueue() {
         next.delete(id);
         return next;
       });
-    } catch (err: any) {
-      addToast('error', `Failed to ${action} decision: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to ${action} decision: ${message}`);
     } finally {
       setProcessingIds((prev) => {
         const next = new Set(prev);
@@ -203,8 +204,9 @@ export function ApprovalQueue() {
       setSelectedIds(new Set());
       const verb = action === 'confirm' ? 'approved' : action === 'reject' ? 'rejected' : 'dismissed';
       addToast('success', `${ids.length} decision${ids.length > 1 ? 's' : ''} ${verb}`);
-    } catch (err: any) {
-      addToast('error', `Batch ${action} failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Batch ${action} failed: ${message}`);
     } finally {
       setProcessingIds(new Set());
     }
@@ -302,7 +304,7 @@ export function ApprovalQueue() {
                   return (
                     <div
                       key={decision.id}
-                      className={`border-l-2 ${urgencyBorder(urgency)} rounded-md border border-th-border/50 bg-th-bg transition-colors ${
+                      className={`cv-auto-lg border-l-2 ${urgencyBorder(urgency)} rounded-md border border-th-border/50 bg-th-bg transition-colors ${
                         isSelected ? 'ring-1 ring-accent/40 bg-accent/5' : ''
                       } ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
                     >

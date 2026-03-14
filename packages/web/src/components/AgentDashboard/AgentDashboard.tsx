@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
@@ -15,12 +16,7 @@ interface CoordinationStatus {
   recentActivity: ActivityEntry[];
 }
 
-interface Props {
-  api: any;
-  ws: any;
-}
-
-export function AgentDashboard({ api, ws }: Props) {
+export function AgentDashboard() {
   const liveAgents = useAppStore((s) => s.agents);
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [showSpawn, setShowSpawn] = useState(false);
@@ -53,8 +49,7 @@ export function AgentDashboard({ api, ws }: Props) {
   // Fetch coordination status (locks + activity)
   const fetchCoordination = useCallback(async () => {
     try {
-      const res = await fetch('/api/coordination/status');
-      const data: CoordinationStatus = await res.json();
+      const data: CoordinationStatus  = await apiFetch('/coordination/status');
       setLocks(data.locks);
       setActivity(data.recentActivity);
     } catch {
@@ -192,14 +187,14 @@ export function AgentDashboard({ api, ws }: Props) {
               </button>
               {!isCollapsed && (
                 <div className="px-1 pb-1">
-                  <AgentActivityTable agents={groupAgents} locks={locks} api={api} ws={ws} onSelectAgent={setSelectedAgent} />
+                  <AgentActivityTable agents={groupAgents} locks={locks} onSelectAgent={setSelectedAgent} />
                 </div>
               )}
             </div>
           );
         })
       ) : (
-        <AgentActivityTable agents={filteredAgents} locks={locks} api={api} ws={ws} onSelectAgent={setSelectedAgent} />
+        <AgentActivityTable agents={filteredAgents} locks={locks} onSelectAgent={setSelectedAgent} />
       )}
 
       {/* Bottom section: Activity Feed + File Locks (collapsible) */}
@@ -224,7 +219,7 @@ export function AgentDashboard({ api, ws }: Props) {
         )}
       </div>
 
-      {showSpawn && <SpawnDialog api={api} onClose={() => setShowSpawn(false)} />}
+      {showSpawn && <SpawnDialog onClose={() => setShowSpawn(false)} />}
     </div>
   );
 }

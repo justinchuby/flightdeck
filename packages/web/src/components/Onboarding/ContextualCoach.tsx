@@ -61,7 +61,7 @@ export function ContextualCoach({ onNavigate }: Props) {
     const sessionMinutes = (Date.now() - sessionStart) / 60_000;
     for (const tip of TIPS) {
       const seenKey = `coach-seen-${tip.id}`;
-      if (localStorage.getItem(seenKey)) continue;
+      try { if (localStorage.getItem(seenKey)) continue; } catch {}
       if (tip.trigger({ agents, pendingDecisions, sessionMinutes })) {
         setActiveTip(tip);
         setDismissed(false);
@@ -87,7 +87,7 @@ export function ContextualCoach({ onNavigate }: Props) {
 
   const handleDismiss = () => {
     if (activeTip) {
-      localStorage.setItem(`coach-seen-${activeTip.id}`, 'true');
+      try { localStorage.setItem(`coach-seen-${activeTip.id}`, 'true'); } catch {}
     }
     setDismissed(true);
     setActiveTip(null);

@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import type { TimerInfo } from '../types';
 import { apiFetch } from '../hooks/useApi';
 
-/** Tracks removal timeouts for fired timers — cleared on early removal */
+// Module-level timeout tracking for the singleton Zustand store.
+// Can't live in useRef (store actions aren't React components) or in Zustand state
+// (setTimeout handles aren't serializable). Cleared via _clearAllFireTimeouts() in tests.
 const fireTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 interface TimerState {

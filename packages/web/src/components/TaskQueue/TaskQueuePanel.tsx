@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
+import { useApiContext } from '../../contexts/ApiContext';
 import { LayoutList, Network, Users, CheckCircle2, XCircle, Loader2, Play, Archive, Clock, BarChart2, Columns3, SplitSquareHorizontal } from 'lucide-react';
 import { EmptyState } from '../Shared';
 import { TaskDagPanelContent } from '../LeadDashboard/TaskDagPanel';
@@ -11,12 +12,8 @@ import { DagResourceView } from './DagResourceView';
 import { KanbanBoard } from './KanbanBoard';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import type { GanttTask } from './DagGantt';
-import type { DagStatus, LeadProgress, AgentInfo, Project } from '../../types';
+import type { DagStatus, DagTask, LeadProgress, AgentInfo, Project } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
-
-interface Props {
-  api: any;
-}
 
 /** Parse a SQLite datetime string, normalizing missing Z suffix to UTC */
 function parseDbTimestamp(ts: string): number {
@@ -158,21 +155,21 @@ function DagPanel({
     let cancelled = false;
     const fetchGlobal = async () => {
       try {
-        const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=0${archivedParam}`);
+        const data = await apiFetch<{ tasks: DagTask[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=0${archivedParam}`);
         if (!cancelled && data) {
           const tasks = data.tasks;
           setGlobalDagStatus({
             tasks,
             fileLockMap: {},
             summary: {
-              pending: tasks.filter((t: any) => t.dagStatus === 'pending').length,
-              ready: tasks.filter((t: any) => t.dagStatus === 'ready').length,
-              running: tasks.filter((t: any) => t.dagStatus === 'running').length,
-              blocked: tasks.filter((t: any) => t.dagStatus === 'blocked').length,
-              done: tasks.filter((t: any) => t.dagStatus === 'done').length,
-              failed: tasks.filter((t: any) => t.dagStatus === 'failed').length,
-              paused: tasks.filter((t: any) => t.dagStatus === 'paused').length,
-              skipped: tasks.filter((t: any) => t.dagStatus === 'skipped').length,
+              pending: tasks.filter((t: DagTask) => t.dagStatus === 'pending').length,
+              ready: tasks.filter((t: DagTask) => t.dagStatus === 'ready').length,
+              running: tasks.filter((t: DagTask) => t.dagStatus === 'running').length,
+              blocked: tasks.filter((t: DagTask) => t.dagStatus === 'blocked').length,
+              done: tasks.filter((t: DagTask) => t.dagStatus === 'done').length,
+              failed: tasks.filter((t: DagTask) => t.dagStatus === 'failed').length,
+              paused: tasks.filter((t: DagTask) => t.dagStatus === 'paused').length,
+              skipped: tasks.filter((t: DagTask) => t.dagStatus === 'skipped').length,
             },
           });
           setGlobalHasMore(data.hasMore);
@@ -203,21 +200,21 @@ function DagPanel({
   const loadMoreGlobalTasks = async () => {
     if (!globalHasMore || !globalDagStatus) return;
     try {
-      const data = await apiFetch<{ tasks: any[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=${globalOffset}${archivedParam}`);
+      const data = await apiFetch<{ tasks: DagTask[]; total: number; hasMore: boolean; offset: number; limit: number }>(`/tasks?scope=global&limit=${GLOBAL_PAGE_SIZE}&offset=${globalOffset}${archivedParam}`);
       if (data) {
         const merged = [...globalDagStatus.tasks, ...data.tasks];
         setGlobalDagStatus({
           tasks: merged,
           fileLockMap: {},
           summary: {
-            pending: merged.filter((t: any) => t.dagStatus === 'pending').length,
-            ready: merged.filter((t: any) => t.dagStatus === 'ready').length,
-            running: merged.filter((t: any) => t.dagStatus === 'running').length,
-            blocked: merged.filter((t: any) => t.dagStatus === 'blocked').length,
-            done: merged.filter((t: any) => t.dagStatus === 'done').length,
-            failed: merged.filter((t: any) => t.dagStatus === 'failed').length,
-            paused: merged.filter((t: any) => t.dagStatus === 'paused').length,
-            skipped: merged.filter((t: any) => t.dagStatus === 'skipped').length,
+            pending: merged.filter((t: DagTask) => t.dagStatus === 'pending').length,
+            ready: merged.filter((t: DagTask) => t.dagStatus === 'ready').length,
+            running: merged.filter((t: DagTask) => t.dagStatus === 'running').length,
+            blocked: merged.filter((t: DagTask) => t.dagStatus === 'blocked').length,
+            done: merged.filter((t: DagTask) => t.dagStatus === 'done').length,
+            failed: merged.filter((t: DagTask) => t.dagStatus === 'failed').length,
+            paused: merged.filter((t: DagTask) => t.dagStatus === 'paused').length,
+            skipped: merged.filter((t: DagTask) => t.dagStatus === 'skipped').length,
           },
         });
         setGlobalHasMore(data.hasMore);
@@ -243,8 +240,8 @@ function DagPanel({
   const ganttTasks: GanttTask[] = (dagStatus?.tasks ?? []).map((t) => ({
     id:          t.id,
     title:       t.title || t.description || t.id,
-    status:      (['pending','running','done','failed','blocked','skipped'] as const)
-                   .includes(t.dagStatus as any)
+    status:      (new Set<string>(['pending','running','done','failed','blocked','skipped']))
+                   .has(t.dagStatus)
                    ? t.dagStatus as GanttTask['status']
                    : 'pending',
     assignee:    t.role,
@@ -396,7 +393,8 @@ function tabKey(tab: TabItem): string {
 // ---------------------------------------------------------------------------
 // Main TaskQueuePanel — tabbed by project
 // ---------------------------------------------------------------------------
-export function TaskQueuePanel({ api }: Props) {
+export function TaskQueuePanel() {
+  const api = useApiContext();
   const agents = useAppStore((s) => s.agents);
   const leadProjects = useLeadStore((s) => s.projects);
   const projectId = useOptionalProjectId();
@@ -479,9 +477,9 @@ export function TaskQueuePanel({ api }: Props) {
         api.fetchDagStatus(leadId),
         apiFetch<LeadProgress>(`/lead/${leadId}/progress`),
       ]);
-      if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData);
+      if (dagData) useLeadStore.getState().setDagStatus(leadId, dagData as DagStatus);
       // Normalize server-side property names (team→crew rename, Phase 1)
-      const raw = progressData as any;
+      const raw = progressData as LeadProgress & { teamAgents?: LeadProgress['crewAgents']; teamSize?: number };
       setProgress({
         ...progressData,
         crewAgents: progressData.crewAgents ?? raw.teamAgents ?? [],

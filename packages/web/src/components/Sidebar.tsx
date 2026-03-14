@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, FolderOpen, Users, Settings, Plus } from 'lucide-react';
+import { Home, FolderOpen, Users, Settings, Plus, type LucideIcon } from 'lucide-react';
 import { NewProjectModal } from './LeadDashboard/NewProjectModal';
 import { SubmitIssueButton } from './ProvideFeedback';
 
 function NavItem({ to, icon: Icon, label, badge, end }: {
-  to: string; icon: any; label: string; badge?: number | null; end?: boolean;
+  to: string; icon: LucideIcon; label: string; badge?: number | null; end?: boolean;
 }) {
   return (
     <NavLink

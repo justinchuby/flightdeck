@@ -133,8 +133,7 @@ function buildActionItems(
         }
         onClose();
         try {
-          const res = await fetch(`/api/export/${leadId}`);
-          const data = await res.json();
+          const data = await apiFetch<{ error?: string; outputDir?: string; files: string[] }>(`/export/${leadId}`);
           if (data.error) alert(`Export failed: ${data.error}`);
           else
             alert(

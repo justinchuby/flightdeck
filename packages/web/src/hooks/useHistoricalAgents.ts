@@ -51,7 +51,7 @@ export function useHistoricalAgents(liveAgentCount: number, projectId?: string |
       try {
         // When no specific project requested, try /api/agents for global data
         if (!projectId) {
-          const apiAgents = await apiFetch<any[]>('/agents').catch(() => []);
+          const apiAgents = await apiFetch<AgentInfo[]>('/agents').catch(() => []);
           const arr = Array.isArray(apiAgents) ? apiAgents : [];
           if (arr.length > 0) {
             if (!cancelled && mountedRef.current) {
@@ -97,8 +97,22 @@ async function getFirstProjectId(): Promise<string | null> {
   }
 }
 
+/** Raw agent record from API — loosely typed for normalization */
+interface RawAgent {
+  id?: string;
+  status?: string;
+  role?: { id?: string; name?: string; icon?: string };
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  createdAt?: string;
+  contextWindowSize?: number;
+  contextWindowUsed?: number;
+  outputPreview?: string;
+}
+
 /** Normalize a raw API agent object to DerivedAgent shape */
-function normalize(a: any): DerivedAgent {
+function normalize(a: RawAgent): DerivedAgent {
   const roleId = a.role?.id ?? 'agent';
   return {
     id: a.id ?? 'unknown',

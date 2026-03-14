@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useGroupStore, groupKey } from '../../stores/groupStore';
@@ -54,17 +55,17 @@ function ReactionBadges({
     if (hasReacted) {
       gs.removeReaction(key, msg.id, emoji, 'human');
       try {
-        await fetch(
-          `/api/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages/${msg.id}/reactions/${encodeURIComponent(emoji)}`,
+        await apiFetch(
+          `/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages/${msg.id}/reactions/${encodeURIComponent(emoji)}`,
           { method: 'DELETE' },
         );
       } catch { /* best-effort */ }
     } else {
       gs.addReaction(key, msg.id, emoji, 'human');
       try {
-        await fetch(
-          `/api/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages/${msg.id}/reactions`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) },
+        await apiFetch(
+          `/lead/${leadId}/groups/${encodeURIComponent(groupName)}/messages/${msg.id}/reactions`,
+          { method: 'POST', body: JSON.stringify({ emoji }) },
         );
       } catch { /* best-effort */ }
     }
@@ -117,7 +118,7 @@ function ReactionBadges({
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
 
-export function GroupChat(_props: { api: any; ws: any }) {
+export function GroupChat() {
   const contextProjectId = useOptionalProjectId();
   const agents = useAppStore((s) => s.agents);
   const {
@@ -250,11 +251,8 @@ export function GroupChat(_props: { api: any; ws: any }) {
       const allGroups: ChatGroup[] = [];
       for (const lead of currentLeads) {
         try {
-          const res = await fetch(`/api/lead/${lead.id}/groups`);
-          if (res.ok) {
-            const data: ChatGroup[] = await res.json();
-            allGroups.push(...data);
-          }
+          const data: ChatGroup[]  = await apiFetch(`/lead/${lead.id}/groups`);
+          allGroups.push(...data);
         } catch { /* skip */ }
       }
       if (!cancelled) {
@@ -294,13 +292,10 @@ export function GroupChat(_props: { api: any; ws: any }) {
     async function fetchMessages() {
       const { leadId, name } = selectedGroup!;
       try {
-        const res = await fetch(
-          `/api/lead/${leadId}/groups/${encodeURIComponent(name)}/messages`,
+        const data: GroupMessage[] = await apiFetch(
+          `/lead/${leadId}/groups/${encodeURIComponent(name)}/messages`,
         );
-        if (res.ok) {
-          const data: GroupMessage[] = await res.json();
-          if (!cancelled) setMessages(groupKey(leadId, name), data);
-        }
+        if (!cancelled) setMessages(groupKey(leadId, name), data);
       } catch { /* skip */ }
     }
 
@@ -390,11 +385,10 @@ export function GroupChat(_props: { api: any; ws: any }) {
     setSending(true);
 
     try {
-      await fetch(
-        `/api/lead/${leadId}/groups/${encodeURIComponent(name)}/messages`,
+      await apiFetch(
+        `/lead/${leadId}/groups/${encodeURIComponent(name)}/messages`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: text }),
         },
       );
@@ -455,7 +449,7 @@ export function GroupChat(_props: { api: any; ws: any }) {
     if (!newGroupName.trim() || !newGroupLeadId || creating) return;
     setCreating(true);
     try {
-      const res = await fetch(`/api/lead/${newGroupLeadId}/groups`, {
+      const group: ChatGroup  = await apiFetch(`/lead/${newGroupLeadId}/groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -463,14 +457,11 @@ export function GroupChat(_props: { api: any; ws: any }) {
           memberIds: Array.from(newGroupMembers),
         }),
       });
-      if (res.ok) {
-        const group: ChatGroup = await res.json();
-        useGroupStore.getState().addGroup(group);
-        const tab = { leadId: group.leadId, name: group.name };
-        setOpenTabs((prev) => [...prev, tab]);
-        selectGroup(group.leadId, group.name);
-        setShowCreate(false);
-      }
+      useGroupStore.getState().addGroup(group);
+      const tab = { leadId: group.leadId, name: group.name };
+      setOpenTabs((prev) => [...prev, tab]);
+      selectGroup(group.leadId, group.name);
+      setShowCreate(false);
     } catch { /* skip */ }
     finally { setCreating(false); }
   }, [newGroupName, newGroupLeadId, newGroupMembers, creating, selectGroup]);

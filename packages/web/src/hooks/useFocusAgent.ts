@@ -80,8 +80,9 @@ export function useFocusAgent(
     try {
       const result = await apiFetch<FocusAgentData>(`/agents/${agentId}/focus`);
       if (requestIdRef.current === requestId) setData(result);
-    } catch (err: any) {
-      if (requestIdRef.current === requestId) setError(err.message ?? 'Failed to load agent data');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (requestIdRef.current === requestId) setError(message ?? 'Failed to load agent data');
     } finally {
       if (requestIdRef.current === requestId) setLoading(false);
     }

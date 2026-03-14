@@ -538,8 +538,9 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         // Project scope: server already filtered by projectId
         setAgents(allAgents);
       }
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to fetch crew roster');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message ?? 'Failed to fetch crew roster');
     } finally {
       setLoading(false);
     }
@@ -569,8 +570,9 @@ export function UnifiedCrewPage({ scope = 'global' }: UnifiedCrewPageProps) {
         }
       }
       setCrewSummaries(prev => prev.filter(s => s.leadId !== leadId));
-    } catch (err: any) {
-      addToast('error', `Failed to delete crew: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to delete crew: ${message}`);
     }
   }, [addToast, agents, selectedAgent]);
 

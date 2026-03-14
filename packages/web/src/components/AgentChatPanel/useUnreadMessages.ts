@@ -12,7 +12,10 @@ import { useAppStore } from '../../stores/appStore';
  *   // On tab switch to Chat: markRead('agent-abc123')
  */
 
-/** Module-level map: agentId → timestamp when Chat tab was last viewed */
+// Module-level external store for unread message tracking.
+// Shared across all useUnreadMessages() consumers via useSyncExternalStore.
+// Module-level (not useRef) because multiple components need the same "last viewed"
+// timestamps — this is a lightweight alternative to a full Zustand store.
 const lastViewedMap = new Map<string, number>();
 let version = 0;
 const listeners = new Set<() => void>();
@@ -57,4 +60,10 @@ export function useUnreadMessages() {
   }, []);
 
   return { hasUnread, markRead };
+}
+
+/** Exposed for testing — resets all unread tracking state */
+export function _resetUnreadState(): void {
+  lastViewedMap.clear();
+  version = 0;
 }
