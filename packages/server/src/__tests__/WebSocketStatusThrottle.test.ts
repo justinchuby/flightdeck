@@ -1,14 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 /**
- * Tests the WebSocketServer status throttle logic:
- * - Only 'idle' status is throttled (500ms buffer) to reduce rapid churn
- * - All other statuses (running, creating, completed, failed, terminated)
- *   bypass the throttle and broadcast immediately
- * - Non-idle transitions cancel any pending throttled idle flush
+ * Tests that WebSocketServer broadcasts all agent:status updates immediately
+ * with no throttling or buffering. The throttle was removed because the upstream
+ * AgentEvents idle debounce already handles churn reduction — a second layer of
+ * delay only caused stale status in the UI.
  *
- * This mirrors the core logic from WebSocketServer.wireAgentEvents 'agent:status' handler
- * to enable focused unit testing without full WS server setup.
+ * This mirrors the WebSocketServer 'agent:status' handler logic for focused testing.
  */
 
 interface StatusMessage {
@@ -17,180 +15,35 @@ interface StatusMessage {
   status: string;
 }
 
-class StatusThrottleHandler {
-  private statusThrottleTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private statusPending = new Map<string, StatusMessage>();
-  readonly broadcasts: StatusMessage[] = [];
-
-  handleStatus(agentId: string, status: string): void {
-    const data: StatusMessage = { type: 'agent:status', agentId, status };
-
-    if (status !== 'idle') {
-      const existingTimer = this.statusThrottleTimers.get(agentId);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-        this.statusThrottleTimers.delete(agentId);
-      }
-      this.statusPending.delete(agentId);
-      this.broadcasts.push(data);
-    } else {
-      this.statusPending.set(agentId, data);
-      if (!this.statusThrottleTimers.has(agentId)) {
-        this.statusThrottleTimers.set(agentId, setTimeout(() => {
-          this.statusThrottleTimers.delete(agentId);
-          const pending = this.statusPending.get(agentId);
-          if (pending) {
-            this.statusPending.delete(agentId);
-            this.broadcasts.push(pending);
-          }
-        }, 500));
-      }
-    }
-  }
-
-  dispose(): void {
-    for (const timer of this.statusThrottleTimers.values()) clearTimeout(timer);
-    this.statusThrottleTimers.clear();
-    this.statusPending.clear();
-  }
+/** Mirrors the simplified WebSocketServer agent:status handler (no throttle). */
+function broadcastStatus(agentId: string, status: string): StatusMessage {
+  return { type: 'agent:status', agentId, status };
 }
 
-describe('WebSocket agent:status throttle', () => {
-  let handler: StatusThrottleHandler;
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-    handler = new StatusThrottleHandler();
-  });
-
-  afterEach(() => {
-    handler.dispose();
-    vi.useRealTimers();
-  });
-
-  it('broadcasts running status immediately without throttle', () => {
-    handler.handleStatus('agent-1', 'running');
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0]).toEqual({
-      type: 'agent:status',
-      agentId: 'agent-1',
-      status: 'running',
-    });
-  });
-
-  it('throttles idle status by 500ms', () => {
-    handler.handleStatus('agent-1', 'idle');
-    expect(handler.broadcasts).toHaveLength(0);
-
-    vi.advanceTimersByTime(500);
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0].status).toBe('idle');
-  });
-
-  it('running cancels pending throttled idle status', () => {
-    handler.handleStatus('agent-1', 'idle');
-    expect(handler.broadcasts).toHaveLength(0);
-
-    // Running arrives before throttle flush
-    handler.handleStatus('agent-1', 'running');
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0].status).toBe('running');
-
-    // Advance past throttle — idle should NOT fire
-    vi.advanceTimersByTime(600);
-    expect(handler.broadcasts).toHaveLength(1);
-  });
-
-  it('rapid idle→running→idle: running arrives instantly, idle is delayed', () => {
-    handler.handleStatus('agent-1', 'idle');
-    vi.advanceTimersByTime(100);
-
-    handler.handleStatus('agent-1', 'running');
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0].status).toBe('running');
-
-    handler.handleStatus('agent-1', 'idle');
-    expect(handler.broadcasts).toHaveLength(1); // Still just the running
-
-    vi.advanceTimersByTime(500);
-    expect(handler.broadcasts).toHaveLength(2);
-    expect(handler.broadcasts[1].status).toBe('idle');
-  });
-
-  it('multiple agents are throttled independently', () => {
-    handler.handleStatus('agent-1', 'idle');
-    handler.handleStatus('agent-2', 'running');
-
-    // Agent-2 should broadcast immediately
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0].agentId).toBe('agent-2');
-
-    // Agent-1 should broadcast after throttle
-    vi.advanceTimersByTime(500);
-    expect(handler.broadcasts).toHaveLength(2);
-    expect(handler.broadcasts[1].agentId).toBe('agent-1');
-  });
-
-  it('only latest idle status is broadcast when multiple updates arrive within throttle window', () => {
-    handler.handleStatus('agent-1', 'idle');
-    vi.advanceTimersByTime(100);
-
-    // Simulate a different non-running status arriving within the window
-    // The pending map is overwritten, but no new timer is started
-    handler.handleStatus('agent-1', 'idle');
-    vi.advanceTimersByTime(400);
-
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0].status).toBe('idle');
-  });
-
-  it('running status is never dropped even with rapid transitions', () => {
-    // Simulate: idle → running → idle → running → idle
-    handler.handleStatus('agent-1', 'idle');
-    handler.handleStatus('agent-1', 'running');
-    handler.handleStatus('agent-1', 'idle');
-    handler.handleStatus('agent-1', 'running');
-    handler.handleStatus('agent-1', 'idle');
-
-    // Both running should have broadcast immediately
-    const runningBroadcasts = handler.broadcasts.filter(b => b.status === 'running');
-    expect(runningBroadcasts).toHaveLength(2);
-
-    // After throttle period, final idle should arrive
-    vi.advanceTimersByTime(500);
-    const idleBroadcasts = handler.broadcasts.filter(b => b.status === 'idle');
-    expect(idleBroadcasts).toHaveLength(1);
-  });
-
-  // All non-idle statuses bypass the throttle
-  it.each(['running', 'creating', 'completed', 'failed', 'terminated'] as const)(
-    '%s status bypasses the throttle and broadcasts immediately',
+describe('WebSocket agent:status — immediate broadcast (no throttle)', () => {
+  it.each(['creating', 'running', 'idle', 'completed', 'failed', 'terminated'] as const)(
+    '%s status broadcasts immediately',
     (status) => {
-      handler.handleStatus('agent-1', status);
-      expect(handler.broadcasts).toHaveLength(1);
-      expect(handler.broadcasts[0].status).toBe(status);
+      const msg = broadcastStatus('agent-1', status);
+      expect(msg).toEqual({ type: 'agent:status', agentId: 'agent-1', status });
     },
   );
 
-  it('creating→running transition broadcasts both immediately', () => {
-    handler.handleStatus('agent-1', 'creating');
-    handler.handleStatus('agent-1', 'running');
+  it('rapid status transitions all produce individual broadcasts', () => {
+    const statuses = ['creating', 'running', 'idle', 'running', 'idle', 'completed'] as const;
+    const messages = statuses.map(s => broadcastStatus('agent-1', s));
 
-    expect(handler.broadcasts).toHaveLength(2);
-    expect(handler.broadcasts[0].status).toBe('creating');
-    expect(handler.broadcasts[1].status).toBe('running');
+    expect(messages).toHaveLength(6);
+    expect(messages.map(m => m.status)).toEqual([
+      'creating', 'running', 'idle', 'running', 'idle', 'completed',
+    ]);
   });
 
-  it('terminal statuses (completed, failed, terminated) cancel pending idle', () => {
-    handler.handleStatus('agent-1', 'idle');
-    expect(handler.broadcasts).toHaveLength(0);
+  it('multiple agents broadcast independently', () => {
+    const msg1 = broadcastStatus('agent-1', 'running');
+    const msg2 = broadcastStatus('agent-2', 'idle');
 
-    handler.handleStatus('agent-1', 'completed');
-    expect(handler.broadcasts).toHaveLength(1);
-    expect(handler.broadcasts[0].status).toBe('completed');
-
-    // Idle should NOT fire after terminal status
-    vi.advanceTimersByTime(600);
-    expect(handler.broadcasts).toHaveLength(1);
+    expect(msg1.agentId).toBe('agent-1');
+    expect(msg2.agentId).toBe('agent-2');
   });
 });
