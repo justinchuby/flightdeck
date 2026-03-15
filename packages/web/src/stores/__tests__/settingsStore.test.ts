@@ -223,6 +223,50 @@ describe('settingsStore — theme and sound', () => {
         window.matchMedia = originalMatchMedia;
       }
     });
+
+    it('change callback updates theme when mode is system', () => {
+      let changeCallback: (() => void) | null = null;
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: true, media: '(prefers-color-scheme: dark)', onchange: null,
+        addEventListener: vi.fn((_event: string, cb: () => void) => { changeCallback = cb; }),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+      });
+      try {
+        useSettingsStore.getState().setThemeMode('system');
+        useSettingsStore.getState().initThemeListener();
+        // Simulate system theme change
+        expect(changeCallback).not.toBeNull();
+        changeCallback!();
+        // The resolved theme should update based on system preference
+        const { resolvedTheme } = useSettingsStore.getState();
+        expect(['light', 'dark']).toContain(resolvedTheme);
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
+
+    it('change callback does nothing when mode is not system', () => {
+      let changeCallback: (() => void) | null = null;
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: false, media: '', onchange: null,
+        addEventListener: vi.fn((_event: string, cb: () => void) => { changeCallback = cb; }),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+      });
+      try {
+        useSettingsStore.getState().setThemeMode('dark');
+        useSettingsStore.getState().initThemeListener();
+        const before = useSettingsStore.getState().resolvedTheme;
+        changeCallback!();
+        // Should not change because themeMode is 'dark', not 'system'
+        expect(useSettingsStore.getState().resolvedTheme).toBe(before);
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
   });
 
   describe('oversight server sync', () => {

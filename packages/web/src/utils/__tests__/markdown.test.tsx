@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { idColor, AgentIdBadge, InlineMarkdown, InlineMarkdownWithMentions, MarkdownContent } from '../markdown';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { idColor, AgentIdBadge, InlineMarkdown, InlineMarkdownWithMentions, MarkdownContent, MentionText } from '../markdown';
+
+// Mock AgentMentionTooltip to render children directly
+vi.mock('../../components/AgentMentionTooltip', () => ({
+  AgentMentionTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 // ── idColor ──────────────────────────────────────────────────────────
 
@@ -165,6 +170,88 @@ describe('InlineMarkdownWithMentions', () => {
     expect(container.querySelector('strong')!.textContent).toBe('Important');
     const mention = container.querySelector('.bg-blue-500\\/20');
     expect(mention).not.toBeNull();
+  });
+
+  it('renders *italic* text', () => {
+    const { container } = render(
+      <InlineMarkdownWithMentions text="This is *italic* emphasis" />,
+    );
+    const em = container.querySelector('em');
+    expect(em).not.toBeNull();
+    expect(em!.textContent).toBe('italic');
+  });
+
+  it('renders mixed bold, italic, and code', () => {
+    const { container } = render(
+      <InlineMarkdownWithMentions text="**bold** and *italic* and `code`" />,
+    );
+    expect(container.querySelector('strong')!.textContent).toBe('bold');
+    expect(container.querySelector('em')!.textContent).toBe('italic');
+    expect(container.querySelector('code')!.textContent).toBe('code');
+  });
+});
+
+// ── MentionText ──────────────────────────────────────────────────────
+
+describe('MentionText', () => {
+  const agents = [
+    { id: 'abc12345deadbeef', role: { id: 'developer', name: 'Developer' }, status: 'running' as const },
+    { id: 'def67890', role: { id: 'architect', name: 'Architect' }, status: 'idle' as const },
+  ];
+
+  it('renders plain text without mentions', () => {
+    const { container } = render(
+      <MentionText text="no mentions here" agents={agents} />,
+    );
+    expect(container.textContent).toContain('no mentions here');
+  });
+
+  it('renders agent mention with clickable span', () => {
+    const { container } = render(
+      <MentionText text="Ask @developer for help" agents={agents} />,
+    );
+    const mention = container.querySelector('.bg-blue-500\\/20');
+    expect(mention).not.toBeNull();
+    expect(mention!.textContent).toContain('developer');
+  });
+
+  it('calls onClickAgent when mention is clicked', () => {
+    const handleClick = vi.fn();
+    const { container } = render(
+      <MentionText text="Ask @developer for help" agents={agents} onClickAgent={handleClick} />,
+    );
+    const mention = container.querySelector('.bg-blue-500\\/20');
+    expect(mention).not.toBeNull();
+    fireEvent.click(mention!);
+    expect(handleClick).toHaveBeenCalledWith('abc12345deadbeef');
+  });
+
+  it('does not throw when onClickAgent is not provided', () => {
+    const { container } = render(
+      <MentionText text="Ask @developer for help" agents={agents} />,
+    );
+    const mention = container.querySelector('.bg-blue-500\\/20');
+    expect(() => fireEvent.click(mention!)).not.toThrow();
+  });
+
+  it('renders @user mention with yellow highlight', () => {
+    const agentsWithUser = [
+      ...agents,
+      { id: 'user', role: { id: 'user', name: 'User' }, status: 'running' as const },
+    ];
+    const { container } = render(
+      <MentionText text="Hey @user check this" agents={agentsWithUser} />,
+    );
+    const userMention = container.querySelector('.bg-yellow-500\\/25');
+    expect(userMention).not.toBeNull();
+    expect(userMention!.textContent).toBe('@user');
+  });
+
+  it('returns null for empty text', () => {
+    const { container } = render(
+      <MentionText text="" agents={agents} />,
+    );
+    expect(container.innerHTML).toBe('');
   });
 });
 
