@@ -238,6 +238,28 @@ describe('SessionReplay', () => {
       expect(keyframes[2].type).toBe('error');
     });
 
+    it('emits spawn keyframe with correct child agentId from delegation details', () => {
+      const delegation = makeActivity({
+        agentId: 'lead-1', actionType: 'delegated',
+        summary: 'Created & delegated to Developer: implement feature',
+        details: { toAgentId: 'dev-1', toRole: 'developer', childId: 'dev-1', childRole: 'developer', delegationId: 'del-1' },
+        timestamp: T1,
+      });
+      const mocks = makeMocks({ activities: [delegation] });
+      (mocks.activityLedger.getUntil as ReturnType<typeof vi.fn>).mockReturnValue([delegation]);
+      const replay = new SessionReplay(mocks.activityLedger, mocks.taskDAG, mocks.decisionLog, mocks.lockRegistry, mocks.agentSource);
+
+      const keyframes = replay.getKeyframes('lead-1');
+      // Should emit both a spawn and a delegation keyframe
+      const spawnKf = keyframes.find(k => k.type === 'spawn');
+      const delegationKf = keyframes.find(k => k.type === 'delegation');
+      expect(spawnKf).toBeDefined();
+      expect(delegationKf).toBeDefined();
+      // The spawn keyframe must use the CHILD agent ID, not the lead's ID
+      expect(spawnKf!.agentId).toBe('dev-1');
+      expect(spawnKf!.agentId).not.toBe('lead-1');
+    });
+
     it('only emits keyframes for team members when using team resolution', () => {
       const teamSpawn = makeActivity({
         agentId: 'dev-1', actionType: 'sub_agent_spawned', projectId: '',
