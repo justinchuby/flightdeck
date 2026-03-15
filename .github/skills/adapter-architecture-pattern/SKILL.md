@@ -20,7 +20,7 @@ Two adapter backends implement the same `AgentAdapter` interface:
 
 | Backend | Transport | Process Model | Session Resume | Providers |
 |---------|-----------|--------------|----------------|-----------|
-| **AcpAdapter** | ACP protocol over stdio/ndjson | Subprocess (spawned CLI) | `loadSession()` — best-effort, falls back to `newSession()` | Copilot, Claude, Gemini, OpenCode, Cursor, Codex |
+| **AcpAdapter** | ACP protocol over stdio/ndjson | Subprocess (spawned CLI) | `loadSession()` — throws on failure so the UI can surface the error | Copilot, Claude, Gemini, OpenCode, Cursor, Codex |
 | **MockAdapter** | In-memory | In-process | N/A | Testing only |
 
 ## Key Files
@@ -76,19 +76,20 @@ interface AgentAdapter extends EventEmitter {
 
 ## Pattern: Session Resume
 
-Session resume is handled uniformly via the ACP protocol:
+Session resume is handled via the ACP protocol. When `loadSession()` fails, the error is propagated so the caller can surface it to the user:
 
 ```typescript
-// AcpAdapter — best-effort via ACP protocol
+// AcpAdapter — throws on failure for UI visibility
 try {
   const result = await connection.loadSession({ sessionId });
-} catch {
-  // Falls back to newSession() — resume silently fails
-  const result = await connection.newSession({ cwd });
+} catch (err) {
+  // Emits 'session_resume_failed' for observability, then throws.
+  // Does NOT fall back to newSession() — the UI should show the error.
+  throw new Error(`Session resume failed: ${err.message}`);
 }
 ```
 
-Whether resume succeeds depends on the CLI provider's support. Some providers persist full conversation history, others don't. The adapter always falls back gracefully to a fresh session.
+Whether resume succeeds depends on the CLI provider's support. Some providers persist full conversation history, others don't. When resume fails, the error is surfaced to the user rather than silently creating a fresh session.
 
 The `SessionResumeManager` (in `packages/server/src/agents/`) orchestrates resume on server startup. It reads the agent roster, checks `preset.supportsResume`, and passes `sessionId` through `AdapterStartOptions`.
 

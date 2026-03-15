@@ -19,7 +19,7 @@
 
 | # | Event Type | File | Line | Triggered By | Payload Structure | Special Handling |
 |---|---|---|---|---|---|---|
-| 7 | `agent:status` | WebSocketServer.ts | 150 | AgentManager 'agent:status' | `{ type: 'agent:status', agentId, status, ...data }` | ⏱️ Throttled 500ms (latest value only) |
+| 7 | `agent:status` | WebSocketServer.ts | 150 | AgentManager 'agent:status' | `{ type: 'agent:status', agentId, status, ...data }` | ⏱️ Throttled 500ms for `idle` only; `running`/`creating`/`failed`/`completed` bypass throttle for instant UI updates |
 | 8 | `agent:text` | WebSocketServer.ts | 201 | AgentManager 'agent:text' | `{ type: 'agent:text', agentId, text: string }` | 📦 Batched 100ms (merged) |
 | 9 | `agent:content` | WebSocketServer.ts | 217 | AgentManager 'agent:content' | `{ type, agentId, content: {text?, contentType?, mimeType?, data?, uri?} }` | Rich media support |
 | 10 | `agent:thinking` | WebSocketServer.ts | 222 | AgentManager 'agent:thinking' | `{ type, agentId, text: string }` | Appends to existing thinking block |
