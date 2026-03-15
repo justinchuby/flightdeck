@@ -228,17 +228,6 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       createdAt: new Date().toISOString(),
     };
 
-    // Complete the previous delegation so the lead can review its output before the new task begins
-    for (const [, existing] of ctx.delegations) {
-      if (existing.toAgentId === child.id && existing.status === 'active') {
-        existing.status = 'completed';
-        existing.completedAt = new Date().toISOString();
-        if (ctx.activeDelegationRepository) {
-          try { ctx.activeDelegationRepository.cancel(existing.id); } catch { /* non-critical */ }
-        }
-      }
-    }
-
     ctx.delegations.set(delegation.id, delegation);
 
     child.task = req.task;
