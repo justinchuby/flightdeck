@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { tasksRoutes } from './tasks.js';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
+import type { AgentStatus } from '@flightdeck/shared';
 
 vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -335,5 +336,121 @@ describe('GET /attention — attention items', () => {
     const failedIdx = types.indexOf('failed');
     const blockedIdx = types.indexOf('blocked');
     expect(failedIdx).toBeLessThan(blockedIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session-scoped filtering (global scope with live agents)
+// ---------------------------------------------------------------------------
+
+describe('GET /tasks — session-scoped filtering', () => {
+  function createMockAgent(id: string, status: AgentStatus) {
+    return { id, status, role: { id: 'lead', name: 'Lead' }, toJSON: () => ({ id, status }) };
+  }
+
+  it('filters to live non-terminal agent leads when live agents present', async () => {
+    const mockTaskDAG = createMockTaskDAG();
+    const liveAgents = [
+      createMockAgent('lead-1', 'running'),
+      createMockAgent('lead-2', 'completed'), // terminal — should be excluded
+    ];
+    const mockAgentManager = {
+      getTaskDAG: () => mockTaskDAG,
+      getAll: vi.fn().mockReturnValue(liveAgents),
+    } as any;
+
+    const srv = createTestServer({
+      agentManager: mockAgentManager,
+      decisionLog: createMockDecisionLog() as any,
+    });
+    const url = await srv.start();
+    try {
+      const res = await fetch(`${url}/tasks`);
+      const body = await res.json();
+      // Only lead-1 is non-terminal; lead-1 owns task-1, task-2, task-5
+      expect(body.tasks).toHaveLength(3);
+      expect(body.tasks.every((t: DagTask) => t.leadId === 'lead-1')).toBe(true);
+    } finally {
+      await srv.stop();
+    }
+  });
+
+  it('scope=lead requires leadId and filters correctly', async () => {
+    const mockTaskDAG = createMockTaskDAG();
+    const mockAgentManager = {
+      getTaskDAG: () => mockTaskDAG,
+      getAll: vi.fn().mockReturnValue([]),
+    } as any;
+
+    const srv = createTestServer({
+      agentManager: mockAgentManager,
+      decisionLog: createMockDecisionLog() as any,
+    });
+    const url = await srv.start();
+    try {
+      // Missing leadId → 400
+      const badRes = await fetch(`${url}/tasks?scope=lead`);
+      expect(badRes.status).toBe(400);
+      const badBody = await badRes.json();
+      expect(badBody.error).toContain('leadId is required');
+
+      // With leadId → only that lead's tasks
+      const res = await fetch(`${url}/tasks?scope=lead&leadId=lead-2`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.tasks).toHaveLength(2); // task-3, task-4
+      expect(body.tasks.every((t: DagTask) => t.leadId === 'lead-2')).toBe(true);
+    } finally {
+      await srv.stop();
+    }
+  });
+
+  it('returns all historical tasks when no live agents present', async () => {
+    const mockTaskDAG = createMockTaskDAG();
+    const mockAgentManager = {
+      getTaskDAG: () => mockTaskDAG,
+      getAll: vi.fn().mockReturnValue([]), // no live agents
+    } as any;
+
+    const srv = createTestServer({
+      agentManager: mockAgentManager,
+      decisionLog: createMockDecisionLog() as any,
+    });
+    const url = await srv.start();
+    try {
+      const res = await fetch(`${url}/tasks`);
+      const body = await res.json();
+      // No live agents → all 5 historical tasks returned
+      expect(body.tasks).toHaveLength(5);
+    } finally {
+      await srv.stop();
+    }
+  });
+
+  it('excludes tasks from terminal-only agents even when they are in memory', async () => {
+    const mockTaskDAG = createMockTaskDAG();
+    // All agents are terminal — should behave like "no live agents"
+    const terminalAgents = [
+      createMockAgent('lead-1', 'completed'),
+      createMockAgent('lead-2', 'failed'),
+    ];
+    const mockAgentManager = {
+      getTaskDAG: () => mockTaskDAG,
+      getAll: vi.fn().mockReturnValue(terminalAgents),
+    } as any;
+
+    const srv = createTestServer({
+      agentManager: mockAgentManager,
+      decisionLog: createMockDecisionLog() as any,
+    });
+    const url = await srv.start();
+    try {
+      const res = await fetch(`${url}/tasks`);
+      const body = await res.json();
+      // All agents terminal → falls through to historical (all tasks)
+      expect(body.tasks).toHaveLength(5);
+    } finally {
+      await srv.stop();
+    }
   });
 });

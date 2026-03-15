@@ -228,13 +228,13 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       createdAt: new Date().toISOString(),
     };
 
-    // Complete any existing active delegation to this agent to prevent orphans
+    // Cancel any existing active delegation to this agent to prevent orphans
     for (const [, existing] of ctx.delegations) {
       if (existing.toAgentId === child.id && existing.status === 'active') {
-        existing.status = 'completed';
+        existing.status = 'cancelled';
         existing.completedAt = new Date().toISOString();
         if (ctx.activeDelegationRepository) {
-          try { ctx.activeDelegationRepository.complete(existing.id); } catch { /* non-critical */ }
+          try { ctx.activeDelegationRepository.cancel(existing.id); } catch { /* non-critical */ }
         }
       }
     }
