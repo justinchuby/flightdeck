@@ -864,6 +864,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       // Guard: only delete from the Map if the entry still points to THIS
       // agent instance.  Auto-restart reuses the same ID, so a replacement
       // agent may already occupy the slot — we must not remove it.
+      // dispose() runs unconditionally — the old agent must always release
+      // its resources even if a replacement occupies the Map slot.
       const exitedAgent = agent;
       setTimeout(() => {
         if (this.agents.get(exitedAgent.id) === exitedAgent) {

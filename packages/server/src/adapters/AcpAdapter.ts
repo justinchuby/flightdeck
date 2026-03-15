@@ -116,6 +116,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   get resumeFailed(): boolean { return this._resumeFailed; }
 
   async start(opts: AdapterStartOptions): Promise<string> {
+    this._resumeFailed = false;
     await withTimeout(this.spawnAndConnect(opts), SDK_TIMEOUT_MS, 'spawnAndConnect');
 
     let sessionId: string;

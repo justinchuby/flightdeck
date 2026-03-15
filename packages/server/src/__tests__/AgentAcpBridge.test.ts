@@ -29,12 +29,18 @@ vi.mock('../adapters/RoleFileWriter.js', () => ({
 const mockStart = vi.fn();
 const mockOn = vi.fn();
 const mockTerminate = vi.fn().mockResolvedValue(undefined);
+const mockPrompt = vi.fn().mockResolvedValue({ stopReason: 'end_turn' });
+const mockCancel = vi.fn().mockResolvedValue(undefined);
 
-const mockAdapter = {
+const mockAdapter: Record<string, any> = {
   start: mockStart,
   on: mockOn,
   terminate: mockTerminate,
+  prompt: mockPrompt,
+  cancel: mockCancel,
   type: 'acp',
+  resumeFailed: false,
+  isPrompting: false,
 };
 
 vi.mock('../adapters/AdapterFactory.js', () => ({
@@ -77,11 +83,13 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     cwd: '/test/project',
     status: 'idle',
     sessionId: undefined,
+    _isResuming: false,
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
     _notifyModelFallback: vi.fn(),
     _notifyStatusChange: vi.fn(),
+    buildFullPrompt: vi.fn(() => 'You are a lead.\n\n[context]\n\nYour task: do the thing'),
     ...overrides,
   } as any;
 }
@@ -99,6 +107,8 @@ const fakeConfig: ServerConfig = {
 describe('AgentAcpBridge — startAcp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAdapter.resumeFailed = false;
+    mockAdapter.isPrompting = false;
   });
 
   afterEach(() => {
@@ -281,5 +291,66 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // Adapter start should still have been called
     expect(mockStart).toHaveBeenCalled();
+  });
+
+  it('re-delivers task via buildFullPrompt when resumeFailed is true', async () => {
+    const agent = createFakeAgent({
+      resumeSessionId: 'old-session-id',
+      _isResuming: true,
+      task: 'Investigate the bug',
+    });
+    // Simulate: adapter.start() resolved, but resume fell back to new session
+    mockAdapter.resumeFailed = true;
+    mockStart.mockResolvedValue('fallback-session-456');
+
+    startAcp(agent, fakeConfig);
+
+    // Wait for the .then() handler to fire
+    await vi.waitFor(() => {
+      expect(agent._notifySessionReady).toHaveBeenCalledWith('fallback-session-456');
+    });
+
+    // Should have called buildFullPrompt to get the task prompt
+    expect(agent.buildFullPrompt).toHaveBeenCalled();
+
+    // Should have prompted with the full prompt content
+    expect(mockPrompt).toHaveBeenCalledWith(
+      'You are a lead.\n\n[context]\n\nYour task: do the thing',
+    );
+
+    // Should have cleared the resuming flag
+    expect(agent._isResuming).toBe(false);
+
+    // Should have logged the fallback
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: 'agent-bridge',
+        msg: 'Resume fell back to new session — delivering task prompt',
+        agentId: agent.id,
+      }),
+    );
+  });
+
+  it('sets agent idle on successful resume (resumeFailed=false, no initialPrompt)', async () => {
+    const agent = createFakeAgent({
+      resumeSessionId: 'valid-session-id',
+      _isResuming: true,
+    });
+    mockAdapter.resumeFailed = false;
+    mockStart.mockResolvedValue('valid-session-id');
+
+    startAcp(agent, fakeConfig);
+
+    await vi.waitFor(() => {
+      expect(agent._notifySessionReady).toHaveBeenCalledWith('valid-session-id');
+    });
+
+    // Should NOT call buildFullPrompt — successful resume waits for input
+    expect(agent.buildFullPrompt).not.toHaveBeenCalled();
+    expect(mockPrompt).not.toHaveBeenCalled();
+
+    // Should be idle
+    expect(agent.status).toBe('idle');
+    expect(agent._isResuming).toBe(false);
   });
 });

@@ -323,11 +323,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     }
   }));
 
-  conn.on('prompt_timeout', (timeoutMs: number) => withCtx(() => {
-    if (agent._isTerminated) return;
-    logger.warn({ module: 'agent', msg: 'Prompt timed out — agent stalled', agentId: agent.id, role: agent.role.name, timeoutMs });
-  }));
-
   conn.on('prompting', (active: boolean) => withCtx(() => {
     if (agent._isTerminated) return;
     if (active) {
