@@ -123,6 +123,8 @@ export interface AgentAdapter extends EventEmitter {
   readonly promptingStartedAt: number | null;
   readonly currentSessionId: string | null;
   readonly supportsImages: boolean;
+  /** True when start() was called with a sessionId but loadSession() failed and a fresh session was created instead. */
+  readonly resumeFailed: boolean;
 
   start(opts: AdapterStartOptions): Promise<string>;
   prompt(content: PromptContent, opts?: PromptOptions): Promise<PromptResult>;

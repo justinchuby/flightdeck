@@ -43,6 +43,7 @@ export class MockAdapter extends EventEmitter implements AgentAdapter {
   get promptingStartedAt(): number | null { return this._promptingStartedAt; }
   get currentSessionId(): string | null { return this._sessionId; }
   get supportsImages(): boolean { return true; }
+  get resumeFailed(): boolean { return false; }
 
   async start(_opts: AdapterStartOptions): Promise<string> {
     this._sessionId = `mock-session-${Date.now()}`;

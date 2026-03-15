@@ -102,6 +102,8 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   private systemNoteBuffer: string[] = [];
   private agentCapabilities: acp.AgentCapabilities | null = null;
 
+  private _resumeFailed = false;
+
   constructor() {
     super();
   }
@@ -111,6 +113,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   get promptingStartedAt(): number | null { return this._promptingStartedAt; }
   get currentSessionId(): string | null { return this.sessionId; }
   get supportsImages(): boolean { return this.agentCapabilities?.promptCapabilities?.image ?? false; }
+  get resumeFailed(): boolean { return this._resumeFailed; }
 
   async start(opts: AdapterStartOptions): Promise<string> {
     await withTimeout(this.spawnAndConnect(opts), SDK_TIMEOUT_MS, 'spawnAndConnect');
@@ -130,13 +133,14 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
         );
         sessionId = opts.sessionId;
       } catch (err) {
-        // Resume failed — do NOT fall back to a new session.
-        // Emit event for observability, then propagate the error so the
-        // caller (AgentManager / API) can surface it to the user.
+        // Resume failed — fall back to a fresh session so the agent stays alive.
+        // New CLI processes cannot load sessions from previous processes, so this
+        // is expected on every resume. The bridge checks `resumeFailed` and
+        // re-delivers the agent's task prompt.
         const message = err instanceof Error ? err.message : String(err);
         logger.warn({
           module: 'acp',
-          msg: 'Session resume failed',
+          msg: 'Session resume failed — falling back to new session',
           requestedSessionId: opts.sessionId,
           error: message,
         });
@@ -144,7 +148,16 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           requestedSessionId: opts.sessionId,
           error: message,
         });
-        throw new Error(`Session resume failed: ${message}`);
+
+        const fallbackResult = await withTimeout(
+          this.connection!.newSession({
+            cwd: opts.cwd || process.cwd(),
+            mcpServers: [],
+          }),
+          SDK_TIMEOUT_MS, 'newSession (fallback)',
+        );
+        sessionId = fallbackResult.sessionId;
+        this._resumeFailed = true;
       }
     } else {
       // Build _meta for providers that accept system prompt via session metadata
