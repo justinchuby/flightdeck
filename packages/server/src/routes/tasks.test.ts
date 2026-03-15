@@ -89,7 +89,7 @@ describe('GET /tasks — global task query', () => {
   let baseUrl: string;
   let stop: () => Promise<void>;
   const mockTaskDAG = createMockTaskDAG();
-  const mockAgentManager = { getTaskDAG: () => mockTaskDAG } as any;
+  const mockAgentManager = { getTaskDAG: () => mockTaskDAG, getAll: vi.fn().mockReturnValue([]) } as any;
   const mockDecisionLog = createMockDecisionLog();
 
   beforeAll(async () => {
@@ -238,7 +238,7 @@ describe('GET /attention — attention items', () => {
   let baseUrl: string;
   let stop: () => Promise<void>;
   const mockTaskDAG = createMockTaskDAG();
-  const mockAgentManager = { getTaskDAG: () => mockTaskDAG } as any;
+  const mockAgentManager = { getTaskDAG: () => mockTaskDAG, getAll: vi.fn().mockReturnValue([]) } as any;
   const mockDecisionLog = createMockDecisionLog();
 
   beforeAll(async () => {

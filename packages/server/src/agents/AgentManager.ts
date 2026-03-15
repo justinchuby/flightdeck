@@ -1333,7 +1333,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.flushTimers.set(agentId, setTimeout(() => this.flushAgentMessage(agentId), 2000));
   }
 
-  /** Flush buffered agent text to the conversation store */
+  /** Clear a pending idle nudge timer for an agent */
   private clearIdleNudgeTimer(agentId: string): void {
     const timer = this.idleNudgeTimers.get(agentId);
     if (timer) {
@@ -1342,6 +1342,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
+  /** Flush buffered agent text to the conversation store */
   private flushAgentMessage(agentId: string): void {
     const timer = this.flushTimers.get(agentId);
     if (timer) { clearTimeout(timer); this.flushTimers.delete(agentId); }
