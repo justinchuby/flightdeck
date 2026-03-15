@@ -144,11 +144,8 @@ export class SessionReplay {
         const discoveredIds = new Set<string>([leadId]);
         for (const ev of allActivities) {
           if (ev.actionType === 'delegated' && discoveredIds.has(ev.agentId)) {
-            // childId is the canonical field; toAgentId appears in direct-message delegations;
-            // spawnedAgentId is a legacy/ghost field (never written by current code, kept for backward compat)
             const childId = (ev.details as Record<string, unknown>)?.childId ??
-              (ev.details as Record<string, unknown>)?.toAgentId ??
-              (ev.details as Record<string, unknown>)?.spawnedAgentId;
+              (ev.details as Record<string, unknown>)?.toAgentId;
             if (typeof childId === 'string') discoveredIds.add(childId);
           }
         }
@@ -197,7 +194,7 @@ export class SessionReplay {
         // "Created & delegated to X" means a new agent was spawned AND given a task.
         // Emit both a spawn and a delegation keyframe so the frontend counts agents.
         if (type === 'delegation' && entry.summary.startsWith('Created &')) {
-          const spawnedId = details.childId ?? details.toAgentId ?? details.spawnedAgentId ?? details.agentId ?? entry.agentId;
+          const spawnedId = details.childId ?? details.toAgentId ?? details.agentId ?? entry.agentId;
           keyframes.push({
             timestamp: entry.timestamp,
             label: entry.summary.replace('Created & delegated to', 'Spawned'),
@@ -234,7 +231,7 @@ export class SessionReplay {
       // "Created & delegated to X" means a new agent was spawned
       if (entry.actionType === 'delegated' && entry.summary.startsWith('Created &')) {
         const details = entry.details as Record<string, string>;
-        const agentId = details.childId ?? details.toAgentId ?? details.spawnedAgentId ?? details.agentId ?? entry.agentId;
+        const agentId = details.childId ?? details.toAgentId ?? details.agentId ?? entry.agentId;
         const role = details.childRole ?? details.toRole ?? details.role ?? entry.agentRole;
         agentMap.set(agentId, {
           id: agentId,
@@ -245,7 +242,7 @@ export class SessionReplay {
       }
       // Legacy: support sub_agent_spawned if it exists
       if (entry.actionType === 'sub_agent_spawned') {
-        const agentId = (entry.details as Record<string, string>).spawnedAgentId ?? entry.agentId;
+        const agentId = (entry.details as Record<string, string>).childId ?? (entry.details as Record<string, string>).toAgentId ?? entry.agentId;
         const role = (entry.details as Record<string, string>).role ?? entry.agentRole;
         agentMap.set(agentId, {
           id: agentId,

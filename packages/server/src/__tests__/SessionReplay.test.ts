@@ -138,13 +138,13 @@ describe('SessionReplay', () => {
       makeActivity({
         actionType: 'sub_agent_spawned',
         summary: 'Spawned developer',
-        details: { spawnedAgentId: 'dev-1', role: 'developer' },
+        details: { childId: 'dev-1', role: 'developer' },
         timestamp: T1,
       }),
       makeActivity({
         actionType: 'sub_agent_spawned',
         summary: 'Spawned architect',
-        details: { spawnedAgentId: 'arch-1', role: 'architect' },
+        details: { childId: 'arch-1', role: 'architect' },
         timestamp: T2,
       }),
     ];
@@ -164,7 +164,7 @@ describe('SessionReplay', () => {
       makeActivity({
         actionType: 'sub_agent_spawned',
         agentId: 'dev-1',
-        details: { spawnedAgentId: 'dev-1', role: 'developer' },
+        details: { childId: 'dev-1', role: 'developer' },
         timestamp: T1,
       }),
       makeActivity({
@@ -524,12 +524,12 @@ describe('SessionReplay', () => {
     it('scopes world state to team members for untitled projects', () => {
       const teamActivity = makeActivity({
         actionType: 'sub_agent_spawned', agentId: 'lead-1', projectId: '',
-        details: { spawnedAgentId: 'dev-1', role: 'developer' },
+        details: { childId: 'dev-1', role: 'developer' },
       });
       const foreignActivity = makeActivity({
         id: 2, agentId: 'foreign-1', projectId: '',
         actionType: 'sub_agent_spawned',
-        details: { spawnedAgentId: 'foreign-2', role: 'architect' },
+        details: { childId: 'foreign-2', role: 'architect' },
       });
 
       const mocks = makeMocks({
