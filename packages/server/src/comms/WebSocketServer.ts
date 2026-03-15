@@ -151,18 +151,29 @@ export class WebSocketServer {
     this.track(agentManager, 'agent:status', (data: AgentManagerEvents['agent:status']) => {
       const agentId = data.agentId;
       const projectId = this.resolveAgentProjectId(agentId);
-      // Throttle: buffer latest status per agent, flush every 500ms
-      this.statusPending.set(agentId, { type: 'agent:status', ...data, _projectId: projectId });
-      if (!this.statusThrottleTimers.has(agentId)) {
-        this.statusThrottleTimers.set(agentId, setTimeout(() => {
+      // 'running' status bypasses throttle — UI should reflect active agents immediately.
+      // Other statuses (idle, etc.) are throttled to reduce rapid churn.
+      if (data.status === 'running') {
+        const existingTimer = this.statusThrottleTimers.get(agentId);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
           this.statusThrottleTimers.delete(agentId);
-          const pending = this.statusPending.get(agentId);
-          if (pending) {
-            this.statusPending.delete(agentId);
-            const { _projectId, ...msg } = pending;
-            this.broadcastToProject(msg, _projectId);
-          }
-        }, 500));
+        }
+        this.statusPending.delete(agentId);
+        this.broadcastToProject({ type: 'agent:status', ...data }, projectId);
+      } else {
+        this.statusPending.set(agentId, { type: 'agent:status', ...data, _projectId: projectId });
+        if (!this.statusThrottleTimers.has(agentId)) {
+          this.statusThrottleTimers.set(agentId, setTimeout(() => {
+            this.statusThrottleTimers.delete(agentId);
+            const pending = this.statusPending.get(agentId);
+            if (pending) {
+              this.statusPending.delete(agentId);
+              const { _projectId, ...msg } = pending;
+              this.broadcastToProject(msg, _projectId);
+            }
+          }, 500));
+        }
       }
     });
 

@@ -186,6 +186,20 @@ describe('AgentAcpBridge — startAcp', () => {
     );
   });
 
+  it('notifies status change to running when bridge starts', async () => {
+    const agent = createFakeAgent();
+    mockStart.mockResolvedValue('session-123');
+
+    await startAcp(agent, fakeConfig);
+
+    // The bridge sets status to 'running' and notifies before conn.start(),
+    // then conn.start() resolving may set it to 'idle' (resumed) or keep running.
+    // We verify the notification was fired with 'running' at bridge init time.
+    expect(agent._notifyStatusChange).toHaveBeenCalledWith('running');
+    // 'running' should be the first notification call
+    expect(agent._notifyStatusChange.mock.calls[0][0]).toBe('running');
+  });
+
   it('passes correct cliArgs to AcpConnection.start', async () => {
     const agent = createFakeAgent({ model: 'claude-sonnet-4' });
     mockStart.mockResolvedValue('session-123');
