@@ -19,7 +19,7 @@
 
 | # | Event Type | File | Line | Triggered By | Payload Structure | Special Handling |
 |---|---|---|---|---|---|---|
-| 7 | `agent:status` | WebSocketServer.ts | 150 | AgentManager 'agent:status' | `{ type: 'agent:status', agentId, status, ...data }` | ⏱️ Throttled 500ms for `idle` only; `running`/`creating`/`failed`/`completed` bypass throttle for instant UI updates |
+| 7 | `agent:status` | WebSocketServer.ts | 150 | AgentManager 'agent:status' | `{ type: 'agent:status', agentId, status, ...data }` | 🔴 No throttle — all statuses broadcast immediately in real-time. Upstream `AgentEvents` idle debounce (500ms) handles churn reduction. |
 | 8 | `agent:text` | WebSocketServer.ts | 201 | AgentManager 'agent:text' | `{ type: 'agent:text', agentId, text: string }` | 📦 Batched 100ms (merged) |
 | 9 | `agent:content` | WebSocketServer.ts | 217 | AgentManager 'agent:content' | `{ type, agentId, content: {text?, contentType?, mimeType?, data?, uri?} }` | Rich media support |
 | 10 | `agent:thinking` | WebSocketServer.ts | 222 | AgentManager 'agent:thinking' | `{ type, agentId, text: string }` | Appends to existing thinking block |
@@ -171,17 +171,18 @@ public broadcastEvent(msg: any, projectId?: string): void
 
 **Code**: Lines 201-213, 486-504
 
-### agent:status Throttling (500ms)
+### agent:status — Immediate Broadcast (No Throttle)
 
 ```
 1. Emit: AgentManager → 'agent:status'
-2. Buffer: WebSocketServer.statusPending[agentId] = latest message
-3. Schedule: setTimeout(() => flush, 500ms)
-4. Flush: Send latest buffered status
-5. Clear: Remove pending timer
+2. Broadcast: WebSocketServer immediately sends to all subscribed clients
 ```
 
-**Code**: Lines 146-162
+The WebSocket layer applies no throttle or buffering to status updates.
+The upstream `AgentEvents.notifyStatus()` debounces `idle` transitions by 500ms
+to prevent rapid idle↔running churn from reaching listeners.
+
+**Code**: Lines 149-152
 
 ---
 
