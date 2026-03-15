@@ -107,6 +107,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
   private messageBuffers: Map<string, string> = new Map(); // agentId → buffered text
   private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private idleNudgeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private crashCounts: Map<string, number> = new Map();
   private maxRestarts: number;
   private autoRestart: boolean;
@@ -761,6 +762,35 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           }
         }
 
+        // When agent resumes work, clear the idle dedup key so the next
+        // idle transition properly re-notifies the parent.
+        if (status === 'running') {
+          this.dispatcher.clearCompletionTracking(agent.id);
+          this.clearIdleNudgeTimer(agent.id);
+        }
+
+        // Idle task nudge: if agent stays idle for 30s with uncompleted DAG
+        // tasks, send a reminder. Nudge once per idle period (not spam).
+        if (status === 'idle' && agent.parentId && !agent._isResuming) {
+          if (!this.idleNudgeTimers.has(agent.id)) {
+            const timer = setTimeout(() => {
+              this.idleNudgeTimers.delete(agent.id);
+              if (agent.status !== 'idle' || isTerminalStatus(agent.status)) return;
+              if (!this.agents.has(agent.id)) return; // agent was removed
+              const leadId = agent.parentId;
+              if (!leadId) return;
+              const dagTask = this.taskDAG.getTaskByAgent(leadId, agent.id);
+              if (dagTask && dagTask.dagStatus === 'running') {
+                agent.sendMessage(
+                  `[System] You have an uncompleted task: "${dagTask.title || dagTask.id}". ` +
+                  `Please mark it done with COMPLETE_TASK, report PROGRESS, or explain what is blocking you.`
+                );
+              }
+            }, 30_000);
+            this.idleNudgeTimers.set(agent.id, timer);
+          }
+        }
+
         // Suppress the first idle notification for resumed agents — their prior
         // work was already reported.
         if (status === 'idle' && agent.parentId && !agent._isResuming) {
@@ -773,6 +803,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
       this.flushAgentMessage(agent.id);
       this.dispatcher.clearBuffer(agent.id);
+      this.clearIdleNudgeTimer(agent.id);
       logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
       // Release any file locks held by the exiting agent
@@ -922,6 +953,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.dispatcher.clearBuffer(id);
+    this.clearIdleNudgeTimer(id);
 
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
@@ -1176,6 +1208,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   async shutdownAll(): Promise<void> {
     this._shuttingDown = true;
     this.heartbeat.stop();
+    // Clear all idle nudge timers to prevent firing on disposed agents
+    for (const [id, timer] of this.idleNudgeTimers) {
+      clearTimeout(timer);
+    }
+    this.idleNudgeTimers.clear();
     const active = [...this.agents.values()]
       .filter(agent => !isTerminalStatus(agent.status));
     logger.info({ module: 'agent', msg: `Terminating ${active.length} active agent(s)...` });
@@ -1294,6 +1331,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const prev = this.flushTimers.get(agentId);
     if (prev) clearTimeout(prev);
     this.flushTimers.set(agentId, setTimeout(() => this.flushAgentMessage(agentId), 2000));
+  }
+
+  /** Clear a pending idle nudge timer for an agent */
+  private clearIdleNudgeTimer(agentId: string): void {
+    const timer = this.idleNudgeTimers.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleNudgeTimers.delete(agentId);
+    }
   }
 
   /** Flush buffered agent text to the conversation store */
