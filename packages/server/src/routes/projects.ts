@@ -764,14 +764,14 @@ export function projectsRoutes(ctx: AppContext): Router {
         projectRegistry.startSession(project.id, agent.id, task);
       }
 
-      // Gather context from previous session
-      const briefing = projectRegistry.buildBriefing(project.id);
-
-      // Send project briefing (fresh start only — resume gets context from ACP session).
-      // Use queueMessage: delivered automatically once the initial prompt completes.
-      if (!isResume && briefing && briefing.sessions.length > 1) {
-        const briefingText = projectRegistry.formatBriefing(briefing);
-        agent.queueMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
+      // Send project briefing (fresh start only — resume gets full context from
+      // loadSession() which replays conversation history).
+      if (!isResume) {
+        const briefing = projectRegistry.buildBriefing(project.id);
+        if (briefing && briefing.sessions.length > 1) {
+          const briefingText = projectRegistry.formatBriefing(briefing);
+          agent.queueMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
+        }
       }
 
       if (!isResume && task) {

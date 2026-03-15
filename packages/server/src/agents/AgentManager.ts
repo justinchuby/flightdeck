@@ -718,6 +718,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.artifactDir) {
         agent.sendMessage(`[System] Your artifact storage directory: ${agent.artifactDir}`);
       }
+
+      // Context compression drops conversation history, so remind the agent of
+      // available commands. Uses the same reminder as the 2-hour heartbeat interval.
+      this.heartbeat.sendCommandReminderTo(agent);
     });
 
     // Wire cost tracking: attribute token usage to the agent's current dagTaskId
