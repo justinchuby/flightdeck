@@ -118,7 +118,6 @@ function AcpVirtuosoFooter({ context }: { context?: AcpVirtuosoContext }) {
   );
 }
 
-/** Render a single content item — handles text, resource, image, audio, or unknown */
 /** ACP content block — can be text, image, audio, resource, or a plain string */
 interface ContentItem {
   type?: string;
