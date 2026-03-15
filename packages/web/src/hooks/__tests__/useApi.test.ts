@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiFetch, getAuthToken } from '../useApi';
+import { apiFetch, getAuthToken, useApi } from '../useApi';
+import { renderHook, act } from '@testing-library/react';
+
+const { mockSetRoles, mockSetConfig, mockUpdateAgent } = vi.hoisted(() => ({
+  mockSetRoles: vi.fn(),
+  mockSetConfig: vi.fn(),
+  mockUpdateAgent: vi.fn(),
+}));
+
+vi.mock('../../stores/appStore', () => {
+  const storeState = {
+    setRoles: mockSetRoles,
+    setConfig: mockSetConfig,
+    updateAgent: mockUpdateAgent,
+  };
+  const useAppStore = vi.fn((selector: (s: typeof storeState) => unknown) => selector(storeState));
+  (useAppStore as Record<string, unknown>).getState = () => storeState;
+  return { useAppStore };
+});
 
 function mockFetchOk(body: unknown = { ok: true }) {
   globalThis.fetch = vi.fn().mockResolvedValue({
@@ -193,5 +211,232 @@ describe('apiFetch', () => {
     const promise = apiFetch('/cancel', { signal: controller.signal, timeoutMs: 0 });
     controller.abort();
     await expect(promise).rejects.toThrow();
+  });
+});
+
+describe('useApi hook', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.stubGlobal('localStorage', { getItem: vi.fn().mockReturnValue(null) });
+    mockSetRoles.mockClear();
+    mockSetConfig.mockClear();
+    mockUpdateAgent.mockClear();
+    globalThis.fetch = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(String(url).includes('/roles') ? [] : {}),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('calls loadRoles and loadConfig on mount', async () => {
+    renderHook(() => useApi());
+    await act(async () => {});
+    expect(mockSetRoles).toHaveBeenCalledWith([]);
+    expect(mockSetConfig).toHaveBeenCalledWith({});
+  });
+
+  it('spawnAgent sends POST /agents with role, task, and options', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({ id: 'new-agent' });
+
+    await act(async () => {
+      await result.current.spawnAgent('dev', 'build feature', { model: 'gpt-4', provider: 'openai' });
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c: unknown[]) => String(c[0]).includes('/api/agents') && (c[1] as RequestInit)?.method === 'POST',
+    );
+    expect(call).toBeDefined();
+    expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({
+      roleId: 'dev',
+      task: 'build feature',
+      model: 'gpt-4',
+      provider: 'openai',
+    });
+  });
+
+  it('spawnAgent works without optional task and options', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({ id: 'new' });
+
+    await act(async () => {
+      await result.current.spawnAgent('dev');
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c: unknown[]) => String(c[0]).includes('/api/agents') && (c[1] as RequestInit)?.method === 'POST',
+    );
+    expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ roleId: 'dev' });
+  });
+
+  it('terminateAgent sends DELETE /agents/:id', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({});
+
+    await act(async () => {
+      await result.current.terminateAgent('agent-1');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/agents/agent-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('interruptAgent sends POST /agents/:id/interrupt', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({});
+
+    await act(async () => {
+      await result.current.interruptAgent('agent-2');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/agents/agent-2/interrupt',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('restartAgent sends POST /agents/:id/restart', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({});
+
+    await act(async () => {
+      await result.current.restartAgent('agent-3');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/agents/agent-3/restart',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('updateConfig sends PATCH /config and updates store', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    const updated = { maxAgents: 10 };
+    mockFetchOk(updated);
+
+    let returned: unknown;
+    await act(async () => {
+      returned = await result.current.updateConfig({ maxAgents: 10 });
+    });
+
+    expect(returned).toEqual(updated);
+    expect(mockSetConfig).toHaveBeenCalledWith(updated);
+  });
+
+  it('createRole sends POST /roles then reloads roles', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk([]);
+
+    const role = { id: 'tester', name: 'Tester', description: '', systemPrompt: '', color: '#f00', icon: '🧪' };
+    await act(async () => {
+      await result.current.createRole(role);
+    });
+
+    const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const postCall = calls.find(
+      (c: unknown[]) => String(c[0]) === '/api/roles' && (c[1] as RequestInit)?.method === 'POST',
+    );
+    expect(postCall).toBeDefined();
+    // Should also reload roles after creating
+    expect(mockSetRoles).toHaveBeenCalled();
+  });
+
+  it('deleteRole sends DELETE /roles/:id then reloads roles', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk([]);
+
+    await act(async () => {
+      await result.current.deleteRole('old-role');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/roles/old-role',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    expect(mockSetRoles).toHaveBeenCalled();
+  });
+
+  it('updateAgent optimistically updates store then sends PATCH', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({});
+
+    await act(async () => {
+      await result.current.updateAgent('a1', { model: 'claude-3' });
+    });
+
+    expect(mockUpdateAgent).toHaveBeenCalledWith('a1', { model: 'claude-3' });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/agents/a1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ model: 'claude-3' }),
+      }),
+    );
+  });
+
+  it('fetchGroups calls /lead/:id/groups', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk([{ name: 'group-1' }]);
+
+    await act(async () => {
+      await result.current.fetchGroups('lead-1');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/lead/lead-1/groups', expect.any(Object));
+  });
+
+  it('fetchGroupMessages encodes group name in URL', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk([]);
+
+    await act(async () => {
+      await result.current.fetchGroupMessages('lead-1', 'my group');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/lead/lead-1/groups/my%20group/messages',
+      expect.any(Object),
+    );
+  });
+
+  it('fetchDagStatus calls /lead/:id/dag', async () => {
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    mockFetchOk({ tasks: [] });
+
+    await act(async () => {
+      await result.current.fetchDagStatus('lead-1');
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/lead/lead-1/dag', expect.any(Object));
+  });
+
+  it('initial load errors do not crash the hook', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'));
+    const { result } = renderHook(() => useApi());
+    await act(async () => {});
+    expect(result.current.spawnAgent).toBeDefined();
+    expect(result.current.terminateAgent).toBeDefined();
   });
 });
