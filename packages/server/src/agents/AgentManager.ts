@@ -1209,7 +1209,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this._shuttingDown = true;
     this.heartbeat.stop();
     // Clear all idle nudge timers to prevent firing on disposed agents
-    for (const [id, timer] of this.idleNudgeTimers) {
+    for (const [_id, timer] of this.idleNudgeTimers) {
       clearTimeout(timer);
     }
     this.idleNudgeTimers.clear();

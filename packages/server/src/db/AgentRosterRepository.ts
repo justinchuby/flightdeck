@@ -125,18 +125,7 @@ export class AgentRosterRepository {
     return rows.map((r) => this.rowToRecord(r));
   }
 
-  /** Get agents for a project within a specific session.
-   *  Intended for future session-scoped views; keep even if currently unused. */
-  getByProjectAndSession(projectId: string, sessionId: string): AgentRecord[] {
-    const rows = this.db.drizzle
-      .select()
-      .from(agentRoster)
-      .where(and(eq(agentRoster.projectId, projectId), eq(agentRoster.sessionId, sessionId)))
-      .all();
-    return rows.map((r) => this.rowToRecord(r));
-  }
-
-  updateStatus(agentId: string, status: RosterAgentStatus): boolean {
+    updateStatus(agentId: string, status: RosterAgentStatus): boolean {
     const result = this.db.drizzle
       .update(agentRoster)
       .set({ status, updatedAt: new Date().toISOString() })
