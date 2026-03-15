@@ -144,7 +144,10 @@ export class SessionReplay {
         const discoveredIds = new Set<string>([leadId]);
         for (const ev of allActivities) {
           if (ev.actionType === 'delegated' && discoveredIds.has(ev.agentId)) {
+            // childId is the canonical field; toAgentId appears in direct-message delegations;
+            // spawnedAgentId is a legacy/ghost field (never written by current code, kept for backward compat)
             const childId = (ev.details as Record<string, unknown>)?.childId ??
+              (ev.details as Record<string, unknown>)?.toAgentId ??
               (ev.details as Record<string, unknown>)?.spawnedAgentId;
             if (typeof childId === 'string') discoveredIds.add(childId);
           }
