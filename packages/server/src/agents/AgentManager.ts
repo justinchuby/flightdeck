@@ -860,10 +860,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.dispatcher.clearCompletionTracking(agent.id);
       }, 10000);
 
-      // Schedule removal from Map and dispose after grace period
+      // Schedule removal from Map and dispose after grace period.
+      // Guard: only delete from the Map if the entry still points to THIS
+      // agent instance.  Auto-restart reuses the same ID, so a replacement
+      // agent may already occupy the slot — we must not remove it.
+      const exitedAgent = agent;
       setTimeout(() => {
-        this.agents.delete(agent.id);
-        agent.dispose();
+        if (this.agents.get(exitedAgent.id) === exitedAgent) {
+          this.agents.delete(exitedAgent.id);
+        }
+        exitedAgent.dispose();
       }, 30_000);
 
       if (code !== null && code !== 0 && !isTerminalStatus(agent.status)) {
