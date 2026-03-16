@@ -20,7 +20,7 @@ describe('TAB_LABELS', () => {
   });
 
   it('all values are non-empty strings', () => {
-    for (const [_key, val] of Object.entries(TAB_LABELS)) {
+    for (const val of Object.values(TAB_LABELS)) {
       expect(typeof val).toBe('string');
       expect(val.length).toBeGreaterThan(0);
     }

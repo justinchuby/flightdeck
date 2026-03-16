@@ -80,7 +80,7 @@ vi.mock('../../ProvideFeedback', () => ({
 }));
 
 vi.mock('../../ui/Tabs', () => ({
-  Tabs: ({ tabs, _activeTab, onTabChange }: any) => (
+  Tabs: ({ tabs, onTabChange }: any) => (
     <div data-testid="tabs">
       {tabs.map((t: any) => (
         <button key={t.id} data-testid={`tab-${t.id}`} onClick={() => onTabChange(t.id)}>

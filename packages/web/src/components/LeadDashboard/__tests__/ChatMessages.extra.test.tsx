@@ -32,7 +32,7 @@ vi.mock('../ChatRenderers', () => ({
       {timestamp && <span>{timestamp}</span>}
     </div>
   ),
-  CollapsibleSystemBlock: ({ text, _timestamp }: { text: string; timestamp: string }) => (
+  CollapsibleSystemBlock: ({ text }: { text: string }) => (
     <div data-testid="system-long-block">
       <span>System (long): {text.slice(0, 50)}</span>
     </div>
