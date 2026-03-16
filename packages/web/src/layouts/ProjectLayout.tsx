@@ -363,23 +363,24 @@ export function ProjectLayout() {
           </div>
 
           {/* Tab bar — horizontal scroll on mobile, hide scrollbar */}
-          <div
-            className="flex items-center flex-nowrap overflow-x-auto px-2 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
-            data-testid="project-tab-bar"
-          >
-            <Tabs
-              tabs={PRIMARY_TABS}
-              activeTab={isOverflowTabActive ? '' : activeTab}
-              onTabChange={handleTabChange}
-              size="sm"
-              className="border-b-0 flex-1"
-            />
+          <div className="flex items-center px-2" data-testid="project-tab-bar">
+            <div
+              className="flex items-center flex-nowrap overflow-x-auto flex-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+            >
+              <Tabs
+                tabs={PRIMARY_TABS}
+                activeTab={isOverflowTabActive ? '' : activeTab}
+                onTabChange={handleTabChange}
+                size="sm"
+                className="border-b-0 flex-1"
+              />
+            </div>
 
             {/* Separator */}
             <div className="w-px h-5 bg-th-border mx-1 shrink-0" />
 
-            {/* Overflow menu */}
-            <div className="relative" ref={overflowRef}>
+            {/* Overflow menu — outside scroll container so dropdown isn't clipped */}
+            <div className="relative shrink-0" ref={overflowRef}>
               <button
                 onClick={() => setOverflowOpen(!overflowOpen)}
                 className={`p-2 rounded transition-colors ${
