@@ -17,7 +17,7 @@ beforeEach(() => {
 // Tests
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('Phase 4 Cycle 5 — Shared Components', () => {
+describe('Shared Components', () => {
 
   // ── EmptyState ────────────────────────────────────────────────────────
   describe('Shared — EmptyState', () => {
