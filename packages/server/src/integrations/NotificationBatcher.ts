@@ -65,8 +65,6 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
 
   static readonly BATCH_WINDOW_MS = 5_000;
 
-
-
   /** Categories that bypass the batch window and deliver immediately. */
   static readonly CRITICAL_CATEGORIES: ReadonlySet<string> = new Set([
     'agent_crashed',

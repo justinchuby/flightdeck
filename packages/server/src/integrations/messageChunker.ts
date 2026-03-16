@@ -5,7 +5,7 @@
 /** Telegram's maximum message length. */
 const TELEGRAM_MAX_LENGTH = 4096;
 
-/** Part indicator suffix like " (2/3)" — max 8 chars. */
+/** Part indicator suffix like " (2/3)" — max 8 chars, supports up to 99 parts. */
 const PART_SUFFIX_MAX = 8;
 
 /** Effective max per chunk, reserving space for part indicator. */

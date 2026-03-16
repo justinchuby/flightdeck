@@ -20,8 +20,6 @@ import type { ConfigStore } from '../config/ConfigStore.js';
 /** Session TTL: 8 hours (AI crew sessions run for extended periods). */
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
-
-
 /**
  * IntegrationRouter — Layer 2 of the 3-layer messaging architecture.
  *
