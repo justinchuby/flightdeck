@@ -84,7 +84,10 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
 | `conversations` | Links a conversation to an agent and optionally a task | `id` (text) |
-| `messages` | Chat messages within a conversation (sender, content, timestamp) | `id` (auto-increment) |
+| `messages` | Chat messages within a conversation (sender, content, role, timestamp) | `id` (auto-increment) |
+
+**Notable columns:**
+- `messages.from_role` — role of the sender (e.g. `developer`, `lead`), used for external message persistence
 
 ### Configuration
 
@@ -113,23 +116,39 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `dag_tasks` | DAG task graph — dependencies, status, priority, assigned agent | `(id, lead_id)` composite |
+| `dag_tasks` | DAG task graph — dependencies, status, priority, assigned agent, team | `(id, lead_id)` composite |
 | `agent_memory` | Key-value memory store per agent, scoped to a lead | `id` (auto-increment), unique on `(lead_id, agent_id, key)` |
 | `agent_plans` | Persisted agent plan entries (JSON array of plan steps) | `agent_id` (text) |
+
+**Notable columns on `dag_tasks`:**
+- `team_id` — multi-team support (default: `'default'`)
+- `failure_reason` — populated when a task fails (agent exit, error message)
+- `archived_at` — soft-delete timestamp for `RESET_DAG` (hidden from active views, preserved for history)
+- `overridden_by` — ID of the task that supersedes this one (nullable)
 
 ### Projects
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `projects` | Persistent project definitions surviving lead sessions (name, cwd, status, model config) | `id` (text) |
+| `projects` | Persistent project definitions surviving lead sessions (name, cwd, status, model config, oversight level) | `id` (text) |
 | `project_sessions` | Links a lead session to a project, tracking session role, task, and lifecycle | `id` (auto-increment), FK `project_id` → `projects` |
+
+**Notable columns on `projects`:**
+- `oversight_level` — per-project oversight override: `null` (inherit global), `'supervised'`, `'balanced'`, or `'autonomous'`
+- `model_config` — JSON mapping role → allowed model IDs
 
 ### Agent Registry & Delegation
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `agent_roster` | Persistent agent registry surviving server restarts (role, model, status, team) | `agent_id` (text) |
-| `active_delegations` | In-flight task assignments from lead to child agents (task, status, result) | `delegation_id` (text), FK `agent_id` → `agent_roster` |
+| `agent_roster` | Persistent agent registry surviving server restarts (role, model, provider, status, team) | `agent_id` (text) |
+| `active_delegations` | In-flight task assignments from lead to child agents (task, status, team, result) | `delegation_id` (text), FK `agent_id` → `agent_roster` |
+
+**Notable columns on `agent_roster`:**
+- `provider` — which CLI provider this agent uses (e.g. `copilot`, `claude`, `gemini`)
+- `team_id` — multi-team support (default: `'default'`)
+- `session_id` — SDK session ID, indexed for cross-session filtering
+- `metadata` — JSON blob for extensible data
 
 ### Knowledge & Memory
 
@@ -143,8 +162,13 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
 | `agent_file_history` | Tracks which files each agent has touched during a session (touch count, timestamps) | `(agent_id, lead_id, file_path)` composite |
-| `task_cost_records` | Token usage attribution per agent per DAG task (input/output tokens) | `(agent_id, dag_task_id, lead_id)` composite |
+| `task_cost_records` | Token usage attribution per agent per DAG task (input/output/cache tokens, USD cost) | `(agent_id, dag_task_id, lead_id)` composite |
 | `session_retros` | Session retrospective data captured when sessions end (JSON blob) | `id` (auto-increment) |
+
+**Notable columns on `task_cost_records`:**
+- `cache_read_tokens` / `cache_write_tokens` — prompt cache token tracking
+- `cost_usd` — estimated cost in USD
+- `project_id` — indexed for per-project cost aggregation
 
 ### Infrastructure
 
