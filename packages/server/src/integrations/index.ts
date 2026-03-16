@@ -4,6 +4,7 @@
 export { IntegrationRouter } from './IntegrationRouter.js';
 export { TelegramAdapter } from './TelegramAdapter.js';
 export { NotificationBatcher } from './NotificationBatcher.js';
+export { chunkMessage } from './messageChunker.js';
 export type {
   MessagingPlatform,
   InboundMessage,

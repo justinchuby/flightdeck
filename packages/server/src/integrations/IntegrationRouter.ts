@@ -20,15 +20,7 @@ import type { ConfigStore } from '../config/ConfigStore.js';
 /** Session TTL: 8 hours (AI crew sessions run for extended periods). */
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
-/** Telegram maximum message length (4096 chars). Truncate with suffix if exceeded. */
-const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
-const TRUNCATION_SUFFIX = '\n… (truncated)';
 
-/** Truncate text to fit within Telegram's message length limit. */
-function truncateForTelegram(text: string): string {
-  if (text.length <= TELEGRAM_MAX_MESSAGE_LENGTH) return text;
-  return text.slice(0, TELEGRAM_MAX_MESSAGE_LENGTH - TRUNCATION_SUFFIX.length) + TRUNCATION_SUFFIX;
-}
 
 /**
  * IntegrationRouter — Layer 2 of the 3-layer messaging architecture.
@@ -460,7 +452,7 @@ export class IntegrationRouter {
     adapter.sendMessage({
       platform: pending.platform as 'telegram' | 'slack',
       chatId: pending.chatId,
-      text: truncateForTelegram(text),
+      text,
       replyToMessageId: messageId,
     }).catch((err) => {
       logger.warn({ module: 'integration-router', msg: 'Reply delivery failed', messageId, error: (err as Error).message });
@@ -493,7 +485,7 @@ export class IntegrationRouter {
     adapter.sendMessage({
       platform: session.platform,
       chatId: session.chatId,
-      text: truncateForTelegram(text),
+      text,
     }).catch((err) => {
       logger.warn({ module: 'integration-router', msg: 'sendToProject delivery failed', projectId, error: (err as Error).message });
     });

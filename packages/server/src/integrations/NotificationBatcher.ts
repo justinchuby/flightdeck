@@ -65,9 +65,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
 
   static readonly BATCH_WINDOW_MS = 5_000;
 
-  /** Telegram maximum message length. Truncate with suffix if exceeded. */
-  static readonly MAX_MESSAGE_LENGTH = 4096;
-  private static readonly TRUNCATION_SUFFIX = '\n… (truncated)';
+
 
   /** Categories that bypass the batch window and deliver immediately. */
   static readonly CRITICAL_CATEGORIES: ReadonlySet<string> = new Set([
@@ -318,15 +316,10 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
         ? formatted
         : this.formatBatch(filtered);
 
-      // Truncate to Telegram's 4096 char limit
-      const truncatedText = text.length > NotificationBatcher.MAX_MESSAGE_LENGTH
-        ? text.slice(0, NotificationBatcher.MAX_MESSAGE_LENGTH - NotificationBatcher.TRUNCATION_SUFFIX.length) + NotificationBatcher.TRUNCATION_SUFFIX
-        : text;
-
       const outbound: OutboundMessage = {
         platform: 'telegram',
         chatId: sub.chatId,
-        text: truncatedText,
+        text,
       };
 
       for (const adapter of this.adapters) {

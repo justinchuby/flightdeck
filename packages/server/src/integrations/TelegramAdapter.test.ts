@@ -299,6 +299,69 @@ describe('TelegramAdapter', () => {
     expect(mockSendMessage).toHaveBeenCalledWith('123', 'Hello from Flightdeck', undefined);
   });
 
+  it('sends multiple messages for long text', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const longText = 'a'.repeat(5000);
+    await adapter.sendMessage({
+      platform: 'telegram',
+      chatId: '123',
+      text: longText,
+    });
+
+    // chunkMessage will split this into 2 chunks
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    // Each sent chunk should be ≤ 4096
+    for (const call of mockSendMessage.mock.calls) {
+      expect(call[1].length).toBeLessThanOrEqual(4096);
+    }
+  });
+
+  it('only thread-replies the first chunk', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const longText = 'a'.repeat(5000);
+    await adapter.sendMessage({
+      platform: 'telegram',
+      chatId: '123',
+      text: longText,
+      replyToMessageId: '42',
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    // First call should have reply_parameters
+    const firstCallOpts = mockSendMessage.mock.calls[0][2];
+    expect(firstCallOpts).toHaveProperty('reply_parameters');
+    // Second call should NOT have reply_parameters
+    const secondCallOpts = mockSendMessage.mock.calls[1][2];
+    expect(secondCallOpts).toBeUndefined();
+  });
+
+  it('enqueues remaining chunks on send failure', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    // Fail on the second chunk
+    mockSendMessage
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    const longText = 'a'.repeat(5000);
+    await adapter.sendMessage({
+      platform: 'telegram',
+      chatId: '123',
+      text: longText,
+    });
+
+    // First chunk sent, second failed
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    // Retry queue should have the remaining content
+    const snapshot = adapter.getRetryQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+  });
+
   it('sends with parse mode', async () => {
     adapter = new TelegramAdapter(createConfig());
     await adapter.start();

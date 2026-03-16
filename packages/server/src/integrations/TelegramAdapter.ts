@@ -4,6 +4,7 @@
 
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import { logger } from '../utils/logger.js';
+import { chunkMessage } from './messageChunker.js';
 import type {
   MessagingAdapter,
   MessagingPlatform,
@@ -172,32 +173,38 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     logger.info({ module: 'telegram', msg: 'Telegram bot stopped' });
   }
 
-  /** Send a message to a Telegram chat. Supports reply threading via replyToMessageId. */
+  /** Send a message to a Telegram chat. Splits long messages into chunks. */
   async sendMessage(message: OutboundMessage): Promise<void> {
     if (!this.bot) {
       logger.warn({ module: 'telegram', msg: 'Cannot send message — bot not running' });
       return;
     }
 
-    try {
-      const opts: Record<string, unknown> = {};
-      if (message.parseMode) opts.parse_mode = message.parseMode;
-      if (message.replyToMessageId) {
-        opts.reply_parameters = { message_id: Number(message.replyToMessageId) };
+    const chunks = chunkMessage(message.text);
+    for (let i = 0; i < chunks.length; i++) {
+      try {
+        const opts: Record<string, unknown> = {};
+        if (message.parseMode) opts.parse_mode = message.parseMode;
+        // Only thread-reply the first chunk
+        if (i === 0 && message.replyToMessageId) {
+          opts.reply_parameters = { message_id: Number(message.replyToMessageId) };
+        }
+        await this.bot.api.sendMessage(
+          message.chatId,
+          chunks[i],
+          Object.keys(opts).length > 0 ? opts : undefined,
+        );
+      } catch (err) {
+        logger.warn({
+          module: 'telegram',
+          msg: 'Failed to send Telegram message',
+          chatId: message.chatId,
+          error: (err as Error).message,
+        });
+        // Enqueue remaining chunks as a single retry message
+        this.enqueueRetry({ ...message, text: chunks.slice(i).join('\n\n') });
+        break;
       }
-      await this.bot.api.sendMessage(
-        message.chatId,
-        message.text,
-        Object.keys(opts).length > 0 ? opts : undefined,
-      );
-    } catch (err) {
-      logger.warn({
-        module: 'telegram',
-        msg: 'Failed to send Telegram message',
-        chatId: message.chatId,
-        error: (err as Error).message,
-      });
-      this.enqueueRetry(message);
     }
   }
 

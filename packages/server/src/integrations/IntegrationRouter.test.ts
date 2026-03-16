@@ -642,7 +642,7 @@ describe('IntegrationRouter', () => {
       expect(session.expiresAt).toBeGreaterThan(shortExpiry);
     });
 
-    it('truncates messages exceeding Telegram max length', async () => {
+    it('passes full text to adapter (chunking handled by adapter)', async () => {
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
       await enableTelegram(configStore);
@@ -655,8 +655,8 @@ describe('IntegrationRouter', () => {
 
       const adapter = agent.getAdapter('telegram')!;
       const sentText = (adapter.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0].text;
-      expect(sentText.length).toBeLessThanOrEqual(4096);
-      expect(sentText).toContain('… (truncated)');
+      // Router no longer truncates — full text is passed to adapter for chunking
+      expect(sentText).toBe(longMessage);
     });
   });
 

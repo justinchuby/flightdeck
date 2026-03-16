@@ -516,7 +516,7 @@ describe('NotificationBatcher', () => {
     expect(adapter.sentMessages).toHaveLength(1); // still 1, no orphaned flush
   });
 
-  it('truncates outbound messages exceeding Telegram max length', () => {
+  it('passes full text to adapter (chunking handled by adapter layer)', () => {
     const adapter = createMockAdapter();
     bridge.addAdapter(adapter);
     bridge.subscribe('chat-1', 'project-1');
@@ -530,7 +530,7 @@ describe('NotificationBatcher', () => {
     }));
 
     expect(adapter.sentMessages).toHaveLength(1);
-    expect(adapter.sentMessages[0].text.length).toBeLessThanOrEqual(NotificationBatcher.MAX_MESSAGE_LENGTH);
-    expect(adapter.sentMessages[0].text).toContain('… (truncated)');
+    // Batcher no longer truncates — full text is passed to adapter for chunking
+    expect(adapter.sentMessages[0].text).toContain(longBody);
   });
 });
