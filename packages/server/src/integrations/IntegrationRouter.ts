@@ -350,34 +350,6 @@ export class IntegrationRouter {
       userId: sanitizeInput(msg.userId),
     };
 
-    // Check bind command FIRST — it works even without an existing session
-    if (sanitizedMsg.text.startsWith('bind ')) {
-      const projectId = sanitizedMsg.text.slice(5).trim();
-      if (!projectId) {
-        const adapter = this.adapters.get(msg.platform);
-        adapter?.sendMessage({
-          platform: msg.platform,
-          chatId: msg.chatId,
-          text: '⚠️ Usage: bind <project-id>',
-        }).catch((err) => {
-          logger.warn({ module: 'integration-router', msg: 'Failed to send bind usage hint', error: (err as Error).message });
-        });
-        return;
-      }
-      this.bindSession(msg.chatId, msg.platform, projectId, msg.userId);
-      const adapter = this.adapters.get(msg.platform);
-      if (adapter) {
-        adapter.sendMessage({
-          platform: msg.platform,
-          chatId: msg.chatId,
-          text: `✅ Chat bound to project: ${projectId}`,
-        }).catch((err) => {
-          logger.warn({ module: 'integration-router', msg: 'Failed to send bind confirmation', error: (err as Error).message });
-        });
-      }
-      return;
-    }
-
     const session = this.getSession(msg.chatId);
 
     if (!session) {
@@ -387,7 +359,7 @@ export class IntegrationRouter {
         adapter.sendMessage({
           platform: msg.platform,
           chatId: msg.chatId,
-          text: 'No active project session. Use /projects to see available projects, then send "bind <project-id>" to connect this chat.',
+          text: 'No active project session. Open Flightdeck Settings → Telegram to bind this chat to a project.',
         }).catch((err) => {
           logger.warn({ module: 'integration-router', msg: 'Failed to send no-session hint', error: (err as Error).message });
         });

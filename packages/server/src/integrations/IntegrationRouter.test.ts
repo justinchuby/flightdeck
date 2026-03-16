@@ -320,21 +320,17 @@ describe('IntegrationRouter', () => {
     expect(active).toHaveLength(0);
   });
 
-  // ── Regression: C1 — bind command was unreachable ─────
+  // ── Security: bind command removed — must use challenge-response ─────
 
-  it('processes bind command even without an active session', async () => {
+  it('returns Settings UI guidance when unbound chat sends bind-like message', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
     await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
-    expect(adapter.onMessage).toHaveBeenCalled();
-
-    // Get the message handler
     const msgHandler = adapter._messageHandlers[0];
-    expect(msgHandler).toBeDefined();
 
-    // Send bind command without any existing session
+    // Send a "bind project-1" message without any existing session
     msgHandler({
       platform: 'telegram',
       chatId: 'new-chat',
@@ -344,10 +340,16 @@ describe('IntegrationRouter', () => {
       receivedAt: Date.now(),
     });
 
-    // Session should have been created
+    // No session should be created — bind command is removed
     const session = agent.getSession('new-chat');
-    expect(session).toBeDefined();
-    expect(session!.projectId).toBe('project-1');
+    expect(session).toBeUndefined();
+
+    // Should send the Settings UI guidance message instead
+    expect(adapter.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Flightdeck Settings'),
+      }),
+    );
   });
 
   // ── Regression: M6 — role renders as [object Object] ──
