@@ -43,7 +43,6 @@ vi.mock('../components/OrgChart/OrgChart', () => mockComp('OrgChart'));
 vi.mock('../components/OverviewPage/OverviewPage', () => mockComp('OverviewPage'));
 vi.mock('../components/GroupChat/GroupChat', () => mockComp('GroupChat'));
 vi.mock('../components/Timeline', () => mockComp('TimelinePage'));
-vi.mock('../components/Canvas', () => mockComp('CanvasPage'));
 vi.mock('../components/Analytics', () => mockComp('AnalyticsPage'));
 vi.mock('../components/AnalysisPage', () => mockComp('AnalysisPage'));
 vi.mock('../components/SessionReplay', () => mockComp('SharedReplayViewer'));

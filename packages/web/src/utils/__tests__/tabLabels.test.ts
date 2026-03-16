@@ -9,7 +9,6 @@ describe('TAB_LABELS', () => {
     expect(TAB_LABELS.agents).toBe('Agents');
     expect(TAB_LABELS.knowledge).toBe('Knowledge');
     expect(TAB_LABELS.timeline).toBe('Timeline');
-    expect(TAB_LABELS.canvas).toBe('Canvas');
   });
 
   it('handles org-chart key', () => {

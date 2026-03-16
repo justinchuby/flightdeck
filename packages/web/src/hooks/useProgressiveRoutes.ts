@@ -29,7 +29,6 @@ const ALL_ROUTES: ProgressiveRoute[] = [
   { path: '/tasks', label: 'Tasks', icon: '📋', tier: 'active' },
   { path: '/timeline', label: 'Timeline', icon: '📅', tier: 'active' },
   // Collaboration
-  { path: '/canvas', label: 'Canvas', icon: '🎨', tier: 'collaboration' },
   { path: '/mission-control', label: 'Mission Control', icon: '🚀', tier: 'collaboration' },
   // Power user
   { path: '/analytics', label: 'Analytics', icon: '📈', tier: 'power' },

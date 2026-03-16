@@ -21,7 +21,6 @@ import {
   MessageSquare,
   Network,
   BarChart3,
-  Workflow,
   MoreHorizontal,
   TrendingUp,
 } from 'lucide-react';
@@ -69,7 +68,6 @@ interface OverflowItem {
 
 const OVERFLOW_ITEMS: OverflowItem[] = [
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={14} /> },
-  { id: 'canvas',    label: 'Canvas',    icon: <Workflow size={14} /> },
 ];
 
 const ALL_TAB_IDS = new Set([

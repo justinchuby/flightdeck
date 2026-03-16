@@ -16,5 +16,4 @@ export const TAB_LABELS: Record<string, string> = {
   groups:      'Groups',
   'org-chart': 'Org Chart',
   analytics:   'Analytics',
-  canvas:      'Canvas',
 };

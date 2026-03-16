@@ -40,7 +40,6 @@ const OrgChart = lazy(() => import('./components/OrgChart/OrgChart').then(m => (
 const OverviewPage = lazy(() => import('./components/OverviewPage/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m => ({ default: m.GroupChat })));
 const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
-const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
 const AnalysisPage = lazy(() => import('./components/AnalysisPage').then(m => ({ default: m.AnalysisPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
@@ -389,7 +388,6 @@ function AppContent() {
               <Route path="org-chart" element={<RouteErrorBoundary name="Org Chart"><OrgChart /></RouteErrorBoundary>} />
               <Route path="analytics" element={<RouteErrorBoundary name="Analytics"><AnalyticsPage /></RouteErrorBoundary>} />
               <Route path="analysis" element={<RouteErrorBoundary name="Analysis"><AnalysisPage /></RouteErrorBoundary>} />
-              <Route path="canvas" element={<RouteErrorBoundary name="Canvas"><CanvasPage /></RouteErrorBoundary>} />
             </Route>
 
             {/* ── Global (non-project-scoped) routes ───────────── */}
@@ -410,7 +408,6 @@ function AppContent() {
             <Route path="/groups" element={<ProjectRedirect page="groups" />} />
             <Route path="/org" element={<ProjectRedirect page="org-chart" />} />
             <Route path="/analytics" element={<ProjectRedirect page="analytics" />} />
-            <Route path="/canvas" element={<ProjectRedirect page="canvas" />} />
             <Route path="/mission-control" element={<ProjectRedirect page="overview" />} />
             <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
 

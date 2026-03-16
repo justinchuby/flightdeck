@@ -179,7 +179,6 @@ describe('ProjectLayout', () => {
     await renderLayout();
     fireEvent.click(screen.getByTestId('overflow-menu'));
     expect(screen.getByTestId('overflow-item-analytics')).toBeInTheDocument();
-    expect(screen.getByTestId('overflow-item-canvas')).toBeInTheDocument();
   });
 
   it('navigates on overflow item click and closes dropdown', async () => {

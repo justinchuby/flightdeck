@@ -39,7 +39,6 @@ function buildNavigationItems(
     { path: '/data', label: 'Go to Data Browser', icon: '🗄️', shortcut: 'G D', keywords: ['data', 'database', 'browser'] },
     { path: '/timeline', label: 'Go to Timeline', icon: '📅', shortcut: 'G I', keywords: ['timeline', 'history', 'events'] },
     { path: '/mission-control', label: 'Go to Mission Control', icon: '🚀', shortcut: 'G M', keywords: ['mission', 'control', 'dashboard'] },
-    { path: '/canvas', label: 'Go to Canvas', icon: '🎨', shortcut: 'G V', keywords: ['canvas', 'flow', 'graph', 'visual'] },
     { path: '/analytics', label: 'Go to Analytics', icon: '📈', shortcut: 'G N', keywords: ['analytics', 'cost', 'metrics'] },
     { path: '/settings', label: 'Go to Settings', icon: '⚙️', shortcut: 'G S', keywords: ['settings', 'preferences', 'config'] },
   ];

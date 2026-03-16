@@ -301,15 +301,15 @@ describe('NLCommandRegistry', () => {
     expect(matchNLCommand('hi')).toBeNull();
   });
 
-  it('getNLPaletteItems returns 28 items', () => {
+  it('getNLPaletteItems returns 27 items', () => {
     const items = getNLPaletteItems(vi.fn());
-    expect(items).toHaveLength(28);
+    expect(items).toHaveLength(27);
     expect(items[0].type).toBe('nl-command');
   });
 
-  it('getAllPatterns returns 28 patterns', () => {
+  it('getAllPatterns returns 27 patterns', () => {
     const patterns = getAllPatterns();
-    expect(patterns).toHaveLength(28);
+    expect(patterns).toHaveLength(27);
     expect(patterns[0]).toHaveProperty('id');
     expect(patterns[0]).toHaveProperty('phrases');
   });
@@ -508,8 +508,8 @@ describe('useProgressiveRoutes', () => {
 
     render(<TestHarness />);
     expect(screen.getByTestId('tier').textContent).toBe('power');
-    // Power tier: all 12 routes visible
-    expect(screen.getByTestId('visible').textContent).toBe('12');
+    // Power tier: all 11 routes visible
+    expect(screen.getByTestId('visible').textContent).toBe('11');
   });
 
   it('returns power tier when session-count >= 3', () => {

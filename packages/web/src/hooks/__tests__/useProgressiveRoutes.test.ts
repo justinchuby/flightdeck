@@ -64,7 +64,7 @@ describe('useProgressiveRoutes', () => {
 
   it('allRoutes contains all defined routes', () => {
     const { result } = renderHook(() => useProgressiveRoutes());
-    expect(result.current.allRoutes.length).toBeGreaterThanOrEqual(12);
+    expect(result.current.allRoutes.length).toBeGreaterThanOrEqual(11);
   });
 
   it('visible + hidden = all', () => {

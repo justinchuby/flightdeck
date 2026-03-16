@@ -48,7 +48,6 @@ vi.mock('../components/OrgChart/OrgChart', () => mockComp('OrgChart'));
 vi.mock('../components/OverviewPage/OverviewPage', () => mockComp('OverviewPage'));
 vi.mock('../components/GroupChat/GroupChat', () => mockComp('GroupChat'));
 vi.mock('../components/Timeline', () => mockComp('TimelinePage'));
-vi.mock('../components/Canvas', () => mockComp('CanvasPage'));
 vi.mock('../components/Analytics', () => mockComp('AnalyticsPage'));
 vi.mock('../components/AnalysisPage', () => mockComp('AnalysisPage'));
 vi.mock('../components/SessionReplay', () => mockComp('SharedReplayViewer'));
@@ -300,12 +299,6 @@ describe('AppRoutes – project-scoped routes', () => {
     });
   });
 
-  it('/projects/p1/canvas renders CanvasPage', async () => {
-    renderApp('/projects/p1/canvas');
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-CanvasPage')).toBeInTheDocument();
-    });
-  });
 });
 
 describe('AppRoutes – backward-compat redirects', () => {
@@ -732,12 +725,6 @@ describe('AppRoutes – additional flat redirects', () => {
     });
   });
 
-  it('/canvas redirects via ProjectRedirect (to /projects when no lead)', async () => {
-    renderApp('/canvas');
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-ProjectsPanel')).toBeInTheDocument();
-    });
-  });
 
   it('/mission-control redirects via ProjectRedirect (to /projects when no lead)', async () => {
     renderApp('/mission-control');
