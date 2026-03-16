@@ -29,8 +29,6 @@ Agents need to talk to each other — not just to you.
 - **Broadcasts** — one agent can announce to the entire crew
 - **Priority routing** — your messages always go to the front of the queue
 
-![Canvas View — see agent relationships and real-time message flow](/screenshots/canvas.png)
-
 When the architect needs to align with three developers on an interface, they create a group chat. Everyone sees the same context. No telephone game, no duplicated conversations.
 
 ### 📋 Task DAG
