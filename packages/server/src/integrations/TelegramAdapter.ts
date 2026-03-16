@@ -127,14 +127,6 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     }, 60_000);
     this.rateLimitCleanupTimer.unref();
 
-    // Drop any leftover webhook/getUpdates connection from a previous
-    // instance (e.g. after a crash) to avoid 409 Conflict errors.
-    try {
-      await this.bot.api.deleteWebhook({ drop_pending_updates: false });
-    } catch {
-      // Best-effort — if this fails, bot.start() will still attempt polling
-    }
-
     // Start long polling (non-blocking)
     this.bot.start({
       allowed_updates: ['message'],
