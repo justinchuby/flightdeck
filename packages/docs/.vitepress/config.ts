@@ -67,7 +67,6 @@ export default defineConfig({
             { text: 'Cost & Token Tracking', link: '/guide/cost-tracking' },
             { text: 'Analytics', link: '/guide/analytics' },
             { text: 'Data Management', link: '/guide/data-management' },
-            { text: 'Telegram Integration', link: '/guide/telegram-integration' },
           ],
         },
         {
