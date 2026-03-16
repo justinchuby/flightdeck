@@ -64,7 +64,6 @@ export default defineConfig({
             { text: 'Command Palette', link: '/guide/command-palette' },
             { text: 'Intent Rules', link: '/guide/intent-rules' },
             { text: 'Data Management', link: '/guide/data-management' },
-            { text: 'GitHub Integration', link: '/guide/github-integration' },
             { text: 'Mobile PWA', link: '/guide/mobile' },
           ],
         },
@@ -113,7 +112,6 @@ export default defineConfig({
           text: 'Feature APIs (Internal)',
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
-            { text: 'GitHub & Conflicts', link: '/reference/github-api' },
           ],
         },
         {
@@ -146,7 +144,6 @@ export default defineConfig({
           text: 'Feature APIs (Internal)',
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
-            { text: 'GitHub & Conflicts', link: '/reference/github-api' },
           ],
         },
         {
