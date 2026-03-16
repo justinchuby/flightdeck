@@ -39,7 +39,7 @@ function truncateForTelegram(text: string): string {
  * IntegrationRouter is a deterministic router (no LLM) that:
  * 1. Manages platform adapters (Telegram, future: Slack)
  * 2. Routes inbound messages to the correct project lead
- * 3. Maintains chat ↔ project session bindings (in-memory, 1h TTL)
+ * 3. Maintains chat ↔ project session bindings (in-memory, 8h TTL)
  * 4. Registers command handlers on adapters (/status, /projects, /agents, /help)
  * 5. Coordinates with NotificationBatcher for outbound event delivery
  */
