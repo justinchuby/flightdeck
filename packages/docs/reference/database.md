@@ -93,7 +93,7 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `roles` | Agent role definitions (name, system prompt, color, icon, model) | `id` (text) |
+| `roles` | Agent role definitions (name, description, system prompt, color, icon, model, built-in flag) | `id` (text) |
 | `settings` | Key-value settings store (max agents, host, etc.) | `key` (text) |
 
 ### Coordination
@@ -102,7 +102,11 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 |-------|---------|-------------|
 | `file_locks` | Active file locks with agent ownership, reason, and TTL expiry | `file_path` (text) |
 | `activity_log` | Append-only log of all agent actions (bounded to 10,000 entries) | `id` (auto-increment) |
-| `decisions` | Architectural decisions logged by agents, with optional user confirmation | `id` (text) |
+| `decisions` | Architectural decisions logged by agents, with optional user confirmation and auto-approval flag | `id` (text) |
+
+**Notable columns on `decisions`:**
+- `autoApproved` — integer flag (0/1) indicating if the decision was auto-approved by the system
+- `needsConfirmation` — integer flag (0/1) for decisions requiring human review
 
 ### Chat Groups
 
@@ -130,7 +134,7 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `projects` | Persistent project definitions surviving lead sessions (name, cwd, status, model config, oversight level) | `id` (text) |
+| `projects` | Persistent project definitions surviving lead sessions (name, description, cwd, status, model config, oversight level) | `id` (text) |
 | `project_sessions` | Links a lead session to a project, tracking session role, task, and lifecycle | `id` (auto-increment), FK `project_id` → `projects` |
 
 **Notable columns on `projects`:**
@@ -154,7 +158,7 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 
 | Table | Purpose | Primary Key |
 |-------|---------|-------------|
-| `collective_memory` | Shared team knowledge persisting across sessions (category/key/value, usage tracking) | `id` (auto-increment), unique on `(category, key, project_id)` |
+| `collective_memory` | Shared team knowledge persisting across sessions (category/key/value, source agent, usage tracking) | `id` (auto-increment), unique on `(category, key, project_id)` |
 | `knowledge` | Per-project 4-tier memory store (core, episodic, procedural, semantic) | `id` (auto-increment), unique on `(project_id, category, key)` |
 
 ### Observability
@@ -176,6 +180,12 @@ The schema defines 25 tables across 10 functional areas. All definitions are in 
 |-------|---------|-------------|
 | `timers` | Agent-created timers and reminders (delay, fire time, repeat, status) | `id` (text) |
 | `message_queue` | Queued inter-agent messages for crash-safe delivery (type, payload, attempts) | `id` (auto-increment) |
+
+### Legacy Tables
+
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `deferred_issues` | Originally for tracking deferred code issues (lead-scoped, status-tracked) | ⚠️ Orphaned — exists in DB via migration 0004 but removed from schema.ts. Not accessible via Drizzle ORM. |
 
 ## Agent Plan Persistence
 
