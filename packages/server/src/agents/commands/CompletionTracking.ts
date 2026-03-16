@@ -50,8 +50,11 @@ export function formatNewlyReadyMessage(
 
 export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): void {
   if (!agent.parentId) return;
-  // Secretary is a background agent that cycles frequently — suppress noise
-  if (agent.role.id === 'secretary') return;
+  // Only send completion reports for agents with assigned work.
+  // Agents cycling without a task or delegation (e.g., secretary, idle pools) shouldn't produce reports.
+  const hasWork = agent.task || agent.dagTaskId
+    || Array.from(ctx.delegations.values()).some(d => d.toAgentId === agent.id && d.status === 'active');
+  if (!hasWork) return;
   const parent = ctx.getAgent(agent.parentId);
   if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
 
@@ -187,8 +190,10 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
     }
   }
 
+  let hadActiveDelegation = false;
   for (const [, del] of ctx.delegations) {
     if (del.toAgentId === agent.id && del.status === 'active') {
+      hadActiveDelegation = true;
       del.status = exitCode === 0 ? 'completed' : 'failed';
       del.completedAt = new Date().toISOString();
       del.result = redact(agent.getTaskOutput(16000)).text;
@@ -201,9 +206,9 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
     }
   }
 
-  // Secretary is a background agent that cycles frequently — suppress report noise
-  // but still complete delegations above
-  if (agent.role.id === 'secretary') return;
+  // Only send exit reports for agents with assigned work.
+  // Agents cycling without a task or delegation shouldn't produce reports, but still complete delegations above.
+  if (!agent.task && !agent.dagTaskId && !hadActiveDelegation) return;
 
   const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
   const rawOutput2 = agent.getTaskOutput(16000);
