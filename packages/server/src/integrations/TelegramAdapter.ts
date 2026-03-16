@@ -140,10 +140,11 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
 
     this.abortController = new AbortController();
 
-    // Start long polling (non-blocking). Pass abort signal for instant shutdown.
+    // Start long polling (non-blocking).
+    // Shutdown is handled by bot.stop() in stop(), with abortController
+    // used to track intentional shutdown and suppress AbortError warnings.
     this.bot.start({
       allowed_updates: ['message'],
-      signal: this.abortController.signal,
       onStart: () => {
         logger.info({ module: 'telegram', msg: 'Telegram bot started (long polling)' });
         this.running = true;

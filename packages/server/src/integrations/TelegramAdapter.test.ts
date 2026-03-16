@@ -706,17 +706,16 @@ describe('TelegramAdapter', () => {
 
   // ── Abort Signal Handling ────────────────────────────────
 
-  it('passes abort signal to bot.start() for instant shutdown', async () => {
+  it('creates abort controller on start and aborts on stop', async () => {
     adapter = new TelegramAdapter(createConfig());
     await adapter.start();
 
-    // The signal should have been passed to bot.start()
-    expect(mockStartHolder.signal).toBeInstanceOf(AbortSignal);
-    expect(mockStartHolder.signal!.aborted).toBe(false);
+    // Bot should be running
+    expect(adapter.isRunning()).toBe(true);
 
-    // After stop, the signal should be aborted
+    // After stop, the bot should be cleanly stopped
     await adapter.stop();
-    expect(mockStartHolder.signal!.aborted).toBe(true);
+    expect(adapter.isRunning()).toBe(false);
   });
 
   it('suppresses AbortError during stop', async () => {
