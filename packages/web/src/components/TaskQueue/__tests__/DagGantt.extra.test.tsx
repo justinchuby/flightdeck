@@ -98,7 +98,7 @@ describe('DagGantt — extra coverage', () => {
 
   it('renders assignee text on task bar', () => {
     const tasks = [makeTask({ id: 'task-1', status: 'running', assignee: 'dev-agent' })];
-    const { _container } = render(<DagGantt tasks={tasks} />);
+    render(<DagGantt tasks={tasks} />);
     expect(screen.getByText('dev-agent')).toBeInTheDocument();
   });
 
@@ -115,7 +115,7 @@ describe('DagGantt — extra coverage', () => {
 
   it('renders skipped tasks', () => {
     const tasks = [makeTask({ id: 'skipped-task', title: 'Skipped Work', status: 'skipped' })];
-    const { _container } = render(<DagGantt tasks={tasks} />);
+    render(<DagGantt tasks={tasks} />);
     expect(screen.getByText('Skipped Work')).toBeInTheDocument();
   });
 

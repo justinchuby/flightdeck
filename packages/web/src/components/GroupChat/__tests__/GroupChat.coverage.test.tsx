@@ -289,7 +289,7 @@ describe('GroupChat – coverage gaps', () => {
     });
     mockApiFetch.mockResolvedValue([mockGroups[0]]);
 
-    const { _container } = await act(async () => render(<GroupChat />));
+    await act(async () => render(<GroupChat />));
 
     await waitFor(() => {
       expect(screen.getByText('backend-team')).toBeDefined();

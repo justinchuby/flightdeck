@@ -98,7 +98,6 @@ describe('CrewStatusContent', () => {
   });
 });
 
-const _storeState = { agents: [] as any[], setSelectedAgent: vi.fn() };
 
 
 

@@ -485,7 +485,7 @@ describe('AcpOutput', () => {
       makeMsg('Agent reply 1', 'agent', 2000),
       makeMsg('Agent reply 2', 'agent', 3000),
     ]);
-    const { _container } = await renderAcpOutput();
+    await renderAcpOutput();
     // The pinned banner should appear (Virtuoso mock doesn't fire atBottomStateChange, so atBottom stays true initially).
     // We need to simulate atBottom=false. The banner checks !atBottom, but the mock Virtuoso never fires atBottomStateChange.
     // So in the mock environment, atBottom defaults to true and the banner won't show.

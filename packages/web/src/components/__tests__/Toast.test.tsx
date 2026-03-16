@@ -132,7 +132,7 @@ describe('ToastContainer', () => {
 
   it('toast disappears from DOM after auto-remove', () => {
     act(() => useToastStore.getState().add('success', 'Vanishing'));
-    const { _container } = render(<ToastContainer />);
+    render(<ToastContainer />);
     expect(screen.getByText('Vanishing')).toBeDefined();
     act(() => vi.advanceTimersByTime(5000));
     // Re-render to reflect store change

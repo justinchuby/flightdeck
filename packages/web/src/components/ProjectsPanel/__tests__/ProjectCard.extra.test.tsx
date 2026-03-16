@@ -165,7 +165,7 @@ describe('ProjectCard — extra coverage', () => {
   });
 
   it('renders aria-expanded attribute correctly', () => {
-    const { _rerender } = renderCard({ isExpanded: false });
+    renderCard({ isExpanded: false });
     const header = screen.getByRole('button', { name: /Toggle details/ });
     expect(header.getAttribute('aria-expanded')).toBe('false');
   });

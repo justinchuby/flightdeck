@@ -84,7 +84,7 @@ describe('ProjectCard', () => {
   });
 
   it('handles click on card', () => {
-    const { _props } = renderCard();
+    renderCard();
     const name = screen.getByText('My Test Project');
     fireEvent.click(name);
     // Click may toggle expand

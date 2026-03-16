@@ -34,7 +34,7 @@ describe('AnnotationPin', () => {
 
   it('stops propagation on click', () => {
     const parentClick = vi.fn();
-    const { _container } = render(
+    render(
       <div onClick={parentClick}>
         <AnnotationPin annotation={makeAnnotation()} position={50} onClick={vi.fn()} />
       </div>,

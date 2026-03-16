@@ -475,7 +475,7 @@ describe('ChatMessages – extra coverage', () => {
   /* ── Empty messages array ─────────────────────────────────────── */
 
   it('renders empty container when no messages', () => {
-    const { _container } = render(
+    render(
       <ChatMessages {...defaultProps} messages={[]} />,
     );
 
