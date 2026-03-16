@@ -189,8 +189,20 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: opts.cwd || process.cwd(),
       shell: process.platform === 'win32',
+      // Detach child so it gets its own process group.  Without this,
+      // Ctrl+C sends SIGINT to the entire foreground process group,
+      // hitting both the server AND every child — causing a double-SIGINT
+      // that crashes the server.  The server explicitly terminates children
+      // during shutdown via shutdownAll() → agent.terminate().
+      detached: true,
       ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
     });
+
+    // Allow the server's event loop to exit without waiting for the
+    // detached child.  The server terminates children explicitly.
+    if (this.process.unref) {
+      this.process.unref();
+    }
 
     if (!this.process.stdin || !this.process.stdout) {
       this.process.kill();
@@ -435,7 +447,15 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           }),
           new Promise<void>((resolve) => {
             killTimer = setTimeout(() => {
-              try { proc.kill(); } catch { /* already exited */ }
+              try {
+                // Kill the entire child process group (detached children
+                // are process group leaders, so -pid targets the group).
+                if (proc.pid) {
+                  process.kill(-proc.pid, 'SIGTERM');
+                } else {
+                  proc.kill();
+                }
+              } catch { /* already exited */ }
               resolve();
             }, TERMINATE_TIMEOUT_MS);
           }),
