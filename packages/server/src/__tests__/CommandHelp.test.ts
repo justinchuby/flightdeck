@@ -52,7 +52,7 @@ describe('CommandHelp', () => {
       const help = buildCommandHelp();
       expect(help).toContain('DELEGATE {"to": "agent-id", "task": "do something"}');
       expect(help).toContain('COMMIT {"message": "feat: add new feature"}');
-      expect(help).toContain('QUERY_CREW {}');
+      expect(help).toContain('QUERY_CREW');
     });
 
     it('includes format hint at the end', () => {
@@ -79,7 +79,8 @@ describe('CommandHelp', () => {
       const lines = help.split('\n');
       const queryCrew = lines.findIndex(l => l.includes('QUERY_CREW — '));
       // Next line should be the example, not Args
-      expect(lines[queryCrew + 1]).toContain('QUERY_CREW {}');
+      expect(lines[queryCrew + 1]).toContain('QUERY_CREW');
+      expect(lines[queryCrew + 1]).not.toContain('QUERY_CREW {}');
     });
 
     it('includes escaping guidance section', () => {
