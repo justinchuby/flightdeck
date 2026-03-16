@@ -255,7 +255,7 @@ describe('ActivityFeed', () => {
       fireEvent.click(screen.getByText('file edit').closest('[class*="cursor-pointer"]')!);
       expect(screen.getByText('Time')).toBeTruthy();
       // Click backdrop (the fixed overlay) using mouseDown since component uses onMouseDown
-      const backdrop = screen.getByText('Time').closest('.fixed');
+      const _backdrop = screen.getByText('Time').closest('.fixed');
       // Find the outermost fixed div
       const overlay = document.querySelector('.fixed.inset-0');
       expect(overlay).toBeTruthy();

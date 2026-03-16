@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 
 // ── Mock all heavy dependencies before importing App ──────────
 
@@ -144,7 +144,7 @@ vi.mock('../utils/notificationSound', () => ({
 import { App } from '../App';
 import { useAppStore } from '../stores/appStore';
 
-function createTestQueryClient() {
+function _createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },

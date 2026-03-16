@@ -8,7 +8,7 @@ vi.mock('../../../hooks/useApi', () => ({
 }));
 
 vi.mock('../../AttachmentBar', () => ({
-  AttachmentBar: ({ attachments, onRemove }: any) => (
+  AttachmentBar: ({ attachments, _onRemove }: any) => (
     <div data-testid="attachment-bar">{attachments?.length ?? 0} attachments</div>
   ),
 }));

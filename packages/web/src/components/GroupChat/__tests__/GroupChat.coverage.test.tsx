@@ -159,7 +159,7 @@ vi.mock('../../FilterTabs', () => ({
 /*  Import component & store                                           */
 /* ------------------------------------------------------------------ */
 import { GroupChat } from '../GroupChat';
-import { useGroupStore, groupKey } from '../../../stores/groupStore';
+import { useGroupStore } from '../../../stores/groupStore';
 
 const mockUseGroupStore = useGroupStore as unknown as ReturnType<typeof vi.fn>;
 
@@ -289,7 +289,7 @@ describe('GroupChat – coverage gaps', () => {
     });
     mockApiFetch.mockResolvedValue([mockGroups[0]]);
 
-    const { container } = await act(async () => render(<GroupChat />));
+    const { _container } = await act(async () => render(<GroupChat />));
 
     await waitFor(() => {
       expect(screen.getByText('backend-team')).toBeDefined();

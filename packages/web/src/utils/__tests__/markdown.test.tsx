@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { idColor, AgentIdBadge, InlineMarkdown, InlineMarkdownWithMentions, MarkdownContent, MentionText } from '../markdown';
 
 // Mock AgentMentionTooltip to render children directly

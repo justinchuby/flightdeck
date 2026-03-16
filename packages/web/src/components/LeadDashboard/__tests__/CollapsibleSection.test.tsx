@@ -81,7 +81,7 @@ describe('CollapsibleSection extra coverage', () => {
   });
 
   it('toggles collapse', () => {
-    const { container } = render(
+    const { _container } = render(
       <CollapsibleSection title="Toggle Test" icon={<span>📋</span>}>
         <div data-testid="content">Inner content</div>
       </CollapsibleSection>,

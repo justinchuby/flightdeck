@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -84,7 +84,7 @@ describe('ProjectCard', () => {
   });
 
   it('handles click on card', () => {
-    const { props } = renderCard();
+    const { _props } = renderCard();
     const name = screen.getByText('My Test Project');
     fireEvent.click(name);
     // Click may toggle expand

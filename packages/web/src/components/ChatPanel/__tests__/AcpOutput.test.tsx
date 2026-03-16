@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useAppStore } from '../../../stores/appStore';
 import { useLeadStore } from '../../../stores/leadStore';
 import type { AcpTextChunk, AcpPlanEntry } from '../../../types';
@@ -485,7 +485,7 @@ describe('AcpOutput', () => {
       makeMsg('Agent reply 1', 'agent', 2000),
       makeMsg('Agent reply 2', 'agent', 3000),
     ]);
-    const { container } = await renderAcpOutput();
+    const { _container } = await renderAcpOutput();
     // The pinned banner should appear (Virtuoso mock doesn't fire atBottomStateChange, so atBottom stays true initially).
     // We need to simulate atBottom=false. The banner checks !atBottom, but the mock Virtuoso never fires atBottomStateChange.
     // So in the mock environment, atBottom defaults to true and the banner won't show.

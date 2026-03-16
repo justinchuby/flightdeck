@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DagGantt } from '../DagGantt';
 import type { GanttTask } from '../DagGantt';
@@ -98,7 +98,7 @@ describe('DagGantt — extra coverage', () => {
 
   it('renders assignee text on task bar', () => {
     const tasks = [makeTask({ id: 'task-1', status: 'running', assignee: 'dev-agent' })];
-    const { container } = render(<DagGantt tasks={tasks} />);
+    const { _container } = render(<DagGantt tasks={tasks} />);
     expect(screen.getByText('dev-agent')).toBeInTheDocument();
   });
 
@@ -115,7 +115,7 @@ describe('DagGantt — extra coverage', () => {
 
   it('renders skipped tasks', () => {
     const tasks = [makeTask({ id: 'skipped-task', title: 'Skipped Work', status: 'skipped' })];
-    const { container } = render(<DagGantt tasks={tasks} />);
+    const { _container } = render(<DagGantt tasks={tasks} />);
     expect(screen.getByText('Skipped Work')).toBeInTheDocument();
   });
 

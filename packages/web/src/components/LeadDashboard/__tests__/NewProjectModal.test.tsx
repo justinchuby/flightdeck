@@ -28,7 +28,6 @@ vi.mock('../../FolderPicker/FolderPicker', () => ({
   ),
 }));
 
-import { useLeadStore } from '../../../stores/leadStore';
 import { NewProjectModal } from '../NewProjectModal';
 
 function renderModal(props = {}) {

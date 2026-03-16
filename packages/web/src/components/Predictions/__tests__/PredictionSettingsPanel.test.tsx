@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import type { PredictionConfig, PredictionAccuracy, Prediction } from '../types';
+import type { PredictionConfig, PredictionAccuracy } from '../types';
 
 // ── Mocks ────────────────────────────────────────────────────────────
 

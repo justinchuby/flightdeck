@@ -101,9 +101,7 @@ describe('ApprovalQueue – extra coverage', () => {
   });
 
   it('batch resolve falls back to individual calls when batch endpoint fails', async () => {
-    let callCount = 0;
     mockApiFetch.mockImplementation((url: string) => {
-      callCount++;
       if (url === '/decisions/batch') return Promise.reject(new Error('Not found'));
       return Promise.resolve({});
     });

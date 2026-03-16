@@ -32,7 +32,7 @@ vi.mock('../ChatRenderers', () => ({
       {timestamp && <span>{timestamp}</span>}
     </div>
   ),
-  CollapsibleSystemBlock: ({ text, timestamp }: { text: string; timestamp: string }) => (
+  CollapsibleSystemBlock: ({ text, _timestamp }: { text: string; timestamp: string }) => (
     <div data-testid="system-long-block">
       <span>System (long): {text.slice(0, 50)}</span>
     </div>
@@ -475,7 +475,7 @@ describe('ChatMessages – extra coverage', () => {
   /* ── Empty messages array ─────────────────────────────────────── */
 
   it('renders empty container when no messages', () => {
-    const { container } = render(
+    const { _container } = render(
       <ChatMessages {...defaultProps} messages={[]} />,
     );
 

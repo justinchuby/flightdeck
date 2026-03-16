@@ -3,11 +3,11 @@
  * Extra coverage for AlertsPanel — executeAction branches (dismiss, invalid endpoint, error).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { useAppStore } from '../../../stores/appStore';
 import { useLeadStore } from '../../../stores/leadStore';
-import { AlertsPanel, detectAlerts, type AlertAction } from '../AlertsPanel';
-import type { AgentInfo, Decision } from '../../../types';
+import { AlertsPanel, detectAlerts } from '../AlertsPanel';
+import type { AgentInfo } from '../../../types';
 
 const mockApiFetch = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({

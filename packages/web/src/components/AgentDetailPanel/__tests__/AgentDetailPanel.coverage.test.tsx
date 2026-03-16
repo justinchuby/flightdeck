@@ -3,7 +3,7 @@
  * Coverage for AgentDetailPanel — tab switching, profile fetch, action buttons.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 const mockApiFetch = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({
@@ -80,7 +80,7 @@ vi.mock('../../ProvideFeedback', () => ({
 }));
 
 vi.mock('../../ui/Tabs', () => ({
-  Tabs: ({ tabs, activeTab, onTabChange }: any) => (
+  Tabs: ({ tabs, _activeTab, onTabChange }: any) => (
     <div data-testid="tabs">
       {tabs.map((t: any) => (
         <button key={t.id} data-testid={`tab-${t.id}`} onClick={() => onTabChange(t.id)}>

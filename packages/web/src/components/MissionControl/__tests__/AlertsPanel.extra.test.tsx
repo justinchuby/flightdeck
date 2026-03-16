@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { useAppStore } from '../../../stores/appStore';
 import { useLeadStore } from '../../../stores/leadStore';
 import type { AgentInfo, Decision } from '../../../types';
@@ -10,7 +10,7 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
-import { AlertsPanel, detectAlerts, type AlertAction } from '../AlertsPanel';
+import { AlertsPanel, detectAlerts } from '../AlertsPanel';
 
 function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {

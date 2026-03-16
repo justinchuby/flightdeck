@@ -46,7 +46,6 @@ vi.mock('../../../utils/format', () => ({
 }));
 
 import { CrewStatusContent, type CrewAgent } from '../CrewStatusContent';
-import type { Delegation } from '../../../types';
 import type { AgentComm, ActivityEvent } from '../../../stores/leadStore';
 
 /* ── Helpers ─────────────────────────────────────────────────────── */

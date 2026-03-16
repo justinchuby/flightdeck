@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useLeadStore } from '../leadStore';
-import type { AcpTextChunk, AcpToolCall, LeadProgress, Decision, DagStatus, ChatGroup, GroupMessage } from '../../types';
+import type { AcpToolCall, LeadProgress, Decision, DagStatus, ChatGroup, GroupMessage } from '../../types';
 import type { ActivityEvent, AgentComm, AgentReport, ProgressSnapshot } from '../leadStore';
 
 const LEAD_ID = 'lead-test-001';

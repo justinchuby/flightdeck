@@ -39,7 +39,7 @@ vi.mock('@visx/scale', () => ({
     return fn;
   },
   scaleTime: () => {
-    const fn = (v: any) => 0;
+    const fn = (_v: any) => 0;
     fn.range = () => fn;
     fn.domain = () => fn;
     fn.nice = () => fn;

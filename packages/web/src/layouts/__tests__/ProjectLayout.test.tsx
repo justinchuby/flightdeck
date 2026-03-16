@@ -55,7 +55,6 @@ vi.mock('../../components/PageTransition', () => ({
 }));
 
 import { useAppStore } from '../../stores/appStore';
-import { useNavigationStore } from '../../stores/navigationStore';
 import { ProjectLayout } from '../ProjectLayout';
 
 describe('ProjectLayout', () => {
