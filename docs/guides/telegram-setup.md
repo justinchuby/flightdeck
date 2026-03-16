@@ -190,6 +190,22 @@ Once connected, you can use these commands in your Telegram chat:
 
 After binding a chat to a project (Step 6), simply type a message in Telegram — it will be routed to that project's lead agent. The lead can reply using the `TELEGRAM_REPLY` command, and you'll see the response in your chat.
 
+### Long Messages
+
+Telegram limits messages to 4,096 characters. When Flightdeck needs to send a longer message (e.g., a detailed status report or agent output), it automatically splits the content into multiple numbered parts:
+
+```
+Here's the full status report for your project...
+(content continues)
+ (1/3)
+```
+```
+...remaining content...
+ (2/3)
+```
+
+Splitting respects markdown boundaries — it won't break inside code blocks, and prefers to split at paragraph or line boundaries for readability.
+
 ---
 
 ## Notification Categories
