@@ -92,10 +92,11 @@ describe('AcpConnection', () => {
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
+      const isWindows = process.platform === 'win32';
       expect(mockSpawn).toHaveBeenCalledWith(
         'copilot',
         expect.arrayContaining(['--acp', '--stdio']),
-        expect.objectContaining({ cwd: '/tmp', detached: true }),
+        expect.objectContaining({ cwd: '/tmp', detached: !isWindows }),
       );
 
       fakeProc.emit('exit', 1);
@@ -112,9 +113,14 @@ describe('AcpConnection', () => {
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
+      const isWindows = process.platform === 'win32';
       const spawnOpts = mockSpawn.mock.calls[0][2];
-      expect(spawnOpts.detached).toBe(true);
-      expect(fakeProc.unref).toHaveBeenCalled();
+      expect(spawnOpts.detached).toBe(!isWindows);
+      if (isWindows) {
+        expect(fakeProc.unref).not.toHaveBeenCalled();
+      } else {
+        expect(fakeProc.unref).toHaveBeenCalled();
+      }
 
       fakeProc.emit('exit', 1);
       await startPromise.catch(() => {});
