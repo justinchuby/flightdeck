@@ -37,6 +37,7 @@ const EMPTY_COMMS: AgentComm[] = [];
 
 function CanvasInner() {
   const liveAgents = useAppStore((s) => s.agents);
+  const connected = useAppStore((s) => s.connected);
   const selectedLeadId = useLeadStore((s) => s.selectedLeadId);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
@@ -66,7 +67,7 @@ function CanvasInner() {
   }, [liveAgents, effectiveLeadId]);
 
   // Historical data fallback: derive agents from keyframes when no live agents
-  const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(projectAgents.length, effectiveLeadId);
+  const { agents: historicalAgents, loading: loadingHistorical } = useHistoricalAgents(projectAgents.length, effectiveLeadId, connected);
 
   const agents = projectAgents.length > 0 ? projectAgents : historicalAgents;
 

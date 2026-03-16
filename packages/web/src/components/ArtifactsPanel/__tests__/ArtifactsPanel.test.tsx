@@ -187,8 +187,8 @@ describe('ArtifactsPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('Codebase Audit Report')).toBeInTheDocument();
     });
-    // Architect emoji (🏗) appears per-artifact row
-    expect(screen.getAllByText('\u{1F3D7}').length).toBeGreaterThanOrEqual(1);
+    // Architect emoji (🏗️) appears per-artifact row
+    expect(screen.getAllByText('\u{1F3D7}\u{FE0F}').length).toBeGreaterThanOrEqual(1);
     // Designer emoji (🎨)
     expect(screen.getAllByText('\u{1F3A8}').length).toBeGreaterThanOrEqual(1);
   });

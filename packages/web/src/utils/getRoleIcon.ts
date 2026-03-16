@@ -9,19 +9,19 @@ import type { Role } from '../types';
  */
 const FALLBACK_ROLE_ICONS: Record<string, string> = {
   lead: '👑',
-  architect: '🏗',
-  developer: '👨‍💻',
-  'code-reviewer': '🔍',
-  'critical-reviewer': '🛡',
-  'readability-reviewer': '📖',
+  architect: '🏗️',
+  developer: '💻',
+  'code-reviewer': '📖',
+  'critical-reviewer': '🛡️',
+  'readability-reviewer': '👁️',
   'qa-tester': '🧪',
   designer: '🎨',
   'tech-writer': '📝',
-  'product-manager': '📋',
-  secretary: '📒',
-  'radical-thinker': '💡',
+  'product-manager': '🎯',
+  secretary: '📋',
+  'radical-thinker': '🚀',
   generalist: '🔧',
-  agent: '🤖',
+  agent: '⚙️',
 };
 
 /**

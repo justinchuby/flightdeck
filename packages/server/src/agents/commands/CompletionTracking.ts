@@ -57,6 +57,28 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   if (ctx.reportedCompletions.has(dedupKey)) return;
   ctx.reportedCompletions.add(dedupKey);
 
+  // Suppress the "finished work" report when the agent already sent
+  // COMPLETE_TASK for its DAG task.  The dedup key above is cleared each
+  // time the agent goes running (to allow re-notification on the next
+  // idle), so it alone is insufficient to prevent duplicates across turns.
+  // Checking the DAG task status is the authoritative guard.
+  if (agent.dagTaskId && agent.parentId) {
+    const dagTask = ctx.taskDAG.getTask(agent.parentId, agent.dagTaskId);
+    if (dagTask && dagTask.dagStatus === 'done') {
+      return;
+    }
+  }
+
+  // Same-turn race guard: the ACP adapter can report idle BEFORE
+  // CommandDispatcher finishes parsing COMPLETE_TASK from the output buffer.
+  // Check the raw output synchronously — if COMPLETE_TASK is present,
+  // suppress this report since the COMPLETE_TASK handler will send its own.
+  const rawOutput = agent.getTaskOutput(16000);
+  const hasCompleteTask = /⟦⟦\s*COMPLETE_TASK\s*\{/.test(rawOutput);
+  if (hasCompleteTask) {
+    return;
+  }
+
   // NOTE: We intentionally do NOT mark the delegation as completed here.
   // The agent's ACP state (running/idle) is the source of truth for display
   // status. Delegation completes when the agent explicitly calls COMPLETE_TASK
@@ -64,7 +86,6 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   // prevents the UI from showing "completed" while the agent is still
   // actively processing between idle/running cycles.
 
-  const rawOutput = agent.getTaskOutput(16000);
   const sentMessages = /⟦⟦\s*(AGENT_MESSAGE|BROADCAST|GROUP_MESSAGE|COMPLETE_TASK)\s*\{/.test(rawOutput);
   const outputNote = sentMessages
     ? 'Agent sent findings directly — see messages above.'
@@ -141,6 +162,27 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
       }
     }
     return;
+  }
+
+  // Suppress exit report when agent already completed its DAG task via
+  // COMPLETE_TASK and exited cleanly.  Same rationale as in notifyParentOfIdle:
+  // the dedup key may have been cleared between turns.
+  if (exitCode === 0 && agent.dagTaskId && agent.parentId) {
+    const dagTask = ctx.taskDAG.getTask(agent.parentId, agent.dagTaskId);
+    if (dagTask && dagTask.dagStatus === 'done') {
+      // Still mark delegations as completed
+      for (const [, del] of ctx.delegations) {
+        if (del.toAgentId === agent.id && del.status === 'active') {
+          del.status = 'completed';
+          del.completedAt = new Date().toISOString();
+          del.result = redact(agent.getTaskOutput(16000)).text;
+          if (ctx.activeDelegationRepository) {
+            try { ctx.activeDelegationRepository.complete(del.id); } catch { /* non-critical */ }
+          }
+        }
+      }
+      return;
+    }
   }
 
   for (const [, del] of ctx.delegations) {

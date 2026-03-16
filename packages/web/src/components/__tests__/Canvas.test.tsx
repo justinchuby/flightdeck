@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent, act } from '@testing-library/react';import { MemoryRouter } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo } from '../../types';
 
@@ -121,7 +120,7 @@ describe('Canvas Lite', () => {
       expect(screen.getByText('Agent Canvas')).toBeInTheDocument();
     });
 
-    it('renders ReactFlow when agents exist', () => {
+    it('renders ReactFlow when agents exist', async () => {
       useAppStore.getState().setAgents([
         makeAgent('lead-1', 'lead'),
         makeAgent('agent-dev-002', 'developer'),
@@ -130,11 +129,13 @@ describe('Canvas Lite', () => {
       const agents = useAppStore.getState().agents;
       agents[1] = { ...agents[1], parentId: 'lead-1' };
       useAppStore.getState().setAgents(agents);
-      render(
-        <MemoryRouter>
-          <CanvasPage />
-        </MemoryRouter>,
-      );
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <CanvasPage />
+          </MemoryRouter>,
+        );
+      });
       expect(screen.getByTestId('canvas-page')).toBeInTheDocument();
       expect(screen.getByTestId('mock-reactflow')).toBeInTheDocument();
       expect(screen.getByTestId('canvas-toolbar')).toBeInTheDocument();
@@ -205,17 +206,19 @@ describe('Canvas Lite', () => {
       // Since __test_transform doesn't exist, test via component rendering
     });
 
-    it('creates nodes for visible agents', () => {
+    it('creates nodes for visible agents', async () => {
       const agents = [
         makeAgent('lead-1', 'lead'),
         { ...makeAgent('dev-001', 'developer'), parentId: 'lead-1' },
       ];
       useAppStore.getState().setAgents(agents);
-      render(
-        <MemoryRouter>
-          <CanvasPage />
-        </MemoryRouter>,
-      );
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <CanvasPage />
+          </MemoryRouter>,
+        );
+      });
       const flow = screen.getByTestId('mock-reactflow');
       expect(flow.getAttribute('data-nodes')).toBe('2');
     });

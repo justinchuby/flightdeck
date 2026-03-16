@@ -306,3 +306,180 @@ describe('ghost DAG warning suppression', () => {
     });
   });
 });
+
+// ── Duplicate Agent Report suppression tests ──────────────────────────
+
+describe('suppress duplicate Agent Report when COMPLETE_TASK already sent', () => {
+  let parent: Agent;
+  let child: Agent;
+  let ctx: CommandHandlerContext;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    parent = makeParent();
+    child = makeAgent({ dagTaskId: 'task-1' });
+    ctx = makeCtx({
+      getAgent: vi.fn().mockImplementation((id: string) =>
+        id === parent.id ? parent : id === child.id ? child : undefined,
+      ),
+      taskDAG: {
+        getTaskByAgent: vi.fn().mockReturnValue(null),
+        getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'done' }),
+        getStatus: vi.fn().mockReturnValue({ summary: { pending: 0, ready: 0, running: 0 } }),
+      },
+    });
+  });
+
+  describe('notifyParentOfIdle', () => {
+    it('suppresses "finished work" report when DAG task is already done', () => {
+      notifyParentOfIdle(ctx, child);
+
+      // Parent should NOT receive the "finished work" report
+      const reportCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('finished work'),
+      );
+      expect(reportCalls).toHaveLength(0);
+      expect((parent.sendMessage as any)).not.toHaveBeenCalled();
+    });
+
+    it('still sends "finished work" report when DAG task is still running and no COMPLETE_TASK in output', () => {
+      child = makeAgent({
+        dagTaskId: 'task-1',
+        getTaskOutput: vi.fn().mockReturnValue('some work output without commands'),
+      });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'running' }),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 0, ready: 0, running: 1 } }),
+        },
+      });
+
+      notifyParentOfIdle(ctx, child);
+
+      const reportCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('finished work'),
+      );
+      expect(reportCalls).toHaveLength(1);
+    });
+
+    it('suppresses report when COMPLETE_TASK is in output buffer (same-turn race)', () => {
+      // DAG task is still 'running' (COMPLETE_TASK hasn't been parsed yet),
+      // but the raw output already contains the command
+      child = makeAgent({
+        dagTaskId: 'task-1',
+        getTaskOutput: vi.fn().mockReturnValue('Done!\n⟦⟦ COMPLETE_TASK {"summary": "finished"} ⟧⟧'),
+      });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'running' }),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 0, ready: 0, running: 1 } }),
+        },
+      });
+
+      notifyParentOfIdle(ctx, child);
+
+      expect((parent.sendMessage as any)).not.toHaveBeenCalled();
+    });
+
+    it('suppresses report even after dedup key is cleared (multi-turn scenario)', () => {
+      // Simulate: COMPLETE_TASK sets dedup key, then agent goes running
+      // (which clears dedup), then goes idle again
+      ctx.reportedCompletions.add(`${child.id}:idle`);
+      // Clear dedup (as happens when agent goes running)
+      ctx.reportedCompletions.delete(`${child.id}:idle`);
+
+      // Now idle fires again — dedup key is gone, but DAG task is done
+      notifyParentOfIdle(ctx, child);
+
+      expect((parent.sendMessage as any)).not.toHaveBeenCalled();
+    });
+
+    it('sends report for agents without a DAG task (no dagTaskId)', () => {
+      child = makeAgent({ dagTaskId: null });
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue(null),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 0, ready: 0, running: 0 } }),
+        },
+      });
+
+      notifyParentOfIdle(ctx, child);
+
+      const reportCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('finished work'),
+      );
+      expect(reportCalls).toHaveLength(1);
+    });
+  });
+
+  describe('notifyParentOfCompletion', () => {
+    it('suppresses exit report when DAG task is done and exit is clean', () => {
+      notifyParentOfCompletion(ctx, child, 0);
+
+      // Parent should NOT receive the exit report
+      const reportCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('completed successfully') || c[0].includes('finished work'),
+      );
+      expect(reportCalls).toHaveLength(0);
+    });
+
+    it('still sends exit report when agent crashes (non-zero exit)', () => {
+      notifyParentOfCompletion(ctx, child, 1);
+
+      const reportCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('failed'),
+      );
+      expect(reportCalls).toHaveLength(1);
+    });
+
+    it('marks delegations as completed even when suppressing exit report', () => {
+      const delegation = {
+        id: 'del-1',
+        fromAgentId: parent.id,
+        toAgentId: child.id,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        completedAt: undefined as string | undefined,
+        result: undefined as string | undefined,
+      };
+      ctx.delegations.set('del-1', delegation as any);
+
+      notifyParentOfCompletion(ctx, child, 0);
+
+      expect(delegation.status).toBe('completed');
+      expect(delegation.completedAt).toBeDefined();
+    });
+
+    it('still sends report when DAG task is running (not yet completed)', () => {
+      ctx = makeCtx({
+        getAgent: vi.fn().mockImplementation((id: string) =>
+          id === parent.id ? parent : id === child.id ? child : undefined,
+        ),
+        taskDAG: {
+          getTaskByAgent: vi.fn().mockReturnValue(null),
+          getTask: vi.fn().mockReturnValue({ id: 'task-1', dagStatus: 'running' }),
+          getStatus: vi.fn().mockReturnValue({ summary: { pending: 0, ready: 0, running: 1 } }),
+        },
+      });
+
+      notifyParentOfCompletion(ctx, child, 0);
+
+      const reportCalls = (parent.sendMessage as any).mock.calls.filter(
+        (c: any[]) => c[0].includes('completed successfully'),
+      );
+      expect(reportCalls).toHaveLength(1);
+    });
+  });
+});
