@@ -224,14 +224,14 @@ Flightdeck sends notifications for various events. You can enable or disable eac
 
 ### Quiet Hours
 
-You can configure quiet hours to suppress non-critical notifications during off-hours:
+You can configure quiet hours to suppress notifications during off-hours:
 
 ```yaml
 # Via the Settings UI: Settings → Telegram → Quiet Hours
 # Enable quiet hours, set start and end times (24-hour format)
 ```
 
-During quiet hours, only **critical** notifications (`decision_needs_approval`, `agent_crashed`, `system_alert`) are delivered. Others are held until quiet hours end.
+During quiet hours, **all** notifications are suppressed — including critical ones. Check the Flightdeck web UI for any events that occurred while quiet hours were active.
 
 ---
 
