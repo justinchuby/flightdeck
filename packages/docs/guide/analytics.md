@@ -16,7 +16,7 @@ A summary card showing aggregate metrics for the selected time window:
 - **Total input/output tokens** consumed
 - **Role contributions** — which roles handled the most tasks and used the most tokens
 
-### Cost Trend Chart
+### Token Trend Chart
 
 A line chart (built with [Visx](https://airbnb.io/visx/)) showing token usage over time:
 
@@ -26,7 +26,7 @@ A line chart (built with [Visx](https://airbnb.io/visx/)) showing token usage ov
 - Responsive width with formatted labels (`1.2M`, `56.8K`)
 - Area fill under the trend line
 
-Helps you spot usage spikes, trends in consumption, and cost trajectory over days/weeks.
+Helps you spot usage spikes and trends in token consumption over days/weeks.
 
 ### Insights Panel
 
@@ -34,14 +34,14 @@ Automatically generated insights based on your session data. These are template-
 
 | Type | Severity | Example |
 |------|----------|---------|
-| **Cost (improving)** | info | "Token usage down 15% over recent sessions" |
-| **Cost (rising)** | warning | "Sessions use 25% more tokens than earlier — review model choices" |
+| **Token usage (improving)** | info | "Token usage down 15% over recent sessions" |
+| **Token usage (rising)** | warning | "Sessions use 25% more tokens than earlier — review model choices" |
 | **Efficiency** | info | "47 tasks across 8 sessions — averaging 5.9 tasks per session" |
 | **Role balance** | suggestion | "Developer handles 65% of tasks — consider distributing across roles" |
 
 **Generation rules:**
-- Cost warning triggers when recent token usage is >20% above average
-- Cost improvement triggers when usage is >10% below average
+- Token usage warning triggers when recent token usage is >20% above average
+- Token usage improvement triggers when usage is >10% below average
 - Role imbalance flags when one role handles >60% of tasks
 
 ### Session History Table
@@ -97,19 +97,19 @@ Tracks task lifecycle over time:
 
 Data comes from DAG task timestamps (`createdAt`, `startedAt`, `completedAt`), with fallback to replay keyframes for sessions without DAG data.
 
-### Cost Curve
+### Token Usage Curve
 
 Shows cumulative token usage distributed across session keyframes:
 
 - **Active sessions**: Uses live agent token counts (real-time)
-- **Historical sessions**: Falls back to `/costs/by-agent` database records
+- **Historical sessions**: Falls back to database records
 - **Visualization**: Input tokens (blue area) and output tokens (green area)
 
 ### Key Stats
 
 Quick metrics for the current session: agent count, task count, total tokens.
 
-### Cost Breakdown
+### Token Breakdown
 
 Detailed token attribution by agent and model:
 
@@ -125,7 +125,7 @@ Detailed token attribution by agent and model:
 | Session List | `GET /analytics/sessions` | On page load |
 | Session Comparison | `GET /analytics/compare?sessions=id1,id2` | On selection change |
 | Per-Project Analysis | `GET /replay/:leadId/keyframes` + `GET /tasks` | Polling |
-| Token Usage | `GET /costs/by-project` + `GET /costs/by-agent` + `GET /costs/by-task` | 15s polling |
+| Token Usage | `GET /costs/by-project` + `GET /costs/by-agent` + `GET /costs/by-task` | 15s polling (internal endpoints) |
 
 ### Metrics Tracked
 

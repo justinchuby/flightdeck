@@ -64,7 +64,6 @@ export default defineConfig({
           items: [
             { text: 'Command Palette', link: '/guide/command-palette' },
             { text: 'Intent Rules', link: '/guide/intent-rules' },
-            { text: 'Cost & Token Tracking', link: '/guide/cost-tracking' },
             { text: 'Analytics', link: '/guide/analytics' },
             { text: 'Data Management', link: '/guide/data-management' },
           ],

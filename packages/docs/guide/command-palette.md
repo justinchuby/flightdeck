@@ -46,7 +46,6 @@ Type natural language directly into ⌘K to control your crew:
 | Status check | "what's the status?" |
 | Show agent | "show me the architect" |
 | List tasks | "what tasks are running?" |
-| Show costs | "how much have we spent?" |
 | Show context | "which agents are running low on context?" |
 | Count agents | "how many agents are active?" |
 | Show errors | "any errors?" |

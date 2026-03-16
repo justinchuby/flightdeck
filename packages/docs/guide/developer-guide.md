@@ -127,7 +127,7 @@ Quick reference for all APIs, hooks, components, and design tokens available in 
 | PUT | `/notifications/settings` | Update notification preferences |
 | GET | `/notifications/routing` | Get notification routing config |
 
-### Analytics & Costs
+### Analytics & Token Usage
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/costs/by-agent` | Costs by agent |
