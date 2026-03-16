@@ -319,4 +319,86 @@ describe('useLeadWebSocket', () => {
     emitWsMessage({ type: 'agent:tool_call', agentId: 'lead-1', toolCall: { toolCallId: 'tc-x', title: 'test' } });
     expect(mockStore.addActivity).not.toHaveBeenCalled();
   });
+
+  // ── project:xxx resolution tests ──────────────────────────────
+
+  describe('project:xxx selectedLeadId resolution', () => {
+    const projAgents: AgentInfo[] = [
+      { id: 'agent-uuid-1', status: 'running', projectId: 'proj-1', role: { id: 'lead', name: 'Lead' } } as AgentInfo,
+      { id: 'child-2', status: 'running', parentId: 'agent-uuid-1', role: { id: 'developer', name: 'Developer' } } as AgentInfo,
+    ];
+
+    beforeEach(() => {
+      mockStore.selectedLeadId = 'project:proj-1';
+      (mockStore as Record<string, unknown>).projects = { 'project:proj-1': {} };
+    });
+
+    it('resolves project:xxx to lead agentId for agent:text', () => {
+      renderHook(() => useLeadWebSocket(projAgents, 'proj-1'));
+      emitWsMessage({ type: 'agent:text', agentId: 'agent-uuid-1', text: 'hello' });
+      expect(mockStore.appendToLastAgentMessage).toHaveBeenCalledWith('project:proj-1', 'hello');
+    });
+
+    it('resolves project:xxx to lead agentId for agent:thinking', () => {
+      renderHook(() => useLeadWebSocket(projAgents, 'proj-1'));
+      emitWsMessage({ type: 'agent:thinking', agentId: 'agent-uuid-1', text: 'pondering' });
+      expect(mockStore.appendToThinkingMessage).toHaveBeenCalledWith('project:proj-1', 'pondering');
+    });
+
+    it('resolves project:xxx to lead agentId for agent:content', () => {
+      renderHook(() => useLeadWebSocket(projAgents, 'proj-1'));
+      emitWsMessage({
+        type: 'agent:content',
+        agentId: 'agent-uuid-1',
+        content: { text: 'content text', contentType: 'text' },
+      });
+      expect(mockStore.addMessage).toHaveBeenCalledWith(
+        'project:proj-1',
+        expect.objectContaining({ text: 'content text', sender: 'agent' }),
+      );
+    });
+
+    it('resolves project:xxx to lead agentId for agent:status running', () => {
+      renderHook(() => useLeadWebSocket(projAgents, 'proj-1'));
+      emitWsMessage({ type: 'agent:status', agentId: 'agent-uuid-1', status: 'running' });
+      expect(mockStore.promoteQueuedMessages).toHaveBeenCalledWith('project:proj-1');
+    });
+
+    it('resolves project:xxx to lead agentId for agent:tool_call', () => {
+      renderHook(() => useLeadWebSocket(projAgents, 'proj-1'));
+      emitWsMessage({
+        type: 'agent:tool_call',
+        agentId: 'agent-uuid-1',
+        toolCall: { toolCallId: 'tc-resolve', title: 'running tool' },
+      });
+      expect(mockStore.addActivity).toHaveBeenCalledWith(
+        'agent-uuid-1',
+        expect.objectContaining({ agentId: 'agent-uuid-1', type: 'tool_call' }),
+      );
+    });
+
+    it('does not resolve when no matching lead agent exists', () => {
+      const noLeadAgents: AgentInfo[] = [
+        { id: 'child-only', status: 'running', projectId: 'other-proj', role: { id: 'developer', name: 'Developer' } } as AgentInfo,
+      ];
+      renderHook(() => useLeadWebSocket(noLeadAgents, 'proj-1'));
+      emitWsMessage({ type: 'agent:text', agentId: 'agent-uuid-1', text: 'should not match' });
+      expect(mockStore.appendToLastAgentMessage).not.toHaveBeenCalled();
+    });
+
+    it('resolves project:xxx for group:message events', () => {
+      renderHook(() => useLeadWebSocket(projAgents, 'proj-1'));
+      emitWsMessage({
+        type: 'group:message',
+        leadId: 'agent-uuid-1',
+        groupName: 'grp-1',
+        message: { fromAgentId: 'child-2', fromRole: 'Developer', content: 'group msg' },
+      });
+      expect(mockStore.addGroupMessage).toHaveBeenCalledWith(
+        'project:proj-1',
+        'grp-1',
+        expect.objectContaining({ fromAgentId: 'child-2' }),
+      );
+    });
+  });
 });

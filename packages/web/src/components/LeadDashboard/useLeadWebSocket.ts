@@ -152,18 +152,18 @@ function handleDecision(msg: WsDecision, store: StoreApi) {
   });
 }
 
-function handleText(msg: WsAgentText, store: StoreApi) {
+function handleText(msg: WsAgentText, store: StoreApi, storeKey: string) {
   const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-  store.appendToLastAgentMessage(msg.agentId, rawText);
+  store.appendToLastAgentMessage(storeKey, rawText);
 }
 
-function handleThinking(msg: WsAgentThinking, store: StoreApi) {
+function handleThinking(msg: WsAgentThinking, store: StoreApi, storeKey: string) {
   const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-  store.appendToThinkingMessage(msg.agentId, rawText);
+  store.appendToThinkingMessage(storeKey, rawText);
 }
 
-function handleContent(msg: WsAgentContent, store: StoreApi) {
-  store.addMessage(msg.agentId, {
+function handleContent(msg: WsAgentContent, store: StoreApi, storeKey: string) {
+  store.addMessage(storeKey, {
     type: 'text',
     text: msg.content.text || '',
     sender: 'agent',
@@ -174,9 +174,9 @@ function handleContent(msg: WsAgentContent, store: StoreApi) {
   });
 }
 
-function handleStatus(msg: WsAgentStatus, store: StoreApi) {
+function handleStatus(msg: WsAgentStatus, store: StoreApi, storeKey: string) {
   if (msg.status === 'running') {
-    store.promoteQueuedMessages(msg.agentId);
+    store.promoteQueuedMessages(storeKey);
   }
 }
 
@@ -407,24 +407,35 @@ export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: strin
       const store = useLeadStore.getState();
       const selectedLeadId = store.selectedLeadId;
 
+      // Resolve project:xxx keys to the actual agent UUID for message matching.
+      // selectedLeadId may temporarily be "project:<id>" during session resume
+      // (before ProjectLayout resolves the real lead agent). Messages arrive with
+      // the real agent UUID, so we need to resolve to match them.
+      let effectiveLeadId = selectedLeadId;
+      if (selectedLeadId?.startsWith('project:') && agents.length > 0) {
+        const projectId = selectedLeadId.slice(8);
+        const lead = agents.find((a) => a.projectId === projectId && a.role?.id === 'lead' && a.status !== 'terminated');
+        if (lead) effectiveLeadId = lead.id;
+      }
+
       switch (msg.type) {
         case 'lead:decision':
           handleDecision(msg, store);
           break;
         case 'agent:text':
-          if (msg.agentId === selectedLeadId) handleText(msg, store);
+          if (msg.agentId === effectiveLeadId) handleText(msg, store, selectedLeadId!);
           break;
         case 'agent:thinking':
-          if (msg.agentId === selectedLeadId) handleThinking(msg, store);
+          if (msg.agentId === effectiveLeadId) handleThinking(msg, store, selectedLeadId!);
           break;
         case 'agent:content':
-          if (msg.agentId === selectedLeadId) handleContent(msg, store);
+          if (msg.agentId === effectiveLeadId) handleContent(msg, store, selectedLeadId!);
           break;
         case 'agent:status':
-          if (msg.agentId === selectedLeadId) handleStatus(msg, store);
+          if (msg.agentId === effectiveLeadId) handleStatus(msg, store, selectedLeadId!);
           break;
         case 'agent:tool_call':
-          if (selectedLeadId) handleToolCall(msg, store, agents, selectedLeadId);
+          if (effectiveLeadId) handleToolCall(msg, store, agents, effectiveLeadId);
           break;
         case 'agent:delegated':
           handleDelegation(msg, store, agents);
@@ -436,16 +447,16 @@ export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: strin
           handleProgress(msg, store);
           break;
         case 'agent:message_sent':
-          if (selectedLeadId) handleMessageSent(msg, store, agents, selectedLeadId);
+          if (effectiveLeadId) handleMessageSent(msg, store, agents, effectiveLeadId);
           break;
         case 'group:created':
-          if (msg.leadId === selectedLeadId && selectedLeadId) handleGroupCreated(store, selectedLeadId);
+          if ((msg.leadId === selectedLeadId || msg.leadId === effectiveLeadId) && effectiveLeadId) handleGroupCreated(store, selectedLeadId!);
           break;
         case 'group:message':
-          if (msg.leadId === selectedLeadId && selectedLeadId) handleGroupMessage(msg, store, selectedLeadId);
+          if ((msg.leadId === selectedLeadId || msg.leadId === effectiveLeadId) && effectiveLeadId) handleGroupMessage(msg, store, selectedLeadId!);
           break;
         case 'dag:updated':
-          if (msg.leadId === selectedLeadId && selectedLeadId) handleDagUpdated(store, selectedLeadId, historicalProjectId);
+          if ((msg.leadId === selectedLeadId || msg.leadId === effectiveLeadId) && effectiveLeadId) handleDagUpdated(store, selectedLeadId!, historicalProjectId);
           break;
         case 'agent:context_compacted':
           handleContextCompacted(msg, store, agents);
