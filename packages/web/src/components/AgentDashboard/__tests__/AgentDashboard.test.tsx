@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 import { AgentDashboard } from '../AgentDashboard';
 import type { AgentInfo } from '../../../types';
 
@@ -89,40 +89,46 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+async function renderDashboard(ui?: React.ReactElement) {
+  await act(async () => {
+    render(ui ?? <AgentDashboard />);
+  });
+}
+
 describe('AgentDashboard', () => {
-  it('renders FleetStats with agents', () => {
-    render(<AgentDashboard />);
+  it('renders FleetStats with agents', async () => {
+    await renderDashboard();
     expect(screen.getByTestId('fleet-stats').textContent).toContain('2 agents');
   });
 
-  it('renders spawn agent button', () => {
-    render(<AgentDashboard />);
+  it('renders spawn agent button', async () => {
+    await renderDashboard();
     expect(screen.getByText('Spawn Agent')).toBeDefined();
   });
 
   it('opens spawn dialog when button clicked', async () => {
-    render(<AgentDashboard />);
+    await renderDashboard();
     expect(screen.queryByTestId('spawn-dialog')).toBeNull();
     fireEvent.click(screen.getByText('Spawn Agent'));
     expect(screen.getByTestId('spawn-dialog')).toBeDefined();
   });
 
   it('opens spawn dialog with N keyboard shortcut', async () => {
-    render(<AgentDashboard />);
+    await renderDashboard();
     fireEvent.keyDown(window, { key: 'n' });
     expect(screen.getByTestId('spawn-dialog')).toBeDefined();
   });
 
   it('closes spawn dialog with Escape', async () => {
-    render(<AgentDashboard />);
+    await renderDashboard();
     fireEvent.click(screen.getByText('Spawn Agent'));
     expect(screen.getByTestId('spawn-dialog')).toBeDefined();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByTestId('spawn-dialog')).toBeNull();
   });
 
-  it('does not open spawn dialog when N pressed in input', () => {
-    render(
+  it('does not open spawn dialog when N pressed in input', async () => {
+    await renderDashboard(
       <div>
         <input data-testid="text-input" />
         <AgentDashboard />
@@ -133,14 +139,14 @@ describe('AgentDashboard', () => {
     expect(screen.queryByTestId('spawn-dialog')).toBeNull();
   });
 
-  it('renders agent filter dropdown', () => {
-    render(<AgentDashboard />);
+  it('renders agent filter dropdown', async () => {
+    await renderDashboard();
     const select = screen.getByDisplayValue('All agents');
     expect(select).toBeDefined();
   });
 
-  it('filters agents when selection changes', () => {
-    render(<AgentDashboard />);
+  it('filters agents when selection changes', async () => {
+    await renderDashboard();
     const select = screen.getByDisplayValue('All agents') as HTMLSelectElement;
     fireEvent.change(select, { target: { value: 'dev-001' } });
     // After filtering, only 1 agent should show
@@ -150,18 +156,18 @@ describe('AgentDashboard', () => {
     expect(hasFiltered).toBe(true);
   });
 
-  it('renders group by project toggle', () => {
-    render(<AgentDashboard />);
+  it('renders group by project toggle', async () => {
+    await renderDashboard();
     expect(screen.getByTitle('Group by project')).toBeDefined();
   });
 
-  it('shows project groups by default', () => {
-    render(<AgentDashboard />);
+  it('shows project groups by default', async () => {
+    await renderDashboard();
     expect(screen.getByText('my-project')).toBeDefined();
   });
 
-  it('collapses project group on click', () => {
-    render(<AgentDashboard />);
+  it('collapses project group on click', async () => {
+    await renderDashboard();
     const groupBtn = screen.getByText('my-project').closest('button')!;
     // Before collapse, table is visible
     expect(screen.getAllByTestId('agent-table').length).toBeGreaterThan(0);
@@ -171,8 +177,8 @@ describe('AgentDashboard', () => {
     expect(screen.getByText('my-project')).toBeDefined();
   });
 
-  it('disables grouping when toggle clicked', () => {
-    render(<AgentDashboard />);
+  it('disables grouping when toggle clicked', async () => {
+    await renderDashboard();
     const toggle = screen.getByTitle('Group by project');
     fireEvent.click(toggle);
     // With grouping off, should show a flat table with all agents
@@ -180,27 +186,27 @@ describe('AgentDashboard', () => {
     expect(screen.getByTestId('agent-table').textContent).toContain('2 agents');
   });
 
-  it('shows activity and locks section collapsed by default', () => {
-    render(<AgentDashboard />);
+  it('shows activity and locks section collapsed by default', async () => {
+    await renderDashboard();
     expect(screen.getByText(/Activity & Locks/)).toBeDefined();
     expect(screen.queryByTestId('activity-feed')).toBeNull();
   });
 
-  it('expands activity section on click', () => {
-    render(<AgentDashboard />);
+  it('expands activity section on click', async () => {
+    await renderDashboard();
     fireEvent.click(screen.getByText(/Activity & Locks/));
     expect(screen.getByTestId('activity-feed')).toBeDefined();
     expect(screen.getByTestId('file-lock-panel')).toBeDefined();
   });
 
-  it('falls back to historical agents when live agents empty', () => {
+  it('falls back to historical agents when live agents empty', async () => {
     storeState = { agents: [], historicalAgents: mockAgents };
-    render(<AgentDashboard />);
+    await renderDashboard();
     expect(screen.getByTestId('fleet-stats').textContent).toContain('2 agents');
   });
 
-  it('renders keyboard shortcut hint', () => {
-    render(<AgentDashboard />);
+  it('renders keyboard shortcut hint', async () => {
+    await renderDashboard();
     expect(screen.getByText('N')).toBeDefined();
   });
 });

@@ -55,21 +55,26 @@ describe('NewProjectModal', () => {
     });
   });
 
-  it('renders the form', () => {
+  it('renders the form', async () => {
     renderModal();
     expect(screen.getByText('New Project')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('My Feature')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Describe what you want/)).toBeInTheDocument();
+    await act(async () => {});
   });
 
   it('validates project name is required', async () => {
     renderModal();
     // First blur the name field to trigger touched state
     const nameInput = screen.getByPlaceholderText('My Feature');
-    fireEvent.focus(nameInput);
-    fireEvent.blur(nameInput);
+    await act(async () => {
+      fireEvent.focus(nameInput);
+      fireEvent.blur(nameInput);
+    });
     // Then click create
-    fireEvent.click(screen.getByText('Create Project'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Create Project'));
+    });
     await waitFor(() => {
       expect(screen.getByText('Project name is required')).toBeInTheDocument();
     });
@@ -77,8 +82,10 @@ describe('NewProjectModal', () => {
 
   it('creates a project successfully', async () => {
     const { onClose } = renderModal();
-    fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test Project' } });
-    fireEvent.click(screen.getByText('Create Project'));
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test Project' } });
+      fireEvent.click(screen.getByText('Create Project'));
+    });
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/lead/start', expect.objectContaining({
         method: 'POST',
@@ -89,8 +96,10 @@ describe('NewProjectModal', () => {
 
   it('navigates to project on success', async () => {
     renderModal();
-    fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test Project' } });
-    fireEvent.click(screen.getByText('Create Project'));
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test Project' } });
+      fireEvent.click(screen.getByText('Create Project'));
+    });
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
     });
@@ -102,8 +111,10 @@ describe('NewProjectModal', () => {
       return Promise.reject(new Error('Server error'));
     });
     renderModal();
-    fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test' } });
-    fireEvent.click(screen.getByText('Create Project'));
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test' } });
+      fireEvent.click(screen.getByText('Create Project'));
+    });
     await waitFor(() => {
       expect(screen.getByText('Server error')).toBeInTheDocument();
     });
@@ -116,24 +127,30 @@ describe('NewProjectModal', () => {
       return new Promise((r) => { resolveCreate = r; });
     });
     renderModal();
-    fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test' } });
-    fireEvent.click(screen.getByText('Create Project'));
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('My Feature'), { target: { value: 'Test' } });
+      fireEvent.click(screen.getByText('Create Project'));
+    });
     await waitFor(() => {
       expect(screen.getByText('Starting...')).toBeInTheDocument();
     });
     await act(async () => resolveCreate!({ id: 'lead-1', projectId: 'proj-1' }));
   });
 
-  it('closes on Cancel', () => {
+  it('closes on Cancel', async () => {
     const { onClose } = renderModal();
-    fireEvent.click(screen.getByText('Cancel'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Cancel'));
+    });
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('closes on backdrop click', () => {
+  it('closes on backdrop click', async () => {
     const { onClose, container } = renderModal();
     const backdrop = container.querySelector('.fixed.inset-0') as HTMLElement;
-    if (backdrop) fireEvent.mouseDown(backdrop);
+    await act(async () => {
+      if (backdrop) fireEvent.mouseDown(backdrop);
+    });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -150,7 +167,9 @@ describe('NewProjectModal', () => {
     await waitFor(() => screen.getByText('Developer'));
     const devBtn = screen.getByText('Developer').closest('button');
     if (devBtn) {
-      fireEvent.click(devBtn);
+      await act(async () => {
+        fireEvent.click(devBtn);
+      });
       // Should be visually selected
       expect(devBtn.className).toContain('yellow');
     }
@@ -159,15 +178,19 @@ describe('NewProjectModal', () => {
   it('opens folder picker', async () => {
     renderModal();
     const browseBtn = screen.getByTitle('Browse folders');
-    fireEvent.click(browseBtn);
+    await act(async () => {
+      fireEvent.click(browseBtn);
+    });
     await waitFor(() => {
       expect(screen.getByTestId('folder-picker')).toBeInTheDocument();
     });
   });
 
-  it('toggles model config panel', () => {
+  it('toggles model config panel', async () => {
     renderModal();
-    fireEvent.click(screen.getByText('Model Configuration'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Model Configuration'));
+    });
     expect(screen.getByTestId('model-config-panel')).toBeInTheDocument();
   });
 });

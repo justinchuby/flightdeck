@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { useAppStore } from '../../../stores/appStore';
 import { useLeadStore } from '../../../stores/leadStore';
 import type { AgentInfo, Decision } from '../../../types';
@@ -96,6 +96,12 @@ function resetStores() {
   useLeadStore.setState({ projects: {}, selectedLeadId: null, drafts: {} });
 }
 
+async function renderPage() {
+  await act(async () => {
+    render(<OverviewPage />);
+  });
+}
+
 // ── Tests ───────────────────────────────────────────────────────────
 
 describe('OverviewPage', () => {
@@ -107,16 +113,16 @@ describe('OverviewPage', () => {
     mockApiFetch.mockResolvedValue([]);
   });
 
-  it('renders empty state when no projects and no effectiveId', () => {
+  it('renders empty state when no projects and no effectiveId', async () => {
     mockProjectId = '';
     mockProjects = [];
     useAppStore.setState({ agents: [] });
 
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByText(/No session data yet/i)).toBeInTheDocument();
   });
 
-  it('renders overview page with quick status bar', () => {
+  it('renders overview page with quick status bar', async () => {
     useAppStore.setState({
       agents: [
         makeAgent({ id: 'lead-1', role: { id: 'lead', name: 'Lead', icon: '👑', description: '' }, status: 'running' }),
@@ -124,7 +130,7 @@ describe('OverviewPage', () => {
       ],
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByTestId('overview-page')).toBeInTheDocument();
     expect(screen.getByTestId('quick-status-bar')).toBeInTheDocument();
     expect(screen.getByText('● Running')).toBeInTheDocument();
@@ -132,14 +138,14 @@ describe('OverviewPage', () => {
     expect(screen.getAllByText(/2 agents/).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows "Stopped" when no active agents', () => {
+  it('shows "Stopped" when no active agents', async () => {
     useAppStore.setState({ agents: [] });
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByText('● Stopped')).toBeInTheDocument();
     expect(screen.getByText(/0 agents/)).toBeInTheDocument();
   });
 
-  it('shows active session banner with stop button when lead is running', () => {
+  it('shows active session banner with stop button when lead is running', async () => {
     const lead = makeAgent({
       id: 'lead-1',
       role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
@@ -148,27 +154,27 @@ describe('OverviewPage', () => {
     });
     useAppStore.setState({ agents: [lead] });
 
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByTestId('active-session-banner')).toBeInTheDocument();
     expect(screen.getByText('Active Session')).toBeInTheDocument();
     expect(screen.getByTestId('stop-session-btn')).toBeInTheDocument();
   });
 
-  it('shows "New Session" button when no active lead', () => {
+  it('shows "New Session" button when no active lead', async () => {
     useAppStore.setState({ agents: [] });
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByTestId('no-session-controls')).toBeInTheDocument();
     expect(screen.getByTestId('new-session-btn')).toBeInTheDocument();
   });
 
-  it('opens new session dialog on button click', () => {
+  it('opens new session dialog on button click', async () => {
     useAppStore.setState({ agents: [] });
-    render(<OverviewPage />);
+    await renderPage();
     fireEvent.click(screen.getByTestId('new-session-btn'));
     expect(screen.getByTestId('new-session-dialog')).toBeInTheDocument();
   });
 
-  it('shows task progress in status bar', () => {
+  it('shows task progress in status bar', async () => {
     const lead = makeAgent({
       id: 'lead-1',
       role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
@@ -200,34 +206,34 @@ describe('OverviewPage', () => {
       },
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByText('3/6 tasks')).toBeInTheDocument();
   });
 
-  it('displays decisions feed section', () => {
-    render(<OverviewPage />);
+  it('displays decisions feed section', async () => {
+    await renderPage();
     expect(screen.getByTestId('decisions-feed')).toBeInTheDocument();
     expect(screen.getByText('Decisions')).toBeInTheDocument();
   });
 
-  it('displays progress feed section', () => {
-    render(<OverviewPage />);
+  it('displays progress feed section', async () => {
+    await renderPage();
     expect(screen.getByTestId('progress-feed')).toBeInTheDocument();
     expect(screen.getByText('Recent Progress')).toBeInTheDocument();
   });
 
-  it('renders token usage section', () => {
-    render(<OverviewPage />);
+  it('renders token usage section', async () => {
+    await renderPage();
     expect(screen.getByTestId('token-usage-section')).toBeInTheDocument();
     expect(screen.getByText('tokens-proj-1')).toBeInTheDocument();
   });
 
-  it('renders session history section', () => {
-    render(<OverviewPage />);
+  it('renders session history section', async () => {
+    await renderPage();
     expect(screen.getByTestId('session-history')).toBeInTheDocument();
   });
 
-  it('shows attention alerts when detectAlerts returns items', () => {
+  it('shows attention alerts when detectAlerts returns items', async () => {
     vi.mocked(detectAlerts).mockReturnValue([
       {
         id: 'alert-1',
@@ -240,20 +246,20 @@ describe('OverviewPage', () => {
     ]);
     useAppStore.setState({ agents: [makeAgent()] });
 
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByTestId('attention-items')).toBeInTheDocument();
     expect(screen.getByText('Attention Required')).toBeInTheDocument();
     expect(screen.getByText(/Agent failed/)).toBeInTheDocument();
   });
 
-  it('shows project directory when project has cwd', () => {
+  it('shows project directory when project has cwd', async () => {
     mockProjects = [{ id: 'proj-1', name: 'Test', status: 'active', cwd: '/home/user/project' }];
-    render(<OverviewPage />);
+    await renderPage();
     expect(screen.getByTestId('project-directory')).toBeInTheDocument();
     expect(screen.getByText('/home/user/project')).toBeInTheDocument();
   });
 
-  it('navigates to session page when clicking active session banner', () => {
+  it('navigates to session page when clicking active session banner', async () => {
     const lead = makeAgent({
       id: 'lead-1',
       role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
@@ -261,7 +267,7 @@ describe('OverviewPage', () => {
     });
     useAppStore.setState({ agents: [lead] });
 
-    render(<OverviewPage />);
+    await renderPage();
     fireEvent.click(screen.getByTestId('active-session-banner'));
     expect(mockNavigate).toHaveBeenCalledWith('/projects/proj-1/session');
   });
@@ -274,7 +280,7 @@ describe('OverviewPage', () => {
     });
     useAppStore.setState({ agents: [lead] });
 
-    render(<OverviewPage />);
+    await renderPage();
     fireEvent.click(screen.getByTestId('stop-session-btn'));
 
     await waitFor(() => {
@@ -295,7 +301,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('file-lock-panel')).toBeInTheDocument();
     });
@@ -313,7 +319,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getAllByTestId('decision-feed-item').length).toBeGreaterThan(0);
     });
@@ -328,7 +334,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('decision-feed-item')).toBeInTheDocument();
     });
@@ -346,7 +352,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('decision-feed-item')).toBeInTheDocument();
     });
@@ -358,13 +364,13 @@ describe('OverviewPage', () => {
     expect(screen.queryByTestId('decision-detail-modal')).not.toBeInTheDocument();
   });
 
-  it('shows "No decisions yet" when no decisions exist', () => {
-    render(<OverviewPage />);
+  it('shows "No decisions yet" when no decisions exist', async () => {
+    await renderPage();
     expect(screen.getByText('No decisions yet')).toBeInTheDocument();
   });
 
-  it('shows "No progress events yet" when no activity exists', () => {
-    render(<OverviewPage />);
+  it('shows "No progress events yet" when no activity exists', async () => {
+    await renderPage();
     expect(screen.getByText('No progress events yet')).toBeInTheDocument();
   });
 
@@ -379,7 +385,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('activity-feed-item')).toBeInTheDocument();
     });
@@ -395,7 +401,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('activity-feed-item')).toBeInTheDocument();
     });
@@ -413,7 +419,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('activity-feed-item')).toBeInTheDocument();
     });
@@ -427,9 +433,9 @@ describe('OverviewPage', () => {
 
   // ── New session dialog ──────────────────────────────────────────
 
-  it('closes new session dialog via close button', () => {
+  it('closes new session dialog via close button', async () => {
     useAppStore.setState({ agents: [] });
-    render(<OverviewPage />);
+    await renderPage();
     fireEvent.click(screen.getByTestId('new-session-btn'));
     expect(screen.getByTestId('new-session-dialog')).toBeInTheDocument();
 
@@ -449,7 +455,7 @@ describe('OverviewPage', () => {
       return Promise.resolve([]);
     });
 
-    render(<OverviewPage />);
+    await renderPage();
     await waitFor(() => {
       expect(screen.getByText('Actionable')).toBeInTheDocument();
     });

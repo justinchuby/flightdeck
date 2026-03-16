@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -47,7 +47,9 @@ describe('useLeadPolling — retry callbacks (lines 28-29, 46-47, 82-83)', () =>
     });
 
     const wrapper = createWrapper();
-    renderHook(() => useLeadPolling('lead-1', true, null), { wrapper });
+    await act(async () => {
+      renderHook(() => useLeadPolling('lead-1', true, null), { wrapper });
+    });
 
     await waitFor(() => {
       const progressCalls = mockApiFetch.mock.calls.filter(
@@ -57,7 +59,7 @@ describe('useLeadPolling — retry callbacks (lines 28-29, 46-47, 82-83)', () =>
     });
 
     // Wait a bit to confirm no retries happen for 404
-    await new Promise(r => setTimeout(r, 100));
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
     const progressCalls = mockApiFetch.mock.calls.filter(
       (c: unknown[]) => (c[0] as string).includes('/progress')
     );
@@ -73,7 +75,9 @@ describe('useLeadPolling — retry callbacks (lines 28-29, 46-47, 82-83)', () =>
     });
 
     const wrapper = createWrapper();
-    renderHook(() => useLeadPolling('lead-1', true, null), { wrapper });
+    await act(async () => {
+      renderHook(() => useLeadPolling('lead-1', true, null), { wrapper });
+    });
 
     await waitFor(() => {
       const decisionCalls = mockApiFetch.mock.calls.filter(
@@ -82,7 +86,7 @@ describe('useLeadPolling — retry callbacks (lines 28-29, 46-47, 82-83)', () =>
       expect(decisionCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    await new Promise(r => setTimeout(r, 100));
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
     const decisionCalls = mockApiFetch.mock.calls.filter(
       (c: unknown[]) => (c[0] as string).includes('/decisions')
     );
@@ -97,7 +101,9 @@ describe('useLeadPolling — retry callbacks (lines 28-29, 46-47, 82-83)', () =>
     });
 
     const wrapper = createWrapper();
-    renderHook(() => useLeadPolling('lead-1', true, null), { wrapper });
+    await act(async () => {
+      renderHook(() => useLeadPolling('lead-1', true, null), { wrapper });
+    });
 
     await waitFor(() => {
       const dagCalls = mockApiFetch.mock.calls.filter(
@@ -106,7 +112,7 @@ describe('useLeadPolling — retry callbacks (lines 28-29, 46-47, 82-83)', () =>
       expect(dagCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    await new Promise(r => setTimeout(r, 100));
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
     const dagCalls = mockApiFetch.mock.calls.filter(
       (c: unknown[]) => (c[0] as string).includes('/dag')
     );

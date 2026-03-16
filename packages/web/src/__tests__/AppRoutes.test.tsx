@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -487,7 +487,7 @@ describe('AppRoutes – togglePause', () => {
       expect(screen.getByText('Pause')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Pause'));
+    await act(async () => { fireEvent.click(screen.getByText('Pause')); });
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/system/pause', { method: 'POST' });
@@ -501,7 +501,7 @@ describe('AppRoutes – togglePause', () => {
       expect(screen.getByText('Resume')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Resume'));
+    await act(async () => { fireEvent.click(screen.getByText('Resume')); });
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/system/resume', { method: 'POST' });
@@ -516,7 +516,7 @@ describe('AppRoutes – togglePause', () => {
       expect(screen.getByText('Pause')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Pause'));
+    await act(async () => { fireEvent.click(screen.getByText('Pause')); });
 
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith('error', expect.stringContaining('Network down'));
@@ -661,16 +661,18 @@ describe('AppRoutes – WebSocket event handling', () => {
       expect(screen.getByTestId('sidebar')).toBeInTheDocument();
     });
 
-    // Now transition to idle
-    useAppStore.setState({
-      agents: [{ id: 'a1', status: 'idle' }] as any,
-    });
+    // Now transition to idle — wrap in act() since setState + rerender triggers state updates
+    act(() => {
+      useAppStore.setState({
+        agents: [{ id: 'a1', status: 'idle' }] as any,
+      });
 
-    rerender(
-      <MemoryRouter initialEntries={['/']}>
-        <App />
-      </MemoryRouter>,
-    );
+      rerender(
+        <MemoryRouter initialEntries={['/']}>
+          <App />
+        </MemoryRouter>,
+      );
+    });
 
     await waitFor(() => {
       expect(mockPlaySound).toHaveBeenCalled();

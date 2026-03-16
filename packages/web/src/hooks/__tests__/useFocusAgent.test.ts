@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../useApi', () => ({
   apiFetch: vi.fn(),
@@ -95,7 +95,7 @@ describe('useFocusAgent', () => {
 
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
 
-    result.current.refresh();
+    act(() => { result.current.refresh(); });
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(2));
   });
 

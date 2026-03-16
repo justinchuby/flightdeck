@@ -50,6 +50,7 @@ describe('useSessionReplay — playback reaches end (lines 119-125)', () => {
     // Wait for keyframes to load (using real timers)
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.duration).toBe(2000);
+    await act(async () => {});
 
     // Now switch to fake timers for playback control
     vi.useFakeTimers();
@@ -63,8 +64,8 @@ describe('useSessionReplay — playback reaches end (lines 119-125)', () => {
     // Default speed is 4, PLAYBACK_TICK_MS is 100
     // Each tick advances by 100 * 4 = 400ms of session time
     // After 5 ticks (500ms real) = 2000ms session time → hits duration
-    act(() => {
-      vi.advanceTimersByTime(600);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
     });
 
     expect(result.current.playing).toBe(false);

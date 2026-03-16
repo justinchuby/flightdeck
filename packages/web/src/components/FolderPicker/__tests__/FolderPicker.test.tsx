@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { FolderPicker } from '../FolderPicker';
 
 const mockApiFetch = vi.fn();
@@ -58,7 +58,7 @@ describe('FolderPicker', () => {
       parent: '/home/user/projects',
       folders: [{ name: 'components', path: '/home/user/projects/src/components' }],
     });
-    fireEvent.click(screen.getByText('src'));
+    await act(async () => { fireEvent.click(screen.getByText('src')); });
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/browse?path=%2Fhome%2Fuser%2Fprojects%2Fsrc');
     });
@@ -72,7 +72,7 @@ describe('FolderPicker', () => {
       parent: '/home',
       folders: [{ name: 'projects', path: '/home/user/projects' }],
     });
-    fireEvent.click(screen.getByLabelText('Go to parent directory'));
+    await act(async () => { fireEvent.click(screen.getByLabelText('Go to parent directory')); });
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/browse?path=%2Fhome%2Fuser');
     });
@@ -93,7 +93,7 @@ describe('FolderPicker', () => {
   it('calls onChange and onClose when Select is clicked', async () => {
     render(<FolderPicker value="/home/user/projects" onChange={onChange} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument());
-    fireEvent.click(screen.getByText(/^Select "/));
+    await act(async () => { fireEvent.click(screen.getByText(/^Select "/)); });
     expect(onChange).toHaveBeenCalledWith('/home/user/projects');
     expect(onClose).toHaveBeenCalled();
   });
@@ -101,13 +101,13 @@ describe('FolderPicker', () => {
   it('calls onClose when Cancel is clicked', async () => {
     render(<FolderPicker value="/home/user/projects" onChange={onChange} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('Cancel'));
+    await act(async () => { fireEvent.click(screen.getByText('Cancel')); });
     expect(onClose).toHaveBeenCalled();
   });
 
   it('calls onClose when close button (×) is clicked', async () => {
     render(<FolderPicker value="/home/user/projects" onChange={onChange} onClose={onClose} />);
-    fireEvent.click(screen.getByLabelText('Close folder picker'));
+    await act(async () => { fireEvent.click(screen.getByLabelText('Close folder picker')); });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -116,7 +116,7 @@ describe('FolderPicker', () => {
     // The backdrop is the outermost div with the fixed class
     const backdrop = screen.getByText('Select Directory').closest('.fixed')!;
     // mouseDown on backdrop itself (target === currentTarget)
-    fireEvent.mouseDown(backdrop, { target: backdrop });
+    await act(async () => { fireEvent.mouseDown(backdrop, { target: backdrop }); });
     expect(onClose).toHaveBeenCalled();
   });
 

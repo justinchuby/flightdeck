@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 import { DataManagement } from '../DataManagement';
 
 const mockApiFetch = vi.fn();
@@ -25,6 +25,7 @@ describe('DataManagement', () => {
   it('renders Data Management heading', async () => {
     render(<DataManagement />);
     expect(screen.getByText('Data Management')).toBeDefined();
+    await act(async () => {});
   });
 
   it('fetches and shows database stats on mount', async () => {
@@ -70,7 +71,7 @@ describe('DataManagement', () => {
 
     render(<DataManagement />);
     await waitFor(() => expect(screen.getByText('Preview')).toBeDefined());
-    fireEvent.click(screen.getByText('Preview'));
+    await act(async () => { fireEvent.click(screen.getByText('Preview')); });
     await waitFor(() => {
       expect(screen.getByText(/150 total records/)).toBeDefined();
       expect(screen.getByText('Permanently Delete')).toBeDefined();
@@ -86,24 +87,25 @@ describe('DataManagement', () => {
 
     render(<DataManagement />);
     await waitFor(() => expect(screen.getByText('Preview')).toBeDefined());
-    fireEvent.click(screen.getByText('Preview'));
+    await act(async () => { fireEvent.click(screen.getByText('Preview')); });
     await waitFor(() => expect(screen.getByText('Permanently Delete')).toBeDefined());
-    fireEvent.click(screen.getByText('Permanently Delete'));
+    await act(async () => { fireEvent.click(screen.getByText('Permanently Delete')); });
     await waitFor(() => {
       expect(screen.getByText(/Deleted 150 records/)).toBeDefined();
     });
   });
 
-  it('has Refresh button', () => {
+  it('has Refresh button', async () => {
     render(<DataManagement />);
     expect(screen.getByText('Refresh')).toBeDefined();
+    await act(async () => {});
   });
 
   it('shows warning for "All data" option', async () => {
     render(<DataManagement />);
     await waitFor(() => expect(screen.getByText('Preview')).toBeDefined());
     const select = screen.getByDisplayValue('30 days');
-    fireEvent.change(select, { target: { value: '0' } });
+    await act(async () => { fireEvent.change(select, { target: { value: '0' } }); });
     expect(screen.getByText(/delete ALL session data/)).toBeDefined();
   });
 });

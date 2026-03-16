@@ -351,17 +351,19 @@ describe('AppCoverage', () => {
       const { rerender } = renderApp();
       await waitFor(() => expect(screen.getByTestId('sidebar')).toBeInTheDocument());
 
-      // Transition all agents to idle
-      useAppStore.setState({
-        agents: [{ id: 'a1', status: 'idle', role: { id: 'dev', name: 'Dev', icon: '💻' } }] as any,
-      });
+      // Transition all agents to idle — wrap in act() since setState + rerender triggers state updates
+      act(() => {
+        useAppStore.setState({
+          agents: [{ id: 'a1', status: 'idle', role: { id: 'dev', name: 'Dev', icon: '💻' } }] as any,
+        });
 
-      // Re-render to trigger the useEffect
-      rerender(
-        <MemoryRouter initialEntries={['/']}>
-          <App />
-        </MemoryRouter>,
-      );
+        // Re-render to trigger the useEffect
+        rerender(
+          <MemoryRouter initialEntries={['/']}>
+            <App />
+          </MemoryRouter>,
+        );
+      });
 
       await waitFor(() => {
         expect(mockPlayCompletionSound).toHaveBeenCalled();
@@ -560,7 +562,7 @@ describe('AppCoverage', () => {
       renderApp();
       await waitFor(() => expect(screen.getByText('Pause')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByText('Pause'));
+      await act(async () => { fireEvent.click(screen.getByText('Pause')); });
 
       await waitFor(() => {
         expect(mockApiFetch).toHaveBeenCalledWith('/system/pause', { method: 'POST' });
@@ -573,7 +575,7 @@ describe('AppCoverage', () => {
       renderApp();
       await waitFor(() => expect(screen.getByText('Resume')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByText('Resume'));
+      await act(async () => { fireEvent.click(screen.getByText('Resume')); });
 
       await waitFor(() => {
         expect(mockApiFetch).toHaveBeenCalledWith('/system/resume', { method: 'POST' });
@@ -585,7 +587,7 @@ describe('AppCoverage', () => {
       renderApp();
       await waitFor(() => expect(screen.getByText('Pause')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByText('Pause'));
+      await act(async () => { fireEvent.click(screen.getByText('Pause')); });
 
       await waitFor(() => {
         expect(mockAddToast).toHaveBeenCalledWith('error', expect.stringContaining('Failed to pause'));

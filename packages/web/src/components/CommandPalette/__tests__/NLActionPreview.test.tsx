@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { NLPattern } from '../../../services/NLCommandRegistry';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
@@ -78,34 +78,39 @@ describe('NLActionPreview', () => {
     mockApiFetch.mockReset();
   });
 
-  it('renders header with pattern icon and description', () => {
+  it('renders header with pattern icon and description', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview();
+    await act(async () => {});
     expect(screen.getByText('⏸')).toBeInTheDocument();
     expect(screen.getByText('Pause all running agents')).toBeInTheDocument();
   });
 
-  it('renders the query text', () => {
+  it('renders the query text', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview({ query: 'pause everything' });
+    await act(async () => {});
     expect(screen.getByText(/pause everything/)).toBeInTheDocument();
   });
 
-  it('has complementary role with aria-label', () => {
+  it('has complementary role with aria-label', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview();
+    await act(async () => {});
     expect(screen.getByRole('complementary')).toHaveAttribute('aria-label', 'Action preview');
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
     renderPreview();
+    await act(async () => {});
     expect(screen.getByText('Loading preview…')).toBeInTheDocument();
   });
 
   it('shows plan steps after loading', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview();
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText('This will:')).toBeInTheDocument();
     });
@@ -118,6 +123,7 @@ describe('NLActionPreview', () => {
   it('shows estimated impact', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview();
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/Affects: 2 agents/)).toBeInTheDocument();
     });
@@ -126,6 +132,7 @@ describe('NLActionPreview', () => {
   it('shows reversible status', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview();
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/Reversible: Yes/)).toBeInTheDocument();
     });
@@ -134,29 +141,33 @@ describe('NLActionPreview', () => {
   it('shows error on preview failure', async () => {
     mockApiFetch.mockRejectedValue(new Error('Network error'));
     renderPreview();
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText('Could not preview command')).toBeInTheDocument();
     });
   });
 
-  it('disables Execute button when loading', () => {
+  it('disables Execute button when loading', async () => {
     mockApiFetch.mockReturnValue(new Promise(() => {}));
     renderPreview();
+    await act(async () => {});
     expect(screen.getByText('Execute →')).toBeDisabled();
   });
 
   it('disables Execute button on error', async () => {
     mockApiFetch.mockRejectedValue(new Error('fail'));
     renderPreview();
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText('Execute →')).toBeDisabled();
     });
   });
 
-  it('calls onClose when Cancel is clicked', () => {
+  it('calls onClose when Cancel is clicked', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     const { onClose } = renderPreview();
-    fireEvent.click(screen.getByText('Cancel'));
+    await act(async () => {});
+    await act(async () => { fireEvent.click(screen.getByText('Cancel')); });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -166,8 +177,9 @@ describe('NLActionPreview', () => {
       .mockResolvedValueOnce({ commandId: 'cmd-1', plan: actionPlan.plan }); // execute
 
     const { onExecuted } = renderPreview();
+    await act(async () => {});
     await waitFor(() => screen.getByText('Execute →'));
-    fireEvent.click(screen.getByText('Execute →'));
+    await act(async () => { fireEvent.click(screen.getByText('Execute →')); });
     await waitFor(() => {
       expect(onExecuted).toHaveBeenCalled();
     });
@@ -180,7 +192,7 @@ describe('NLActionPreview', () => {
 
     renderPreview();
     await waitFor(() => screen.getByText('Execute →'));
-    fireEvent.click(screen.getByText('Execute →'));
+    await act(async () => { fireEvent.click(screen.getByText('Execute →')); });
     await waitFor(() => {
       expect(undoStack.push).toHaveBeenCalledWith('cmd-1', 'Pause 2 agents');
     });
@@ -193,7 +205,7 @@ describe('NLActionPreview', () => {
 
     renderPreview();
     await waitFor(() => screen.getByText('Execute →'));
-    fireEvent.click(screen.getByText('Execute →'));
+    await act(async () => { fireEvent.click(screen.getByText('Execute →')); });
     await waitFor(() => {
       expect(screen.getByText('Command execution failed')).toBeInTheDocument();
     });
@@ -215,9 +227,10 @@ describe('NLActionPreview', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('fetches preview with correct endpoint and body', () => {
+  it('fetches preview with correct endpoint and body', async () => {
     mockApiFetch.mockResolvedValue(actionPlan);
     renderPreview({ query: 'pause all' });
+    await act(async () => {});
     expect(mockApiFetch).toHaveBeenCalledWith('/nl/preview', {
       method: 'POST',
       body: JSON.stringify({ command: 'pause all', sessionId: 'session-123' }),

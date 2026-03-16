@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
@@ -63,6 +63,7 @@ describe('DataBrowser', () => {
 
   it('renders the main heading and refresh button', async () => {
     render(<DataBrowser />);
+    await act(async () => {});
     expect(screen.getByText('Database')).toBeInTheDocument();
     expect(screen.getByLabelText('Refresh database stats')).toBeInTheDocument();
   });
@@ -117,7 +118,7 @@ describe('DataBrowser', () => {
     await waitFor(() => expect(screen.getByText('5')).toBeInTheDocument());
 
     // Switch to memory tab
-    fireEvent.click(screen.getByTestId('tab-memory'));
+    await act(async () => { fireEvent.click(screen.getByTestId('tab-memory')); });
 
     // Should show memory entry
     expect(await screen.findByText('test-key')).toBeInTheDocument();
@@ -132,7 +133,7 @@ describe('DataBrowser', () => {
     render(<DataBrowser />);
     await waitFor(() => expect(screen.getByText('5')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId('tab-memory'));
+    await act(async () => { fireEvent.click(screen.getByTestId('tab-memory')); });
     expect(await screen.findByText('No memory entries yet')).toBeInTheDocument();
   });
 
@@ -153,7 +154,7 @@ describe('DataBrowser', () => {
     render(<DataBrowser />);
     await waitFor(() => expect(screen.getByText('7')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId('tab-decisions'));
+    await act(async () => { fireEvent.click(screen.getByTestId('tab-decisions')); });
     expect(await screen.findByText('Use TypeScript')).toBeInTheDocument();
     expect(screen.getByText('confirmed')).toBeInTheDocument();
   });
@@ -166,7 +167,7 @@ describe('DataBrowser', () => {
     render(<DataBrowser />);
     await waitFor(() => expect(screen.getByText('7')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId('tab-decisions'));
+    await act(async () => { fireEvent.click(screen.getByTestId('tab-decisions')); });
     expect(await screen.findByText('No decisions recorded')).toBeInTheDocument();
   });
 
@@ -180,7 +181,7 @@ describe('DataBrowser', () => {
     render(<DataBrowser />);
     await waitFor(() => expect(screen.getByText('12')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId('tab-activity'));
+    await act(async () => { fireEvent.click(screen.getByTestId('tab-activity')); });
     expect(await screen.findByText('Built feature X')).toBeInTheDocument();
     expect(screen.getByText('progress_update')).toBeInTheDocument();
   });
@@ -193,7 +194,7 @@ describe('DataBrowser', () => {
     render(<DataBrowser />);
     await waitFor(() => expect(screen.getByText('12')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId('tab-activity'));
+    await act(async () => { fireEvent.click(screen.getByTestId('tab-activity')); });
     expect(await screen.findByText('No activity recorded')).toBeInTheDocument();
   });
 
@@ -204,7 +205,7 @@ describe('DataBrowser', () => {
     const updatedStats = { ...defaultStats, memory: 99 };
     mockApiFetch.mockResolvedValueOnce(updatedStats);
 
-    fireEvent.click(screen.getByLabelText('Refresh database stats'));
+    await act(async () => { fireEvent.click(screen.getByLabelText('Refresh database stats')); });
 
     expect(await screen.findByText('99')).toBeInTheDocument();
   });

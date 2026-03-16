@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { useAppStore } from '../../../stores/appStore';
 import { useLeadStore } from '../../../stores/leadStore';
 import type { AcpTextChunk, AcpPlanEntry } from '../../../types';
@@ -112,7 +112,9 @@ function seedActivity(events: ActivityEvent[]) {
 async function renderAcpOutput() {
   // Lazy-import so mocks are resolved first
   const { AcpOutput } = await import('../AcpOutput');
-  return render(<AcpOutput agentId={AGENT_ID} />);
+  const result = render(<AcpOutput agentId={AGENT_ID} />);
+  await act(async () => {});
+  return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -227,7 +229,7 @@ describe('AcpOutput', () => {
 
     // Click the plan toggle button to collapse
     const toggleBtn = screen.getByText(/Plan \(1\/2\)/);
-    fireEvent.click(toggleBtn);
+    await act(async () => { fireEvent.click(toggleBtn); });
 
     // Entries should now be hidden
     expect(screen.queryByText('Design the API')).not.toBeInTheDocument();
@@ -436,7 +438,7 @@ describe('AcpOutput', () => {
     await renderAcpOutput();
     // Second queued message should have a "Move up" button
     const moveUpBtn = screen.getByTitle('Move up');
-    fireEvent.click(moveUpBtn);
+    await act(async () => { fireEvent.click(moveUpBtn); });
     expect(mockApiFetch).toHaveBeenCalledWith(
       `/agents/${AGENT_ID}/queue/reorder`,
       { method: 'POST', body: JSON.stringify({ from: 1, to: 0 }) },
@@ -452,7 +454,7 @@ describe('AcpOutput', () => {
     ]);
     await renderAcpOutput();
     const moveDownBtn = screen.getByTitle('Move down');
-    fireEvent.click(moveDownBtn);
+    await act(async () => { fireEvent.click(moveDownBtn); });
     expect(mockApiFetch).toHaveBeenCalledWith(
       `/agents/${AGENT_ID}/queue/reorder`,
       { method: 'POST', body: JSON.stringify({ from: 0, to: 1 }) },
@@ -467,7 +469,7 @@ describe('AcpOutput', () => {
     ]);
     await renderAcpOutput();
     const removeBtn = screen.getByTitle('Remove');
-    fireEvent.click(removeBtn);
+    await act(async () => { fireEvent.click(removeBtn); });
     expect(mockApiFetch).toHaveBeenCalledWith(
       `/agents/${AGENT_ID}/queue/0`,
       { method: 'DELETE' },
@@ -556,7 +558,7 @@ describe('AcpOutput', () => {
     ]);
     await renderAcpOutput();
     const expandBtn = screen.getByText(/2 system events/);
-    fireEvent.click(expandBtn);
+    await act(async () => { fireEvent.click(expandBtn); });
     expect(screen.getByText('Inner system note')).toBeInTheDocument();
     expect(screen.getByText('Another note')).toBeInTheDocument();
   });
@@ -579,7 +581,7 @@ describe('AcpOutput', () => {
     ]);
     await renderAcpOutput();
     const label = screen.getByText('2 tool uses');
-    fireEvent.click(label);
+    await act(async () => { fireEvent.click(label); });
     // After expansion, individual tool labels should be visible
     expect(screen.getByText('tool A')).toBeInTheDocument();
     expect(screen.getByText('tool B')).toBeInTheDocument();
@@ -607,7 +609,7 @@ describe('AcpOutput', () => {
     await renderAcpOutput();
     // Click to expand
     const container = screen.getByText('Architect').closest('div[class*="cursor-pointer"]')!;
-    fireEvent.click(container);
+    await act(async () => { fireEvent.click(container); });
     // After expansion the body should be visible
     expect(screen.getByText(/Design review notes/)).toBeInTheDocument();
   });
@@ -745,7 +747,7 @@ describe('AcpOutput', () => {
     await renderAcpOutput();
     // Activity inside agent group is in CollapsibleSystemEvents
     const expandBtn = screen.getByText(/1 system event$/);
-    fireEvent.click(expandBtn);
+    await act(async () => { fireEvent.click(expandBtn); });
     expect(screen.getByText(/Progress 50%/)).toBeInTheDocument();
   });
 
@@ -764,7 +766,7 @@ describe('AcpOutput', () => {
     await renderAcpOutput();
     // The system message should be in a collapsible section
     const btn = screen.getByText(/1 system event$/);
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     expect(screen.getByText('System note')).toBeInTheDocument();
   });
 

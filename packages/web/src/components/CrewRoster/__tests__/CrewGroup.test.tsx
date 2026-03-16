@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { CrewGroup } from '../CrewGroup';
 import type { RosterAgent, CrewSummary } from '../types';
 
@@ -91,84 +91,94 @@ beforeEach(() => {
 });
 
 describe('CrewGroup', () => {
-  it('renders group header with project name', () => {
+  it('renders group header with project name', async () => {
     render(<CrewGroup {...defaultProps()} />);
+    await act(async () => {});
     expect(screen.getByText('Test Project')).toBeTruthy();
   });
 
-  it('shows active agent count badge when agents are active', () => {
+  it('shows active agent count badge when agents are active', async () => {
     render(<CrewGroup {...defaultProps()} />);
+    await act(async () => {});
     expect(screen.getByText('1/2 active')).toBeTruthy();
   });
 
-  it('shows total agent count when none are active', () => {
+  it('shows total agent count when none are active', async () => {
     const props = defaultProps();
     props.summary = makeSummary({ activeAgentCount: 0 });
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.getByText('2 agents')).toBeTruthy();
   });
 
-  it('renders agent rows when expanded', () => {
+  it('renders agent rows when expanded', async () => {
     render(<CrewGroup {...defaultProps()} />);
+    await act(async () => {});
     // Lead and developer agent rows should be visible
     expect(screen.getByText('lead')).toBeTruthy();
     expect(screen.getByText('developer')).toBeTruthy();
   });
 
-  it('hides agent rows when collapsed', () => {
+  it('hides agent rows when collapsed', async () => {
     render(<CrewGroup {...defaultProps()} defaultExpanded={false} />);
+    await act(async () => {});
     expect(screen.queryByText('developer')).toBeNull();
   });
 
-  it('toggles expand/collapse on header click', () => {
+  it('toggles expand/collapse on header click', async () => {
     render(<CrewGroup {...defaultProps()} defaultExpanded={true} />);
+    await act(async () => {});
     expect(screen.getByText('developer')).toBeTruthy();
 
     // Click the header toggle button
     const toggleBtn = screen.getByText('Test Project').closest('button')!;
-    fireEvent.click(toggleBtn);
+    await act(async () => { fireEvent.click(toggleBtn); });
     expect(screen.queryByText('developer')).toBeNull();
 
-    fireEvent.click(toggleBtn);
+    await act(async () => { fireEvent.click(toggleBtn); });
     expect(screen.getByText('developer')).toBeTruthy();
   });
 
-  it('calls onSelectAgent when agent row is clicked', () => {
+  it('calls onSelectAgent when agent row is clicked', async () => {
     const props = defaultProps();
     render(<CrewGroup {...props} />);
-    fireEvent.click(screen.getByText('developer'));
+    await act(async () => {});
+    await act(async () => { fireEvent.click(screen.getByText('developer')); });
     expect(props.onSelectAgent).toHaveBeenCalledWith('agent-002');
   });
 
-  it('shows delete button only when crew is inactive', () => {
+  it('shows delete button only when crew is inactive', async () => {
     const props = defaultProps();
     props.summary = makeSummary({ activeAgentCount: 0 });
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', liveStatus: null, status: 'terminated' }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.getByTitle('Delete crew')).toBeTruthy();
   });
 
-  it('hides delete button when agents are active', () => {
+  it('hides delete button when agents are active', async () => {
     const props = defaultProps();
     props.summary = makeSummary({ activeAgentCount: 1 });
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', liveStatus: 'running' }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.queryByTitle('Delete crew')).toBeNull();
   });
 
-  it('shows delete confirmation dialog', () => {
+  it('shows delete confirmation dialog', async () => {
     const props = defaultProps();
     props.summary = makeSummary({ activeAgentCount: 0 });
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', status: 'terminated', liveStatus: null }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
 
-    fireEvent.click(screen.getByTitle('Delete crew'));
+    await act(async () => { fireEvent.click(screen.getByTitle('Delete crew')); });
     expect(screen.getByText('Cancel')).toBeTruthy();
     expect(screen.getByText(/cannot be undone/)).toBeTruthy();
   });
@@ -180,68 +190,75 @@ describe('CrewGroup', () => {
       makeAgent({ agentId: 'lead-001', role: 'lead', status: 'terminated', liveStatus: null }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
 
-    fireEvent.click(screen.getByTitle('Delete crew'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await act(async () => { fireEvent.click(screen.getByTitle('Delete crew')); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Delete' })); });
 
     await waitFor(() => {
       expect(props.onDeleteCrew).toHaveBeenCalledWith('lead-001');
     });
   });
 
-  it('cancels delete confirmation', () => {
+  it('cancels delete confirmation', async () => {
     const props = defaultProps();
     props.summary = makeSummary({ activeAgentCount: 0 });
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', status: 'terminated', liveStatus: null }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
 
-    fireEvent.click(screen.getByTitle('Delete crew'));
+    await act(async () => { fireEvent.click(screen.getByTitle('Delete crew')); });
     expect(screen.getByText('Cancel')).toBeTruthy();
 
-    fireEvent.click(screen.getByText('Cancel'));
+    await act(async () => { fireEvent.click(screen.getByText('Cancel')); });
     expect(screen.queryByText('Cancel')).toBeNull();
   });
 
-  it('highlights selected agent row', () => {
+  it('highlights selected agent row', async () => {
     const props = defaultProps();
     props.selectedAgentId = 'agent-002';
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     // The selected agent button should have the selected class
     const agentBtn = screen.getByText('developer').closest('button')!;
     expect(agentBtn.className).toContain('border-blue-500');
   });
 
-  it('falls back to crew ID when no project name', () => {
+  it('falls back to crew ID when no project name', async () => {
     const props = defaultProps();
     props.summary = makeSummary({ projectName: null, projectId: null });
     props.agents = [makeAgent({ agentId: 'lead-001', role: 'lead', projectId: null })];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.getByText('Crew lead-001')).toBeTruthy();
   });
 
-  it('displays session count in header', () => {
+  it('displays session count in header', async () => {
     render(<CrewGroup {...defaultProps()} />);
+    await act(async () => {});
     expect(screen.getByText(/3 sessions/)).toBeTruthy();
   });
 
-  it('shows agent token usage when present', () => {
+  it('shows agent token usage when present', async () => {
     const props = defaultProps();
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', inputTokens: 1000, outputTokens: 500 }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.getByText('↓1000')).toBeTruthy();
     expect(screen.getByText('↑500')).toBeTruthy();
   });
 
-  it('shows agent task description when present', () => {
+  it('shows agent task description when present', async () => {
     const props = defaultProps();
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', task: 'Implement auth module' }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.getByText(/Implement auth module/)).toBeTruthy();
   });
 
@@ -251,6 +268,7 @@ describe('CrewGroup', () => {
     ]);
 
     render(<CrewGroup {...defaultProps()} />);
+    await act(async () => {});
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/projects/proj-1/sessions/detail');
@@ -261,12 +279,13 @@ describe('CrewGroup', () => {
     });
   });
 
-  it('shows provider badge on agent when present', () => {
+  it('shows provider badge on agent when present', async () => {
     const props = defaultProps();
     props.agents = [
       makeAgent({ agentId: 'lead-001', role: 'lead', provider: 'anthropic' }),
     ];
     render(<CrewGroup {...props} />);
+    await act(async () => {});
     expect(screen.getByText('anthropic')).toBeTruthy();
   });
 });

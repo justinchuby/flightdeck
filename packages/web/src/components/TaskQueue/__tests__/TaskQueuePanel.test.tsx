@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 
 /* ------------------------------------------------------------------ */
 /*  Test data                                                         */
@@ -95,10 +95,12 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+const mockApiContext = {
+  fetchDagStatus: vi.fn().mockResolvedValue(mockDagStatus),
+};
+
 vi.mock('../../../contexts/ApiContext', () => ({
-  useApiContext: () => ({
-    fetchDagStatus: vi.fn().mockResolvedValue(mockDagStatus),
-  }),
+  useApiContext: () => mockApiContext,
 }));
 
 vi.mock('../../../stores/appStore', () => ({
@@ -175,7 +177,6 @@ import { TaskQueuePanel } from '../TaskQueuePanel';
 /* ------------------------------------------------------------------ */
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.useFakeTimers({ shouldAdvanceTime: true });
   currentMockAgents = [
     {
       id: leadId,
@@ -190,15 +191,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.runOnlyPendingTimers();
-  vi.useRealTimers();
   cleanup();
 });
 
 async function renderAndSettle() {
   const result = render(<TaskQueuePanel />);
-  // Flush microtasks from useEffect + API calls
-  await vi.advanceTimersByTimeAsync(0);
+  // Flush async state updates from useEffect API calls
+  await act(async () => {});
   return result;
 }
 
@@ -266,8 +265,9 @@ describe('TaskQueuePanel', () => {
   it('switches to list view when list button is clicked', async () => {
     await renderAndSettle();
 
-    fireEvent.click(screen.getByTitle('List view'));
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('List view'));
+    });
 
     expect(screen.getByTestId('task-dag-panel')).toBeDefined();
   });
@@ -276,8 +276,9 @@ describe('TaskQueuePanel', () => {
   it('switches to graph view when graph button is clicked', async () => {
     await renderAndSettle();
 
-    fireEvent.click(screen.getByTitle('Graph view'));
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('Graph view'));
+    });
 
     expect(screen.getByTestId('dag-graph')).toBeDefined();
     expect(screen.queryByTestId('split-view')).toBeNull();

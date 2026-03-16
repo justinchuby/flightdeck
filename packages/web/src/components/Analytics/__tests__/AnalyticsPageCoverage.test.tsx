@@ -4,7 +4,7 @@
  * and comparison toggle branches.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
 const mockApiFetch = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({
@@ -67,15 +67,17 @@ describe('AnalyticsPage — coverage', () => {
     vi.clearAllMocks();
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
     render(<AnalyticsPage />);
+    await act(async () => {});
     expect(screen.getByText('Loading analytics...')).toBeInTheDocument();
   });
 
   it('shows empty state when no sessions', async () => {
     mockApiFetch.mockResolvedValue({ totalSessions: 0, totalInputTokens: 0, totalOutputTokens: 0, sessions: [], roleContributions: [] });
     render(<AnalyticsPage />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('analytics-empty')).toBeInTheDocument();
     });
@@ -93,6 +95,7 @@ describe('AnalyticsPage — coverage', () => {
       roleContributions: [],
     });
     render(<AnalyticsPage />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('analytics-page')).toBeInTheDocument();
     });
@@ -106,6 +109,7 @@ describe('AnalyticsPage — coverage', () => {
     // The error banner only shows alongside existing content, not in place of it
     mockApiFetch.mockRejectedValue(new Error('Network error'));
     render(<AnalyticsPage />);
+    await act(async () => {});
     // When totalSessions is 0 and there's an error, the empty state shows instead
     await waitFor(() => {
       expect(screen.getByTestId('analytics-empty')).toBeInTheDocument();
@@ -125,12 +129,15 @@ describe('AnalyticsPage — coverage', () => {
       roleContributions: [],
     });
     render(<AnalyticsPage />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('analytics-page')).toBeInTheDocument();
     });
 
     // Change to 7d window — should filter out 40-day-old session
-    fireEvent.change(screen.getByTestId('time-window'), { target: { value: '7d' } });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('time-window'), { target: { value: '7d' } });
+    });
     expect(screen.getByTestId('analytics-page')).toBeInTheDocument();
   });
 
@@ -149,13 +156,16 @@ describe('AnalyticsPage — coverage', () => {
       .mockResolvedValue({ sessions: [], difference: {} }); // comparison fetch
 
     render(<AnalyticsPage />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('session-table')).toBeInTheDocument();
     });
 
     // Toggle compare for 2 sessions
-    fireEvent.click(screen.getByTestId('compare-btn'));
-    fireEvent.click(screen.getByTestId('compare-btn-2'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('compare-btn'));
+      fireEvent.click(screen.getByTestId('compare-btn-2'));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('comparison-view')).toBeInTheDocument();
@@ -178,14 +188,17 @@ describe('AnalyticsPage — coverage', () => {
       .mockResolvedValue({ sessions: [], difference: {} });
 
     render(<AnalyticsPage />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('session-table')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId('compare-btn'));
-    fireEvent.click(screen.getByTestId('compare-btn-2'));
-    // Toggling a 3rd should replace oldest
-    fireEvent.click(screen.getByTestId('compare-btn-3'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('compare-btn'));
+      fireEvent.click(screen.getByTestId('compare-btn-2'));
+      // Toggling a 3rd should replace oldest
+      fireEvent.click(screen.getByTestId('compare-btn-3'));
+    });
   });
 
   it('handles "all" time window showing all sessions', async () => {
@@ -199,10 +212,13 @@ describe('AnalyticsPage — coverage', () => {
       roleContributions: [],
     });
     render(<AnalyticsPage />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('analytics-page')).toBeInTheDocument();
     });
-    fireEvent.change(screen.getByTestId('time-window'), { target: { value: 'all' } });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('time-window'), { target: { value: 'all' } });
+    });
     expect(screen.getByTestId('analytics-page')).toBeInTheDocument();
   });
 });

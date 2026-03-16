@@ -83,11 +83,12 @@ describe('useSessionReplay', () => {
     const dur = result.current.duration;
 
     // Seek to end
-    result.current.seek(dur);
+    act(() => { result.current.seek(dur); });
     await waitFor(() => expect(result.current.currentTime).toBe(dur));
 
     // Play should reset to 0
-    result.current.play();
+    act(() => { result.current.play(); });
+
     await waitFor(() => expect(result.current.playing).toBe(true));
     expect(result.current.currentTime).toBeLessThan(dur);
   });
@@ -100,7 +101,7 @@ describe('useSessionReplay', () => {
     });
     const { result } = renderHook(() => useSessionReplay('lead-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.duration).toBeGreaterThan(0));
-    result.current.seek(5000);
+    act(() => { result.current.seek(5000); });
     await waitFor(() => expect(result.current.currentTime).toBe(5000));
     expect(result.current.worldState).toBeNull();
   });
@@ -141,7 +142,7 @@ describe('useSessionReplay', () => {
       { timestamp: '2026-03-06T12:00:00.000Z', label: 'Start', type: 'milestone' },
       { timestamp: '2026-03-06T12:05:00.000Z', label: 'End', type: 'milestone' },
     ] });
-    rerender({ id: 'lead-2' });
+    act(() => { rerender({ id: 'lead-2' }); });
 
     // State should reset immediately
     await waitFor(() => expect(result.current.currentTime).toBe(0));

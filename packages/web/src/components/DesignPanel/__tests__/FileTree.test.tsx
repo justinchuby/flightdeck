@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { FileTree } from '../FileTree';
 
 // ── Mocks ─────────────────────────────────────────────────────────
@@ -42,15 +42,17 @@ beforeEach(() => {
 });
 
 describe('FileTree', () => {
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
     expect(screen.getByText('Loading files…')).toBeTruthy();
   });
 
   it('renders root entries after loading', async () => {
     mockApiFetch.mockResolvedValue(rootFiles);
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
 
     await waitFor(() => {
       expect(screen.getByText('src')).toBeTruthy();
@@ -62,6 +64,7 @@ describe('FileTree', () => {
   it('shows empty state when no files', async () => {
     mockApiFetch.mockResolvedValue({ path: '', items: [] });
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
 
     await waitFor(() => {
       expect(screen.getByText('No files in project directory')).toBeTruthy();
@@ -71,20 +74,22 @@ describe('FileTree', () => {
   it('calls onSelectFile when a file is clicked', async () => {
     mockApiFetch.mockResolvedValue(rootFiles);
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
 
     await waitFor(() => screen.getByText('README.md'));
-    fireEvent.click(screen.getByText('README.md'));
+    await act(async () => { fireEvent.click(screen.getByText('README.md')); });
     expect(defaultProps.onSelectFile).toHaveBeenCalledWith('README.md');
   });
 
   it('expands directory on click and fetches children', async () => {
     mockApiFetch.mockResolvedValueOnce(rootFiles);
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
 
     await waitFor(() => screen.getByText('src'));
 
     mockApiFetch.mockResolvedValueOnce(srcFiles);
-    fireEvent.click(screen.getByText('src'));
+    await act(async () => { fireEvent.click(screen.getByText('src')); });
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
@@ -97,20 +102,22 @@ describe('FileTree', () => {
   it('toggles directory collapse on second click', async () => {
     mockApiFetch.mockResolvedValueOnce(rootFiles);
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
     await waitFor(() => screen.getByText('src'));
 
     mockApiFetch.mockResolvedValueOnce(srcFiles);
-    fireEvent.click(screen.getByText('src'));
+    await act(async () => { fireEvent.click(screen.getByText('src')); });
     await waitFor(() => screen.getByText('main.py'));
 
     // Collapse
-    fireEvent.click(screen.getByText('src'));
+    await act(async () => { fireEvent.click(screen.getByText('src')); });
     expect(screen.queryByText('main.py')).toBeNull();
   });
 
   it('highlights selected file', async () => {
     mockApiFetch.mockResolvedValue(rootFiles);
     render(<FileTree {...defaultProps} selectedPath="README.md" />);
+    await act(async () => {});
 
     await waitFor(() => {
       const btn = screen.getByText('README.md').closest('button')!;
@@ -122,15 +129,17 @@ describe('FileTree', () => {
     mockApiFetch.mockResolvedValueOnce(rootFiles);
     mockApiFetch.mockResolvedValueOnce(srcFiles);
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
     await waitFor(() => screen.getByText('src'));
 
-    fireEvent.click(screen.getByText('src'));
+    await act(async () => { fireEvent.click(screen.getByText('src')); });
     expect(defaultProps.onSelectFile).not.toHaveBeenCalled();
   });
 
   it('fetches root directory on mount using projectId', async () => {
     mockApiFetch.mockResolvedValue(rootFiles);
     render(<FileTree {...defaultProps} />);
+    await act(async () => {});
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { ShareableReplay } from '../types';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
@@ -61,21 +61,24 @@ describe('SharedReplayViewer', () => {
     mockApiFetch.mockReset();
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
     render(<SharedReplayViewer />);
+    await act(async () => {});
     expect(screen.getByText('Loading shared replay...')).toBeInTheDocument();
   });
 
-  it('fetches replay data with the token', () => {
+  it('fetches replay data with the token', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     expect(mockApiFetch).toHaveBeenCalledWith('/shared/abc-123');
   });
 
   it('renders replay viewer after successful fetch', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('shared-replay-viewer')).toBeInTheDocument();
     });
@@ -84,6 +87,7 @@ describe('SharedReplayViewer', () => {
   it('displays replay title in header', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/Test Session Replay/)).toBeInTheDocument();
     });
@@ -92,6 +96,7 @@ describe('SharedReplayViewer', () => {
   it('displays shared-by info', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/Shared by alice/)).toBeInTheDocument();
     });
@@ -100,6 +105,7 @@ describe('SharedReplayViewer', () => {
   it('displays duration in minutes', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/10 min/)).toBeInTheDocument();
     });
@@ -108,6 +114,7 @@ describe('SharedReplayViewer', () => {
   it('displays agent count', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/3 agents/)).toBeInTheDocument();
     });
@@ -116,6 +123,7 @@ describe('SharedReplayViewer', () => {
   it('displays task count', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/12 tasks/)).toBeInTheDocument();
     });
@@ -124,6 +132,7 @@ describe('SharedReplayViewer', () => {
   it('shows error state on 404', async () => {
     mockApiFetch.mockRejectedValue(new Error('404 Not Found'));
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('shared-replay-error')).toBeInTheDocument();
     });
@@ -133,6 +142,7 @@ describe('SharedReplayViewer', () => {
   it('shows generic error message on non-404 failure', async () => {
     mockApiFetch.mockRejectedValue(new Error('Server error'));
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('shared-replay-error')).toBeInTheDocument();
     });
@@ -142,6 +152,7 @@ describe('SharedReplayViewer', () => {
   it('shows expiry hint on error', async () => {
     mockApiFetch.mockRejectedValue(new Error('404'));
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText(/may have expired/)).toBeInTheDocument();
     });
@@ -150,6 +161,7 @@ describe('SharedReplayViewer', () => {
   it('renders play/pause toggle', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => screen.getByTestId('shared-replay-viewer'));
     // Initially not playing — Play icon is an SVG, check container button exists
     const buttons = screen.getAllByRole('button');
@@ -159,6 +171,7 @@ describe('SharedReplayViewer', () => {
   it('shows initial time as 0:00', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText('0:00')).toBeInTheDocument();
     });
@@ -167,6 +180,7 @@ describe('SharedReplayViewer', () => {
   it('shows total duration formatted', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       // 600 seconds = 10:00
       expect(screen.getByText('10:00')).toBeInTheDocument();
@@ -176,6 +190,7 @@ describe('SharedReplayViewer', () => {
   it('renders annotation pins when present', async () => {
     mockApiFetch.mockResolvedValue(replayWithAnnotations);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByTestId('annotation-ann-1')).toBeInTheDocument();
       expect(screen.getByTestId('annotation-ann-2')).toBeInTheDocument();
@@ -185,6 +200,7 @@ describe('SharedReplayViewer', () => {
   it('shows annotation count button', async () => {
     mockApiFetch.mockResolvedValue(replayWithAnnotations);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => {
       expect(screen.getByText('2')).toBeInTheDocument();
     });
@@ -193,6 +209,7 @@ describe('SharedReplayViewer', () => {
   it('does not show annotation button when no annotations', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => screen.getByTestId('shared-replay-viewer'));
     // No annotation count button
     expect(screen.queryByText(/annotations/i)).not.toBeInTheDocument();
@@ -201,13 +218,16 @@ describe('SharedReplayViewer', () => {
   it('advances time on skip-forward click', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
+    await act(async () => {});
     await waitFor(() => screen.getByTestId('shared-replay-viewer'));
 
     // Find skip-forward button (third transport button)
     const buttons = screen.getAllByRole('button');
     // Skip-forward is after play/pause
     const skipForward = buttons[2];
-    fireEvent.click(skipForward);
+    await act(async () => {
+      fireEvent.click(skipForward);
+    });
 
     // Time should advance by 5 seconds -> 0:05
     await waitFor(() => {

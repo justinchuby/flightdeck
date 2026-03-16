@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 
 /* ------------------------------------------------------------------ */
 /*  Test data                                                         */
@@ -113,10 +113,12 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+const mockApiContext = {
+  fetchDagStatus: vi.fn().mockResolvedValue(mockDagStatus),
+};
+
 vi.mock('../../../contexts/ApiContext', () => ({
-  useApiContext: () => ({
-    fetchDagStatus: vi.fn().mockResolvedValue(mockDagStatus),
-  }),
+  useApiContext: () => mockApiContext,
 }));
 
 vi.mock('../../../stores/appStore', () => ({
@@ -221,23 +223,21 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.runOnlyPendingTimers();
   vi.useRealTimers();
-  cleanup();
 });
 
 async function renderAndSettle() {
   const result = render(<TaskQueuePanel />);
-  await vi.advanceTimersByTimeAsync(0);
+  await act(async () => {});
   return result;
 }
 
 /** Flush multiple microtask cycles for async state chains (fetch → setState → re-render → fetch...) */
 async function settleAsync() {
-  // Each cycle advances time and flushes promises/React updates.
-  // Persisted projects need: fetch /projects → setState → auto-select → fetch details → fetch DAG → setState
   for (let i = 0; i < 5; i++) {
-    await vi.advanceTimersByTimeAsync(50);
+    await act(async () => {});
   }
 }
 
@@ -256,7 +256,7 @@ describe('TaskQueuePanel – coverage', () => {
 
       await renderAndSettle();
       // Wait for projects fetch in useEffect
-      await vi.advanceTimersByTimeAsync(100);
+      await act(async () => {});
 
       expect(screen.getByText('Old Project')).toBeDefined();
     });
@@ -272,7 +272,7 @@ describe('TaskQueuePanel – coverage', () => {
       });
 
       await renderAndSettle();
-      await vi.advanceTimersByTimeAsync(100);
+      await act(async () => {});
 
       expect(screen.queryByText('Archived Project')).toBeNull();
     });
@@ -316,8 +316,9 @@ describe('TaskQueuePanel – coverage', () => {
       await settleAsync();
 
       const resumeButton = screen.getByText('Resume Project');
-      fireEvent.click(resumeButton);
-      await vi.advanceTimersByTimeAsync(600);
+      await act(async () => {
+        fireEvent.click(resumeButton);
+      });
 
       expect(mockApiFetch).toHaveBeenCalledWith(
         '/projects/proj-old/resume',
@@ -378,8 +379,9 @@ describe('TaskQueuePanel – coverage', () => {
     it('switches to gantt view', async () => {
       await renderAndSettle();
 
-      fireEvent.click(screen.getByTitle('Gantt view'));
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Gantt view'));
+      });
 
       expect(screen.getByTestId('dag-gantt')).toBeDefined();
     });
@@ -387,8 +389,9 @@ describe('TaskQueuePanel – coverage', () => {
     it('switches to resource view', async () => {
       await renderAndSettle();
 
-      fireEvent.click(screen.getByTitle('Resource view'));
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Resource view'));
+      });
 
       expect(screen.getByTestId('dag-resource')).toBeDefined();
     });
@@ -396,8 +399,9 @@ describe('TaskQueuePanel – coverage', () => {
     it('switches to kanban view', async () => {
       await renderAndSettle();
 
-      fireEvent.click(screen.getByTitle('Kanban board'));
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Kanban board'));
+      });
 
       expect(screen.getByTestId('kanban-board')).toBeDefined();
       expect(screen.queryByTestId('split-view')).toBeNull();
@@ -406,12 +410,14 @@ describe('TaskQueuePanel – coverage', () => {
     it('switches back to split view from another view', async () => {
       await renderAndSettle();
 
-      fireEvent.click(screen.getByTitle('Graph view'));
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Graph view'));
+      });
       expect(screen.queryByTestId('split-view')).toBeNull();
 
-      fireEvent.click(screen.getByTitle('Split view (Kanban + Graph)'));
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Split view (Kanban + Graph)'));
+      });
       expect(screen.getByTestId('split-view')).toBeDefined();
     });
   });
@@ -460,8 +466,9 @@ describe('TaskQueuePanel – coverage', () => {
 
       await renderAndSettle();
 
-      fireEvent.click(screen.getByTitle('Graph view'));
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => {
+        fireEvent.click(screen.getByTitle('Graph view'));
+      });
 
       expect(screen.queryByTestId('scope-switcher')).toBeNull();
     });
@@ -502,8 +509,9 @@ describe('TaskQueuePanel – coverage', () => {
 
       // Scope switcher should be visible in split view (default)
       const scopeSwitcher = screen.getByTestId('scope-switcher');
-      fireEvent.change(scopeSwitcher, { target: { value: 'global' } });
-      await vi.advanceTimersByTimeAsync(200);
+      await act(async () => {
+        fireEvent.change(scopeSwitcher, { target: { value: 'global' } });
+      });
 
       expect(mockApiFetch).toHaveBeenCalledWith(expect.stringContaining('/tasks?scope=global'));
     });
@@ -554,8 +562,9 @@ describe('TaskQueuePanel – coverage', () => {
 
       // Switch scope to global
       const scopeSwitcher = screen.getByTestId('scope-switcher');
-      fireEvent.change(scopeSwitcher, { target: { value: 'global' } });
-      await vi.advanceTimersByTimeAsync(200);
+      await act(async () => {
+        fireEvent.change(scopeSwitcher, { target: { value: 'global' } });
+      });
 
       // Verify global tasks API was called with pagination params
       expect(mockApiFetch).toHaveBeenCalledWith(expect.stringContaining('/tasks?scope=global&limit=200&offset=0'));
@@ -591,7 +600,7 @@ describe('TaskQueuePanel – coverage', () => {
       };
 
       await renderAndSettle();
-      await vi.advanceTimersByTimeAsync(100);
+      await act(async () => {});
 
       // First tab content should be active (Project Alpha)
       expect(screen.getByText('Project Alpha')).toBeDefined();
@@ -678,22 +687,24 @@ describe('TaskQueuePanel – coverage', () => {
       });
 
       await renderAndSettle();
-      await vi.advanceTimersByTimeAsync(200);
+      await act(async () => {});
 
       // Initially on active lead tab
       expect(screen.getByText('Progress')).toBeDefined();
 
       // Click persisted tab
       const persistedTab = screen.getByText('Persisted Project');
-      fireEvent.click(persistedTab);
-      await vi.advanceTimersByTimeAsync(200);
+      await act(async () => {
+        fireEvent.click(persistedTab);
+      });
 
       expect(screen.getByText('Resume Project')).toBeDefined();
 
       // Click back to active tab
       const activeTab = screen.getByText('My Project');
-      fireEvent.click(activeTab);
-      await vi.advanceTimersByTimeAsync(100);
+      await act(async () => {
+        fireEvent.click(activeTab);
+      });
 
       expect(screen.getByText('Progress')).toBeDefined();
     });
@@ -724,7 +735,7 @@ describe('TaskQueuePanel – coverage', () => {
       });
 
       await renderAndSettle();
-      await vi.advanceTimersByTimeAsync(100);
+      await act(async () => {});
 
       expect(screen.getByText('No tasks or delegations yet')).toBeDefined();
     });
@@ -751,7 +762,7 @@ describe('TaskQueuePanel – coverage', () => {
       });
 
       await renderAndSettle();
-      await vi.advanceTimersByTimeAsync(100);
+      await act(async () => {});
 
       expect(screen.getByText(/2 failed/)).toBeDefined();
     });

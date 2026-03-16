@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, act } from '@testing-library/react';
 import { ModelConfigPanel } from '../ModelConfigPanel';
 
 const mockApiFetch = vi.fn();
@@ -46,26 +46,27 @@ afterEach(cleanup);
 
 describe('ModelConfigPanel', () => {
   it('fetches models and config on mount', async () => {
-    render(<ModelConfigPanel projectId="p1" />);
+    await act(async () => { render(<ModelConfigPanel projectId="p1" />); });
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith('/models');
     });
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     render(<ModelConfigPanel projectId="p1" />);
     expect(screen.getByText('Loading models...')).toBeDefined();
+    await act(async () => {});
   });
 
   it('renders role names after loading', async () => {
-    render(<ModelConfigPanel projectId="p1" />);
+    await act(async () => { render(<ModelConfigPanel projectId="p1" />); });
     await waitFor(() => {
       expect(screen.getByText('Developer')).toBeDefined();
     });
   });
 
   it('renders allowlist header with reset button', async () => {
-    render(<ModelConfigPanel projectId="p1" />);
+    await act(async () => { render(<ModelConfigPanel projectId="p1" />); });
     await waitFor(() => {
       expect(screen.getByText('Model Allowlist')).toBeDefined();
       expect(screen.getByTitle('Reset to defaults')).toBeDefined();
@@ -73,7 +74,7 @@ describe('ModelConfigPanel', () => {
   });
 
   it('renders sticky header testid', async () => {
-    render(<ModelConfigPanel projectId="p1" />);
+    await act(async () => { render(<ModelConfigPanel projectId="p1" />); });
     await waitFor(() => {
       expect(screen.getByTestId('allowlist-sticky-header')).toBeDefined();
     });
