@@ -70,10 +70,43 @@ budget:
     pause: 1.0
 
 provider:
-  id: copilot                         # Active provider — one of the 6 below
+  id: copilot                         # Default provider for spawning agents — one of the 6 below
   # binaryOverride: null              # Override binary path (optional)
   # argsOverride: null                # Override spawn args (optional)
   # envOverride: {}                   # Extra env vars (optional)
+
+# Toggle individual providers on/off and set per-provider model preferences.
+# All detected providers are enabled by default; disable ones you don't use.
+# Also configurable via Settings → Providers in the dashboard.
+providerSettings:
+  copilot:
+    enabled: true
+    models: []                        # per-provider model preferences (empty = use defaults)
+  claude:
+    enabled: true
+    models: []
+  gemini:
+    enabled: true
+    models: []
+  codex:
+    enabled: true
+    models: []
+  cursor:
+    enabled: true
+    models: []
+  opencode:
+    enabled: true
+    models: []
+
+# Provider preference order — first available provider is used when the
+# default (provider.id) is unavailable. Drag-to-reorder in the Settings UI.
+providerRanking:
+  - copilot
+  - claude
+  - gemini
+  - codex
+  - cursor
+  - opencode
 
 # ── Provider reference ──────────────────────────────────────────────
 # Uncomment the provider block you want to use and set id: above.

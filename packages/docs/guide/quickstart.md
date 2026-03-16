@@ -58,7 +58,33 @@ server:
   maxConcurrentAgents: 50        # max agents running at once (1–200)
 
 provider:
-  id: copilot                    # active provider: copilot, claude, gemini, codex, cursor, opencode
+  id: copilot                    # default provider for spawning agents
+  # binaryOverride: null         # override CLI binary path
+  # argsOverride: null           # override CLI spawn args
+  # envOverride: {}              # extra env vars for the provider
+
+# Toggle individual providers on/off and set per-provider model preferences.
+# The system auto-detects installed providers; use this to disable ones you
+# don't want or to pin preferred models per provider.
+providerSettings:
+  copilot:
+    enabled: true
+  claude:
+    enabled: true
+    models: [claude-opus-4.6, claude-sonnet-4.6]
+  gemini:
+    enabled: false               # disable a provider you don't use
+  # codex, cursor, opencode — all enabled by default
+
+# Provider preference order — first available provider wins when the default
+# is unavailable. Drag-to-reorder in the Settings UI.
+providerRanking:
+  - copilot
+  - claude
+  - gemini
+  - codex
+  - cursor
+  - opencode
 
 models:
   defaults:
@@ -71,6 +97,9 @@ models:
 budget:
   limit: null                    # null = unlimited, or a dollar cap
 ```
+
+> [!TIP]
+> You can also manage providers from **Settings → Providers** in the dashboard — toggle providers on/off, reorder the ranking, test connections, and set per-provider model preferences without editing YAML.
 
 > [!TIP]
 > The config is hot-reloaded — most changes take effect without restarting the server. See the comments in `flightdeck.config.example.yaml` for per-field details.
