@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { DesignPanel } from '../DesignPanel';
 
@@ -148,11 +148,11 @@ describe('DesignPanel', () => {
     });
 
     // Close sidebar
-    fireEvent.click(screen.getByLabelText('Close sidebar'));
+    await act(async () => { fireEvent.click(screen.getByLabelText('Close sidebar')); });
     expect(screen.queryByText('Files')).toBeNull();
 
     // Re-open sidebar
-    fireEvent.click(screen.getByLabelText('Open sidebar'));
+    await act(async () => { fireEvent.click(screen.getByLabelText('Open sidebar')); });
     expect(screen.getByText('Files')).toBeTruthy();
   });
 });

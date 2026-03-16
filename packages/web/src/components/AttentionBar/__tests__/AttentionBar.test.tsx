@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent, act } from '@testing-library/react';import { MemoryRouter } from 'react-router-dom';
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
@@ -245,7 +244,7 @@ describe('AttentionBar', () => {
     expect(screen.queryByTestId('attention-item-blocked')).toBeInTheDocument();
   });
 
-  it('dismiss hides the bar (yellow/red)', () => {
+  it('dismiss hides the bar (yellow/red)', async () => {
     mockAppState.agents = [makeAgent('a1', 'running')];
     mockAppState.pendingDecisions = [{ id: 'd1', title: 'Decision' }];
     renderBar();
@@ -253,7 +252,7 @@ describe('AttentionBar', () => {
     const bar = screen.getByTestId('attention-bar');
     expect(bar).toHaveAttribute('data-escalation', 'yellow');
 
-    fireEvent.click(screen.getByTestId('attention-dismiss'));
+    await act(async () => { fireEvent.click(screen.getByTestId('attention-dismiss')); });
     // After dismiss, items should be hidden (component re-renders with dismissed state)
   });
 
@@ -362,7 +361,7 @@ describe('AttentionBar', () => {
       mockAppState.agents = [makeAgent('a1', 'running')];
       mockLeadState.projects = { 'p1': { dagStatus: makeDagStatus({ done: 5, running: 2 }) } };
 
-      renderBar();
+      await act(async () => { renderBar(); });
       // Wait for API response to be processed
       await vi.waitFor(() => {
         expect(screen.getByTestId('attention-bar')).toHaveAttribute('data-escalation', 'red');
@@ -393,7 +392,7 @@ describe('AttentionBar', () => {
       mockLeadState.selectedLeadId = 'proj-1';
       mockLeadState.projects = { 'proj-1': { dagStatus: makeDagStatus({ done: 5, running: 2 }) } };
 
-      renderBar();
+      await act(async () => { renderBar(); });
       await vi.waitFor(() => {
         expect(mockApiFetch).toHaveBeenCalledWith(expect.stringContaining('/attention?scope=project&projectId=proj-1'));
       });

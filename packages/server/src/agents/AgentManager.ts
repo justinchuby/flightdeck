@@ -230,7 +230,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.lockRegistry.on('lock:expired', ({ filePath, agentId }: { filePath: string; agentId: string }) => {
       const agent = this.agents.get(agentId);
       if (agent && (agent.status === 'running' || agent.status === 'idle')) {
-        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired and was released. Re-acquire it if you still need it.`);
+        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired after the TTL timeout. If you still need it, reacquire with LOCK_FILE.`);
       }
     });
 
@@ -718,6 +718,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.artifactDir) {
         agent.sendMessage(`[System] Your artifact storage directory: ${agent.artifactDir}`);
       }
+
+      // Context compression drops conversation history, so remind the agent of
+      // available commands. Uses the same reminder as the 2-hour heartbeat interval.
+      this.heartbeat.sendCommandReminderTo(agent);
     });
 
     // Wire cost tracking: attribute token usage to the agent's current dagTaskId
@@ -860,10 +864,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.dispatcher.clearCompletionTracking(agent.id);
       }, 10000);
 
-      // Schedule removal from Map and dispose after grace period
+      // Schedule removal from Map and dispose after grace period.
+      // Guard: only delete from the Map if the entry still points to THIS
+      // agent instance.  Auto-restart reuses the same ID, so a replacement
+      // agent may already occupy the slot — we must not remove it.
+      // dispose() runs unconditionally — the old agent must always release
+      // its resources even if a replacement occupies the Map slot.
+      const exitedAgent = agent;
       setTimeout(() => {
-        this.agents.delete(agent.id);
-        agent.dispose();
+        if (this.agents.get(exitedAgent.id) === exitedAgent) {
+          this.agents.delete(exitedAgent.id);
+        }
+        exitedAgent.dispose();
       }, 30_000);
 
       if (code !== null && code !== 0 && !isTerminalStatus(agent.status)) {

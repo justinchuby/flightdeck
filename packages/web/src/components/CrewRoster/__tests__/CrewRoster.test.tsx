@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { CrewRoster } from '../CrewRoster';
 
@@ -154,12 +154,15 @@ describe('CrewRoster', () => {
 
   it('renders roster with agent cards', async () => {
     setupMocks();
-    renderPanel();
+    // Suppress expected DOM-nesting warning (button > button in AgentRow session-id copy)
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(async () => { renderPanel(); });
     await waitFor(() => {
       expect(screen.getByText('architect')).toBeInTheDocument();
     });
     expect(screen.getByText('developer')).toBeInTheDocument();
     expect(screen.getByText('reviewer')).toBeInTheDocument();
+    spy.mockRestore();
   });
 
   it('shows agent IDs in short form', async () => {
@@ -478,8 +481,8 @@ describe('CrewRoster', () => {
 
     fireEvent.click(screen.getByText('aa11bb22'));
     await waitFor(() => {
-      // Architect emoji from getRoleIcon
-      expect(screen.getByText('\u{1F3D7}')).toBeInTheDocument();
+      // Architect emoji from getRoleIcon (U+1F3D7 + U+FE0F variation selector)
+      expect(screen.getByText('\u{1F3D7}\u{FE0F}')).toBeInTheDocument();
     });
   });
 

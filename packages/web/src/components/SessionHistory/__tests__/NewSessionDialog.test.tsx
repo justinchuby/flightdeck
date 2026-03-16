@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { NewSessionDialog } from '../NewSessionDialog';
 
@@ -47,16 +47,20 @@ describe('NewSessionDialog', () => {
     mockDefaultEndpoints();
   });
 
-  function renderDialog() {
-    return render(
-      <MemoryRouter>
-        <NewSessionDialog projectId="proj-1" onClose={onClose} onStarted={onStarted} />
-      </MemoryRouter>,
-    );
+  async function renderDialog() {
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(
+        <MemoryRouter>
+          <NewSessionDialog projectId="proj-1" onClose={onClose} onStarted={onStarted} />
+        </MemoryRouter>,
+      );
+    });
+    return result;
   }
 
   it('renders the dialog with header and controls', async () => {
-    renderDialog();
+    await renderDialog();
     expect(screen.getByText('New Session')).toBeInTheDocument();
     expect(screen.getByTestId('new-session-task')).toBeInTheDocument();
     expect(screen.getByTestId('new-session-model')).toBeInTheDocument();
@@ -65,7 +69,7 @@ describe('NewSessionDialog', () => {
   });
 
   it('populates model dropdown with filtered models from active provider', async () => {
-    renderDialog();
+    await renderDialog();
     await waitFor(() => {
       const select = screen.getByTestId('new-session-model') as HTMLSelectElement;
       const options = Array.from(select.options).map(o => o.value);
@@ -78,7 +82,7 @@ describe('NewSessionDialog', () => {
   });
 
   it('fetches and displays roles (excluding lead)', async () => {
-    renderDialog();
+    await renderDialog();
     await waitFor(() => {
       expect(screen.getByTestId('role-developer')).toBeInTheDocument();
       expect(screen.getByTestId('role-architect')).toBeInTheDocument();
@@ -88,7 +92,7 @@ describe('NewSessionDialog', () => {
   });
 
   it('toggles role selection on click', async () => {
-    renderDialog();
+    await renderDialog();
     await waitFor(() => expect(screen.getByTestId('role-developer')).toBeInTheDocument());
 
     const devBtn = screen.getByTestId('role-developer');
@@ -103,7 +107,7 @@ describe('NewSessionDialog', () => {
 
   it('calls resume endpoint with freshStart on start', async () => {
     mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
-    renderDialog();
+    await renderDialog();
 
     fireEvent.click(screen.getByTestId('start-session-btn'));
 
@@ -121,7 +125,7 @@ describe('NewSessionDialog', () => {
 
   it('includes task in the request body', async () => {
     mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
-    renderDialog();
+    await renderDialog();
 
     fireEvent.change(screen.getByTestId('new-session-task'), {
       target: { value: 'Fix all bugs' },
@@ -141,7 +145,7 @@ describe('NewSessionDialog', () => {
 
   it('includes selected roles as team hint in task', async () => {
     mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
-    renderDialog();
+    await renderDialog();
 
     await waitFor(() => expect(screen.getByTestId('role-developer')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('role-developer'));
@@ -162,7 +166,7 @@ describe('NewSessionDialog', () => {
 
   it('sends selected lead model', async () => {
     mockDefaultEndpoints(() => Promise.resolve({ id: 'lead-1' }));
-    renderDialog();
+    await renderDialog();
 
     // Wait for models to load into the dropdown
     await waitFor(() => {
@@ -189,7 +193,7 @@ describe('NewSessionDialog', () => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
       return Promise.reject(new Error('Server down'));
     });
-    renderDialog();
+    await renderDialog();
 
     fireEvent.click(screen.getByTestId('start-session-btn'));
 
@@ -199,21 +203,21 @@ describe('NewSessionDialog', () => {
     expect(onStarted).not.toHaveBeenCalled();
   });
 
-  it('closes on Cancel click', () => {
-    renderDialog();
+  it('closes on Cancel click', async () => {
+    await renderDialog();
     fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('closes on backdrop click', () => {
-    renderDialog();
+  it('closes on backdrop click', async () => {
+    await renderDialog();
     const backdrop = screen.getByTestId('new-session-dialog');
     fireEvent.mouseDown(backdrop);
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('closes on Escape key', () => {
-    renderDialog();
+  it('closes on Escape key', async () => {
+    await renderDialog();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });
@@ -224,7 +228,7 @@ describe('NewSessionDialog', () => {
       if (path === '/roles') return Promise.resolve(MOCK_ROLES);
       return new Promise((r) => { resolveResume = r; });
     });
-    renderDialog();
+    await renderDialog();
 
     fireEvent.click(screen.getByTestId('start-session-btn'));
     expect(screen.getByTestId('start-session-btn')).toBeDisabled();

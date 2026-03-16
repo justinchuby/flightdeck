@@ -1059,32 +1059,10 @@ describe('AcpAdapter', () => {
     });
   });
 
-  // ── 10. Prompt timeout ──────────────────────────────────────────
-
-  describe('prompt timeout', () => {
-    it('emits prompt_timeout when prompt exceeds time limit', async () => {
-      setupSuccessfulStart();
-      // Make the prompt hang until timeout fires
-      mockPrompt.mockImplementation(() => new Promise(() => {}));
-
-      const adapter = new AcpAdapter();
-      await adapter.start(DEFAULT_START_OPTS);
-
-      const timeoutEvents: number[] = [];
-      adapter.on('prompt_timeout', (ms: number) => timeoutEvents.push(ms));
-
-      // Mock timers to avoid waiting 10 real minutes
-      vi.useFakeTimers();
-      const promptPromise = adapter.prompt('test').catch(() => {});
-      // Advance past the 10-minute timeout
-      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 100);
-      await promptPromise;
-      vi.useRealTimers();
-
-      expect(timeoutEvents).toHaveLength(1);
-      expect(timeoutEvents[0]).toBe(10 * 60 * 1000);
-    });
-  });
+  // ── 10. Prompt timeout (removed) ─────────────────────────────────
+  // The 10-minute prompt timeout was removed because it killed agents
+  // working on complex tasks. AlertEngine.checkLongRunningPrompts()
+  // provides observability for long-running prompts without hard-killing.
 
   // ── 11. Drain order (drainQueue before prompt_complete) ─────────
 

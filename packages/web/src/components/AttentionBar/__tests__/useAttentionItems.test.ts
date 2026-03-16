@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
@@ -341,11 +341,11 @@ describe('useAttentionItems', () => {
 
       // Fire 10 rapid events (simulating burst of dag:updated)
       for (let i = 0; i < 10; i++) {
-        window.dispatchEvent(new CustomEvent('attention:changed'));
+        act(() => { window.dispatchEvent(new CustomEvent('attention:changed')); });
       }
 
       // Wait for 2s debounce window + settle
-      await new Promise(r => setTimeout(r, 2500));
+      await act(async () => { await new Promise(r => setTimeout(r, 2500)); });
 
       // Should debounce to exactly 1 refetch, not 10
       expect(mockApiFetch).toHaveBeenCalledTimes(1);

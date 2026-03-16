@@ -764,26 +764,21 @@ export function projectsRoutes(ctx: AppContext): Router {
         projectRegistry.startSession(project.id, agent.id, task);
       }
 
-      // Gather context from previous session
-      const briefing = projectRegistry.buildBriefing(project.id);
-
-      // Send project briefing (fresh start only — resume gets context from ACP session)
-      if (!isResume && briefing && briefing.sessions.length > 1) {
-        const briefingText = projectRegistry.formatBriefing(briefing);
-        const BRIEFING_DELAY_MS = 3000;
-        setTimeout(() => {
-          agent.sendMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
-        }, BRIEFING_DELAY_MS);
+      // Send project briefing (fresh start only — resume gets full context from
+      // loadSession() which replays conversation history).
+      if (!isResume) {
+        const briefing = projectRegistry.buildBriefing(project.id);
+        if (briefing && briefing.sessions.length > 1) {
+          const briefingText = projectRegistry.formatBriefing(briefing);
+          agent.queueMessage(`[System — Project Context]\n${briefingText}\n\nContinue from where the previous session left off.`);
+        }
       }
 
       if (!isResume && task) {
-        // Delay task delivery so the lead receives crew roster before the task.
-        // Scale with team size: base 5s + 2s per agent (batched in groups of 3).
-        const teamSize = agentIds?.length ?? (resumeAll && lastSession ? 6 : 0);
-        const TASK_DELIVERY_DELAY_MS = 5000 + Math.ceil(teamSize / 3) * 2000;
-        setTimeout(() => {
-          agent.sendMessage(task!);
-        }, TASK_DELIVERY_DELAY_MS);
+        // Queued after briefing — FIFO ordering guarantees briefing is delivered
+        // first. The prompt_complete → _drainOneMessage pipeline auto-delivers
+        // each message when the agent finishes its current prompt.
+        agent.queueMessage(task!);
       }
 
       logger.info({ module: 'project', msg: 'Project resumed', projectId: project.id, name: project.name, agentId: agent.id });

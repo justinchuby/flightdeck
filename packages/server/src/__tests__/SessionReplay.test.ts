@@ -138,13 +138,13 @@ describe('SessionReplay', () => {
       makeActivity({
         actionType: 'sub_agent_spawned',
         summary: 'Spawned developer',
-        details: { spawnedAgentId: 'dev-1', role: 'developer' },
+        details: { childId: 'dev-1', role: 'developer' },
         timestamp: T1,
       }),
       makeActivity({
         actionType: 'sub_agent_spawned',
         summary: 'Spawned architect',
-        details: { spawnedAgentId: 'arch-1', role: 'architect' },
+        details: { childId: 'arch-1', role: 'architect' },
         timestamp: T2,
       }),
     ];
@@ -164,7 +164,7 @@ describe('SessionReplay', () => {
       makeActivity({
         actionType: 'sub_agent_spawned',
         agentId: 'dev-1',
-        details: { spawnedAgentId: 'dev-1', role: 'developer' },
+        details: { childId: 'dev-1', role: 'developer' },
         timestamp: T1,
       }),
       makeActivity({
@@ -236,6 +236,28 @@ describe('SessionReplay', () => {
       expect(keyframes[0].type).toBe('spawn');
       expect(keyframes[1].type).toBe('milestone');
       expect(keyframes[2].type).toBe('error');
+    });
+
+    it('emits spawn keyframe with correct child agentId from delegation details', () => {
+      const delegation = makeActivity({
+        agentId: 'lead-1', actionType: 'delegated',
+        summary: 'Created & delegated to Developer: implement feature',
+        details: { toAgentId: 'dev-1', toRole: 'developer', childId: 'dev-1', childRole: 'developer', delegationId: 'del-1' },
+        timestamp: T1,
+      });
+      const mocks = makeMocks({ activities: [delegation] });
+      (mocks.activityLedger.getUntil as ReturnType<typeof vi.fn>).mockReturnValue([delegation]);
+      const replay = new SessionReplay(mocks.activityLedger, mocks.taskDAG, mocks.decisionLog, mocks.lockRegistry, mocks.agentSource);
+
+      const keyframes = replay.getKeyframes('lead-1');
+      // Should emit both a spawn and a delegation keyframe
+      const spawnKf = keyframes.find(k => k.type === 'spawn');
+      const delegationKf = keyframes.find(k => k.type === 'delegation');
+      expect(spawnKf).toBeDefined();
+      expect(delegationKf).toBeDefined();
+      // The spawn keyframe must use the CHILD agent ID, not the lead's ID
+      expect(spawnKf!.agentId).toBe('dev-1');
+      expect(spawnKf!.agentId).not.toBe('lead-1');
     });
 
     it('only emits keyframes for team members when using team resolution', () => {
@@ -502,12 +524,12 @@ describe('SessionReplay', () => {
     it('scopes world state to team members for untitled projects', () => {
       const teamActivity = makeActivity({
         actionType: 'sub_agent_spawned', agentId: 'lead-1', projectId: '',
-        details: { spawnedAgentId: 'dev-1', role: 'developer' },
+        details: { childId: 'dev-1', role: 'developer' },
       });
       const foreignActivity = makeActivity({
         id: 2, agentId: 'foreign-1', projectId: '',
         actionType: 'sub_agent_spawned',
-        details: { spawnedAgentId: 'foreign-2', role: 'architect' },
+        details: { childId: 'foreign-2', role: 'architect' },
       });
 
       const mocks = makeMocks({

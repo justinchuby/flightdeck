@@ -40,15 +40,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Pro
 
 const SDK_TIMEOUT_MS = 30_000;
 
-/**
- * Maximum time a single prompt can run before being timed out (10 minutes).
- * Defense-in-depth: AlertEngine.checkLongRunningPrompts() fires a separate
- * 'long_running_prompt' alert at 30 minutes for any agent (including leads)
- * that is still prompting — this catches cases where the timeout fails or
- * the adapter is stuck in a non-prompt state.
- */
-const PROMPT_TIMEOUT_MS = 10 * 60 * 1000;
-
 /** Maximum number of buffered system notes before oldest entries are dropped. */
 const MAX_SYSTEM_NOTE_BUFFER = 50;
 
@@ -129,14 +120,11 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     if (opts.sessionId) {
       // Try to resume an existing session (supported by some providers)
       try {
-        await withTimeout(
-          this.connection!.loadSession({
-            sessionId: opts.sessionId,
-            cwd: opts.cwd || process.cwd(),
-            mcpServers: [],
-          }),
-          SDK_TIMEOUT_MS, 'loadSession',
-        );
+        await this.connection!.loadSession({
+          sessionId: opts.sessionId,
+          cwd: opts.cwd || process.cwd(),
+          mcpServers: [],
+        });
         sessionId = opts.sessionId;
       } catch (err) {
         // Resume failed — do NOT fall back to a new session.
@@ -197,12 +185,26 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     this.validateCliCommand(opts.cliCommand);
 
     const args = [...(opts.baseArgs || ['--acp', '--stdio']), ...(opts.cliArgs || [])];
+    // On Unix, detach child so it gets its own process group.  Without this,
+    // Ctrl+C sends SIGINT to the entire foreground process group, hitting
+    // both the server AND every child — causing a double-SIGINT that crashes
+    // the server.  On Windows, detached:true creates a visible console window,
+    // so we skip it there (Windows doesn't have Unix process groups anyway;
+    // shell:true already isolates the child).
+    const isWindows = process.platform === 'win32';
     this.process = spawn(opts.cliCommand, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: opts.cwd || process.cwd(),
-      shell: process.platform === 'win32',
+      shell: isWindows,
+      detached: !isWindows,
       ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
     });
+
+    // Allow the server's event loop to exit without waiting for the
+    // detached child.  The server terminates children explicitly.
+    if (!isWindows && this.process.unref) {
+      this.process.unref();
+    }
 
     if (!this.process.stdin || !this.process.stdout) {
       this.process.kill();
@@ -353,14 +355,10 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     const blocks = toSdkContentBlocks(content);
 
     try {
-      const result = await withTimeout(
-        this.connection.prompt({
-          sessionId: this.sessionId,
-          prompt: blocks,
-        }),
-        PROMPT_TIMEOUT_MS,
-        'Prompt execution',
-      );
+      const result = await this.connection.prompt({
+        sessionId: this.sessionId,
+        prompt: blocks,
+      });
 
       this._isPrompting = false;
       this._promptingStartedAt = null;
@@ -385,12 +383,6 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       this._isPrompting = false;
       this._promptingStartedAt = null;
       this.emit('prompting', false);
-
-      const isTimeout = err instanceof Error && err.message.includes('timed out');
-      if (isTimeout) {
-        logger.warn({ module: 'acp', msg: 'Prompt timed out — agent may be stalled', timeoutMs: PROMPT_TIMEOUT_MS });
-        this.emit('prompt_timeout', PROMPT_TIMEOUT_MS);
-      }
 
       this.drainQueue();
       this.emit('prompt_complete', 'error');
@@ -457,7 +449,16 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           }),
           new Promise<void>((resolve) => {
             killTimer = setTimeout(() => {
-              try { proc.kill(); } catch { /* already exited */ }
+              try {
+                // Kill the child process (group). On Unix, detached children
+                // are process group leaders — use -pid to terminate the group.
+                // On Windows, negative PIDs are unsupported; use proc.kill().
+                if (proc.pid && process.platform !== 'win32') {
+                  process.kill(-proc.pid, 'SIGTERM');
+                } else {
+                  proc.kill('SIGTERM');
+                }
+              } catch { /* already exited */ }
               resolve();
             }, TERMINATE_TIMEOUT_MS);
           }),

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReplayScrubber } from '../SessionReplay/ReplayScrubber';
 import { useSessionReplay } from '../../hooks/useSessionReplay';
@@ -68,11 +68,11 @@ describe('useSessionReplay', () => {
     const dur = result.current.duration;
 
     // Seek below 0 clamps to 0
-    result.current.seek(-1000);
+    act(() => { result.current.seek(-1000); });
     await waitFor(() => expect(result.current.currentTime).toBe(0));
 
     // Seek above duration clamps to duration
-    result.current.seek(999999999);
+    act(() => { result.current.seek(999999999); });
     await waitFor(() => expect(result.current.currentTime).toBe(dur));
   });
 
@@ -133,7 +133,7 @@ describe('useSessionReplay', () => {
     await waitFor(() => expect(result.current.duration).toBeGreaterThan(0));
 
     // Seek forward and start playing
-    result.current.seek(5000);
+    act(() => { result.current.seek(5000); });
     await waitFor(() => expect(result.current.currentTime).toBe(5000));
 
     // Switch to a different project

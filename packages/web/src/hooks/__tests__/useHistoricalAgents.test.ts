@@ -60,9 +60,9 @@ describe('deriveAgentsFromKeyframes', () => {
       kf('spawn', 'Spawned Architect: design', undefined, 'a2'),
       kf('spawn', 'Spawned Unknown Role: mystery', undefined, 'a3'),
     ]);
-    expect(agents[0].role.icon).toBe('👨‍💻');
-    expect(agents[1].role.icon).toBe('🏗');
-    expect(agents[2].role.icon).toBe('🤖'); // fallback
+    expect(agents[0].role.icon).toBe('💻');
+    expect(agents[1].role.icon).toBe('🏗️');
+    expect(agents[2].role.icon).toBe('🤖'); // fallback for unknown roles
   });
 
   it('handles multiple exits of same role', () => {

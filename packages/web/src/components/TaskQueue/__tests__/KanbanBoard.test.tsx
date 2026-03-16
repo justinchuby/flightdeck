@@ -10,7 +10,7 @@
  * DnD cross-column status change, DnD same-column reorder, DnD invalid targets.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import { KanbanBoard } from '../KanbanBoard';
 import type { DagStatus, DagTask, DagTaskStatus } from '../../../types';
 
@@ -542,11 +542,14 @@ describe('KanbanBoard', () => {
       fireEvent.click(screen.getByTestId('add-task-button'));
       fireEvent.change(screen.getByRole('textbox', { name: 'Task title' }), { target: { value: 'Task' } });
       fireEvent.change(screen.getByRole('textbox', { name: 'Task role' }), { target: { value: 'dev' } });
-      fireEvent.submit(screen.getByTestId('add-task-form'));
+      // Suppress expected warning from AddTaskForm error path
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await act(async () => { fireEvent.submit(screen.getByTestId('add-task-form')); });
 
       await waitFor(() => {
         expect(screen.getByText('Server error')).toBeTruthy();
       });
+      spy.mockRestore();
     });
 
     it('closes form when Cancel is clicked', () => {

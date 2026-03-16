@@ -18,6 +18,7 @@ interface CoordinationStatus {
 
 export function AgentDashboard() {
   const liveAgents = useAppStore((s) => s.agents);
+  const connected = useAppStore((s) => s.connected);
   const setSelectedAgent = useAppStore((s) => s.setSelectedAgent);
   const [showSpawn, setShowSpawn] = useState(false);
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export function AgentDashboard() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Derive historical agents from keyframe events when no live agents
-  const { agents: historicalAgents } = useHistoricalAgents(liveAgents.length);
+  const { agents: historicalAgents } = useHistoricalAgents(liveAgents.length, undefined, connected);
 
   const agents = liveAgents.length > 0 ? liveAgents : historicalAgents;
 
