@@ -185,22 +185,24 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     this.validateCliCommand(opts.cliCommand);
 
     const args = [...(opts.baseArgs || ['--acp', '--stdio']), ...(opts.cliArgs || [])];
+    // On Unix, detach child so it gets its own process group.  Without this,
+    // Ctrl+C sends SIGINT to the entire foreground process group, hitting
+    // both the server AND every child — causing a double-SIGINT that crashes
+    // the server.  On Windows, detached:true creates a visible console window,
+    // so we skip it there (Windows doesn't have Unix process groups anyway;
+    // shell:true already isolates the child).
+    const isWindows = process.platform === 'win32';
     this.process = spawn(opts.cliCommand, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: opts.cwd || process.cwd(),
-      shell: process.platform === 'win32',
-      // Detach child so it gets its own process group.  Without this,
-      // Ctrl+C sends SIGINT to the entire foreground process group,
-      // hitting both the server AND every child — causing a double-SIGINT
-      // that crashes the server.  The server explicitly terminates children
-      // during shutdown via shutdownAll() → agent.terminate().
-      detached: true,
+      shell: isWindows,
+      detached: !isWindows,
       ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
     });
 
     // Allow the server's event loop to exit without waiting for the
     // detached child.  The server terminates children explicitly.
-    if (this.process.unref) {
+    if (!isWindows && this.process.unref) {
       this.process.unref();
     }
 
@@ -448,12 +450,13 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           new Promise<void>((resolve) => {
             killTimer = setTimeout(() => {
               try {
-                // Kill the entire child process group (detached children
-                // are process group leaders, so -pid targets the group).
-                if (proc.pid) {
+                // Kill the child process (group). On Unix, detached children
+                // are process group leaders — use -pid to terminate the group.
+                // On Windows, negative PIDs are unsupported; use proc.kill().
+                if (proc.pid && process.platform !== 'win32') {
                   process.kill(-proc.pid, 'SIGTERM');
                 } else {
-                  proc.kill();
+                  proc.kill('SIGTERM');
                 }
               } catch { /* already exited */ }
               resolve();
