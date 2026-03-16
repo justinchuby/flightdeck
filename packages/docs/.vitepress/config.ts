@@ -53,7 +53,6 @@ export default defineConfig({
           items: [
             { text: 'Lead Dashboard', link: '/guide/dashboard-lead' },
             { text: 'Agents View', link: '/guide/dashboard-agents' },
-            { text: 'Canvas View', link: '/guide/canvas-view' },
             { text: 'Settings', link: '/guide/dashboard-settings' },
             { text: 'UI Design', link: '/guide/ui-design' },
           ],
@@ -92,45 +91,6 @@ export default defineConfig({
         },
       ],
       '/reference/': [
-        {
-          text: 'Design Documents',
-          items: [
-            { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
-            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
-          ],
-        },
-        {
-          text: 'API Reference (Internal)',
-          items: [
-            { text: 'REST API', link: '/reference/api' },
-            { text: 'WebSocket Events', link: '/reference/websocket' },
-            { text: 'Timeline Components', link: '/reference/timeline-api' },
-            { text: 'Database Schema', link: '/reference/database' },
-          ],
-        },
-        {
-          text: 'Feature APIs (Internal)',
-          items: [
-            { text: 'NL Commands', link: '/reference/nl-api' },
-          ],
-        },
-        {
-          text: 'Architecture (Internal)',
-          items: [
-            { text: 'Configuration', link: '/reference/configuration' },
-            { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },
-            { text: 'Design Decisions', link: '/reference/design-decisions' },
-          ],
-        },
-      ],
-      '/design/': [
-        {
-          text: 'Design Documents',
-          items: [
-            { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
-            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
-          ],
-        },
         {
           text: 'API Reference (Internal)',
           items: [
