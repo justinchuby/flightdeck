@@ -36,9 +36,6 @@ function createMockIntegrationRouter(adapter: MessagingAdapter, sessions: ChatSe
   return {
     getAdapter: vi.fn((platform: string) => platform === 'telegram' ? adapter : null),
     getAllSessions: vi.fn(() => sessions),
-    bindSession: vi.fn((chatId: string, platform: string, projectId: string, boundBy: string) => ({
-      chatId, platform, projectId, boundBy, createdAt: Date.now(), expiresAt: Date.now() + 3600_000,
-    })),
     getBatcher: vi.fn(() => ({
       pendingCount: vi.fn(() => 0),
       getAllSubscriptions: vi.fn(() => []),

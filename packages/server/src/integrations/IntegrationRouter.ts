@@ -150,8 +150,8 @@ export class IntegrationRouter {
     return this.notificationBatcher;
   }
 
-  /** Bind a chat to a project. */
-  bindSession(chatId: string, platform: 'telegram' | 'slack', projectId: string, boundBy: string): ChatSession {
+  /** Bind a chat to a project. Private — callers must use challenge-response auth (createChallenge + verifyChallenge). */
+  private bindSession(chatId: string, platform: 'telegram' | 'slack', projectId: string, boundBy: string): ChatSession {
     const session: ChatSession = {
       chatId,
       platform,
