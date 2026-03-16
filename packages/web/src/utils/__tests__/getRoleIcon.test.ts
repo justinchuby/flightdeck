@@ -12,19 +12,19 @@ describe('getRoleIcon', () => {
 
   it('returns fallback icon for known role ID strings', () => {
     expect(getRoleIcon('lead')).toBe('👑');
-    expect(getRoleIcon('architect')).toBe('🏗');
-    expect(getRoleIcon('developer')).toBe('👨‍💻');
-    expect(getRoleIcon('code-reviewer')).toBe('🔍');
-    expect(getRoleIcon('critical-reviewer')).toBe('🛡');
-    expect(getRoleIcon('readability-reviewer')).toBe('📖');
+    expect(getRoleIcon('architect')).toBe('🏗️');
+    expect(getRoleIcon('developer')).toBe('💻');
+    expect(getRoleIcon('code-reviewer')).toBe('📖');
+    expect(getRoleIcon('critical-reviewer')).toBe('🛡️');
+    expect(getRoleIcon('readability-reviewer')).toBe('👁️');
     expect(getRoleIcon('qa-tester')).toBe('🧪');
     expect(getRoleIcon('designer')).toBe('🎨');
     expect(getRoleIcon('tech-writer')).toBe('📝');
-    expect(getRoleIcon('product-manager')).toBe('📋');
-    expect(getRoleIcon('secretary')).toBe('📒');
-    expect(getRoleIcon('radical-thinker')).toBe('💡');
+    expect(getRoleIcon('product-manager')).toBe('🎯');
+    expect(getRoleIcon('secretary')).toBe('📋');
+    expect(getRoleIcon('radical-thinker')).toBe('🚀');
     expect(getRoleIcon('generalist')).toBe('🔧');
-    expect(getRoleIcon('agent')).toBe('🤖');
+    expect(getRoleIcon('agent')).toBe('⚙️');
   });
 
   it('returns default 🤖 for unknown role ID string', () => {
