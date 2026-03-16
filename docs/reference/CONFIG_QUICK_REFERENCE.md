@@ -24,6 +24,7 @@ MAX_AGENTS=50              # Max concurrent agents (default)
 DB_PATH=./flightdeck.db    # Database path (default)
 SERVER_SECRET=...          # JWT secret (auto-generated if missing)
 AUTH=none                  # Disable auth (set to 'none')
+TELEGRAM_BOT_TOKEN=...    # Telegram bot token (see docs/guides/telegram-setup.md)
 ```
 
 ## ServerConfig Interface
