@@ -1,19 +1,12 @@
 # Features Overview
 
-Flightdeck ships 33+ features across three phases. This page provides a quick reference to everything available.
+Flightdeck ships 30+ features across three phases. This page provides a quick reference to everything available.
 
 ![Lead Dashboard — your home screen for tracking projects and agents](/images/01-lead-dashboard.png)
 
 ## Phase 2 — Core Observability & Control
 
 These features provide real-time visibility into your agent crew and give you controls to guide their work.
-
-### Agent Canvas
-Interactive node-based visualization of your agent crew using ReactFlow. Nodes represent agents, edges show communication flows (messages, delegations, broadcasts). Drag to rearrange, zoom in/out, or use auto-layout. Color-coded by agent status.
-
-![Canvas View](/images/03-canvas.png)
-
-→ [Canvas View Guide](/guide/canvas-view)
 
 ### Batch Approval
 Approve or reject multiple pending agent actions at once. When agents request permission for file writes or shell commands, batch approval lets you review and act on all pending items from a single panel instead of one at a time.
@@ -27,7 +20,7 @@ A compact horizontal status strip at the top of every page showing real-time cre
 Visual context window usage indicator per agent. Shows how much of an agent's context window is consumed, with color-coded warnings (green → amber → red) as agents approach their limit.
 
 ### Focus Agent Panel
-Deep-dive view for any single agent: current task, recent messages, file diffs, pending decisions, and activity timeline. Click any agent in the Canvas or agent list to open their Focus panel.
+Deep-dive view for any single agent: current task, recent messages, file diffs, pending decisions, and activity timeline. Click any agent in the agent list to open their Focus panel.
 
 ### Session Replay
 Scrub through past sessions like a video timeline. Keyframes capture agent state, messages, and DAG changes. Adjustable playback speed (0.5x–4x). Share replays via tokenized links.
@@ -36,7 +29,7 @@ Scrub through past sessions like a video timeline. Keyframes capture agent state
 Review and respond to agent decisions requiring human input. Each decision shows context, options, and impact. Approve, reject, or provide custom feedback.
 
 ### Historical Data
-Browse historical project data even when no live session is running. All pages (Overview, Timeline, Canvas, Tasks, Agents, Mission Control) load data from the REST API when WebSocket data is unavailable. Group chat history is preserved per project.
+Browse historical project data even when no live session is running. All pages (Overview, Timeline, Tasks, Agents, Mission Control) load data from the REST API when WebSocket data is unavailable. Group chat history is preserved per project.
 
 ### Coordination Timeline
 Chronological view of all inter-agent events: messages sent, tasks delegated, files locked, code reviewed. Filter by agent or event type.
@@ -70,7 +63,7 @@ The ⌘K command palette is the brain of the product. Fuzzy search (Fuse.js) acr
 → [Command Palette Guide](/guide/command-palette)
 
 ### Natural Language Crew Control
-30 NL commands across 4 categories (control, query, navigate, create). Type "pause all agents" or "show me running tasks" directly in ⌘K. Pattern matching — no LLM required. Mandatory preview for destructive commands. Undo stack with 5-minute TTL.
+27 NL commands across 4 categories (control, query, navigate, create). Type "pause all agents" or "show me running tasks" directly in ⌘K. Pattern matching — no LLM required. Mandatory preview for destructive commands. Undo stack with 5-minute TTL.
 
 → [Command Palette Guide](/guide/command-palette)
 
@@ -82,15 +75,8 @@ Three-layer onboarding system. QuickStart: guided project creation as first-run 
 ### Chat Virtualization
 High-performance chat rendering using react-virtuoso. Only visible messages plus a small overscan buffer are rendered in the DOM, keeping the UI responsive even with 1000+ messages. Pinned user message banners ensure important messages from the user are never buried under agent responses.
 
-### GitHub Integration
-PAT-based GitHub connection. Create PRs with auto-generated descriptions. CI status panel with per-check rendering. Commit-to-task linking with timeline pins. Draft PR default for safety. Graceful degradation when not connected.
-
-→ [GitHub Integration Guide](/guide/github-integration)
-
 ### Conflict Detection
-Four detection levels: same directory, import overlap, lock contention, branch divergence. Real-time scanning. Conflict detail panel with 4 resolution options. Canvas conflict edges (amber/red). Integration with workflow triggers.
-
-→ [GitHub Integration Guide](/guide/github-integration)
+Four detection levels: same directory, import overlap, lock contention, branch divergence. Real-time scanning. Conflict detail panel with resolution options. Integration with workflow triggers.
 
 ### Mobile PWA (Removed)
 > Mobile-specific layouts have been removed. See [Mobile Support](/guide/mobile) for details.
