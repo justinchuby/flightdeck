@@ -230,8 +230,17 @@ sidecar:
 4. OpenClaw loads the generated config and starts channel connections
 5. Bot tokens never cross the WebSocket IPC boundary
 
-**Security concern:** Flightdeck generates a config file containing bot tokens on disk.
-Mitigation: use restricted permissions (`0600`), temp directory, delete on shutdown.
+**⚠️ Security risk: Bot tokens written to disk.** Flightdeck would generate a config file
+containing plaintext bot tokens. Mitigations:
+- File permissions: `0600` (owner read/write only)
+- Location: OS temp directory with random suffix
+- Lifecycle: delete on shutdown (but NOT on crash — tokens persist on disk after unclean exit)
+- Alternative: pass tokens via environment variables to the child process instead of a config
+  file (preferred, but requires OpenClaw to support all channel tokens via env vars — currently
+  only `TELEGRAM_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, and `SLACK_BOT_TOKEN` are supported via env)
+
+This is an inherent risk of the sidecar model: secrets must cross a process boundary.
+Native adapters avoid this entirely since tokens stay in Flightdeck's own process memory.
 
 ### 3.2 Gateway Authentication
 
@@ -539,7 +548,7 @@ WhatsApp and MS Teams are "nice to have" for Phase 2. Everything else is niche.
 
 | Dimension | Cost |
 |---|---|
-| **Development** | SidecarBridge (~400 LOC) + process lifecycle (~200 LOC) + config generation (~150 LOC) + health checks (~100 LOC) + message translation (~300 LOC) = **~1,150 LOC** |
+| **Development** | SidecarBridge (~400 LOC) + process lifecycle (~300 LOC) + config generation (~200 LOC) + health checks (~150 LOC) + message translation (~400 LOC) + error handling/logging (~150 LOC) + tests (~500 LOC) = **~2,100 LOC total** |
 | **Dependencies** | `openclaw` (50+ transitive deps, multiple native modules) |
 | **Install size** | +300-500 MB |
 | **Memory** | +100-200 MB (full OpenClaw runtime) |
@@ -563,14 +572,14 @@ WhatsApp and MS Teams are "nice to have" for Phase 2. Everything else is niche.
 
 | Criterion | Native Adapters | OpenClaw Sidecar |
 |---|---|---|
-| **LOC to write** | ~1,500 | ~1,150 |
-| **LOC to maintain** | ~1,500 (all ours) | ~1,150 (ours) + OpenClaw (theirs, 300K+ LOC) |
+| **LOC to write** | ~1,500 | ~2,100 |
+| **LOC to maintain** | ~1,500 (all ours) | ~2,100 (ours) + OpenClaw (theirs, 300K+ LOC) |
 | **Channels covered** | 3 (95% of users) | 20+ (99% of users) |
 | **Install size** | +15-25 MB | +300-500 MB |
 | **Runtime memory** | +10-30 MB | +100-200 MB |
 | **Processes** | 1 | 2 |
 | **Config files** | 1 | 2 |
-| **Node.js requirement** | ≥18 | ≥22.16 |
+| **Node.js requirement** | ≥18 | ≥22.16 (**breaking**: forces Flightdeck users to upgrade Node.js) |
 | **Failure domains** | 0 new | 1 new (IPC) |
 | **Version coupling** | None | OpenClaw releases |
 | **Rich media support** | Text-only (initially) | Full (via OpenClaw) |
@@ -580,9 +589,10 @@ WhatsApp and MS Teams are "nice to have" for Phase 2. Everything else is niche.
 ### 8.4 Break-Even Analysis
 
 The sidecar becomes worthwhile only when:
-1. Flightdeck needs **6+ channels** (beyond the native adapter development cost)
+1. Flightdeck needs **6+ channels** (the sidecar actually costs MORE LOC than native adapters for ≤5 channels)
 2. Users demand **rich media** (images, voice, keyboards) across all channels
-3. The team is willing to accept **external version coupling** and **IPC complexity**
+3. The team is willing to accept **external version coupling**, **IPC complexity**, and **undocumented protocol risk**
+4. Users can upgrade to **Node.js ≥22.16** (OpenClaw's requirement, vs Flightdeck's ≥18)
 
 For the current Flightdeck user base, none of these conditions are met.
 
@@ -592,12 +602,15 @@ For the current Flightdeck user base, none of these conditions are met.
 
 ### Recommendation: **Build Native Adapters (Option A)**
 
-The sidecar approach trades ~350 LOC of development savings for:
+The sidecar approach trades development effort for operational complexity — and after
+correcting the LOC estimate (including error handling, logging, and tests), the sidecar
+actually costs **more code** (~2,100 LOC) than native adapters (~1,500 LOC), plus:
 - +300-500 MB install size
 - +100-200 MB runtime memory
-- A new failure domain (IPC)
-- External version coupling to a fast-moving project
-- Operational complexity (2 processes, 2 configs, health monitoring)
+- A new failure domain (IPC over undocumented WebSocket protocol)
+- External version coupling to a fast-moving project (breaking changes every 1-2 weeks)
+- Node.js ≥22.16 requirement (breaking for users on Node 18-22)
+- Bot tokens written to disk (security risk on unclean shutdown)
 
 **This is not a good trade.**
 
@@ -654,8 +667,11 @@ ws.send(JSON.stringify({ type: 'auth', token: 'GATEWAY_TOKEN' }));
 }
 ```
 
-The protocol is not formally documented as a public API. It's designed for OpenClaw's
-own native apps and may change without notice.
+The protocol is **not formally documented as a public API**. It's designed for OpenClaw's
+own native apps and may change without notice. This is a significant risk — the sidecar's
+IPC layer would depend on an undocumented, unstable protocol. Any OpenClaw update could
+break the bridge with no deprecation warning. Flightdeck would need integration tests
+that run against each OpenClaw release to detect breakage proactively.
 
 ## Appendix B: OpenClaw npm Package Exports
 
