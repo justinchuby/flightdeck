@@ -93,6 +93,16 @@ describe('appStore', () => {
       const agent = useAppStore.getState().agents.find((a) => a.id === 'a2')!;
       expect(agent.messages).toBeUndefined();
     });
+
+    it('uses new messages when explicitly provided on setAgents', () => {
+      const oldMsg = { type: 'text' as const, text: 'old', sender: 'agent' as const, timestamp: 1000 };
+      const newMsg = { type: 'text' as const, text: 'new', sender: 'agent' as const, timestamp: 2000 };
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', messages: [oldMsg] }));
+      useAppStore.getState().setAgents([makeAgent({ id: 'a1', messages: [newMsg] })]);
+      const agent = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
+      expect(agent.messages).toHaveLength(1);
+      expect(agent.messages![0].text).toBe('new');
+    });
   });
 
   describe('addAgent', () => {
@@ -125,6 +135,16 @@ describe('appStore', () => {
       useAppStore.getState().addAgent(makeAgent({ id: 'a1', plan: undefined }));
       const agent = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
       expect(agent.plan).toHaveLength(1);
+    });
+
+    it('uses new messages when explicitly provided on replacement', () => {
+      const oldMsg = { type: 'text' as const, text: 'old', sender: 'agent' as const, timestamp: 1000 };
+      const newMsg = { type: 'text' as const, text: 'new', sender: 'agent' as const, timestamp: 2000 };
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', messages: [oldMsg] }));
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', messages: [newMsg] }));
+      const agent = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
+      expect(agent.messages).toHaveLength(1);
+      expect(agent.messages![0].text).toBe('new');
     });
   });
 

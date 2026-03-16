@@ -52,9 +52,11 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         agents: incoming.map((a) => {
           const prev = byId.get(a.id);
-          return prev
-            ? { ...a, messages: prev.messages ?? a.messages, plan: prev.plan ?? a.plan }
-            : a;
+          if (!prev) return a;
+          // Use new value if explicitly provided; fall back to previous if new is undefined
+          const messages = a.messages !== undefined ? a.messages : prev.messages;
+          const plan = a.plan !== undefined ? a.plan : prev.plan;
+          return { ...a, messages, plan };
         }),
       };
     }),
@@ -62,9 +64,10 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => {
       const prev = s.agents.find((a) => a.id === agent.id);
       if (prev) {
-        // Merge: keep client-only fields (messages, plan) that server doesn't provide
-        const merged = { ...agent, messages: prev.messages ?? agent.messages, plan: prev.plan ?? agent.plan };
-        return { agents: s.agents.map((a) => (a.id === agent.id ? merged : a)) };
+        // Merge: keep client-only fields (messages, plan) only when new agent doesn't provide them
+        const messages = agent.messages !== undefined ? agent.messages : prev.messages;
+        const plan = agent.plan !== undefined ? agent.plan : prev.plan;
+        return { agents: s.agents.map((a) => (a.id === agent.id ? { ...agent, messages, plan } : a)) };
       }
       return { agents: [...s.agents, agent] };
     }),
