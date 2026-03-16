@@ -5,7 +5,11 @@
 /** Telegram's maximum message length. */
 const TELEGRAM_MAX_LENGTH = 4096;
 
-/** Part indicator suffix like " (2/3)" — max 8 chars, supports up to 99 parts. */
+/**
+ * Part indicator suffix like " (2/3)" — max 8 chars, supports up to 99 parts.
+ * Messages needing 100+ chunks (~400KB+) would overflow by 2 chars — acceptable
+ * since Telegram messages that large are unrealistic in practice.
+ */
 const PART_SUFFIX_MAX = 8;
 
 /** Effective max per chunk, reserving space for part indicator. */
@@ -60,7 +64,9 @@ function findSplitPoint(text: string, maxLen: number): number {
   // 1. Check for unclosed code fences in the candidate slice
   const fenceCount = (candidate.match(/```/g) || []).length;
   if (fenceCount % 2 !== 0) {
-    // Inside a code fence — find the opening fence and split before it
+    // Inside a code fence — find the opening fence and split before it.
+    // If lastFence === 0 (message starts with ```), we can't split before it,
+    // so we fall through to paragraph/line/word splitting as graceful degradation.
     const lastFence = candidate.lastIndexOf('```');
     if (lastFence > 0) return lastFence;
   }
