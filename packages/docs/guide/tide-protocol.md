@@ -1,5 +1,7 @@
 # TIDE Protocol — Trust-Informed Dynamic Escalation
 
+> ⚠️ **Research / Future** — This document describes a protocol that is not yet implemented. It is retained for future reference and research purposes.
+
 > An adaptive coordination protocol for multi-agent systems that dynamically adjusts coordination intensity based on real-time signals — per-task, not global.
 
 ## Abstract
