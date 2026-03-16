@@ -186,6 +186,16 @@ export class IntegrationRouter {
     return result;
   }
 
+  /** Remove a session by chatId. Returns true if found and removed. */
+  removeSession(chatId: string): boolean {
+    const session = this.sessions.get(chatId);
+    if (!session) return false;
+    this.sessions.delete(chatId);
+    this.notificationBatcher.unsubscribe(chatId, session.projectId);
+    logger.info({ module: 'integration-router', msg: 'Session revoked', chatId, projectId: session.projectId });
+    return true;
+  }
+
   // ── Challenge-response for session binding (B-1 / C-2) ────────────
 
   /**

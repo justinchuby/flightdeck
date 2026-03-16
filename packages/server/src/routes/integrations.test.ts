@@ -36,6 +36,12 @@ function createMockIntegrationRouter(adapter: MessagingAdapter, sessions: ChatSe
   return {
     getAdapter: vi.fn((platform: string) => platform === 'telegram' ? adapter : null),
     getAllSessions: vi.fn(() => sessions),
+    removeSession: vi.fn((chatId: string) => {
+      const idx = sessions.findIndex(s => s.chatId === chatId);
+      if (idx === -1) return false;
+      sessions.splice(idx, 1);
+      return true;
+    }),
     getBatcher: vi.fn(() => ({
       pendingCount: vi.fn(() => 0),
       getAllSubscriptions: vi.fn(() => []),
@@ -135,5 +141,116 @@ describe('C-2: Integration routes session validation', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toContain('No adapter found');
+  });
+
+  // ── DELETE /integrations/sessions/:chatId ──
+
+  it('DELETE /integrations/sessions/:chatId revokes an active session', async () => {
+    const res = await fetch(`${baseUrl}/integrations/sessions/chat-1`, {
+      method: 'DELETE',
+    });
+    expect(res.status).toBe(204);
+    expect(mockRouter.removeSession).toHaveBeenCalledWith('chat-1');
+  });
+
+  it('DELETE /integrations/sessions/:chatId returns 404 for unknown chatId', async () => {
+    const res = await fetch(`${baseUrl}/integrations/sessions/nonexistent`, {
+      method: 'DELETE',
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toContain('No active session');
+  });
+});
+
+// ── Validate Token ──────────────────────────────────────────
+
+describe('POST /integrations/telegram/validate-token', () => {
+  let baseUrl: string;
+  let stop: () => Promise<void>;
+  const mockAdapter = createMockAdapter();
+  const mockSessions = createMockSessions();
+  const mockRouter = createMockIntegrationRouter(mockAdapter, mockSessions);
+
+  beforeAll(async () => {
+    const srv = createTestServer({ integrationRouter: mockRouter as any });
+    baseUrl = await srv.start();
+    stop = srv.stop;
+  });
+  afterAll(async () => { await stop?.(); });
+
+  it('rejects request without botToken', async () => {
+    const res = await fetch(`${baseUrl}/integrations/telegram/validate-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.valid).toBe(false);
+    expect(body.error).toContain('botToken is required');
+  });
+
+  it('returns valid: false for invalid token', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      json: () => Promise.resolve({ ok: false, description: 'Unauthorized' }),
+    }) as any;
+
+    try {
+      const res = await realFetch(`${baseUrl}/integrations/telegram/validate-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: 'invalid-token' }),
+      });
+      const body = await res.json();
+      expect(body.valid).toBe(false);
+      expect(body.error).toContain('Unauthorized');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('returns bot info for valid token', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      json: () => Promise.resolve({
+        ok: true,
+        result: { id: 123456, is_bot: true, first_name: 'FlightdeckBot', username: 'flightdeck_bot' },
+      }),
+    }) as any;
+
+    try {
+      const res = await realFetch(`${baseUrl}/integrations/telegram/validate-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: 'valid-token-here' }),
+      });
+      const body = await res.json();
+      expect(body.valid).toBe(true);
+      expect(body.bot.id).toBe(123456);
+      expect(body.bot.username).toBe('flightdeck_bot');
+      expect(body.bot.firstName).toBe('FlightdeckBot');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it('handles network errors gracefully', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error')) as any;
+
+    try {
+      const res = await realFetch(`${baseUrl}/integrations/telegram/validate-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: 'some-token' }),
+      });
+      const body = await res.json();
+      expect(body.valid).toBe(false);
+      expect(body.error).toContain('Network error');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
