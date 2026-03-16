@@ -55,6 +55,13 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   private running = false;
   private startError: string | null = null;
 
+  /** Bounded set of recently-seen Telegram update IDs for deduplication. */
+  private seenUpdateIds: Set<number> = new Set();
+  private static readonly MAX_SEEN_IDS = 1000;
+
+  /** AbortController for graceful long-polling shutdown. */
+  private abortController: AbortController | null = null;
+
   // Retry queue for failed outbound messages (in-memory, 5-min TTL)
   private retryQueue: Array<{ message: OutboundMessage; attempts: number; expiresAt: number }> = [];
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -108,6 +115,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       throw new Error(`Telegram bot initialization failed: ${safeMsg}`);
     }
 
+    this.setupDeduplicationMiddleware();
     this.setupCommandHandlers();
     this.setupMessageHandler();
     this.setupErrorHandler();
@@ -129,8 +137,12 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       // Best-effort — if this fails, bot.start() will still attempt polling
     }
 
-    // Start long polling (non-blocking)
+    this.abortController = new AbortController();
+
+    // Start long polling (non-blocking). Pass abort signal for instant shutdown.
     this.bot.start({
+      allowed_updates: ['message'],
+      signal: this.abortController.signal,
       onStart: () => {
         logger.info({ module: 'telegram', msg: 'Telegram bot started (long polling)' });
         this.running = true;
@@ -160,14 +172,24 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       this.retryTimer = null;
     }
 
+    // Signal abort to cancel long-polling immediately (no 30s hang)
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+
     try {
       await this.bot.stop();
     } catch (err) {
-      logger.warn({ module: 'telegram', msg: 'Error stopping Telegram bot', error: (err as Error).message });
+      // AbortError is expected when we abort the controller
+      if ((err as Error).name !== 'AbortError') {
+        logger.warn({ module: 'telegram', msg: 'Error stopping Telegram bot', error: (err as Error).message });
+      }
     }
 
     this.bot = null;
     this.retryQueue = [];
+    this.seenUpdateIds.clear();
     this.emit('stopped', undefined as unknown as void);
     logger.info({ module: 'telegram', msg: 'Telegram bot stopped' });
   }
@@ -214,6 +236,34 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   }
 
   // ── Private ──────────────────────────────────────────────
+
+  /**
+   * grammY middleware that drops updates with previously-seen update_id.
+   * Uses a bounded Set (FIFO eviction at 1000 entries) to prevent
+   * double-processing during restart-during-burst scenarios.
+   */
+  private setupDeduplicationMiddleware(): void {
+    if (!this.bot) return;
+
+    this.bot.use(async (ctx: { update: { update_id: number } }, next: () => Promise<void>) => {
+      const updateId = ctx.update.update_id;
+
+      if (this.seenUpdateIds.has(updateId)) {
+        logger.debug({ module: 'telegram', msg: 'Duplicate update skipped', updateId });
+        return;
+      }
+
+      this.seenUpdateIds.add(updateId);
+
+      // FIFO eviction when over capacity
+      if (this.seenUpdateIds.size > TelegramAdapter.MAX_SEEN_IDS) {
+        const oldest = this.seenUpdateIds.values().next().value;
+        if (oldest !== undefined) this.seenUpdateIds.delete(oldest);
+      }
+
+      await next();
+    });
+  }
 
   private setupCommandHandlers(): void {
     if (!this.bot) return;
