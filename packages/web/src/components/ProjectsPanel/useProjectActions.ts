@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
+import { useLeadStore } from '../../stores/leadStore';
 import { useToastStore } from '../Toast';
 import type { EnrichedProject } from './ProjectCard';
 
@@ -44,6 +45,10 @@ export function useProjectActions(
         const response = await apiFetch<{ id: string }>(`/projects/${id}/resume`, { method: 'POST', body: JSON.stringify({ resumeAll: true }) });
         addToast('success', 'Project resumed — lead agent spawned');
         if (response?.id) {
+          // Set leadStore immediately so WS messages are routed correctly from the start
+          const leadStore = useLeadStore.getState();
+          leadStore.addProject(response.id);
+          leadStore.selectLead(response.id);
           navigate(`/projects/${id}/session`);
         } else {
           await fetchProjects();

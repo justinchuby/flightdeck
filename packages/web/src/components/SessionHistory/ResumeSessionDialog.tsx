@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
+import { useLeadStore } from '../../stores/leadStore';
 import { Play, Loader2, Users, UserPlus, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ProvideFeedback } from '../ProvideFeedback';
 import type { SessionDetail, SessionAgent } from './SessionHistory';
@@ -118,6 +119,10 @@ export function ResumeSessionDialog({ projectId, lastSession, onClose, onResume 
       });
       onResume();
       if (response?.id) {
+        // Set leadStore immediately so WS messages are routed correctly from the start
+        const leadStore = useLeadStore.getState();
+        leadStore.addProject(response.id);
+        leadStore.selectLead(response.id);
         navigate(`/projects/${projectId}/session`);
       }
     } catch (err: unknown) {

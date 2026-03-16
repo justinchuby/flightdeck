@@ -513,6 +513,10 @@ export function TaskQueuePanel() {
         body: JSON.stringify({}),
       });
       if (agent?.id) {
+        // Set leadStore immediately so WS messages are routed correctly from the start
+        const leadStore = useLeadStore.getState();
+        leadStore.addProject(agent.id);
+        leadStore.selectLead(agent.id);
         setTimeout(() => setSelectedTab(agent.id), 500);
       }
     } catch { /* ignore */ }
