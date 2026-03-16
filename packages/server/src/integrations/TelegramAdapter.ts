@@ -245,6 +245,8 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   private setupDeduplicationMiddleware(): void {
     if (!this.bot) return;
 
+    // Hand-rolled ctx type — avoids importing grammY's Context at the type level
+    // since grammY is lazy-imported at runtime to keep it optional.
     this.bot.use(async (ctx: { update: { update_id: number } }, next: () => Promise<void>) => {
       const updateId = ctx.update.update_id;
 

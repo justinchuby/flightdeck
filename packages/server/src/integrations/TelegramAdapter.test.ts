@@ -600,7 +600,7 @@ describe('TelegramAdapter', () => {
     const dedupMiddleware = mockUseHandlers[0];
     const next = vi.fn().mockResolvedValue(undefined);
 
-    // Add 1001 unique IDs (MAX_SEEN_IDS is 1000)
+    // Add 1001 unique IDs — one more than MAX_SEEN_IDS (1000) to trigger FIFO eviction
     for (let i = 1; i <= 1001; i++) {
       await dedupMiddleware({ update: { update_id: i } }, next);
     }
