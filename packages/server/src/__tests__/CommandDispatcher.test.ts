@@ -251,6 +251,17 @@ describe('CommandDispatcher', () => {
         expect.stringContaining('CREW_ROSTER'),
       );
     });
+
+    it('works with empty {} payload (matches help text example)', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent]);
+      (ctx.getRunningCount as any).mockReturnValue(1);
+
+      dispatch(dispatcher, leadAgent, '⟦⟦ QUERY_CREW {} ⟧⟧');
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('CREW_ROSTER'),
+      );
+    });
   });
 
   // ── Broadcast ──────────────────────────────────────────────────────
@@ -1362,5 +1373,30 @@ describe('CommandDispatcher', () => {
       expect(buf).toContain('SENTINEL');
       expect(buf.length).toBeLessThanOrEqual(100_000);
     });
+  });
+
+  describe('no-payload commands accept empty {} payload', () => {
+    // All no-payload commands should work with both `COMMAND` and `COMMAND {}` forms
+    // since the help text examples show `COMMAND {}`.
+    const noPayloadCommands = [
+      'HALT_HEARTBEAT',
+      'RESUME_HEARTBEAT',
+      'TASK_STATUS',
+      'QUERY_TASKS',
+      'QUERY_GROUPS',
+      'QUERY_PEERS',
+      'LIST_CAPABILITIES',
+    ];
+
+    for (const cmd of noPayloadCommands) {
+      it(`${cmd} {} does not trigger unknown command`, () => {
+        const agent = makeAgent({ id: `agent-${cmd.toLowerCase()}` });
+        dispatch(dispatcher, agent, `⟦⟦ ${cmd} {} ⟧⟧`);
+
+        const calls = (agent.sendMessage as any).mock.calls.map((c: any[]) => c[0]);
+        const unknownMsg = calls.find((msg: string) => msg.includes('Unknown command'));
+        expect(unknownMsg).toBeUndefined();
+      });
+    }
   });
 });

@@ -15,7 +15,7 @@ import { deriveArgs } from './CommandHelp.js';
 import { resolveAgentInProject } from './CommCommands.js';
 
 const DM_REGEX = /⟦⟦\s*DIRECT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
-const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*⟧⟧/s;
+const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 
 function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: string): void {
   const match = data.match(DM_REGEX);

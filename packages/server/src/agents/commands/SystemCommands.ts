@@ -16,11 +16,11 @@ import { PROVIDER_PRESETS } from '../../adapters/presets.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
-const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*⟧⟧/s;
-const RESUME_HEARTBEAT_REGEX = /⟦⟦\s*RESUME_HEARTBEAT\s*⟧⟧/s;
+const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*(?:\{[^}]*\})?\s*⟧⟧/s;
+const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*(?:\{[^}]*\})?\s*⟧⟧/s;
+const RESUME_HEARTBEAT_REGEX = /⟦⟦\s*RESUME_HEARTBEAT\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 const REQUEST_LIMIT_CHANGE_REGEX = /⟦⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*⟧⟧/s;
-const QUERY_PROVIDERS_REGEX = /⟦⟦\s*QUERY_PROVIDERS\s*⟧⟧/s;
+const QUERY_PROVIDERS_REGEX = /⟦⟦\s*QUERY_PROVIDERS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
