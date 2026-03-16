@@ -50,6 +50,8 @@ export function formatNewlyReadyMessage(
 
 export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): void {
   if (!agent.parentId) return;
+  // Secretary is a background agent that cycles frequently — suppress noise
+  if (agent.role.id === 'secretary') return;
   const parent = ctx.getAgent(agent.parentId);
   if (!parent || (parent.status !== 'running' && parent.status !== 'idle')) return;
 
@@ -198,6 +200,10 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
       }
     }
   }
+
+  // Secretary is a background agent that cycles frequently — suppress report noise
+  // but still complete delegations above
+  if (agent.role.id === 'secretary') return;
 
   const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
   const rawOutput2 = agent.getTaskOutput(16000);
