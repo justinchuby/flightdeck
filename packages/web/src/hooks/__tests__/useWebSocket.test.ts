@@ -250,6 +250,47 @@ describe('useWebSocket — message handling', () => {
     expect(msgs?.[0].text).toBe('thinking');
   });
 
+  it('agent:thinking normalizes object text payload', () => {
+    setup();
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    simulateMsg({ type: 'agent:thinking', agentId: 'a1', text: { text: 'pondering' } });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs?.[0].sender).toBe('thinking');
+    expect(msgs?.[0].text).toBe('pondering');
+  });
+
+  it('agent:thinking skips empty text', () => {
+    setup();
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    simulateMsg({ type: 'agent:thinking', agentId: 'a1', text: '' });
+    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    expect(msgs).toHaveLength(0);
+  });
+
+  it('thinking messages survive init (setAgents) reinit', () => {
+    setup();
+    const thinkMsg = { type: 'text', text: 'deep thought', sender: 'thinking', timestamp: 1000 };
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [thinkMsg] } as any] });
+    // Simulate WS reconnect init — server sends agents without messages
+    simulateMsg({ type: 'init', agents: [{ id: 'a1', status: 'idle' }] });
+    const agent = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(agent?.status).toBe('idle');
+    expect(agent?.messages).toHaveLength(1);
+    expect(agent?.messages?.[0].text).toBe('deep thought');
+  });
+
+  it('thinking messages survive agent:spawned re-announcement', () => {
+    setup();
+    const thinkMsg = { type: 'text', text: 'reasoning...', sender: 'thinking', timestamp: 1000 };
+    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [thinkMsg] } as any] });
+    // Simulate agent:spawned for same agent (e.g., session resume)
+    simulateMsg({ type: 'agent:spawned', agent: { id: 'a1', status: 'idle', role: { id: 'dev', name: 'Dev' } } });
+    const agent = useAppStore.getState().agents.find(a => a.id === 'a1');
+    expect(agent?.status).toBe('idle');
+    expect(agent?.messages).toHaveLength(1);
+    expect(agent?.messages?.[0].sender).toBe('thinking');
+  });
+
   it('agent:usage updates token counts', () => {
     setup();
     useAppStore.setState({ agents: [{ id: 'a1', status: 'running' } as any] });

@@ -72,6 +72,27 @@ describe('appStore', () => {
       useAppStore.getState().setAgents([makeAgent({ id: 'a1' }), makeAgent({ id: 'a2' })]);
       expect(useAppStore.getState().agents).toHaveLength(2);
     });
+
+    it('preserves messages from existing agents across init replacement', () => {
+      const msgs = [
+        { type: 'text' as const, text: 'thinking...', sender: 'thinking' as const, timestamp: 1000 },
+        { type: 'text' as const, text: 'hello', sender: 'agent' as const, timestamp: 2000 },
+      ];
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', messages: msgs }));
+      // Simulate WS init with toJSON()-style agents (no messages)
+      useAppStore.getState().setAgents([makeAgent({ id: 'a1', status: 'idle', messages: undefined })]);
+      const agent = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
+      expect(agent.status).toBe('idle');
+      expect(agent.messages).toHaveLength(2);
+      expect(agent.messages![0].sender).toBe('thinking');
+    });
+
+    it('does not carry messages to agents with different ids', () => {
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', messages: [{ type: 'text', text: 'hi', sender: 'agent', timestamp: 1 }] }));
+      useAppStore.getState().setAgents([makeAgent({ id: 'a2', messages: undefined })]);
+      const agent = useAppStore.getState().agents.find((a) => a.id === 'a2')!;
+      expect(agent.messages).toBeUndefined();
+    });
   });
 
   describe('addAgent', () => {
@@ -85,6 +106,25 @@ describe('appStore', () => {
       useAppStore.getState().addAgent(makeAgent({ id: 'a1', status: 'terminated' }));
       expect(useAppStore.getState().agents).toHaveLength(1);
       expect(useAppStore.getState().agents[0].status).toBe('terminated');
+    });
+
+    it('preserves messages when replacing an existing agent', () => {
+      const thinkingMsg = { type: 'text' as const, text: 'pondering...', sender: 'thinking' as const, timestamp: 1000 };
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', messages: [thinkingMsg] }));
+      // Simulate agent:spawned with toJSON()-style data (no messages)
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', status: 'idle', messages: undefined }));
+      const agent = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
+      expect(agent.status).toBe('idle');
+      expect(agent.messages).toHaveLength(1);
+      expect(agent.messages![0].sender).toBe('thinking');
+    });
+
+    it('preserves plan when replacing an existing agent', () => {
+      const plan = [{ id: '1', title: 'task', status: 'in_progress' as const, priority: 'high' as const }];
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', plan }));
+      useAppStore.getState().addAgent(makeAgent({ id: 'a1', plan: undefined }));
+      const agent = useAppStore.getState().agents.find((a) => a.id === 'a1')!;
+      expect(agent.plan).toHaveLength(1);
     });
   });
 

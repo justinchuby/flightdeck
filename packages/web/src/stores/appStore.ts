@@ -45,13 +45,29 @@ export const useAppStore = create<AppState>((set) => ({
   pendingDecisions: [],
   approvalQueueOpen: false,
 
-  setAgents: (agents) => set({ agents }),
+  setAgents: (incoming) =>
+    set((s) => {
+      // Preserve client-only fields (messages, plan) that aren't in server's toJSON()
+      const byId = new Map(s.agents.map((a) => [a.id, a]));
+      return {
+        agents: incoming.map((a) => {
+          const prev = byId.get(a.id);
+          return prev
+            ? { ...a, messages: prev.messages ?? a.messages, plan: prev.plan ?? a.plan }
+            : a;
+        }),
+      };
+    }),
   addAgent: (agent) =>
-    set((s) =>
-      s.agents.some((a) => a.id === agent.id)
-        ? { agents: s.agents.map((a) => (a.id === agent.id ? agent : a)) }
-        : { agents: [...s.agents, agent] },
-    ),
+    set((s) => {
+      const prev = s.agents.find((a) => a.id === agent.id);
+      if (prev) {
+        // Merge: keep client-only fields (messages, plan) that server doesn't provide
+        const merged = { ...agent, messages: prev.messages ?? agent.messages, plan: prev.plan ?? agent.plan };
+        return { agents: s.agents.map((a) => (a.id === agent.id ? merged : a)) };
+      }
+      return { agents: [...s.agents, agent] };
+    }),
   updateAgent: (id, patch) =>
     set((s) => ({
       agents: s.agents.map((a) => (a.id === id ? { ...a, ...patch } : a)),

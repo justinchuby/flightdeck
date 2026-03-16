@@ -268,15 +268,18 @@ export function useWebSocket() {
           break;
         }
         case 'agent:thinking': {
+          // Normalize text shape — match lead panel's defensive handling
+          const thinkText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
+          if (!thinkText) break;
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const msgs = [...(existing?.messages ?? [])];
           const last = msgs[msgs.length - 1];
           // Append to existing thinking message or create new one
           if (last && last.sender === 'thinking') {
-            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + msg.text, timestamp: last.timestamp || Date.now() };
+            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + thinkText, timestamp: last.timestamp || Date.now() };
           } else {
-            msgs.push({ type: 'text', text: msg.text, sender: 'thinking', timestamp: Date.now() });
+            msgs.push({ type: 'text', text: thinkText, sender: 'thinking', timestamp: Date.now() });
           }
           updateAgent(msg.agentId, { messages: msgs });
           break;
