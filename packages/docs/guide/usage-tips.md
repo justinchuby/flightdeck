@@ -65,7 +65,7 @@ When multiple agents need to coordinate on a shared concern (API design, naming 
 
 The **Overview** page is your health dashboard for the entire crew.
 
-![Overview Dashboard](/screenshots/overview.png)
+![Overview Dashboard](/screenshots/home-dashboard.png)
 
 ### Reading the Visualizations
 
@@ -89,7 +89,7 @@ The **Overview** page is your health dashboard for the entire crew.
 
 The **Timeline** is the most detailed view of what your agents did and when.
 
-![Timeline View](/screenshots/timeline-live.png)
+![Timeline View](/screenshots/timeline.png)
 
 ### Reading the Gantt Chart
 

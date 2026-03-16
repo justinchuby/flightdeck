@@ -67,7 +67,7 @@ Orchestration produces a natural side effect: **visibility**. When agents commun
 - **Session Replay** — scrub through past sessions at up to 32× to review how the team coordinated
 - **Overview** — cumulative flow, agent activity heatmaps, and context usage at a glance
 
-![Timeline — watch the orchestration unfold over time](/screenshots/timeline-live.png)
+![Timeline — watch the orchestration unfold over time](/screenshots/timeline.png)
 
 ---
 
