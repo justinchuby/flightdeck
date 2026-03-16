@@ -185,12 +185,26 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     this.validateCliCommand(opts.cliCommand);
 
     const args = [...(opts.baseArgs || ['--acp', '--stdio']), ...(opts.cliArgs || [])];
+    // On Unix, detach child so it gets its own process group.  Without this,
+    // Ctrl+C sends SIGINT to the entire foreground process group, hitting
+    // both the server AND every child — causing a double-SIGINT that crashes
+    // the server.  On Windows, detached:true creates a visible console window,
+    // so we skip it there (Windows doesn't have Unix process groups anyway;
+    // shell:true already isolates the child).
+    const isWindows = process.platform === 'win32';
     this.process = spawn(opts.cliCommand, args, {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: opts.cwd || process.cwd(),
-      shell: process.platform === 'win32',
+      shell: isWindows,
+      detached: !isWindows,
       ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
     });
+
+    // Allow the server's event loop to exit without waiting for the
+    // detached child.  The server terminates children explicitly.
+    if (!isWindows && this.process.unref) {
+      this.process.unref();
+    }
 
     if (!this.process.stdin || !this.process.stdout) {
       this.process.kill();
@@ -435,7 +449,16 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           }),
           new Promise<void>((resolve) => {
             killTimer = setTimeout(() => {
-              try { proc.kill(); } catch { /* already exited */ }
+              try {
+                // Kill the child process (group). On Unix, detached children
+                // are process group leaders — use -pid to terminate the group.
+                // On Windows, negative PIDs are unsupported; use proc.kill().
+                if (proc.pid && process.platform !== 'win32') {
+                  process.kill(-proc.pid, 'SIGTERM');
+                } else {
+                  proc.kill('SIGTERM');
+                }
+              } catch { /* already exited */ }
               resolve();
             }, TERMINATE_TIMEOUT_MS);
           }),
