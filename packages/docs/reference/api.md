@@ -4,10 +4,16 @@
 These API references are for Flightdeck contributors. They are not part of the public API and may change without notice. If you're using Flightdeck to manage AI agent crews, see the [Guide](/guide/) instead.
 :::
 
-> **Base URL**: `http://localhost:3001/api`  
-> **Authentication**: Bearer token (auto-generated on server start, required on all routes)  
-> **Content-Type**: `application/json` for all request bodies  
-> **Rate limits**: Agent spawn — 30 req/min. Lead messages — 50 req/10s.
+> **Base URL**: `http://localhost:3001/api`
+> **Authentication**: Bearer token (auto-generated on server start, required on all routes)
+> **Content-Type**: `application/json` for all request bodies
+> **Rate limits**: Agent spawn — 30 req/min. Lead messages — 50 req/10s. Knowledge writes — 30 req/min.
+
+---
+
+## Table of Contents
+
+[[toc]]
 
 ---
 
@@ -15,897 +21,458 @@ These API references are for Flightdeck contributors. They are not part of the p
 
 ### `GET /agents`
 
-**Description**: Returns all currently active agents. Optionally filter by project.
+List all currently active (in-memory) agents. Optionally filter by project or session.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `projectId` | query | string | no | Filter agents by project. Omit to return all agents (UI default). |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Filter agents by project |
+| `sessionId` | query | string | no | Further narrow to a specific session |
 
-**Response**:
-```json
-[
-  {
-    "id": "abc12345-...",
-    "role": { "id": "developer", "name": "Developer", "icon": "💻" },
-    "status": "running",
-    "task": "Implement authentication module",
-    "model": "claude-opus-4-6",
-    "inputTokens": 12400,
-    "outputTokens": 3200,
-    "contextWindowSize": 200000,
-    "contextWindowUsed": 15600,
-    "parentId": "lead-agent-id"
-  }
-]
-```
+**Response**: `AgentJSON[]`
 
 ---
 
 ### `POST /agents`
 
-**Description**: Spawns a new agent with the given role and optional task. Rate-limited to 30 requests per minute.
+Spawn a new agent with the given role and optional task. Rate-limited to 30 req/min.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `roleId` | body | string | yes | Role identifier (e.g. `"developer"`, `"architect"`) |
-| `task` | body | string | no | Initial task description sent to the agent |
-| `mode` | body | string | no | Execution mode (`"autopilot"` or `"interactive"`) |
-| `autopilot` | body | boolean | no | If `true`, agent runs without waiting for approval prompts |
-| `model` | body | string | no | Override the default model for this role |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `roleId` | body | string | yes | Role identifier (e.g. `developer`, `lead`) |
+| `task` | body | string | no | Initial task description |
+| `model` | body | string | no | Model override (e.g. `claude-sonnet-4-6`) |
+| `provider` | body | string | no | Provider override |
+| `sessionId` | body | string | no | Resume an existing ACP session |
 
-**Response** `201 Created`:
-```json
-{ "id": "abc12345-...", "role": { ... }, "status": "idle", ... }
-```
-
-**Errors**: `400` unknown role · `429` concurrency limit reached
+**Response** `201`: `AgentJSON`
+**Errors**: `400` unknown role, `429` rate limit
 
 ---
 
 ### `DELETE /agents/:id`
 
-**Description**: Terminates an agent and frees its concurrency slot.
+Terminate an agent by ID.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
+**Response**: `{ ok: boolean }`
 
-**Response**: `{ "ok": true }`
+---
+
+### `POST /agents/:id/terminate`
+
+Terminate an agent (alias for `DELETE /agents/:id`).
+
+**Response**: `{ ok: boolean }`
 
 ---
 
 ### `POST /agents/:id/interrupt`
 
-**Description**: Sends a SIGINT to the agent's underlying process, cancelling its current operation.
+Interrupt the agent's current work (cancel in-flight prompt).
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-
-**Response**: `{ "ok": true }` or `{ "ok": false, "error": "Cancel not supported for this agent mode" }`
+**Response**: `{ ok: boolean }` or `{ ok: false, error: string }`
 
 ---
 
 ### `POST /agents/:id/restart`
 
-**Description**: Terminates and immediately re-spawns an agent, preserving its role and task assignment.
+Restart an agent with a fresh context window (preserves role and task).
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-
-**Response** `201 Created`: New agent JSON
+**Response** `201`: `AgentJSON`
 
 ---
 
-### `GET /agents/:id/plan`
+### `POST /agents/:id/compact`
 
-**Description**: Returns the agent's current plan (step list). Falls back to the persisted plan in the database if the agent is no longer in memory.
+Compact an agent's context (restart with context handoff).
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-
-**Response**: `{ "agentId": "...", "plan": [ { "step": 1, "text": "..." } ] }`
-
----
-
-### `GET /agents/:id/messages`
-
-**Description**: Returns the persisted message history for an agent.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-| `limit` | query | number | no | Max messages to return (default 200, max 1000) |
-
-**Response**: `{ "agentId": "...", "messages": [ { "sender": "agent", "content": "...", "timestamp": "..." } ] }`
-
----
-
-### `POST /agents/:id/input`
-
-**Description**: Writes raw text directly to the agent's stdin — bypasses message formatting. Use for low-level control.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-| `text` | body | string | yes | Text to write to stdin |
-
-**Response**: `{ "ok": true }`
-
----
-
-### `POST /agents/:id/message`
-
-**Description**: Sends a user message to an agent. Supports queuing (waits until agent is idle) or interrupt mode (cancels current work first).
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-| `text` | body | string | yes | Message content |
-| `mode` | body | string | no | `"queue"` (default) or `"interrupt"` |
-
-**Response**:
-- Queue mode: `{ "ok": true, "mode": "queue", "pending": 1, "status": "running" }`
-- Interrupt mode: `{ "ok": true, "mode": "interrupt", "status": "running" }`
+**Response** `201`: `{ compacted: true, agent: AgentJSON }`
 
 ---
 
 ### `PATCH /agents/:id`
 
-**Description**: Updates mutable agent properties. Currently supports changing the model at runtime.
+Update agent properties (currently only `model`).
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
 | `model` | body | string | no | New model identifier |
 
-**Response**: Updated agent JSON
+**Response**: `AgentJSON`
+
+---
+
+### `GET /agents/:id/plan`
+
+Get the agent's current task plan (from memory or persisted DB).
+
+**Response**: `{ agentId: string, plan: object }`
+
+---
+
+### `GET /agents/:id/messages`
+
+Get persisted message history for an agent. For resumed sessions, falls back to prior session messages.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | query | number | no | Max messages (default 200, max 1000) |
+| `includeSystem` | query | boolean | no | Include system messages (default false) |
+
+**Response**: `{ agentId: string, messages: Message[], fromPriorSession: boolean }`
+
+---
+
+### `POST /agents/:id/input`
+
+Send raw text input to an agent's stdin.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `text` | body | string | yes | Text to write to agent |
+
+**Response**: `{ ok: true }`
+
+---
+
+### `POST /agents/:id/message`
+
+Send a message to an agent. Rate-limited to 50 req/10s.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `text` | body | string | yes | Message content |
+| `mode` | body | string | no | `queue` (default) or `interrupt` |
+| `attachments` | body | array | no | `[{ name, mimeType, data }]` — image attachments |
+
+**Response**: `{ ok: true, mode: string, pending?: number, status: string }`
 
 ---
 
 ### `GET /agents/:id/queue`
 
-**Description**: Returns summaries (first 100 chars) of each pending queued message for an agent.
+Get pending message queue for an agent.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-
-**Response**: `{ "agentId": "...", "queue": ["[USER MESSAGE] ...", "..."] }`
+**Response**: `{ agentId: string, queue: MessageSummary[] }`
 
 ---
 
 ### `DELETE /agents/:id/queue/:index`
 
-**Description**: Removes a queued message by its zero-based index. The message is discarded and will never be delivered.
+Remove a message from the pending queue by index.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-| `index` | path | number | yes | Zero-based index in the pending queue |
-
-**Response**: `{ "ok": true, "queue": ["...remaining messages..."] }`
+**Response**: `{ ok: true, queue: MessageSummary[] }`
 
 ---
 
 ### `POST /agents/:id/queue/reorder`
 
-**Description**: Moves a queued message from one position to another, changing the delivery order.
+Reorder messages in the pending queue.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-| `from` | body | number | yes | Source index (zero-based) |
-| `to` | body | number | yes | Destination index (zero-based) |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `from` | body | number | yes | Source index |
+| `to` | body | number | yes | Destination index |
 
-**Response**: `{ "ok": true, "queue": ["...reordered messages..."] }`
+**Response**: `{ ok: true, queue: MessageSummary[] }`
 
 ---
 
-### `POST /agents/:id/permission`
+### `GET /agents/:id/focus`
 
-**Description**: Resolves a pending permission prompt for an agent (e.g. file write approval).
+Aggregated single-agent focus view: agent state, recent output, activities, decisions, file locks, and diff.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Agent UUID |
-| `approved` | body | boolean | yes | `true` to approve, `false` to deny |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `activityLimit` | query | number | no | Max activity entries (default 50, max 200) |
+| `outputLimit` | query | number | no | Max output chars (default 8000) |
 
-**Response**: `{ "ok": true }`
-
----
-
-## Agent Roles
-
-### `GET /roles`
-
-**Description**: Returns all registered agent roles (built-in + custom).
-
-**Parameters**: None
-
-**Response**:
-```json
-[
-  { "id": "developer", "name": "Developer", "icon": "💻", "color": "#3b82f6", "model": "claude-opus-4-6", "systemPrompt": "..." }
-]
-```
+**Response**: `{ agent, recentOutput, activities, decisions, fileLocks, diff }`
 
 ---
 
-### `POST /roles`
+### `GET /agents/:id/tasks`
 
-**Description**: Registers a new custom role.
+Get task history for an agent from the DAG.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | body | string | yes | Unique role identifier (slug) |
-| `name` | body | string | yes | Display name |
-| `systemPrompt` | body | string | yes | Role-specific system prompt |
-| `icon` | body | string | no | Emoji icon |
-| `color` | body | string | no | Hex color for UI |
-| `model` | body | string | no | Default model override |
-
-**Response** `201 Created`: Role object
+**Response**: `DagTask[]`
 
 ---
 
-### `DELETE /roles/:id`
+### `GET /agents/:id/diff`
 
-**Description**: Removes a custom role. Built-in roles cannot be deleted.
+Full git diff for all files locked by this agent.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Role identifier |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `cached` | query | string | no | Set to `false` to bypass cache |
 
-**Response**: `{ "ok": true }`
+**Response**: `DiffResult`
 
 ---
 
-## Project Lead
+### `GET /agents/:id/diff/summary`
+
+Lightweight diff summary (for badges — lines added/removed, file count).
+
+**Response**: `DiffSummary`
+
+---
+
+## Lead Agent
 
 ### `POST /lead/start`
 
-**Description**: Starts a new Project Lead agent (or resumes an existing project). Rate-limited. Sends the initial task to the lead after a short delay.
+Start a new project with a lead agent. Rate-limited to 30 req/min.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `task` | body | string | no | Initial task description |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `task` | body | string | no | Initial project task |
 | `name` | body | string | no | Project name |
-| `model` | body | string | no | Model override for the lead |
-| `cwd` | body | string | no | Working directory for the project |
-| `sessionId` | body | string | no | ACP session ID to resume |
-| `projectId` | body | string | no | Existing project ID to resume |
+| `model` | body | string | no | Model override |
+| `cwd` | body | string | no | Working directory |
+| `sessionId` | body | string | no | Resume an existing session |
+| `projectId` | body | string | no | Attach to existing project |
 
-**Response** `201 Created`: Lead agent JSON  
-**Errors**: `429` concurrency limit or rate limit
+**Response** `201`: `AgentJSON`
 
 ---
 
 ### `GET /lead`
 
-**Description**: Returns all top-level Project Lead agents (excludes sub-leads spawned by architects).
+List all lead agents (top-level, no parent).
 
-**Parameters**: None
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Filter by project |
 
-**Response**: Array of lead agent JSON objects
+**Response**: `AgentJSON[]`
 
 ---
 
 ### `GET /lead/:id`
 
-**Description**: Returns a single lead agent by ID.
+Get a specific lead agent's details.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-
-**Response**: Lead agent JSON  
-**Errors**: `404` if not found or not a lead role
+**Response**: `AgentJSON`
 
 ---
 
 ### `POST /lead/:id/message`
 
-**Description**: Sends a user message to the lead. Defaults to `"interrupt"` mode (unlike the generic agent message endpoint which defaults to `"queue"`). Rate-limited to 50 req/10s.
+Send a priority message to the lead agent. Rate-limited to 50 req/10s.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
 | `text` | body | string | yes | Message content |
-| `mode` | body | string | no | `"interrupt"` (default) or `"queue"` |
+| `mode` | body | string | no | `interrupt` (default) or `queue` |
+| `attachments` | body | array | no | Image attachments |
 
-**Response**: `{ "ok": true, "mode": "interrupt" }` or `{ "ok": true, "mode": "queue", "pending": 1 }`
+**Response**: `{ ok: true, mode: string }`
 
 ---
 
 ### `PATCH /lead/:id`
 
-**Description**: Updates lead-specific properties.
+Update lead agent properties.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-| `cwd` | body | string | no | Update working directory |
-| `projectName` | body | string | no | Update displayed project name |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `cwd` | body | string | no | New working directory |
+| `projectName` | body | string | no | New project name |
 
-**Response**: Updated lead agent JSON
+**Response**: `AgentJSON`
 
 ---
 
 ### `GET /lead/:id/decisions`
 
-**Description**: Returns all decisions logged by agents under this lead.
+Get decisions logged by this lead's crew.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-
-**Response**: Array of decision objects enriched with agent role names
+**Response**: `Decision[]`
 
 ---
-
-### `GET /lead/:id/delegations`
-
-**Description**: Returns all active and completed delegations issued by this lead.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-
-**Response**: Array of delegation objects with `{ id, agentId, task, status, createdAt }`
-
----
-
-### `GET /lead/:id/dag`
-
-**Description**: Returns the current Task DAG status for a lead's project.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-
-**Response**: DAG status object with tasks, dependencies, and completion state
-
----
-
-### `GET /lead/:id/progress`
-
-**Description**: Returns a summary of project progress including delegation counts, completion percentage, team size, and token usage.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-
-**Response**:
-```json
-{
-  "totalDelegations": 12,
-  "active": 3,
-  "completed": 8,
-  "failed": 1,
-  "completionPct": 67,
-  "teamSize": 5,
-  "leadTokens": { "input": 45000, "output": 12000 },
-  "teamAgents": [ { "id": "...", "role": {}, "status": "running", "inputTokens": 8000, ... } ],
-  "delegations": [ ... ]
-}
-```
-
----
-
-## Communication — Groups
 
 ### `GET /lead/:id/groups`
 
-**Description**: Returns all chat groups associated with a lead's session.
+List chat groups for a lead agent's session.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-
-**Response**: Array of group objects with `{ name, members, createdAt, archived }`
+**Response**: `ChatGroup[]`
 
 ---
 
 ### `POST /lead/:id/groups`
 
-**Description**: Creates a new chat group. The `"human"` participant is always added automatically.
+Create a chat group within a lead's session.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-| `name` | body | string | yes | Group name (unique per lead) |
-| `memberIds` | body | string[] | no | Agent UUIDs to include |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `name` | body | string | yes | Group name |
+| `memberIds` | body | string[] | no | Initial member agent IDs |
 
-**Response** `201 Created`: Group object  
-**Errors**: `400` name required or name already exists
+**Response** `201`: `ChatGroup`
 
 ---
 
 ### `GET /lead/:id/groups/:name/messages`
 
-**Description**: Returns recent messages from a group chat.
+Get messages from a chat group.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-| `name` | path | string | yes | Group name |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
 | `limit` | query | number | no | Max messages (default 50) |
 
-**Response**: Array of `{ id, groupName, fromAgentId, fromRole, content, timestamp }`
+**Response**: `ChatMessage[]`
 
 ---
 
 ### `POST /lead/:id/groups/:name/messages`
 
-**Description**: Sends a message from the human user into a group chat. The message is delivered to all agent members.
+Send a message to a chat group (as human user). Delivers to all agent members.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Lead agent UUID |
-| `name` | path | string | yes | Group name |
-| `content` | body | string | yes | Message text |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `content` | body | string | yes | Message content |
 
-**Response** `201 Created`: Message object  
-**Errors**: `404` group not found
+**Response** `201`: `ChatMessage`
 
 ---
 
-## Decisions
+### `POST /lead/:id/groups/:name/messages/:messageId/reactions`
 
-### `GET /decisions`
+Add a reaction to a group message.
 
-**Description**: Returns decisions from the log, optionally filtered by project or confirmation status.
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `emoji` | body | string | yes | Emoji (max 8 chars) |
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `needs_confirmation` | query | boolean | no | If `"true"`, returns only pending decisions |
-| `projectId` | query | string | no | Filter decisions by project. Omit to return all. |
-
-**Response**: Array of decision objects
+**Response**: `{ success: boolean }`
 
 ---
 
-### `POST /decisions/:id/confirm`
+### `DELETE /lead/:id/groups/:name/messages/:messageId/reactions/:emoji`
 
-**Description**: Approves a decision and optionally executes any associated system action (e.g. changing agent concurrency limit). Notifies the lead agent.
+Remove a reaction from a group message.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Decision ID |
-| `reason` | body | string | no | Optional user comment sent to the lead |
-
-**Response**: Updated decision object
+**Response**: `{ success: boolean }`
 
 ---
 
-### `POST /decisions/:id/reject`
+### `GET /lead/:id/delegations`
 
-**Description**: Rejects a decision and notifies the lead agent to revise its approach.
+Get all delegations from this lead.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Decision ID |
-| `reason` | body | string | no | Optional rejection reason sent to the lead |
-
-**Response**: Updated decision object
+**Response**: `Delegation[]`
 
 ---
 
-### `POST /decisions/:id/respond`
+### `GET /lead/:id/dag`
 
-**Description**: Approves a decision and sends a custom message to the originating agent.
+Get the task DAG status for a lead's session.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Decision ID |
-| `message` | body | string | yes | Feedback message delivered to the agent |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `includeArchived` | query | boolean | no | Include archived tasks |
 
-**Response**: Updated decision object
+**Response**: `{ tasks, fileLockMap, summary }`
 
 ---
 
-### `POST /decisions/:id/feedback`
+### `GET /lead/:id/progress`
 
-**Description**: Sends feedback on a decision without changing its status. Useful for non-confirmation decisions where the user wants to comment without accepting or rejecting.
+Aggregated progress for a lead's crew: delegations, team agents, tokens used.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Decision ID |
-| `message` | body | string | yes | Feedback text delivered to the lead |
-
-**Response**: `{ "ok": true, "decision": { ... } }`
+**Response**: `{ totalDelegations, active, completed, failed, completionPct, teamSize, leadTokens, teamAgents, delegations }`
 
 ---
 
-## Coordination
+## Costs
 
-### `GET /coordination/status`
+### `GET /costs/by-agent`
 
-**Description**: Returns a combined snapshot: all agents, all active file locks, and recent activity. Optionally scoped to a project.
+Token and cost totals grouped by agent.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `projectId` | query | string | no | Filter to a specific project. Omit to return all. |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Filter by project |
 
-**Response**: `{ "agents": [...], "locks": [...], "recentActivity": [...] }`
-
----
-
-### `GET /coordination/locks`
-
-**Description**: Returns all active file locks. Optionally scoped to a project.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `projectId` | query | string | no | Filter locks by project. Omit to return all. |
-
-**Response**: Array of `{ agentId, agentRole, filePath, reason, acquiredAt, expiresAt }`
+**Response**: `AgentCost[]`
 
 ---
 
-### `POST /coordination/locks`
+### `GET /costs/by-task`
 
-**Description**: Acquires a file lock on behalf of an agent.
+Token and cost totals grouped by task.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `agentId` | body | string | yes | Agent requesting the lock |
-| `filePath` | body | string | yes | Path to lock (supports globs) |
-| `reason` | body | string | no | Human-readable reason |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `leadId` | query | string | no | Filter by lead |
+| `projectId` | query | string | no | Filter by project |
 
-**Response** `201 Created`: `{ "ok": true }` or `409 Conflict`: `{ "ok": false, "holder": { ... } }`
+**Response**: `TaskCost[]`
 
 ---
 
-### `DELETE /coordination/locks/:filePath`
+### `GET /costs/agent/:agentId`
 
-**Description**: Releases a file lock.
+Task-level cost breakdown for a specific agent.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `filePath` | path | string | yes | URL-encoded file path |
-| `agentId` | query | string | yes | Agent releasing the lock |
-
-**Response**: `{ "ok": true }`
+**Response**: `TaskCost[]`
 
 ---
 
-### `GET /coordination/activity`
+### `GET /costs/by-project`
 
-**Description**: Returns activity log entries. Can be filtered by agent, action type, or time range.
+Aggregate costs per project.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `agentId` | query | string | no | Filter by agent UUID |
-| `type` | query | string | no | Filter by action type (e.g. `"delegated"`, `"status_change"`) |
-| `limit` | query | number | no | Max entries (default 50) |
-| `since` | query | string | no | ISO timestamp — returns entries after this time |
-
-**Response**: Array of activity log entries
+**Response**: `ProjectCost[]`
 
 ---
 
-### `GET /coordination/summary`
+### `GET /costs/by-session`
 
-**Description**: Returns an aggregated summary of all activity (counts by type, by agent, etc.).
+Session-level costs for a project.
 
-**Parameters**: None
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | yes | Project ID |
 
-**Response**: Summary object from `ActivityLedger.getSummary()`
-
----
-
-### `GET /coordination/timeline`
-
-**Description**: Returns rich timeline data for the swim-lane visualization — agent status segments, communication links, file lock spans, and time range metadata.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `since` | query | string | no | ISO timestamp — only include events after this time |
-| `leadId` | query | string | no | Scope results to a specific lead's team |
-
-**Response**:
-```json
-{
-  "agents": [
-    {
-      "id": "...", "shortId": "abc12345", "role": "developer", "model": "...",
-      "createdAt": "...", "endedAt": null,
-      "segments": [ { "status": "running", "startAt": "...", "endAt": "...", "taskLabel": "..." } ]
-    }
-  ],
-  "communications": [
-    { "type": "delegation", "fromAgentId": "...", "toAgentId": "...", "summary": "...", "timestamp": "..." }
-  ],
-  "locks": [
-    { "agentId": "...", "filePath": "src/auth.ts", "acquiredAt": "...", "releasedAt": "..." }
-  ],
-  "timeRange": { "start": "...", "end": "..." },
-  "project": { "projectId": "...", "projectName": "My App", "leadId": "..." }
-}
-```
+**Response**: `SessionCost[]`
 
 ---
 
-### `GET /coordination/alerts`
+## Timers
 
-**Description**: Returns all active proactive alerts from the AlertEngine (stuck agents, context pressure, duplicate edits, idle+ready mismatch, stale decisions).
+### `GET /timers`
 
-**Parameters**: None
+List all agent timers with remaining time.
 
-**Response**: Array of alert objects with `{ type, severity, agentId, message, timestamp }`
-
----
-
-### `GET /coordination/eager-schedule`
-
-**Description**: Returns the EagerScheduler's current pre-assignment queue — tasks matched to available agents before they become active.
-
-**Parameters**: None
-
-**Response**: Array of pre-assignment objects
+**Response**: `Timer[]`
 
 ---
 
-### `GET /coordination/capabilities`
+### `POST /timers`
 
-**Description**: Queries the capability registry to find agents with specific expertise (file, technology, keyword, domain).
+Create a timer for an agent.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | query | string | yes | Scope to a lead's team |
-| `file` | query | string | no | Match by file path |
-| `technology` | query | string | no | Match by technology name |
-| `keyword` | query | string | no | Match by keyword |
-| `domain` | query | string | no | Match by domain |
-| `availableOnly` | query | boolean | no | Only return agents that are idle |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | body | string | yes | Agent to notify |
+| `label` | body | string | yes | Timer label |
+| `message` | body | string | no | Message to deliver when fired |
+| `delaySeconds` | body | number | yes | Delay in seconds (1–86400) |
+| `repeat` | body | boolean | no | Repeat after firing |
+| `projectId` | body | string | no | Verify agent belongs to project |
 
-**Response**: Array of capability match objects
-
----
-
-### `GET /coordination/match-agent`
-
-**Description**: Uses the AgentMatcher to find the best-fit agent for a task description, considering role, files, technologies, and availability.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | query | string | yes | Scope to a lead's team |
-| `task` | query | string | no | Task description to match |
-| `role` | query | string | no | Required role filter |
-| `file` | query | string | no | Relevant file path |
-| `tech` | query | string | no | Relevant technology |
-| `keyword` | query | string | no | Comma-separated keywords |
-| `preferIdle` | query | boolean | no | Prefer idle agents |
-
-**Response**: Array of scored agent matches
+**Response** `201`: `Timer`
+**Errors**: `429` timer limit (max 20/agent)
 
 ---
 
-### `GET /coordination/file-impact`
+### `DELETE /timers/:timerId`
 
-**Description**: Returns the dependency impact analysis for a file — which other files depend on it directly and transitively.
+Cancel a pending timer.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `file` | query | string | yes | File path to analyze |
-
-**Response**: `{ "directDependents": [...], "transitiveDependents": [...], "depth": 3 }`
-
----
-
-### `GET /coordination/retries`
-
-**Description**: Returns the current auto-retry queue managed by the RetryManager.
-
-**Parameters**: None
-
-**Response**: Array of retry entries with `{ agentId, attempts, nextRetryAt, reason }`
-
----
-
-### `GET /coordination/crash-reports`
-
-**Description**: Returns crash forensics reports. Optionally filtered to a single agent.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `agentId` | query | string | no | Filter reports to a specific agent |
-
-**Response**: Array of crash report objects with stack traces, context, and timestamps
-
----
-
-### `GET /coordination/escalations`
-
-**Description**: Returns escalation records from the EscalationManager.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `all` | query | boolean | no | If `"true"`, includes resolved escalations (default: active only) |
-
-**Response**: `{ "escalations": [...], "rules": [...] }`
-
----
-
-### `PUT /coordination/escalations/:id/resolve`
-
-**Description**: Marks an escalation as resolved.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Escalation ID |
-
-**Response**: `{ "ok": true }`  
-**Errors**: `404` escalation not found
-
----
-
-## Task Management
-
-### `GET /coordination/templates`
-
-**Description**: Returns all registered task templates for common project patterns.
-
-**Parameters**: None
-
-**Response**: Array of task template objects with `{ id, name, description, tasks[] }`
-
----
-
-### `POST /coordination/decompose`
-
-**Description**: Decomposes a free-text task description into a structured list of sub-tasks using the TaskDecomposer.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `task` | body | string | yes | Natural-language task description |
-
-**Response**: `{ "tasks": [ { "id": "...", "title": "...", "role": "developer", "dependsOn": [] } ] }`
-
----
-
-## Decision Records (ADR-style)
-
-### `GET /coordination/decisions`
-
-**Description**: Returns architecture decision records from the DecisionRecordStore, with optional filtering.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `status` | query | string | no | Filter by status (e.g. `"accepted"`, `"proposed"`) |
-| `tag` | query | string | no | Filter by tag |
-| `since` | query | string | no | ISO timestamp filter |
-
-**Response**: Array of ADR objects
-
----
-
-### `GET /coordination/decisions/tags`
-
-**Description**: Returns all unique tags used across decision records.
-
-**Parameters**: None
-
-**Response**: Array of tag strings
-
----
-
-### `GET /coordination/decisions/search`
-
-**Description**: Full-text search within decision record titles and content.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `q` | query | string | yes | Search query |
-
-**Response**: Array of matching ADR objects
-
----
-
-### `GET /coordination/decisions/:id`
-
-**Description**: Returns a single architecture decision record by ID.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Decision record ID |
-
-**Response**: ADR object  
-**Errors**: `404` if not found
-
----
-
-## Session & Export
-
-### `GET /coordination/retros/:leadId`
-
-**Description**: Returns all retrospective reports generated for a lead's sessions.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | path | string | yes | Lead agent UUID |
-
-**Response**: Array of retro objects
-
----
-
-### `POST /coordination/retros/:leadId`
-
-**Description**: Generates a new retrospective report for the current session of a lead.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | path | string | yes | Lead agent UUID |
-
-**Response**: Generated retro object
-
----
-
-### `GET /export/:leadId`
-
-**Description**: Exports the full session for a lead to disk (`.flightdeck/exports/`) and returns the export manifest.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | path | string | yes | Lead agent UUID |
-
-**Response**: `{ "path": "...", "files": [...], "exportedAt": "..." }`
+**Response**: `{ success: true }`
 
 ---
 
@@ -913,255 +480,1389 @@ These API references are for Flightdeck contributors. They are not part of the p
 
 ### `GET /projects`
 
-**Description**: Returns all persistent projects.
+List all projects, enriched with agent counts, storage mode, and cost data.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `status` | query | string | no | Filter by project status (e.g. `"active"`, `"archived"`) |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `status` | query | string | no | Filter by status (e.g. `active`, `archived`) |
 
-**Response**: Array of project objects
+**Response**: `EnrichedProject[]`
 
 ---
 
 ### `GET /projects/:id`
 
-**Description**: Returns a single project with its session history and active lead ID.
+Get project details with sessions, agent counts, and storage mode.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Project UUID |
+**Response**: `ProjectDetail`
 
-**Response**: `{ ...project, "sessions": [...], "activeLeadId": "..." }`
+---
+
+### `GET /projects/:id/sessions/detail`
+
+Enriched session history with agent composition, task summary, and retro status.
+
+**Response**: `DetailedSession[]`
 
 ---
 
 ### `POST /projects`
 
-**Description**: Creates a new persistent project record.
+Create a new project.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
 | `name` | body | string | yes | Project name |
-| `description` | body | string | no | Project description |
+| `description` | body | string | no | Description |
 | `cwd` | body | string | no | Working directory |
 
-**Response** `201 Created`: Project object
+**Response** `201`: `Project`
+
+---
+
+### `POST /projects/import`
+
+Import a project from an external source.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `name` | body | string | yes | Project name |
+| `cwd` | body | string | no | Working directory |
+| _(other fields)_ | body | varies | no | Import-specific data |
+
+**Response** `201`: `Project`
 
 ---
 
 ### `PATCH /projects/:id`
 
-**Description**: Updates project metadata.
+Update project properties.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Project UUID |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
 | `name` | body | string | no | New name |
 | `description` | body | string | no | New description |
 | `cwd` | body | string | no | New working directory |
 | `status` | body | string | no | New status |
+| `oversightLevel` | body | string | no | `supervised`, `balanced`, or `autonomous` (null clears) |
 
-**Response**: Updated project object
-
----
-
-### `GET /projects/:id/briefing`
-
-**Description**: Returns a structured context briefing for a project — task history, decisions, key milestones — for use when resuming.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Project UUID |
-
-**Response**: `{ ...briefing, "formatted": "Plain-text briefing for the lead agent..." }`
-
----
-
-### `POST /projects/:id/resume`
-
-**Description**: Starts a new lead agent for an existing project, injecting previous session context and message history.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Project UUID |
-| `task` | body | string | no | New task for this session |
-| `model` | body | string | no | Model override |
-
-**Response** `201 Created`: New lead agent JSON  
-**Errors**: `409` project already has an active lead · `429` concurrency limit
+**Response**: `Project`
 
 ---
 
 ### `DELETE /projects/:id`
 
-**Description**: Permanently deletes a project and all its session records.
+Delete a project (must be `archived` status). Cascades to roster agents.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Project UUID |
-
-**Response**: `{ "ok": true }`  
-**Errors**: `404` project not found
+**Response**: `{ ok: true, rosterDeleted: number }`
 
 ---
 
-## Search & Analytics
+### `POST /projects/:id/resume`
 
-### `GET /search`
+Resume a project session. Rate-limited to 30 req/min.
 
-**Description**: Full-text search across all content: agent conversations, group messages, DAG tasks, decisions, and the activity log. Results are merged and sorted by timestamp descending.
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `task` | body | string | no | Override task for resumed session |
+| `model` | body | string | no | Model override |
+| `freshStart` | body | boolean | no | Skip session resume, start fresh |
+| `resumeAll` | body | boolean | no | Re-spawn all agents from last session |
+| `agents` | body | string[] | no | Specific agent IDs to respawn |
+| `sessionId` | body | number | no | Resume a specific session by ID |
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `q` | query | string | yes | Search query (min 2 chars, max 200 chars) |
-| `limit` | query | number | no | Max results per source (default 50, max 200) |
-| `types` | query | string | no | Comma-separated source filter: `conversation`, `group`, `task`, `decision`, `activity` |
-| `agentId` | query | string | no | Filter to a specific agent (SearchEngine only) |
-| `leadId` | query | string | no | Filter to a lead's project (SearchEngine only) |
-| `since` | query | string | no | ISO timestamp lower bound (SearchEngine only) |
+**Response** `201`: `AgentJSON` (with `respawning` count)
+**Errors**: `409` already active
 
-**Response**:
-```json
-{
-  "query": "authentication",
-  "count": 14,
-  "results": [
-    { "source": "conversation", "id": 42, "agentId": "...", "agentRole": "Developer", "content": "...", "timestamp": "..." },
-    { "source": "decision", "id": "d-1", "content": "Use JWT tokens", "rationale": "...", "status": "accepted", ... }
-  ]
-}
-```
+---
+
+### `POST /projects/:id/stop`
+
+Terminate all running agents for a project.
+
+**Response**: `{ ok: true, terminated: number, total: number }`
+
+---
+
+### `GET /projects/:id/briefing`
+
+Get the project context briefing (for lead onboarding).
+
+**Response**: `Briefing`
+
+---
+
+### `GET /projects/:id/dag`
+
+Historical task DAG for a project (from database).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `includeArchived` | query | boolean | no | Include archived tasks |
+
+**Response**: `{ tasks, fileLockMap, summary }`
+
+---
+
+### `PATCH /projects/:id/tasks/:taskId/status`
+
+Transition a task's DAG status (for Kanban board drag-and-drop).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `status` | body | string | yes | Target status: `pending`, `ready`, `running`, `done`, `failed`, `blocked`, `paused`, `skipped` |
+
+**Response**: `{ ok: true, task: DagTask }`
+
+---
+
+### `PATCH /projects/:id/tasks/:taskId/priority`
+
+Update a task's priority (for reordering within Kanban columns).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `priority` | body | number | yes | New priority value |
+
+**Response**: `{ ok: true, task: DagTask }`
+
+---
+
+### `POST /projects/:id/tasks`
+
+Create a new task from the Kanban board.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `role` | body | string | yes | Agent role for the task |
+| `title` | body | string | no | Task title (title or description required) |
+| `description` | body | string | no | Task description |
+| `priority` | body | number | no | Priority (default 0) |
+| `dependsOn` | body | string[] | no | Dependency task IDs |
+| `files` | body | string[] | no | Related files |
+
+**Response** `201`: `{ ok, taskId, tasks }`
+
+---
+
+### `GET /projects/:id/groups`
+
+Historical chat groups for a project (from database).
+
+**Response**: `ChatGroup[]`
+
+---
+
+### `GET /projects/:id/groups/:name/messages`
+
+Historical group messages for a project.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | query | number | no | Max messages (default 200, max 1000) |
+
+**Response**: `ChatMessage[]`
+
+---
+
+### `GET /projects/:id/messages`
+
+Conversation messages across all agents in a project.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | query | number | no | Max messages (default 200, max 1000) |
+
+**Response**: `{ messages, leadId }`
+
+---
+
+### `GET /projects/:id/files`
+
+Directory listing for the project's working directory.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `path` | query | string | no | Relative subdirectory (default: root) |
+
+**Response**: `{ path, items: [{ name, path, type, ext }] }`
+
+---
+
+### `GET /projects/:id/file-contents`
+
+Read a file from the project directory (text only, max 512 KB).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `path` | query | string | yes | Relative file path |
+
+**Response**: `{ path, content, size, ext }`
+
+---
+
+### `GET /projects/:id/artifacts`
+
+List markdown artifacts from agent working directories, grouped by agent and session.
+
+**Response**: `{ groups: ArtifactGroup[], artifactBasePath: string }`
+
+---
+
+### `GET /projects/:id/artifact-contents`
+
+Read a file from organized artifact storage.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `path` | query | string | yes | Relative path within artifacts |
+
+**Response**: `{ path, content, size, ext }`
+
+---
+
+### `GET /projects/:id/session-artifact`
+
+Read a file from an agent's Copilot CLI session directory (allowlisted paths only).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | query | string | yes | Agent ID |
+| `path` | query | string | yes | File path (e.g. `plan.md`, `files/report.md`) |
+
+**Response**: `{ path, content, size, ext }`
+
+---
+
+### Model Config
+
+#### `GET /models`
+
+List all known models, defaults, and models grouped by provider.
+
+**Response**: `{ models, defaults, modelsByProvider, activeProvider }`
+
+---
+
+#### `GET /projects/:id/model-config`
+
+Get per-project model configuration.
+
+**Response**: `ModelConfig`
+
+---
+
+#### `PUT /projects/:id/model-config`
+
+Set per-project model configuration.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `config` | body | object | yes | Model config (role → model mapping) |
+
+**Response**: `ModelConfig`
+
+---
+
+### Knowledge (Project-Scoped)
+
+#### `GET /projects/:id/knowledge`
+
+List knowledge entries for a project.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `category` | query | string | no | Filter: `core`, `episodic`, `procedural`, `semantic` |
+
+**Response**: `KnowledgeEntry[]`
+
+---
+
+#### `GET /projects/:id/knowledge/search`
+
+Full-text or hybrid search across project knowledge.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `q` | query | string | yes | Search query (max 500 chars) |
+| `category` | query | string | no | Category filter |
+| `limit` | query | number | no | Max results (default 20, max 100) |
+
+**Response**: `KnowledgeEntry[]` or `SearchResult[]` (hybrid)
+
+---
+
+#### `GET /projects/:id/knowledge/stats`
+
+Category statistics for project knowledge.
+
+**Response**: `CategoryStats`
+
+---
+
+#### `GET /projects/:id/knowledge/training`
+
+Training summary (corrections and feedback) for a project.
+
+**Response**: `TrainingSummary`
+
+---
+
+#### `POST /projects/:id/knowledge`
+
+Create or update a knowledge entry. Rate-limited to 30 req/min.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `category` | body | string | yes | `episodic`, `procedural`, or `semantic` (not `core`) |
+| `key` | body | string | yes | Unique key |
+| `content` | body | string | yes | Entry content |
+| `metadata` | body | object | no | Optional metadata (`description`, `tags`, `label`, `notes`) |
+
+**Response** `201`: `KnowledgeEntry`
+
+---
+
+#### `DELETE /projects/:id/knowledge/:category/:key`
+
+Delete a knowledge entry.
+
+**Response**: `{ ok: true }`
+
+---
+
+## Tasks
+
+### `GET /tasks`
+
+Global task query with flexible scoping and filtering.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `scope` | query | string | no | `global` (default), `project`, or `lead` |
+| `projectId` | query | string | conditional | Required when scope=project |
+| `leadId` | query | string | conditional | Required when scope=lead |
+| `status` | query | string | no | Comma-separated status filter (e.g. `running,failed`) |
+| `role` | query | string | no | Filter by role |
+| `assignedAgentId` | query | string | no | Filter by assigned agent |
+| `includeArchived` | query | boolean | no | Include archived tasks |
+| `limit` | query | number | no | Max results (default 200, max 1000) |
+| `offset` | query | number | no | Pagination offset |
+
+**Response**: `{ tasks, total, limit, offset, hasMore, scope }`
+
+---
+
+### `PATCH /tasks/:leadId/:taskId/unarchive`
+
+Restore an archived task.
+
+**Response**: `DagTask`
+
+---
+
+### `GET /attention`
+
+Aggregated attention items: failed tasks, blocked tasks, pending decisions.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `scope` | query | string | no | `global` (default) or `project` |
+| `projectId` | query | string | no | Filter by project |
+
+**Response**: `{ scope, escalation, summary: { failedCount, blockedCount, decisionCount, totalCount }, items }`
+
+---
+
+## Coordination
+
+### `GET /coordination/status`
+
+Overview: agents, file locks, and recent activity.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `{ agents, locks, recentActivity }`
+
+---
+
+### `GET /coordination/locks`
+
+List all active file locks.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Filter by project |
+
+**Response**: `FileLock[]`
+
+---
+
+### `POST /coordination/locks`
+
+Acquire a file lock for an agent.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | body | string | yes | Agent requesting the lock |
+| `filePath` | body | string | yes | File path to lock |
+| `reason` | body | string | no | Reason for lock |
+
+**Response** `201`: `{ ok: true }`
+**Errors**: `409` already locked by another agent
+
+---
+
+### `DELETE /coordination/locks/:filePath`
+
+Release a file lock.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | query/body | string | yes | Agent releasing the lock |
+
+**Response**: `{ ok: boolean }`
+
+---
+
+### `GET /coordination/activity`
+
+Query the activity ledger.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | query | string | no | Filter by agent |
+| `type` | query | string | no | Filter by action type |
+| `limit` | query | number | no | Max entries (default 50, max 1000) |
+| `since` | query | string | no | ISO timestamp — return entries after this time |
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `ActivityEntry[]`
+
+---
+
+### `GET /coordination/summary`
+
+Activity summary statistics.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `ActivitySummary`
+
+---
+
+### `GET /coordination/timeline`
+
+Timeline data for the session visualization (agents, communications, locks).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `leadId` | query | string | no | Scope to a lead's crew |
+| `since` | query | string | no | ISO timestamp — incremental since |
+
+**Response**: `{ agents, communications, locks, timeRange, project, ledgerVersion, dropCount }`
+
+---
+
+### `GET /coordination/timeline/stream` (SSE)
+
+Server-Sent Events stream for real-time timeline updates.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `leadId` | query | string | yes | Lead agent to track |
+| `lastEventId` | query | string | no | Resume from event ID |
+
+**Events**: `init`, `activity`, `lock`, `comm:update`, `reconnect`
+
+---
+
+### `GET /coordination/alerts`
+
+Active alert conditions.
+
+**Response**: `Alert[]`
+
+---
+
+### `GET /coordination/eager-schedule`
+
+Current eager scheduler state.
+
+**Response**: `EagerSchedule`
+
+---
+
+### `GET /coordination/capabilities`
+
+Agent capabilities registry.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | query | string | no | Filter by agent |
+
+**Response**: `Capability[]`
+
+---
+
+### `GET /coordination/match-agent`
+
+Find the best agent for a task.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `task` | query | string | no | Task description |
+| `role` | query | string | no | Required role |
+
+**Response**: `AgentMatch`
+
+---
+
+### `GET /coordination/file-impact`
+
+File dependency impact analysis.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `filePath` | query | string | no | File to analyze |
+
+**Response**: `FileImpact`
+
+---
+
+### `GET /coordination/retries`
+
+Retry manager state (pending retries, history).
+
+**Response**: `RetryState`
+
+---
+
+### `GET /coordination/crash-reports`
+
+Agent crash forensics reports.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agentId` | query | string | no | Filter by agent |
+
+**Response**: `CrashReport[]`
+
+---
+
+### `GET /coordination/templates`
+
+List all task templates.
+
+**Response**: `TaskTemplate[]`
+
+---
+
+### `POST /coordination/decompose`
+
+Decompose a task description into sub-tasks.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `description` | body | string | yes | Task to decompose |
+
+**Response**: `{ subtasks: TaskTemplate[] }`
 
 ---
 
 ### `GET /coordination/scorecards`
 
-**Description**: Returns performance scorecards for all agents in a lead's team.
+Performance scorecards for agents.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | query | string | yes | Lead agent UUID |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `leadId` | query | string | no | Scope to a lead's crew |
 
-**Response**: Array of scorecard objects with metrics (tasks completed, tokens used, error rate, etc.)
+**Response**: `Scorecard[]`
 
 ---
 
 ### `GET /coordination/scorecards/:agentId`
 
-**Description**: Returns the performance scorecard for a single agent.
+Performance scorecard for a specific agent.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `agentId` | path | string | yes | Agent UUID |
-
-**Response**: Scorecard object or `null`
+**Response**: `Scorecard`
 
 ---
 
 ### `GET /coordination/leaderboard`
 
-**Description**: Returns agents ranked by performance score for a lead's team.
+Agent leaderboard rankings.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `leadId` | query | string | yes | Lead agent UUID |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `leadId` | query | string | no | Scope to a lead's crew |
 
-**Response**: Array of `{ agentId, role, score, rank, metrics: { ... } }` sorted by score descending
+**Response**: `Leaderboard`
 
 ---
 
 ### `GET /coordination/coverage`
 
-**Description**: Returns test coverage history and trend data.
+Test coverage history and trends.
 
-**Parameters**: None
-
-**Response**: `{ "history": [...], "latest": { "lines": 84.2, "branches": 71.0, ... }, "trend": { "tests": [...], "durations": [...] } }`
+**Response**: `{ history, latest, trend }`
 
 ---
 
 ### `GET /coordination/complexity`
 
-**Description**: Returns code complexity alerts and per-file metrics.
+Code complexity alerts and high-complexity files.
 
-**Parameters**: None
-
-**Response**: `{ "alerts": [...], "files": [...], "highComplexity": [...] }`
+**Response**: `{ alerts, files, highComplexity }`
 
 ---
 
 ### `GET /coordination/dependencies`
 
-**Description**: Returns dependency analysis across all workspace packages.
+Project dependency scan (workspace packages, counts).
 
-**Parameters**: None
-
-**Response**: `{ "workspaces": { "server": { ... }, "web": { ... } }, "counts": { "production": 12, "dev": 24, "total": 36 } }`
+**Response**: `{ workspaces, counts }`
 
 ---
 
-## Webhooks
+### `GET /coordination/model-selector`
 
-### `GET /webhooks`
+Available models and role overrides.
 
-**Description**: Returns all registered webhook configurations.
-
-**Parameters**: None
-
-**Response**: Array of webhook objects with `{ id, url, events, enabled, createdAt }`
+**Response**: `{ models, overrides }`
 
 ---
 
-### `POST /webhooks`
+### `GET /coordination/token-budgets`
 
-**Description**: Registers a new outbound webhook.
+Token budget allocations and utilization.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `url` | body | string | yes | Destination URL |
-| `events` | body | string[] | yes | Event names to subscribe to (e.g. `["agent.completed", "decision.created"]`) |
-| `secret` | body | string | no | HMAC signing secret |
-| `enabled` | body | boolean | no | Default `true` |
-
-**Response** `201 Created`: Webhook configuration object
+**Response**: `{ budgets, totalBudget, totalUsed, utilization }`
 
 ---
 
-### `DELETE /webhooks/:id`
+### `GET /coordination/parallel-analysis`
 
-**Description**: Unregisters a webhook.
+Analyze task DAG for parallelization opportunities.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Webhook ID |
-
-**Response**: `{ "removed": true }`
+**Response**: `ParallelAnalysis`
 
 ---
 
-### `GET /webhooks/:id/deliveries`
+### `GET /coordination/project-templates`
 
-**Description**: Returns delivery history for a webhook (success/failure, response codes, timestamps).
+List all project templates.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Webhook ID |
+**Response**: `ProjectTemplate[]`
 
-**Response**: Array of delivery records
+---
+
+### `GET /coordination/project-templates/search`
+
+Search project templates by keyword.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `keyword` | query | string | yes | Search keyword |
+
+**Response**: `ProjectTemplate[]`
+
+---
+
+### `GET /coordination/project-templates/:id`
+
+Get a specific project template.
+
+**Response**: `ProjectTemplate`
+
+---
+
+### `GET /coordination/knowledge`
+
+List or filter knowledge transfer entries.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Filter by project |
+| `category` | query | string | no | Filter by category |
+| `tag` | query | string | no | Filter by tag |
+
+**Response**: `KnowledgeTransferEntry[]`
+
+---
+
+### `GET /coordination/knowledge/search`
+
+Search knowledge transfer entries.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `q` | query | string | yes | Search query |
+
+**Response**: `KnowledgeTransferEntry[]`
+
+---
+
+### `GET /coordination/knowledge/popular`
+
+Most accessed knowledge entries.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | query | number | no | Max results (default 10, max 100) |
+
+**Response**: `KnowledgeTransferEntry[]`
+
+---
+
+### `POST /coordination/knowledge`
+
+Create a knowledge transfer entry.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | body | string | yes | Project ID |
+| `category` | body | string | yes | `pattern`, `pitfall`, `tool`, `architecture`, `process` |
+| `title` | body | string | yes | Entry title |
+| `content` | body | string | yes | Entry content |
+| `tags` | body | string[] | no | Tags |
+
+**Response** `201`: `KnowledgeTransferEntry`
+
+---
+
+## Decisions
+
+### `GET /decisions`
+
+List all decisions.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `needs_confirmation` | query | boolean | no | Only pending confirmations |
+| `projectId` | query | string | no | Filter by project |
+| `grouped` | query | boolean | no | Return grouped by pending status |
+
+**Response**: `Decision[]` or grouped format
+
+---
+
+### `POST /decisions/:id/confirm`
+
+Approve a decision. Executes linked system actions and notifies the lead.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `reason` | body | string | no | Approval reason |
+
+**Response**: `Decision`
+
+---
+
+### `POST /decisions/:id/reject`
+
+Reject a decision. Notifies the lead to revise.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `reason` | body | string | no | Rejection reason |
+
+**Response**: `Decision`
+
+---
+
+### `POST /decisions/:id/dismiss`
+
+Silently remove a decision from the queue (no lead notification).
+
+**Response**: `Decision`
+
+---
+
+### `POST /decisions/:id/respond`
+
+Send a response/feedback to the agent who made the decision.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `message` | body | string | yes | Feedback message |
+
+**Response**: `Decision`
+
+---
+
+### `POST /decisions/:id/feedback`
+
+Send feedback on any decision (doesn't change status).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `message` | body | string | yes | Feedback message |
+
+**Response**: `{ ok: true, decision }`
+
+---
+
+### `POST /decisions/batch`
+
+Batch confirm, reject, or dismiss decisions.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `ids` | body | string[] | yes | Decision IDs |
+| `action` | body | string | yes | `confirm`, `reject`, or `dismiss` |
+| `reason` | body | string | no | Reason (for confirm/reject) |
+
+**Response**: `{ results: Decision[] }`
+
+---
+
+### `POST /decisions/pause-timer`
+
+Pause or resume decision auto-approval timers.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `paused` | body | boolean | yes | True to pause, false to resume |
+
+**Response**: `{ paused: boolean }`
+
+---
+
+### Decision Records (ADR-style)
+
+#### `GET /coordination/decisions`
+
+List architectural decision records.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `status` | query | string | no | Filter by status |
+| `tag` | query | string | no | Filter by tag |
+| `since` | query | string | no | ISO timestamp filter |
+
+**Response**: `DecisionRecord[]`
+
+---
+
+#### `GET /coordination/decisions/tags`
+
+List all decision record tags.
+
+**Response**: `string[]`
+
+---
+
+#### `GET /coordination/decisions/search`
+
+Search decision records.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `q` | query | string | yes | Search query |
+
+**Response**: `DecisionRecord[]`
+
+---
+
+#### `GET /coordination/decisions/:id`
+
+Get a specific decision record.
+
+**Response**: `DecisionRecord`
+
+---
+
+## Crew Management
+
+### `GET /crews`
+
+List all crews (agent groups by team).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `{ crews: [{ crewId, agentCount, roles }] }`
+
+---
+
+### `GET /crews/summary`
+
+Crew groups with leader info, agent counts, and activity status.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `CrewSummary[]`
+
+---
+
+### `GET /crews/:crewId`
+
+Crew details with knowledge and training stats.
+
+**Response**: `{ crewId, agentCount, agents, knowledgeCount, trainingSummary }`
+
+---
+
+### `GET /crews/:crewId/agents`
+
+List agents in a crew with enriched live status.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `status` | query | string | no | Filter: `idle`, `running`, `terminated`, `failed` |
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `EnrichedAgent[]`
+
+---
+
+### `GET /crews/:crewId/agents/:agentId/profile`
+
+Detailed agent profile within a crew.
+
+**Response**: `AgentProfile`
+
+---
+
+### `GET /crews/:crewId/health`
+
+Crew health: status counts, uptime, per-agent details.
+
+**Response**: `{ crewId, totalAgents, statusCounts, agents }`
+
+---
+
+### `POST /crews/:crewId/agents/:agentId/clone`
+
+Clone an agent (creates a copy with the same configuration). Rate-limited to 10 req/min.
+
+**Response** `201`: `{ ok: true, clone }`
+
+---
+
+### `DELETE /crews/:leadId`
+
+Delete a crew (lead + all child agents from roster). Only terminated crews. Rate-limited to 10 req/min.
+
+**Response**: `{ ok: true, deleted: number }`
+
+---
+
+### `DELETE /roster/:agentId`
+
+Remove a single agent from the roster. Only terminated agents. Rate-limited to 10 req/min.
+
+**Response**: `{ ok: true, agentId: string }`
+
+---
+
+## Session Retros
+
+### `GET /coordination/retros/:leadId`
+
+Get retrospectives for a session.
+
+**Response**: `Retro[]`
+
+---
+
+### `POST /coordination/retros/:leadId`
+
+Create a retrospective for a session.
+
+**Response** `201`: `Retro`
+
+---
+
+## Session Replay
+
+### `GET /replay/:leadId/state`
+
+Reconstruct world state at a specific timestamp.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `at` | query | string | yes | ISO timestamp |
+
+**Response**: `WorldState`
+
+---
+
+### `GET /replay/:leadId/events`
+
+Query events in a time range or by limit.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `from` | query | string | conditional | Start timestamp (required with `to`) |
+| `to` | query | string | conditional | End timestamp (required with `from`) |
+| `limit` | query | number | conditional | Most recent N events (alternative to from/to) |
+| `types` | query | string | no | Comma-separated action types |
+
+**Response**: `{ events }`
+
+---
+
+### `GET /replay/:leadId/keyframes`
+
+Get session keyframes for the replay timeline.
+
+**Response**: `{ keyframes }`
+
+---
+
+## Shared Links
+
+### `POST /replay/:leadId/share`
+
+Create a share link for a session replay.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `expiresInHours` | body | number | no | Expiration (default: 24h) |
+| `label` | body | string | no | Human label |
+
+**Response** `201`: `ShareLink`
+
+---
+
+### `GET /replay/:leadId/shares`
+
+List share links for a session.
+
+**Response**: `ShareLink[]`
+
+---
+
+### `DELETE /shared/:token`
+
+Revoke a share link.
+
+**Response**: `{ revoked: true }`
+
+---
+
+### `GET /shared/:token`
+
+Access a shared replay (no auth required). Returns keyframes and latest state.
+
+**Response**: `{ leadId, label, expiresAt, keyframes, state }`
+
+---
+
+### `GET /shared/:token/state`
+
+Get shared replay state at a specific timestamp.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `at` | query | string | yes | ISO timestamp |
+
+**Response**: `WorldState`
+
+---
+
+## Communications
+
+### `GET /comms/:leadId/flows`
+
+Communication flow graph (nodes, edges, timeline) for a lead's crew.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `since` | query | string | no | ISO timestamp |
+| `types` | query | string | no | Comma-separated: `message`, `broadcast`, `group_message`, `delegation` |
+
+**Response**: `{ nodes, edges, timeline }`
+
+---
+
+### `GET /comms/:leadId/stats`
+
+Communication statistics for a crew.
+
+**Response**: `{ totalMessages, byType, mostActive }`
+
+---
+
+## Analytics
+
+### `GET /analytics`
+
+Analytics overview across all sessions.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `AnalyticsOverview`
+
+---
+
+### `GET /analytics/sessions`
+
+List past sessions with summary data.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `{ sessions }`
+
+---
+
+### `GET /analytics/compare`
+
+Compare sessions side by side.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `sessions` | query | string | yes | Comma-separated lead IDs (min 2) |
+
+**Response**: `SessionComparison`
+
+---
+
+## Catch-up Summary
+
+### `GET /summary/:leadId/since`
+
+Generate a catch-up summary of what happened since a timestamp.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `t` | query | string | yes | ISO timestamp |
+
+**Response**: `CatchUpSummary`
+
+---
+
+### `GET /catchup/:leadId`
+
+Alias for the above with cleaner URL.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `since` | query | string | yes | ISO timestamp |
+
+**Response**: `CatchUpSummary`
+
+---
+
+## Reports
+
+### `GET /reports/session`
+
+Generate a session report in HTML or Markdown.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `format` | query | string | no | `html` (default) or `md` |
+| `leadId` | query | string | no | Lead to report on (default: first running lead) |
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: HTML or Markdown body
+
+---
+
+### `GET /export/:leadId`
+
+Export session data.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `format` | query | string | no | Export format |
+
+**Response**: Exported session data
+
+---
+
+## Configuration
+
+### `GET /config`
+
+Get current server configuration.
+
+**Response**: `ServerConfig`
+
+---
+
+### `GET /config/yaml`
+
+Get the oversight section of flightdeck.config.yaml (never exposes secrets).
+
+**Response**: `{ oversight }`
+
+---
+
+### `PATCH /config`
+
+Update server configuration. Persists to YAML config.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `maxConcurrentAgents` | body | number | no | Max concurrent agents |
+| `host` | body | string | no | Server host |
+| `oversightLevel` | body | string | no | `supervised`, `balanced`, `autonomous` |
+| `customInstructions` | body | string | no | Custom instructions |
+
+**Response**: `ServerConfig`
+
+---
+
+## System
+
+### `POST /system/pause`
+
+Pause all agent processing.
+
+**Response**: `{ paused: true }`
+
+---
+
+### `POST /system/resume`
+
+Resume agent processing.
+
+**Response**: `{ paused: false }`
+
+---
+
+### `GET /system/status`
+
+Get system pause state.
+
+**Response**: `{ paused: boolean }`
+
+---
+
+## Budget
+
+### `GET /budget`
+
+Get budget status.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | query | string | no | Scope to project |
+
+**Response**: `BudgetStatus`
+
+---
+
+### `POST /budget`
+
+Set budget configuration.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | body | number/null | no | Budget limit (0=disabled, null=unlimited) |
+| `thresholds` | body | object | no | Alert thresholds |
+| `projectId` | body | string | no | Scope to project |
+
+**Response**: `{ updated: true, ...BudgetStatus }`
+
+---
+
+### `POST /budget/check`
+
+Check budget against current spend. May auto-pause if over limit.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `projectId` | body/query | string | no | Scope to project |
+
+**Response**: `{ level, ...BudgetStatus }`
+
+---
+
+## Roles
+
+### `GET /roles`
+
+List all registered agent roles.
+
+**Response**: `Role[]`
+
+---
+
+### `POST /roles`
+
+Register a new custom role.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `id` | body | string | yes | Role identifier |
+| `name` | body | string | yes | Display name |
+| `systemPrompt` | body | string | no | System prompt |
+| `model` | body | string | no | Default model |
+| _(other fields)_ | body | varies | no | Additional role config |
+
+**Response** `201`: `Role`
+
+---
+
+### `DELETE /roles/:id`
+
+Remove a custom role.
+
+**Response**: `{ ok: boolean }`
+
+---
+
+### `POST /roles/test`
+
+Dry-run a custom role configuration (no LLM call).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `role` | body | object | yes | Role configuration |
+| `message` | body | string | yes | Test message |
+
+**Response**: `{ response, role, valid }`
+
+---
+
+## Search
+
+### `GET /search`
+
+Global search across conversations, group chats, tasks, decisions, and activity.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `q` | query | string | yes | Search query (min 2, max 200 chars) |
+| `limit` | query | number | no | Max results (default 50, max 200) |
+
+**Response**: `{ query, count, results }` — results have `source` field: `conversation`, `group`, `task`, `decision`, `activity`
+
+---
+
+### Advanced Search (Services)
+
+#### `GET /search` (services)
+
+Full-text search with type filtering.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `q` | query | string | yes | Search query |
+| `types` | query | string | no | Comma-separated types |
+| `agentId` | query | string | no | Filter by agent |
+| `leadId` | query | string | no | Filter by lead |
+| `since` | query | string | no | ISO timestamp |
+| `limit` | query | number | no | Max results |
+
+**Response**: `SearchResult[]`
 
 ---
 
@@ -1169,314 +1870,488 @@ These API references are for Flightdeck contributors. They are not part of the p
 
 ### `GET /notifications`
 
-**Description**: Returns in-app notifications.
+List notifications with optional filtering.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `unreadOnly` | query | boolean | no | If `"true"`, only unread notifications |
-| `category` | query | string | no | Filter by category (e.g. `"alert"`, `"decision"`, `"system"`) |
-| `limit` | query | number | no | Max notifications to return |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `unreadOnly` | query | boolean | no | Only unread |
+| `category` | query | string | no | Category filter |
+| `limit` | query | number | no | Max notifications |
 
-**Response**: `{ "notifications": [...], "unreadCount": 3 }`
+**Response**: `{ notifications, unreadCount }`
 
 ---
 
 ### `PUT /notifications/read-all`
 
-**Description**: Marks all notifications as read.
+Mark all notifications as read.
 
-**Parameters**: None
-
-**Response**: `{ "ok": true }`
+**Response**: `{ ok: true }`
 
 ---
 
 ### `PUT /notifications/:id/read`
 
-**Description**: Marks a single notification as read.
+Mark a single notification as read.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Notification ID |
-
-**Response**: `{ "ok": true }`  
-**Errors**: `404` notification not found
+**Response**: `{ ok: true }`
 
 ---
 
 ### `GET /notifications/preferences`
 
-**Description**: Returns notification preferences for a user.
+Get notification preferences.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `userId` | query | string | no | User identifier (default `"default"`) |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `userId` | query | string | no | User ID (default: `default`) |
 
-**Response**: Preferences object or `null`
+**Response**: `NotificationPreferences`
 
 ---
 
 ### `PUT /notifications/preferences`
 
-**Description**: Updates notification preferences for a user.
+Update notification preferences.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `userId` | body | string | no | User identifier (default `"default"`) |
-| *(other fields)* | body | object | no | Preference key-value pairs |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `userId` | body | string | no | User ID (default: `default`) |
+| _(prefs)_ | body | object | yes | Preference fields |
 
-**Response**: Updated preferences object
-
----
-
-## System
-
-### `GET /config`
-
-**Description**: Returns the current server configuration.
-
-**Parameters**: None
-
-**Response**: `{ "maxConcurrentAgents": 10, "host": "localhost", "port": 3001 }`
+**Response**: `NotificationPreferences`
 
 ---
 
-### `PATCH /config`
+## Escalations
 
-**Description**: Updates server configuration at runtime. Changes to `maxConcurrentAgents` are persisted to SQLite.
+### `GET /coordination/escalations`
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `maxConcurrentAgents` | body | number | no | Max simultaneous agents (1–20) |
-| `host` | body | string | no | Server hostname |
+List escalations (active by default, or all).
 
-**Response**: Updated config object
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `all` | query | boolean | no | Include resolved |
 
----
-
-### `POST /system/pause`
-
-**Description**: Pauses the entire system. Halts message delivery to all agents — queued messages stay in the queue. Running agents finish their current prompt but won't receive new messages. All running/idle agents are notified to hold position.
-
-**Parameters**: None
-
-**Response**: `{ "paused": true }`
+**Response**: `{ escalations, rules }`
 
 ---
 
-### `POST /system/resume`
+### `PUT /coordination/escalations/:id/resolve`
 
-**Description**: Resumes the system after a pause. All idle agents drain their pending message queues. Normal message delivery resumes.
+Resolve an escalation.
 
-**Parameters**: None
-
-**Response**: `{ "paused": false }`
+**Response**: `{ ok: true }`
 
 ---
 
-### `GET /system/status`
+## Natural Language Commands
 
-**Description**: Returns the current system pause state.
+### `GET /nl/commands`
 
-**Parameters**: None
+List all registered NL command patterns.
 
-**Response**: `{ "paused": false }`
+**Response**: `{ commands: CommandPattern[] }`
 
 ---
+
+### `POST /nl/preview`
+
+Preview what a command would do (no execution).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `command` | body | string | yes | Command text |
+| `leadId` | body | string | yes | Lead agent context |
+
+**Response**: `CommandPlan`
+
+---
+
+### `POST /nl/execute`
+
+Match, plan, and execute a natural language command.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `command` | body | string | yes | Command text |
+| `leadId` | body | string | yes | Lead agent context |
+
+**Response**: `CommandResult`
+
+---
+
+### `POST /nl/undo`
+
+Undo a previously executed command.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `commandId` | body | string | yes | Command ID to undo |
+
+**Response**: `UndoResult`
+
+---
+
+### `GET /nl/suggestions`
+
+Context-aware action suggestions for a session.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `leadId` | query | string | yes | Lead agent context |
+
+**Response**: `{ suggestions }`
+
+---
+
+## Onboarding
+
+### `GET /onboarding/status`
+
+Get user onboarding progress.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `userId` | query | string | no | User ID (default: `default`) |
+
+**Response**: `{ tourComplete, completedSteps, tier, sessionCount, coachDismissed }`
+
+---
+
+### `POST /onboarding/progress`
+
+Update onboarding progress.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `userId` | body | string | no | User ID |
+| `tourComplete` | body | boolean | no | Mark tour complete |
+| `completedStep` | body | string | no | Step ID to mark complete |
+| `tier` | body | string | no | New tier (`starter`, etc.) |
+| `incrementSession` | body | boolean | no | Increment session count |
+| `coachDismissed` | body | string | no | Coach hint ID to dismiss |
+
+**Response**: `OnboardingState`
+
+---
+
+## Predictions
+
+### `GET /predictions`
+
+Get active predictions.
+
+**Response**: `{ predictions }`
+
+---
+
+### `GET /predictions/history`
+
+Get resolved predictions.
+
+**Response**: `{ predictions }`
+
+---
+
+### `GET /predictions/accuracy`
+
+Prediction accuracy statistics.
+
+**Response**: `AccuracyStats`
+
+---
+
+### `GET /predictions/config`
+
+Get prediction configuration.
+
+**Response**: `PredictionConfig`
+
+---
+
+### `PUT /predictions/config`
+
+Update prediction configuration.
+
+**Response**: `PredictionConfig`
+
+---
+
+### `POST /predictions/:id/dismiss`
+
+Dismiss a prediction.
+
+**Response**: `{ ok: true }`
+
+---
+
+### `POST /predictions/:id/resolve`
+
+Resolve a prediction with an outcome.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `outcome` | body | string | yes | `correct`, `avoided`, or `wrong` |
+
+**Response**: `{ ok: true }`
+
+---
+
+### `POST /predictions/generate`
+
+Manually trigger prediction generation.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `agents` | body | array | yes | Agent snapshots |
+| `budget` | body | object | no | Budget snapshot |
+
+**Response**: `{ predictions, count }`
+
+---
+
+## Integrations
+
+### `GET /integrations/status`
+
+Integration system status: adapters, sessions, pending notifications.
+
+**Response**: `{ enabled, adapters, sessions, pendingNotifications, subscriptions }`
+
+---
+
+### `POST /integrations/sessions`
+
+Initiate a session bind challenge (sends verification code to chat).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `chatId` | body | string | yes | External chat identifier |
+| `platform` | body | string | yes | Platform (e.g. `telegram`) |
+| `projectId` | body | string | yes | Project to bind to |
+| `boundBy` | body | string | no | Who initiated (default: `api`) |
+
+**Response** `202`: `{ status: 'challenge_sent', chatId, expiresAt, message }`
+
+---
+
+### `POST /integrations/sessions/verify`
+
+Complete the verification challenge.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `chatId` | body | string | yes | Chat identifier |
+| `code` | body | string | yes | Verification code |
+
+**Response** `201`: `IntegrationSession`
+**Errors**: `403` invalid code, `429` rate limited
+
+---
+
+### `GET /integrations/sessions`
+
+List all active integration sessions.
+
+**Response**: `IntegrationSession[]`
+
+---
+
+### `POST /integrations/subscriptions`
+
+Subscribe a chat to project notifications.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `chatId` | body | string | yes | Chat identifier |
+| `projectId` | body | string | yes | Project to subscribe to |
+| `categories` | body | string[] | no | Notification categories |
+
+**Response** `201`: `Subscription`
+
+---
+
+### `DELETE /integrations/subscriptions`
+
+Unsubscribe a chat from project notifications.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `chatId` | body | string | yes | Chat identifier |
+| `projectId` | body | string | yes | Project ID |
+
+**Response** `204`: _(empty)_
+
+---
+
+### `GET /integrations/subscriptions`
+
+List all active subscriptions.
+
+**Response**: `Subscription[]`
+
+---
+
+### `POST /integrations/test-message`
+
+Send a test message through an integration adapter.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `platform` | body | string | yes | Platform |
+| `chatId` | body | string | yes | Chat identifier |
+| `text` | body | string | yes | Message text |
+
+**Response**: `{ sent: true }`
+
+---
+
+### `PATCH /integrations/telegram`
+
+Update Telegram integration config in flightdeck.config.yaml.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `enabled` | body | boolean | no | Enable/disable |
+| `botToken` | body | string | no | Bot token |
+| `allowedChatIds` | body | array | no | Allowed chat IDs |
+| `rateLimitPerMinute` | body | number | no | Rate limit |
+| `notifications` | body | object | no | Notification config |
+
+**Response**: `{ ok: true, updated: string[] }`
+
+---
+
+## Settings & Providers
+
+### `GET /settings/providers`
+
+List provider configs (instant, no CLI detection).
+
+**Response**: `ProviderConfig[]`
+
+---
+
+### `GET /settings/providers/status`
+
+Async CLI detection for all providers (cached).
+
+**Response**: `ProviderStatus[]`
+
+---
+
+### `GET /settings/providers/:provider`
+
+Single provider status with model preferences.
+
+**Response**: `{ ...ProviderStatus, modelPreferences }`
+
+---
+
+### `POST /settings/providers/:provider/test`
+
+Run a connection/auth health check for a provider.
+
+**Response**: `{ success: boolean, message: string }`
+
+---
+
+### `PUT /settings/providers/:provider`
+
+Update provider config (enabled, model preferences).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `enabled` | body | boolean | no | Enable/disable |
+| `modelPreferences` | body | object | no | `{ defaultModel?, preferredModels? }` |
+
+**Response**: `{ ...ProviderStatus, modelPreferences }`
+
+---
+
+### `PUT /settings/provider`
+
+Set the active provider.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `id` | body | string | yes | Provider ID |
+
+**Response**: `{ activeProvider: string }`
+
+---
+
+### `GET /settings/provider-ranking`
+
+Get provider preference order.
+
+**Response**: `{ ranking: string[] }`
+
+---
+
+### `PUT /settings/provider-ranking`
+
+Set provider preference order.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `ranking` | body | string[] | yes | Ordered provider IDs |
+
+**Response**: `{ ranking: string[] }`
+
+---
+
+## Filesystem Browse
 
 ### `GET /browse`
 
-**Description**: Lists non-hidden subdirectories of a path on the server filesystem. Powers the folder picker in the UI.
+Browse directories for the folder picker. Restricted to user home and server CWD.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `path` | query | string | no | Directory to list (default: `process.cwd()`) |
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `path` | query | string | no | Directory path (default: CWD) |
 
-**Response**: `{ "current": "/Users/...", "parent": "/Users", "folders": [ { "name": "src", "path": "/Users/.../src" } ] }`
-
----
-
-## Database Browser
-
-These endpoints expose direct database access for debugging and administration.
-
-### `GET /db/memory`
-
-**Description**: Returns all agent memory entries ordered by creation date descending.
-
-**Response**: Array of `agentMemory` rows
+**Response**: `{ current, parent, folders: [{ name, path }] }`
 
 ---
 
-### `DELETE /db/memory/:id`
+## Webhooks
 
-**Description**: Deletes an agent memory entry by numeric ID.
+### `GET /webhooks`
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | number | yes | Row ID |
+List registered webhooks.
 
-**Response**: `{ "ok": true }`
+**Response**: `Webhook[]`
 
 ---
 
-### `GET /db/conversations`
+### `POST /webhooks`
 
-**Description**: Returns all conversation records ordered by creation date descending.
+Register a new webhook.
 
-**Response**: Array of conversation rows
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `url` | body | string | yes | Webhook URL |
+| `events` | body | string[] | no | Event types to subscribe |
 
----
-
-### `GET /db/conversations/:id/messages`
-
-**Description**: Returns messages for a specific conversation.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Conversation ID |
-| `limit` | query | number | no | Max messages (default 100, max 1000) |
-
-**Response**: Array of message rows in chronological order
+**Response** `201`: `Webhook`
 
 ---
 
-### `DELETE /db/conversations/:id`
+### `DELETE /webhooks/:id`
 
-**Description**: Deletes a conversation and all its messages.
+Remove a webhook.
 
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Conversation ID |
-
-**Response**: `{ "ok": true }`
+**Response**: `{ ok: true }`
 
 ---
 
-### `GET /db/decisions`
+### `GET /webhooks/:id/deliveries`
 
-**Description**: Returns all decision records ordered by creation date descending.
+Get delivery history for a webhook.
 
-**Response**: Array of decision rows
-
----
-
-### `DELETE /db/decisions/:id`
-
-**Description**: Deletes a decision record.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | string | yes | Decision ID |
-
-**Response**: `{ "ok": true }`
-
----
-
-### `GET /db/activity`
-
-**Description**: Returns activity log entries, newest first.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `limit` | query | number | no | Max entries (default 200, max 2000) |
-
-**Response**: Array of activity log rows
-
----
-
-### `DELETE /db/activity/:id`
-
-**Description**: Deletes a single activity log entry.
-
-**Parameters**:
-| Name | In | Type | Required | Description |
-|------|----|------|----------|-------------|
-| `id` | path | number | yes | Row ID |
-
-**Response**: `{ "ok": true }`
-
----
-
-### `GET /db/stats`
-
-**Description**: Returns row counts for every major database table.
-
-**Parameters**: None
-
-**Response**:
-```json
-{
-  "memory": 42,
-  "conversations": 7,
-  "messages": 1204,
-  "decisions": 23,
-  "activity": 8812,
-  "dagTasks": 38
-}
-```
-
----
-
-## WebSocket
-
-The server exposes a WebSocket endpoint at `ws://localhost:3001` for real-time push events.
-
-### Authentication
-
-Include the auth token as a query parameter:
-```
-ws://localhost:3001?token=<your-token>
-```
-
-### Event Types
-
-| Event | Description |
-|-------|-------------|
-| `init` | Sent on connect with full agent list, locks, and `systemPaused` state |
-| `agent:text` | Streaming text output from an agent |
-| `agent:status` | Agent status change (`idle`, `running`, `completed`, `failed`) |
-| `agent:spawned` | New agent created — includes full agent JSON |
-| `agent:terminated` | Agent terminated |
-| `agent:exit` | Agent process exited with code |
-| `agent:tool_call` | Agent invoked a tool |
-| `agent:content` | Rich content from agent (image, audio, resource) |
-| `agent:thinking` | Agent thinking/reasoning text |
-| `agent:plan` | Agent plan updated |
-| `agent:permission_request` | Agent requesting tool permission |
-| `agent:session_ready` | Agent ACP session established |
-| `agent:context_compacted` | Agent context window compacted |
-| `agent:sub_spawned` | Child agent created by parent |
-| `agent:delegated` | Task delegated to agent |
-| `agent:completion_reported` | Agent reported task completion |
-| `agent:message_sent` | Inter-agent message delivered |
-| `agent:crashed` | Agent process crashed |
-| `agent:auto_restarted` | Agent automatically restarted after crash |
-| `agent:restart_limit` | Agent hit max restart limit |
-| `lead:decision` | New decision logged by lead |
-| `lead:progress` | Lead progress update |
-| `dag:updated` | Task DAG state changed |
-| `group:created` | Chat group created |
-| `group:message` | Message sent to a chat group |
-| `group:member_added` | Agent added to a group |
-| `group:member_removed` | Agent removed from a group |
-| `system:paused` | System pause state changed — `{ "paused": true/false }` |
-| `decision:confirmed` | Decision confirmed by user |
-| `decision:rejected` | Decision rejected by user |
-| `lock:acquired` | File lock acquired |
-| `lock:released` | File lock released |
-| `activity` | Activity ledger entry |
+**Response**: `Delivery[]`
 
 ---
 
@@ -1484,98 +2359,109 @@ ws://localhost:3001?token=<your-token>
 
 ### `GET /data/stats`
 
-**Description**: Database statistics — file size, record counts, oldest session.
+Database statistics: file size, table row counts, oldest session.
 
-**Response**:
-```json
-{
-  "fileSizeBytes": 5832256,
-  "tableCounts": { "projects": 3, "project_sessions": 9, "activity_log": 2050, "..." : "..." },
-  "totalRecords": 2972,
-  "oldestSession": "2025-01-15T10:30:00Z"
-}
-```
+**Response**: `{ fileSizeBytes, tableCounts, totalRecords, oldestSession }`
 
 ---
 
 ### `POST /data/cleanup`
 
-**Description**: Purge old completed session data. Use `dryRun: true` to preview.
+Purge old data. Supports dry-run mode.
 
-**Request Body**:
-```json
-{ "olderThanDays": 30, "dryRun": true }
-```
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `olderThanDays` | body | number | yes | Days threshold (0 = all data) |
+| `dryRun` | body | boolean | no | Preview without deleting (default false) |
 
-**Response**:
-```json
-{
-  "deleted": { "project_sessions": 2, "activity_log": 40, "dag_tasks": 8, "projects": 1 },
-  "totalDeleted": 51,
-  "sessionsDeleted": 2,
-  "dryRun": true,
-  "cutoffDate": "2025-02-01T00:00:00.000Z"
-}
-```
+**Response**: `{ deleted, totalDeleted, sessionsDeleted, dryRun, cutoffDate }`
 
 ---
 
-## Project Historical Data
+## Database Browser
 
-### `GET /projects/:id/dag`
+### `GET /db/memory`
 
-**Description**: Get historical DAG tasks for a project.
+List all agent memory entries.
 
-**Response**:
-```json
-[
-  {
-    "id": "task-1",
-    "leadId": "lead-abc",
-    "title": "Implement feature X",
-    "role": "developer",
-    "dagStatus": "done",
-    "createdAt": "2025-03-01T10:00:00Z",
-    "completedAt": "2025-03-01T11:30:00Z"
-  }
-]
-```
+**Response**: `AgentMemory[]`
 
 ---
 
-### `GET /projects/:id/groups`
+### `DELETE /db/memory/:id`
 
-**Description**: Get historical chat groups for a project.
+Delete a memory entry.
 
-**Response**:
-```json
-[
-  {
-    "name": "feature-team",
-    "leadId": "lead-abc",
-    "roles": "[\"developer\",\"reviewer\"]",
-    "createdAt": "2025-03-01T10:00:00Z",
-    "messageCount": 26
-  }
-]
-```
+**Response**: `{ ok: true }`
 
 ---
 
-### `GET /projects/:id/groups/:name/messages`
+### `GET /db/conversations`
 
-**Description**: Get historical messages for a specific chat group.
+List all conversations.
 
-**Response**:
-```json
-[
-  {
-    "id": 1,
-    "groupName": "feature-team",
-    "fromAgentId": "agent-abc",
-    "fromRole": "developer",
-    "content": "Starting implementation...",
-    "timestamp": "2025-03-01T10:05:00Z"
-  }
-]
-```
+**Response**: `Conversation[]`
+
+---
+
+### `GET /db/conversations/:id/messages`
+
+Get messages for a conversation.
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | query | number | no | Max messages (default 100, max 1000) |
+
+**Response**: `Message[]`
+
+---
+
+### `DELETE /db/conversations/:id`
+
+Delete a conversation and its messages.
+
+**Response**: `{ ok: true }`
+
+---
+
+### `GET /db/decisions`
+
+List all decisions (raw DB).
+
+**Response**: `Decision[]`
+
+---
+
+### `DELETE /db/decisions/:id`
+
+Delete a decision.
+
+**Response**: `{ ok: true }`
+
+---
+
+### `GET /db/activity`
+
+List activity log entries (raw DB).
+
+| Param | In | Type | Required | Description |
+|---|---|---|---|---|
+| `limit` | query | number | no | Max entries (default 200, max 2000) |
+
+**Response**: `ActivityLogEntry[]`
+
+---
+
+### `DELETE /db/activity/:id`
+
+Delete an activity log entry.
+
+**Response**: `{ ok: true }`
+
+---
+
+### `GET /db/stats`
+
+Row counts for core tables.
+
+**Response**: `{ memory, conversations, messages, decisions, activity, dagTasks }`
