@@ -29,6 +29,7 @@ export default defineConfig({
           text: 'Core Concepts',
           items: [
             { text: 'Architecture', link: '/guide/architecture' },
+            { text: 'Providers', link: '/guide/providers' },
             { text: 'Roles & Agents', link: '/guide/roles' },
             { text: 'Agent Commands', link: '/guide/commands' },
             { text: 'Command Syntax', link: '/guide/command-syntax' },
@@ -46,6 +47,7 @@ export default defineConfig({
             { text: 'Agent Communication', link: '/guide/agent-communication' },
             { text: 'Chat Groups', link: '/guide/chat-groups' },
             { text: 'Chat UI Architecture', link: '/guide/chat-architecture' },
+            { text: 'Telegram Integration', link: '/guide/telegram-integration' },
           ],
         },
         {
@@ -62,7 +64,10 @@ export default defineConfig({
           items: [
             { text: 'Command Palette', link: '/guide/command-palette' },
             { text: 'Intent Rules', link: '/guide/intent-rules' },
+            { text: 'Cost & Token Tracking', link: '/guide/cost-tracking' },
+            { text: 'Analytics', link: '/guide/analytics' },
             { text: 'Data Management', link: '/guide/data-management' },
+            { text: 'Telegram Integration', link: '/guide/telegram-integration' },
           ],
         },
         {
