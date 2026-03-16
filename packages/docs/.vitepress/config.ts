@@ -63,7 +63,6 @@ export default defineConfig({
             { text: 'Command Palette', link: '/guide/command-palette' },
             { text: 'Intent Rules', link: '/guide/intent-rules' },
             { text: 'Data Management', link: '/guide/data-management' },
-            { text: 'Mobile PWA', link: '/guide/mobile' },
           ],
         },
         {

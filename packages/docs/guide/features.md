@@ -78,8 +78,5 @@ High-performance chat rendering using react-virtuoso. Only visible messages plus
 ### Conflict Detection
 Four detection levels: same directory, import overlap, lock contention, branch divergence. Real-time scanning. Conflict detail panel with resolution options. Integration with workflow triggers.
 
-### Mobile PWA (Removed)
-> Mobile-specific layouts have been removed. See [Mobile Support](/guide/mobile) for details.
-
 ### Custom Role Builder
 Create custom agent roles with visual editor. Emoji and color picker. Model selection with comparison cards. Prompt templates across 6 categories. Live preview card. Test role with dry-run before deploying.

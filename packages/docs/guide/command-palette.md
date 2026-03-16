@@ -53,11 +53,10 @@ Type natural language directly into ⌘K to control your crew:
 | Show conflicts | "are there any conflicts?" |
 | Show timeline | "show recent activity" |
 
-### Navigate Commands (5)
+### Navigate Commands (4)
 | Command | Example |
 |---------|---------|
 | Go to page | "go to settings" |
-| Open canvas | "show me the canvas" |
 | Open agent | "focus on developer" |
 | Open dashboard | "go home" |
 | Open timeline | "show timeline" |

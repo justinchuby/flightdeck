@@ -26,7 +26,6 @@ The **Radical Thinker** agent role is designed for first-principles brainstormin
 | Prompt | What You Get |
 |--------|-------------|
 | "Challenge our current navigation structure — is a sidebar the right choice?" | First-principles analysis of navigation patterns |
-| "What if we removed the Canvas view entirely? What would we lose?" | Honest assessment of feature value |
 | "We have 10+ pages. A new user lands on the dashboard. Is this overwhelming?" | UX critique from a fresh perspective |
 | "What's the simplest possible version of session replay?" | Minimal viable approach |
 
@@ -124,32 +123,6 @@ Use **16× or 32× speed** to quickly scan a multi-hour session in minutes. Swit
 :::
 
 ---
-
-## Canvas View for Live Collaboration
-
-The **Canvas** shows your agent crew as an interactive node graph.
-
-![Canvas View](/screenshots/canvas.png)
-
-### What You See
-
-- **Nodes** = agents, sized and colored by role/status
-- **Edges** = communication flows between agents (messages, delegations, broadcasts)
-- **Animated edges** = real-time messages being sent right now
-- **Node badges** = task count, error indicators, lock count
-
-### How to Use It
-
-- **Drag nodes** to rearrange the layout
-- **Click a node** to open the agent detail panel (tasks, recent messages, files locked)
-- **Zoom** with scroll wheel to focus on a cluster of agents
-- **Auto-layout** button rearranges nodes for clarity
-
-### What to Look For
-
-- **Isolated nodes** — agents with no edges may be stuck or waiting
-- **Dense clusters** — heavy communication between agents suggests active collaboration (or potential conflicts)
-- **Red/error nodes** — agents that hit errors need attention
 
 ---
 
