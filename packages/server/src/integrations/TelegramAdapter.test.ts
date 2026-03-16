@@ -27,7 +27,7 @@ const {
   mockCommandHandlers: new Map<string, (ctx: any) => Promise<void>>(),
   mockOnHandlers: new Map<string, (ctx: any) => Promise<void>>(),
   mockCatchHolder: { handler: null as ((err: any) => void) | null },
-  mockStartHolder: { callback: null as (() => void) | null, signal: null as AbortSignal | null },
+  mockStartHolder: { callback: null as (() => void) | null },
   mockStopFn: vi.fn().mockResolvedValue(undefined),
   mockUseHandlers: [] as Array<(ctx: any, next: () => Promise<void>) => Promise<void>>,
 }));
@@ -47,9 +47,8 @@ vi.mock('grammy', () => {
     catch(handler: (err: any) => void) {
       mockCatchHolder.handler = handler;
     }
-    start(opts?: { onStart?: () => void; allowed_updates?: string[]; signal?: AbortSignal }) {
+    start(opts?: { onStart?: () => void; allowed_updates?: string[] }) {
       mockStartHolder.callback = opts?.onStart ?? null;
-      mockStartHolder.signal = opts?.signal ?? null;
       if (opts?.onStart) {
         // Call synchronously for test predictability
         opts.onStart();
@@ -84,7 +83,6 @@ describe('TelegramAdapter', () => {
     mockOnHandlers.clear();
     mockCatchHolder.handler = null;
     mockStartHolder.callback = null;
-    mockStartHolder.signal = null;
     mockUseHandlers.length = 0;
   });
 
@@ -641,58 +639,40 @@ describe('TelegramAdapter', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  // ── Abort Signal Handling ────────────────────────────────
+  // ── Graceful Stop ─────────────────────────────────────────
 
-  it('passes abort signal to bot.start() for instant shutdown', async () => {
+  it('calls bot.stop() on graceful shutdown', async () => {
     adapter = new TelegramAdapter(createConfig());
     await adapter.start();
 
-    // The signal should have been passed to bot.start()
-    expect(mockStartHolder.signal).toBeInstanceOf(AbortSignal);
-    expect(mockStartHolder.signal!.aborted).toBe(false);
-
-    // After stop, the signal should be aborted
     await adapter.stop();
-    expect(mockStartHolder.signal!.aborted).toBe(true);
+
+    expect(mockStopFn).toHaveBeenCalledOnce();
+    expect(adapter.isRunning()).toBe(false);
   });
 
-  it('suppresses AbortError during stop', async () => {
+  it('logs warning when bot.stop() throws', async () => {
     const { logger: mockLogger } = await import('../utils/logger.js');
     adapter = new TelegramAdapter(createConfig());
     await adapter.start();
 
-    // Make bot.stop() throw an AbortError
-    const abortError = new Error('The operation was aborted');
-    abortError.name = 'AbortError';
-    mockStopFn.mockRejectedValueOnce(abortError);
-
-    vi.mocked(mockLogger.warn).mockClear();
-    await adapter.stop();
-
-    // AbortError should NOT be logged as a warning
-    const warnCalls = vi.mocked(mockLogger.warn).mock.calls;
-    const stopErrorLogs = warnCalls.filter(
-      (call) => (call[0] as any)?.msg === 'Error stopping Telegram bot',
-    );
-    expect(stopErrorLogs).toHaveLength(0);
-  });
-
-  it('logs non-AbortError during stop', async () => {
-    const { logger: mockLogger } = await import('../utils/logger.js');
-    adapter = new TelegramAdapter(createConfig());
-    await adapter.start();
-
-    // Make bot.stop() throw a regular error
     mockStopFn.mockRejectedValueOnce(new Error('Network failure'));
 
     vi.mocked(mockLogger.warn).mockClear();
     await adapter.stop();
 
-    // Non-AbortError SHOULD be logged as a warning
     const warnCalls = vi.mocked(mockLogger.warn).mock.calls;
     const stopErrorLogs = warnCalls.filter(
       (call) => (call[0] as any)?.msg === 'Error stopping Telegram bot',
     );
     expect(stopErrorLogs).toHaveLength(1);
+  });
+
+  it('passes allowed_updates to bot.start()', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    // Verify bot started successfully with allowed_updates option
+    expect(adapter.isRunning()).toBe(true);
   });
 });

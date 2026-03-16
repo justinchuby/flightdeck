@@ -59,9 +59,6 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   private seenUpdateIds: Set<number> = new Set();
   private static readonly MAX_SEEN_IDS = 1000;
 
-  /** AbortController for graceful long-polling shutdown. */
-  private abortController: AbortController | null = null;
-
   // Retry queue for failed outbound messages (in-memory, 5-min TTL)
   private retryQueue: Array<{ message: OutboundMessage; attempts: number; expiresAt: number }> = [];
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -137,12 +134,9 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       // Best-effort — if this fails, bot.start() will still attempt polling
     }
 
-    this.abortController = new AbortController();
-
-    // Start long polling (non-blocking). Pass abort signal for instant shutdown.
+    // Start long polling (non-blocking)
     this.bot.start({
       allowed_updates: ['message'],
-      signal: this.abortController.signal,
       onStart: () => {
         logger.info({ module: 'telegram', msg: 'Telegram bot started (long polling)' });
         this.running = true;
@@ -172,19 +166,10 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       this.retryTimer = null;
     }
 
-    // Signal abort to cancel long-polling immediately (no 30s hang)
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-
     try {
       await this.bot.stop();
     } catch (err) {
-      // AbortError is expected when we abort the controller
-      if ((err as Error).name !== 'AbortError') {
-        logger.warn({ module: 'telegram', msg: 'Error stopping Telegram bot', error: (err as Error).message });
-      }
+      logger.warn({ module: 'telegram', msg: 'Error stopping Telegram bot', error: (err as Error).message });
     }
 
     this.bot = null;
