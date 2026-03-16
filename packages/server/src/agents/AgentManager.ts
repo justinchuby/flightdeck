@@ -107,6 +107,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
   private messageBuffers: Map<string, string> = new Map(); // agentId → buffered text
   private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private thinkingBuffers: Map<string, string> = new Map(); // agentId → buffered thinking text
+  private thinkingFlushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private idleNudgeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private crashCounts: Map<string, number> = new Map();
   private maxRestarts: number;
@@ -633,6 +635,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onThinking((text) => {
       this.emit('agent:thinking', { agentId: agent.id, text });
+      this.bufferThinkingMessage(agent.id, text);
     });
 
     agent.onPlan((entries) => {
@@ -747,6 +750,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.emit('agent:status', { agentId: agent.id, status });
         this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         if (status === 'idle' || isTerminalStatus(status)) {
+          this.flushThinkingMessage(agent.id);
           this.flushAgentMessage(agent.id);
         }
 
@@ -805,6 +809,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onExit((code) => {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+      this.flushThinkingMessage(agent.id);
       this.flushAgentMessage(agent.id);
       this.dispatcher.clearBuffer(agent.id);
       this.clearIdleNudgeTimer(agent.id);
@@ -1275,7 +1280,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   /** Persist a human message to the agent's conversation history */
   persistHumanMessage(agentId: string, text: string): void {
-    this.flushAgentMessage(agentId); // flush any buffered agent text first
+    this.flushThinkingMessage(agentId);
+    this.flushAgentMessage(agentId); // flush any buffered agent/thinking text first
     const threadId = this.agentThreads.get(agentId);
     if (threadId && this.conversationStore) {
       this.conversationStore.addMessage(threadId, 'user', text);
@@ -1311,7 +1317,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   /** Get recent messages from an agent's conversation history */
   getMessageHistory(agentId: string, limit = 200): import('../db/ConversationStore.js').ThreadMessage[] {
     if (!this.conversationStore) return [];
-    this.flushAgentMessage(agentId); // flush pending buffer before reading
+    this.flushThinkingMessage(agentId);
+    this.flushAgentMessage(agentId); // flush pending buffers before reading
     return this.conversationStore.getRecentMessages(agentId, limit).reverse(); // chronological order
   }
 
@@ -1336,6 +1343,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   /** Buffer agent output text, flushing after 2s of silence */
   private bufferAgentMessage(agentId: string, data: string): void {
+    // Flush any pending thinking text first so messages stay chronological
+    this.flushThinkingMessage(agentId);
+
     const existing = this.messageBuffers.get(agentId) || '';
     this.messageBuffers.set(agentId, existing + data);
 
@@ -1369,10 +1379,42 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
+  /** Buffer thinking text, flushing after 2s of silence */
+  private bufferThinkingMessage(agentId: string, data: string): void {
+    // Flush any pending agent text first so thinking and agent messages
+    // are stored in chronological order
+    this.flushAgentMessage(agentId);
+
+    const existing = this.thinkingBuffers.get(agentId) || '';
+    this.thinkingBuffers.set(agentId, existing + data);
+
+    const prev = this.thinkingFlushTimers.get(agentId);
+    if (prev) clearTimeout(prev);
+    this.thinkingFlushTimers.set(agentId, setTimeout(() => this.flushThinkingMessage(agentId), 2000));
+  }
+
+  /** Flush buffered thinking text to the conversation store */
+  private flushThinkingMessage(agentId: string): void {
+    const timer = this.thinkingFlushTimers.get(agentId);
+    if (timer) { clearTimeout(timer); this.thinkingFlushTimers.delete(agentId); }
+
+    const text = this.thinkingBuffers.get(agentId);
+    if (!text) return;
+    this.thinkingBuffers.delete(agentId);
+
+    const threadId = this.agentThreads.get(agentId);
+    if (threadId && this.conversationStore) {
+      this.conversationStore.addMessage(threadId, 'thinking', text);
+    }
+  }
+
   /** Flush all buffered agent messages (e.g. on new client connection) */
   flushAllMessages(): void {
     for (const agentId of this.messageBuffers.keys()) {
       this.flushAgentMessage(agentId);
+    }
+    for (const agentId of this.thinkingBuffers.keys()) {
+      this.flushThinkingMessage(agentId);
     }
   }
 
