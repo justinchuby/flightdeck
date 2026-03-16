@@ -29,7 +29,7 @@ const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
  * IntegrationRouter is a deterministic router (no LLM) that:
  * 1. Manages platform adapters (Telegram, future: Slack)
  * 2. Routes inbound messages to the correct project lead
- * 3. Maintains chat ↔ project session bindings (in-memory, 1h TTL)
+ * 3. Maintains chat ↔ project session bindings (in-memory, 8h TTL)
  * 4. Registers command handlers on adapters (/status, /projects, /agents, /help)
  * 5. Coordinates with NotificationBatcher for outbound event delivery
  */
@@ -140,8 +140,8 @@ export class IntegrationRouter {
     return this.notificationBatcher;
   }
 
-  /** Bind a chat to a project. */
-  bindSession(chatId: string, platform: 'telegram' | 'slack', projectId: string, boundBy: string): ChatSession {
+  /** Bind a chat to a project. Private — callers must use challenge-response auth (createChallenge + verifyChallenge). */
+  private bindSession(chatId: string, platform: 'telegram' | 'slack', projectId: string, boundBy: string): ChatSession {
     const session: ChatSession = {
       chatId,
       platform,
@@ -340,34 +340,6 @@ export class IntegrationRouter {
       userId: sanitizeInput(msg.userId),
     };
 
-    // Check bind command FIRST — it works even without an existing session
-    if (sanitizedMsg.text.startsWith('bind ')) {
-      const projectId = sanitizedMsg.text.slice(5).trim();
-      if (!projectId) {
-        const adapter = this.adapters.get(msg.platform);
-        adapter?.sendMessage({
-          platform: msg.platform,
-          chatId: msg.chatId,
-          text: '⚠️ Usage: bind <project-id>',
-        }).catch((err) => {
-          logger.warn({ module: 'integration-router', msg: 'Failed to send bind usage hint', error: (err as Error).message });
-        });
-        return;
-      }
-      this.bindSession(msg.chatId, msg.platform, projectId, msg.userId);
-      const adapter = this.adapters.get(msg.platform);
-      if (adapter) {
-        adapter.sendMessage({
-          platform: msg.platform,
-          chatId: msg.chatId,
-          text: `✅ Chat bound to project: ${projectId}`,
-        }).catch((err) => {
-          logger.warn({ module: 'integration-router', msg: 'Failed to send bind confirmation', error: (err as Error).message });
-        });
-      }
-      return;
-    }
-
     const session = this.getSession(msg.chatId);
 
     if (!session) {
@@ -377,7 +349,7 @@ export class IntegrationRouter {
         adapter.sendMessage({
           platform: msg.platform,
           chatId: msg.chatId,
-          text: 'No active project session. Use /projects to see available projects, then send "bind <project-id>" to connect this chat.',
+          text: 'No active project session. Open Flightdeck Settings → Telegram to bind this chat to a project.',
         }).catch((err) => {
           logger.warn({ module: 'integration-router', msg: 'Failed to send no-session hint', error: (err as Error).message });
         });

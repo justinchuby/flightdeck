@@ -90,6 +90,20 @@ async function enableTelegram(store: ReturnType<typeof createMockConfigStore>): 
   await new Promise((r) => setTimeout(r, 10));
 }
 
+/** Bind a session through the challenge-response auth flow (mirrors production path). */
+async function bindViaChallenge(
+  router: IntegrationRouter,
+  chatId: string,
+  platform: 'telegram' | 'slack',
+  projectId: string,
+  userId: string,
+): Promise<import('./types.js').ChatSession> {
+  await router.createChallenge(chatId, platform, projectId, userId);
+  const challenge = router.getPendingChallenge(chatId)!;
+  const session = router.verifyChallenge(chatId, challenge.code)!;
+  return session;
+}
+
 describe('IntegrationRouter', () => {
   let agent: IntegrationRouter;
   let agentManager: ReturnType<typeof createMockAgentManager>;
@@ -147,8 +161,9 @@ describe('IntegrationRouter', () => {
   it('binds a chat session to a project', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
-    const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
     expect(session.chatId).toBe('chat-1');
     expect(session.platform).toBe('telegram');
     expect(session.projectId).toBe('project-1');
@@ -159,8 +174,9 @@ describe('IntegrationRouter', () => {
   it('retrieves session and refreshes TTL', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
-    agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
     const session = agent.getSession('chat-1');
     expect(session).toBeDefined();
     expect(session!.projectId).toBe('project-1');
@@ -169,8 +185,9 @@ describe('IntegrationRouter', () => {
   it('returns undefined for expired sessions', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
-    const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
     // Force expiry
     session.expiresAt = Date.now() - 1000;
 
@@ -180,9 +197,10 @@ describe('IntegrationRouter', () => {
   it('lists all active sessions', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
-    agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
-    agent.bindSession('chat-2', 'telegram', 'project-2', 'user-2');
+    await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+    await bindViaChallenge(agent, 'chat-2', 'telegram', 'project-2', 'user-2');
 
     expect(agent.getAllSessions()).toHaveLength(2);
   });
@@ -190,8 +208,9 @@ describe('IntegrationRouter', () => {
   it('does NOT auto-subscribe chat to notifications when binding session', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
-    agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
 
     const subs = bridge.getSubscriptions('chat-1');
     expect(subs).toHaveLength(0); // User must explicitly opt in
@@ -312,29 +331,26 @@ describe('IntegrationRouter', () => {
   it('cleans expired sessions on getAllSessions', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
+    await enableTelegram(configStore);
 
-    const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
     session.expiresAt = Date.now() - 1000;
 
     const active = agent.getAllSessions();
     expect(active).toHaveLength(0);
   });
 
-  // ── Regression: C1 — bind command was unreachable ─────
+  // ── Security: bind command removed — must use challenge-response ─────
 
-  it('processes bind command even without an active session', async () => {
+  it('returns Settings UI guidance when unbound chat sends bind-like message', async () => {
     agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
     await agent.start();
     await enableTelegram(configStore);
 
     const adapter = agent.getAdapter('telegram') as any;
-    expect(adapter.onMessage).toHaveBeenCalled();
-
-    // Get the message handler
     const msgHandler = adapter._messageHandlers[0];
-    expect(msgHandler).toBeDefined();
 
-    // Send bind command without any existing session
+    // Send a "bind project-1" message without any existing session
     msgHandler({
       platform: 'telegram',
       chatId: 'new-chat',
@@ -344,10 +360,16 @@ describe('IntegrationRouter', () => {
       receivedAt: Date.now(),
     });
 
-    // Session should have been created
+    // No session should be created — bind command is removed
     const session = agent.getSession('new-chat');
-    expect(session).toBeDefined();
-    expect(session!.projectId).toBe('project-1');
+    expect(session).toBeUndefined();
+
+    // Should send the Settings UI guidance message instead
+    expect(adapter.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Flightdeck Settings'),
+      }),
+    );
   });
 
   // ── Regression: M6 — role renders as [object Object] ──
@@ -387,7 +409,7 @@ describe('IntegrationRouter', () => {
     await enableTelegram(configStore);
 
     // Bind a session first
-    agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
 
     const adapter = agent.getAdapter('telegram') as any;
     const msgHandler = adapter._messageHandlers[0];
@@ -429,7 +451,7 @@ describe('IntegrationRouter', () => {
     await enableTelegram(configStore);
 
     // Bind a session
-    agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
 
     const adapter = agent.getAdapter('telegram') as any;
     const msgHandler = adapter._messageHandlers[0];
@@ -580,12 +602,15 @@ describe('IntegrationRouter', () => {
       await agent.start();
       await enableTelegram(configStore);
 
-      agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+      await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+
+      const adapter = agent.getAdapter('telegram')!;
+      // Clear mock calls from challenge-response setup
+      (adapter.sendMessage as ReturnType<typeof vi.fn>).mockClear();
 
       const result = agent.sendToProject('project-1', 'Build passed!');
       expect(result).toBe(true);
 
-      const adapter = agent.getAdapter('telegram')!;
       expect(adapter.sendMessage).toHaveBeenCalledWith({
         platform: 'telegram',
         chatId: 'chat-1',
@@ -607,7 +632,7 @@ describe('IntegrationRouter', () => {
       await agent.start();
       await enableTelegram(configStore);
 
-      const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+      const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
       session.expiresAt = Date.now() - 1000; // Force expire
 
       const result = agent.sendToProject('project-1', 'Hello');
@@ -617,9 +642,11 @@ describe('IntegrationRouter', () => {
     it('returns false when no adapter is available', async () => {
       agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
       await agent.start();
+      await enableTelegram(configStore);
 
-      // Manually add a session without an adapter
-      agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+      // Bind via auth flow, then remove adapter to simulate unavailability
+      await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+      (agent as any).adapters.delete('telegram');
 
       const result = agent.sendToProject('project-1', 'Hello');
       expect(result).toBe(false);
@@ -630,7 +657,7 @@ describe('IntegrationRouter', () => {
       await agent.start();
       await enableTelegram(configStore);
 
-      const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+      const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
 
       // Set session to expire soon (1 second from now)
       session.expiresAt = Date.now() + 1000;
@@ -647,13 +674,16 @@ describe('IntegrationRouter', () => {
       await agent.start();
       await enableTelegram(configStore);
 
-      agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+      await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+
+      const adapter = agent.getAdapter('telegram')!;
+      // Clear mock calls from challenge-response setup
+      (adapter.sendMessage as ReturnType<typeof vi.fn>).mockClear();
 
       const longMessage = 'x'.repeat(5000);
       const result = agent.sendToProject('project-1', longMessage);
       expect(result).toBe(true);
 
-      const adapter = agent.getAdapter('telegram')!;
       const sentText = (adapter.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0].text;
       // Router no longer truncates — full text is passed to adapter for chunking
       expect(sentText).toBe(longMessage);
@@ -668,7 +698,7 @@ describe('IntegrationRouter', () => {
     await enableTelegram(configStore);
 
     const before = Date.now();
-    const session = agent.bindSession('chat-1', 'telegram', 'project-1', 'user-1');
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
     const eightHoursMs = 8 * 60 * 60 * 1000;
 
     // Session should expire approximately 8 hours from now
