@@ -2,6 +2,21 @@
 
 Quick reference for all APIs, hooks, components, and design tokens available in the Flightdeck web application.
 
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Runtime** | Node.js with npm workspaces monorepo |
+| **Frontend** | React 19.2, TypeScript 5.9, Vite 8, Tailwind CSS 4 |
+| **State Management** | Zustand 5 (stores in `src/stores/`), TanStack Query 5 (server state) |
+| **Testing** | Vitest 4 + @testing-library/react 16, Playwright for E2E |
+| **Backend** | Express 5, better-sqlite3, Drizzle ORM, WebSocket (ws) |
+| **Shared** | `@flightdeck/shared` — Zod schemas, shared types (workspace dependency) |
+| **Charts** | visx (d3-based) |
+| **Build** | Vite 8 with `@vitejs/plugin-react`, dev server proxies API/WS to :3001 |
+
+---
+
 ## API Endpoints
 
 ### Agents
@@ -147,8 +162,6 @@ All hooks are in `src/hooks/`. Import example: `import { useProjects } from '../
 | `useRecentCommands()` | `{ recent, addRecent, clearRecent }` | Recent command history (localStorage) |
 | `useProgressiveRoutes()` | `{ tier, visibleRoutes, hiddenRoutes }` | Progressive sidebar disclosure |
 | `useDashboardLayout()` | `{ panels, allPanels, togglePanel, movePanel, reorderPanels }` | Dashboard panel config |
-| `useCanvasGraph(agents)` | `{ nodes, edges }` | React Flow graph from agents |
-| `useCanvasLayout()` | `[layout, setLayout]` | Persisted canvas positions |
 | `useAutoScroll(ref, deps)` | void | Auto-scroll container to bottom |
 | `useIdleTimer(timeout)` | `{ isIdle }` | User inactivity detection |
 | `useAttachments()` | `{ attachments, addAttachment, removeAttachment }` | File attachment state |
@@ -226,7 +239,7 @@ Import: styles are global via `src/styles/motion.css`. Just add class names.
 | `motion-slide-in-right` | 250ms | Panels, slide-overs |
 | `motion-slide-up` | 250ms | Toasts, bottom sheets |
 | `motion-slide-down` | 250ms | Dropdowns, notifications |
-| `motion-scale-in` | 250ms | Canvas nodes, modals |
+| `motion-scale-in` | 250ms | Modals, popovers |
 | `motion-scale-in-spring` | 450ms | Playful/dramatic entrances |
 | `motion-pulse` | 2s ∞ | Status indicators |
 | `motion-pulse-border` | 2s ∞ | Attention-drawing borders |
@@ -311,7 +324,22 @@ All variables use RGB triplets for opacity support: `rgba(var(--chart-1), 0.5)`.
 
 ## Key Patterns
 
-### API Fetching
+### TanStack Query (Server State)
+
+Use `useQuery` from `@tanstack/react-query` for all server data fetching:
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '../hooks/useApi';
+
+const { data, isLoading, error } = useQuery({
+  queryKey: ['agents', projectId],
+  queryFn: ({ signal }) => apiFetch(`/api/agents?project=${projectId}`, { signal }),
+  refetchInterval: 5000,
+});
+```
+
+### API Fetching (Low-Level)
 
 ```typescript
 import { apiFetch } from '../hooks/useApi';
@@ -332,7 +360,22 @@ const data = await apiFetch<unknown>('/endpoint');
 const items = Array.isArray(data) ? data : data?.items ?? [];
 ```
 
-### Zustand Selectors
+### Zustand Store (Client State)
+
+Stores live in `src/stores/`. Define stores with Zustand 5's `create`:
+
+```typescript
+import { create } from 'zustand';
+
+const useAppStore = create<AppState>((set, get) => ({
+  agents: [],
+  setAgents: (agents) => set({ agents }),
+}));
+
+// Testing: useAppStore.getState().setAgents([...])
+```
+
+Use selectors to avoid unnecessary re-renders:
 
 ```typescript
 // ✅ Good — re-renders only when agents changes
