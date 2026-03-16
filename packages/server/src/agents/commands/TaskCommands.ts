@@ -291,6 +291,8 @@ function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string):
         const skippedAgent = ctx.getAgent(result.skippedAgentId);
         if (skippedAgent) {
           skippedAgent.sendMessage(`[System] Task "${req.taskId}" was skipped by the Project Lead. Please stop working on it.`);
+          skippedAgent.task = undefined;
+          skippedAgent.dagTaskId = undefined;
         }
         ctx.lockRegistry.releaseAll(result.skippedAgentId);
         markAgentDelegations(ctx, result.skippedAgentId, 'to', 'cancelled');
@@ -326,7 +328,18 @@ function handleCancelTask(ctx: CommandHandlerContext, agent: Agent, data: string
   try {
     const req = parseCommandPayload(agent, match[1], taskIdSchema, 'CANCEL_TASK');
     if (!req) return;
+    const taskBefore = ctx.taskDAG.getTask(agent.id, req.taskId);
     const ok = ctx.taskDAG.cancelTask(agent.id, req.taskId);
+    if (ok && taskBefore?.assignedAgentId) {
+      const assignedAgent = ctx.getAgent(taskBefore.assignedAgentId);
+      if (assignedAgent) {
+        assignedAgent.sendMessage(`[System] Task "${req.taskId}" was cancelled by the Project Lead.`);
+        assignedAgent.task = undefined;
+        assignedAgent.dagTaskId = undefined;
+      }
+      ctx.lockRegistry.releaseAll(taskBefore.assignedAgentId);
+      markAgentDelegations(ctx, taskBefore.assignedAgentId, 'to', 'cancelled');
+    }
     agent.sendMessage(ok ? `[System] Task "${req.taskId}" cancelled.` : `[System] Cannot cancel task "${req.taskId}" (may be running or done).`);
   } catch { agent.sendMessage('[System] CANCEL_TASK error: invalid payload.'); }
 }
@@ -448,6 +461,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       // guard in notifyParentOfIdle from letting stale-task agents through after
       // the dedup key is cleared on running→idle cycles.
       agent.task = undefined;
+      agent.dagTaskId = undefined;
       return;
     }
 
@@ -469,7 +483,17 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       }
       return;
     }
+    const taskBefore = ctx.taskDAG.getTask(agent.id, req.taskId);
     const newlyReady = ctx.taskDAG.completeTask(agent.id, req.taskId);
+
+    // Clear the assigned agent's task reference so the idle guard doesn't re-report
+    if (taskBefore?.assignedAgentId) {
+      const assignedAgent = ctx.getAgent(taskBefore.assignedAgentId);
+      if (assignedAgent) {
+        assignedAgent.task = undefined;
+        assignedAgent.dagTaskId = undefined;
+      }
+    }
 
     // Log to activity ledger so keyframes/milestones track completion
     ctx.activityLedger.log(agent.id, agent.role.id, 'task_completed',
@@ -590,6 +614,7 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
     if (oldAgent) {
       oldAgent.sendMessage(`[System] Task "${req.taskId}" has been reassigned to another agent. Please stop working on it.`);
       oldAgent.dagTaskId = undefined;
+      oldAgent.task = undefined;
     }
     ctx.lockRegistry.releaseAll(result.oldAgentId);
     // Cancel only the delegation for this specific task (not all of old agent's delegations)

@@ -52,7 +52,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   if (!agent.parentId) return;
   // Only send completion reports for agents with assigned work.
   // Agents cycling without a task or delegation (e.g., secretary, idle pools) shouldn't produce reports.
-  const hasWork = agent.task || agent.dagTaskId
+  const hasWork = agent.task
     || Array.from(ctx.delegations.values()).some(d => d.toAgentId === agent.id && d.status === 'active');
   if (!hasWork) return;
   const parent = ctx.getAgent(agent.parentId);
@@ -208,7 +208,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
 
   // Only send exit reports for agents with assigned work.
   // Agents cycling without a task or delegation shouldn't produce reports, but still complete delegations above.
-  if (!agent.task && !agent.dagTaskId && !hadActiveDelegation) return;
+  if (!agent.task && !hadActiveDelegation) return;
 
   const status = exitCode === -1 ? 'terminated' : exitCode === 0 ? 'completed successfully' : `failed (exit code ${exitCode})`;
   const rawOutput2 = agent.getTaskOutput(16000);
