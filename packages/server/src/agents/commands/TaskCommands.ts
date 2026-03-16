@@ -444,6 +444,10 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         agent.sendMessage(`[System] Task completion signaled to parent. (No DAG task ID — use dagTaskId for DAG integration.)`);
       }
+      // Clear task assignment — the work is done. This prevents the task-based
+      // guard in notifyParentOfIdle from letting stale-task agents through after
+      // the dedup key is cleared on running→idle cycles.
+      agent.task = undefined;
       return;
     }
 
