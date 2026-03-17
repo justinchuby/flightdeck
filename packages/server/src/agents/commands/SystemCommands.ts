@@ -80,7 +80,10 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
     const memories = ctx.agentMemory.getByLead(agent.id);
     if (memories.length > 0) {
       const byAgent = new Map<string, MemoryEntry[]>();
+      // Filter out role and model — already in crew roster, stored model can be stale
+      const REDUNDANT_KEYS = new Set(['role', 'model']);
       for (const m of memories) {
+        if (REDUNDANT_KEYS.has(m.key)) continue;
         const list = byAgent.get(m.agentId) || [];
         list.push(m);
         byAgent.set(m.agentId, list);
@@ -90,7 +93,9 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
         const facts = entries.map(e => `${e.key}: ${e.value}`).join(', ');
         lines.push(`  - ${agentId.slice(0, 8)}: ${facts}`);
       }
+      if (lines.length > 0) {
       memorySection = `== AGENT MEMORY ==\nRecorded facts about your agents:\n${lines.join('\n')}`;
+      }
     }
   }
 
