@@ -26,6 +26,11 @@ vi.mock('../../../stores/leadStore', () => ({
   useLeadStore: { getState: () => mockStore },
 }));
 
+let mockAppStoreAgents: any[] = [];
+vi.mock('../../../stores/appStore', () => ({
+  useAppStore: { getState: () => ({ agents: mockAppStoreAgents }) },
+}));
+
 const mockApiFetch = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
@@ -102,5 +107,74 @@ describe('useLeadWebSocket — uncovered lines', () => {
     // Wait a tick for the .then() to resolve
     await new Promise(r => setTimeout(r, 10));
     expect(mockStore.setGroups).not.toHaveBeenCalled();
+  });
+});
+
+// ── project:xxx resolution tests ────────────────────────────────
+
+describe('useLeadWebSocket — project:xxx → UUID resolution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAppStoreAgents = [];
+  });
+
+  it('resolves project:xxx to lead UUID using closure agents', () => {
+    const agentsWithProject = [
+      { id: 'lead-uuid-1', status: 'running', projectId: 'proj-abc', role: { id: 'lead', name: 'Lead' } } as AgentInfo,
+    ];
+    mockStore.selectedLeadId = 'project:proj-abc';
+
+    renderHook(() => useLeadWebSocket(agentsWithProject, null));
+
+    emitWsMessage({ type: 'agent:text', agentId: 'lead-uuid-1', text: 'hello' });
+    expect(mockStore.appendToLastAgentMessage).toHaveBeenCalledWith('project:proj-abc', 'hello');
+  });
+
+  it('resolves project:xxx using appStore fallback when closure agents is empty', () => {
+    mockStore.selectedLeadId = 'project:proj-abc';
+    mockAppStoreAgents = [
+      { id: 'lead-uuid-2', status: 'running', projectId: 'proj-abc', role: { id: 'lead', name: 'Lead' } } as AgentInfo,
+    ];
+
+    // Pass empty agents array — simulates stale closure during mount race
+    renderHook(() => useLeadWebSocket([], null));
+
+    emitWsMessage({ type: 'agent:text', agentId: 'lead-uuid-2', text: 'from appStore' });
+    expect(mockStore.appendToLastAgentMessage).toHaveBeenCalledWith('project:proj-abc', 'from appStore');
+  });
+
+  it('drops agent:text when project:xxx resolution finds no matching lead', () => {
+    mockStore.selectedLeadId = 'project:proj-unknown';
+    mockAppStoreAgents = [];
+
+    renderHook(() => useLeadWebSocket([], null));
+
+    emitWsMessage({ type: 'agent:text', agentId: 'some-agent', text: 'orphan' });
+    expect(mockStore.appendToLastAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('resolves project:xxx for agent:thinking via appStore fallback', () => {
+    mockStore.selectedLeadId = 'project:proj-abc';
+    mockAppStoreAgents = [
+      { id: 'lead-uuid-3', status: 'running', projectId: 'proj-abc', role: { id: 'lead', name: 'Lead' } } as AgentInfo,
+    ];
+
+    renderHook(() => useLeadWebSocket([], null));
+
+    emitWsMessage({ type: 'agent:thinking', agentId: 'lead-uuid-3', text: 'reasoning...' });
+    expect(mockStore.appendToThinkingMessage).toHaveBeenCalledWith('project:proj-abc', 'reasoning...');
+  });
+
+  it('skips terminated leads during project:xxx resolution', () => {
+    mockStore.selectedLeadId = 'project:proj-abc';
+    mockAppStoreAgents = [
+      { id: 'dead-lead', status: 'terminated', projectId: 'proj-abc', role: { id: 'lead', name: 'Lead' } } as AgentInfo,
+      { id: 'live-lead', status: 'running', projectId: 'proj-abc', role: { id: 'lead', name: 'Lead' } } as AgentInfo,
+    ];
+
+    renderHook(() => useLeadWebSocket([], null));
+
+    emitWsMessage({ type: 'agent:text', agentId: 'live-lead', text: 'alive' });
+    expect(mockStore.appendToLastAgentMessage).toHaveBeenCalledWith('project:proj-abc', 'alive');
   });
 });
