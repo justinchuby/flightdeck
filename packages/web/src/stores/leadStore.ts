@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
+import type { Decision, LeadProgress, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
 import { useMessageStore } from './messageStore';
 
 export interface ActivityEvent {
@@ -43,7 +43,6 @@ export interface AgentReport {
 }
 
 interface ProjectState {
-  messages: AcpTextChunk[];
   decisions: Decision[];
   progress: LeadProgress | null;
   progressSummary: string | null;
@@ -55,10 +54,6 @@ interface ProjectState {
   groups: ChatGroup[];
   groupMessages: Record<string, GroupMessage[]>;
   dagStatus: DagStatus | null;
-  /** Timestamp of last text received — used to show "working" indicator */
-  lastTextAt: number;
-  /** When true, the next appended text should start on a new line */
-  pendingNewline: boolean;
 }
 
 interface LeadState {
@@ -80,11 +75,6 @@ interface LeadState {
   setProgress: (leadId: string, progress: LeadProgress) => void;
   setProgressSummary: (leadId: string, summary: string) => void;
   addProgressSnapshot: (leadId: string, snapshot: ProgressSnapshot) => void;
-  addMessage: (leadId: string, msg: AcpTextChunk) => void;
-  setMessages: (leadId: string, messages: AcpTextChunk[]) => void;
-  appendToLastAgentMessage: (leadId: string, text: string) => void;
-  appendToThinkingMessage: (leadId: string, text: string) => void;
-  promoteQueuedMessages: (leadId: string) => void;
   updateToolCall: (leadId: string, toolCall: AcpToolCall) => void;
   addActivity: (leadId: string, event: ActivityEvent) => void;
   addComm: (leadId: string, comm: AgentComm) => void;
@@ -96,7 +86,7 @@ interface LeadState {
 }
 
 function emptyProject(): ProjectState {
-  return { messages: [], decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, dagStatus: null, lastTextAt: 0, pendingNewline: false };
+  return { decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, dagStatus: null };
 }
 
 export const useLeadStore = create<LeadState>((set) => ({
@@ -172,62 +162,8 @@ export const useLeadStore = create<LeadState>((set) => ({
       return { projects: { ...s.projects, [leadId]: { ...proj, progressHistory: [...proj.progressHistory, snapshot] } } };
     }),
 
-  addMessage: (leadId, msg) => {
-    const ms = useMessageStore.getState();
-    ms.ensureChannel(leadId);
-    ms.addMessage(leadId, msg);
-    const ch = useMessageStore.getState().channels[leadId];
-    set((s) => {
-      const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [] } } };
-    });
-  },
-
-  setMessages: (leadId, messages) => {
-    const ms = useMessageStore.getState();
-    ms.ensureChannel(leadId);
-    ms.setMessages(leadId, messages);
-    const ch = useMessageStore.getState().channels[leadId];
-    set((s) => {
-      const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [] } } };
-    });
-  },
-
-  appendToLastAgentMessage: (leadId, text) => {
-    const ms = useMessageStore.getState();
-    ms.ensureChannel(leadId);
-    ms.appendToLastAgentMessage(leadId, text);
-    const ch = useMessageStore.getState().channels[leadId];
-    set((s) => {
-      const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [], lastTextAt: ch?.lastTextAt ?? proj.lastTextAt, pendingNewline: ch?.pendingNewline ?? proj.pendingNewline } } };
-    });
-  },
-
-  appendToThinkingMessage: (leadId, text) => {
-    const ms = useMessageStore.getState();
-    ms.ensureChannel(leadId);
-    ms.appendToThinkingMessage(leadId, text);
-    const ch = useMessageStore.getState().channels[leadId];
-    set((s) => {
-      const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [], pendingNewline: true } } };
-    });
-  },
-
-  promoteQueuedMessages: (leadId) => {
-    const ms = useMessageStore.getState();
-    ms.ensureChannel(leadId);
-    ms.promoteQueuedMessages(leadId);
-    const ch = useMessageStore.getState().channels[leadId];
-    set((s) => {
-      const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [] } } };
-    });
-  },
-
-  updateToolCall: (leadId, toolCall) =>
+  updateToolCall: (leadId, toolCall) => {
+    useMessageStore.getState().setPendingNewline(leadId, true);
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       const existing = proj.toolCalls.findIndex((t) => t.toolCallId === toolCall.toolCallId);
@@ -240,8 +176,9 @@ export const useLeadStore = create<LeadState>((set) => ({
       }
       // Keep only last 50
       if (toolCalls.length > 50) toolCalls = toolCalls.slice(-50);
-      return { projects: { ...s.projects, [leadId]: { ...proj, toolCalls, pendingNewline: true } } };
-    }),
+      return { projects: { ...s.projects, [leadId]: { ...proj, toolCalls } } };
+    });
+  },
 
   addActivity: (leadId, event) =>
     set((s) => {
