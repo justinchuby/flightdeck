@@ -521,7 +521,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     agent.model = effectiveModel ?? '';
     if (cwd) agent.cwd = cwd;
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
-    if (resumeSessionId) agent._isResuming = true;
+    if (resumeSessionId) agent._setResuming();
     if (options?.projectName) agent.projectName = options.projectName;
     if (options?.projectId) agent.projectId = options.projectId;
     if (options?.provider) agent.provider = options.provider;
@@ -710,7 +710,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
 
     agent.onSessionResumeFailed((info) => {
+      agent._clearResuming();
       this.emit('agent:session_resume_failed', { agentId: agent.id, ...info });
+      // Notify parent so it can reassign or re-spawn this agent
+      if (agent.parentId) {
+        const parent = this.agents.get(agent.parentId);
+        if (parent && (parent.status === 'running' || parent.status === 'idle')) {
+          parent.sendMessage(
+            `[System] ⚠️ ${agent.role.name} (${agent.id.slice(0, 8)}) failed to resume session: ${info.error}. ` +
+            `Consider re-spawning this agent or reassigning its task.`
+          );
+        }
+      }
     });
 
     agent.onContextCompacted((info) => {
@@ -763,7 +774,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         }
 
         if (agent.role.id === 'lead') {
-          if (status === 'idle' && !agent._isResuming) {
+          if (status === 'idle' && !agent.isResuming) {
             this.heartbeat.trackIdle(agent.id);
           } else if (status === 'running') {
             this.heartbeat.trackActive(agent.id);
@@ -779,7 +790,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
         // Idle task nudge: if agent stays idle for 30s with uncompleted DAG
         // tasks, send a reminder. Nudge once per idle period (not spam).
-        if (status === 'idle' && agent.parentId && !agent._isResuming) {
+        if (status === 'idle' && agent.parentId && !agent.isResuming) {
           if (!this.idleNudgeTimers.has(agent.id)) {
             const timer = setTimeout(() => {
               this.idleNudgeTimers.delete(agent.id);
@@ -801,7 +812,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
         // Suppress the first idle notification for resumed agents — their prior
         // work was already reported.
-        if (status === 'idle' && agent.parentId && !agent._isResuming) {
+        if (status === 'idle' && agent.parentId && !agent.isResuming) {
           this.dispatcher.notifyParentOfIdle(agent);
         }
       });
@@ -931,7 +942,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       this.updateLeadBudgets();
       // Auto-add to groups with matching role criteria (B4: group auto-add)
       // Skip during resume — agents pick up context from restored ACP session.
-      if (parentId && !agent._isResuming) {
+      if (parentId && !agent.isResuming) {
         this.autoAddToRoleGroups(agent);
       }
     };
