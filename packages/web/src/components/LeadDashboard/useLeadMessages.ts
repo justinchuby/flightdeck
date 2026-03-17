@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLeadStore } from '../../stores/leadStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { apiFetch } from '../../hooks/useApi';
 import type { AcpTextChunk } from '../../types';
 
@@ -41,8 +42,10 @@ export function useLeadMessages(
       const leads: LeadListItem[] = await apiFetch('/lead', { signal });
       if (!Array.isArray(leads)) return [];
       const store = useLeadStore.getState();
+      const msgStore = useMessageStore.getState();
       for (const l of leads) {
         store.addProject(l.id);
+        msgStore.ensureChannel(l.id);
         // Pre-load message history for each lead (best-effort)
         apiFetch<MessageHistoryResponse>(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal })
           .then((data) => {
@@ -53,10 +56,10 @@ export function useLeadMessages(
                 sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                 timestamp: new Date(m.timestamp).getTime(),
               }));
-              const current = useLeadStore.getState().projects[l.id];
-              if (!current || current.messages.length === 0) {
-                useLeadStore.getState().setMessages(l.id, msgs);
-              }
+              const ms = useMessageStore.getState();
+              ms.mergeHistory(l.id, msgs);
+              const ch = ms.channels[l.id];
+              if (ch) useLeadStore.getState().setMessages(l.id, ch.messages);
             }
           })
           .catch(() => { /* non-critical — will load via WS */ });
@@ -105,10 +108,10 @@ export function useLeadMessages(
           ...(m.fromRole ? { fromRole: m.fromRole } : {}),
           timestamp: new Date(m.timestamp).getTime(),
         }));
-        const current = useLeadStore.getState().projects[selectedLeadId!];
-        if (!current || current.messages.length === 0) {
-          useLeadStore.getState().setMessages(selectedLeadId!, msgs);
-        }
+        const ms = useMessageStore.getState();
+        ms.mergeHistory(selectedLeadId!, msgs);
+        const ch = ms.channels[selectedLeadId!];
+        if (ch) useLeadStore.getState().setMessages(selectedLeadId!, ch.messages);
       }
       return data;
     },

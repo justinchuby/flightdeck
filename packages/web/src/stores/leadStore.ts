@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Decision, LeadProgress, AcpTextChunk, AcpToolCall, ChatGroup, GroupMessage, DagStatus } from '../types';
-import { hasUnclosedCommandBlock } from '../utils/commandParser';
+import { useMessageStore } from './messageStore';
 
 export interface ActivityEvent {
   id: string;
@@ -172,62 +172,60 @@ export const useLeadStore = create<LeadState>((set) => ({
       return { projects: { ...s.projects, [leadId]: { ...proj, progressHistory: [...proj.progressHistory, snapshot] } } };
     }),
 
-  addMessage: (leadId, msg) =>
+  addMessage: (leadId, msg) => {
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(leadId);
+    ms.addMessage(leadId, msg);
+    const ch = useMessageStore.getState().channels[leadId];
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      const withTs = { ...msg, timestamp: msg.timestamp ?? Date.now() };
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: [...proj.messages, withTs] } } };
-    }),
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [] } } };
+    });
+  },
 
-  setMessages: (leadId, messages) =>
+  setMessages: (leadId, messages) => {
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(leadId);
+    ms.setMessages(leadId, messages);
+    const ch = useMessageStore.getState().channels[leadId];
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages } } };
-    }),
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [] } } };
+    });
+  },
 
-  appendToLastAgentMessage: (leadId, text) =>
+  appendToLastAgentMessage: (leadId, text) => {
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(leadId);
+    ms.appendToLastAgentMessage(leadId, text);
+    const ch = useMessageStore.getState().channels[leadId];
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      const msgs = [...proj.messages];
-      // Find the last agent message (may not be the very last message if thinking interleaved)
-      let agentIdx = -1;
-      for (let k = msgs.length - 1; k >= 0; k--) {
-        if (msgs[k].sender === 'agent') { agentIdx = k; break; }
-        // Only look past thinking messages — stop at user/system/external boundaries
-        if (msgs[k].sender !== 'thinking') break;
-      }
-      const agentText = agentIdx >= 0 ? msgs[agentIdx].text : '';
-      // Use depth-aware check — the old `lastIndexOf('⟦⟦') > lastIndexOf('⟧⟧')` heuristic
-      // fails when nested ⟦⟦ ⟧⟧ appear inside command JSON (e.g. DELEGATE with example commands)
-      const unclosedCommand = hasUnclosedCommandBlock(agentText);
-      if (agentIdx >= 0 && (!proj.pendingNewline || unclosedCommand)) {
-        msgs[agentIdx] = { ...msgs[agentIdx], text: agentText + text, timestamp: msgs[agentIdx].timestamp || Date.now() };
-      } else {
-        msgs.push({ type: 'text', text: text, sender: 'agent', timestamp: Date.now() });
-      }
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, lastTextAt: Date.now(), pendingNewline: false } } };
-    }),
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [], lastTextAt: ch?.lastTextAt ?? proj.lastTextAt, pendingNewline: ch?.pendingNewline ?? proj.pendingNewline } } };
+    });
+  },
 
-  appendToThinkingMessage: (leadId, text) =>
+  appendToThinkingMessage: (leadId, text) => {
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(leadId);
+    ms.appendToThinkingMessage(leadId, text);
+    const ch = useMessageStore.getState().channels[leadId];
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      const msgs = [...proj.messages];
-      const lastIdx = msgs.length - 1;
-      if (lastIdx >= 0 && msgs[lastIdx].sender === 'thinking') {
-        msgs[lastIdx] = { ...msgs[lastIdx], text: (msgs[lastIdx].text || '') + text };
-      } else {
-        msgs.push({ type: 'text', text, sender: 'thinking', timestamp: Date.now() });
-      }
-      // Set pendingNewline so next agent text starts a new message (paragraph break after reasoning)
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: msgs, pendingNewline: true } } };
-    }),
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [], pendingNewline: true } } };
+    });
+  },
 
-  promoteQueuedMessages: (leadId) =>
+  promoteQueuedMessages: (leadId) => {
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(leadId);
+    ms.promoteQueuedMessages(leadId);
+    const ch = useMessageStore.getState().channels[leadId];
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
-      const updated = proj.messages.map((m) => m.queued ? { ...m, queued: false } : m);
-      return { projects: { ...s.projects, [leadId]: { ...proj, messages: updated } } };
-    }),
+      return { projects: { ...s.projects, [leadId]: { ...proj, messages: ch?.messages ?? [] } } };
+    });
+  },
 
   updateToolCall: (leadId, toolCall) =>
     set((s) => {
@@ -301,5 +299,8 @@ export const useLeadStore = create<LeadState>((set) => ({
       return { projects: { ...s.projects, [leadId]: { ...proj, dagStatus: status } } };
     }),
 
-  reset: () => set({ projects: {}, selectedLeadId: null }),
+  reset: () => {
+    useMessageStore.getState().reset();
+    set({ projects: {}, selectedLeadId: null });
+  },
 }));

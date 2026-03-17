@@ -29,6 +29,7 @@ import { CatchUpBanner } from './components/CatchUp';
 import { StatusPopover } from './components/StatusPopover/StatusPopover';
 import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
+import { useMessageStore } from './stores/messageStore';
 import type { AcpTextChunk, Project } from './types';
 import { ProjectLayout } from './layouts/ProjectLayout';
 import { shortAgentId } from './utils/agentLabel';
@@ -251,6 +252,7 @@ function AppContent() {
         const store = useLeadStore.getState();
         leads.forEach((l) => {
           store.addProject(l.id);
+          useMessageStore.getState().ensureChannel(l.id);
           apiFetch<{ messages: Array<{ sender?: string; text?: string; content?: string; timestamp?: string | number }> }>(`/agents/${l.id}/messages?limit=200`, { signal })
             .then((data) => {
               if (Array.isArray(data.messages) && data.messages.length > 0) {
@@ -260,10 +262,10 @@ function AppContent() {
                   sender: m.sender as 'agent' | 'user' | 'system',
                   timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
                 }));
-                const current = useLeadStore.getState().projects[l.id];
-                if (!current || current.messages.length === 0) {
-                  useLeadStore.getState().setMessages(l.id, msgs);
-                }
+                const ms = useMessageStore.getState();
+                ms.mergeHistory(l.id, msgs);
+                const ch = ms.channels[l.id];
+                if (ch) useLeadStore.getState().setMessages(l.id, ch.messages);
               }
             })
             .catch(() => { /* message history fetch — non-critical, will load via WS */ });

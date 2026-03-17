@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLeadStore } from '../../stores/leadStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { apiFetch } from '../../hooks/useApi';
 import { LeadDashboard } from './LeadDashboard';
 import type { AcpTextChunk, DagStatus, Decision, ChatGroup, LeadProgress } from '../../types';
@@ -25,6 +26,7 @@ export function ReadOnlySession() {
     if (!store.projects[leadId]) {
       store.addProject(leadId);
     }
+    useMessageStore.getState().ensureChannel(leadId);
     store.selectLead(leadId);
 
     const controller = new AbortController();
@@ -43,7 +45,10 @@ export function ReadOnlySession() {
               sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
               timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
             }));
-            useLeadStore.getState().setMessages(leadId, msgs);
+            const ms = useMessageStore.getState();
+            ms.mergeHistory(leadId, msgs);
+            const ch = ms.channels[leadId];
+            if (ch) useLeadStore.getState().setMessages(leadId, ch.messages);
           }
         }),
       apiFetch<Decision[]>(`/lead/${leadId}/decisions`, opts)

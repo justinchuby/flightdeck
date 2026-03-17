@@ -51,6 +51,7 @@ vi.mock('../../../utils/formatRelativeTime', () => ({
 // ── Import AFTER mocks ───────────────────────────────────────
 
 import { AgentChatPanel } from '../AgentChatPanel';
+import { useMessageStore } from '../../../stores/messageStore';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -74,6 +75,14 @@ function makeMessage(overrides: Record<string, any> = {}) {
   };
 }
 
+/** Populate messageStore for a given agent with messages */
+function setAgentMessages(messages: any[]) {
+  useMessageStore.getState().ensureChannel('agent-abc123');
+  if (messages.length > 0) {
+    useMessageStore.getState().setMessages('agent-abc123', messages);
+  }
+}
+
 // ── Tests ────────────────────────────────────────────────────
 
 describe('AgentChatPanel', () => {
@@ -83,6 +92,7 @@ describe('AgentChatPanel', () => {
     mockUpdateAgent.mockReset();
     mockAddToast.mockReset();
     mockAgents = [];
+    useMessageStore.getState().reset();
   });
 
   afterEach(() => {
@@ -91,6 +101,7 @@ describe('AgentChatPanel', () => {
 
   it('renders empty state when no messages exist', async () => {
     mockAgents = [makeAgent()];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     await waitFor(() => {
       expect(screen.getByText('No messages yet')).toBeInTheDocument();
@@ -98,12 +109,12 @@ describe('AgentChatPanel', () => {
   });
 
   it('renders messages from store for live agents', async () => {
-    mockAgents = [makeAgent({
-      messages: [
-        makeMessage({ text: 'Agent says hello', sender: 'agent' }),
-        makeMessage({ text: 'User says hi', sender: 'user' }),
-      ],
-    })];
+    const messages = [
+      makeMessage({ text: 'Agent says hello', sender: 'agent' }),
+      makeMessage({ text: 'User says hi', sender: 'user' }),
+    ];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByText('Agent says hello')).toBeInTheDocument();
     expect(screen.getByText('User says hi')).toBeInTheDocument();
@@ -111,6 +122,7 @@ describe('AgentChatPanel', () => {
 
   it('fetches messages from API when store is empty', async () => {
     mockAgents = [makeAgent({ messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockResolvedValueOnce({
       messages: [
         { content: 'Fetched message', sender: 'agent', timestamp: '2026-01-01T00:00:00Z' },
@@ -129,6 +141,7 @@ describe('AgentChatPanel', () => {
 
   it('populates store after API fetch', async () => {
     mockAgents = [makeAgent({ messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockResolvedValueOnce({
       messages: [
         { content: 'From API', sender: 'agent', timestamp: '2026-01-01T00:00:00Z' },
@@ -138,16 +151,15 @@ describe('AgentChatPanel', () => {
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
 
     await waitFor(() => {
-      expect(mockUpdateAgent).toHaveBeenCalledWith('agent-abc123', {
-        messages: expect.arrayContaining([
-          expect.objectContaining({ text: 'From API', sender: 'agent' }),
-        ]),
-      });
+      const msgs = useMessageStore.getState().channels['agent-abc123']?.messages ?? [];
+      expect(msgs.length).toBeGreaterThan(0);
+      expect(msgs[0].text).toBe('From API');
     });
   });
 
   it('shows loading state during API fetch', async () => {
     mockAgents = [makeAgent({ messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     // Never-resolving promise to keep loading state
     mockApiFetch.mockReturnValue(new Promise(() => {}));
 
@@ -157,6 +169,7 @@ describe('AgentChatPanel', () => {
 
   it('shows error when API fetch fails', async () => {
     mockAgents = [makeAgent({ messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockRejectedValueOnce(new Error('Connection refused'));
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
@@ -168,6 +181,7 @@ describe('AgentChatPanel', () => {
 
   it('shows input box for active agents', async () => {
     mockAgents = [makeAgent({ status: 'running' })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByTestId('agent-chat-input')).toBeInTheDocument();
     expect(screen.getByTestId('agent-chat-send')).toBeInTheDocument();
@@ -175,6 +189,7 @@ describe('AgentChatPanel', () => {
 
   it('hides input box when readOnly is true', async () => {
     mockAgents = [makeAgent({ status: 'running' })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" readOnly />); });
     expect(screen.queryByTestId('agent-chat-input')).not.toBeInTheDocument();
     expect(screen.getByText('Read-only — agent is no longer active')).toBeInTheDocument();
@@ -182,6 +197,7 @@ describe('AgentChatPanel', () => {
 
   it('shows inactive message for terminated agents', async () => {
     mockAgents = [makeAgent({ status: 'terminated' })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.queryByTestId('agent-chat-input')).not.toBeInTheDocument();
     expect(screen.getByText(/Agent is terminated/)).toBeInTheDocument();
@@ -189,6 +205,7 @@ describe('AgentChatPanel', () => {
 
   it('sends message via API on Enter', async () => {
     mockAgents = [makeAgent({ status: 'idle', messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockResolvedValue({ messages: [] });
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
@@ -211,6 +228,7 @@ describe('AgentChatPanel', () => {
 
   it('adds optimistic user message to store on send', async () => {
     mockAgents = [makeAgent({ status: 'idle', messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockResolvedValue({ messages: [] });
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
@@ -223,15 +241,15 @@ describe('AgentChatPanel', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
     });
 
-    expect(mockUpdateAgent).toHaveBeenCalledWith('agent-abc123', {
-      messages: expect.arrayContaining([
-        expect.objectContaining({ text: 'Test message', sender: 'user' }),
-      ]),
+    await waitFor(() => {
+      const msgs = useMessageStore.getState().channels['agent-abc123']?.messages ?? [];
+      expect(msgs.some((m: any) => m.text === 'Test message' && m.sender === 'user')).toBe(true);
     });
   });
 
   it('marks user message as queued when agent is busy', async () => {
     mockAgents = [makeAgent({ status: 'running', messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockResolvedValue({ messages: [] });
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
@@ -244,21 +262,22 @@ describe('AgentChatPanel', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
     });
 
-    expect(mockUpdateAgent).toHaveBeenCalledWith('agent-abc123', {
-      messages: expect.arrayContaining([
-        expect.objectContaining({ text: 'Queued msg', queued: true }),
-      ]),
+    await waitFor(() => {
+      const msgs = useMessageStore.getState().channels['agent-abc123']?.messages ?? [];
+      expect(msgs.some((m: any) => m.text === 'Queued msg' && m.queued === true)).toBe(true);
     });
   });
 
   it('disables send button when input is empty', async () => {
     mockAgents = [makeAgent({ status: 'running' })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByTestId('agent-chat-send')).toBeDisabled();
   });
 
   it('clears input after sending', async () => {
     mockAgents = [makeAgent({ status: 'idle', messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     mockApiFetch.mockResolvedValue({ messages: [] });
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
@@ -276,6 +295,7 @@ describe('AgentChatPanel', () => {
 
   it('shows toast on send failure', async () => {
     mockAgents = [makeAgent({ status: 'idle', messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     // First call is the history fetch, second is the send
     mockApiFetch
       .mockResolvedValueOnce({ messages: [] })
@@ -297,14 +317,14 @@ describe('AgentChatPanel', () => {
   });
 
   it('filters out empty and outgoing DM messages', async () => {
-    mockAgents = [makeAgent({
-      messages: [
-        makeMessage({ text: 'Visible message' }),
-        makeMessage({ text: '   ' }),
-        makeMessage({ text: '📤 [To dev] message', sender: 'system' }),
-        makeMessage({ text: 'Also visible' }),
-      ],
-    })];
+    const messages = [
+      makeMessage({ text: 'Visible message' }),
+      makeMessage({ text: '   ' }),
+      makeMessage({ text: '📤 [To dev] message', sender: 'system' }),
+      makeMessage({ text: 'Also visible' }),
+    ];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByText('Visible message')).toBeInTheDocument();
@@ -313,35 +333,35 @@ describe('AgentChatPanel', () => {
   });
 
   it('renders system messages as compact labels', async () => {
-    mockAgents = [makeAgent({
-      messages: [
-        makeMessage({ text: '[System] Agent spawned', sender: 'system' }),
-      ],
-    })];
+    const messages = [
+      makeMessage({ text: '[System] Agent spawned', sender: 'system' }),
+    ];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByText('[System] Agent spawned')).toBeInTheDocument();
   });
 
   it('renders thinking messages with italic styling', async () => {
-    mockAgents = [makeAgent({
-      messages: [
-        makeMessage({ text: 'Analyzing the codebase...', sender: 'thinking' }),
-      ],
-    })];
+    const messages = [
+      makeMessage({ text: 'Analyzing the codebase...', sender: 'thinking' }),
+    ];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByText(/Analyzing the codebase/)).toBeInTheDocument();
   });
 
   it('renders separator for system "---" messages', async () => {
-    mockAgents = [makeAgent({
-      messages: [
-        makeMessage({ text: 'Before separator' }),
-        makeMessage({ text: '---', sender: 'system' }),
-        makeMessage({ text: 'After separator' }),
-      ],
-    })];
+    const messages = [
+      makeMessage({ text: 'Before separator' }),
+      makeMessage({ text: '---', sender: 'system' }),
+      makeMessage({ text: 'After separator' }),
+    ];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByText('Before separator')).toBeInTheDocument();
@@ -349,9 +369,9 @@ describe('AgentChatPanel', () => {
   });
 
   it('does not fetch if store already has messages', async () => {
-    mockAgents = [makeAgent({
-      messages: [makeMessage({ text: 'Already loaded' })],
-    })];
+    const messages = [makeMessage({ text: 'Already loaded' })];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
 
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     // Should not call messages endpoint (only called for empty stores)
@@ -362,6 +382,7 @@ describe('AgentChatPanel', () => {
 
   it('does not allow Shift+Enter to send', async () => {
     mockAgents = [makeAgent({ status: 'idle', messages: [] })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
 
     const input = screen.getByTestId('agent-chat-input');
@@ -381,12 +402,14 @@ describe('AgentChatPanel', () => {
 
   it('shows input for idle agents', async () => {
     mockAgents = [makeAgent({ status: 'idle' })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.getByTestId('agent-chat-input')).toBeInTheDocument();
   });
 
   it('hides input for completed agents', async () => {
     mockAgents = [makeAgent({ status: 'completed' })];
+    useMessageStore.getState().ensureChannel('agent-abc123');
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.queryByTestId('agent-chat-input')).not.toBeInTheDocument();
   });
