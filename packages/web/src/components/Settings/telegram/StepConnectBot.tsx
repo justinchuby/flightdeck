@@ -53,14 +53,6 @@ export function StepConnectBot({ config, onUpdate, onNext }: StepProps) {
     if (e.key === 'Enter') handleVerify();
   };
 
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData('text');
-    if (pasted.includes(':')) {
-      // Looks like a bot token — auto-verify after paste
-      setTimeout(() => handleVerify(), 100);
-    }
-  };
-
   return (
     <div data-testid="telegram-wizard-step-1" className="space-y-4">
       <div>
@@ -92,7 +84,6 @@ export function StepConnectBot({ config, onUpdate, onNext }: StepProps) {
               onChange={(e) => handleTokenChange(e.target.value)}
               onFocus={() => { if (masked) setMasked(false); }}
               onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
               placeholder="Enter your Telegram bot token"
               disabled={validating}
               data-testid="telegram-token-input"
