@@ -176,27 +176,37 @@ export function AcpOutput({ agentId }: Props) {
   const plan = agent?.plan ?? [];
   const messages = agent?.messages ?? [];
 
-  // Fetch message history when agent panel opens and no messages are loaded yet
+  // Fetch message history when agent panel opens.
+  // Track whether history has been loaded to avoid redundant fetches.
+  const historyLoadedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!agentId || messages.length > 0) return;
+    if (!agentId || historyLoadedRef.current === agentId) return;
+    historyLoadedRef.current = agentId;
     apiFetch<{ messages: Array<{ sender?: string; content?: string; text?: string; timestamp?: number }> }>(`/agents/${agentId}/messages?limit=200`)
       .then((data) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
+          const msgs: AcpTextChunk[] = data.messages.map((m) => ({
+            type: 'text' as const,
+            text: m.content || m.text || '',
+            sender: (m.sender || 'agent') as 'agent' | 'user' | 'system' | 'thinking',
+            timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
+          }));
           const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
-          // Only load if still no messages (avoid overwriting live data)
-          if (!existing?.messages?.length) {
-            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
-              type: 'text' as const,
-              text: m.content || m.text || '',
-              sender: (m.sender || 'agent') as 'agent' | 'user' | 'system' | 'thinking',
-              timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
-            }));
+          const existingMsgs = existing?.messages ?? [];
+          if (existingMsgs.length === 0) {
             useAppStore.getState().updateAgent(agentId, { messages: msgs });
+          } else {
+            // Merge: history first, then any WS messages newer than history
+            const latestHistTs = msgs[msgs.length - 1]?.timestamp ?? 0;
+            const newer = existingMsgs.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+            if (newer.length < existingMsgs.length) {
+              useAppStore.getState().updateAgent(agentId, { messages: [...msgs, ...newer] });
+            }
           }
         }
       })
       .catch(() => { /* data will load on next poll */ });
-  }, [agentId, messages.length]);
+  }, [agentId]);
 
   // Get activity events for this agent from leadStore
   const allProjects = useLeadStore((s) => s.projects);
