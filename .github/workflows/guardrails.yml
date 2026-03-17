@@ -1,0 +1,32 @@
+name: Guardrails
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build shared types
+        run: npm run build --workspace=packages/shared
+
+      - name: Check file sizes
+        run: bash scripts/check-file-size.sh
+
+      - name: Check import boundaries
+        run: bash scripts/check-import-boundaries.sh
+
+      - name: Check circular dependencies
+        run: bash scripts/check-circular-deps.sh

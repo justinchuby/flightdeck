@@ -56,7 +56,11 @@
     "docs:build": "npm run build --workspace=packages/docs",
     "docs:generate-api": "node scripts/generate-api-docs.mjs",
     "docs:generate-db": "node scripts/generate-db-docs.mjs",
-    "docs:generate": "node scripts/generate-api-docs.mjs && node scripts/generate-db-docs.mjs"
+    "docs:generate": "node scripts/generate-api-docs.mjs && node scripts/generate-db-docs.mjs",
+    "check:file-size": "bash scripts/check-file-size.sh",
+    "check:boundaries": "bash scripts/check-import-boundaries.sh",
+    "check:circular": "bash scripts/check-circular-deps.sh",
+    "check:guardrails": "bash scripts/check-file-size.sh && bash scripts/check-import-boundaries.sh && bash scripts/check-circular-deps.sh"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.16.1",
@@ -76,10 +80,14 @@
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "eslint": "^10.0.2",
+    "madge": "^8.0.0",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3"
   },
   "bundledDependencies": [
+    "@flightdeck/shared"
+  ],
+  "bundleDependencies": [
     "@flightdeck/shared"
   ]
 }
