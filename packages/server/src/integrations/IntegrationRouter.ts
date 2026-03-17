@@ -100,6 +100,9 @@ export class IntegrationRouter {
     // Wire NotificationBatcher to AgentManager
     this.notificationBatcher.wire(this.agentManager);
 
+    // Refresh session TTL on each notification delivery
+    this.notificationBatcher.setDeliveryCallback((chatId: string) => this.refreshSession(chatId));
+
     // Listen for config changes to enable/disable integrations dynamically
     this.configStore.on('config:reloaded', () => {
       this.handleConfigChange();
@@ -194,6 +197,14 @@ export class IntegrationRouter {
     this.notificationBatcher.unsubscribe(chatId, session.projectId);
     logger.info({ module: 'integration-router', msg: 'Session revoked', chatId, projectId: session.projectId });
     return true;
+  }
+
+  /** Refresh a session's TTL without requiring user interaction. Called on notification delivery. */
+  refreshSession(chatId: string): void {
+    const session = this.sessions.get(chatId);
+    if (session && session.expiresAt > Date.now()) {
+      session.expiresAt = Date.now() + SESSION_TTL_MS;
+    }
   }
 
   // ── Challenge-response for session binding (B-1 / C-2) ────────────

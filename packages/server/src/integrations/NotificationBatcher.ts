@@ -63,7 +63,15 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
   private wiredHandlers: Array<{ event: string; handler: (...args: any[]) => void }> = [];
   private notificationService: NotificationService | null = null;
 
+  // Per-category rate limiting for critical events (prevents crash-loop flooding)
+  private criticalRateBuckets: Map<string, { count: number; resetAt: number }> = new Map();
+
+  /** Callback invoked after successful notification delivery, used for session TTL refresh. */
+  private onDelivered?: (chatId: string) => void;
+
   static readonly BATCH_WINDOW_MS = 5_000;
+  static readonly CRITICAL_RATE_LIMIT = 3;
+  static readonly CRITICAL_RATE_WINDOW_MS = 60_000;
 
   /** Categories that bypass the batch window and deliver immediately. */
   static readonly CRITICAL_CATEGORIES: ReadonlySet<string> = new Set([
@@ -79,6 +87,11 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
   /** Set the NotificationService for preference-based filtering. */
   setNotificationService(ns: NotificationService): void {
     this.notificationService = ns;
+  }
+
+  /** Set callback invoked after each successful notification delivery (e.g., to refresh session TTL). */
+  setDeliveryCallback(cb: (chatId: string) => void): void {
+    this.onDelivered = cb;
   }
 
   /** Subscribe a chat to receive notifications for a project. */
@@ -203,23 +216,37 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
     logger.info({ module: 'notification-batcher', msg: 'Wired to AgentManager events' });
   }
 
-  /** Queue an event for batched delivery. Critical events bypass the batch window. */
+  /** Queue an event for batched delivery. Critical events bypass the batch window (rate-limited). */
   queueEvent(event: NotificationEvent): void {
     const { projectId } = event;
 
-    // Critical events (crashes, decisions needing approval) skip batching
+    // Critical events (crashes, decisions needing approval) skip batching — unless rate-limited
     if (NotificationBatcher.CRITICAL_CATEGORIES.has(event.category)) {
       if (!this.pendingEvents.has(projectId)) {
         this.pendingEvents.set(projectId, []);
       }
       this.pendingEvents.get(projectId)!.push({ event, queuedAt: Date.now() });
-      // Clear any existing batch timer — the flush below handles all pending events
-      const existingTimer = this.flushTimers.get(projectId);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-        this.flushTimers.delete(projectId);
+
+      const bucketKey = `${projectId}:${event.category}`;
+      if (this.isCriticalWithinLimit(bucketKey)) {
+        // Within limit — immediate flush (existing behavior)
+        const existingTimer = this.flushTimers.get(projectId);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+          this.flushTimers.delete(projectId);
+        }
+        this.flushProject(projectId);
+      } else {
+        // Over limit — fall through to normal batch path (event preserved, not dropped)
+        if (!this.flushTimers.has(projectId)) {
+          const timer = setTimeout(() => {
+            this.flushTimers.delete(projectId);
+            this.flushProject(projectId);
+          }, NotificationBatcher.BATCH_WINDOW_MS);
+          timer.unref();
+          this.flushTimers.set(projectId, timer);
+        }
       }
-      this.flushProject(projectId);
       return;
     }
 
@@ -255,6 +282,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
     }
     this.flushTimers.clear();
     this.pendingEvents.clear();
+    this.criticalRateBuckets.clear();
     this.subscriptions = [];
 
     // H-3: Remove wired event listeners to prevent leaks
@@ -277,6 +305,20 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
   }
 
   // ── Private ──────────────────────────────────────────────
+
+  /** Check if a critical event is within the rate limit. Returns true if allowed. */
+  private isCriticalWithinLimit(bucketKey: string): boolean {
+    const now = Date.now();
+    let bucket = this.criticalRateBuckets.get(bucketKey);
+
+    if (!bucket || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + NotificationBatcher.CRITICAL_RATE_WINDOW_MS };
+      this.criticalRateBuckets.set(bucketKey, bucket);
+    }
+
+    bucket.count++;
+    return bucket.count <= NotificationBatcher.CRITICAL_RATE_LIMIT;
+  }
 
   private flushProject(projectId: string): void {
     const pending = this.pendingEvents.get(projectId);
@@ -333,6 +375,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
       }
 
       this.emit('notification:sent', { chatId: sub.chatId, count: filtered.length });
+      this.onDelivered?.(sub.chatId);
     }
   }
 

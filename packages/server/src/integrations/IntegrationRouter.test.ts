@@ -705,4 +705,74 @@ describe('IntegrationRouter', () => {
     expect(session.expiresAt).toBeGreaterThanOrEqual(before + eightHoursMs - 100);
     expect(session.expiresAt).toBeLessThanOrEqual(before + eightHoursMs + 1000);
   });
+
+  // ── Session auto-renewal ──────────────────────────────────
+
+  it('refreshSession extends TTL for active sessions', async () => {
+    agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+    await enableTelegram(configStore);
+
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+
+    // Set session to expire soon
+    session.expiresAt = Date.now() + 1000;
+    const shortExpiry = session.expiresAt;
+
+    agent.refreshSession('chat-1');
+
+    // TTL should have been refreshed to ~8h from now
+    expect(session.expiresAt).toBeGreaterThan(shortExpiry);
+  });
+
+  it('refreshSession does not revive expired sessions', async () => {
+    agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+    await enableTelegram(configStore);
+
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+
+    // Force expiry
+    session.expiresAt = Date.now() - 1000;
+
+    agent.refreshSession('chat-1');
+
+    // Session should still be expired — refreshSession doesn't revive dead sessions
+    expect(session.expiresAt).toBeLessThan(Date.now());
+  });
+
+  it('refreshSession is a no-op for unknown chatIds', async () => {
+    agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+
+    // Should not throw
+    agent.refreshSession('nonexistent');
+  });
+
+  it('wires delivery callback to refresh session TTL on notification delivery', async () => {
+    agent = new IntegrationRouter(agentManager, projectRegistry, configStore, bridge);
+    await agent.start();
+    await enableTelegram(configStore);
+
+    const session = await bindViaChallenge(agent, 'chat-1', 'telegram', 'project-1', 'user-1');
+
+    // Subscribe to notifications
+    bridge.subscribe('chat-1', 'project-1');
+
+    // Set session to expire soon
+    session.expiresAt = Date.now() + 1000;
+    const shortExpiry = session.expiresAt;
+
+    // Trigger a notification delivery
+    bridge.queueEvent({
+      category: 'agent_crashed',
+      projectId: 'project-1',
+      title: 'Agent crashed',
+      body: 'Developer crashed',
+      timestamp: Date.now(),
+    });
+
+    // Session TTL should have been refreshed by the delivery callback
+    expect(session.expiresAt).toBeGreaterThan(shortExpiry);
+  });
 });

@@ -533,4 +533,145 @@ describe('NotificationBatcher', () => {
     // Batcher no longer truncates — full text is passed to adapter for chunking
     expect(adapter.sentMessages[0].text).toContain(longBody);
   });
+
+  // ── Delivery callback ─────────────────────────────────────
+
+  it('invokes delivery callback after sending notifications', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    const deliveryCb = vi.fn();
+    bridge.setDeliveryCallback(deliveryCb);
+
+    bridge.queueEvent(createEvent({ category: 'agent_crashed' }));
+
+    expect(adapter.sentMessages).toHaveLength(1);
+    expect(deliveryCb).toHaveBeenCalledWith('chat-1');
+  });
+
+  it('invokes delivery callback for each subscribed chat', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+    bridge.subscribe('chat-2', 'project-1');
+
+    const deliveryCb = vi.fn();
+    bridge.setDeliveryCallback(deliveryCb);
+
+    bridge.queueEvent(createEvent({ category: 'agent_crashed' }));
+
+    expect(deliveryCb).toHaveBeenCalledTimes(2);
+    expect(deliveryCb).toHaveBeenCalledWith('chat-1');
+    expect(deliveryCb).toHaveBeenCalledWith('chat-2');
+  });
+
+  it('does not fail when no delivery callback is set', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    // No callback set — should not throw
+    bridge.queueEvent(createEvent({ category: 'agent_crashed' }));
+    expect(adapter.sentMessages).toHaveLength(1);
+  });
+
+  // ── Critical Event Rate Limiting ─────────────────────────
+
+  it('rate-limits critical events to prevent crash-loop flooding', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    // First 3 crash events should flush immediately
+    for (let i = 1; i <= 3; i++) {
+      bridge.queueEvent(createEvent({
+        category: 'agent_crashed',
+        title: `Crash ${i}`,
+      }));
+      expect(adapter.sentMessages).toHaveLength(i);
+    }
+
+    // 4th crash event should NOT flush immediately (rate-limited)
+    bridge.queueEvent(createEvent({
+      category: 'agent_crashed',
+      title: 'Crash 4',
+    }));
+    expect(adapter.sentMessages).toHaveLength(3); // still 3
+
+    // But the event is preserved and flushed after the batch window
+    vi.advanceTimersByTime(NotificationBatcher.BATCH_WINDOW_MS + 100);
+    expect(adapter.sentMessages).toHaveLength(4);
+    expect(adapter.sentMessages[3].text).toContain('Crash 4');
+  });
+
+  it('rate-limits per project and per category independently', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+    bridge.subscribe('chat-1', 'project-2');
+
+    // 3 crashes for project-1 (at limit)
+    for (let i = 0; i < 3; i++) {
+      bridge.queueEvent(createEvent({
+        category: 'agent_crashed',
+        projectId: 'project-1',
+        title: `P1 crash ${i}`,
+      }));
+    }
+    expect(adapter.sentMessages).toHaveLength(3);
+
+    // Different project should have its own bucket
+    bridge.queueEvent(createEvent({
+      category: 'agent_crashed',
+      projectId: 'project-2',
+      title: 'P2 crash',
+    }));
+    expect(adapter.sentMessages).toHaveLength(4);
+  });
+
+  it('rate limit resets after the window expires', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    // Exhaust the limit
+    for (let i = 0; i < 3; i++) {
+      bridge.queueEvent(createEvent({
+        category: 'agent_crashed',
+        title: `Crash ${i}`,
+      }));
+    }
+    expect(adapter.sentMessages).toHaveLength(3);
+
+    // 4th is rate-limited, flush via batch window
+    bridge.queueEvent(createEvent({ category: 'agent_crashed', title: 'Crash 3' }));
+    vi.advanceTimersByTime(NotificationBatcher.BATCH_WINDOW_MS + 100);
+    expect(adapter.sentMessages).toHaveLength(4);
+
+    // Advance past the rate limit window
+    vi.advanceTimersByTime(NotificationBatcher.CRITICAL_RATE_WINDOW_MS);
+
+    // Now crashes should flush immediately again
+    bridge.queueEvent(createEvent({ category: 'agent_crashed', title: 'Crash after reset' }));
+    expect(adapter.sentMessages).toHaveLength(5);
+  });
+
+  it('decision_needs_approval also respects rate limit', () => {
+    const adapter = createMockAdapter();
+    bridge.addAdapter(adapter);
+    bridge.subscribe('chat-1', 'project-1');
+
+    for (let i = 0; i < 3; i++) {
+      bridge.queueEvent(createEvent({
+        category: 'decision_needs_approval',
+        title: `Decision ${i}`,
+      }));
+    }
+    expect(adapter.sentMessages).toHaveLength(3);
+
+    // 4th is rate-limited
+    bridge.queueEvent(createEvent({ category: 'decision_needs_approval', title: 'Decision 3' }));
+    expect(adapter.sentMessages).toHaveLength(3);
+  });
 });
