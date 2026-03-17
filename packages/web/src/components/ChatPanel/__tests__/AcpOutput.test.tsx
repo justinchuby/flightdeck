@@ -301,10 +301,13 @@ describe('AcpOutput', () => {
     );
   });
 
-  it('does NOT call apiFetch when messages already exist', async () => {
+  it('fetches history even when messages already exist (merge behavior)', async () => {
     seedAgent([makeMsg('Already here', 'agent', 1000)]);
     await renderAcpOutput();
-    expect(mockApiFetch).not.toHaveBeenCalled();
+    // With the always-fetch-and-merge behavior, apiFetch IS called to load DB history
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/agents/'),
+    );
   });
 
   /* ---------- System message filtering ---------- */

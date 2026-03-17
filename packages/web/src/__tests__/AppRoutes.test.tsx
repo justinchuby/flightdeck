@@ -366,12 +366,19 @@ describe('AppRoutes – ProjectRedirect behavior', () => {
   });
 
   it('/lead with a selected lead ID redirects to project session', async () => {
-    mockSelectedLeadId = 'project:proj-42';
+    mockSelectedLeadId = 'lead-agent-42';
+    useAppStore.setState({
+      agents: [
+        { id: 'lead-agent-42', role: { id: 'lead' }, parentId: undefined, status: 'running', projectId: 'proj-42' },
+      ] as any,
+      selectedAgentId: null,
+      systemPaused: false,
+      connected: true,
+      loading: false,
+    });
 
     renderApp('/lead');
     await waitFor(() => {
-      // ProjectRedirect extracts "proj-42" from "project:proj-42"
-      // and redirects to /projects/proj-42/session
       expect(screen.getByTestId('project-layout')).toBeInTheDocument();
       expect(screen.getByTestId('mock-LeadDashboard')).toBeInTheDocument();
     });
@@ -400,7 +407,16 @@ describe('AppRoutes – ProjectRedirect behavior', () => {
   });
 
   it('/overview redirects using ProjectRedirect', async () => {
-    mockSelectedLeadId = 'project:my-proj';
+    mockSelectedLeadId = 'lead-my-proj';
+    useAppStore.setState({
+      agents: [
+        { id: 'lead-my-proj', role: { id: 'lead' }, parentId: undefined, status: 'running', projectId: 'my-proj' },
+      ] as any,
+      selectedAgentId: null,
+      systemPaused: false,
+      connected: true,
+      loading: false,
+    });
 
     renderApp('/overview');
     await waitFor(() => {
@@ -409,7 +425,16 @@ describe('AppRoutes – ProjectRedirect behavior', () => {
   });
 
   it('/tasks redirects to project tasks via ProjectRedirect', async () => {
-    mockSelectedLeadId = 'project:proj-1';
+    mockSelectedLeadId = 'lead-proj-1';
+    useAppStore.setState({
+      agents: [
+        { id: 'lead-proj-1', role: { id: 'lead' }, parentId: undefined, status: 'running', projectId: 'proj-1' },
+      ] as any,
+      selectedAgentId: null,
+      systemPaused: false,
+      connected: true,
+      loading: false,
+    });
 
     renderApp('/tasks');
     await waitFor(() => {

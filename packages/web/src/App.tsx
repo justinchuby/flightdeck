@@ -73,11 +73,7 @@ function ProjectRedirect({ page }: { page: string }) {
       const firstLead = agents.find((a) => a.role?.id === 'lead' && !a.parentId);
       return firstLead?.projectId ?? firstLead?.id ?? null;
     }
-    // If selectedLeadId is a project: prefix, extract the ID
-    if (selectedLeadId.startsWith('project:')) {
-      return selectedLeadId.slice('project:'.length);
-    }
-    // Otherwise it's a lead agent ID — find its projectId
+    // selectedLeadId is always a real agent UUID — find its projectId
     const lead = agents.find((a) => a.id === selectedLeadId);
     return lead?.projectId ?? selectedLeadId;
   }, [selectedLeadId, agents]);
@@ -95,9 +91,6 @@ function _HomeRedirect() {
 
   const projectId = useMemo(() => {
     if (selectedLeadId) {
-      if (selectedLeadId.startsWith('project:')) {
-        return selectedLeadId.slice('project:'.length);
-      }
       const lead = agents.find((a) => a.id === selectedLeadId);
       return lead?.projectId ?? selectedLeadId;
     }
@@ -287,16 +280,8 @@ function AppContent() {
     queryFn: async ({ signal }) => {
       const projects: Project[] = await apiFetch('/projects', { signal });
       if (!Array.isArray(projects)) return [];
-      const store = useLeadStore.getState();
-      for (const proj of projects) {
-        if (proj.status === 'archived') continue;
-        const key = `project:${proj.id}`;
-        store.addProject(key);
-      }
-      if (!store.selectedLeadId && projects.length > 0) {
-        const first = projects.find((p) => p.status !== 'archived');
-        if (first) store.selectLead(`project:${first.id}`);
-      }
+      // Projects are discovered via ProjectLayout when the user navigates.
+      // No need to pre-populate leadStore with project:xxx keys.
       return projects;
     },
     staleTime: 30_000,

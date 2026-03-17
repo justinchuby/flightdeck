@@ -9,7 +9,7 @@ const EMPTY_REPORTS: AgentReport[] = [];
 
 export function useCatchUpSummary(
   selectedLeadId: string | null,
-  effectiveLeadId: string | null | undefined,
+  _effectiveLeadId: string | null | undefined,
   agents: Array<{ id: string; parentId?: string; status: string }>,
   currentProject: { decisions?: Decision[]; comms?: AgentComm[]; agentReports?: AgentReport[] } | null,
 ) {
@@ -41,7 +41,7 @@ export function useCatchUpSummary(
   useEffect(() => {
     if (!currentProject) return;
     const currentCounts = {
-      tasks: agents.filter(a => a.parentId === effectiveLeadId && (a.status === 'completed' || a.status === 'failed')).length,
+      tasks: agents.filter(a => a.parentId === selectedLeadId && (a.status === 'completed' || a.status === 'failed')).length,
       decisions: (currentProject.decisions ?? EMPTY_DECISIONS).filter((d: Decision) => d.needsConfirmation && d.status === 'recorded').length,
       comms: (currentProject.comms ?? EMPTY_COMMS).length,
       reports: (currentProject.agentReports ?? EMPTY_REPORTS).length,

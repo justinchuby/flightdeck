@@ -187,10 +187,10 @@ describe('SidebarTabs — extra coverage', () => {
       expect(screen.getByTestId('groups-panel')).toBeTruthy();
     });
 
-    it('groups tab handles project: prefix in selectedLeadId', () => {
+    it('groups tab handles null leadAgent gracefully', () => {
       const props = makeProps();
       props.tabs.activeTab = 'groups';
-      props.selectedLeadId = 'project:abc123';
+      props.selectedLeadId = 'lead-abc123';
       props.leadAgent = undefined;
       render(<SidebarTabs {...props} />);
       expect(screen.getByTestId('groups-panel')).toBeTruthy();

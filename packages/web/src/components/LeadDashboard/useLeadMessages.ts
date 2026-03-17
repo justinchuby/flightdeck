@@ -83,14 +83,10 @@ export function useLeadMessages(
     };
   }, [selectedLeadId, ws, readOnly, chatInitialScroll]);
 
-  // Load message history for selected lead (if store is empty)
+  // Load message history for selected lead — always fetch + merge with live WS messages
   const selectedProj = selectedLeadId ? projects[selectedLeadId] : null;
-  const needsHistory = !!selectedLeadId && (!selectedProj || selectedProj.messages.length === 0);
-  const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
   const msgApiPath = selectedLeadId
-    ? isHistorical
-      ? `/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-      : `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
+    ? `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
     : '';
 
   useQuery({
@@ -108,11 +104,16 @@ export function useLeadMessages(
         const current = useLeadStore.getState().projects[selectedLeadId!];
         if (!current || current.messages.length === 0) {
           useLeadStore.getState().setMessages(selectedLeadId!, msgs);
+        } else {
+          // Merge: DB history first, then any live WS messages newer than the latest historical
+          const latestHistTs = Math.max(...msgs.map((m) => m.timestamp ?? 0));
+          const liveOnly = current.messages.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+          useLeadStore.getState().setMessages(selectedLeadId!, [...msgs, ...liveOnly]);
         }
       }
       return data;
     },
-    enabled: needsHistory,
+    enabled: !!selectedLeadId,
     staleTime: 60_000,
   });
 }
