@@ -111,7 +111,6 @@ export const useLeadStore = create<LeadState>((set) => ({
       // Merge: keep target data if non-empty, otherwise take from source
       const merged: ProjectState = {
         ...source,
-        messages: target.messages.length > 0 ? target.messages : source.messages,
         decisions: target.decisions.length > 0 ? target.decisions : source.decisions,
         activity: target.activity.length > 0 ? target.activity : source.activity,
         comms: target.comms.length > 0 ? target.comms : source.comms,

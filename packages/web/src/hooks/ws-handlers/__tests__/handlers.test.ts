@@ -78,12 +78,40 @@ function makeCtx(agents: any[] = []): WsHandlerContext {
     addPendingDecision: vi.fn(),
     removePendingDecision: vi.fn(),
   };
+  const channels: Record<string, any[]> = {};
   return {
     setAgents: vi.fn(),
     addAgent: vi.fn(),
     updateAgent: vi.fn(),
     getAppState: () => state,
     pendingNewlineRef: { current: new Set<string>() },
+    messageStore: {
+      ensureChannel: vi.fn((id: string) => { if (!channels[id]) channels[id] = []; }),
+      addMessage: vi.fn((id: string, msg: any) => { if (!channels[id]) channels[id] = []; channels[id].push(msg); }),
+      setMessages: vi.fn((id: string, msgs: any[]) => { channels[id] = msgs; }),
+      appendToLastAgentMessage: vi.fn((id: string, text: string) => {
+        if (!channels[id]) channels[id] = [];
+        const msgs = channels[id];
+        const last = msgs[msgs.length - 1];
+        if (last && last.sender === 'agent') {
+          last.text = (last.text || '') + text;
+        } else {
+          msgs.push({ type: 'text', text, sender: 'agent', timestamp: Date.now() });
+        }
+      }),
+      appendToThinkingMessage: vi.fn((id: string, text: string) => {
+        if (!channels[id]) channels[id] = [];
+        const msgs = channels[id];
+        const last = msgs[msgs.length - 1];
+        if (last && last.sender === 'thinking') {
+          last.text = (last.text || '') + text;
+        } else {
+          msgs.push({ type: 'text', text, sender: 'thinking', timestamp: Date.now() });
+        }
+      }),
+      setPendingNewline: vi.fn(),
+      getMessages: vi.fn((id: string) => channels[id] ?? []),
+    },
   };
 }
 
@@ -175,27 +203,28 @@ describe('agentStatusHandlers', () => {
 
 describe('agentTextHandlers', () => {
   it('handleAgentText appends to existing agent message', () => {
-    const ctx = makeCtx([{ id: 'a1', messages: [{ type: 'text', text: 'hello', sender: 'agent', timestamp: 1 }] }]);
+    const ctx = makeCtx([{ id: 'a1', messages: [] }]);
+    // Pre-populate messageStore with an existing agent message
+    ctx.messageStore.ensureChannel('a1');
+    ctx.messageStore.addMessage('a1', { type: 'text', text: 'hello', sender: 'agent', timestamp: 1 });
+    vi.clearAllMocks();
+
     handleAgentText({ agentId: 'a1', text: ' world' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ text: 'hello world' })],
-    });
+    expect(ctx.messageStore.ensureChannel).toHaveBeenCalledWith('a1');
+    expect(ctx.messageStore.appendToLastAgentMessage).toHaveBeenCalledWith('a1', ' world');
   });
 
   it('handleAgentText creates new message when no existing', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [] }]);
     handleAgentText({ agentId: 'a1', text: 'first' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ text: 'first', sender: 'agent' })],
-    });
+    expect(ctx.messageStore.ensureChannel).toHaveBeenCalledWith('a1');
+    expect(ctx.messageStore.appendToLastAgentMessage).toHaveBeenCalledWith('a1', 'first');
   });
 
   it('handleAgentText normalizes object text', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [] }]);
     handleAgentText({ agentId: 'a1', text: { text: 'from obj' } }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ text: 'from obj' })],
-    });
+    expect(ctx.messageStore.appendToLastAgentMessage).toHaveBeenCalledWith('a1', 'from obj');
   });
 
   it('handleResponseStart sets pending newline flag', () => {
@@ -207,9 +236,8 @@ describe('agentTextHandlers', () => {
   it('handleAgentContent pushes content message', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [] }]);
     handleAgentContent({ agentId: 'a1', content: { text: 'img', contentType: 'image', mimeType: 'image/png', data: 'base64' } }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ contentType: 'image', mimeType: 'image/png' })],
-    });
+    expect(ctx.messageStore.ensureChannel).toHaveBeenCalledWith('a1');
+    expect(ctx.messageStore.addMessage).toHaveBeenCalledWith('a1', expect.objectContaining({ contentType: 'image', mimeType: 'image/png' }));
   });
 });
 
@@ -219,31 +247,31 @@ describe('agentThinkingHandlers', () => {
   it('handleAgentThinking creates thinking message', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [] }]);
     handleAgentThinking({ agentId: 'a1', text: 'reasoning...' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ text: 'reasoning...', sender: 'thinking' })],
-    });
+    expect(ctx.messageStore.ensureChannel).toHaveBeenCalledWith('a1');
+    expect(ctx.messageStore.appendToThinkingMessage).toHaveBeenCalledWith('a1', 'reasoning...');
   });
 
   it('handleAgentThinking appends to existing thinking message', () => {
-    const ctx = makeCtx([{ id: 'a1', messages: [{ type: 'text', text: 'part1', sender: 'thinking', timestamp: 1 }] }]);
+    const ctx = makeCtx([{ id: 'a1', messages: [] }]);
+    // Pre-populate messageStore with an existing thinking message
+    ctx.messageStore.ensureChannel('a1');
+    ctx.messageStore.appendToThinkingMessage('a1', 'part1');
+    vi.clearAllMocks();
+
     handleAgentThinking({ agentId: 'a1', text: 'part2' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ text: 'part1part2' })],
-    });
+    expect(ctx.messageStore.appendToThinkingMessage).toHaveBeenCalledWith('a1', 'part2');
   });
 
   it('handleAgentThinking normalizes object text', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [] }]);
     handleAgentThinking({ agentId: 'a1', text: { text: 'thinking obj' } }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
-      messages: [expect.objectContaining({ text: 'thinking obj' })],
-    });
+    expect(ctx.messageStore.appendToThinkingMessage).toHaveBeenCalledWith('a1', 'thinking obj');
   });
 
   it('handleAgentThinking skips empty text', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [] }]);
     handleAgentThinking({ agentId: 'a1', text: '' }, ctx);
-    expect(ctx.updateAgent).not.toHaveBeenCalled();
+    expect(ctx.messageStore.appendToThinkingMessage).not.toHaveBeenCalled();
   });
 });
 
@@ -282,10 +310,10 @@ describe('toolCallHandlers', () => {
   it('handleToolCall adds new tool call and message', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [], toolCalls: [] }]);
     handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc1', title: 'bash', status: 'running', kind: 'bash' } }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', expect.objectContaining({
+    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
       toolCalls: [expect.objectContaining({ toolCallId: 'tc1' })],
-      messages: [expect.objectContaining({ sender: 'tool' })],
-    }));
+    });
+    expect(ctx.messageStore.setMessages).toHaveBeenCalledWith('a1', [expect.objectContaining({ sender: 'tool', toolCallId: 'tc1' })]);
   });
 
   it('handleToolCall sets pending newline flag', () => {
@@ -297,8 +325,10 @@ describe('toolCallHandlers', () => {
   it('handleToolCall only updates toolCalls when status unchanged', () => {
     const ctx = makeCtx([{ id: 'a1', messages: [], toolCalls: [{ toolCallId: 'tc1', status: 'running' }] }]);
     handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc1', title: 'test', status: 'running' } }, ctx);
-    const call = (ctx.updateAgent as any).mock.calls[0][1];
-    expect(call.messages).toBeUndefined();
+    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
+      toolCalls: [expect.objectContaining({ toolCallId: 'tc1' })],
+    });
+    expect(ctx.messageStore.setMessages).not.toHaveBeenCalled();
   });
 });
 
@@ -311,8 +341,8 @@ describe('messagingHandlers', () => {
       { id: 'to1', messages: [] },
     ]);
     handleMessageSent({ from: 'from1', to: 'to1', fromRole: 'Dev', content: 'hello' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('to1', expect.objectContaining({
-      messages: [expect.objectContaining({ text: expect.stringContaining('📨') })],
+    expect(ctx.messageStore.addMessage).toHaveBeenCalledWith('to1', expect.objectContaining({
+      text: expect.stringContaining('📨'),
     }));
   });
 
@@ -322,16 +352,16 @@ describe('messagingHandlers', () => {
       { id: 'to1', messages: [], role: { name: 'Arch' } },
     ]);
     handleMessageSent({ from: 'from1', to: 'to1', content: 'hello' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('from1', expect.objectContaining({
-      messages: [expect.objectContaining({ text: expect.stringContaining('📤') })],
+    expect(ctx.messageStore.addMessage).toHaveBeenCalledWith('from1', expect.objectContaining({
+      text: expect.stringContaining('📤'),
     }));
   });
 
   it('handleMessageSent from system uses system sender', () => {
     const ctx = makeCtx([{ id: 'to1', messages: [] }]);
     handleMessageSent({ from: 'system', to: 'to1', content: 'info' }, ctx);
-    expect(ctx.updateAgent).toHaveBeenCalledWith('to1', expect.objectContaining({
-      messages: [expect.objectContaining({ sender: 'system', text: expect.stringContaining('⚙️') })],
+    expect(ctx.messageStore.addMessage).toHaveBeenCalledWith('to1', expect.objectContaining({
+      sender: 'system', text: expect.stringContaining('⚙️'),
     }));
   });
 });

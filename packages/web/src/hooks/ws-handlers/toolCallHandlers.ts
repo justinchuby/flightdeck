@@ -20,11 +20,12 @@ export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
   const tc = msg.toolCall;
   const prevTc = idx >= 0 ? calls[idx] : undefined;
   if (!prevTc || prevTc.status !== tc.status) {
-    const msgs = [...(existing?.messages ?? [])];
+    const ms = ctx.messageStore;
+    ms.ensureChannel(msg.agentId);
+    const msgs = [...ms.getMessages(msg.agentId)];
     const statusIcon = tc.status === 'completed' ? '✓' : tc.status === 'cancelled' ? '✗' : '⟳';
     const title = typeof tc.title === 'string' ? tc.title : String(tc.title);
 
-    // Find existing message with same toolCallId and update in-place
     const existingMsgIdx = msgs.findIndex(
       (m: any) => m.sender === 'tool' && m.toolCallId === tc.toolCallId,
     );
@@ -46,8 +47,7 @@ export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
         toolKind: tc.kind,
       });
     }
-    ctx.updateAgent(msg.agentId, { toolCalls: updated, messages: msgs });
-  } else {
-    ctx.updateAgent(msg.agentId, { toolCalls: updated });
+    ms.setMessages(msg.agentId, msgs);
   }
+  ctx.updateAgent(msg.agentId, { toolCalls: updated });
 }

@@ -307,11 +307,11 @@ describe('AcpOutput', () => {
     );
   });
 
-  it('fetches history even when messages already exist (merge behavior)', async () => {
+  it('skips history fetch when messages already exist', async () => {
     seedAgent([makeMsg('Already here', 'agent', 1000)]);
     await renderAcpOutput();
-    // With the always-fetch-and-merge behavior, apiFetch IS called to load DB history
-    expect(mockApiFetch).toHaveBeenCalledWith(
+    // With messageStore, we skip fetch when messages already exist
+    expect(mockApiFetch).not.toHaveBeenCalledWith(
       expect.stringContaining('/agents/'),
     );
   });

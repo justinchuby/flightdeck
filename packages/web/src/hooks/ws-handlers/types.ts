@@ -21,6 +21,16 @@ export interface WsHandlerContext {
   };
   /** Mutable ref tracking agents needing a newline before next text append */
   pendingNewlineRef: { current: Set<string> };
+  /** Message store operations for per-agent message channels */
+  messageStore: {
+    ensureChannel: (agentId: string) => void;
+    addMessage: (agentId: string, msg: AcpTextChunk) => void;
+    setMessages: (agentId: string, msgs: AcpTextChunk[]) => void;
+    appendToLastAgentMessage: (agentId: string, text: string) => void;
+    appendToThinkingMessage: (agentId: string, text: string) => void;
+    setPendingNewline: (agentId: string, value: boolean) => void;
+    getMessages: (agentId: string) => AcpTextChunk[];
+  };
 }
 
 /** A WS message handler processes one or more message types */

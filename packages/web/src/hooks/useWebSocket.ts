@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useMessageStore } from '../stores/messageStore';
 import type { WsMessage } from '../types';
 import { getAuthToken } from './useApi';
 import { createMessageDispatcher, type WsHandlerContext } from './ws-handlers';
@@ -44,6 +45,15 @@ export function useWebSocket() {
       updateAgent: (...args) => useAppStore.getState().updateAgent(...args),
       getAppState: () => useAppStore.getState(),
       pendingNewlineRef,
+      messageStore: {
+        ensureChannel: (id) => useMessageStore.getState().ensureChannel(id),
+        addMessage: (id, msg) => useMessageStore.getState().addMessage(id, msg),
+        setMessages: (id, msgs) => useMessageStore.getState().setMessages(id, msgs),
+        appendToLastAgentMessage: (id, text) => useMessageStore.getState().appendToLastAgentMessage(id, text),
+        appendToThinkingMessage: (id, text) => useMessageStore.getState().appendToThinkingMessage(id, text),
+        setPendingNewline: (id, v) => useMessageStore.getState().setPendingNewline(id, v),
+        getMessages: (id) => useMessageStore.getState().channels[id]?.messages ?? [],
+      },
     };
     const dispatch = createMessageDispatcher(ctx);
 

@@ -43,9 +43,9 @@ export function handleAgentStatus(msg: any, ctx: WsHandlerContext): void {
 
   // When agent transitions from idle back to running, insert a turn separator.
   if (msg.status === 'running' && wasIdle) {
-    const existing = ctx.getAppState().agents.find((a: any) => a.id === msg.agentId);
-    if (existing?.messages?.length) {
-      const msgs = [...existing.messages];
+    const ms = ctx.messageStore;
+    const msgs = [...ms.getMessages(msg.agentId)];
+    if (msgs.length > 0) {
       const last = msgs[msgs.length - 1];
       if (last?.sender === 'agent') {
         const separator: AcpTextChunk = { type: 'text', text: '---', sender: 'system' };
@@ -59,7 +59,7 @@ export function handleAgentStatus(msg: any, ctx: WsHandlerContext): void {
         } else {
           msgs.push(separator);
         }
-        ctx.updateAgent(msg.agentId, { messages: msgs });
+        ms.setMessages(msg.agentId, msgs);
       }
     }
   }
