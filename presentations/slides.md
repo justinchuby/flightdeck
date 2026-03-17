@@ -18,6 +18,8 @@ fonts:
 
 <div class="text-center max-w-3xl mx-auto">
 
+<div class="text-4xl font-bold text-blue-400 mb-6">Flightdeck</div>
+
 <div class="text-2xl text-gray-100 leading-relaxed font-light">
 
 *"What if AIs could work together like a real engineering team?"*
@@ -465,7 +467,21 @@ layout: center
 
 <div class="space-y-4 text-center">
 
-<div class="text-sm text-gray-300">Built with Copilot. Open source.</div>
+<div class="text-3xl font-bold text-blue-400">Flightdeck</div>
+
+<div class="text-sm text-gray-300 mt-2">Multi-agent AI development. Built with Copilot. Open source.</div>
+
+<div class="bg-gray-800 rounded-lg p-4 border border-gray-700 mt-6 text-sm inline-block mx-auto">
+
+```bash
+npm install -g @flightdeck-ai/flightdeck && flightdeck
+# Or from source:
+git clone https://github.com/justinchuby/flightdeck.git
+```
+
+</div>
+
+<div class="text-gray-500 mt-4">github.com/justinchuby/flightdeck</div>
 
 <div class="text-lg mt-6">**Questions?**</div>
 
