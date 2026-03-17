@@ -1,5 +1,10 @@
 // Domain types — barrel export
 export {
+  type Branded,
+  AgentId, ProjectId, SessionId, TaskId, MessageId, DelegationId, DecisionId,
+  isValidId,
+} from './entityIds.js';
+export {
   PROVIDER_REGISTRY, PROVIDER_IDS,
   getProvider, getAllProviders, isValidProviderId,
   type ProviderId, type ProviderDefinition, type ProviderColors,
