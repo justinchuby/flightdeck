@@ -191,6 +191,18 @@ describe('POST /integrations/telegram/validate-token', () => {
     expect(body.error).toContain('botToken is required');
   });
 
+  it('rejects malformed token format', async () => {
+    const res = await fetch(`${baseUrl}/integrations/telegram/validate-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botToken: '../../../etc/passwd' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.valid).toBe(false);
+    expect(body.error).toContain('Invalid token format');
+  });
+
   it('returns valid: false for invalid token', async () => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = vi.fn().mockResolvedValueOnce({
@@ -201,7 +213,7 @@ describe('POST /integrations/telegram/validate-token', () => {
       const res = await realFetch(`${baseUrl}/integrations/telegram/validate-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botToken: 'invalid-token' }),
+        body: JSON.stringify({ botToken: '123456:InvalidTokenXyz' }),
       });
       const body = await res.json();
       expect(body.valid).toBe(false);
@@ -224,7 +236,7 @@ describe('POST /integrations/telegram/validate-token', () => {
       const res = await realFetch(`${baseUrl}/integrations/telegram/validate-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botToken: 'valid-token-here' }),
+        body: JSON.stringify({ botToken: '123456:ValidTokenHere_abc' }),
       });
       const body = await res.json();
       expect(body.valid).toBe(true);
@@ -244,7 +256,7 @@ describe('POST /integrations/telegram/validate-token', () => {
       const res = await realFetch(`${baseUrl}/integrations/telegram/validate-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botToken: 'some-token' }),
+        body: JSON.stringify({ botToken: '123456:SomeToken_abc' }),
       });
       const body = await res.json();
       expect(body.valid).toBe(false);

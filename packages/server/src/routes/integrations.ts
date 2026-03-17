@@ -254,8 +254,13 @@ export function integrationRoutes(ctx: AppContext): Router {
         return res.status(400).json({ valid: false, error: 'botToken is required' });
       }
 
-      // Call Telegram Bot API directly — no adapter needed for validation
-      const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+      // Call Telegram Bot API directly — no adapter needed for validation.
+      // Validate token format (digits:alphanumeric) to prevent URL injection.
+      if (!/^\d+:[A-Za-z0-9_-]+$/.test(botToken)) {
+        return res.json({ valid: false, error: 'Invalid token format. Expected format: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11' });
+      }
+
+      const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(botToken)}/getMe`);
       const data = await response.json() as {
         ok: boolean;
         result?: { id: number; is_bot: boolean; first_name: string; username?: string };
