@@ -722,24 +722,12 @@ describe('CommandDispatcher', () => {
         leadAgent.cwd,
         undefined, // options (non-lead, no projectName)
       );
-      // Memory stores task but NOT model (model is already in crew roster)
+      // Memory stores model
       expect(ctx.agentMemory.store).toHaveBeenCalledWith(
         leadAgent.id,
         newChild.id,
-        'task',
-        'build',
-      );
-      expect(ctx.agentMemory.store).not.toHaveBeenCalledWith(
-        leadAgent.id,
-        newChild.id,
         'model',
-        expect.anything(),
-      );
-      expect(ctx.agentMemory.store).not.toHaveBeenCalledWith(
-        leadAgent.id,
-        newChild.id,
-        'role',
-        expect.anything(),
+        'claude-opus-4',
       );
     });
   });

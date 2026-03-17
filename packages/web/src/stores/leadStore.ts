@@ -71,7 +71,6 @@ interface LeadState {
 
   selectLead: (id: string | null) => void;
   addProject: (id: string) => void;
-  migrateProject: (fromId: string, toId: string) => void;
   removeProject: (id: string) => void;
   setDraft: (leadId: string, text: string) => void;
 
@@ -111,30 +110,6 @@ export const useLeadStore = create<LeadState>((set) => ({
     set((s) => {
       if (s.projects[id]) return s;
       return { projects: { ...s.projects, [id]: emptyProject() } };
-    }),
-
-  migrateProject: (fromId, toId) =>
-    set((s) => {
-      const source = s.projects[fromId];
-      if (!source || fromId === toId) return s;
-      const target = s.projects[toId] ?? emptyProject();
-      // Merge: keep target data if non-empty, otherwise take from source
-      const merged: ProjectState = {
-        ...source,
-        messages: target.messages.length > 0 ? target.messages : source.messages,
-        decisions: target.decisions.length > 0 ? target.decisions : source.decisions,
-        activity: target.activity.length > 0 ? target.activity : source.activity,
-        comms: target.comms.length > 0 ? target.comms : source.comms,
-        agentReports: target.agentReports.length > 0 ? target.agentReports : source.agentReports,
-        groups: target.groups.length > 0 ? target.groups : source.groups,
-        groupMessages: Object.keys(target.groupMessages).length > 0 ? target.groupMessages : source.groupMessages,
-        dagStatus: target.dagStatus ?? source.dagStatus,
-        progress: target.progress ?? source.progress,
-        progressSummary: target.progressSummary ?? source.progressSummary,
-        progressHistory: target.progressHistory.length > 0 ? target.progressHistory : source.progressHistory,
-      };
-      const { [fromId]: _, ...rest } = s.projects;
-      return { projects: { ...rest, [toId]: merged } };
     }),
 
   removeProject: (id) =>

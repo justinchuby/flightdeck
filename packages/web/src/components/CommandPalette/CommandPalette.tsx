@@ -125,7 +125,7 @@ function buildActionItems(
       keywords: ['export', 'save', 'download', 'session'],
       action: async () => {
         const leadId = useLeadStore.getState().selectedLeadId;
-        if (!leadId || leadId.startsWith('project:')) {
+        if (!leadId) {
           alert('Select an active project first');
           onClose();
           return;

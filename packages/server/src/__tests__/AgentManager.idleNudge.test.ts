@@ -14,7 +14,7 @@ interface MockAgent {
   id: string;
   parentId: string | undefined;
   status: string;
-  isResuming: boolean;
+  _isResuming: boolean;
   sendMessage: Mock;
 }
 
@@ -54,7 +54,7 @@ class IdleNudgeTracker {
       this.clearTimer(agent.id);
     }
 
-    if (status === 'idle' && agent.parentId && !agent.isResuming) {
+    if (status === 'idle' && agent.parentId && !agent._isResuming) {
       if (!this.timers.has(agent.id)) {
         const timer = setTimeout(() => {
           this.timers.delete(agent.id);
@@ -116,7 +116,7 @@ describe('Idle nudge timer', () => {
       id: 'agent-dev-001',
       parentId: 'agent-lead-001',
       status: 'running',
-      isResuming: false,
+      _isResuming: false,
       sendMessage: vi.fn(),
     };
     tracker.registerAgent(agent);

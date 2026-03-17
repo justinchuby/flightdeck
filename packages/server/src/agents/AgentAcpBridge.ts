@@ -165,7 +165,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent._notifySessionReady(sessionId);
     if (initialPrompt) {
       // Fresh agent — clear resume flag (it's false anyway) and start prompting.
-      agent._clearResuming();
+      agent._isResuming = false;
       return conn.prompt(initialPrompt);
     }
     // Resumed agents have no initial prompt — they're waiting for input.
@@ -177,8 +177,8 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent.status = 'idle';
     agent._notifyStatusChange(agent.status);
     // Clear AFTER session-ready and idle notifications have fired synchronously,
-    // so all resume-suppression guards see isResuming === true.
-    agent._clearResuming();
+    // so all resume-suppression guards see _isResuming === true.
+    agent._isResuming = false;
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
     logger.error({ module: 'agent-bridge', msg: 'Adapter start failed', err: errorMsg, backend, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
@@ -188,9 +188,6 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
 
     // Store error for exit event (text pipeline is buffered, races with immediate exit)
     agent.exitError = errorMsg;
-
-    // Clear resume flag so notification guards don't stay permanently suppressed
-    agent._clearResuming();
 
     agent.status = 'failed';
     agent._notifyExit(1);
@@ -203,7 +200,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     runWithAgentContext(agent.id, agent.role.name, agent.projectId, fn);
 
   conn.on('text', (text: string) => withCtx(() => {
-    if (agent._isTerminated || agent.isResuming) return;
+    if (agent._isTerminated || agent._isResuming) return;
     agent.messages.push(text);
     if (agent.messages.length > agent._maxMessages) {
       agent.messages = agent.messages.slice(-agent._maxMessages);
@@ -214,17 +211,17 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('content', (content: any) => withCtx(() => {
-    if (agent.isResuming) return;
+    if (agent._isResuming) return;
     agent._notifyContent(content);
   }));
 
   conn.on('thinking', (text: string) => withCtx(() => {
-    if (agent.isResuming) return;
+    if (agent._isResuming) return;
     agent._notifyThinking(text);
   }));
 
   conn.on('tool_call', (info: ToolCallInfo) => withCtx(() => {
-    if (agent._isTerminated || agent.isResuming) return;
+    if (agent._isTerminated || agent._isResuming) return;
     const idx = agent.toolCalls.findIndex((t) => t.toolCallId === info.toolCallId);
     if (idx >= 0) {
       agent.toolCalls[idx] = info;
@@ -238,7 +235,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('tool_call_update', (update: Partial<ToolCallInfo> & { toolCallId: string }) => withCtx(() => {
-    if (agent.isResuming) return;
+    if (agent._isResuming) return;
     const idx = agent.toolCalls.findIndex((t) => t.toolCallId === update.toolCallId);
     if (idx >= 0) {
       agent.toolCalls[idx] = { ...agent.toolCalls[idx], ...update };
@@ -316,7 +313,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     if (active) {
       // If the provider resumes an in-flight prompt from the previous session,
       // cancel it immediately — resumed agents must start idle.
-      if (agent.isResuming) {
+      if (agent._isResuming) {
         conn.cancel().catch(() => { /* best-effort */ });
         return;
       }

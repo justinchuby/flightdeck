@@ -176,12 +176,11 @@ export function AcpOutput({ agentId }: Props) {
   const plan = agent?.plan ?? [];
   const messages = agent?.messages ?? [];
 
-  // Fetch message history when agent panel opens.
-  // Track whether history has been loaded to avoid redundant fetches.
-  const historyLoadedRef = useRef<string | null>(null);
+  // Fetch message history when agent panel opens — always merge with live WS messages
+  const historyFetchedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!agentId || historyLoadedRef.current === agentId) return;
-    historyLoadedRef.current = agentId;
+    if (!agentId || historyFetchedRef.current === agentId) return;
+    historyFetchedRef.current = agentId;
     apiFetch<{ messages: Array<{ sender?: string; content?: string; text?: string; timestamp?: number }> }>(`/agents/${agentId}/messages?limit=200`)
       .then((data) => {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
@@ -192,16 +191,13 @@ export function AcpOutput({ agentId }: Props) {
             timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
           }));
           const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
-          const existingMsgs = existing?.messages ?? [];
-          if (existingMsgs.length === 0) {
+          if (!existing?.messages?.length) {
             useAppStore.getState().updateAgent(agentId, { messages: msgs });
           } else {
-            // Merge: history first, then any WS messages newer than history
-            const latestHistTs = msgs[msgs.length - 1]?.timestamp ?? 0;
-            const newer = existingMsgs.filter((m) => (m.timestamp ?? 0) > latestHistTs);
-            if (newer.length < existingMsgs.length) {
-              useAppStore.getState().updateAgent(agentId, { messages: [...msgs, ...newer] });
-            }
+            // Merge: DB history first, then any live WS messages newer than the latest historical
+            const latestHistTs = Math.max(...msgs.map((m) => m.timestamp ?? 0));
+            const liveOnly = existing.messages.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+            useAppStore.getState().updateAgent(agentId, { messages: [...msgs, ...liveOnly] });
           }
         }
       })

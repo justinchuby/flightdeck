@@ -73,7 +73,7 @@ export class ContextRefresher {
     for (const agent of this.agentManager.getAll()) {
       if (agent.status !== 'running') continue;
       if (!agent.role.receivesStatusUpdates) continue;
-      if (agent.isResuming) continue; // Skip agents still resuming
+      if (agent._isResuming) continue; // Skip agents still resuming
 
       const projectId = this.agentManager.getProjectIdForAgent(agent.id);
       const peers = this.buildPeerList(projectId);

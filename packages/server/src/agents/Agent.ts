@@ -175,16 +175,7 @@ export class Agent {
   public resumeSessionId?: string;
 
   /** @internal True while agent is still in resume initialization — suppresses parent notifications */
-  private _resuming = false;
-
-  /** Whether this agent is currently in the resume initialization window */
-  get isResuming(): boolean { return this._resuming; }
-
-  /** @internal Mark agent as resuming (called once at spawn when resumeSessionId is set) */
-  _setResuming(): void { this._resuming = true; }
-
-  /** @internal Clear the resuming flag (called when resume completes, fails, or agent terminates) */
-  _clearResuming(): void { this._resuming = false; }
+  _isResuming = false;
 
   // ── Internal constants exposed for AgentAcpBridge ───────────────────────
   /** @internal */ readonly _maxMessages = 500;
@@ -641,7 +632,6 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   async terminate(): Promise<void> {
     if (this.terminated) return;
     this.terminated = true;
-    this._clearResuming();
     this.status = 'terminated';
     this.events.notifyStatus(this.status);
     if (this.acpConnection) {

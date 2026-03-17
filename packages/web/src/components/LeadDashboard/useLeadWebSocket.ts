@@ -1,7 +1,6 @@
 import { apiFetch } from '../../hooks/useApi';
 import { useEffect } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
-import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
 
@@ -406,40 +405,26 @@ export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: strin
     const handler = (event: Event) => {
       const msg: WsMsg = JSON.parse((event as MessageEvent).data);
       const store = useLeadStore.getState();
-      const selectedLeadId = store.selectedLeadId;
-
-      // Resolve project:xxx keys to the actual agent UUID for message matching.
-      // selectedLeadId may temporarily be "project:<id>" during session resume
-      // (before ProjectLayout resolves the real lead agent). Messages arrive with
-      // the real agent UUID, so we need to resolve to match them.
-      // Use appStore.agents (fresh via getState) as fallback when the closure's
-      // agents array is stale/empty — prevents dropped messages during mount races.
-      let effectiveLeadId = selectedLeadId;
-      if (selectedLeadId?.startsWith('project:')) {
-        const projectId = selectedLeadId.slice(8);
-        const agentList = agents.length > 0 ? agents : useAppStore.getState().agents;
-        const lead = agentList.find((a: AgentInfo) => a.projectId === projectId && a.role?.id === 'lead' && a.status !== 'terminated');
-        if (lead) effectiveLeadId = lead.id;
-      }
+      const leadId = store.selectedLeadId;
 
       switch (msg.type) {
         case 'lead:decision':
           handleDecision(msg, store);
           break;
         case 'agent:text':
-          if (msg.agentId === effectiveLeadId) handleText(msg, store, selectedLeadId!);
+          if (msg.agentId === leadId) handleText(msg, store, leadId!);
           break;
         case 'agent:thinking':
-          if (msg.agentId === effectiveLeadId) handleThinking(msg, store, selectedLeadId!);
+          if (msg.agentId === leadId) handleThinking(msg, store, leadId!);
           break;
         case 'agent:content':
-          if (msg.agentId === effectiveLeadId) handleContent(msg, store, selectedLeadId!);
+          if (msg.agentId === leadId) handleContent(msg, store, leadId!);
           break;
         case 'agent:status':
-          if (msg.agentId === effectiveLeadId) handleStatus(msg, store, selectedLeadId!);
+          if (msg.agentId === leadId) handleStatus(msg, store, leadId!);
           break;
         case 'agent:tool_call':
-          if (effectiveLeadId) handleToolCall(msg, store, agents, effectiveLeadId);
+          if (leadId) handleToolCall(msg, store, agents, leadId);
           break;
         case 'agent:delegated':
           handleDelegation(msg, store, agents);
@@ -451,16 +436,16 @@ export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: strin
           handleProgress(msg, store);
           break;
         case 'agent:message_sent':
-          if (effectiveLeadId) handleMessageSent(msg, store, agents, effectiveLeadId);
+          if (leadId) handleMessageSent(msg, store, agents, leadId);
           break;
         case 'group:created':
-          if ((msg.leadId === selectedLeadId || msg.leadId === effectiveLeadId) && effectiveLeadId) handleGroupCreated(store, selectedLeadId!);
+          if (msg.leadId === leadId && leadId) handleGroupCreated(store, leadId);
           break;
         case 'group:message':
-          if ((msg.leadId === selectedLeadId || msg.leadId === effectiveLeadId) && effectiveLeadId) handleGroupMessage(msg, store, selectedLeadId!);
+          if (msg.leadId === leadId && leadId) handleGroupMessage(msg, store, leadId);
           break;
         case 'dag:updated':
-          if ((msg.leadId === selectedLeadId || msg.leadId === effectiveLeadId) && effectiveLeadId) handleDagUpdated(store, selectedLeadId!, historicalProjectId);
+          if (msg.leadId === leadId && leadId) handleDagUpdated(store, leadId, historicalProjectId);
           break;
         case 'agent:context_compacted':
           handleContextCompacted(msg, store, agents);
