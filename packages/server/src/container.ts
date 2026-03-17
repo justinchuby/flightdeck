@@ -524,7 +524,7 @@ function wireEvents(c: ServiceContainer): void {
 
   // Eager scheduler → Lead notification
   eagerScheduler!.on('task:ready', ({ taskId }: { taskId: string }) => {
-    const lead = agentManager.getAll().find(a => a.role?.id === 'lead' && a.status === 'running' && !a._isResuming);
+    const lead = agentManager.getAll().find(a => a.role?.id === 'lead' && a.status === 'running' && !a.isResuming);
     if (lead) {
       lead.sendMessage(`[System] ⚡ Eager Scheduler: task now ready: ${taskId.slice(0, 8)}`);
     }
