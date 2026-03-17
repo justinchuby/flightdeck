@@ -1,0 +1,196 @@
+{
+  "name": "flightdeck-vscode",
+  "displayName": "Flightdeck",
+  "description": "Multi-Agent Orchestration Platform for VS Code",
+  "version": "0.5.0",
+  "publisher": "justinchuby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/justinchuby/flightdeck"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./dist/extension.js",
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewContainers": {
+      "activitybar": [
+        {
+          "id": "flightdeck",
+          "title": "Flightdeck",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "flightdeck": [
+        {
+          "id": "flightdeck-agents",
+          "name": "Agents"
+        },
+        {
+          "id": "flightdeck-tasks",
+          "name": "Tasks"
+        },
+        {
+          "id": "flightdeck-locks",
+          "name": "File Locks"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "flightdeck-agents",
+        "contents": "Not connected to Flightdeck server.\n[Connect](command:flightdeck.connect)",
+        "when": "!flightdeck.connected"
+      }
+    ],
+    "commands": [
+      {
+        "command": "flightdeck.connect",
+        "title": "Connect to Server",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.disconnect",
+        "title": "Disconnect",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.openDashboard",
+        "title": "Open Dashboard",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.refreshAgents",
+        "title": "Refresh Agents",
+        "icon": "$(refresh)",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.refreshTasks",
+        "title": "Refresh Tasks",
+        "icon": "$(refresh)",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.sendMessage",
+        "title": "Send Message",
+        "icon": "$(comment)",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.terminateAgent",
+        "title": "Terminate Agent",
+        "icon": "$(close)",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.approveDecision",
+        "title": "Approve Decision",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.startServer",
+        "title": "Start Server",
+        "category": "Flightdeck"
+      },
+      {
+        "command": "flightdeck.stopServer",
+        "title": "Stop Server",
+        "category": "Flightdeck"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "flightdeck.refreshAgents",
+          "when": "view == flightdeck-agents",
+          "group": "navigation"
+        },
+        {
+          "command": "flightdeck.refreshTasks",
+          "when": "view == flightdeck-tasks",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "flightdeck.sendMessage",
+          "when": "view == flightdeck-agents",
+          "group": "inline"
+        },
+        {
+          "command": "flightdeck.terminateAgent",
+          "when": "view == flightdeck-agents",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Flightdeck",
+      "properties": {
+        "flightdeck.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:3001",
+          "description": "URL of the Flightdeck server"
+        },
+        "flightdeck.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect to the Flightdeck server on startup"
+        },
+        "flightdeck.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for agent events"
+        },
+        "flightdeck.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Flightdeck server binary. Leave empty to auto-detect (monorepo, npx, or global install)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "vsce package --no-dependencies",
+    "lint": "eslint src/",
+    "test": "vitest run src/__tests__/"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  },
+  "icon": "resources/icon.png",
+  "homepage": "https://flightdeck.justinchuby.com",
+  "bugs": {
+    "url": "https://github.com/justinchuby/flightdeck/issues"
+  },
+  "keywords": [
+    "ai",
+    "multi-agent",
+    "orchestration",
+    "copilot",
+    "flightdeck"
+  ],
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  }
+}

@@ -52,8 +52,16 @@ const wsServer = new WebSocketServer(
 );
 wireHttpLayer(container, httpServer, wsServer);
 
+// Read server version from package.json for /version endpoint
+const serverPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf-8'));
+const SERVER_VERSION: string = serverPkg.version ?? '0.0.0';
+const API_VERSION = 1; // Bump when breaking API changes happen
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', agents: container.agentManager.getAll().length });
+});
+app.get('/version', (_req, res) => {
+  res.json({ version: SERVER_VERSION, apiVersion: API_VERSION });
 });
 app.use('/api', authMiddleware);
 app.use('/api', apiRouter(container));

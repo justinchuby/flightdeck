@@ -1,6 +1,6 @@
 {
   "name": "@flightdeck-ai/flightdeck",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "Flightdeck - AI crew management platform",
   "license": "MIT",
   "repository": {
@@ -19,7 +19,8 @@
     "packages/shared",
     "packages/server",
     "packages/web",
-    "packages/docs"
+    "packages/docs",
+    "packages/vscode"
   ],
   "files": [
     "bin/",
