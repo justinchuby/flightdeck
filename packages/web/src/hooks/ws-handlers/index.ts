@@ -1,4 +1,4 @@
-import type { WsHandlerContext } from './types';
+import type { WsHandlerContext, WsServerMessage } from './types';
 import {
   handleInit, handleAgentSpawned, handleAgentTerminated, handleAgentExit,
   handleAgentStatus, handleSubSpawned, handleSpawnError, handleModelFallback,
@@ -25,44 +25,46 @@ export { normalizeWsText } from './normalizeText';
  * Build a message-type → handler lookup table.
  * Called once per hook mount; the returned Map is used for O(1) dispatch.
  */
-export function createMessageDispatcher(ctx: WsHandlerContext): (msg: any) => void {
-  const handlers: Record<string, (msg: any) => void> = {
-    'init':                       (m) => handleInit(m, ctx),
-    'agent:spawned':              (m) => handleAgentSpawned(m, ctx),
-    'agent:terminated':           (m) => handleAgentTerminated(m, ctx),
-    'agent:exit':                 (m) => handleAgentExit(m, ctx),
-    'agent:status':               (m) => handleAgentStatus(m, ctx),
-    'agent:sub_spawned':          (m) => handleSubSpawned(m, ctx),
-    'agent:spawn_error':          (m) => handleSpawnError(m, ctx),
-    'agent:model_fallback':       (m) => handleModelFallback(m, ctx),
-    'agent:session_ready':        (m) => handleSessionReady(m, ctx),
-    'agent:session_resume_failed': (m) => handleSessionResumeFailed(m, ctx),
-    'agent:text':                 (m) => handleAgentText(m, ctx),
-    'agent:response_start':       (m) => handleResponseStart(m, ctx),
-    'agent:content':              (m) => handleAgentContent(m, ctx),
-    'agent:thinking':             (m) => handleAgentThinking(m, ctx),
-    'agent:plan':                 (m) => handleAgentPlan(m, ctx),
-    'agent:usage':                (m) => handleAgentUsage(m, ctx),
-    'agent:tool_call':            (m) => handleToolCall(m, ctx),
-    'agent:message_sent':         (m) => handleMessageSent(m, ctx),
-    'group:created':              (m) => handleGroupCreated(m),
-    'group:message':              (m) => handleGroupMessage(m),
-    'group:member_added':         (m) => handleGroupMemberAdded(m),
-    'group:member_removed':       (m) => handleGroupMemberRemoved(m),
-    'group:reaction':             (m) => handleGroupReaction(m),
-    'system:paused':              (m) => handleSystemPaused(m, ctx),
-    'timer:created':              (m) => handleTimerCreated(m),
-    'timer:fired':                (m) => handleTimerFired(m),
-    'timer:cancelled':            (m) => handleTimerCancelled(m),
-    'lead:decision':              (m) => handleLeadDecision(m, ctx),
-    'decision:confirmed':         (m) => handleDecisionResolved(m, ctx),
-    'decision:rejected':          (m) => handleDecisionResolved(m, ctx),
-    'decision:dismissed':         (m) => handleDecisionResolved(m, ctx),
-    'decisions:batch':            (m) => handleDecisionsBatch(m, ctx),
+export function createMessageDispatcher(ctx: WsHandlerContext): (msg: WsServerMessage) => void {
+  // Each handler is typed to its specific event interface via WsServerMessageOf<T>.
+  // The dispatcher narrows the union by `msg.type` at runtime for O(1) lookup.
+  const handlers: Record<string, (msg: WsServerMessage) => void> = {
+    'init':                       (m) => handleInit(m as any, ctx),
+    'agent:spawned':              (m) => handleAgentSpawned(m as any, ctx),
+    'agent:terminated':           (m) => handleAgentTerminated(m as any, ctx),
+    'agent:exit':                 (m) => handleAgentExit(m as any, ctx),
+    'agent:status':               (m) => handleAgentStatus(m as any, ctx),
+    'agent:sub_spawned':          (m) => handleSubSpawned(m as any, ctx),
+    'agent:spawn_error':          (m) => handleSpawnError(m as any, ctx),
+    'agent:model_fallback':       (m) => handleModelFallback(m as any, ctx),
+    'agent:session_ready':        (m) => handleSessionReady(m as any, ctx),
+    'agent:session_resume_failed': (m) => handleSessionResumeFailed(m as any, ctx),
+    'agent:text':                 (m) => handleAgentText(m as any, ctx),
+    'agent:response_start':       (m) => handleResponseStart(m as any, ctx),
+    'agent:content':              (m) => handleAgentContent(m as any, ctx),
+    'agent:thinking':             (m) => handleAgentThinking(m as any, ctx),
+    'agent:plan':                 (m) => handleAgentPlan(m as any, ctx),
+    'agent:usage':                (m) => handleAgentUsage(m as any, ctx),
+    'agent:tool_call':            (m) => handleToolCall(m as any, ctx),
+    'agent:message_sent':         (m) => handleMessageSent(m as any, ctx),
+    'group:created':              (m) => handleGroupCreated(m as any),
+    'group:message':              (m) => handleGroupMessage(m as any),
+    'group:member_added':         (m) => handleGroupMemberAdded(m as any),
+    'group:member_removed':       (m) => handleGroupMemberRemoved(m as any),
+    'group:reaction':             (m) => handleGroupReaction(m as any),
+    'system:paused':              (m) => handleSystemPaused(m as any, ctx),
+    'timer:created':              (m) => handleTimerCreated(m as any),
+    'timer:fired':                (m) => handleTimerFired(m as any),
+    'timer:cancelled':            (m) => handleTimerCancelled(m as any),
+    'lead:decision':              (m) => handleLeadDecision(m as any, ctx),
+    'decision:confirmed':         (m) => handleDecisionResolved(m as any, ctx),
+    'decision:rejected':          (m) => handleDecisionResolved(m as any, ctx),
+    'decision:dismissed':         (m) => handleDecisionResolved(m as any, ctx),
+    'decisions:batch':            (m) => handleDecisionsBatch(m as any, ctx),
     'attention:changed':          () => handleAttentionChanged(),
   };
 
-  return (msg: any) => {
+  return (msg: WsServerMessage) => {
     const handler = handlers[msg.type];
     if (handler) handler(msg);
   };

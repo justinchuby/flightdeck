@@ -1,4 +1,4 @@
-import type { WsHandlerContext } from './types';
+import type { WsHandlerContext, WsServerMessageOf } from './types';
 import { shortAgentId } from '../../utils/agentLabel';
 import { useMessageStore } from '../../stores/messageStore';
 
@@ -7,7 +7,7 @@ import { useMessageStore } from '../../stores/messageStore';
  * Shows messages in both the recipient's and sender's chat panels.
  */
 
-export function handleMessageSent(msg: any, ctx: WsHandlerContext): void {
+export function handleMessageSent(msg: WsServerMessageOf<'agent:message_sent'>, ctx: WsHandlerContext): void {
   const toId = msg.to;
   const fromId = msg.from;
   const isFromSystem = fromId === 'system';

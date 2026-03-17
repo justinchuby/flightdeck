@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
-import type { WsMessage } from '../types';
+import type { WsServerMessage, WsClientMessage } from '@flightdeck/shared';
 import { getAuthToken } from './useApi';
 import { createMessageDispatcher, type WsHandlerContext } from './ws-handlers';
 
@@ -12,7 +12,7 @@ import { createMessageDispatcher, type WsHandlerContext } from './ws-handlers';
 let globalWs: WebSocket | null = null;
 
 /** Send a WS message from any component (best-effort, no-op if not connected) */
-export function sendWsMessage(msg: Record<string, unknown>): void {
+export function sendWsMessage(msg: WsClientMessage): void {
   if (globalWs?.readyState === WebSocket.OPEN) {
     globalWs.send(JSON.stringify(msg));
   }
@@ -61,7 +61,7 @@ export function useWebSocket() {
       // Subscribe to ALL agent events ('*') — the UI is a monitoring dashboard that
       // needs visibility into every agent's output for panel rendering. Project-scoping
       // is handled server-side (subscribedProject filter), not via agent-level subscriptions.
-      ws.send(JSON.stringify({ type: 'subscribe', agentId: '*' }));
+      ws.send(JSON.stringify({ type: 'subscribe', agentId: '*' } satisfies WsClientMessage));
     };
     ws.onclose = () => {
       setConnected(false);
@@ -75,7 +75,7 @@ export function useWebSocket() {
       window.dispatchEvent(new MessageEvent('ws-message', { data: event.data }));
 
       try {
-        const msg: WsMessage = JSON.parse(event.data);
+        const msg = JSON.parse(event.data) as WsServerMessage;
         dispatch(msg);
       } catch (err) {
         console.error('[useWebSocket] Failed to parse message:', err);
@@ -101,7 +101,7 @@ export function useWebSocket() {
     };
   }, [connect]);
 
-  const send = useCallback((msg: WsMessage) => {
+  const send = useCallback((msg: WsClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(msg));
     }

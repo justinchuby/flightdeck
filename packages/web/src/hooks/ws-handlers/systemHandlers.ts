@@ -1,4 +1,4 @@
-import type { WsHandlerContext } from './types';
+import type { WsHandlerContext, WsServerMessageOf } from './types';
 import { useTimerStore } from '../../stores/timerStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { apiFetch } from '../useApi';
@@ -8,16 +8,16 @@ import { apiFetch } from '../useApi';
  * system:paused, timer:*, lead:decision, decision:*, decisions:batch, attention:changed
  */
 
-export function handleSystemPaused(msg: any, ctx: WsHandlerContext): void {
+export function handleSystemPaused(msg: WsServerMessageOf<'system:paused'>, ctx: WsHandlerContext): void {
   ctx.getAppState().setSystemPaused(msg.paused);
 }
 
-export function handleTimerCreated(msg: any): void {
+export function handleTimerCreated(msg: WsServerMessageOf<'timer:created'>): void {
   const ts = useTimerStore.getState();
-  if (msg.timer) ts.addTimer(msg.timer);
+  if (msg.timer) ts.addTimer(msg.timer as any);
 }
 
-export function handleTimerFired(msg: any): void {
+export function handleTimerFired(msg: WsServerMessageOf<'timer:fired'>): void {
   const ts = useTimerStore.getState();
   const timerId = msg.timerId ?? msg.timer?.id;
   if (timerId) {
@@ -26,13 +26,13 @@ export function handleTimerFired(msg: any): void {
   }
 }
 
-export function handleTimerCancelled(msg: any): void {
+export function handleTimerCancelled(msg: WsServerMessageOf<'timer:cancelled'>): void {
   const ts = useTimerStore.getState();
   const timerId = msg.timerId ?? msg.timer?.id;
   if (timerId) ts.removeTimer(timerId);
 }
 
-export function handleLeadDecision(msg: any, ctx: WsHandlerContext): void {
+export function handleLeadDecision(msg: WsServerMessageOf<'lead:decision'>, ctx: WsHandlerContext): void {
   if (msg.needsConfirmation && msg.id) {
     const effectiveLevel = useSettingsStore.getState().getEffectiveLevel(msg.projectId ?? undefined);
     if (effectiveLevel === 'autonomous') {
@@ -48,7 +48,7 @@ export function handleLeadDecision(msg: any, ctx: WsHandlerContext): void {
       title: msg.title || 'Untitled decision',
       rationale: msg.rationale || '',
       needsConfirmation: true,
-      status: 'recorded',
+      status: msg.status ?? 'recorded',
       autoApproved: msg.autoApproved ?? false,
       confirmedAt: msg.confirmedAt ?? null,
       category: msg.category,
@@ -57,17 +57,21 @@ export function handleLeadDecision(msg: any, ctx: WsHandlerContext): void {
   }
 }
 
-export function handleDecisionResolved(msg: any, ctx: WsHandlerContext): void {
-  const decisionId = msg.decisionId ?? msg.id;
+export function handleDecisionResolved(msg: WsServerMessageOf<'decision:confirmed'>, ctx: WsHandlerContext): void {
+  // Support both flat (msg.id) and nested (msg.decision.id) formats
+  const flat = msg as unknown as { decisionId?: string; id?: string };
+  const nested = msg.decision as { decisionId?: string; id?: string } | undefined;
+  const decisionId = flat.decisionId ?? flat.id ?? nested?.decisionId ?? nested?.id;
   if (decisionId) {
     ctx.getAppState().removePendingDecision(decisionId);
   }
 }
 
-export function handleDecisionsBatch(msg: any, ctx: WsHandlerContext): void {
+export function handleDecisionsBatch(msg: WsServerMessageOf<'decisions:batch'>, ctx: WsHandlerContext): void {
   const decisions = msg.decisions ?? [];
   for (const d of decisions) {
-    if (d.id) ctx.getAppState().removePendingDecision(d.id);
+    const decision = d as { id?: string };
+    if (decision.id) ctx.getAppState().removePendingDecision(decision.id);
   }
 }
 

@@ -1,4 +1,4 @@
-import type { WsHandlerContext, AcpTextChunk } from './types';
+import type { WsHandlerContext, AcpTextChunk, WsServerMessageOf } from './types';
 import { useToastStore } from '../../components/Toast';
 import { shortAgentId } from '../../utils/agentLabel';
 import { useMessageStore } from '../../stores/messageStore';
@@ -10,7 +10,7 @@ import { useMessageStore } from '../../stores/messageStore';
  * agent:session_ready, agent:session_resume_failed
  */
 
-export function handleInit(msg: any, ctx: WsHandlerContext): void {
+export function handleInit(msg: WsServerMessageOf<'init'>, ctx: WsHandlerContext): void {
   ctx.setAgents(msg.agents);
   ctx.getAppState().setLoading(false);
   if (msg.systemPaused !== undefined) {
@@ -18,15 +18,15 @@ export function handleInit(msg: any, ctx: WsHandlerContext): void {
   }
 }
 
-export function handleAgentSpawned(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentSpawned(msg: WsServerMessageOf<'agent:spawned'>, ctx: WsHandlerContext): void {
   ctx.addAgent(msg.agent);
 }
 
-export function handleAgentTerminated(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentTerminated(msg: WsServerMessageOf<'agent:terminated'>, ctx: WsHandlerContext): void {
   ctx.updateAgent(msg.agentId, { status: 'terminated' });
 }
 
-export function handleAgentExit(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentExit(msg: WsServerMessageOf<'agent:exit'>, ctx: WsHandlerContext): void {
   // Don't overwrite 'terminated' with 'failed' — explicit termination takes precedence
   const prev = ctx.getAppState().agents.find((a: any) => a.id === msg.agentId);
   if (prev?.status === 'terminated') return;
@@ -37,7 +37,7 @@ export function handleAgentExit(msg: any, ctx: WsHandlerContext): void {
   });
 }
 
-export function handleAgentStatus(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentStatus(msg: WsServerMessageOf<'agent:status'>, ctx: WsHandlerContext): void {
   const prev = ctx.getAppState().agents.find((a: any) => a.id === msg.agentId);
   const wasIdle = prev && (prev.status === 'idle' || prev.status === 'completed');
   ctx.updateAgent(msg.agentId, { status: msg.status });
@@ -68,7 +68,7 @@ export function handleAgentStatus(msg: any, ctx: WsHandlerContext): void {
   }
 }
 
-export function handleSubSpawned(msg: any, ctx: WsHandlerContext): void {
+export function handleSubSpawned(msg: WsServerMessageOf<'agent:sub_spawned'>, ctx: WsHandlerContext): void {
   ctx.addAgent(msg.child);
   ctx.updateAgent(msg.parentId, {
     childIds: [
@@ -78,13 +78,13 @@ export function handleSubSpawned(msg: any, ctx: WsHandlerContext): void {
   });
 }
 
-export function handleSpawnError(msg: any, ctx: WsHandlerContext): void {
+export function handleSpawnError(msg: WsServerMessageOf<'agent:spawn_error'>, ctx: WsHandlerContext): void {
   const parentAgent = ctx.getAppState().agents.find((a: any) => a.id === msg.agentId);
   const label = parentAgent?.role?.name ?? shortAgentId(msg.agentId) ?? 'Agent';
   useToastStore.getState().add('error', `Spawn failed (${label}): ${msg.message}`);
 }
 
-export function handleModelFallback(msg: any, ctx: WsHandlerContext): void {
+export function handleModelFallback(msg: WsServerMessageOf<'agent:model_fallback'>, ctx: WsHandlerContext): void {
   ctx.updateAgent(msg.agentId, {
     model: msg.resolved,
     modelResolution: {
@@ -97,11 +97,11 @@ export function handleModelFallback(msg: any, ctx: WsHandlerContext): void {
   useToastStore.getState().add('info', `🔄 ${msg.agentRole}: ${msg.requested} → ${msg.resolved} (${msg.provider})`);
 }
 
-export function handleSessionReady(msg: any, ctx: WsHandlerContext): void {
+export function handleSessionReady(msg: WsServerMessageOf<'agent:session_ready'>, ctx: WsHandlerContext): void {
   ctx.updateAgent(msg.agentId, { sessionId: msg.sessionId });
 }
 
-export function handleSessionResumeFailed(msg: any, _ctx: WsHandlerContext): void {
+export function handleSessionResumeFailed(msg: WsServerMessageOf<'agent:session_resume_failed'>, _ctx: WsHandlerContext): void {
   const agentId = shortAgentId(msg.agentId ?? '');
   const error = msg.error ?? 'Unknown error';
   useToastStore.getState().add('error', `Session resume failed (agent ${agentId}): ${error}`);

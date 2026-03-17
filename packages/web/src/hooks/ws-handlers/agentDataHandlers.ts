@@ -1,15 +1,15 @@
-import type { WsHandlerContext } from './types';
+import type { WsHandlerContext, WsServerMessageOf } from './types';
 
 /**
  * Handlers for agent data events:
  * agent:plan, agent:usage
  */
 
-export function handleAgentPlan(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentPlan(msg: WsServerMessageOf<'agent:plan'>, ctx: WsHandlerContext): void {
   ctx.updateAgent(msg.agentId, { plan: msg.plan });
 }
 
-export function handleAgentUsage(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentUsage(msg: WsServerMessageOf<'agent:usage'>, ctx: WsHandlerContext): void {
   ctx.updateAgent(msg.agentId, {
     inputTokens: msg.inputTokens,
     outputTokens: msg.outputTokens,

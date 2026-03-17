@@ -1,4 +1,4 @@
-import type { WsHandlerContext } from './types';
+import type { WsHandlerContext, WsServerMessageOf } from './types';
 import { normalizeWsText } from './normalizeText';
 import { useMessageStore } from '../../stores/messageStore';
 
@@ -7,7 +7,7 @@ import { useMessageStore } from '../../stores/messageStore';
  * agent:text, agent:response_start, agent:content
  */
 
-export function handleAgentText(msg: any, ctx: WsHandlerContext): void {
+export function handleAgentText(msg: WsServerMessageOf<'agent:text'>, ctx: WsHandlerContext): void {
   const rawText = normalizeWsText(msg.text);
   const store = useMessageStore.getState();
   const needsNewline = ctx.pendingNewlineRef.current.has(msg.agentId);
@@ -18,17 +18,17 @@ export function handleAgentText(msg: any, ctx: WsHandlerContext): void {
   store.appendToLastAgentMessage(msg.agentId, rawText);
 }
 
-export function handleResponseStart(msg: any, ctx: WsHandlerContext): void {
+export function handleResponseStart(msg: WsServerMessageOf<'agent:response_start'>, ctx: WsHandlerContext): void {
   ctx.pendingNewlineRef.current.add(msg.agentId);
 }
 
-export function handleAgentContent(msg: any, _ctx: WsHandlerContext): void {
+export function handleAgentContent(msg: WsServerMessageOf<'agent:content'>, _ctx: WsHandlerContext): void {
   useMessageStore.getState().addMessage(msg.agentId, {
     type: 'text',
     text: msg.content.text || '',
     sender: 'agent',
     timestamp: Date.now(),
-    contentType: msg.content.contentType,
+    contentType: msg.content.contentType as 'text' | 'image' | 'audio' | 'resource' | undefined,
     mimeType: msg.content.mimeType,
     data: msg.content.data,
     uri: msg.content.uri,
