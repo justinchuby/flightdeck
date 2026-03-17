@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile);
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface FileDiff {
+interface FileDiff {
   path: string;
   status: 'modified' | 'added' | 'deleted';
   additions: number;
@@ -17,13 +17,13 @@ export interface FileDiff {
   diff: string;
 }
 
-export interface DiffSummary {
+interface DiffSummary {
   filesChanged: number;
   additions: number;
   deletions: number;
 }
 
-export interface DiffResult {
+interface DiffResult {
   agentId: string;
   files: FileDiff[];
   summary: DiffSummary;

@@ -8,7 +8,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-export interface CoverageSnapshot {
+interface CoverageSnapshot {
   timestamp: number;
   totalTests: number;
   totalFiles: number;

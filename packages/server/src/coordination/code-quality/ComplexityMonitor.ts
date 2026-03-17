@@ -21,7 +21,7 @@ import { isAbsolute, join } from 'path';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-export interface FileComplexity {
+interface FileComplexity {
   path: string;
   lines: number;
   size: number; // bytes
@@ -32,7 +32,7 @@ export interface FileComplexity {
   lastChecked: number;
 }
 
-export interface ComplexityAlert {
+interface ComplexityAlert {
   path: string;
   metric: string;
   value: number;

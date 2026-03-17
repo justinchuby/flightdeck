@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CoverageTracker } from '../coordination/code-quality/CoverageTracker.js';
-import type { CoverageSnapshot } from '../coordination/code-quality/CoverageTracker.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function makeSnapshot(passed: number, overrides: Partial<CoverageSnapshot> = {}): CoverageSnapshot {
+function makeSnapshot(passed: number, overrides: Partial<{ timestamp: number; totalTests: number; totalFiles: number; passed: number; failed: number; duration: number; commitRef: string }> = {}) {
   return {
     timestamp: Date.now(),
     totalTests: passed + (overrides.failed ?? 0),

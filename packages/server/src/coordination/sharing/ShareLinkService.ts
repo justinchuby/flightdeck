@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface ShareLink {
+interface ShareLink {
   token: string;
   leadId: string;
   createdAt: string;
@@ -12,7 +12,7 @@ export interface ShareLink {
   accessCount: number;
 }
 
-export interface ShareLinkInput {
+interface ShareLinkInput {
   leadId: string;
   expiresInHours?: number;  // default 72h
   label?: string;

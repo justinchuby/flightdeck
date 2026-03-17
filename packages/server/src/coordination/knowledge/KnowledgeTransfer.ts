@@ -12,7 +12,7 @@
 
 export type KnowledgeCategory = 'pattern' | 'pitfall' | 'tool' | 'architecture' | 'process';
 
-export interface KnowledgeEntry {
+interface KnowledgeEntry {
   id: string;
   projectId: string;
   category: KnowledgeCategory;

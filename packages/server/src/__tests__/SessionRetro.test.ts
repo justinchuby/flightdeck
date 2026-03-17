@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SessionRetro, type SessionRetroData } from '../coordination/sessions/SessionRetro.js';
+import { SessionRetro } from '../coordination/sessions/SessionRetro.js';
 
 // ── Mock helpers ──────────────────────────────────────────────────────────
 
@@ -129,7 +129,7 @@ describe('SessionRetro', () => {
 
   describe('getRetros', () => {
     it('returns parsed retro data', () => {
-      const sampleRetro: SessionRetroData = {
+      const sampleRetro = {
         generatedAt: '2026-01-01T00:00:00.000Z',
         summary: {
           leadId: 'lead-1',

@@ -55,7 +55,7 @@ export interface CrewMember {
   contextWindowUsed?: number;
 }
 
-export interface CrewFormatOptions {
+interface CrewFormatOptions {
   /** The agent receiving this message — excluded from the crew table */
   viewerId: string;
   /** Role of the viewer — controls what sections appear */
@@ -70,7 +70,7 @@ export interface CrewFormatOptions {
   recentActivity?: string[];
 }
 
-export interface QueryCrewOptions extends CrewFormatOptions {
+interface QueryCrewOptions extends CrewFormatOptions {
   /** Memory entries for QUERY_CREW only */
   memorySection?: string;
   /** Sibling leads section for sub-leads */

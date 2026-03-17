@@ -3,13 +3,13 @@ import type { ActivityEntry, ActionType } from '../activity/ActivityLedger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface PipelineEvent {
+interface PipelineEvent {
   entry: ActivityEntry;
   /** Context bag for handlers to pass data downstream */
   meta: Record<string, unknown>;
 }
 
-export interface EventHandler {
+interface EventHandler {
   /** Which action types this handler reacts to ('*' = all) */
   eventTypes: ActionType[] | '*';
   /** Descriptive name for logging */
@@ -22,7 +22,7 @@ export interface EventHandler {
 
 const MAX_QUEUE_SIZE = 10_000;
 
-export interface EventPipelineOptions {
+interface EventPipelineOptions {
   /** Called whenever an event is dropped due to queue overflow */
   onEventDropped?: (droppedEvent: PipelineEvent) => void;
 }

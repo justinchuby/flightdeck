@@ -4,7 +4,7 @@ import { eq, sql, desc } from 'drizzle-orm';
 import { activityLog, dagTasks } from '../../db/schema.js';
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface SessionListItem {
+interface SessionListItem {
   id: string;
   leadId: string;
   projectId: string | null;
@@ -18,7 +18,7 @@ export interface SessionListItem {
   agentCount: number;
 }
 
-export interface SessionSummary {
+interface SessionSummary {
   leadId: string;
   projectId: string | null;
   status: string;
@@ -30,7 +30,7 @@ export interface SessionSummary {
   totalOutputTokens: number;
 }
 
-export interface AnalyticsOverview {
+interface AnalyticsOverview {
   totalSessions: number;
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -38,7 +38,7 @@ export interface AnalyticsOverview {
   roleContributions: Array<{ role: string; taskCount: number; tokenUsage: number }>;
 }
 
-export interface SessionComparison {
+interface SessionComparison {
   sessions: SessionSummary[];
   deltas: {
     tokenDelta: number;

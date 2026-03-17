@@ -3,7 +3,7 @@ import type { CapabilityRegistry } from './CapabilityRegistry.js';
 import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import { isTerminalStatus } from '../../agents/Agent.js';
 
-export interface MatchScore {
+interface MatchScore {
   agentId: string;
   agentRole: string;
   agentName: string;
@@ -12,7 +12,7 @@ export interface MatchScore {
   status: string;
 }
 
-export interface MatchQuery {
+interface MatchQuery {
   task: string;
   requiredRole?: string;
   files?: string[];

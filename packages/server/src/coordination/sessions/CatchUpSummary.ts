@@ -18,7 +18,7 @@ export interface CatchUpSummary {
   keyEvents: KeyEvent[];
 }
 
-export interface KeyEvent {
+interface KeyEvent {
   timestamp: string;
   type: string;
   summary: string;

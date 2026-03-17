@@ -1,7 +1,7 @@
 import type { DecisionLog, Decision } from './DecisionLog.js';
 import { logger } from '../../utils/logger.js';
 
-export interface DecisionRecord {
+interface DecisionRecord {
   id: string;
   title: string;
   status: 'proposed' | 'accepted' | 'rejected' | 'superseded' | 'deprecated';

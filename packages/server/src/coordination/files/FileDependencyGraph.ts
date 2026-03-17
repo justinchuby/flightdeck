@@ -11,7 +11,7 @@ interface FileNode {
   lastAnalyzed: number;
 }
 
-export interface ImpactAnalysis {
+interface ImpactAnalysis {
   directDependents: string[];     // files that directly import the changed file
   transitiveDependents: string[]; // all files affected (recursive)
   depth: number;                  // max depth of impact chain

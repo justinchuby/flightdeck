@@ -9,7 +9,7 @@
  */
 import type { ActivityEntry, ActionType } from './ActivityLedger.js';
 
-export type ActivityPriority = 'high' | 'medium' | 'low';
+type ActivityPriority = 'high' | 'medium' | 'low';
 
 /** Map each action type to a priority tier */
 const PRIORITY_MAP: Record<ActionType, ActivityPriority> = {
@@ -69,7 +69,7 @@ function isInterAgentNoise(entry: ActivityEntry): boolean {
   return false;
 }
 
-export function getActivityPriority(actionType: ActionType): ActivityPriority {
+function getActivityPriority(actionType: ActionType): ActivityPriority {
   return PRIORITY_MAP[actionType] ?? 'low';
 }
 

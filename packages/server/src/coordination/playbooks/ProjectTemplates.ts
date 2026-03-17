@@ -8,7 +8,7 @@
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export interface ProjectTemplate {
+interface ProjectTemplate {
   id: string;
   name: string;
   description: string;

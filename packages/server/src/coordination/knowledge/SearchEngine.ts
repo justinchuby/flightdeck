@@ -1,7 +1,7 @@
 import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import type { DecisionLog } from '../decisions/DecisionLog.js';
 
-export interface SearchResult {
+interface SearchResult {
   type: 'activity' | 'decision' | 'message';
   score: number;
   agentId?: string;

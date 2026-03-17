@@ -9,7 +9,7 @@ import * as schema from '../../db/schema.js';
 import type { Timer } from '@flightdeck/shared';
 export type { Timer, TimerStatus } from '@flightdeck/shared';
 
-export interface TimerInput {
+interface TimerInput {
   label: string;
   message: string;
   delaySeconds: number;

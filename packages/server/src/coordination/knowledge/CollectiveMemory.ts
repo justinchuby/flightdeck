@@ -18,7 +18,7 @@ export const KNOWLEDGE_TO_MEMORY_CATEGORY: Record<string, MemoryCategory> = {
   episodic: 'expertise',
 };
 
-export interface CollectiveMemoryEntry {
+interface CollectiveMemoryEntry {
   id: number;
   category: MemoryCategory;
   key: string;

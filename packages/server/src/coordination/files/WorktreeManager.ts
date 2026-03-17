@@ -25,14 +25,14 @@ function toForwardSlash(p: string): string {
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface WorktreeInfo {
+interface WorktreeInfo {
   agentId: string;
   branch: string;
   path: string;
   createdAt: number;
 }
 
-export interface MergeResult {
+interface MergeResult {
   ok: boolean;
   conflicts?: string[];
   mergeCommit?: string;
@@ -41,7 +41,7 @@ export interface MergeResult {
 }
 
 /** Minimal interface for lock checking — avoids hard dependency on FileLockRegistry. */
-export interface LockChecker {
+interface LockChecker {
   getByAgent(agentId: string): Array<{ filePath: string }>;
 }
 

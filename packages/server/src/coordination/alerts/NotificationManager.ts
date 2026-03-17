@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../../utils/logger.js';
 
 export type NotificationChannel = 'websocket' | 'webhook' | 'agent-message';
-export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
+type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type NotificationCategory = 'task' | 'build' | 'decision' | 'alert' | 'communication' | 'system';
 
 export interface NotificationPreference {

@@ -65,11 +65,11 @@ const ROUTINE_ACTION_TYPES: Set<ActionType> = new Set([
   'heartbeat_halted',
 ]);
 
-export type EventTier = 'critical' | 'notable' | 'routine';
+type EventTier = 'critical' | 'notable' | 'routine';
 
 // ── Classification ──────────────────────────────────────────────────
 
-export function classifyEvent(event: ActivityEntry): EventTier {
+function classifyEvent(event: ActivityEntry): EventTier {
   const text = event.summary;
 
   // Action-type shortcuts
@@ -93,7 +93,7 @@ export function classifyEvent(event: ActivityEntry): EventTier {
 
 // ── Health synthesis ────────────────────────────────────────────────
 
-export interface ProjectHealthSnapshot {
+interface ProjectHealthSnapshot {
   criticalEvents: ActivityEntry[];
   recentCompletions: ActivityEntry[];
   pendingActions: { pendingDecisions: number; blockedTasks: number };
