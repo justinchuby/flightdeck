@@ -5,7 +5,11 @@ export {
   type ProviderId, type ProviderDefinition, type ProviderColors,
   type ProviderLink, type ProviderTierModels,
 } from './provider.js';
-export { AgentStatusSchema, type AgentStatus } from './agent.js';
+export {
+  AgentStatusSchema, type AgentStatus,
+  AgentPhaseSchema, type AgentPhase,
+  isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus,
+} from './agent.js';
 export { RoleSchema, type Role } from './role.js';
 export {
   DagTaskStatusSchema, DagTaskSchema,

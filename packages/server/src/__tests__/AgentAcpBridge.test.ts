@@ -80,12 +80,24 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     model: undefined,
     resumeSessionId: undefined,
     cwd: '/test/project',
-    status: 'idle',
+    _phase: 'idle' as string,
+    get phase() { return this._phase; },
+    get status() {
+      switch (this._phase) {
+        case 'starting': return 'creating';
+        case 'running': case 'thinking': case 'resuming': return 'running';
+        case 'idle': return 'idle';
+        case 'stopping': case 'stopped': return 'terminated';
+        case 'error': return 'failed';
+        default: return 'idle';
+      }
+    },
+    transitionTo(phase: string) { this._phase = phase; },
     sessionId: undefined,
-    _resuming: false,
-    get isResuming() { return this._resuming; },
-    _setResuming() { this._resuming = true; },
-    _clearResuming() { this._resuming = false; },
+    get isResuming() { return this._phase === 'resuming'; },
+    _setResuming() { this._phase = 'resuming'; },
+    _clearResuming() { if (this._phase === 'resuming') this._phase = 'idle'; },
+    get _isTerminated() { return this._phase === 'stopped' || this._phase === 'error'; },
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
