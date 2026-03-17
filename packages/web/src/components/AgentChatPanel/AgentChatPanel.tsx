@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, AlertCircle, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { useToastStore } from '../Toast';
 import { apiFetch } from '../../hooks/useApi';
 import { AgentIdBadge } from '../../utils/markdown';
@@ -58,7 +59,7 @@ function apiMessageToChunk(msg: ApiMessage): AcpTextChunk {
  */
 export function AgentChatPanel({ agentId, readOnly, maxHeight, compact, autoFocusInput }: AgentChatPanelProps) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
-  const storeMessages = agent?.messages ?? [];
+  const storeMessages = useMessageStore((s) => s.channels[agentId]?.messages ?? []);
 
   const [fetchedMessages, setFetchedMessages] = useState<AcpTextChunk[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,13 +91,8 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight, compact, autoFocu
         if (cancelled) return;
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           setFetchedMessages(data.messages.map(apiMessageToChunk));
-          // Also populate the store so other components benefit
-          const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
-          if (!existing?.messages?.length) {
-            useAppStore.getState().updateAgent(agentId, {
-              messages: data.messages.map(apiMessageToChunk),
-            });
-          }
+          // Also populate the message store so other components benefit
+          useMessageStore.getState().mergeHistory(agentId, data.messages.map(apiMessageToChunk));
         }
       })
       .catch((err: unknown) => {
@@ -140,15 +136,14 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight, compact, autoFocu
     // Optimistic update — add user message to store immediately
     const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
     const isAgentBusy = existing?.status === 'running';
-    const msgs = [...(existing?.messages ?? [])];
-    msgs.push({
+    const userMsg: AcpTextChunk = {
       type: 'text',
       text,
       sender: 'user',
       timestamp: Date.now(),
       ...(isAgentBusy ? { queued: true } : {}),
-    });
-    useAppStore.getState().updateAgent(agentId, { messages: msgs });
+    };
+    useMessageStore.getState().addMessage(agentId, userMsg);
     setInputText('');
 
     try {
