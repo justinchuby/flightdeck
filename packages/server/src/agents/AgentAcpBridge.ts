@@ -119,8 +119,12 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   agent._setAcpConnection(conn);
   agent.provider = effectiveProvider;
   agent.backend = backend;
-  agent.status = 'running';
-  agent._notifyStatusChange(agent.status);
+  // Only transition to running for fresh agents — resuming agents stay in 'resuming'
+  // phase until the resume window completes (phaseToStatus maps resuming → 'running' for API)
+  if (!agent.isResuming) {
+    agent.transitionTo('running');
+    agent._notifyStatusChange(agent.status);
+  }
   wireAcpEvents(agent, conn);
 
   const { options: startOpts, modelResolution } = buildStartOptions(adapterConfig, {
@@ -174,10 +178,11 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     if (conn.isPrompting) {
       try { await conn.cancel(); } catch (e) { logger.warn({ module: 'agent-bridge', msg: 'Resume cancel failed (best-effort)', err: (e as Error).message }); }
     }
-    agent.status = 'idle';
+    agent.transitionTo('idle');
     agent._notifyStatusChange(agent.status);
     // Clear AFTER session-ready and idle notifications have fired synchronously,
     // so all resume-suppression guards see isResuming === true.
+    // Note: _clearResuming() is a no-op now since we already transitioned to 'idle'.
     agent._clearResuming();
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
@@ -192,7 +197,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     // Clear resume flag so notification guards don't stay permanently suppressed
     agent._clearResuming();
 
-    agent.status = 'failed';
+    agent.transitionTo('error');
     agent._notifyExit(1);
   });
 }
@@ -291,7 +296,11 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   conn.on('exit', (code: number) => withCtx(() => {
     // Not suppressed during resume — exit events must always propagate for cleanup
     if (!agent._isTerminated) {
-      agent.status = code === 0 ? 'completed' : 'failed';
+      if (code === 0) {
+        agent.transitionTo('stopped', { exitCode: 0 });
+      } else {
+        agent.transitionTo('error');
+      }
     }
     agent._notifyExit(code);
   }));
@@ -305,12 +314,12 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
       agent.queueMessage(notes);
     }
 
-    if (agent.status === 'running' && !conn.isPrompting) {
+    if ((agent.phase === 'running' || agent.phase === 'thinking') && !conn.isPrompting) {
       if (!agent.systemPaused && agent.pendingMessageCount > 0) {
         agent._drainOneMessage();
         return;
       }
-      agent.status = 'idle';
+      agent.transitionTo('idle');
       agent._notifyStatusChange(agent.status);
     }
   }));
@@ -324,8 +333,10 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
         conn.cancel().catch(() => { /* best-effort */ });
         return;
       }
-      if (agent.status !== 'running') {
-        agent.status = 'running';
+      // Transition to 'thinking' — the LLM is actively generating
+      if (agent.phase !== 'thinking') {
+        agent.transitionTo('thinking');
+        // Notify as 'running' for backward compatibility (thinking maps to running)
         agent._notifyStatusChange(agent.status);
       }
     }

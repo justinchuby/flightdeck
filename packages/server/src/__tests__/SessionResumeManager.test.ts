@@ -40,6 +40,7 @@ function makeAgentJSON(overrides: Partial<AgentJSON> = {}): AgentJSON {
     id: 'agent-1',
     role: testRole,
     status: 'running',
+    phase: 'running',
     childIds: [],
     createdAt: new Date().toISOString(),
     outputPreview: '',

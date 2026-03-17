@@ -11,8 +11,10 @@ import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBri
 import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
 
-import type { AgentStatus } from '@flightdeck/shared';
-export type { AgentStatus } from '@flightdeck/shared';
+import type { AgentStatus, AgentPhase } from '@flightdeck/shared';
+import { isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus } from '@flightdeck/shared';
+export type { AgentStatus, AgentPhase } from '@flightdeck/shared';
+export { isTerminalPhase } from '@flightdeck/shared';
 import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
 
 export function isTerminalStatus(status: AgentStatus): boolean {
@@ -39,6 +41,8 @@ export interface AgentJSON {
   id: string;
   role: Role;
   status: AgentStatus;
+  /** Internal lifecycle phase (more granular than status) */
+  phase: AgentPhase;
   task?: string;
   dagTaskId?: string;
   parentId?: string;
@@ -85,7 +89,51 @@ export class Agent {
   public readonly id: string;
   public readonly role: Role;
   public readonly createdAt: Date;
-  public status: AgentStatus = 'creating';
+
+  // ── Phase state machine (replaces status + _resuming + terminated booleans) ──
+  private _phase: AgentPhase = 'starting';
+  /** Exit code from ACP process — used to distinguish 'completed' (0) from 'terminated' */
+  private _exitCode: number | null = null;
+
+  /** Current phase of this agent's lifecycle */
+  get phase(): AgentPhase { return this._phase; }
+
+  /** Backward-compatible status derived from phase (for API/frontend) */
+  get status(): AgentStatus { return phaseToStatus(this._phase, this._exitCode); }
+
+  /**
+   * Transition to a new phase with validation.
+   * Invalid transitions log a warning but are not blocked (defensive).
+   */
+  transitionTo(nextPhase: AgentPhase, opts?: { exitCode?: number }): void {
+    const allowed = PHASE_TRANSITIONS[this._phase];
+    if (!allowed.has(nextPhase)) {
+      logger.warn({
+        module: 'agent', msg: 'Invalid phase transition',
+        agentId: this.id, from: this._phase, to: nextPhase,
+      });
+    }
+    if (opts?.exitCode !== undefined) {
+      this._exitCode = opts.exitCode;
+    }
+    this._phase = nextPhase;
+  }
+
+  /** Whether this agent is currently in the resume initialization window */
+  get isResuming(): boolean { return this._phase === 'resuming'; }
+
+  /** @internal Mark agent as resuming (called once at spawn when resumeSessionId is set) */
+  _setResuming(): void { this.transitionTo('resuming'); }
+
+  /** @internal Clear the resuming flag — transitions to idle (or stays if already past resuming) */
+  _clearResuming(): void {
+    if (this._phase === 'resuming') {
+      this.transitionTo('idle');
+    }
+  }
+
+  /** @internal Whether this agent has reached a terminal phase */
+  get _isTerminated(): boolean { return isTerminalPhase(this._phase); }
   public task?: string;
   public dagTaskId?: string;
   public parentId?: string;
@@ -154,7 +202,6 @@ export class Agent {
   private static MAX_WINDOW_AGE_MS = 600_000;        // 10min max window
   private static MIN_POINTS_FOR_PREDICTION = 3;      // minimum data points
   private static MIN_SPAN_MS = 30_000;               // minimum 30s span
-  private terminated = false;
   /** Hash of the last CREW_UPDATE sent — used to skip duplicate updates */
   private lastUpdateHash: string = '';
   /** When true, message delivery is halted — messages stay queued */
@@ -174,22 +221,9 @@ export class Agent {
   /** Resume a previous session by its Copilot session ID */
   public resumeSessionId?: string;
 
-  /** @internal True while agent is still in resume initialization — suppresses parent notifications */
-  private _resuming = false;
-
-  /** Whether this agent is currently in the resume initialization window */
-  get isResuming(): boolean { return this._resuming; }
-
-  /** @internal Mark agent as resuming (called once at spawn when resumeSessionId is set) */
-  _setResuming(): void { this._resuming = true; }
-
-  /** @internal Clear the resuming flag (called when resume completes, fails, or agent terminates) */
-  _clearResuming(): void { this._resuming = false; }
-
   // ── Internal constants exposed for AgentAcpBridge ───────────────────────
   /** @internal */ readonly _maxMessages = 500;
   /** @internal */ readonly _maxToolCalls = 200;
-  /** @internal */ get _isTerminated(): boolean { return this.terminated; }
 
   constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], id?: string) {
     this.id = id || uuid();
@@ -213,7 +247,7 @@ export class Agent {
     bridgePromise.catch((err) => {
       logger.error({ module: 'agent', msg: 'Bridge startup failed', agentId: this.id, err: (err as Error).message });
       this.exitError = (err as Error).message;
-      this.status = 'failed';
+      this.transitionTo('error');
     });
   }
 
@@ -452,15 +486,15 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   }
 
   write(data: PromptContent, opts?: { priority?: boolean }): void {
-    if (this.terminated) return;
+    if (this._isTerminated) return;
     if (this.acpConnection?.isConnected) {
-      this.status = 'running';
+      this.transitionTo('running');
       this.events.notifyStatus(this.status);
       this.acpConnection.prompt(data, opts).catch((err) => {
         logger.error({ module: 'agent', msg: 'Prompt failed', role: this.role.name, err: String(err?.message || err) });
-        // Reset status so agent doesn't get stuck as 'running'
-        if (this.status === 'running') {
-          this.status = 'idle';
+        // Reset phase so agent doesn't get stuck as 'running'
+        if (this._phase === 'running' || this._phase === 'thinking') {
+          this.transitionTo('idle');
           this.events.notifyStatus(this.status);
         }
       });
@@ -507,7 +541,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       this.enqueueMessage(message, opts?.priority, mqId);
       return;
     }
-    if (this.status === 'idle') {
+    if (this._phase === 'idle') {
       this.write(message, opts);
       // Mark delivered immediately since we wrote directly
       if (mqId && this.messageQueueStore) {
@@ -539,7 +573,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
   /** Interrupt current work, then send message */
   async interruptWithMessage(message: PromptContent): Promise<void> {
-    if (this.acpConnection && this.status === 'running') {
+    if (this.acpConnection && (this._phase === 'running' || this._phase === 'thinking')) {
       // Mark cleared messages as delivered in DB before discarding
       if (this.messageQueueStore) {
         for (const { mqId } of this.pendingMessages) {
@@ -578,7 +612,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
   /** Drain one pending message if idle — called when system resumes */
   drainPendingMessages(): void {
-    if (this.status === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
+    if (this._phase === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
       const next = this.pendingMessages.shift()!;
       this.write(next.content);
       // Mark delivered in DB after successful write
@@ -639,10 +673,8 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   }
 
   async terminate(): Promise<void> {
-    if (this.terminated) return;
-    this.terminated = true;
-    this._clearResuming();
-    this.status = 'terminated';
+    if (this._isTerminated) return;
+    this.transitionTo('stopped');
     this.events.notifyStatus(this.status);
     if (this.acpConnection) {
       const conn = this.acpConnection;
@@ -751,6 +783,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
       id: this.id,
       role: this.role,
       status: this.status,
+      phase: this.phase,
       task: this.task,
       dagTaskId: this.dagTaskId,
       parentId: this.parentId,
