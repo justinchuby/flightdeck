@@ -33,7 +33,7 @@ export function useLeadMessages(
   ws: { subscribe: (id: string) => void; unsubscribe: (id: string) => void },
   chatInitialScroll: React.MutableRefObject<boolean>,
 ) {
-  const projects = useLeadStore((s) => s.projects);
+  const channels = useMessageStore((s) => s.channels);
 
   // On mount, load existing leads from server (skip in read-only mode — data pre-loaded)
   useQuery({
@@ -42,10 +42,8 @@ export function useLeadMessages(
       const leads: LeadListItem[] = await apiFetch('/lead', { signal });
       if (!Array.isArray(leads)) return [];
       const store = useLeadStore.getState();
-      const msgStore = useMessageStore.getState();
       for (const l of leads) {
         store.addProject(l.id);
-        msgStore.ensureChannel(l.id);
         // Pre-load message history for each lead (best-effort)
         apiFetch<MessageHistoryResponse>(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal })
           .then((data) => {
@@ -56,10 +54,10 @@ export function useLeadMessages(
                 sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                 timestamp: new Date(m.timestamp).getTime(),
               }));
-              const ms = useMessageStore.getState();
-              ms.mergeHistory(l.id, msgs);
-              const ch = ms.channels[l.id];
-              if (ch) useLeadStore.getState().setMessages(l.id, ch.messages);
+              const ch = useMessageStore.getState().channels[l.id];
+              if (!ch || ch.messages.length === 0) {
+                useMessageStore.getState().mergeHistory(l.id, msgs);
+              }
             }
           })
           .catch(() => { /* non-critical — will load via WS */ });
@@ -86,9 +84,9 @@ export function useLeadMessages(
     };
   }, [selectedLeadId, ws, readOnly, chatInitialScroll]);
 
-  // Load message history for selected lead (if store is empty)
-  const selectedProj = selectedLeadId ? projects[selectedLeadId] : null;
-  const needsHistory = !!selectedLeadId && (!selectedProj || selectedProj.messages.length === 0);
+  // Load message history for selected lead (if messageStore channel is empty)
+  const selectedCh = selectedLeadId ? channels[selectedLeadId] : null;
+  const needsHistory = !!selectedLeadId && (!selectedCh || selectedCh.messages.length === 0);
   const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
   const msgApiPath = selectedLeadId
     ? isHistorical
@@ -108,10 +106,10 @@ export function useLeadMessages(
           ...(m.fromRole ? { fromRole: m.fromRole } : {}),
           timestamp: new Date(m.timestamp).getTime(),
         }));
-        const ms = useMessageStore.getState();
-        ms.mergeHistory(selectedLeadId!, msgs);
-        const ch = ms.channels[selectedLeadId!];
-        if (ch) useLeadStore.getState().setMessages(selectedLeadId!, ch.messages);
+        const ch = useMessageStore.getState().channels[selectedLeadId!];
+        if (!ch || ch.messages.length === 0) {
+          useMessageStore.getState().mergeHistory(selectedLeadId!, msgs);
+        }
       }
       return data;
     },

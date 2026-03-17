@@ -257,8 +257,6 @@ function AppContent() {
                 }));
                 const ms = useMessageStore.getState();
                 ms.mergeHistory(l.id, msgs);
-                const ch = ms.channels[l.id];
-                if (ch) useLeadStore.getState().setMessages(l.id, ch.messages);
               }
             })
             .catch(() => { /* message history fetch — non-critical, will load via WS */ });

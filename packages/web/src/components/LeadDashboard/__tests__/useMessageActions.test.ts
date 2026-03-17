@@ -2,15 +2,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-const mockAddMessage = vi.fn();
-const mockSetMessages = vi.fn();
 const mockProjects: Record<string, any> = {};
 vi.mock('../../../stores/leadStore', () => ({
   useLeadStore: {
     getState: () => ({
-      addMessage: mockAddMessage,
-      setMessages: mockSetMessages,
       projects: mockProjects,
+    }),
+  },
+}));
+
+const mockMsAddMessage = vi.fn();
+const mockMsSetMessages = vi.fn();
+const mockMsEnsureChannel = vi.fn();
+let mockMsChannels: Record<string, any> = {};
+
+vi.mock('../../../stores/messageStore', () => ({
+  useMessageStore: {
+    getState: () => ({
+      addMessage: mockMsAddMessage,
+      setMessages: mockMsSetMessages,
+      ensureChannel: mockMsEnsureChannel,
+      channels: mockMsChannels,
     }),
   },
 }));
@@ -33,7 +45,10 @@ describe('useMessageActions', () => {
     mockApiFetch.mockResolvedValue({});
     // Reset projects
     Object.keys(mockProjects).forEach((k) => delete mockProjects[k]);
-    mockProjects['lead-1'] = {
+    mockProjects['lead-1'] = {};
+    // Reset message channels
+    mockMsChannels = {};
+    mockMsChannels['lead-1'] = {
       messages: [
         { type: 'text', text: 'hello', sender: 'agent', queued: false },
         { type: 'text', text: 'queued msg', sender: 'user', queued: true },
@@ -58,7 +73,7 @@ describe('useMessageActions', () => {
       await result.current.sendMessage();
     });
     expect(setInput).toHaveBeenCalledWith('');
-    expect(mockAddMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+    expect(mockMsAddMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
       text: 'Hello world',
       sender: 'user',
     }));
@@ -70,7 +85,7 @@ describe('useMessageActions', () => {
 
   it('sendMessage with interrupt inserts separator when last msg from agent', async () => {
     // Make last message from agent
-    mockProjects['lead-1'] = {
+    mockMsChannels['lead-1'] = {
       messages: [
         { type: 'text', text: 'agent response', sender: 'agent', queued: false },
       ],
@@ -82,7 +97,7 @@ describe('useMessageActions', () => {
       await result.current.sendMessage('interrupt');
     });
     // Should insert separator before user message since last msg is from agent
-    expect(mockAddMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+    expect(mockMsAddMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
       text: '---',
       sender: 'system',
     }));
@@ -142,11 +157,11 @@ describe('useMessageActions', () => {
       await result.current.removeQueuedMessage(0);
     });
     expect(mockApiFetch).toHaveBeenCalledWith('/agents/lead-1/queue/0', { method: 'DELETE' });
-    expect(mockSetMessages).toHaveBeenCalled();
+    expect(mockMsSetMessages).toHaveBeenCalled();
   });
 
   it('reorderQueuedMessage calls API and reorders store', async () => {
-    mockProjects['lead-1'].messages = [
+    mockMsChannels['lead-1'].messages = [
       { type: 'text', text: 'non-queued', sender: 'agent', queued: false },
       { type: 'text', text: 'q1', sender: 'user', queued: true },
       { type: 'text', text: 'q2', sender: 'user', queued: true },
@@ -160,6 +175,6 @@ describe('useMessageActions', () => {
     expect(mockApiFetch).toHaveBeenCalledWith('/agents/lead-1/queue/reorder', expect.objectContaining({
       method: 'POST',
     }));
-    expect(mockSetMessages).toHaveBeenCalled();
+    expect(mockMsSetMessages).toHaveBeenCalled();
   });
 });

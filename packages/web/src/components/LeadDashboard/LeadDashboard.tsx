@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Crown, Eye } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import type { AgentReport, ProgressSnapshot, ActivityEvent, AgentComm } from '../../stores/leadStore';
 import type { AcpTextChunk, Decision, ChatGroup, GroupMessage, Delegation, LeadProgress } from '../../types';
@@ -127,6 +128,7 @@ export function LeadDashboard({ readOnly = false }: Props) {
   useLeadPolling(selectedLeadId, isActiveAgent, historicalProjectId);
 
   // Auto-scroll on new messages
+  const channelMessages = useMessageStore((s) => selectedLeadId ? s.channels[selectedLeadId]?.messages : undefined);
   useEffect(() => {
     const el = chatContainerRef.current;
     if (!el) return;
@@ -139,7 +141,7 @@ export function LeadDashboard({ readOnly = false }: Props) {
     if (isNearBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [currentProject?.messages]);
+  }, [channelMessages]);
 
   const reportsScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -199,7 +201,7 @@ export function LeadDashboard({ readOnly = false }: Props) {
     useAppStore.getState().setSelectedAgent(agentId);
   }, []);
 
-  const messages = currentProject?.messages ?? EMPTY_MESSAGES;
+  const messages = channelMessages ?? EMPTY_MESSAGES;
   const decisions = currentProject?.decisions ?? EMPTY_DECISIONS;
   const pendingConfirmations = decisions.filter((d) => d.needsConfirmation && d.status === 'recorded');
   const progress = currentProject?.progress ?? null;
