@@ -1,4 +1,4 @@
-import type { WsHandlerContext } from './types';
+import type { WsHandlerContext, WsServerMessageOf } from './types';
 import { useMessageStore } from '../../stores/messageStore';
 
 /**
@@ -6,7 +6,7 @@ import { useMessageStore } from '../../stores/messageStore';
  * Manages both the live toolCalls[] array and the chronological messages[] timeline.
  */
 
-export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
+export function handleToolCall(msg: WsServerMessageOf<'agent:tool_call'>, ctx: WsHandlerContext): void {
   ctx.pendingNewlineRef.current.add(msg.agentId);
   const existing = ctx.getAppState().agents.find((a: any) => a.id === msg.agentId);
 
@@ -36,7 +36,7 @@ export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
       msgs[existingMsgIdx] = {
         ...msgs[existingMsgIdx],
         text: `${statusIcon} ${title}`,
-        toolStatus: tc.status,
+        toolStatus: tc.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
       };
     } else {
       msgs.push({
@@ -45,7 +45,7 @@ export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
         sender: 'tool',
         timestamp: Date.now(),
         toolCallId: tc.toolCallId,
-        toolStatus: tc.status,
+        toolStatus: tc.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
         toolKind: tc.kind,
       });
     }

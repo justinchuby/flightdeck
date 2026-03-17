@@ -1,4 +1,5 @@
 import type { AcpTextChunk } from '../../types';
+import type { WsServerMessage, WsServerMessageOf } from '@flightdeck/shared';
 
 /**
  * Shared context passed to all WS message handlers.
@@ -23,7 +24,8 @@ export interface WsHandlerContext {
   pendingNewlineRef: { current: Set<string> };
 }
 
-/** A WS message handler processes one or more message types */
-export type WsMessageHandler = (msg: any, ctx: WsHandlerContext) => void;
+/** A WS message handler processes a specific typed message */
+export type WsMessageHandler<T extends WsServerMessage['type'] = WsServerMessage['type']> =
+  (msg: WsServerMessageOf<T>, ctx: WsHandlerContext) => void;
 
-export type { AcpTextChunk };
+export type { AcpTextChunk, WsServerMessage, WsServerMessageOf };
