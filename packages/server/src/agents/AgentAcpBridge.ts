@@ -247,15 +247,18 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('plan', (entries: PlanEntry[]) => withCtx(() => {
+    // Not suppressed during resume — plan state should always be captured
     agent.plan = entries;
     agent._notifyPlan(entries);
   }));
 
   conn.on('session_resume_failed', (info: { requestedSessionId: string; error: string }) => withCtx(() => {
+    agent._clearResuming();
     agent._notifySessionResumeFailed(info);
   }));
 
   conn.on('usage', (usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; durationMs?: number; model?: string }) => withCtx(() => {
+    // Not suppressed during resume — usage/cost data should always be recorded
     agent.inputTokens = usage.inputTokens;
     agent.outputTokens = usage.outputTokens;
     agent.hasRealUsageData = true;
@@ -286,6 +289,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('exit', (code: number) => withCtx(() => {
+    // Not suppressed during resume — exit events must always propagate for cleanup
     if (!agent._isTerminated) {
       agent.status = code === 0 ? 'completed' : 'failed';
     }
