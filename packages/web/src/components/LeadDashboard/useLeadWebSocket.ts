@@ -1,6 +1,7 @@
 import { apiFetch } from '../../hooks/useApi';
 import { useEffect } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
+import { useAppStore } from '../../stores/appStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
 
@@ -411,10 +412,13 @@ export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: strin
       // selectedLeadId may temporarily be "project:<id>" during session resume
       // (before ProjectLayout resolves the real lead agent). Messages arrive with
       // the real agent UUID, so we need to resolve to match them.
+      // Use appStore.agents (fresh via getState) as fallback when the closure's
+      // agents array is stale/empty — prevents dropped messages during mount races.
       let effectiveLeadId = selectedLeadId;
-      if (selectedLeadId?.startsWith('project:') && agents.length > 0) {
+      if (selectedLeadId?.startsWith('project:')) {
         const projectId = selectedLeadId.slice(8);
-        const lead = agents.find((a) => a.projectId === projectId && a.role?.id === 'lead' && a.status !== 'terminated');
+        const agentList = agents.length > 0 ? agents : useAppStore.getState().agents;
+        const lead = agentList.find((a: AgentInfo) => a.projectId === projectId && a.role?.id === 'lead' && a.status !== 'terminated');
         if (lead) effectiveLeadId = lead.id;
       }
 

@@ -26,6 +26,10 @@ vi.mock('../../../stores/leadStore', () => ({
   useLeadStore: { getState: () => mockStore },
 }));
 
+vi.mock('../../../stores/appStore', () => ({
+  useAppStore: { getState: () => ({ agents: [] }) },
+}));
+
 vi.mock('../../../hooks/useApi', () => ({
   apiFetch: vi.fn().mockResolvedValue({}),
 }));

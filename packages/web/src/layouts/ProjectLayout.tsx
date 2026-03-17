@@ -174,6 +174,11 @@ export function ProjectLayout() {
     if (lead) {
       // Live lead found — always use its real agent ID
       store.addProject(lead.id);
+      // Migrate any messages accumulated under the temporary project:xxx key
+      const fallbackKey = `project:${id}`;
+      if (store.projects[fallbackKey]) {
+        store.migrateProject(fallbackKey, lead.id);
+      }
       if (store.selectedLeadId !== lead.id) {
         store.selectLead(lead.id);
       }
