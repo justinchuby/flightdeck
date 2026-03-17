@@ -45,6 +45,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useGroupStore } from '../../stores/groupStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { sendWsMessage, useWebSocket } from '../useWebSocket';
+import { useMessageStore } from '../../stores/messageStore';
 
 function simulateMsg(msg: Record<string, unknown>) {
   act(() => { lastWs?.onmessage?.({ data: JSON.stringify(msg) }); });
@@ -52,6 +53,17 @@ function simulateMsg(msg: Record<string, unknown>) {
 
 function openWs() {
   act(() => { lastWs?.onopen?.({}); });
+}
+
+function getAgentMessages(agentId: string) {
+  return useMessageStore.getState().channels[agentId]?.messages ?? [];
+}
+
+function setAgentWithMessages(agentId: string, agent: Record<string, unknown>, messages: unknown[] = []) {
+  useAppStore.setState({ agents: [{ ...agent, id: agentId, messages } as any] });
+  const ms = useMessageStore.getState();
+  ms.ensureChannel(agentId);
+  if (messages.length > 0) ms.setMessages(agentId, messages as any);
 }
 
 describe('sendWsMessage', () => {
@@ -77,6 +89,7 @@ describe('useWebSocket — connection lifecycle', () => {
     vi.useFakeTimers();
     lastWs = null;
     useAppStore.setState({ agents: [], connected: false, loading: true });
+    useMessageStore.getState().reset();
   });
 
   afterEach(() => {
@@ -135,6 +148,7 @@ describe('useWebSocket — message handling', () => {
     });
     useGroupStore.setState({ groups: [], messages: {} });
     useTimerStore.setState({ timers: [] });
+    useMessageStore.getState().reset();
   });
 
   afterEach(() => {
@@ -206,64 +220,54 @@ describe('useWebSocket — message handling', () => {
 
   it('agent:text appends text to agent messages', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: 'hello' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(1);
-    expect(msgs?.[0].text).toBe('hello');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].text).toBe('hello');
   });
 
   it('agent:text appends to existing agent message', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [{ type: 'text', text: 'hello', sender: 'agent', timestamp: Date.now() }],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [{ type: 'text', text: 'hello', sender: 'agent', timestamp: Date.now() }]);
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: ' world' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(1);
-    expect(msgs?.[0].text).toBe('hello world');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].text).toBe('hello world');
   });
 
   it('agent:thinking creates thinking message', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({ type: 'agent:thinking', agentId: 'a1', text: 'hmm' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[0].sender).toBe('thinking');
-    expect(msgs?.[0].text).toBe('hmm');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[0].sender).toBe('thinking');
+    expect(msgs[0].text).toBe('hmm');
   });
 
   it('agent:thinking appends to existing thinking message', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [{ type: 'text', text: 'think', sender: 'thinking', timestamp: Date.now() }],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [{ type: 'text', text: 'think', sender: 'thinking', timestamp: Date.now() }]);
     simulateMsg({ type: 'agent:thinking', agentId: 'a1', text: 'ing' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(1);
-    expect(msgs?.[0].text).toBe('thinking');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].text).toBe('thinking');
   });
 
   it('agent:thinking normalizes object text payload', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({ type: 'agent:thinking', agentId: 'a1', text: { text: 'pondering' } });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[0].sender).toBe('thinking');
-    expect(msgs?.[0].text).toBe('pondering');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[0].sender).toBe('thinking');
+    expect(msgs[0].text).toBe('pondering');
   });
 
   it('agent:thinking skips empty text', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({ type: 'agent:thinking', agentId: 'a1', text: '' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
+    const msgs = getAgentMessages('a1');
     expect(msgs).toHaveLength(0);
   });
 
@@ -302,20 +306,20 @@ describe('useWebSocket — message handling', () => {
 
   it('agent:content pushes content message', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({
       type: 'agent:content', agentId: 'a1',
       content: { text: 'result', contentType: 'resource', mimeType: 'text/plain' },
     });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(1);
-    expect(msgs?.[0].text).toBe('result');
-    expect(msgs?.[0].contentType).toBe('resource');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].text).toBe('result');
+    expect(msgs[0].contentType).toBe('resource');
   });
 
   it('agent:tool_call adds new tool call', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [], toolCalls: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running', toolCalls: [] });
     simulateMsg({
       type: 'agent:tool_call', agentId: 'a1',
       toolCall: { toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' },
@@ -327,11 +331,9 @@ describe('useWebSocket — message handling', () => {
 
   it('agent:tool_call updates existing tool call on status change', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running', messages: [],
-        toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
-      } as any],
+    setAgentWithMessages('a1', {
+      status: 'running',
+      toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
     });
     simulateMsg({
       type: 'agent:tool_call', agentId: 'a1',
@@ -343,18 +345,13 @@ describe('useWebSocket — message handling', () => {
 
   it('agent:response_start sets pending newline flag', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [{ type: 'text', text: 'first', sender: 'agent', timestamp: Date.now() }],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [{ type: 'text', text: 'first', sender: 'agent', timestamp: Date.now() }]);
     simulateMsg({ type: 'agent:response_start', agentId: 'a1' });
     // Next text should create a new message, not append
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: 'second' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(2);
-    expect(msgs?.[1].text).toBe('second');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(2);
+    expect(msgs[1].text).toBe('second');
   });
 
   it('agent:plan updates agent plan', () => {
@@ -493,190 +490,144 @@ describe('useWebSocket — message handling', () => {
   it('agent:status inserts separator when transitioning idle→running with agent message', () => {
     setup();
     const now = Date.now();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'idle',
-        messages: [
-          { type: 'text', text: 'old msg', sender: 'agent', timestamp: now - 5000 },
-        ],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'idle' }, [
+      { type: 'text', text: 'old msg', sender: 'agent', timestamp: now - 5000 },
+    ]);
     simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.some(m => m.text === '---')).toBe(true);
+    const msgs = getAgentMessages('a1');
+    expect(msgs.some(m => m.text === '---')).toBe(true);
   });
 
   it('agent:status inserts separator before recent agent message when text arrived early', () => {
     setup();
     const now = Date.now();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'idle',
-        messages: [
-          { type: 'text', text: 'old response', sender: 'agent', timestamp: now - 5000 },
-          { type: 'text', text: 'new text', sender: 'agent', timestamp: now - 500 },
-        ],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'idle' }, [
+      { type: 'text', text: 'old response', sender: 'agent', timestamp: now - 5000 },
+      { type: 'text', text: 'new text', sender: 'agent', timestamp: now - 500 },
+    ]);
     simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[1]?.text).toBe('---');
-    expect(msgs?.[2]?.text).toBe('new text');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[1]?.text).toBe('---');
+    expect(msgs[2]?.text).toBe('new text');
   });
 
   it('agent:status inserts separator after message when prev is non-agent', () => {
     setup();
     const now = Date.now();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'idle',
-        messages: [
-          { type: 'text', text: 'thought', sender: 'thinking', timestamp: now - 3000 },
-          { type: 'text', text: 'new text', sender: 'agent', timestamp: now - 500 },
-        ],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'idle' }, [
+      { type: 'text', text: 'thought', sender: 'thinking', timestamp: now - 3000 },
+      { type: 'text', text: 'new text', sender: 'agent', timestamp: now - 500 },
+    ]);
     simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[msgs.length - 1]?.text).toBe('---');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[msgs.length - 1]?.text).toBe('---');
   });
 
   it('agent:status does not insert separator when last message is not agent', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'completed',
-        messages: [
-          { type: 'text', text: 'thought', sender: 'thinking', timestamp: Date.now() - 5000 },
-        ],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'completed' }, [
+      { type: 'text', text: 'thought', sender: 'thinking', timestamp: Date.now() - 5000 },
+    ]);
     simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.some(m => m.text === '---')).toBe(false);
+    const msgs = getAgentMessages('a1');
+    expect(msgs.some(m => m.text === '---')).toBe(false);
   });
 
   it('agent:status no separator when not transitioning from idle/completed', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [{ type: 'text', text: 'msg', sender: 'agent', timestamp: Date.now() }],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [{ type: 'text', text: 'msg', sender: 'agent', timestamp: Date.now() }]);
     simulateMsg({ type: 'agent:status', agentId: 'a1', status: 'running' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.some(m => m.text === '---')).toBe(false);
+    const msgs = getAgentMessages('a1');
+    expect(msgs.some(m => m.text === '---')).toBe(false);
   });
 
   // ── agent:text edge cases ─────────────────────────────────────
 
   it('agent:text stringifies non-string text', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: { nested: true } });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[0].text).toContain('nested');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[0].text).toContain('nested');
   });
 
   it('agent:text uses text.text when text is an object with .text', () => {
     setup();
-    useAppStore.setState({ agents: [{ id: 'a1', status: 'running', messages: [] } as any] });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: { text: 'wrapped value' } });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[0].text).toBe('wrapped value');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[0].text).toBe('wrapped value');
   });
 
   it('agent:text skips notification messages when finding append target', () => {
     setup();
     const now = Date.now();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [
-          { type: 'text', text: 'hello', sender: 'agent', timestamp: now - 1000 },
-          { type: 'text', text: '📨 [From dev] msg', sender: 'system', timestamp: now - 500 },
-        ],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [
+      { type: 'text', text: 'hello', sender: 'agent', timestamp: now - 1000 },
+      { type: 'text', text: '📨 [From dev] msg', sender: 'system', timestamp: now - 500 },
+    ]);
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: ' world' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.[0].text).toBe('hello world');
+    const msgs = getAgentMessages('a1');
+    expect(msgs[0].text).toBe('hello world');
   });
 
   it('agent:text creates new message when user message breaks append chain', () => {
     setup();
     const now = Date.now();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [
-          { type: 'text', text: 'response', sender: 'agent', timestamp: now - 3000 },
-          { type: 'text', text: 'user input', sender: 'user', timestamp: now - 1000 },
-        ],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [
+      { type: 'text', text: 'response', sender: 'agent', timestamp: now - 3000 },
+      { type: 'text', text: 'user input', sender: 'user', timestamp: now - 1000 },
+    ]);
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: 'new response' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(3);
-    expect(msgs?.[2].text).toBe('new response');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(3);
+    expect(msgs[2].text).toBe('new response');
   });
 
   it('agent:text appends when hasUnclosedCommandBlock returns true despite newline', async () => {
     const { hasUnclosedCommandBlock } = await import('../../utils/commandParser');
     (hasUnclosedCommandBlock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [{ type: 'text', text: '```bash\necho hi', sender: 'agent', timestamp: Date.now() }],
-      } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' }, [{ type: 'text', text: '```bash\necho hi', sender: 'agent', timestamp: Date.now() }]);
     simulateMsg({ type: 'agent:response_start', agentId: 'a1' });
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: '\n```' });
-    const msgs = useAppStore.getState().agents.find(a => a.id === 'a1')?.messages;
-    expect(msgs?.length).toBe(1);
-    expect(msgs?.[0].text).toContain('```');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].text).toContain('```');
   });
 
   // ── agent:tool_call edge cases ────────────────────────────────
 
   it('agent:tool_call only updates toolCalls when status unchanged', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [{ type: 'text', text: '⟳ Run tests', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running', timestamp: Date.now() }],
-        toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
-      } as any],
-    });
+    setAgentWithMessages('a1', {
+      status: 'running',
+      toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
+    }, [{ type: 'text', text: '⟳ Run tests', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running', timestamp: Date.now() }]);
     simulateMsg({
       type: 'agent:tool_call', agentId: 'a1',
       toolCall: { toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' },
     });
-    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
-    expect(a?.messages?.length).toBe(1);
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
   });
 
   it('agent:tool_call updates existing tool message in-place on status change', () => {
     setup();
-    useAppStore.setState({
-      agents: [{
-        id: 'a1', status: 'running',
-        messages: [
-          { type: 'text', text: '⟳ Run tests', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running', timestamp: Date.now() },
-        ],
-        toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
-      } as any],
-    });
+    setAgentWithMessages('a1', {
+      status: 'running',
+      toolCalls: [{ toolCallId: 'tc1', title: 'Run tests', status: 'running', kind: 'bash' }],
+    }, [
+      { type: 'text', text: '⟳ Run tests', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running', timestamp: Date.now() },
+    ]);
     simulateMsg({
       type: 'agent:tool_call', agentId: 'a1',
       toolCall: { toolCallId: 'tc1', title: 'Run tests', status: 'completed', kind: 'bash' },
     });
-    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
-    expect(a?.messages?.length).toBe(1);
-    expect(a?.messages?.[0].text).toContain('✓');
-    expect(a?.messages?.[0].toolStatus).toBe('completed');
+    const msgs = getAgentMessages('a1');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].text).toContain('✓');
+    expect(msgs[0].toolStatus).toBe('completed');
   });
 
   // ── agent:message_sent branches ───────────────────────────────
@@ -689,56 +640,46 @@ describe('useWebSocket — message handling', () => {
         { id: 'a2', status: 'running', messages: [], role: { name: 'developer' } } as any,
       ],
     });
+    useMessageStore.getState().ensureChannel('a1');
+    useMessageStore.getState().ensureChannel('a2');
     simulateMsg({
       type: 'agent:message_sent', from: 'a1', to: 'a2',
       fromRole: 'architect', content: 'implement auth',
     });
-    const recipient = useAppStore.getState().agents.find(a => a.id === 'a2');
-    expect(recipient?.messages?.some(m => m.text?.includes('📨'))).toBe(true);
-    const sender = useAppStore.getState().agents.find(a => a.id === 'a1');
-    expect(sender?.messages?.some(m => m.text?.includes('📤'))).toBe(true);
+    expect(getAgentMessages('a2').some(m => m.text?.includes('📨'))).toBe(true);
+    expect(getAgentMessages('a1').some(m => m.text?.includes('📤'))).toBe(true);
   });
 
   it('agent:message_sent from system uses system prefix', () => {
     setup();
-    useAppStore.setState({
-      agents: [{ id: 'a1', status: 'running', messages: [] } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({
       type: 'agent:message_sent', from: 'system', to: 'a1',
       content: 'system instruction',
     });
-    const recipient = useAppStore.getState().agents.find(a => a.id === 'a1');
-    expect(recipient?.messages?.some(m => m.text?.includes('⚙️'))).toBe(true);
-    expect(recipient?.messages?.some(m => m.sender === 'system')).toBe(true);
+    const msgs = getAgentMessages('a1');
+    expect(msgs.some(m => m.text?.includes('⚙️'))).toBe(true);
+    expect(msgs.some(m => m.sender === 'system')).toBe(true);
   });
 
   it('agent:message_sent broadcast shows [To All]', () => {
     setup();
-    useAppStore.setState({
-      agents: [
-        { id: 'a1', status: 'running', messages: [], role: { name: 'lead' } } as any,
-      ],
-    });
+    setAgentWithMessages('a1', { status: 'running', role: { name: 'lead' } });
     simulateMsg({
       type: 'agent:message_sent', from: 'a1', to: 'all',
       fromRole: 'lead', content: 'attention everyone',
     });
-    const sender = useAppStore.getState().agents.find(a => a.id === 'a1');
-    expect(sender?.messages?.some(m => m.text?.includes('[To All]'))).toBe(true);
+    expect(getAgentMessages('a1').some(m => m.text?.includes('[To All]'))).toBe(true);
   });
 
   it('agent:message_sent does not add sender message when from === to', () => {
     setup();
-    useAppStore.setState({
-      agents: [{ id: 'a1', status: 'running', messages: [] } as any],
-    });
+    setAgentWithMessages('a1', { status: 'running' });
     simulateMsg({
       type: 'agent:message_sent', from: 'a1', to: 'a1',
       content: 'self message',
     });
-    const a = useAppStore.getState().agents.find(a => a.id === 'a1');
-    expect(a?.messages?.filter(m => m.text?.includes('📤')).length).toBe(0);
+    expect(getAgentMessages('a1').filter(m => m.text?.includes('📤')).length).toBe(0);
   });
 
   // ── group:reaction branches ───────────────────────────────────
@@ -932,6 +873,7 @@ describe('useWebSocket — returned methods', () => {
     vi.useFakeTimers();
     lastWs = null;
     useAppStore.setState({ agents: [] });
+    useMessageStore.getState().reset();
   });
 
   afterEach(() => {

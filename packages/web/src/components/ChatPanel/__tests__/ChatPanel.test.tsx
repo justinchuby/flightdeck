@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ChatPanel } from '../ChatPanel';
 import { useAppStore } from '../../../stores/appStore';
+import { useMessageStore } from '../../../stores/messageStore';
 
 // Mock apiFetch
 const mockApiFetch = vi.fn().mockResolvedValue({ ok: true });
@@ -32,12 +33,14 @@ function seedAgent(status = 'idle') {
       contextWindowUsed: 0,
     } as any,
   ]);
+  useMessageStore.getState().ensureChannel(AGENT_ID);
 }
 
 describe('ChatPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAppStore.getState().setAgents([]);
+    useMessageStore.getState().reset();
   });
 
   it('sends message via REST API (not WebSocket)', () => {
@@ -97,8 +100,8 @@ describe('ChatPanel', () => {
     fireEvent.change(textarea, { target: { value: 'test' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
 
-    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
-    const lastMsg = agent?.messages?.[agent.messages.length - 1];
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    const lastMsg = msgs[msgs.length - 1];
     expect(lastMsg?.queued).toBe(true);
   });
 
@@ -110,8 +113,8 @@ describe('ChatPanel', () => {
     fireEvent.change(textarea, { target: { value: 'urgent' } });
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
 
-    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
-    const lastMsg = agent?.messages?.[agent.messages.length - 1];
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    const lastMsg = msgs[msgs.length - 1];
     expect(lastMsg?.queued).toBeFalsy();
   });
 
@@ -130,14 +133,15 @@ describe('ChatPanel', () => {
         contextWindowUsed: 0,
       } as any,
     ]);
+    useMessageStore.getState().ensureChannel(AGENT_ID);
+    useMessageStore.getState().setMessages(AGENT_ID, [{ type: 'text', text: 'previous response', sender: 'agent', timestamp: 1000 }] as any);
     render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'urgent fix' } });
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
 
-    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
-    const msgs = agent?.messages ?? [];
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
     // Should have: [agent msg, separator, user msg]
     expect(msgs).toHaveLength(3);
     expect(msgs[0].sender).toBe('agent');
@@ -162,14 +166,15 @@ describe('ChatPanel', () => {
         contextWindowUsed: 0,
       } as any,
     ]);
+    useMessageStore.getState().ensureChannel(AGENT_ID);
+    useMessageStore.getState().setMessages(AGENT_ID, [{ type: 'text', text: 'user question', sender: 'user', timestamp: 1000 }] as any);
     render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'interrupt' } });
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
 
-    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
-    const msgs = agent?.messages ?? [];
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
     // Should have: [user msg, user msg] — no separator needed
     expect(msgs).toHaveLength(2);
     expect(msgs[0].sender).toBe('user');

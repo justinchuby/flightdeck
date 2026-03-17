@@ -3,7 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { useGroupStore, groupKey } from '../stores/groupStore';
 import { useTimerStore } from '../stores/timerStore';
 import { useToastStore } from '../components/Toast';
-import { hasUnclosedCommandBlock } from '../utils/commandParser';
+import { useMessageStore } from '../stores/messageStore';
 import type { AcpTextChunk, WsMessage } from '../types';
 import { getAuthToken, apiFetch } from './useApi';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -100,22 +100,17 @@ export function useWebSocket() {
           const prev = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
           const wasIdle = prev && (prev.status === 'idle' || prev.status === 'completed');
           updateAgent(msg.agentId, { status: msg.status });
-          // When agent transitions from idle back to running, insert a turn separator.
-          // Due to status throttling (500ms), text from the new response may have already
-          // arrived before this status change. In that case, insert the separator BEFORE
-          // the new-turn text so it appears in the right visual position.
           if (msg.status === 'running' && wasIdle) {
-            const existing = useAppStore.getState().agents.find((a) => a.id === msg.agentId);
-            if (existing?.messages?.length) {
-              const msgs = [...existing.messages];
+            const ms = useMessageStore.getState();
+            const ch = ms.channels[msg.agentId];
+            if (ch && ch.messages.length > 0) {
+              const msgs = [...ch.messages];
               const last = msgs[msgs.length - 1];
               if (last?.sender === 'agent') {
                 const separator: AcpTextChunk = { type: 'text', text: '---', sender: 'system' };
-                // If the last agent message was just created (< 2s ago), text from the new
-                // turn already arrived — insert separator before it, not after.
                 if (last.timestamp && Date.now() - last.timestamp < 2000 && msgs.length >= 2) {
-                  const prev = msgs[msgs.length - 2];
-                  if (prev?.sender === 'agent' || prev?.sender === undefined) {
+                  const prevMsg = msgs[msgs.length - 2];
+                  if (prevMsg?.sender === 'agent' || prevMsg?.sender === undefined) {
                     msgs.splice(msgs.length - 1, 0, separator);
                   } else {
                     msgs.push(separator);
@@ -123,7 +118,7 @@ export function useWebSocket() {
                 } else {
                   msgs.push(separator);
                 }
-                updateAgent(msg.agentId, { messages: msgs });
+                ms.setMessages(msg.agentId, msgs);
               }
             }
           }
@@ -159,89 +154,43 @@ export function useWebSocket() {
         }
         case 'agent:text': {
           const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-          const state = useAppStore.getState();
-          const existing = state.agents.find((a) => a.id === msg.agentId);
-          const msgs = [...(existing?.messages ?? [])];
           const needsNewline = pendingNewlineRef.current.has(msg.agentId);
           if (needsNewline) pendingNewlineRef.current.delete(msg.agentId);
-
-          // Find the last agent message, skipping over interleaved DM/group notifications.
-          // This prevents system notifications (📨, 📤, 🗣️) from fragmenting a streaming response.
-          let appendIdx = -1;
-          for (let i = msgs.length - 1; i >= 0; i--) {
-            const m = msgs[i];
-            const sender = m.sender ?? 'agent';
-            if (sender === 'agent') {
-              appendIdx = i;
-              break;
-            }
-            // User messages, separators, and thinking blocks break the append chain
-            if (sender === 'user' || sender === 'thinking' || m.text === '---') break;
-            // System messages that are DM/group notifications are transparent — keep searching
-          }
-
-          const appendTarget = appendIdx >= 0 ? msgs[appendIdx] : null;
-          const appendText = appendTarget?.text ?? '';
-          const hasUnclosedCommand = hasUnclosedCommandBlock(appendText);
-          // Append if: unclosed command (always finish it) OR no break signal pending
-          if (appendTarget && (hasUnclosedCommand || !needsNewline)) {
-            msgs[appendIdx] = { ...appendTarget, text: appendText + rawText, timestamp: appendTarget.timestamp || Date.now() };
-          } else {
-            msgs.push({ type: 'text', text: rawText, sender: 'agent', timestamp: Date.now() });
-          }
-          updateAgent(msg.agentId, { messages: msgs });
+          const ms = useMessageStore.getState();
+          ms.ensureChannel(msg.agentId);
+          if (needsNewline) ms.setPendingNewline(msg.agentId, true);
+          ms.appendToLastAgentMessage(msg.agentId, rawText);
           break;
         }
         case 'agent:tool_call': {
           pendingNewlineRef.current.add(msg.agentId);
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
-
-          // Update toolCalls[] (live state) — latest status per tool call, used
-          // by AgentCard/FleetOverview for "what is the agent doing right now?"
           const calls = existing?.toolCalls ?? [];
           const idx = calls.findIndex((tc) => tc.toolCallId === msg.toolCall.toolCallId);
           const updated = idx >= 0
             ? calls.map((tc, i) => (i === idx ? msg.toolCall : tc))
             : [...calls, msg.toolCall];
-
-          // Append to messages[] (timeline) — chronological record for the chat
-          // panel. Only inject on new tool calls or status transitions (not
-          // duplicate updates for the same status). Carries toolStatus/toolKind
-          // so the renderer can show proper colors without cross-referencing.
           const tc = msg.toolCall;
           const prevTc = idx >= 0 ? calls[idx] : undefined;
           if (!prevTc || prevTc.status !== tc.status) {
-            const msgs = [...(existing?.messages ?? [])];
+            const ms = useMessageStore.getState();
+            ms.ensureChannel(msg.agentId);
+            const ch = ms.channels[msg.agentId];
+            const msgs = [...(ch?.messages ?? [])];
             const statusIcon = tc.status === 'completed' ? '✓' : tc.status === 'cancelled' ? '✗' : '⟳';
             const title = typeof tc.title === 'string' ? tc.title : String(tc.title);
-
-            // Find existing message with same toolCallId and update in-place
             const existingMsgIdx = msgs.findIndex(
               (m) => m.sender === 'tool' && m.toolCallId === tc.toolCallId,
             );
-
             if (existingMsgIdx >= 0) {
-              msgs[existingMsgIdx] = {
-                ...msgs[existingMsgIdx],
-                text: `${statusIcon} ${title}`,
-                toolStatus: tc.status,
-              };
+              msgs[existingMsgIdx] = { ...msgs[existingMsgIdx], text: `${statusIcon} ${title}`, toolStatus: tc.status };
             } else {
-              msgs.push({
-                type: 'text',
-                text: `${statusIcon} ${title}`,
-                sender: 'tool',
-                timestamp: Date.now(),
-                toolCallId: tc.toolCallId,
-                toolStatus: tc.status,
-                toolKind: tc.kind,
-              });
+              msgs.push({ type: 'text', text: `${statusIcon} ${title}`, sender: 'tool', timestamp: Date.now(), toolCallId: tc.toolCallId, toolStatus: tc.status, toolKind: tc.kind });
             }
-            updateAgent(msg.agentId, { toolCalls: updated, messages: msgs });
-          } else {
-            updateAgent(msg.agentId, { toolCalls: updated });
+            ms.setMessages(msg.agentId, msgs);
           }
+          updateAgent(msg.agentId, { toolCalls: updated });
           break;
         }
         case 'agent:response_start': {
@@ -251,37 +200,20 @@ export function useWebSocket() {
           break;
         }
         case 'agent:content': {
-          const state = useAppStore.getState();
-          const existing = state.agents.find((a) => a.id === msg.agentId);
-          const msgs = [...(existing?.messages ?? [])];
-          msgs.push({
-            type: 'text',
-            text: msg.content.text || '',
-            sender: 'agent',
-            timestamp: Date.now(),
-            contentType: msg.content.contentType,
-            mimeType: msg.content.mimeType,
-            data: msg.content.data,
-            uri: msg.content.uri,
+          const ms = useMessageStore.getState();
+          ms.ensureChannel(msg.agentId);
+          ms.addMessage(msg.agentId, {
+            type: 'text', text: msg.content.text || '', sender: 'agent', timestamp: Date.now(),
+            contentType: msg.content.contentType, mimeType: msg.content.mimeType, data: msg.content.data, uri: msg.content.uri,
           });
-          updateAgent(msg.agentId, { messages: msgs });
           break;
         }
         case 'agent:thinking': {
-          // Normalize text shape — match lead panel's defensive handling
           const thinkText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
           if (!thinkText) break;
-          const state = useAppStore.getState();
-          const existing = state.agents.find((a) => a.id === msg.agentId);
-          const msgs = [...(existing?.messages ?? [])];
-          const last = msgs[msgs.length - 1];
-          // Append to existing thinking message or create new one
-          if (last && last.sender === 'thinking') {
-            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + thinkText, timestamp: last.timestamp || Date.now() };
-          } else {
-            msgs.push({ type: 'text', text: thinkText, sender: 'thinking', timestamp: Date.now() });
-          }
-          updateAgent(msg.agentId, { messages: msgs });
+          const ms = useMessageStore.getState();
+          ms.ensureChannel(msg.agentId);
+          ms.appendToThinkingMessage(msg.agentId, thinkText);
           break;
         }
         case 'agent:plan':
@@ -302,7 +234,6 @@ export function useWebSocket() {
           });
           break;
         case 'agent:message_sent': {
-          // Show incoming messages in the recipient agent's chat panel
           const toId = msg.to;
           const fromId = msg.from;
           const isFromSystem = fromId === 'system';
@@ -310,46 +241,25 @@ export function useWebSocket() {
             ? `${msg.fromRole} (${shortAgentId(fromId ?? '')})`
             : (fromId ? shortAgentId(fromId) : '') || 'System';
           const preview = (msg.content ?? '').slice(0, 2000);
-
-          // Show in recipient's panel
+          const ms = useMessageStore.getState();
           if (toId && toId !== 'system') {
-            const state = useAppStore.getState();
-            const recipient = state.agents.find((a) => a.id === toId);
-            if (recipient) {
-              const msgs = [...(recipient.messages ?? [])];
-              msgs.push({
-                type: 'text',
-                text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
-                sender: isFromSystem ? 'system' : 'user',
-                timestamp: Date.now(),
-              });
-              updateAgent(toId, { messages: msgs });
-            }
+            ms.ensureChannel(toId);
+            ms.addMessage(toId, {
+              type: 'text', text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
+              sender: isFromSystem ? 'system' : 'user', timestamp: Date.now(),
+            });
           }
-
-          // Also show in sender's panel so both sides see the DM
           if (fromId && fromId !== 'system' && toId !== fromId) {
             const state = useAppStore.getState();
-            const sender = state.agents.find((a) => a.id === fromId);
-            if (sender) {
-              const isBroadcast = toId === 'all';
-              const recipientLabel = isBroadcast
-                ? 'All'
-                : (() => {
-                    const toAgent = state.agents.find((a) => a.id === toId);
-                    return toAgent?.role?.name
-                      ? `${toAgent.role.name} (${shortAgentId(toId ?? '')})`
-                      : shortAgentId(toId ?? '');
-                  })();
-              const msgs = [...(sender.messages ?? [])];
-              msgs.push({
-                type: 'text',
-                text: `📤 [To ${recipientLabel}] ${preview}`,
-                sender: 'system',
-                timestamp: Date.now(),
-              });
-              updateAgent(fromId, { messages: msgs });
-            }
+            const isBroadcast = toId === 'all';
+            const recipientLabel = isBroadcast ? 'All' : (() => {
+              const toAgent = state.agents.find((a) => a.id === toId);
+              return toAgent?.role?.name ? `${toAgent.role.name} (${shortAgentId(toId ?? '')})` : shortAgentId(toId ?? '');
+            })();
+            ms.ensureChannel(fromId);
+            ms.addMessage(fromId, {
+              type: 'text', text: `📤 [To ${recipientLabel}] ${preview}`, sender: 'system', timestamp: Date.now(),
+            });
           }
           break;
         }

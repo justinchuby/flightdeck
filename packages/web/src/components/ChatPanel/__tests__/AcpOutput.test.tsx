@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useAppStore } from '../../../stores/appStore';
+import { useMessageStore } from '../../../stores/messageStore';
 import { useLeadStore } from '../../../stores/leadStore';
 import type { AcpTextChunk, AcpPlanEntry } from '../../../types';
 import type { ActivityEvent } from '../../../stores/leadStore';
@@ -100,6 +101,10 @@ function seedAgent(messages: AcpTextChunk[] = [], plan: AcpPlanEntry[] = []) {
       contextWindowUsed: 0,
     } as any,
   ]);
+  useMessageStore.getState().ensureChannel(AGENT_ID);
+  if (messages.length > 0) {
+    useMessageStore.getState().setMessages(AGENT_ID, messages);
+  }
 }
 
 function seedActivity(events: ActivityEvent[]) {
@@ -125,6 +130,7 @@ describe('AcpOutput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAppStore.getState().setAgents([]);
+    useMessageStore.getState().reset();
     // Reset leadStore projects
     const projects = useLeadStore.getState().projects;
     for (const id of Object.keys(projects)) {
@@ -708,15 +714,15 @@ describe('AcpOutput', () => {
     });
     seedAgent([]); // no messages
     await renderAcpOutput();
-    // Wait for the async fetch to complete
+    // Wait for the async fetch to complete — messages now go into messageStore
     await vi.waitFor(() => {
-      const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
-      expect(agent?.messages?.length).toBe(2);
+      const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+      expect(msgs.length).toBe(2);
     });
-    const agent = useAppStore.getState().agents.find((a) => a.id === AGENT_ID);
-    expect(agent!.messages![0].text).toBe('Fetched msg');
-    expect(agent!.messages![1].text).toBe('User fetched');
-    expect(agent!.messages![1].sender).toBe('user');
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    expect(msgs[0].text).toBe('Fetched msg');
+    expect(msgs[1].text).toBe('User fetched');
+    expect(msgs[1].sender).toBe('user');
   });
 
   /* ---------- Activity events ---------- */

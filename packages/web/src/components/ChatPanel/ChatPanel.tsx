@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { resolveShortId } from '../../utils/resolveShortId';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
@@ -112,22 +113,23 @@ export function ChatPanel({ agentId }: Props) {
   const handleSend = (mode: 'queue' | 'interrupt' = 'queue') => {
     if (!inputText.trim()) return;
 
-    // Record user message in store so it appears in chat
+    // Record user message in messageStore so it appears in chat
     const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
     const isAgentBusy = existing?.status === 'running';
-    const msgs = [...(existing?.messages ?? [])];
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(agentId);
     // For interrupts, insert a separator so the post-interrupt response appears as a new bubble
     if (mode === 'interrupt' && isAgentBusy) {
-      const last = msgs[msgs.length - 1];
-      if (last?.sender === 'agent') {
-        msgs.push({ type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
+      const ch = ms.channels[agentId];
+      const lastMsg = ch?.messages[ch.messages.length - 1];
+      if (lastMsg?.sender === 'agent') {
+        ms.addMessage(agentId, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       }
     }
     const imgAttachments = attachments.length > 0
       ? attachments.filter((a) => a.kind === 'image').map((a) => ({ name: a.name, mimeType: a.mimeType }))
       : undefined;
-    msgs.push({ type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}), attachments: imgAttachments && imgAttachments.length > 0 ? imgAttachments : undefined });
-    useAppStore.getState().updateAgent(agentId, { messages: msgs });
+    ms.addMessage(agentId, { type: 'text', text: inputText, sender: 'user', timestamp: Date.now(), ...(isAgentBusy && mode === 'queue' ? { queued: true } : {}), attachments: imgAttachments && imgAttachments.length > 0 ? imgAttachments : undefined });
 
     if (broadcast) {
       const running = useAppStore.getState().agents.filter((a) => a.status === 'running');

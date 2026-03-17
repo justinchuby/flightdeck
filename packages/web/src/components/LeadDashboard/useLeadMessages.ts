@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLeadStore } from '../../stores/leadStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { apiFetch } from '../../hooks/useApi';
 import type { AcpTextChunk } from '../../types';
 
@@ -41,8 +42,10 @@ export function useLeadMessages(
       const leads: LeadListItem[] = await apiFetch('/lead', { signal });
       if (!Array.isArray(leads)) return [];
       const store = useLeadStore.getState();
+      const msgStore = useMessageStore.getState();
       for (const l of leads) {
         store.addProject(l.id);
+        msgStore.ensureChannel(l.id);
         // Pre-load message history for each lead (best-effort)
         apiFetch<MessageHistoryResponse>(`/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal })
           .then((data) => {
@@ -53,10 +56,10 @@ export function useLeadMessages(
                 sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                 timestamp: new Date(m.timestamp).getTime(),
               }));
-              const current = useLeadStore.getState().projects[l.id];
-              if (!current || current.messages.length === 0) {
-                useLeadStore.getState().setMessages(l.id, msgs);
-              }
+              const ms = useMessageStore.getState();
+              ms.mergeHistory(l.id, msgs);
+              const ch = ms.channels[l.id];
+              if (ch) useLeadStore.getState().setMessages(l.id, ch.messages);
             }
           })
           .catch(() => { /* non-critical — will load via WS */ });
@@ -83,10 +86,14 @@ export function useLeadMessages(
     };
   }, [selectedLeadId, ws, readOnly, chatInitialScroll]);
 
-  // Load message history for selected lead — always fetch + merge with live WS messages
+  // Load message history for selected lead (if store is empty)
   const selectedProj = selectedLeadId ? projects[selectedLeadId] : null;
+  const needsHistory = !!selectedLeadId && (!selectedProj || selectedProj.messages.length === 0);
+  const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
   const msgApiPath = selectedLeadId
-    ? `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
+    ? isHistorical
+      ? `/projects/${selectedLeadId.slice(8)}/messages?limit=200`
+      : `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
     : '';
 
   useQuery({
@@ -101,19 +108,14 @@ export function useLeadMessages(
           ...(m.fromRole ? { fromRole: m.fromRole } : {}),
           timestamp: new Date(m.timestamp).getTime(),
         }));
-        const current = useLeadStore.getState().projects[selectedLeadId!];
-        if (!current || current.messages.length === 0) {
-          useLeadStore.getState().setMessages(selectedLeadId!, msgs);
-        } else {
-          // Merge: DB history first, then any live WS messages newer than the latest historical
-          const latestHistTs = Math.max(...msgs.map((m) => m.timestamp ?? 0));
-          const liveOnly = current.messages.filter((m) => (m.timestamp ?? 0) > latestHistTs);
-          useLeadStore.getState().setMessages(selectedLeadId!, [...msgs, ...liveOnly]);
-        }
+        const ms = useMessageStore.getState();
+        ms.mergeHistory(selectedLeadId!, msgs);
+        const ch = ms.channels[selectedLeadId!];
+        if (ch) useLeadStore.getState().setMessages(selectedLeadId!, ch.messages);
       }
       return data;
     },
-    enabled: !!selectedLeadId,
+    enabled: needsHistory,
     staleTime: 60_000,
   });
 }
