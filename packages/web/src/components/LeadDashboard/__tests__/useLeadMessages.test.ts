@@ -8,26 +8,41 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockAddProject = vi.fn();
 const mockSelectLead = vi.fn();
-const mockSetMessages = vi.fn();
-let mockProjects: Record<string, { messages: any[] }> = {};
 let mockSelectedLeadId: string | null = null;
 
 vi.mock('../../../stores/leadStore', () => ({
   useLeadStore: Object.assign(
     (sel: (s: any) => any) => {
       const state = {
-        projects: mockProjects,
         selectedLeadId: mockSelectedLeadId,
       };
       return typeof sel === 'function' ? sel(state) : state;
     },
     {
       getState: () => ({
-        projects: mockProjects,
         selectedLeadId: mockSelectedLeadId,
         addProject: mockAddProject,
         selectLead: mockSelectLead,
-        setMessages: mockSetMessages,
+      }),
+    },
+  ),
+}));
+
+// ── Message store mock ──────────────────────────────────────────
+
+const mockMergeHistory = vi.fn();
+let mockChannels: Record<string, { messages: any[] }> = {};
+
+vi.mock('../../../stores/messageStore', () => ({
+  useMessageStore: Object.assign(
+    (sel: (s: any) => any) => {
+      const state = { channels: mockChannels };
+      return typeof sel === 'function' ? sel(state) : state;
+    },
+    {
+      getState: () => ({
+        channels: mockChannels,
+        mergeHistory: mockMergeHistory,
       }),
     },
   ),
@@ -65,7 +80,7 @@ function makeScrollRef() {
 describe('useLeadMessages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockProjects = {};
+    mockChannels = {};
     mockSelectedLeadId = null;
     mockApiFetch.mockResolvedValue([]);
   });
@@ -170,7 +185,7 @@ describe('useLeadMessages', () => {
   });
 
   it('loads message history for selected lead when store is empty', async () => {
-    mockProjects = {}; // empty store
+    mockChannels = {}; // empty store
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/agents/lead-1/messages')) {
         return Promise.resolve({
@@ -193,7 +208,7 @@ describe('useLeadMessages', () => {
         expect.anything(),
       );
     });
-    expect(mockSetMessages).toHaveBeenCalled();
+    expect(mockMergeHistory).toHaveBeenCalled();
   });
 
   it('always uses agent API path (no project:xxx routing)', async () => {
@@ -217,9 +232,9 @@ describe('useLeadMessages', () => {
     });
   });
 
-  it('fetches history even when store already has messages (always merge)', async () => {
-    mockProjects = {
-      'lead-1': { messages: [{ type: 'text', text: 'live', sender: 'agent', timestamp: 2000 }] },
+  it('does not reload messages when store already has them', async () => {
+    mockChannels = {
+      'lead-1': { messages: [{ type: 'text', text: 'existing', sender: 'agent', timestamp: 123 }] },
     };
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/lead') return Promise.resolve([{ id: 'lead-1', status: 'running' }]);
@@ -293,7 +308,7 @@ describe('useLeadMessages', () => {
     );
 
     await waitFor(() => {
-      expect(mockSetMessages).toHaveBeenCalledWith('lead-1', expect.any(Array));
+      expect(mockMergeHistory).toHaveBeenCalledWith('lead-1', expect.any(Array));
     });
   });
 });

@@ -1,7 +1,7 @@
 import { apiFetch } from '../../hooks/useApi';
 import { useEffect } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
-import { useAppStore } from '../../stores/appStore';
+import { useMessageStore } from '../../stores/messageStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
 
@@ -153,18 +153,18 @@ function handleDecision(msg: WsDecision, store: StoreApi) {
   });
 }
 
-function handleText(msg: WsAgentText, store: StoreApi, storeKey: string) {
+function handleText(msg: WsAgentText, _store: StoreApi, storeKey: string) {
   const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-  store.appendToLastAgentMessage(storeKey, rawText);
+  useMessageStore.getState().appendToLastAgentMessage(storeKey, rawText);
 }
 
-function handleThinking(msg: WsAgentThinking, store: StoreApi, storeKey: string) {
+function handleThinking(msg: WsAgentThinking, _store: StoreApi, storeKey: string) {
   const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-  store.appendToThinkingMessage(storeKey, rawText);
+  useMessageStore.getState().appendToThinkingMessage(storeKey, rawText);
 }
 
-function handleContent(msg: WsAgentContent, store: StoreApi, storeKey: string) {
-  store.addMessage(storeKey, {
+function handleContent(msg: WsAgentContent, _store: StoreApi, storeKey: string) {
+  useMessageStore.getState().addMessage(storeKey, {
     type: 'text',
     text: msg.content.text || '',
     sender: 'agent',
@@ -175,9 +175,9 @@ function handleContent(msg: WsAgentContent, store: StoreApi, storeKey: string) {
   });
 }
 
-function handleStatus(msg: WsAgentStatus, store: StoreApi, storeKey: string) {
+function handleStatus(msg: WsAgentStatus, _store: StoreApi, storeKey: string) {
   if (msg.status === 'running') {
-    store.promoteQueuedMessages(storeKey);
+    useMessageStore.getState().promoteQueuedMessages(storeKey);
   }
 }
 
@@ -315,7 +315,7 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
   // Surface DMs in the lead chat panel
   const preview = (msg.content ?? '').slice(0, 2000);
   if (msg.from === 'system' && msg.to === leadId) {
-    store.addMessage(leadId, { type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system', timestamp: Date.now() });
+    useMessageStore.getState().addMessage(leadId, { type: 'text', text: `⚙️ [System] ${preview}`, sender: 'system', timestamp: Date.now() });
   } else if (isBroadcast) {
     // Broadcasts tracked in comms panel — don't duplicate in chat
   } else if (msg.to === leadId) {
@@ -323,7 +323,7 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
   } else if (msg.from === leadId) {
     const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
     const recipientId = shortAgentId(msg.to ?? '');
-    store.addMessage(leadId, { type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system', timestamp: Date.now() });
+    useMessageStore.getState().addMessage(leadId, { type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system', timestamp: Date.now() });
   }
   // Inter-agent DMs tracked in comms panel — don't duplicate in chat
 }
@@ -386,7 +386,7 @@ function handleContextCompacted(msg: WsContextCompacted, store: StoreApi, agents
   }
   if (targetLeadId) {
     const pct = msg.percentDrop != null ? `${msg.percentDrop}%` : '?%';
-    store.addMessage(targetLeadId, {
+    useMessageStore.getState().addMessage(targetLeadId, {
       type: 'text',
       text: `🔄 Context compacted for agent ${shortAgentId(compactedId)}: ${pct} reduction`,
       sender: 'system',

@@ -166,15 +166,21 @@ export const useMessageStore = create<MessageStoreState>((set, get) => ({
       }
       const agentText = agentIdx >= 0 ? msgs[agentIdx].text : '';
       const unclosedCommand = hasUnclosedCommandBlock(agentText);
+      let knownIds = ch.knownIds;
       if (agentIdx >= 0 && (!ch.pendingNewline || unclosedCommand)) {
         msgs[agentIdx] = { ...msgs[agentIdx], text: agentText + text, timestamp: msgs[agentIdx].timestamp || Date.now() };
+        // Existing message modified in-place — knownIds unchanged (O(1))
       } else {
-        msgs.push({ type: 'text', text, sender: 'agent', timestamp: Date.now() });
+        const newMsg: AcpTextChunk = { type: 'text', text, sender: 'agent', timestamp: Date.now() };
+        msgs.push(newMsg);
+        // Incrementally add new ID — O(1) instead of O(n) rebuild
+        knownIds = new Set(knownIds);
+        knownIds.add(messageId(newMsg));
       }
       return {
         channels: {
           ...s.channels,
-          [channelId]: { ...ch, messages: msgs, knownIds: buildIdSet(msgs), lastTextAt: Date.now(), pendingNewline: false },
+          [channelId]: { ...ch, messages: msgs, knownIds, lastTextAt: Date.now(), pendingNewline: false },
         },
       };
     }),
@@ -184,15 +190,21 @@ export const useMessageStore = create<MessageStoreState>((set, get) => ({
       const ch = s.channels[channelId] || emptyChannel();
       const msgs = [...ch.messages];
       const lastIdx = msgs.length - 1;
+      let knownIds = ch.knownIds;
       if (lastIdx >= 0 && msgs[lastIdx].sender === 'thinking') {
         msgs[lastIdx] = { ...msgs[lastIdx], text: (msgs[lastIdx].text || '') + text };
+        // Existing message modified in-place — knownIds unchanged (O(1))
       } else {
-        msgs.push({ type: 'text', text, sender: 'thinking', timestamp: Date.now() });
+        const newMsg: AcpTextChunk = { type: 'text', text, sender: 'thinking', timestamp: Date.now() };
+        msgs.push(newMsg);
+        // Incrementally add new ID — O(1) instead of O(n) rebuild
+        knownIds = new Set(knownIds);
+        knownIds.add(messageId(newMsg));
       }
       return {
         channels: {
           ...s.channels,
-          [channelId]: { ...ch, messages: msgs, knownIds: buildIdSet(msgs), pendingNewline: true },
+          [channelId]: { ...ch, messages: msgs, knownIds, pendingNewline: true },
         },
       };
     }),
@@ -201,10 +213,11 @@ export const useMessageStore = create<MessageStoreState>((set, get) => ({
     set((s) => {
       const ch = s.channels[channelId] || emptyChannel();
       const updated = ch.messages.map((m) => m.queued ? { ...m, queued: false } : m);
+      // knownIds unchanged — queued flag doesn't affect message identity
       return {
         channels: {
           ...s.channels,
-          [channelId]: { ...ch, messages: updated, knownIds: buildIdSet(updated) },
+          [channelId]: { ...ch, messages: updated },
         },
       };
     }),

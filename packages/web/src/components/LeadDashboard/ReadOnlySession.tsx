@@ -47,8 +47,6 @@ export function ReadOnlySession() {
             }));
             const ms = useMessageStore.getState();
             ms.mergeHistory(leadId, msgs);
-            const ch = ms.channels[leadId];
-            if (ch) useLeadStore.getState().setMessages(leadId, ch.messages);
           }
         }),
       apiFetch<Decision[]>(`/lead/${leadId}/decisions`, opts)
