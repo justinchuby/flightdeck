@@ -16,20 +16,23 @@ import { isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus } from '@flightdeck/s
 export type { AgentStatus, AgentPhase } from '@flightdeck/shared';
 export { isTerminalPhase } from '@flightdeck/shared';
 import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
+import type { AgentId, ProjectId, SessionId, TaskId } from '../types/brandedIds.js';
+import { asAgentId } from '../types/brandedIds.js';
+export type { AgentId, ProjectId, SessionId, TaskId } from '../types/brandedIds.js';
 
 export function isTerminalStatus(status: AgentStatus): boolean {
   return status === 'completed' || status === 'failed' || status === 'terminated';
 }
 
 export interface AgentContextInfo {
-  id: string;
+  id: AgentId;
   role: string;
   roleName: string;
   status: AgentStatus;
   task?: string;
   lockedFiles: string[];
   model?: string;
-  parentId?: string;
+  parentId?: AgentId;
   isSystemAgent?: boolean;
   pendingMessages?: number;
   createdAt?: string;
@@ -38,22 +41,22 @@ export interface AgentContextInfo {
 }
 
 export interface AgentJSON {
-  id: string;
+  id: AgentId;
   role: Role;
   status: AgentStatus;
   /** Internal lifecycle phase (more granular than status) */
   phase: AgentPhase;
   task?: string;
-  dagTaskId?: string;
-  parentId?: string;
-  childIds: string[];
+  dagTaskId?: TaskId;
+  parentId?: AgentId;
+  childIds: AgentId[];
   createdAt: string;
   outputPreview: string;
   plan?: PlanEntry[];
   toolCalls?: ToolCallInfo[];
-  sessionId?: string | null;
+  sessionId?: SessionId | null;
   projectName?: string;
-  projectId?: string;
+  projectId?: ProjectId;
   model: string;
   cwd?: string;
   inputTokens: number;
@@ -86,7 +89,7 @@ export interface AgentJSON {
 }
 
 export class Agent {
-  public readonly id: string;
+  public readonly id: AgentId;
   public readonly role: Role;
   public readonly createdAt: Date;
 
@@ -135,18 +138,18 @@ export class Agent {
   /** @internal Whether this agent has reached a terminal phase */
   get _isTerminated(): boolean { return isTerminalPhase(this._phase); }
   public task?: string;
-  public dagTaskId?: string;
-  public parentId?: string;
-  public childIds: string[] = [];
+  public dagTaskId?: TaskId;
+  public parentId?: AgentId;
+  public childIds: AgentId[] = [];
   public plan: PlanEntry[] = [];
   public toolCalls: ToolCallInfo[] = [];
   public messages: string[] = [];
   /** Index into messages[] marking the start of the current task's output */
   public taskOutputStartIndex: number = 0;
-  private _sessionId: string | null = null;
+  private _sessionId: SessionId | null = null;
   /** ACP session ID — set once when the session starts, immutable thereafter. */
-  get sessionId(): string | null { return this._sessionId; }
-  set sessionId(value: string | null) {
+  get sessionId(): SessionId | null { return this._sessionId; }
+  set sessionId(value: SessionId | null) {
     if (this._sessionId !== null && value !== this._sessionId) {
       logger.warn({ module: 'agent', msg: 'Ignoring sessionId overwrite', agentId: this.id, current: this._sessionId, attempted: value });
       return;
@@ -154,7 +157,7 @@ export class Agent {
     this._sessionId = value;
   }
   public projectName?: string;
-  public projectId?: string;
+  public projectId?: ProjectId;
   /** Model for this agent (e.g. "claude-opus-4.6"). Always set during spawn. */
   public model = '';
   /** Working directory for this agent's CLI process */
@@ -226,11 +229,11 @@ export class Agent {
   /** @internal */ readonly _maxToolCalls = 200;
 
   constructor(role: Role, config: ServerConfig, task?: string, parentId?: string, peers: AgentContextInfo[] = [], id?: string) {
-    this.id = id || uuid();
+    this.id = asAgentId(id || uuid());
     this.role = role;
     this.config = config;
     this.task = task;
-    this.parentId = parentId;
+    this.parentId = parentId ? asAgentId(parentId) : undefined;
     this.createdAt = new Date();
     this.peers = peers;
   }
