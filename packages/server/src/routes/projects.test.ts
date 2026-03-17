@@ -262,7 +262,7 @@ describe('POST /projects/:id/resume — enhanced with team respawn', () => {
 
   // Mock spawn returns an agent with the requested ID (8th arg) to honor the invariant
   const makeFakeAgent = (id: string) => ({
-    id, status: 'running', sendMessage: vi.fn(),
+    id, status: 'running', sendMessage: vi.fn(), queueMessage: vi.fn(),
     toJSON: () => ({ id, status: 'running', role: { id: 'lead' } }),
   });
 

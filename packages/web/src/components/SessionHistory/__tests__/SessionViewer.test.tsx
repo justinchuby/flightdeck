@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SessionViewer } from '../SessionViewer';
 
@@ -29,44 +29,48 @@ describe('SessionViewer', () => {
     mockApiFetch.mockResolvedValue({ messages: [{ id: 1 }] });
   });
 
-  function renderViewer(props: Partial<Parameters<typeof SessionViewer>[0]> = {}) {
-    return render(
-      <MemoryRouter>
-        <SessionViewer session={session} onClose={onClose} onResume={onResume} {...props} />
-      </MemoryRouter>
-    );
+  async function renderViewer(props: Partial<Parameters<typeof SessionViewer>[0]> = {}) {
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(
+        <MemoryRouter>
+          <SessionViewer session={session} onClose={onClose} onResume={onResume} {...props} />
+        </MemoryRouter>
+      );
+    });
+    return result;
   }
 
-  it('renders session summary panel', () => {
-    renderViewer();
+  it('renders session summary panel', async () => {
+    await renderViewer();
     expect(screen.getByTestId('session-viewer')).toBeInTheDocument();
     expect(screen.getByText('Session Summary')).toBeInTheDocument();
   });
 
-  it('shows task description', () => {
-    renderViewer();
+  it('shows task description', async () => {
+    await renderViewer();
     expect(screen.getByText('Implement auth module')).toBeInTheDocument();
   });
 
-  it('shows session metadata', () => {
-    renderViewer();
+  it('shows session metadata', async () => {
+    await renderViewer();
     expect(screen.getByText(/lead-abc123/)).toBeInTheDocument();
     expect(screen.getByText('completed')).toBeInTheDocument();
   });
 
-  it('shows agent count', () => {
-    renderViewer();
+  it('shows agent count', async () => {
+    await renderViewer();
     expect(screen.getByText('4')).toBeInTheDocument();
   });
 
-  it('shows task summary', () => {
-    renderViewer();
+  it('shows task summary', async () => {
+    await renderViewer();
     expect(screen.getByText(/8\/10/)).toBeInTheDocument();
     expect(screen.getByText(/1 failed/)).toBeInTheDocument();
   });
 
   it('fetches message count with limit=200 on mount', async () => {
-    renderViewer();
+    await renderViewer();
     await waitFor(() => {
       const call = mockApiFetch.mock.calls[0];
       expect(call[0]).toBe('/agents/lead-abc123/messages?limit=200');
@@ -74,42 +78,42 @@ describe('SessionViewer', () => {
     });
   });
 
-  it('shows View full conversation button when projectId exists', () => {
-    renderViewer();
+  it('shows View full conversation button when projectId exists', async () => {
+    await renderViewer();
     expect(screen.getByTestId('session-viewer-view-full')).toBeInTheDocument();
     expect(screen.getByText('View full conversation')).toBeInTheDocument();
   });
 
-  it('shows Resume button for ended sessions', () => {
-    renderViewer();
+  it('shows Resume button for ended sessions', async () => {
+    await renderViewer();
     expect(screen.getByTestId('session-viewer-resume')).toBeInTheDocument();
     expect(screen.getByText('Resume this session')).toBeInTheDocument();
   });
 
-  it('hides Resume button for active sessions', () => {
-    renderViewer({ session: { ...session, status: 'active' } });
+  it('hides Resume button for active sessions', async () => {
+    await renderViewer({ session: { ...session, status: 'active' } });
     expect(screen.queryByTestId('session-viewer-resume')).not.toBeInTheDocument();
   });
 
-  it('hides Resume button when onResume not provided', () => {
-    renderViewer({ onResume: undefined });
+  it('hides Resume button when onResume not provided', async () => {
+    await renderViewer({ onResume: undefined });
     expect(screen.queryByTestId('session-viewer-resume')).not.toBeInTheDocument();
   });
 
-  it('calls onClose when close button clicked', () => {
-    renderViewer();
+  it('calls onClose when close button clicked', async () => {
+    await renderViewer();
     fireEvent.click(screen.getByTestId('session-viewer-close'));
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('calls onClose when Escape is pressed', () => {
-    renderViewer();
+  it('calls onClose when Escape is pressed', async () => {
+    await renderViewer();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('calls onResume and onClose when Resume clicked', () => {
-    renderViewer();
+  it('calls onResume and onClose when Resume clicked', async () => {
+    await renderViewer();
     fireEvent.click(screen.getByTestId('session-viewer-resume'));
     expect(onClose).toHaveBeenCalled();
     expect(onResume).toHaveBeenCalled();

@@ -315,3 +315,11 @@ body {
 @media (max-width: 480px) {
   .stat-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Content-visibility optimization for off-screen list items ───────────── */
+/* Apply to individual list items in long scrollable lists.
+   Skips rendering of off-screen items, ~10x faster initial paint.
+   contain-intrinsic-size provides estimated height for stable scrollbars. */
+.cv-auto        { content-visibility: auto; contain-intrinsic-size: auto 60px; }
+.cv-auto-sm     { content-visibility: auto; contain-intrinsic-size: auto 40px; }
+.cv-auto-lg     { content-visibility: auto; contain-intrinsic-size: auto 100px; }

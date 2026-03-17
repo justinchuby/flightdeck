@@ -9,7 +9,7 @@
  * InlineMarkdown / InlineMarkdownWithMentions from utils/markdown.tsx.
  */
 import React, { useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark-dimmed.min.css';
@@ -60,9 +60,11 @@ export function Markdown({ text, mentionAgents, onMentionClick, className, monos
   const hasMentions = mentionAgents && mentionAgents.length > 0;
 
   const components = useMemo(() => {
-    const base: Record<string, React.ComponentType<any>> = {
+    type HtmlProps<T extends keyof React.JSX.IntrinsicElements> = React.JSX.IntrinsicElements[T] & ExtraProps;
+
+    const base: Components = {
       // Code blocks: use highlight.js classes, add copy-friendly styling
-      pre: ({ children, ...props }: any) => (
+      pre: ({ children, ...props }: HtmlProps<'pre'>) => (
         <pre
           className="bg-th-bg border border-th-border rounded-md px-3 py-2 my-2 overflow-x-auto text-xs font-mono text-th-text-alt"
           {...props}
@@ -71,7 +73,7 @@ export function Markdown({ text, mentionAgents, onMentionClick, className, monos
         </pre>
       ),
       // Inline code
-      code: ({ className: codeClass, children, ...props }: any) => {
+      code: ({ className: codeClass, children, ...props }: HtmlProps<'code'>) => {
         // If it has a language class, it's inside a <pre> — let highlight.js handle it
         if (codeClass) {
           return <code className={codeClass} {...props}>{children}</code>;
@@ -83,32 +85,32 @@ export function Markdown({ text, mentionAgents, onMentionClick, className, monos
         );
       },
       // Tables: match existing Flightdeck table styling
-      table: ({ children }: any) => (
+      table: ({ children }: HtmlProps<'table'>) => (
         <div className="my-2 overflow-x-auto">
           <table className="text-xs font-mono border-collapse border border-th-border w-full">
             {children}
           </table>
         </div>
       ),
-      thead: ({ children }: any) => <thead>{children}</thead>,
-      th: ({ children }: any) => (
+      thead: ({ children }: HtmlProps<'thead'>) => <thead>{children}</thead>,
+      th: ({ children }: HtmlProps<'th'>) => (
         <th className="border border-th-border px-2 py-1 text-left text-th-text-alt font-semibold bg-th-bg-alt">
           {children}
         </th>
       ),
-      td: ({ children }: any) => (
+      td: ({ children }: HtmlProps<'td'>) => (
         <td className="border border-th-border px-2 py-1 text-th-text-alt">{children}</td>
       ),
       // Headings: compact sizing for dashboard context
-      h1: ({ children }: any) => <h1 className="text-base font-bold text-th-text-alt mt-3 mb-1">{children}</h1>,
-      h2: ({ children }: any) => <h2 className="text-sm font-bold text-th-text-alt mt-3 mb-1">{children}</h2>,
-      h3: ({ children }: any) => <h3 className="text-xs font-bold text-th-text-alt mt-2 mb-0.5 uppercase tracking-wider">{children}</h3>,
+      h1: ({ children }: HtmlProps<'h1'>) => <h1 className="text-base font-bold text-th-text-alt mt-3 mb-1">{children}</h1>,
+      h2: ({ children }: HtmlProps<'h2'>) => <h2 className="text-sm font-bold text-th-text-alt mt-3 mb-1">{children}</h2>,
+      h3: ({ children }: HtmlProps<'h3'>) => <h3 className="text-xs font-bold text-th-text-alt mt-2 mb-0.5 uppercase tracking-wider">{children}</h3>,
       // Lists
-      ul: ({ children }: any) => <ul className="list-disc list-inside ml-2 my-1 space-y-0.5">{children}</ul>,
-      ol: ({ children }: any) => <ol className="list-decimal list-inside ml-2 my-1 space-y-0.5">{children}</ol>,
-      li: ({ children }: any) => <li className="text-th-text-alt text-xs">{children}</li>,
+      ul: ({ children }: HtmlProps<'ul'>) => <ul className="list-disc list-inside ml-2 my-1 space-y-0.5">{children}</ul>,
+      ol: ({ children }: HtmlProps<'ol'>) => <ol className="list-decimal list-inside ml-2 my-1 space-y-0.5">{children}</ol>,
+      li: ({ children }: HtmlProps<'li'>) => <li className="text-th-text-alt text-xs">{children}</li>,
       // Blockquotes
-      blockquote: ({ children }: any) => (
+      blockquote: ({ children }: HtmlProps<'blockquote'>) => (
         <blockquote className="border-l-2 border-th-border pl-3 my-2 text-th-text-muted italic">
           {children}
         </blockquote>
@@ -116,13 +118,13 @@ export function Markdown({ text, mentionAgents, onMentionClick, className, monos
       // Horizontal rule
       hr: () => <hr className="border-th-border my-3" />,
       // Links
-      a: ({ href, children }: any) => (
+      a: ({ href, children }: HtmlProps<'a'>) => (
         <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">
           {children}
         </a>
       ),
       // Task list checkboxes
-      input: ({ type, checked, ...props }: any) => {
+      input: ({ type, checked, ...props }: HtmlProps<'input'>) => {
         if (type === 'checkbox') {
           return (
             <input
@@ -140,14 +142,14 @@ export function Markdown({ text, mentionAgents, onMentionClick, className, monos
 
     // Inject @mention rendering into paragraph and list item text
     if (hasMentions) {
-      base.p = ({ children }: any) => (
+      base.p = ({ children }: HtmlProps<'p'>) => (
         <p className="my-1">
           <MentionAwareChildren agents={mentionAgents!} onMentionClick={onMentionClick}>
             {children}
           </MentionAwareChildren>
         </p>
       );
-      base.li = ({ children }: any) => (
+      base.li = ({ children }: HtmlProps<'li'>) => (
         <li className="text-th-text-alt text-xs">
           <MentionAwareChildren agents={mentionAgents!} onMentionClick={onMentionClick}>
             {children}

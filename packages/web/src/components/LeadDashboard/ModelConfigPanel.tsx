@@ -183,8 +183,9 @@ export function ModelConfigPanel({ projectId, value, onChange, compact }: Props)
       setSavedConfig(config);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to save');
     } finally {
       setSaving(false);
     }

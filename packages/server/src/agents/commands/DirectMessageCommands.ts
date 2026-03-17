@@ -15,7 +15,7 @@ import { deriveArgs } from './CommandHelp.js';
 import { resolveAgentInProject } from './CommCommands.js';
 
 const DM_REGEX = /⟦⟦\s*DIRECT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
-const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*⟧⟧/s;
+const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 
 function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: string): void {
   const match = data.match(DM_REGEX);
@@ -95,6 +95,6 @@ function handleQueryPeers(ctx: CommandHandlerContext, agent: Agent): void {
 export function getDirectMessageCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: DM_REGEX, name: 'DIRECT_MESSAGE', handler: (a, d) => handleDirectMessage(ctx, a, d), help: { description: 'Queue a message for an agent (non-interrupting)', example: 'DIRECT_MESSAGE {"to": "agent-id", "content": "your message"}', category: 'Communication', args: deriveArgs(directMessageSchema) } },
-    { regex: QUERY_PEERS_REGEX, name: 'QUERY_PEERS', handler: (a) => handleQueryPeers(ctx, a), help: { description: 'List peer agents for direct messaging', example: 'QUERY_PEERS {}', category: 'System' } },
+    { regex: QUERY_PEERS_REGEX, name: 'QUERY_PEERS', handler: (a) => handleQueryPeers(ctx, a), help: { description: 'List peer agents for direct messaging', example: 'QUERY_PEERS', category: 'System' } },
   ];
 }

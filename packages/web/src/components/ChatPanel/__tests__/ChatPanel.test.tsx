@@ -18,16 +18,6 @@ vi.mock('../AcpOutput', () => ({
 
 const AGENT_ID = 'aaaa1111-2222-3333-4444-555566667777';
 
-function makeWs() {
-  return {
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-    sendInput: vi.fn(),
-    resizeAgent: vi.fn(),
-    send: vi.fn(),
-  };
-}
-
 function seedAgent(status = 'idle') {
   useAppStore.getState().setAgents([
     {
@@ -52,8 +42,7 @@ describe('ChatPanel', () => {
 
   it('sends message via REST API (not WebSocket)', () => {
     seedAgent();
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'hello agent' } });
@@ -67,15 +56,11 @@ describe('ChatPanel', () => {
         body: JSON.stringify({ text: 'hello agent', mode: 'queue' }),
       }),
     );
-
-    // Should NOT use WebSocket sendInput
-    expect(ws.sendInput).not.toHaveBeenCalled();
   });
 
   it('uses interrupt mode on Ctrl+Enter with text', () => {
     seedAgent('running');
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'urgent fix' } });
@@ -92,8 +77,7 @@ describe('ChatPanel', () => {
 
   it('calls interruptAgent on Ctrl+Enter with no text', () => {
     seedAgent('running');
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
@@ -107,8 +91,7 @@ describe('ChatPanel', () => {
 
   it('marks message as queued when agent is busy and mode is queue', () => {
     seedAgent('running');
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'test' } });
@@ -121,8 +104,7 @@ describe('ChatPanel', () => {
 
   it('does NOT mark message as queued when agent is busy and mode is interrupt', () => {
     seedAgent('running');
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'urgent' } });
@@ -148,8 +130,7 @@ describe('ChatPanel', () => {
         contextWindowUsed: 0,
       } as any,
     ]);
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'urgent fix' } });
@@ -181,8 +162,7 @@ describe('ChatPanel', () => {
         contextWindowUsed: 0,
       } as any,
     ]);
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'interrupt' } });
@@ -223,8 +203,7 @@ describe('ChatPanel', () => {
       } as any,
     ]);
 
-    const ws = makeWs();
-    render(<ChatPanel agentId={AGENT_ID} ws={ws} />);
+    render(<ChatPanel agentId={AGENT_ID} />);
 
     const textarea = screen.getByPlaceholderText(/Type a message/);
     fireEvent.change(textarea, { target: { value: 'hey @bbbb2222 check this' } });
@@ -240,6 +219,5 @@ describe('ChatPanel', () => {
       `/agents/${OTHER_ID}/message`,
       expect.anything(),
     );
-    expect(ws.sendInput).not.toHaveBeenCalled();
   });
 });

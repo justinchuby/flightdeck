@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../hooks/useApi';
+import { useLeadStore } from '../../stores/leadStore';
 import { useModels, deriveModelName } from '../../hooks/useModels';
 import { Plus, Loader2, Check, Sparkles } from 'lucide-react';
 
@@ -68,6 +69,10 @@ export function NewSessionDialog({ projectId, onClose, onStarted }: NewSessionDi
       });
       onStarted();
       if (response?.id) {
+        // Set leadStore immediately so WS messages are routed correctly from the start
+        const leadStore = useLeadStore.getState();
+        leadStore.addProject(response.id);
+        leadStore.selectLead(response.id);
         navigate(`/projects/${projectId}`);
       }
     } catch (err: unknown) {

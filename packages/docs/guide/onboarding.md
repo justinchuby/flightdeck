@@ -12,7 +12,7 @@ On first launch, instead of showing an empty dashboard, Flightdeck presents a **
 - **Feature Build** — full team (lead, developers, architect, reviewer)
 - **Bug Fix** — focused team for debugging
 - **Documentation** — writer + reviewer
-- **Custom** — blank canvas, configure your own team
+- **Custom** — blank slate, configure your own team
 
 Selecting a configuration immediately launches a session. The user goes from "first visit" to "watching agents work" in seconds.
 
@@ -21,21 +21,20 @@ Selecting a configuration immediately launches a session. The user goes from "fi
 
 ## SpotlightTour
 
-After launching their first session, a 6-step overlay tour highlights real UI elements:
+After launching their first session, a 5-step overlay tour highlights real UI elements:
 
 | Step | Element | What it teaches |
 |------|---------|----------------|
 | 1 | Pulse strip | "This bar shows crew health at a glance" |
 | 2 | Agent list | "Your active agents appear here" |
-| 3 | Canvas view | "Visualize agent relationships" |
-| 4 | Approval queue | "Agents ask permission here" |
-| 5 | Chat panel | "Message any agent directly" |
-| 6 | ⌘K palette | "Press ⌘K to control everything" |
+| 3 | Approval queue | "Agents ask permission here" |
+| 4 | Chat panel | "Message any agent directly" |
+| 5 | ⌘K palette | "Press ⌘K to control everything" |
 
 Each step:
 - Dims everything except the target element
 - Shows a tooltip with description and "Next" / "Skip" buttons
-- Tracks completion progress (1/6, 2/6, etc.)
+- Tracks completion progress (1/5, 2/5, etc.)
 
 The tour uses `useSpotlight(selector)` to dynamically locate DOM elements.
 
@@ -47,7 +46,7 @@ The sidebar starts minimal and grows as the user demonstrates mastery:
 4 items: Overview, Agents, Chat, Settings
 
 ### Tier 2 — Explorer
-+3 items: Canvas, Timeline, Analytics  
++2 items: Timeline, Analytics  
 *Unlocked after: first session completed or 3+ agent interactions*
 
 ### Tier 3 — Operator  

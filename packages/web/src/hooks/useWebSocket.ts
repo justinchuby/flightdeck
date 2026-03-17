@@ -9,7 +9,11 @@ import { getAuthToken, apiFetch } from './useApi';
 import { useSettingsStore } from '../stores/settingsStore';
 import { shortAgentId } from '../utils/agentLabel';
 
-// Module-level WS ref for global access (e.g., timer pause from ApprovalSlideOver)
+// Singleton WebSocket reference — the app maintains exactly ONE server connection.
+// Module-level so sendWsMessage() can be called from any component (e.g., timer
+// pause from ApprovalSlideOver) without threading the WS ref through props/context.
+// Updated in connect() and nulled on close; safe because useWebSocket() is called
+// once in App.tsx and manages the full lifecycle.
 let globalWs: WebSocket | null = null;
 
 /** Send a WS message from any component (best-effort, no-op if not connected) */
@@ -264,15 +268,18 @@ export function useWebSocket() {
           break;
         }
         case 'agent:thinking': {
+          // Normalize text shape — match lead panel's defensive handling
+          const thinkText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
+          if (!thinkText) break;
           const state = useAppStore.getState();
           const existing = state.agents.find((a) => a.id === msg.agentId);
           const msgs = [...(existing?.messages ?? [])];
           const last = msgs[msgs.length - 1];
           // Append to existing thinking message or create new one
           if (last && last.sender === 'thinking') {
-            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + msg.text, timestamp: last.timestamp || Date.now() };
+            msgs[msgs.length - 1] = { ...last, text: (last.text || '') + thinkText, timestamp: last.timestamp || Date.now() };
           } else {
-            msgs.push({ type: 'text', text: msg.text, sender: 'thinking', timestamp: Date.now() });
+            msgs.push({ type: 'text', text: thinkText, sender: 'thinking', timestamp: Date.now() });
           }
           updateAgent(msg.agentId, { messages: msgs });
           break;

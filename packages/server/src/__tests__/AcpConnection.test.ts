@@ -92,11 +92,35 @@ describe('AcpConnection', () => {
       const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
       await new Promise((r) => setTimeout(r, 50));
 
+      const isWindows = process.platform === 'win32';
       expect(mockSpawn).toHaveBeenCalledWith(
         'copilot',
         expect.arrayContaining(['--acp', '--stdio']),
-        expect.objectContaining({ cwd: '/tmp' }),
+        expect.objectContaining({ cwd: '/tmp', detached: !isWindows }),
       );
+
+      fakeProc.emit('exit', 1);
+      await startPromise.catch(() => {});
+    });
+
+    it('spawns child in its own process group (detached) to prevent double-SIGINT', async () => {
+      mockExecFileSync.mockReturnValue('');
+      const fakeProc = createFakeProcess();
+      fakeProc.unref = vi.fn();
+      mockSpawn.mockReturnValue(fakeProc);
+
+      const conn = new AcpConnection();
+      const startPromise = conn.start({ cliCommand: 'copilot', cwd: '/tmp' });
+      await new Promise((r) => setTimeout(r, 50));
+
+      const isWindows = process.platform === 'win32';
+      const spawnOpts = mockSpawn.mock.calls[0][2];
+      expect(spawnOpts.detached).toBe(!isWindows);
+      if (isWindows) {
+        expect(fakeProc.unref).not.toHaveBeenCalled();
+      } else {
+        expect(fakeProc.unref).toHaveBeenCalled();
+      }
 
       fakeProc.emit('exit', 1);
       await startPromise.catch(() => {});

@@ -21,7 +21,6 @@ import {
   MessageSquare,
   Network,
   BarChart3,
-  Workflow,
   MoreHorizontal,
   TrendingUp,
 } from 'lucide-react';
@@ -69,7 +68,6 @@ interface OverflowItem {
 
 const OVERFLOW_ITEMS: OverflowItem[] = [
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={14} /> },
-  { id: 'canvas',    label: 'Canvas',    icon: <Workflow size={14} /> },
 ];
 
 const ALL_TAB_IDS = new Set([
@@ -172,14 +170,25 @@ export function ProjectLayout() {
     const lead = agents.find(
       (a) => a.role?.id === 'lead' && !a.parentId && (a.projectId === id || a.id === id),
     );
-    const storeKey = lead?.id ?? `project:${id}`;
 
-    // Ensure the project exists in the store
-    store.addProject(storeKey);
-
-    // Select it if not already selected
-    if (store.selectedLeadId !== storeKey) {
-      store.selectLead(storeKey);
+    if (lead) {
+      // Live lead found — always use its real agent ID
+      store.addProject(lead.id);
+      if (store.selectedLeadId !== lead.id) {
+        store.selectLead(lead.id);
+      }
+    } else {
+      // No live lead yet — fall back to project:xxx ONLY if we don't already
+      // have a real agent ID selected (e.g. set during resume before agent:spawned arrives)
+      const currentKey = store.selectedLeadId;
+      const currentIsRealAgentForProject = currentKey && !currentKey.startsWith('project:');
+      if (!currentIsRealAgentForProject) {
+        const fallbackKey = `project:${id}`;
+        store.addProject(fallbackKey);
+        if (currentKey !== fallbackKey) {
+          store.selectLead(fallbackKey);
+        }
+      }
     }
   }, [id, agents]);
 
@@ -365,23 +374,24 @@ export function ProjectLayout() {
           </div>
 
           {/* Tab bar — horizontal scroll on mobile, hide scrollbar */}
-          <div
-            className="flex items-center flex-nowrap overflow-x-auto px-2 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
-            data-testid="project-tab-bar"
-          >
-            <Tabs
-              tabs={PRIMARY_TABS}
-              activeTab={isOverflowTabActive ? '' : activeTab}
-              onTabChange={handleTabChange}
-              size="sm"
-              className="border-b-0 flex-1"
-            />
+          <div className="flex items-center px-2" data-testid="project-tab-bar">
+            <div
+              className="flex items-center flex-nowrap overflow-x-auto flex-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+            >
+              <Tabs
+                tabs={PRIMARY_TABS}
+                activeTab={isOverflowTabActive ? '' : activeTab}
+                onTabChange={handleTabChange}
+                size="sm"
+                className="border-b-0 flex-1"
+              />
+            </div>
 
             {/* Separator */}
             <div className="w-px h-5 bg-th-border mx-1 shrink-0" />
 
-            {/* Overflow menu */}
-            <div className="relative" ref={overflowRef}>
+            {/* Overflow menu — outside scroll container so dropdown isn't clipped */}
+            <div className="relative shrink-0" ref={overflowRef}>
               <button
                 onClick={() => setOverflowOpen(!overflowOpen)}
                 className={`p-2 rounded transition-colors ${

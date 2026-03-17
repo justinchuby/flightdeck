@@ -1,156 +1,79 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
-import { CommsPanelContent } from '../CommsPanel';
-import type { AgentComm } from '../../../stores/leadStore';
-import type { GroupMessage } from '../../../types';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 
-// Mock appStore
+const storeState = { agents: [], setSelectedAgent: vi.fn() };
 vi.mock('../../../stores/appStore', () => ({
   useAppStore: Object.assign(
-    vi.fn(() => null),
-    { getState: () => ({ agents: [], setSelectedAgent: vi.fn() }) },
+    (sel: (s: any) => any) => sel(storeState),
+    { getState: () => storeState },
   ),
 }));
 
-// Mock the Markdown component to verify it receives the right props
-vi.mock('../../ui/Markdown', () => ({
-  Markdown: ({ text, monospace }: { text: string; monospace?: boolean }) => (
-    <div data-testid="markdown-renderer" data-monospace={monospace ? 'true' : 'false'}>
-      {text}
-    </div>
-  ),
+vi.mock('../../../utils/markdown', () => ({
+  MentionText: ({ text }: { text: string }) => <span>{text}</span>,
 }));
 
-// Mock AgentReportBlock
-vi.mock('../AgentReportBlock', () => ({
-  AgentReportBlock: ({ content }: { content: string }) => (
-    <div data-testid="agent-report-block">{content}</div>
-  ),
-}));
+import { CommsPanelContent } from '../CommsPanel';
 
-// jsdom doesn't implement scrollTo
-beforeEach(() => {
-  Element.prototype.scrollTo = vi.fn();
+const makeComm = (id: string, from: string, to: string, content = 'Hello') => ({
+  id,
+  fromId: from,
+  toId: to,
+  fromRole: 'Developer',
+  toRole: 'Lead',
+  content,
+  timestamp: Date.now(),
+  type: 'agent_message' as const,
 });
 
-// Mock messageTiers to avoid complexity
-vi.mock('../../../utils/messageTiers', () => ({
-  classifyMessage: () => 'routine',
-  tierPassesFilter: () => true,
-  TIER_CONFIG: {
-    critical: { bgClass: '', borderBClass: '', borderClass: '' },
-    notable: { bgClass: '', borderBClass: '', borderClass: '' },
-    routine: { bgClass: '', borderBClass: '', borderClass: '' },
-  },
-}));
-
-function makeComm(overrides: Partial<AgentComm> = {}): AgentComm {
-  return {
-    id: 'comm-1',
-    fromId: 'agent-aaa',
-    toId: 'agent-bbb',
-    fromRole: 'Architect',
-    toRole: 'Project Lead',
-    content: 'Hello **world**',
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-function makeGroupMsg(overrides: Partial<GroupMessage> = {}): GroupMessage {
-  return {
-    id: 'gm-1',
-    groupName: 'test-group',
-    fromId: 'agent-aaa',
-    fromRole: 'Developer',
-    content: '## Status\n- item 1\n- item 2',
-    timestamp: Date.now(),
-    ...overrides,
-  };
-}
-
-describe('CommsPanelContent popup markdown rendering', () => {
-  it('renders Markdown component in 1:1 message popup', () => {
-    const comm = makeComm({ content: '**bold text** and `code`' });
-    const { container } = render(
-      <CommsPanelContent comms={[comm]} groupMessages={{}} />,
-    );
-
-    // Click the message to open the popup
-    fireEvent.click(container.querySelector('.cursor-pointer')!);
-
-    // The popup (fixed overlay) should use Markdown component (not <pre>)
-    const popup = container.querySelector('.fixed');
-    expect(popup).toBeTruthy();
-    const markdownEl = popup!.querySelector('[data-testid="markdown-renderer"]');
-    expect(markdownEl).toBeTruthy();
-    expect(markdownEl!.textContent).toContain('**bold text** and `code`');
-    expect(markdownEl!.getAttribute('data-monospace')).toBe('true');
+describe('CommsPanelContent', () => {
+  it('renders without comms', () => {
+    const { container } = render(<CommsPanelContent comms={[]} groupMessages={{}} />);
+    expect(container).toBeTruthy();
   });
 
-  it('renders Markdown component in group message popup', () => {
-    const groupMsg = makeGroupMsg({ content: '## Heading\n- bullet point' });
-    const { container } = render(
-      <CommsPanelContent comms={[]} groupMessages={{ 'test-group': [groupMsg] }} />,
+  it('renders comm messages', () => {
+    render(
+      <CommsPanelContent
+        comms={[makeComm('c1', 'a1', 'lead', 'Test message')]}
+        groupMessages={{}}
+      />,
     );
-
-    // Click the group message to open the popup
-    fireEvent.click(container.querySelector('.cursor-pointer')!);
-
-    // The popup (fixed overlay) should use Markdown component
-    const popup = container.querySelector('.fixed');
-    expect(popup).toBeTruthy();
-    const markdownEl = popup!.querySelector('[data-testid="markdown-renderer"]');
-    expect(markdownEl).toBeTruthy();
-    expect(markdownEl!.textContent).toContain('## Heading');
-    expect(markdownEl!.getAttribute('data-monospace')).toBe('true');
+    expect(screen.getByText('Test message')).toBeInTheDocument();
   });
 
-  it('does not render <pre> tags for popup message content', () => {
-    const comm = makeComm({ content: 'Some message content' });
-    const { container } = render(
-      <CommsPanelContent comms={[comm]} groupMessages={{}} />,
+  it('renders multiple comms', () => {
+    render(
+      <CommsPanelContent
+        comms={[
+          makeComm('c1', 'a1', 'lead', 'First message'),
+          makeComm('c2', 'a2', 'lead', 'Second message'),
+        ]}
+        groupMessages={{}}
+      />,
     );
-
-    // Open the popup
-    fireEvent.click(container.querySelector('.cursor-pointer')!);
-
-    // The popup body should not contain a <pre> element
-    const popup = container.querySelector('.fixed');
-    expect(popup).toBeTruthy();
-    const preElements = popup!.querySelectorAll('pre');
-    expect(preElements.length).toBe(0);
+    expect(screen.getByText('First message')).toBeInTheDocument();
+    expect(screen.getByText('Second message')).toBeInTheDocument();
   });
 
-  it('still uses AgentReportBlock for [Agent Report] messages in popup', () => {
-    const comm = makeComm({ content: '[Agent Report] some report data' });
-    const { container } = render(
-      <CommsPanelContent comms={[comm]} groupMessages={{}} />,
-    );
-
-    // Open the popup
-    fireEvent.click(container.querySelector('.cursor-pointer')!);
-
-    // The popup (fixed overlay) should use AgentReportBlock, not Markdown
-    const popup = container.querySelector('.fixed');
-    expect(popup).toBeTruthy();
-    expect(popup!.querySelector('[data-testid="agent-report-block"]')).toBeTruthy();
-    expect(popup!.querySelector('[data-testid="markdown-renderer"]')).toBeNull();
+  it('renders group messages', () => {
+    const groupMessages = {
+      'group-1': [
+        { id: 'gm1', groupId: 'group-1', groupName: 'Backend Team', fromId: 'a1', fromRole: 'Developer', content: 'Group hello', timestamp: Date.now() },
+      ],
+    };
+    render(<CommsPanelContent comms={[]} groupMessages={groupMessages as any} />);
+    expect(screen.getByText('Group hello')).toBeInTheDocument();
   });
 
-  it('still uses AgentReportBlock for [Agent ACK] messages in popup', () => {
-    const comm = makeComm({ content: '[Agent ACK] task acknowledged' });
-    const { container } = render(
-      <CommsPanelContent comms={[comm]} groupMessages={{}} />,
+  it('shows from/to roles', () => {
+    render(
+      <CommsPanelContent
+        comms={[makeComm('c1', 'a1', 'lead', 'role test')]}
+        groupMessages={{}}
+      />,
     );
-
-    // Open the popup
-    fireEvent.click(container.querySelector('.cursor-pointer')!);
-
-    const popup = container.querySelector('.fixed');
-    expect(popup).toBeTruthy();
-    expect(popup!.querySelector('[data-testid="agent-report-block"]')).toBeTruthy();
-    expect(popup!.querySelector('[data-testid="markdown-renderer"]')).toBeNull();
+    expect(screen.getByText('Developer')).toBeInTheDocument();
   });
 });

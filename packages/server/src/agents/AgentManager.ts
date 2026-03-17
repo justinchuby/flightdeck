@@ -107,6 +107,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
   private messageBuffers: Map<string, string> = new Map(); // agentId → buffered text
   private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private thinkingBuffers: Map<string, string> = new Map(); // agentId → buffered thinking text
+  private thinkingFlushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private idleNudgeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private crashCounts: Map<string, number> = new Map();
   private maxRestarts: number;
   private autoRestart: boolean;
@@ -229,7 +232,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.lockRegistry.on('lock:expired', ({ filePath, agentId }: { filePath: string; agentId: string }) => {
       const agent = this.agents.get(agentId);
       if (agent && (agent.status === 'running' || agent.status === 'idle')) {
-        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired and was released. Re-acquire it if you still need it.`);
+        agent.sendMessage(`[System] Your file lock on "${filePath}" has expired after the TTL timeout. If you still need it, reacquire with LOCK_FILE.`);
       }
     });
 
@@ -632,6 +635,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onThinking((text) => {
       this.emit('agent:thinking', { agentId: agent.id, text });
+      this.bufferThinkingMessage(agent.id, text);
     });
 
     agent.onPlan((entries) => {
@@ -717,6 +721,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (agent.artifactDir) {
         agent.sendMessage(`[System] Your artifact storage directory: ${agent.artifactDir}`);
       }
+
+      // Context compression drops conversation history, so remind the agent of
+      // available commands. Uses the same reminder as the 2-hour heartbeat interval.
+      this.heartbeat.sendCommandReminderTo(agent);
     });
 
     // Wire cost tracking: attribute token usage to the agent's current dagTaskId
@@ -742,6 +750,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.emit('agent:status', { agentId: agent.id, status });
         this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         if (status === 'idle' || isTerminalStatus(status)) {
+          this.flushThinkingMessage(agent.id);
           this.flushAgentMessage(agent.id);
         }
 
@@ -761,6 +770,35 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           }
         }
 
+        // When agent resumes work, clear the idle dedup key so the next
+        // idle transition properly re-notifies the parent.
+        if (status === 'running') {
+          this.dispatcher.clearCompletionTracking(agent.id);
+          this.clearIdleNudgeTimer(agent.id);
+        }
+
+        // Idle task nudge: if agent stays idle for 30s with uncompleted DAG
+        // tasks, send a reminder. Nudge once per idle period (not spam).
+        if (status === 'idle' && agent.parentId && !agent._isResuming) {
+          if (!this.idleNudgeTimers.has(agent.id)) {
+            const timer = setTimeout(() => {
+              this.idleNudgeTimers.delete(agent.id);
+              if (agent.status !== 'idle' || isTerminalStatus(agent.status)) return;
+              if (!this.agents.has(agent.id)) return; // agent was removed
+              const leadId = agent.parentId;
+              if (!leadId) return;
+              const dagTask = this.taskDAG.getTaskByAgent(leadId, agent.id);
+              if (dagTask && dagTask.dagStatus === 'running') {
+                agent.sendMessage(
+                  `[System] You have an uncompleted task: "${dagTask.title || dagTask.id}". ` +
+                  `Please mark it done with COMPLETE_TASK, report PROGRESS, or explain what is blocking you.`
+                );
+              }
+            }, 30_000);
+            this.idleNudgeTimers.set(agent.id, timer);
+          }
+        }
+
         // Suppress the first idle notification for resumed agents — their prior
         // work was already reported.
         if (status === 'idle' && agent.parentId && !agent._isResuming) {
@@ -771,8 +809,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onExit((code) => {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
+      this.flushThinkingMessage(agent.id);
       this.flushAgentMessage(agent.id);
       this.dispatcher.clearBuffer(agent.id);
+      this.clearIdleNudgeTimer(agent.id);
       logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
       // Release any file locks held by the exiting agent
@@ -829,10 +869,18 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.dispatcher.clearCompletionTracking(agent.id);
       }, 10000);
 
-      // Schedule removal from Map and dispose after grace period
+      // Schedule removal from Map and dispose after grace period.
+      // Guard: only delete from the Map if the entry still points to THIS
+      // agent instance.  Auto-restart reuses the same ID, so a replacement
+      // agent may already occupy the slot — we must not remove it.
+      // dispose() runs unconditionally — the old agent must always release
+      // its resources even if a replacement occupies the Map slot.
+      const exitedAgent = agent;
       setTimeout(() => {
-        this.agents.delete(agent.id);
-        agent.dispose();
+        if (this.agents.get(exitedAgent.id) === exitedAgent) {
+          this.agents.delete(exitedAgent.id);
+        }
+        exitedAgent.dispose();
       }, 30_000);
 
       if (code !== null && code !== 0 && !isTerminalStatus(agent.status)) {
@@ -922,6 +970,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.dispatcher.clearBuffer(id);
+    this.clearIdleNudgeTimer(id);
 
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
@@ -1176,6 +1225,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   async shutdownAll(): Promise<void> {
     this._shuttingDown = true;
     this.heartbeat.stop();
+    // Clear all idle nudge timers to prevent firing on disposed agents
+    for (const [_id, timer] of this.idleNudgeTimers) {
+      clearTimeout(timer);
+    }
+    this.idleNudgeTimers.clear();
     const active = [...this.agents.values()]
       .filter(agent => !isTerminalStatus(agent.status));
     logger.info({ module: 'agent', msg: `Terminating ${active.length} active agent(s)...` });
@@ -1226,7 +1280,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   /** Persist a human message to the agent's conversation history */
   persistHumanMessage(agentId: string, text: string): void {
-    this.flushAgentMessage(agentId); // flush any buffered agent text first
+    this.flushThinkingMessage(agentId);
+    this.flushAgentMessage(agentId); // flush any buffered agent/thinking text first
     const threadId = this.agentThreads.get(agentId);
     if (threadId && this.conversationStore) {
       this.conversationStore.addMessage(threadId, 'user', text);
@@ -1262,7 +1317,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   /** Get recent messages from an agent's conversation history */
   getMessageHistory(agentId: string, limit = 200): import('../db/ConversationStore.js').ThreadMessage[] {
     if (!this.conversationStore) return [];
-    this.flushAgentMessage(agentId); // flush pending buffer before reading
+    this.flushThinkingMessage(agentId);
+    this.flushAgentMessage(agentId); // flush pending buffers before reading
     return this.conversationStore.getRecentMessages(agentId, limit).reverse(); // chronological order
   }
 
@@ -1287,6 +1343,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   /** Buffer agent output text, flushing after 2s of silence */
   private bufferAgentMessage(agentId: string, data: string): void {
+    // Flush any pending thinking text first so messages stay chronological
+    this.flushThinkingMessage(agentId);
+
     const existing = this.messageBuffers.get(agentId) || '';
     this.messageBuffers.set(agentId, existing + data);
 
@@ -1294,6 +1353,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const prev = this.flushTimers.get(agentId);
     if (prev) clearTimeout(prev);
     this.flushTimers.set(agentId, setTimeout(() => this.flushAgentMessage(agentId), 2000));
+  }
+
+  /** Clear a pending idle nudge timer for an agent */
+  private clearIdleNudgeTimer(agentId: string): void {
+    const timer = this.idleNudgeTimers.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+      this.idleNudgeTimers.delete(agentId);
+    }
   }
 
   /** Flush buffered agent text to the conversation store */
@@ -1311,10 +1379,42 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
   }
 
+  /** Buffer thinking text, flushing after 2s of silence */
+  private bufferThinkingMessage(agentId: string, data: string): void {
+    // Flush any pending agent text first so thinking and agent messages
+    // are stored in chronological order
+    this.flushAgentMessage(agentId);
+
+    const existing = this.thinkingBuffers.get(agentId) || '';
+    this.thinkingBuffers.set(agentId, existing + data);
+
+    const prev = this.thinkingFlushTimers.get(agentId);
+    if (prev) clearTimeout(prev);
+    this.thinkingFlushTimers.set(agentId, setTimeout(() => this.flushThinkingMessage(agentId), 2000));
+  }
+
+  /** Flush buffered thinking text to the conversation store */
+  private flushThinkingMessage(agentId: string): void {
+    const timer = this.thinkingFlushTimers.get(agentId);
+    if (timer) { clearTimeout(timer); this.thinkingFlushTimers.delete(agentId); }
+
+    const text = this.thinkingBuffers.get(agentId);
+    if (!text) return;
+    this.thinkingBuffers.delete(agentId);
+
+    const threadId = this.agentThreads.get(agentId);
+    if (threadId && this.conversationStore) {
+      this.conversationStore.addMessage(threadId, 'thinking', text);
+    }
+  }
+
   /** Flush all buffered agent messages (e.g. on new client connection) */
   flushAllMessages(): void {
     for (const agentId of this.messageBuffers.keys()) {
       this.flushAgentMessage(agentId);
+    }
+    for (const agentId of this.thinkingBuffers.keys()) {
+      this.flushThinkingMessage(agentId);
     }
   }
 

@@ -151,7 +151,7 @@ export const useLeadStore = create<LeadState>((set) => ({
     set((s) => {
       const proj = s.projects[leadId] || emptyProject();
       // Normalize server-side property names (team→crew rename, Phase 1)
-      const raw = progress as any;
+      const raw = progress as LeadProgress & { teamAgents?: LeadProgress['crewAgents']; teamSize?: number };
       const normalized: LeadProgress = {
         ...progress,
         crewAgents: progress.crewAgents ?? raw.teamAgents ?? [],

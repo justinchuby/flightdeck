@@ -48,8 +48,8 @@ function markAgentDelegations(
 // ── Regex patterns ────────────────────────────────────────────────────
 
 const DECLARE_TASKS_REGEX = /⟦⟦\s*DECLARE_TASKS\s*([\[{].*?[\]}])\s*⟧⟧/s;
-const TASK_STATUS_REGEX = /⟦⟦\s*TASK_STATUS\s*⟧⟧/s;
-const QUERY_TASKS_REGEX = /⟦⟦\s*QUERY_TASKS\s*⟧⟧/s;
+const TASK_STATUS_REGEX = /⟦⟦\s*TASK_STATUS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
+const QUERY_TASKS_REGEX = /⟦⟦\s*QUERY_TASKS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 const PAUSE_TASK_REGEX = /⟦⟦\s*PAUSE_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const RESUME_TASK_REGEX = /⟦⟦\s*RESUME_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const RETRY_TASK_REGEX = /⟦⟦\s*RETRY_TASK\s*(\{.*?\})\s*⟧⟧/s;
@@ -57,7 +57,7 @@ const SKIP_TASK_REGEX = /⟦⟦\s*SKIP_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const ADD_TASK_REGEX = /⟦⟦\s*ADD_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const CANCEL_TASK_REGEX = /⟦⟦\s*CANCEL_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const COMPLETE_TASK_REGEX = /⟦⟦\s*COMPLETE_TASK\s*(\{.*?\})\s*⟧⟧/s;
-const RESET_DAG_REGEX = /⟦⟦\s*RESET_DAG\s*⟧⟧/s;
+const RESET_DAG_REGEX = /⟦⟦\s*RESET_DAG\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 const ADD_DEPENDENCY_REGEX = /⟦⟦\s*ADD_DEPENDENCY\s*(\{.*?\})\s*⟧⟧/s;
 const REASSIGN_TASK_REGEX = /⟦⟦\s*REASSIGN_TASK\s*(\{.*?\})\s*⟧⟧/s;
 const FORCE_READY_REGEX = /⟦⟦\s*FORCE_READY\s*(\{.*?\})\s*⟧⟧/s;
@@ -291,6 +291,8 @@ function handleSkipTask(ctx: CommandHandlerContext, agent: Agent, data: string):
         const skippedAgent = ctx.getAgent(result.skippedAgentId);
         if (skippedAgent) {
           skippedAgent.sendMessage(`[System] Task "${req.taskId}" was skipped by the Project Lead. Please stop working on it.`);
+          skippedAgent.task = undefined;
+          skippedAgent.dagTaskId = undefined;
         }
         ctx.lockRegistry.releaseAll(result.skippedAgentId);
         markAgentDelegations(ctx, result.skippedAgentId, 'to', 'cancelled');
@@ -326,7 +328,18 @@ function handleCancelTask(ctx: CommandHandlerContext, agent: Agent, data: string
   try {
     const req = parseCommandPayload(agent, match[1], taskIdSchema, 'CANCEL_TASK');
     if (!req) return;
+    const taskBefore = ctx.taskDAG.getTask(agent.id, req.taskId);
     const ok = ctx.taskDAG.cancelTask(agent.id, req.taskId);
+    if (ok && taskBefore?.assignedAgentId) {
+      const assignedAgent = ctx.getAgent(taskBefore.assignedAgentId);
+      if (assignedAgent) {
+        assignedAgent.sendMessage(`[System] Task "${req.taskId}" was cancelled by the Project Lead.`);
+        assignedAgent.task = undefined;
+        assignedAgent.dagTaskId = undefined;
+      }
+      ctx.lockRegistry.releaseAll(taskBefore.assignedAgentId);
+      markAgentDelegations(ctx, taskBefore.assignedAgentId, 'to', 'cancelled');
+    }
     agent.sendMessage(ok ? `[System] Task "${req.taskId}" cancelled.` : `[System] Cannot cancel task "${req.taskId}" (may be running or done).`);
   } catch { agent.sendMessage('[System] CANCEL_TASK error: invalid payload.'); }
 }
@@ -444,6 +457,11 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         agent.sendMessage(`[System] Task completion signaled to parent. (No DAG task ID — use dagTaskId for DAG integration.)`);
       }
+      // Clear task assignment — the work is done. This prevents the task-based
+      // guard in notifyParentOfIdle from letting stale-task agents through after
+      // the dedup key is cleared on running→idle cycles.
+      agent.task = undefined;
+      agent.dagTaskId = undefined;
       return;
     }
 
@@ -465,7 +483,17 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       }
       return;
     }
+    const taskBefore = ctx.taskDAG.getTask(agent.id, req.taskId);
     const newlyReady = ctx.taskDAG.completeTask(agent.id, req.taskId);
+
+    // Clear the assigned agent's task reference so the idle guard doesn't re-report
+    if (taskBefore?.assignedAgentId) {
+      const assignedAgent = ctx.getAgent(taskBefore.assignedAgentId);
+      if (assignedAgent) {
+        assignedAgent.task = undefined;
+        assignedAgent.dagTaskId = undefined;
+      }
+    }
 
     // Log to activity ledger so keyframes/milestones track completion
     ctx.activityLedger.log(agent.id, agent.role.id, 'task_completed',
@@ -586,6 +614,7 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
     if (oldAgent) {
       oldAgent.sendMessage(`[System] Task "${req.taskId}" has been reassigned to another agent. Please stop working on it.`);
       oldAgent.dagTaskId = undefined;
+      oldAgent.task = undefined;
     }
     ctx.lockRegistry.releaseAll(result.oldAgentId);
     // Cancel only the delegation for this specific task (not all of old agent's delegations)
@@ -697,7 +726,7 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: DECLARE_TASKS_REGEX, name: 'DECLARE_TASKS', handler: (a, d) => handleDeclareTasks(ctx, a, d), help: { description: 'Declare a set of tasks with dependencies', example: 'DECLARE_TASKS {"tasks": [{"taskId": "task-1", "role": "developer", "description": "..."}]}', category: 'Task DAG', args: deriveArgs(declareTasksSchema) } },
     { regex: COMPLETE_TASK_REGEX, name: 'COMPLETE_TASK', handler: (a, d) => handleCompleteTask(ctx, a, d), help: { description: 'Mark a task as done', example: 'COMPLETE_TASK {"summary": "what was accomplished"}', category: 'Task DAG', args: deriveArgs(completeTaskSchema) } },
-    { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => handleTaskStatus(ctx, a, _d), help: { description: 'View the task DAG status', example: 'TASK_STATUS {}', category: 'Task DAG' } },
+    { regex: TASK_STATUS_REGEX, name: 'TASK_STATUS', handler: (a, _d) => handleTaskStatus(ctx, a, _d), help: { description: 'View the task DAG status', example: 'TASK_STATUS', category: 'Task DAG' } },
     { regex: QUERY_TASKS_REGEX, name: 'QUERY_TASKS', handler: (a, _d) => handleTaskStatus(ctx, a, _d) },
     { regex: PAUSE_TASK_REGEX, name: 'PAUSE_TASK', handler: (a, d) => handlePauseTask(ctx, a, d), help: { description: 'Pause a task', example: 'PAUSE_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: RESUME_TASK_REGEX, name: 'RESUME_TASK', handler: (a, d) => handleResumeTask(ctx, a, d), help: { description: 'Resume a paused task', example: 'RESUME_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
@@ -706,7 +735,7 @@ export function getTaskCommands(ctx: CommandHandlerContext): CommandEntry[] {
     { regex: SKIP_TASK_REGEX, name: 'SKIP_TASK', handler: (a, d) => handleSkipTask(ctx, a, d), help: { description: 'Skip a task', example: 'SKIP_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: ADD_TASK_REGEX, name: 'ADD_TASK', handler: (a, d) => handleAddTask(ctx, a, d), help: { description: 'Add a single task to the DAG', example: 'ADD_TASK {"taskId": "task-2", "role": "developer", "description": "..."}', category: 'Task DAG', args: deriveArgs(addTaskSchema) } },
     { regex: CANCEL_TASK_REGEX, name: 'CANCEL_TASK', handler: (a, d) => handleCancelTask(ctx, a, d), help: { description: 'Cancel a task', example: 'CANCEL_TASK {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
-    { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d), help: { description: 'Reset the entire task DAG', example: 'RESET_DAG {}', category: 'Task DAG' } },
+    { regex: RESET_DAG_REGEX, name: 'RESET_DAG', handler: (a, _d) => handleResetDAG(ctx, a, _d), help: { description: 'Reset the entire task DAG', example: 'RESET_DAG', category: 'Task DAG' } },
     { regex: ADD_DEPENDENCY_REGEX, name: 'ADD_DEPENDENCY', handler: (a, d) => handleAddDependency(ctx, a, d), help: { description: 'Add a dependency between tasks', example: 'ADD_DEPENDENCY {"taskId": "task-2", "dependsOn": ["task-1"]}', category: 'Task DAG', args: deriveArgs(addDependencySchema) } },
     { regex: FORCE_READY_REGEX, name: 'FORCE_READY', handler: (a, d) => handleForceReady(ctx, a, d), help: { description: 'Force a task to ready status', example: 'FORCE_READY {"taskId": "task-1"}', category: 'Task DAG', args: deriveArgs(taskIdSchema) } },
     { regex: ASSIGN_TASK_REGEX, name: 'ASSIGN_TASK', handler: (a, d) => handleAssignTask(ctx, a, d), help: { description: 'Assign a task to a specific agent', example: 'ASSIGN_TASK {"taskId": "task-2", "agentId": "agent-id"}', category: 'Task DAG', args: deriveArgs(assignTaskSchema) } },

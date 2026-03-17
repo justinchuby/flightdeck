@@ -419,4 +419,207 @@ describe('CrewPage', () => {
     expect(screen.getByText('5 corrections')).toBeInTheDocument();
   });
 
+  it('shows dash when trainingSummary is null', async () => {
+    setupMocks({ crewDetail: { ...crewDetailData, trainingSummary: null } });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('crew-identity')).toBeInTheDocument();
+    });
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('toggleSort cycles sort field on button click', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    // The sort button shows current sortField text next to an icon
+    // Default sortField is 'role'. Find the button element containing the ArrowUpDown icon.
+    const sortButtons = screen.getAllByRole('button');
+    const sortBtn = sortButtons.find(b => b.textContent?.trim() === 'role');
+    expect(sortBtn).toBeDefined();
+    if (sortBtn) {
+      fireEvent.click(sortBtn);
+    }
+    // Agents still visible after sort
+    expect(screen.getByText('architect')).toBeInTheDocument();
+  });
+
+  // ── Crew selector with multiple crews ────────────────
+
+  it('shows crew selector when multiple crews exist', async () => {
+    const multiCrews = {
+      crews: [
+        { crewId: 'default', agentCount: 3, roles: ['architect'] },
+        { crewId: 'ops-team', agentCount: 2, roles: ['developer'] },
+      ],
+    };
+    setupMocks({ crews: multiCrews });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    // The select dropdown should be visible
+    const select = screen.getByRole('combobox');
+    expect(select).toBeInTheDocument();
+  });
+
+  it('switches crew when selecting from dropdown', async () => {
+    const multiCrews = {
+      crews: [
+        { crewId: 'default', agentCount: 3, roles: ['architect'] },
+        { crewId: 'ops-team', agentCount: 2, roles: ['developer'] },
+      ],
+    };
+    setupMocks({ crews: multiCrews });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'ops-team' } });
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(expect.stringContaining('/crews/ops-team/agents'));
+    });
+  });
+
+  it('auto-selects first crew when current crew not in list', async () => {
+    const otherCrews = {
+      crews: [
+        { crewId: 'alpha-team', agentCount: 1, roles: ['developer'] },
+      ],
+    };
+    setupMocks({ crews: otherCrews });
+    renderPage();
+    // "default" is initial but not in the crews list — should auto-switch to "alpha-team"
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(expect.stringContaining('/crews/alpha-team'));
+    });
+  });
+
+  // ── Refresh button ────────────────────────────────────
+
+  it('triggers data refresh on Refresh button click', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    const callCount = mockApiFetch.mock.calls.length;
+    fireEvent.click(screen.getByText('Refresh'));
+    await waitFor(() => {
+      expect(mockApiFetch.mock.calls.length).toBeGreaterThan(callCount);
+    });
+  });
+
+  // ── Lifecycle modal onActionComplete ──────────────────
+
+  // ── Lifecycle modal close (already tested above for basic open/close) ──
+  // onActionComplete coverage: the callback calls fetchData + setManagingAgent(null)
+  // These paths are already exercised by the polling + close modal tests
+
+  // ── Profile tabs (history, skills, settings) ──────────
+
+  it('shows history tab placeholder', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getAllByText('History').length).toBeGreaterThan(0);
+    });
+
+    const historyBtns = screen.getAllByText('History');
+    const tabBtn = historyBtns.find(el => el.closest('button'));
+    if (tabBtn) fireEvent.click(tabBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Task history will be available/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows skills tab placeholder', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getAllByText('Skills').length).toBeGreaterThan(0);
+    });
+
+    const skillsBtns = screen.getAllByText('Skills');
+    const tabBtn = skillsBtns.find(el => el.closest('button'));
+    if (tabBtn) fireEvent.click(tabBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Skills and training data/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows settings tab with provider and model', async () => {
+    setupMocks({ profile: { ...profileData, provider: 'anthropic' } });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('aa11bb22')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('aa11bb22'));
+    await waitFor(() => {
+      expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
+    });
+
+    const settingsBtns = screen.getAllByText('Settings');
+    const tabBtn = settingsBtns.find(el => el.closest('button'));
+    if (tabBtn) fireEvent.click(tabBtn);
+    await waitFor(() => {
+      expect(screen.getByText('anthropic')).toBeInTheDocument();
+    });
+  });
+
+  // ── formatUptime edge cases (via agent uptime display) ──
+
+  it('displays uptime in seconds for < 1 minute', async () => {
+    const agentsWithUptime = rosterAgents.map((a, i) =>
+      i === 0 ? { ...a, uptimeMs: 30_000 } : a,
+    );
+    setupMocks({ agents: agentsWithUptime, health: { ...healthData, agents: healthData.agents.map((a, i) => i === 0 ? { ...a, uptimeMs: 30_000 } : a) } });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('30s')).toBeInTheDocument();
+    });
+  });
+
+  it('displays uptime in days for > 24h', async () => {
+    const agentsWithUptime = rosterAgents.map((a, i) =>
+      i === 0 ? { ...a, uptimeMs: 172_800_000 } : a,
+    );
+    setupMocks({ agents: agentsWithUptime, health: { ...healthData, agents: healthData.agents.map((a, i) => i === 0 ? { ...a, uptimeMs: 172_800_000 } : a) } });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('2.0d')).toBeInTheDocument();
+    });
+  });
+
+  // ── Polling ───────────────────────────────────────────
+
+  it('polls data silently on 10s interval', async () => {
+    setupMocks();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+    const callCount = mockApiFetch.mock.calls.length;
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+    await waitFor(() => {
+      expect(mockApiFetch.mock.calls.length).toBeGreaterThan(callCount);
+    });
+  });
+
 });

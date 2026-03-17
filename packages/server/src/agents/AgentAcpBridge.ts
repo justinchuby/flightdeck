@@ -120,6 +120,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   agent.provider = effectiveProvider;
   agent.backend = backend;
   agent.status = 'running';
+  agent._notifyStatusChange(agent.status);
   wireAcpEvents(agent, conn);
 
   const { options: startOpts, modelResolution } = buildStartOptions(adapterConfig, {
@@ -305,11 +306,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
       agent.status = 'idle';
       agent._notifyStatusChange(agent.status);
     }
-  }));
-
-  conn.on('prompt_timeout', (timeoutMs: number) => withCtx(() => {
-    if (agent._isTerminated) return;
-    logger.warn({ module: 'agent', msg: 'Prompt timed out — agent stalled', agentId: agent.id, role: agent.role.name, timeoutMs });
   }));
 
   conn.on('prompting', (active: boolean) => withCtx(() => {

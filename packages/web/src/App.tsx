@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useApi } from './hooks/useApi';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { apiFetch } from './hooks/useApi';
+import { ApiProvider } from './contexts/ApiContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import { useAppStore } from './stores/appStore';
 import { useSettingsStore, shouldNotify } from './stores/settingsStore';
 import { useCommandPalette } from './hooks/useCommandPalette';
@@ -28,7 +30,6 @@ import { StatusPopover } from './components/StatusPopover/StatusPopover';
 import { SetupWizard, shouldShowSetupWizard } from './components/SetupWizard';
 import { useLeadStore } from './stores/leadStore';
 import type { AcpTextChunk, Project } from './types';
-import { apiFetch } from './hooks/useApi';
 import { ProjectLayout } from './layouts/ProjectLayout';
 import { shortAgentId } from './utils/agentLabel';
 
@@ -39,7 +40,6 @@ const OrgChart = lazy(() => import('./components/OrgChart/OrgChart').then(m => (
 const OverviewPage = lazy(() => import('./components/OverviewPage/OverviewPage').then(m => ({ default: m.OverviewPage })));
 const GroupChat = lazy(() => import('./components/GroupChat/GroupChat').then(m => ({ default: m.GroupChat })));
 const TimelinePage = lazy(() => import('./components/Timeline').then(m => ({ default: m.TimelinePage })));
-const CanvasPage = lazy(() => import('./components/Canvas').then(m => ({ default: m.CanvasPage })));
 const AnalyticsPage = lazy(() => import('./components/Analytics').then(m => ({ default: m.AnalyticsPage })));
 const AnalysisPage = lazy(() => import('./components/AnalysisPage').then(m => ({ default: m.AnalysisPage })));
 const SharedReplayViewer = lazy(() => import('./components/SessionReplay').then(m => ({ default: m.SharedReplayViewer })));
@@ -120,9 +120,29 @@ function NotFoundPage() {
   );
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export function App() {
-  const ws = useWebSocket();
-  const api = useApi();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ApiProvider>
+        <WebSocketProvider>
+          <AppContent />
+        </WebSocketProvider>
+      </ApiProvider>
+    </QueryClientProvider>
+  );
+}
+
+function AppContent() {
   const _connected = useAppStore((s) => s.connected);
   const agents = useAppStore((s) => s.agents);
   const selectedAgentId = useAppStore((s) => s.selectedAgentId);
@@ -144,8 +164,9 @@ export function App() {
     try {
       const endpoint = systemPaused ? '/system/resume' : '/system/pause';
       await apiFetch(endpoint, { method: 'POST' });
-    } catch (err: any) {
-      addToast('error', `Failed to ${systemPaused ? 'resume' : 'pause'}: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to ${systemPaused ? 'resume' : 'pause'}: ${message}`);
     }
   }, [systemPaused, addToast]);
 
@@ -220,61 +241,66 @@ export function App() {
     }
   }, [agents, soundEnabled]);
 
-  // On app startup: load active leads + persisted projects into leadStore
-  useEffect(() => {
-    // Load active leads and their message history
-    fetch('/api/lead').then((r) => r.json()).then((leads: any[]) => {
-      if (!Array.isArray(leads)) return;
-      const store = useLeadStore.getState();
-      leads.forEach((l) => {
-        store.addProject(l.id);
-        // Pre-load message history
-        fetch(`/api/agents/${l.id}/messages?limit=200`)
-          .then((r) => r.json())
-          .then((data: any) => {
-            if (Array.isArray(data.messages) && data.messages.length > 0) {
-              const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
-                type: 'text' as const,
-                text: m.content,
-                sender: m.sender as 'agent' | 'user' | 'system',
-                timestamp: new Date(m.timestamp).getTime(),
-              }));
-              const current = useLeadStore.getState().projects[l.id];
-              if (!current || current.messages.length === 0) {
-                useLeadStore.getState().setMessages(l.id, msgs);
+  // On app startup: load active leads + pre-load their message history
+  useQuery({
+    queryKey: ['app', 'leads'],
+    queryFn: async ({ signal }) => {
+      try {
+        const leads: Array<{ id: string; status: string; task?: string }> = await apiFetch('/lead', { signal });
+        if (!Array.isArray(leads)) return [];
+        const store = useLeadStore.getState();
+        leads.forEach((l) => {
+          store.addProject(l.id);
+          apiFetch<{ messages: Array<{ sender?: string; text?: string; content?: string; timestamp?: string | number }> }>(`/agents/${l.id}/messages?limit=200`, { signal })
+            .then((data) => {
+              if (Array.isArray(data.messages) && data.messages.length > 0) {
+                const msgs: AcpTextChunk[] = data.messages.map((m) => ({
+                  type: 'text' as const,
+                  text: m.content || m.text || '',
+                  sender: m.sender as 'agent' | 'user' | 'system',
+                  timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
+                }));
+                const current = useLeadStore.getState().projects[l.id];
+                if (!current || current.messages.length === 0) {
+                  useLeadStore.getState().setMessages(l.id, msgs);
+                }
               }
-            }
-          })
-          .catch(() => { /* message history fetch — non-critical, will load via WS */ });
-      });
-      // Auto-select first running lead
-      if (!store.selectedLeadId) {
-        const running = leads.find((l) => l.status === 'running');
-        if (running) store.selectLead(running.id);
+            })
+            .catch(() => { /* message history fetch — non-critical, will load via WS */ });
+        });
+        if (!store.selectedLeadId) {
+          const running = leads.find((l) => l.status === 'running');
+          if (running) store.selectLead(running.id);
+        }
+        return leads;
+      } catch (err) {
+        addToast('error', 'Failed to load sessions — check server connection');
+        throw err;
       }
-    }).catch((err) => {
-      console.warn('[App] Failed to load active leads:', err);
-      addToast('error', 'Failed to load sessions — check server connection');
-    });
+    },
+    staleTime: 30_000,
+  });
 
-    // Load persisted projects and register them in leadStore
-    fetch('/api/projects').then((r) => r.json()).then((projects: Project[]) => {
-      if (!Array.isArray(projects)) return;
+  // On app startup: load persisted projects and register them in leadStore
+  useQuery({
+    queryKey: ['app', 'projects'],
+    queryFn: async ({ signal }) => {
+      const projects: Project[] = await apiFetch('/projects', { signal });
+      if (!Array.isArray(projects)) return [];
       const store = useLeadStore.getState();
       for (const proj of projects) {
         if (proj.status === 'archived') continue;
         const key = `project:${proj.id}`;
         store.addProject(key);
       }
-      // If no lead is selected yet, select the first project
       if (!store.selectedLeadId && projects.length > 0) {
         const first = projects.find((p) => p.status !== 'archived');
         if (first) store.selectLead(`project:${first.id}`);
       }
-    }).catch((err) => {
-      console.warn('[App] Failed to load projects:', err);
-    });
-  }, [addToast]);
+      return projects;
+    },
+    staleTime: 30_000,
+  });
 
   return (
     <div className="flex h-screen bg-surface text-th-text-alt">
@@ -349,25 +375,24 @@ export function App() {
             {/* ── Project-scoped nested routes ─────────────────── */}
             <Route path="/projects/:id" element={<ProjectLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
-              <Route path="overview" element={<RouteErrorBoundary name="Overview"><OverviewPage api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel api={api} /></RouteErrorBoundary>} />
+              <Route path="overview" element={<RouteErrorBoundary name="Overview"><OverviewPage /></RouteErrorBoundary>} />
+              <Route path="session" element={<RouteErrorBoundary name="Session"><LeadDashboard /></RouteErrorBoundary>} />
+              <Route path="sessions/:leadId" element={<RouteErrorBoundary name="Session History"><ReadOnlySession /></RouteErrorBoundary>} />
+              <Route path="tasks" element={<RouteErrorBoundary name="Tasks"><TaskQueuePanel /></RouteErrorBoundary>} />
               <Route path="crew" element={<RouteErrorBoundary name="Crew"><UnifiedCrewPage scope="project" /></RouteErrorBoundary>} />
               <Route path="agents" element={<Navigate to="../crew" replace />} />
               <Route path="knowledge" element={<RouteErrorBoundary name="Knowledge"><KnowledgePanel /></RouteErrorBoundary>} />
               <Route path="artifacts" element={<RouteErrorBoundary name="Artifacts"><ArtifactsPanel /></RouteErrorBoundary>} />
-              <Route path="timeline" element={<RouteErrorBoundary name="Timeline"><TimelinePage api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="groups" element={<RouteErrorBoundary name="Groups"><GroupChat api={api} ws={ws} /></RouteErrorBoundary>} />
-              <Route path="org-chart" element={<RouteErrorBoundary name="Org Chart"><OrgChart api={api} ws={ws} /></RouteErrorBoundary>} />
+              <Route path="timeline" element={<RouteErrorBoundary name="Timeline"><TimelinePage /></RouteErrorBoundary>} />
+              <Route path="groups" element={<RouteErrorBoundary name="Groups"><GroupChat /></RouteErrorBoundary>} />
+              <Route path="org-chart" element={<RouteErrorBoundary name="Org Chart"><OrgChart /></RouteErrorBoundary>} />
               <Route path="analytics" element={<RouteErrorBoundary name="Analytics"><AnalyticsPage /></RouteErrorBoundary>} />
               <Route path="analysis" element={<RouteErrorBoundary name="Analysis"><AnalysisPage /></RouteErrorBoundary>} />
-              <Route path="canvas" element={<RouteErrorBoundary name="Canvas"><CanvasPage /></RouteErrorBoundary>} />
             </Route>
 
             {/* ── Global (non-project-scoped) routes ───────────── */}
             <Route path="/projects" element={<RouteErrorBoundary name="Projects"><ProjectsPanel /></RouteErrorBoundary>} />
-            <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel api={api} /></RouteErrorBoundary>} />
+            <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel /></RouteErrorBoundary>} />
             <Route path="/shared/:token" element={<RouteErrorBoundary name="Shared Replay"><SharedReplayViewer /></RouteErrorBoundary>} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}
@@ -383,7 +408,6 @@ export function App() {
             <Route path="/groups" element={<ProjectRedirect page="groups" />} />
             <Route path="/org" element={<ProjectRedirect page="org-chart" />} />
             <Route path="/analytics" element={<ProjectRedirect page="analytics" />} />
-            <Route path="/canvas" element={<ProjectRedirect page="canvas" />} />
             <Route path="/mission-control" element={<ProjectRedirect page="overview" />} />
             <Route path="/data" element={<Navigate to="/knowledge?tab=memory" replace />} />
 
@@ -398,7 +422,7 @@ export function App() {
         {/* Desktop: sidebar panel */}
         {selectedAgentId && (
           <div className="w-full max-w-[500px] border-l border-th-border flex flex-col bg-th-bg">
-            <ChatPanel agentId={selectedAgentId} ws={ws} />
+            <ChatPanel agentId={selectedAgentId} />
           </div>
         )}
       </div>

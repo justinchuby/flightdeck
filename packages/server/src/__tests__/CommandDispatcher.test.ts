@@ -251,6 +251,17 @@ describe('CommandDispatcher', () => {
         expect.stringContaining('CREW_ROSTER'),
       );
     });
+
+    it('works with empty {} payload (matches help text example)', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent]);
+      (ctx.getRunningCount as any).mockReturnValue(1);
+
+      dispatch(dispatcher, leadAgent, '⟦⟦ QUERY_CREW {} ⟧⟧');
+
+      expect((leadAgent.sendMessage as any)).toHaveBeenCalledWith(
+        expect.stringContaining('CREW_ROSTER'),
+      );
+    });
   });
 
   // ── Broadcast ──────────────────────────────────────────────────────
@@ -1078,6 +1089,7 @@ describe('CommandDispatcher', () => {
   describe('auto-DAG-update on agent completion', () => {
     it('auto-completes DAG task when agent exits with code 0', () => {
       const child = makeChildAgent(leadAgent.id, {
+        task: 'implement feature',
         getRecentOutput: vi.fn().mockReturnValue('done'),
         getTaskOutput: vi.fn().mockReturnValue('done'),
       });
@@ -1102,6 +1114,7 @@ describe('CommandDispatcher', () => {
 
     it('auto-fails DAG task when agent exits with non-zero code', () => {
       const child = makeChildAgent(leadAgent.id, {
+        task: 'implement feature',
         getRecentOutput: vi.fn().mockReturnValue('error'),
         getTaskOutput: vi.fn().mockReturnValue('error'),
       });
@@ -1121,6 +1134,7 @@ describe('CommandDispatcher', () => {
 
     it('skips DAG update when no matching DAG task exists', () => {
       const child = makeChildAgent(leadAgent.id, {
+        task: 'implement feature',
         getRecentOutput: vi.fn().mockReturnValue('done'),
         getTaskOutput: vi.fn().mockReturnValue('done'),
       });
@@ -1137,6 +1151,7 @@ describe('CommandDispatcher', () => {
 
     it('auto-completes DAG task via idle notification', () => {
       const child = makeChildAgent(leadAgent.id, {
+        task: 'implement feature',
         getRecentOutput: vi.fn().mockReturnValue('done'),
         getTaskOutput: vi.fn().mockReturnValue('done'),
       });
@@ -1362,5 +1377,30 @@ describe('CommandDispatcher', () => {
       expect(buf).toContain('SENTINEL');
       expect(buf.length).toBeLessThanOrEqual(100_000);
     });
+  });
+
+  describe('no-payload commands accept empty {} payload', () => {
+    // All no-payload commands should work with both `COMMAND` and `COMMAND {}` forms
+    // since the help text examples show `COMMAND {}`.
+    const noPayloadCommands = [
+      'HALT_HEARTBEAT',
+      'RESUME_HEARTBEAT',
+      'TASK_STATUS',
+      'QUERY_TASKS',
+      'QUERY_GROUPS',
+      'QUERY_PEERS',
+      'LIST_CAPABILITIES',
+    ];
+
+    for (const cmd of noPayloadCommands) {
+      it(`${cmd} {} does not trigger unknown command`, () => {
+        const agent = makeAgent({ id: `agent-${cmd.toLowerCase()}` });
+        dispatch(dispatcher, agent, `⟦⟦ ${cmd} {} ⟧⟧`);
+
+        const calls = (agent.sendMessage as any).mock.calls.map((c: any[]) => c[0]);
+        const unknownMsg = calls.find((msg: string) => msg.includes('Unknown command'));
+        expect(unknownMsg).toBeUndefined();
+      });
+    }
   });
 });

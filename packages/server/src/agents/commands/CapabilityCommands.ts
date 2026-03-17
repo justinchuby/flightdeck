@@ -13,7 +13,7 @@ import { deriveArgs } from './CommandHelp.js';
 // ── Regex patterns ────────────────────────────────────────────────────
 
 const ACQUIRE_REGEX = /⟦⟦\s*ACQUIRE_CAPABILITY\s*(\{.*?\})\s*⟧⟧/s;
-const LIST_REGEX = /⟦⟦\s*LIST_CAPABILITIES\s*⟧⟧/s;
+const LIST_REGEX = /⟦⟦\s*LIST_CAPABILITIES\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 const RELEASE_REGEX = /⟦⟦\s*RELEASE_CAPABILITY\s*(\{.*?\})\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export function getCapabilityCommands(ctx: CommandHandlerContext): CommandEntry[
       regex: LIST_REGEX,
       name: 'LIST_CAPABILITIES',
       handler: (a) => handleList(ctx, a),
-      help: { description: 'List your current capabilities', example: 'LIST_CAPABILITIES {}', category: 'Capabilities' },
+      help: { description: 'List your current capabilities', example: 'LIST_CAPABILITIES', category: 'Capabilities' },
     },
     {
       regex: RELEASE_REGEX,

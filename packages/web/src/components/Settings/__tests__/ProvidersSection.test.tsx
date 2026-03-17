@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { ProvidersSection } from '../ProvidersSection';
 
 // ── Mocks ─────────────────────────────────────────────────
@@ -213,13 +213,16 @@ describe('ProvidersSection', () => {
       .mockResolvedValueOnce(MOCK_CONFIGS)
       .mockResolvedValueOnce(MOCK_RANKING)
       .mockRejectedValueOnce(new Error('status timeout'));
-    render(<ProvidersSection />);
+    // Suppress expected warning from ProvidersSection error path
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await act(async () => { render(<ProvidersSection />); });
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
     // Cards render — toggles work even without status
     expect(screen.getByText('GitHub Copilot SDK')).toBeInTheDocument();
     expect(screen.getByTestId('toggle-copilot')).toBeInTheDocument();
+    spy.mockRestore();
   });
 
   it('does not show preview badge for Codex', async () => {
@@ -232,7 +235,7 @@ describe('ProvidersSection', () => {
     expect(codexCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
   });
 
-  it('shows preview badge for Claude but not Copilot or Codex', async () => {
+  it('shows preview badge for Cursor but not Copilot, Claude, or Codex', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
@@ -241,9 +244,11 @@ describe('ProvidersSection', () => {
     const copilotCard = screen.getByTestId('provider-card-copilot');
     const claudeCard = screen.getByTestId('provider-card-claude');
     const codexCard = screen.getByTestId('provider-card-codex');
+    const cursorCard = screen.getByTestId('provider-card-cursor');
     expect(copilotCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
-    expect(claudeCard.querySelector('[data-testid="preview-badge"]')).not.toBeNull();
+    expect(claudeCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
     expect(codexCard.querySelector('[data-testid="preview-badge"]')).toBeNull();
+    expect(cursorCard.querySelector('[data-testid="preview-badge"]')).not.toBeNull();
   });
 
   it('shows two setup links for Codex when expanded', async () => {

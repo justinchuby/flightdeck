@@ -77,13 +77,13 @@ export function leadRoutes(ctx: AppContext): Router {
         // Briefing suppressed during resume — agent picks up context from ACP session
       }
 
-      // Task message suppressed during resume — clean slate, no system messages
+      // Task message suppressed during resume — clean slate, no system messages.
+      // Use queueMessage instead of setTimeout: the message is queued while the
+      // agent initializes and auto-delivered once the initial prompt completes
+      // (via the prompt_complete → _drainOneMessage pipeline).
       if (!resumingProject && task) {
-        const TASK_DELIVERY_DELAY_MS = 2000;
-        setTimeout(() => {
-          logger.info('lead', `Sending initial task to ${agent.id.slice(0, 8)}: "${task.slice(0, 80)}"`);
-          agent.sendMessage(task);
-        }, TASK_DELIVERY_DELAY_MS);
+        logger.info('lead', `Queuing initial task for ${agent.id.slice(0, 8)}: "${task.slice(0, 80)}"`);
+        agent.queueMessage(task);
       }
 
       // Auto-spawn Secretary agent for DAG tracking and dependency analysis

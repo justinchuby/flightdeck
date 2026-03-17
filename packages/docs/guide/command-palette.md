@@ -46,18 +46,16 @@ Type natural language directly into ⌘K to control your crew:
 | Status check | "what's the status?" |
 | Show agent | "show me the architect" |
 | List tasks | "what tasks are running?" |
-| Show costs | "how much have we spent?" |
 | Show context | "which agents are running low on context?" |
 | Count agents | "how many agents are active?" |
 | Show errors | "any errors?" |
 | Show conflicts | "are there any conflicts?" |
 | Show timeline | "show recent activity" |
 
-### Navigate Commands (5)
+### Navigate Commands (4)
 | Command | Example |
 |---------|---------|
 | Go to page | "go to settings" |
-| Open canvas | "show me the canvas" |
 | Open agent | "focus on developer" |
 | Open dashboard | "go home" |
 | Open timeline | "show timeline" |

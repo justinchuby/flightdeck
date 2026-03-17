@@ -47,13 +47,64 @@ jobs:
           done
           exit $DRIFT
 
-      - name: Unit tests with coverage
+      - name: Build all packages
+        run: npm run build
+
+      - name: Server unit tests with coverage
         run: npm run test:coverage --workspace=packages/server
 
-      - name: Upload coverage to Codecov
+      - name: Web unit tests with coverage
+        run: npm run test:coverage --workspace=packages/web
+
+      - name: CLI smoke test
+        run: |
+          # Test the actual CLI entry point — npx resolves the local bin
+          npx flightdeck --no-browser &
+          SERVER_PID=$!
+
+          # Wait for server to be ready (up to 15s)
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/health > /dev/null 2>&1; then
+              echo "✅ Server responded to /health after ~$((i / 2))s"
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server process died (PID $SERVER_PID)"
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          # Final health check
+          HEALTH=$(curl -sf http://localhost:3001/health || true)
+          if [ -z "$HEALTH" ]; then
+            echo "❌ Server never responded to /health"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "Health response: $HEALTH"
+
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+          wait $SERVER_PID 2>/dev/null || true
+          echo "✅ CLI smoke test passed"
+
+      - name: Upload server coverage to Codecov
         if: always()
         uses: codecov/codecov-action@v5
         with:
           files: packages/server/coverage/lcov.info
           flags: server
           fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload web coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: packages/web/coverage/lcov.info
+          flags: web
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

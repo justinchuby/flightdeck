@@ -1,0 +1,46 @@
+name: Docs Freshness Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/server/src/routes/**'
+      - 'packages/server/src/db/schema.ts'
+      - 'packages/docs/reference/api.md'
+      - 'packages/docs/reference/database.md'
+      - 'scripts/generate-api-docs.mjs'
+      - 'scripts/generate-db-docs.mjs'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/server/src/routes/**'
+      - 'packages/server/src/db/schema.ts'
+      - 'packages/docs/reference/api.md'
+      - 'packages/docs/reference/database.md'
+      - 'scripts/generate-api-docs.mjs'
+      - 'scripts/generate-db-docs.mjs'
+
+jobs:
+  check-docs-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Generate docs
+        run: |
+          node scripts/generate-api-docs.mjs
+          node scripts/generate-db-docs.mjs
+
+      - name: Check for stale docs
+        run: |
+          if git diff --exit-code packages/docs/reference/api.md packages/docs/reference/database.md; then
+            echo "✅ Documentation is up to date"
+          else
+            echo "❌ Documentation is stale! Run 'npm run docs:generate' and commit the changes."
+            git diff --stat packages/docs/reference/
+            exit 1
+          fi

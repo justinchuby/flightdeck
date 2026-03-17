@@ -99,8 +99,8 @@ export function AgentChatPanel({ agentId, readOnly, maxHeight, compact, autoFocu
           }
         }
       })
-      .catch((err: Error) => {
-        if (!cancelled) setFetchError(err.message);
+      .catch((err: unknown) => {
+        if (!cancelled) setFetchError(err instanceof Error ? err.message : String(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

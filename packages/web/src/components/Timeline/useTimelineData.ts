@@ -1,3 +1,4 @@
+import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTimelineSSE } from './useTimelineSSE';
 import type { ConnectionHealth } from './useTimelineSSE';
@@ -90,12 +91,7 @@ function useTimelinePolling(leadId: string | null, enabled: boolean) {
     if (!leadId || !enabled) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/coordination/timeline?leadId=${leadId}`);
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(body || `HTTP ${res.status}`);
-      }
-      const json: TimelineData = await res.json();
+      const json: TimelineData = await apiFetch(`/coordination/timeline?leadId=${leadId}`);
       setData(json);
       setError(null);
     } catch (err) {

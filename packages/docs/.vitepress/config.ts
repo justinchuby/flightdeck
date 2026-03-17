@@ -29,6 +29,7 @@ export default defineConfig({
           text: 'Core Concepts',
           items: [
             { text: 'Architecture', link: '/guide/architecture' },
+            { text: 'Providers', link: '/guide/providers' },
             { text: 'Roles & Agents', link: '/guide/roles' },
             { text: 'Agent Commands', link: '/guide/commands' },
             { text: 'Command Syntax', link: '/guide/command-syntax' },
@@ -46,6 +47,7 @@ export default defineConfig({
             { text: 'Agent Communication', link: '/guide/agent-communication' },
             { text: 'Chat Groups', link: '/guide/chat-groups' },
             { text: 'Chat UI Architecture', link: '/guide/chat-architecture' },
+            { text: 'Telegram Integration', link: '/guide/telegram-integration' },
           ],
         },
         {
@@ -53,7 +55,6 @@ export default defineConfig({
           items: [
             { text: 'Lead Dashboard', link: '/guide/dashboard-lead' },
             { text: 'Agents View', link: '/guide/dashboard-agents' },
-            { text: 'Canvas View', link: '/guide/canvas-view' },
             { text: 'Settings', link: '/guide/dashboard-settings' },
             { text: 'UI Design', link: '/guide/ui-design' },
           ],
@@ -63,9 +64,8 @@ export default defineConfig({
           items: [
             { text: 'Command Palette', link: '/guide/command-palette' },
             { text: 'Intent Rules', link: '/guide/intent-rules' },
+            { text: 'Analytics', link: '/guide/analytics' },
             { text: 'Data Management', link: '/guide/data-management' },
-            { text: 'GitHub Integration', link: '/guide/github-integration' },
-            { text: 'Mobile PWA', link: '/guide/mobile' },
           ],
         },
         {
@@ -94,13 +94,6 @@ export default defineConfig({
       ],
       '/reference/': [
         {
-          text: 'Design Documents',
-          items: [
-            { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
-            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
-          ],
-        },
-        {
           text: 'API Reference (Internal)',
           items: [
             { text: 'REST API', link: '/reference/api' },
@@ -113,40 +106,6 @@ export default defineConfig({
           text: 'Feature APIs (Internal)',
           items: [
             { text: 'NL Commands', link: '/reference/nl-api' },
-            { text: 'GitHub & Conflicts', link: '/reference/github-api' },
-          ],
-        },
-        {
-          text: 'Architecture (Internal)',
-          items: [
-            { text: 'Configuration', link: '/reference/configuration' },
-            { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },
-            { text: 'Design Decisions', link: '/reference/design-decisions' },
-          ],
-        },
-      ],
-      '/design/': [
-        {
-          text: 'Design Documents',
-          items: [
-            { text: 'Docker Sandboxing', link: '/design/docker-sandboxing' },
-            { text: 'Hot-Reload Agent Preservation', link: '/design/hot-reload-agent-preservation' },
-          ],
-        },
-        {
-          text: 'API Reference (Internal)',
-          items: [
-            { text: 'REST API', link: '/reference/api' },
-            { text: 'WebSocket Events', link: '/reference/websocket' },
-            { text: 'Timeline Components', link: '/reference/timeline-api' },
-            { text: 'Database Schema', link: '/reference/database' },
-          ],
-        },
-        {
-          text: 'Feature APIs (Internal)',
-          items: [
-            { text: 'NL Commands', link: '/reference/nl-api' },
-            { text: 'GitHub & Conflicts', link: '/reference/github-api' },
           ],
         },
         {

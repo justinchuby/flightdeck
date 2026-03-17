@@ -3,18 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLeadStore } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { LeadDashboard } from './LeadDashboard';
-import type { AcpTextChunk, DagStatus } from '../../types';
-
-interface ReadOnlySessionProps {
-  api: any;
-  ws: any;
-}
+import type { AcpTextChunk, DagStatus, Decision, ChatGroup, LeadProgress } from '../../types';
 
 /**
  * Route wrapper that renders LeadDashboard in read-only mode for a historical session.
  * Mounted at /projects/:id/sessions/:leadId
  */
-export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
+export function ReadOnlySession() {
   const { leadId } = useParams<{ leadId: string }>();
   const navigate = useNavigate();
   const previousLeadRef = useRef<string | null>(null);
@@ -38,37 +33,37 @@ export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
     // Fire-and-forget historical data fetches.
     // Endpoints may 404 for old sessions — allSettled ignores individual failures.
     Promise.allSettled([
-      apiFetch<{ messages: any[] }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`, opts)
+      apiFetch<{ messages: Array<{ sender?: string; content?: string; text?: string; timestamp?: number }> }>(`/agents/${leadId}/messages?limit=1000&includeSystem=true`, opts)
         .then((data) => {
           if (controller.signal.aborted) return;
           if (Array.isArray(data?.messages) && data.messages.length > 0) {
-            const msgs: AcpTextChunk[] = data.messages.map((m: any) => ({
+            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
               type: 'text' as const,
-              text: m.content,
+              text: m.content || m.text || '',
               sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
-              timestamp: new Date(m.timestamp).getTime(),
+              timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
             }));
             useLeadStore.getState().setMessages(leadId, msgs);
           }
         }),
-      apiFetch<any[]>(`/lead/${leadId}/decisions`, opts)
+      apiFetch<Decision[]>(`/lead/${leadId}/decisions`, opts)
         .then((data) => {
           if (controller.signal.aborted || !Array.isArray(data)) return;
           useLeadStore.getState().setDecisions(leadId, data);
         }),
-      apiFetch<any[]>(`/lead/${leadId}/groups`, opts)
+      apiFetch<ChatGroup[]>(`/lead/${leadId}/groups`, opts)
         .then((data) => {
           if (controller.signal.aborted || !Array.isArray(data)) return;
           useLeadStore.getState().setGroups(leadId, data);
         }),
-      apiFetch<any>(`/lead/${leadId}/dag`, opts)
+      apiFetch<DagStatus>(`/lead/${leadId}/dag`, opts)
         .then((data) => {
           if (controller.signal.aborted || !data?.tasks) return;
-          useLeadStore.getState().setDagStatus(leadId, data as DagStatus);
+          useLeadStore.getState().setDagStatus(leadId, data);
         }),
-      apiFetch<any>(`/lead/${leadId}/progress`, opts)
+      apiFetch<LeadProgress>(`/lead/${leadId}/progress`, opts)
         .then((data) => {
-          if (controller.signal.aborted || !data || data.error) return;
+          if (controller.signal.aborted || !data || ('error' in data)) return;
           useLeadStore.getState().setProgress(leadId, data);
         }),
     ]);
@@ -88,5 +83,5 @@ export function ReadOnlySession({ api, ws }: ReadOnlySessionProps) {
     return null;
   }
 
-  return <LeadDashboard api={api} ws={ws} readOnly />;
+  return <LeadDashboard readOnly />;
 }

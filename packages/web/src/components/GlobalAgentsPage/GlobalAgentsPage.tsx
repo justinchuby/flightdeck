@@ -62,8 +62,9 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
     try {
       await apiFetch(`/agents/${agent.id}/interrupt`, { method: 'POST' });
       addToast('success', `Interrupted ${agent.role.name}`);
-    } catch (err: any) {
-      addToast('error', `Failed to interrupt: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to interrupt: ${message}`);
     } finally {
       setActionLoading(null);
     }
@@ -81,8 +82,9 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
       addToast('success', 'Message sent');
       setMessageText('');
       setShowMessageInput(false);
-    } catch (err: any) {
-      addToast('error', `Failed to send message: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to send message: ${message}`);
     } finally {
       setActionLoading(null);
     }
@@ -94,8 +96,9 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
       await apiFetch(`/agents/${agent.id}/terminate`, { method: 'POST' });
       addToast('success', `Terminated ${agent.role.name}`);
       setConfirmStop(false);
-    } catch (err: any) {
-      addToast('error', `Failed to stop: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      addToast('error', `Failed to stop: ${message}`);
     } finally {
       setActionLoading(null);
     }
@@ -271,8 +274,9 @@ export function GlobalAgentsPage() {
       setError(null);
       const data = await apiFetch<AgentInfo[]>('/agents');
       setAgents(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to fetch agents');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message ?? 'Failed to fetch agents');
     } finally {
       setLoading(false);
     }
@@ -382,7 +386,9 @@ export function GlobalAgentsPage() {
           </div>
         ) : (
           filtered.map(agent => (
-            <AgentCard key={agent.id} agent={agent} />
+            <div key={agent.id} className="cv-auto-lg">
+              <AgentCard agent={agent} />
+            </div>
           ))
         )}
       </div>

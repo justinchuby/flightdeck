@@ -29,8 +29,6 @@ Agents need to talk to each other — not just to you.
 - **Broadcasts** — one agent can announce to the entire crew
 - **Priority routing** — your messages always go to the front of the queue
 
-![Canvas View — see agent relationships and real-time message flow](/screenshots/canvas.png)
-
 When the architect needs to align with three developers on an interface, they create a group chat. Everyone sees the same context. No telephone game, no duplicated conversations.
 
 ### 📋 Task DAG
@@ -69,7 +67,7 @@ Orchestration produces a natural side effect: **visibility**. When agents commun
 - **Session Replay** — scrub through past sessions at up to 32× to review how the team coordinated
 - **Overview** — cumulative flow, agent activity heatmaps, and context usage at a glance
 
-![Timeline — watch the orchestration unfold over time](/screenshots/timeline-live.png)
+![Timeline — watch the orchestration unfold over time](/screenshots/timeline.png)
 
 ---
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { TimelineData } from './useTimelineData';
+import type { TimelineData, TimelineStatus, CommType } from './useTimelineData';
 import { shortAgentId } from '../../utils/agentLabel';
 
 export type ConnectionHealth = 'connected' | 'connecting' | 'reconnecting' | 'degraded' | 'offline';
@@ -260,7 +260,7 @@ export function useTimelineSSE(leadId: string | null): UseTimelineSSEResult {
 }
 
 /** Merge an incremental activity entry into existing timeline data */
-function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
+function mergeActivityEntry(prev: TimelineData, entry: { actionType: string; agentId: string; agentRole?: string; summary?: string; timestamp: string; details?: Record<string, string> }): TimelineData {
   const communications = [...prev.communications];
   const agents = prev.agents.map(a => ({ ...a, segments: [...a.segments] }));
   const locks = [...prev.locks];
@@ -272,24 +272,24 @@ function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
       agent = {
         id: entry.agentId,
         shortId: shortAgentId(entry.agentId),
-        role: entry.agentRole,
+        role: entry.agentRole ?? 'agent',
         createdAt: entry.timestamp,
         segments: [],
       };
-      agents.push(agent);
+      agents.push(agent!);
     }
     // Close previous segment
-    if (agent.segments.length > 0) {
-      const lastSeg = agent.segments[agent.segments.length - 1];
+    if (agent!.segments.length > 0) {
+      const lastSeg = agent!.segments[agent!.segments.length - 1];
       if (!lastSeg.endAt) {
-        agent.segments[agent.segments.length - 1] = { ...lastSeg, endAt: entry.timestamp };
+        agent!.segments[agent!.segments.length - 1] = { ...lastSeg, endAt: entry.timestamp };
       }
     }
     const statusMatch = entry.summary?.match(/^Status:\s*(.+)$/);
-    const status = statusMatch ? statusMatch[1] : entry.summary;
-    agent.segments.push({ status, startAt: entry.timestamp });
+    const status = (statusMatch ? statusMatch[1] : entry.summary) as TimelineStatus;
+    agent!.segments.push({ status, startAt: entry.timestamp });
     if (['completed', 'failed', 'terminated'].includes(status)) {
-      agent.endedAt = entry.timestamp;
+      agent!.endedAt = entry.timestamp;
     }
   }
 
@@ -332,7 +332,7 @@ function mergeActivityEntry(prev: TimelineData, entry: any): TimelineData {
 }
 
 /** Merge an incremental lock event into existing timeline data */
-function mergeLockEvent(prev: TimelineData, lockEvent: any): TimelineData {
+function mergeLockEvent(prev: TimelineData, lockEvent: { type: string; agentId: string; filePath: string; timestamp?: string }): TimelineData {
   const locks = [...prev.locks];
 
   if (lockEvent.type === 'acquired') {
@@ -360,9 +360,9 @@ function mergeLockEvent(prev: TimelineData, lockEvent: any): TimelineData {
 const MAX_COMMUNICATIONS = 500;
 
 /** Merge an incremental comm:update event into existing timeline data */
-export function mergeCommEvent(prev: TimelineData, comm: any): TimelineData {
+export function mergeCommEvent(prev: TimelineData, comm: { type: string; fromAgentId: string; toAgentId?: string; groupName?: string; summary: string; timestamp: string }): TimelineData {
   const appended = [...prev.communications, {
-    type: comm.type,
+    type: comm.type as CommType,
     fromAgentId: comm.fromAgentId,
     toAgentId: comm.toAgentId ?? undefined,
     groupName: comm.groupName,

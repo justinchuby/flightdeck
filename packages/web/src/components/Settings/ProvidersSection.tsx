@@ -118,8 +118,9 @@ function ProviderCard({
         { method: 'POST' },
       );
       setTestResult(result);
-    } catch (err: any) {
-      setTestResult({ success: false, message: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setTestResult({ success: false, message: message });
     } finally {
       setTesting(false);
     }
@@ -185,6 +186,9 @@ function ProviderCard({
                 ? `${authLabel}${provider.version ? ` · ${provider.version}` : ''}`
                 : 'CLI not found on PATH'}
           </div>
+          {provider.id === 'copilot' && (
+            <div className="text-[10px] text-th-text-muted mt-0.5">Requires Copilot ≥ 1.0.4</div>
+          )}
         </div>
         {/* Enable/disable toggle */}
         <button
@@ -365,8 +369,9 @@ export function ProvidersSection() {
           })
           .finally(() => setStatusLoading(false));
       })
-      .catch((err) => {
-        setError(err.message);
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
         setConfigLoading(false);
         setStatusLoading(false);
       });

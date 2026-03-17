@@ -52,8 +52,9 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
       if (mode === 'interrupt') {
         apiFetch(`/agents/${selectedAgent.id}/interrupt`, { method: 'POST' }).then(() => {
           useToastStore.getState().add('success', `Interrupted ${selectedAgent.role.name}`);
-        }).catch((err: Error) => {
-          useToastStore.getState().add('error', `Failed to interrupt: ${err.message}`);
+        }).catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          useToastStore.getState().add('error', `Failed to interrupt: ${message}`);
         });
       }
       return;
@@ -187,7 +188,7 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                   <button
                     onClick={() => {
                       if (confirm('Stop this agent?')) {
-                        fetch(`/api/agents/${selectedAgent.id}`, { method: 'DELETE' });
+                        apiFetch(`/agents/${selectedAgent.id}`, { method: 'DELETE' });
                         setSelectedAgent(null);
                       }
                     }}

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "cd ../shared && rm -f tsconfig.tsbuildinfo && npm run build",
+    "predev": "cd ../shared && node -e \"try{require('fs').unlinkSync('tsconfig.tsbuildinfo')}catch{}\" && npm run build",
     "dev": "tsx watch src/index.ts",
     "build": "tsc --build",
     "start": "node dist/index.js",
@@ -12,7 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.14.1",
+    "@agentclientprotocol/sdk": "^0.16.1",
     "@flightdeck/shared": "*",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.6",
@@ -20,7 +20,7 @@
     "express": "^5.2.1",
     "grammy": "^1.41.1",
     "helmet": "^8.1.0",
-    "pino": "^9.14.0",
+    "pino": "^10.3.1",
     "uuid": "^13.0.0",
     "ws": "^8.19.0",
     "yaml": "^2.8.2",

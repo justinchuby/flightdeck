@@ -46,7 +46,7 @@ export function AgentLifecycle({ agentId, crewId, agent, onClose, onActionComple
 
       switch (action) {
         case 'clone': {
-          const data = await apiFetch(`/crews/${encodedCrew}/agents/${encodedAgent}/clone`, {
+          const data = await apiFetch<{ clone?: { agentId?: string } }>(`/crews/${encodedCrew}/agents/${encodedAgent}/clone`, {
             method: 'POST',
           });
           setResult({ ok: true, message: `Agent cloned: ${data.clone?.agentId ? shortAgentId(data.clone.agentId) : 'new agent'}` });
@@ -60,8 +60,9 @@ export function AgentLifecycle({ agentId, crewId, agent, onClose, onActionComple
       }
 
       onActionComplete();
-    } catch (err: any) {
-      setResult({ ok: false, message: err.message || `Failed to ${action} agent` });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setResult({ ok: false, message: message || `Failed to ${action} agent` });
     } finally {
       setLoading(false);
       setConfirm(null);

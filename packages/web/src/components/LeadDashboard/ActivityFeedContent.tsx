@@ -3,8 +3,9 @@ import { GitBranch, CheckCircle, MessageSquare, BarChart3, Loader2, Wrench } fro
 import { EmptyState } from '../Shared';
 import type { ActivityEvent } from '../../stores/leadStore';
 import { shortAgentId } from '../../utils/agentLabel';
+import type { AgentInfo } from '../../types';
 
-export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: any[] }) {
+export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: AgentInfo[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -30,11 +31,11 @@ export function ActivityFeedContent({ activity, agents }: { activity: ActivityEv
         <EmptyState icon="📡" title="No activity yet" compact />
       ) : (
         recent.map((evt) => {
-          const agent = agents.find((a: any) => a.id === evt.agentId);
+          const agent = agents.find((a) => a.id === evt.agentId);
           const label = agent?.role?.name ?? evt.agentRole;
           const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           return (
-            <div key={evt.id} className="px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
+            <div key={evt.id} className="cv-auto-sm px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
               {getIcon(evt.type, evt.status)}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">

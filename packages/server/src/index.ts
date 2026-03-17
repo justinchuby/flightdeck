@@ -35,7 +35,9 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false,  // Vite-bundled frontend uses patterns blocked by default CSP
+}));
 app.use(originValidation);
 app.use(express.json({ limit: '10mb' }));
 app.use(requestContextMiddleware);

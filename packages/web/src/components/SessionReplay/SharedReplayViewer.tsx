@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Users, Clock, Play, Pause, SkipBack, SkipForward, MapPin } from 'lucide-react';
 import type { ShareableReplay } from './types';
 import { AnnotationPin } from './AnnotationPin';
+import { apiFetch } from '../../hooks/useApi';
 
 /**
  * Read-only shared replay viewer — /shared/:token route.
@@ -21,13 +22,12 @@ export function SharedReplayViewer() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    fetch(`/api/shared/${token}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(res.status === 404 ? 'Replay not found or link expired' : 'Failed to load replay');
-        return res.json();
-      })
+    apiFetch<ShareableReplay>(`/shared/${token}`)
       .then((data) => setReplay(data))
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg.includes('404') ? 'Replay not found or link expired' : msg);
+      })
       .finally(() => setLoading(false));
   }, [token]);
 

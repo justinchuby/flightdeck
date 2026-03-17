@@ -422,4 +422,213 @@ describe('TelegramSettings', () => {
       expect(screen.getByText(/TELEGRAM_BOT_TOKEN/)).toBeInTheDocument();
     });
   });
+
+  // ── Notification category toggle (non-critical) ───────
+
+  it('toggles a non-critical notification category', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByText('Notification Types')).toBeInTheDocument();
+    });
+    // task_completed is non-critical — toggle it
+    fireEvent.click(screen.getByTestId('telegram-notif-task_completed'));
+    // Should not throw
+  });
+
+  it('does not toggle critical notification category', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByText('Notification Types')).toBeInTheDocument();
+    });
+    // decision_needs_approval is critical — clicking should have no effect (no toggle)
+    const btn = screen.getByTestId('telegram-notif-decision_needs_approval');
+    fireEvent.click(btn);
+    // Critical item should still be visually indicated as always on
+    expect(screen.getAllByText('always on').length).toBe(3);
+  });
+
+  // ── Disconnected status ───────────────────────────────
+
+  it('shows Disconnected status when enabled but no adapter running', async () => {
+    const disconnectedStatus = {
+      ...MOCK_STATUS,
+      enabled: true,
+      adapters: [{ platform: 'telegram', running: false }],
+    };
+    mockApiFetch
+      .mockResolvedValueOnce(disconnectedStatus)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      const statusEl = screen.getByTestId('telegram-status');
+      expect(statusEl.textContent).toContain('Disconnected');
+    });
+  });
+
+  // ── Config with notification preferences ──────────────
+
+  it('loads notification categories and quiet hours from config', async () => {
+    const configWithPrefs = {
+      telegram: {
+        ...MOCK_CONFIG.telegram,
+        notifications: {
+          enabledCategories: ['decision_needs_approval', 'agent_crashed', 'system_alert', 'task_completed'],
+          quietHours: { enabled: true, startHour: 23, endHour: 7 },
+        },
+      },
+    };
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(configWithPrefs);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      // Quiet hours should auto-enable since config has them
+      expect(screen.getByTestId('telegram-quiet-start')).toBeInTheDocument();
+      expect(screen.getByTestId('telegram-quiet-end')).toBeInTheDocument();
+    });
+  });
+
+  // ── Status summary bar ────────────────────────────────
+
+  it('shows status summary when enabled', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByText(/2 pending/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/1 subscriptions/)).toBeInTheDocument();
+    expect(screen.getByText(/1 sessions/)).toBeInTheDocument();
+  });
+
+  // ── Quiet hours time selection ────────────────────────
+
+  it('changes quiet hours start time', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByTestId('telegram-quiet-toggle')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('telegram-quiet-toggle'));
+    await waitFor(() => {
+      expect(screen.getByTestId('telegram-quiet-start')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByTestId('telegram-quiet-start'), { target: { value: '21' } });
+    // Should not throw; value change is accepted
+  });
+
+  // ── Toggle enable rollback on API failure ─────────────
+
+  it('rolls back enabled state on toggle API failure', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG)
+      .mockRejectedValueOnce(new Error('Toggle failed')); // PATCH fails
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByTestId('telegram-toggle')).toBeInTheDocument();
+    });
+    // Initial state: enabled=true. Toggle to disable.
+    fireEvent.click(screen.getByTestId('telegram-toggle'));
+    // After API fails, should rollback
+    await waitFor(() => {
+      const statusEl = screen.getByTestId('telegram-status');
+      expect(statusEl.textContent).toContain('Connected');
+    });
+  });
+
+  // ── Save error handling ───────────────────────────────
+
+  it('shows error on save failure', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG)
+      .mockRejectedValueOnce(new Error('Save failed')); // PATCH
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByTestId('telegram-save-btn')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('telegram-save-btn'));
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/)).toBeInTheDocument();
+    });
+  });
+
+  // ── Chat ID Enter key ─────────────────────────────────
+
+  it('adds chat ID on Enter key press', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByTestId('telegram-chatid-input')).toBeInTheDocument();
+    });
+    const input = screen.getByTestId('telegram-chatid-input');
+    fireEvent.change(input, { target: { value: '999' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByText('999')).toBeInTheDocument();
+  });
+
+  // ── Token focus unmasks ───────────────────────────────
+
+  it('unmasks token on focus', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      const input = screen.getByTestId('telegram-token-input') as HTMLInputElement;
+      expect(input.type).toBe('password');
+    });
+    fireEvent.focus(screen.getByTestId('telegram-token-input'));
+    await waitFor(() => {
+      const input = screen.getByTestId('telegram-token-input') as HTMLInputElement;
+      expect(input.type).toBe('text');
+    });
+  });
+
+  // ── Save success shows "Saved ✓" ─────────────────────
+
+  it('shows success state after saving', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG)
+      .mockResolvedValueOnce({}) // PATCH success
+      .mockResolvedValueOnce(MOCK_STATUS); // refresh status
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByTestId('telegram-save-btn')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('telegram-save-btn'));
+    await waitFor(() => {
+      expect(screen.getByText('Saved ✓')).toBeInTheDocument();
+    });
+  });
+
+  // ── Duplicate chat ID prevention ──────────────────────
+
+  it('does not add duplicate chat ID', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_STATUS)
+      .mockResolvedValueOnce(MOCK_CONFIG);
+    render(<TelegramSettings />);
+    await waitFor(() => {
+      expect(screen.getByText('111')).toBeInTheDocument();
+    });
+    const input = screen.getByTestId('telegram-chatid-input');
+    fireEvent.change(input, { target: { value: '111' } });
+    fireEvent.click(screen.getByTestId('telegram-add-chatid'));
+    // Should still only have one instance of '111'
+    expect(screen.getAllByText('111')).toHaveLength(1);
+  });
 });

@@ -29,12 +29,17 @@ vi.mock('../adapters/RoleFileWriter.js', () => ({
 const mockStart = vi.fn();
 const mockOn = vi.fn();
 const mockTerminate = vi.fn().mockResolvedValue(undefined);
+const mockPrompt = vi.fn().mockResolvedValue({ stopReason: 'end_turn' });
+const mockCancel = vi.fn().mockResolvedValue(undefined);
 
-const mockAdapter = {
+const mockAdapter: Record<string, any> = {
   start: mockStart,
   on: mockOn,
   terminate: mockTerminate,
+  prompt: mockPrompt,
+  cancel: mockCancel,
   type: 'acp',
+  isPrompting: false,
 };
 
 vi.mock('../adapters/AdapterFactory.js', () => ({
@@ -77,11 +82,13 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     cwd: '/test/project',
     status: 'idle',
     sessionId: undefined,
+    _isResuming: false,
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
     _notifyModelFallback: vi.fn(),
     _notifyStatusChange: vi.fn(),
+    buildFullPrompt: vi.fn(() => 'You are a lead.\n\n[context]\n\nYour task: do the thing'),
     ...overrides,
   } as any;
 }
@@ -99,6 +106,7 @@ const fakeConfig: ServerConfig = {
 describe('AgentAcpBridge — startAcp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAdapter.isPrompting = false;
   });
 
   afterEach(() => {
@@ -186,6 +194,20 @@ describe('AgentAcpBridge — startAcp', () => {
     );
   });
 
+  it('notifies status change to running when bridge starts', async () => {
+    const agent = createFakeAgent();
+    mockStart.mockResolvedValue('session-123');
+
+    await startAcp(agent, fakeConfig);
+
+    // The bridge sets status to 'running' and notifies before conn.start(),
+    // then conn.start() resolving may set it to 'idle' (resumed) or keep running.
+    // We verify the notification was fired with 'running' at bridge init time.
+    expect(agent._notifyStatusChange).toHaveBeenCalledWith('running');
+    // 'running' should be the first notification call
+    expect(agent._notifyStatusChange.mock.calls[0][0]).toBe('running');
+  });
+
   it('passes correct cliArgs to AcpConnection.start', async () => {
     const agent = createFakeAgent({ model: 'claude-sonnet-4' });
     mockStart.mockResolvedValue('session-123');
@@ -267,5 +289,26 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // Adapter start should still have been called
     expect(mockStart).toHaveBeenCalled();
+  });
+
+  it('sets agent idle on successful resume (no initialPrompt)', async () => {
+    const agent = createFakeAgent({
+      resumeSessionId: 'valid-session-id',
+      _isResuming: true,
+    });
+    mockStart.mockResolvedValue('valid-session-id');
+
+    startAcp(agent, fakeConfig);
+
+    await vi.waitFor(() => {
+      expect(agent._notifySessionReady).toHaveBeenCalledWith('valid-session-id');
+    });
+
+    // Should NOT prompt — successful resume waits for input
+    expect(mockPrompt).not.toHaveBeenCalled();
+
+    // Should be idle
+    expect(agent.status).toBe('idle');
+    expect(agent._isResuming).toBe(false);
   });
 });

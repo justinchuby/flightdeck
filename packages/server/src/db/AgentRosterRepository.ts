@@ -114,7 +114,18 @@ export class AgentRosterRepository {
     return rows.map((r) => this.rowToRecord(r));
   }
 
-  updateStatus(agentId: string, status: RosterAgentStatus): boolean {
+  /** Get all agents for a specific session (uses idx_agent_roster_session index).
+   *  Intended for future session-scoped views; keep even if currently unused. */
+  getBySession(sessionId: string): AgentRecord[] {
+    const rows = this.db.drizzle
+      .select()
+      .from(agentRoster)
+      .where(eq(agentRoster.sessionId, sessionId))
+      .all();
+    return rows.map((r) => this.rowToRecord(r));
+  }
+
+    updateStatus(agentId: string, status: RosterAgentStatus): boolean {
     const result = this.db.drizzle
       .update(agentRoster)
       .set({ status, updatedAt: new Date().toISOString() })

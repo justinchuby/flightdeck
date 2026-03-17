@@ -34,6 +34,30 @@ jobs:
         run: npx --workspace=packages/web tsc --noEmit
         shell: bash
 
-      - name: Unit tests
-        run: npm test --workspace=packages/server
+      - name: Server unit tests with coverage
+        run: npm run test:coverage --workspace=packages/server
         shell: bash
+
+      - name: Web unit tests with coverage
+        run: npm run test:coverage --workspace=packages/web
+        shell: bash
+
+      - name: Upload server coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: packages/server/coverage/lcov.info
+          flags: server-windows
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload web coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: packages/web/coverage/lcov.info
+          flags: web-windows
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -20,7 +20,7 @@ import { deriveArgs } from './CommandHelp.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const LIST_TEMPLATES_REGEX    = /⟦⟦\s*LIST_TEMPLATES\s*⟧⟧/s;
+const LIST_TEMPLATES_REGEX    = /⟦⟦\s*LIST_TEMPLATES\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 const APPLY_TEMPLATE_REGEX    = /⟦⟦\s*APPLY_TEMPLATE\s*(\{.*?\})\s*⟧⟧/s;
 const DECOMPOSE_TASK_REGEX    = /⟦⟦\s*DECOMPOSE_TASK\s*(\{.*?\})\s*⟧⟧/s;
 

@@ -26,8 +26,6 @@ export class WebSocketServer {
   private agentManager: AgentManager;
   private lockRegistry: FileLockRegistry;
   private decisionLog: DecisionLog;
-  private statusThrottleTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private statusPending = new Map<string, AgentManagerEvents['agent:status'] & { type: string; _projectId: string | undefined }>();
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   // agent:text batching — buffer per agent, flush every 100ms
   private textBuffer = new Map<string, { texts: string[]; projectId?: string }>();
@@ -149,21 +147,8 @@ export class WebSocketServer {
     });
 
     this.track(agentManager, 'agent:status', (data: AgentManagerEvents['agent:status']) => {
-      const agentId = data.agentId;
-      const projectId = this.resolveAgentProjectId(agentId);
-      // Throttle: buffer latest status per agent, flush every 500ms
-      this.statusPending.set(agentId, { type: 'agent:status', ...data, _projectId: projectId });
-      if (!this.statusThrottleTimers.has(agentId)) {
-        this.statusThrottleTimers.set(agentId, setTimeout(() => {
-          this.statusThrottleTimers.delete(agentId);
-          const pending = this.statusPending.get(agentId);
-          if (pending) {
-            this.statusPending.delete(agentId);
-            const { _projectId, ...msg } = pending;
-            this.broadcastToProject(msg, _projectId);
-          }
-        }, 500));
-      }
+      const projectId = this.resolveAgentProjectId(data.agentId);
+      this.broadcastToProject({ type: 'agent:status', ...data }, projectId);
     });
 
     this.track(agentManager, 'agent:crashed', (data: AgentManagerEvents['agent:crashed']) => {
@@ -556,11 +541,6 @@ export class WebSocketServer {
       cleanup();
     }
     this.eventCleanups.length = 0;
-
-    // Clean up throttle timers
-    for (const timer of this.statusThrottleTimers.values()) clearTimeout(timer);
-    this.statusThrottleTimers.clear();
-    this.statusPending.clear();
 
     // Clean up text buffer
     if (this.textFlushTimer) {

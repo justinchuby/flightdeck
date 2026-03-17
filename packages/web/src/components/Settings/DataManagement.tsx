@@ -59,8 +59,9 @@ export function DataManagement() {
     try {
       const data = await apiFetch<DataStats>('/data/stats');
       setStats(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load stats');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to load stats');
     } finally {
       setLoading(false);
     }
@@ -79,8 +80,9 @@ export function DataManagement() {
         body: JSON.stringify({ olderThanDays: selectedDays, dryRun: true }),
       });
       setPreview(result);
-    } catch (err: any) {
-      setError(err.message || 'Failed to preview cleanup');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to preview cleanup');
     } finally {
       setPreviewing(false);
     }
@@ -99,8 +101,9 @@ export function DataManagement() {
       setPreview(null);
       // Refresh stats after purge
       await fetchStats();
-    } catch (err: any) {
-      setError(err.message || 'Failed to purge data');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || 'Failed to purge data');
     } finally {
       setPurging(false);
     }

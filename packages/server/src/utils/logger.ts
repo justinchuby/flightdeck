@@ -36,7 +36,7 @@ const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
 const isDev = !isTest && process.env.NODE_ENV !== 'production';
 
 function createPinoLogger(): pino.Logger {
-  const level = process.env.LOG_LEVEL || (isTest ? 'silent' : 'debug');
+  const level = process.env.LOG_LEVEL || (isTest ? 'silent' : isDev ? 'debug' : 'warn');
 
   if (isDev) {
     try {

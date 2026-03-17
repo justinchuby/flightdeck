@@ -129,9 +129,11 @@ describe('KnowledgePanel', () => {
     fireEvent.click(proceduralCard!);
 
     // Should show only procedural entries
-    expect(screen.getByText('git-workflow')).toBeTruthy();
-    expect(screen.queryByText('agent-identity')).toBeNull();
-    expect(screen.queryByText('api-conventions')).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByText('git-workflow')).toBeTruthy();
+      expect(screen.queryByText('agent-identity')).toBeNull();
+      expect(screen.queryByText('api-conventions')).toBeNull();
+    });
   });
 
   it('expands entry to show details on click', async () => {
@@ -193,8 +195,10 @@ describe('KnowledgePanel', () => {
     });
 
     fireEvent.click(screen.getByText('Add Entry'));
-    expect(screen.getByText('New Knowledge Entry')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Knowledge content...')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('New Knowledge Entry')).toBeTruthy();
+      expect(screen.getByPlaceholderText('Knowledge content...')).toBeTruthy();
+    });
   });
 
   it('creates a new entry via the form', async () => {
@@ -306,7 +310,9 @@ describe('KnowledgePanel', () => {
     expect(screen.getByText('All')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('page-tab-training'));
     // After switching, category filter tabs should be gone (Browse hidden)
-    expect(screen.queryByText('All')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('All')).not.toBeInTheDocument();
+    });
   });
 
   it('switches to Memory tab', async () => {
@@ -318,6 +324,8 @@ describe('KnowledgePanel', () => {
     expect(screen.getByText('All')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('page-tab-memory'));
     // Browse content gone, category filter tabs hidden
-    expect(screen.queryByText('All')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('All')).not.toBeInTheDocument();
+    });
   });
 });

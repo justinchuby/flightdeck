@@ -85,12 +85,12 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   }, [configLoading]);
 
   const handleDismiss = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, 'true');
+    try { localStorage.setItem(STORAGE_KEY, 'true'); } catch {}
     onComplete();
   }, [onComplete]);
 
   const handleFinish = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, 'true');
+    try { localStorage.setItem(STORAGE_KEY, 'true'); } catch {}
     onComplete();
   }, [onComplete]);
 
@@ -185,6 +185,9 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                                   </span>
                                 )}
                               </div>
+                              {p.id === 'copilot' && (
+                                <div className="text-[10px] text-th-text-muted">Requires Copilot ≥ 1.0.4</div>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
@@ -303,5 +306,5 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
 
 /** Check if the setup wizard should be shown (no providers configured + not dismissed). */
 export function shouldShowSetupWizard(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== 'true';
+  try { return localStorage.getItem(STORAGE_KEY) !== 'true'; } catch { return true; }
 }

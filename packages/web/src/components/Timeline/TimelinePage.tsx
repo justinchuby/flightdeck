@@ -19,11 +19,6 @@ import { ProjectTabs } from '../ProjectTabs';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import './timeline-a11y.css';
 
-interface Props {
-  api: any;
-  ws: any;
-}
-
 // ── Filter config ────────────────────────────────────────────────────
 
 const ALL_ROLES = ['lead', 'architect', 'developer', 'code-reviewer', 'critical-reviewer', 'designer', 'secretary', 'qa-tester'] as const;
@@ -102,7 +97,7 @@ function applyFilters(
 }
 
 /** Timeline visualization page — shows agent activity over time using visx. */
-export function TimelinePage({ api: _api, ws: _ws }: Props) {
+export function TimelinePage() {
   const contextProjectId = useOptionalProjectId();
   const storeAgents = useAppStore((s) => s.agents);
   const announcements = useAccessibilityAnnouncements();

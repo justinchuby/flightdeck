@@ -201,9 +201,10 @@ describe('ProjectsPanel', () => {
   });
 
   it('shows Delete button only for archived projects', async () => {
+    const stoppedProject = { ...sampleProjects[0], runningAgentCount: 0, idleAgentCount: 0, activeAgentCount: 0 };
     mockApiFetch.mockImplementation((path: string) => {
-      if (path === '/projects') return Promise.resolve(sampleProjects);
-      if (path === `/projects/${sampleProjects[0].id}`) return Promise.resolve(sampleProjects[0]);
+      if (path === '/projects') return Promise.resolve([stoppedProject, sampleProjects[1]]);
+      if (path === `/projects/${sampleProjects[0].id}`) return Promise.resolve(stoppedProject);
       return Promise.resolve([]);
     });
 
@@ -303,9 +304,10 @@ describe('ProjectsPanel', () => {
   });
 
   it('calls resume endpoint when Resume is clicked', async () => {
+    const stoppedProject = { ...sampleProjects[0], runningAgentCount: 0, idleAgentCount: 0, activeAgentCount: 0 };
     mockApiFetch.mockImplementation((path: string, opts?: any) => {
-      if (path === '/projects' && !opts) return Promise.resolve(sampleProjects);
-      if (path === `/projects/${sampleProjects[0].id}` && !opts) return Promise.resolve(sampleProjects[0]);
+      if (path === '/projects' && !opts) return Promise.resolve([stoppedProject, sampleProjects[1]]);
+      if (path === `/projects/${sampleProjects[0].id}` && !opts) return Promise.resolve(stoppedProject);
       if (path === `/projects/${sampleProjects[0].id}/resume` && opts?.method === 'POST') return Promise.resolve({ id: 'new-agent-id' });
       return Promise.resolve([]);
     });

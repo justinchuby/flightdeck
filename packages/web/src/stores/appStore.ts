@@ -45,13 +45,32 @@ export const useAppStore = create<AppState>((set) => ({
   pendingDecisions: [],
   approvalQueueOpen: false,
 
-  setAgents: (agents) => set({ agents }),
+  setAgents: (incoming) =>
+    set((s) => {
+      // Preserve client-only fields (messages, plan) that aren't in server's toJSON()
+      const byId = new Map(s.agents.map((a) => [a.id, a]));
+      return {
+        agents: incoming.map((a) => {
+          const prev = byId.get(a.id);
+          if (!prev) return a;
+          // Use new value if explicitly provided; fall back to previous if new is undefined
+          const messages = a.messages !== undefined ? a.messages : prev.messages;
+          const plan = a.plan !== undefined ? a.plan : prev.plan;
+          return { ...a, messages, plan };
+        }),
+      };
+    }),
   addAgent: (agent) =>
-    set((s) =>
-      s.agents.some((a) => a.id === agent.id)
-        ? { agents: s.agents.map((a) => (a.id === agent.id ? agent : a)) }
-        : { agents: [...s.agents, agent] },
-    ),
+    set((s) => {
+      const prev = s.agents.find((a) => a.id === agent.id);
+      if (prev) {
+        // Merge: keep client-only fields (messages, plan) only when new agent doesn't provide them
+        const messages = agent.messages !== undefined ? agent.messages : prev.messages;
+        const plan = agent.plan !== undefined ? agent.plan : prev.plan;
+        return { agents: s.agents.map((a) => (a.id === agent.id ? { ...agent, messages, plan } : a)) };
+      }
+      return { agents: [...s.agents, agent] };
+    }),
   updateAgent: (id, patch) =>
     set((s) => ({
       agents: s.agents.map((a) => (a.id === id ? { ...a, ...patch } : a)),

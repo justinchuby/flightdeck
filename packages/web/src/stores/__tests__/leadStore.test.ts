@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useLeadStore } from '../leadStore';
+import type { AcpToolCall, LeadProgress, Decision, DagStatus, ChatGroup, GroupMessage } from '../../types';
+import type { ActivityEvent, AgentComm, AgentReport, ProgressSnapshot } from '../leadStore';
 
 const LEAD_ID = 'lead-test-001';
 
@@ -8,8 +10,407 @@ function resetStore() {
   useLeadStore.getState().addProject(LEAD_ID);
 }
 
+function makeDecision(overrides: Partial<Decision> = {}): Decision {
+  return {
+    id: 'dec-1',
+    agentId: 'agent-1',
+    agentRole: 'Developer',
+    leadId: LEAD_ID,
+    projectId: null,
+    title: 'Use tabs',
+    rationale: 'Consistency',
+    needsConfirmation: true,
+    status: 'recorded',
+    autoApproved: false,
+    confirmedAt: null,
+    timestamp: new Date().toISOString(),
+    category: 'style',
+    ...overrides,
+  };
+}
+
+function makeProgress(overrides: Partial<LeadProgress> = {}): LeadProgress {
+  return {
+    totalDelegations: 3,
+    active: 1,
+    completed: 1,
+    failed: 0,
+    completionPct: 33,
+    crewSize: 2,
+    crewAgents: [],
+    delegations: [],
+    ...overrides,
+  };
+}
+
+function makeToolCall(overrides: Partial<AcpToolCall> = {}): AcpToolCall {
+  return {
+    toolCallId: 'tc-1',
+    title: 'bash',
+    kind: 'tool',
+    status: 'completed',
+    ...overrides,
+  };
+}
+
+function makeActivity(overrides: Partial<ActivityEvent> = {}): ActivityEvent {
+  return {
+    id: 'act-1',
+    agentId: 'agent-1',
+    agentRole: 'Developer',
+    type: 'tool_call',
+    summary: 'ran bash',
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+function makeComm(overrides: Partial<AgentComm> = {}): AgentComm {
+  return {
+    id: 'comm-1',
+    fromId: 'agent-1',
+    fromRole: 'Developer',
+    toId: 'lead-1',
+    toRole: 'Lead',
+    content: 'hello',
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+function makeReport(overrides: Partial<AgentReport> = {}): AgentReport {
+  return {
+    id: 'rpt-1',
+    fromRole: 'Developer',
+    fromId: 'agent-1',
+    content: 'Done with task',
+    timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
 describe('leadStore', () => {
   beforeEach(resetStore);
+
+  // ── Core project management ──────────────────────────────
+
+  describe('selectLead', () => {
+    it('sets selectedLeadId', () => {
+      useLeadStore.getState().selectLead(LEAD_ID);
+      expect(useLeadStore.getState().selectedLeadId).toBe(LEAD_ID);
+    });
+
+    it('clears selectedLeadId with null', () => {
+      useLeadStore.getState().selectLead(LEAD_ID);
+      useLeadStore.getState().selectLead(null);
+      expect(useLeadStore.getState().selectedLeadId).toBeNull();
+    });
+  });
+
+  describe('addProject', () => {
+    it('creates empty project state', () => {
+      const proj = useLeadStore.getState().projects[LEAD_ID];
+      expect(proj).toBeDefined();
+      expect(proj.messages).toEqual([]);
+      expect(proj.decisions).toEqual([]);
+      expect(proj.progress).toBeNull();
+      expect(proj.dagStatus).toBeNull();
+    });
+
+    it('is idempotent — does not overwrite existing project', () => {
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'hi', sender: 'user', timestamp: 1 });
+      useLeadStore.getState().addProject(LEAD_ID); // re-add
+      expect(useLeadStore.getState().projects[LEAD_ID].messages).toHaveLength(1);
+    });
+  });
+
+  describe('removeProject', () => {
+    it('removes the project and its draft', () => {
+      useLeadStore.getState().setDraft(LEAD_ID, 'draft text');
+      useLeadStore.getState().removeProject(LEAD_ID);
+      expect(useLeadStore.getState().projects[LEAD_ID]).toBeUndefined();
+      expect(useLeadStore.getState().drafts[LEAD_ID]).toBeUndefined();
+    });
+
+    it('resets selectedLeadId when removed project was selected', () => {
+      useLeadStore.getState().selectLead(LEAD_ID);
+      useLeadStore.getState().removeProject(LEAD_ID);
+      expect(useLeadStore.getState().selectedLeadId).toBeNull();
+    });
+
+    it('preserves selectedLeadId when a different project is removed', () => {
+      useLeadStore.getState().addProject('other-lead');
+      useLeadStore.getState().selectLead(LEAD_ID);
+      useLeadStore.getState().removeProject('other-lead');
+      expect(useLeadStore.getState().selectedLeadId).toBe(LEAD_ID);
+    });
+  });
+
+  describe('setDraft', () => {
+    it('stores draft text for a lead', () => {
+      useLeadStore.getState().setDraft(LEAD_ID, 'hello world');
+      expect(useLeadStore.getState().drafts[LEAD_ID]).toBe('hello world');
+    });
+  });
+
+  describe('reset', () => {
+    it('clears all state', () => {
+      useLeadStore.getState().selectLead(LEAD_ID);
+      useLeadStore.getState().setDraft(LEAD_ID, 'draft');
+      useLeadStore.getState().reset();
+      expect(useLeadStore.getState().projects).toEqual({});
+      expect(useLeadStore.getState().selectedLeadId).toBeNull();
+    });
+  });
+
+  // ── Decisions ────────────────────────────────────────────
+
+  describe('setDecisions', () => {
+    it('replaces all decisions for a lead', () => {
+      const decs = [makeDecision({ id: 'd1' }), makeDecision({ id: 'd2' })];
+      useLeadStore.getState().setDecisions(LEAD_ID, decs);
+      expect(useLeadStore.getState().projects[LEAD_ID].decisions).toHaveLength(2);
+    });
+
+    it('creates project if it does not exist', () => {
+      useLeadStore.getState().setDecisions('new-lead', [makeDecision()]);
+      expect(useLeadStore.getState().projects['new-lead'].decisions).toHaveLength(1);
+    });
+  });
+
+  describe('addDecision', () => {
+    it('appends a decision to existing list', () => {
+      useLeadStore.getState().addDecision(LEAD_ID, makeDecision({ id: 'd1' }));
+      useLeadStore.getState().addDecision(LEAD_ID, makeDecision({ id: 'd2' }));
+      expect(useLeadStore.getState().projects[LEAD_ID].decisions).toHaveLength(2);
+    });
+  });
+
+  describe('updateDecision', () => {
+    it('updates a specific decision by id', () => {
+      useLeadStore.getState().addDecision(LEAD_ID, makeDecision({ id: 'd1', status: 'recorded' }));
+      useLeadStore.getState().updateDecision(LEAD_ID, 'd1', { status: 'confirmed' });
+      expect(useLeadStore.getState().projects[LEAD_ID].decisions[0].status).toBe('confirmed');
+    });
+
+    it('does not affect other decisions', () => {
+      useLeadStore.getState().addDecision(LEAD_ID, makeDecision({ id: 'd1' }));
+      useLeadStore.getState().addDecision(LEAD_ID, makeDecision({ id: 'd2', title: 'Use spaces' }));
+      useLeadStore.getState().updateDecision(LEAD_ID, 'd1', { status: 'rejected' });
+      expect(useLeadStore.getState().projects[LEAD_ID].decisions[1].title).toBe('Use spaces');
+      expect(useLeadStore.getState().projects[LEAD_ID].decisions[1].status).toBe('recorded');
+    });
+  });
+
+  // ── Progress ─────────────────────────────────────────────
+
+  describe('setProgress', () => {
+    it('sets progress for a lead', () => {
+      useLeadStore.getState().setProgress(LEAD_ID, makeProgress({ completionPct: 50 }));
+      expect(useLeadStore.getState().projects[LEAD_ID].progress?.completionPct).toBe(50);
+    });
+
+    it('normalizes team→crew properties', () => {
+      const oldFormat = { ...makeProgress(), crewAgents: undefined as any, crewSize: undefined as any, teamAgents: [{ id: 'a1' }], teamSize: 3 };
+      useLeadStore.getState().setProgress(LEAD_ID, oldFormat as any);
+      const progress = useLeadStore.getState().projects[LEAD_ID].progress!;
+      expect(progress.crewAgents).toEqual([{ id: 'a1' }]);
+      expect(progress.crewSize).toBe(3);
+    });
+  });
+
+  describe('setProgressSummary', () => {
+    it('sets summary text', () => {
+      useLeadStore.getState().setProgressSummary(LEAD_ID, 'All tasks done');
+      expect(useLeadStore.getState().projects[LEAD_ID].progressSummary).toBe('All tasks done');
+    });
+  });
+
+  describe('addProgressSnapshot', () => {
+    it('appends snapshot to history', () => {
+      const snap: ProgressSnapshot = { summary: 'Midpoint', completed: ['a'], inProgress: ['b'], blocked: [], timestamp: Date.now() };
+      useLeadStore.getState().addProgressSnapshot(LEAD_ID, snap);
+      useLeadStore.getState().addProgressSnapshot(LEAD_ID, { ...snap, summary: 'Later' });
+      expect(useLeadStore.getState().projects[LEAD_ID].progressHistory).toHaveLength(2);
+    });
+  });
+
+  // ── Messages ─────────────────────────────────────────────
+
+  describe('addMessage', () => {
+    it('adds a message with timestamp', () => {
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'hello', sender: 'user', timestamp: 12345 });
+      const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].timestamp).toBe(12345);
+    });
+
+    it('defaults timestamp to Date.now() if not provided', () => {
+      const before = Date.now();
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'hi', sender: 'user' });
+      const ts = useLeadStore.getState().projects[LEAD_ID].messages[0].timestamp!;
+      expect(ts).toBeGreaterThanOrEqual(before);
+    });
+  });
+
+  describe('setMessages', () => {
+    it('replaces all messages', () => {
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'old', sender: 'user', timestamp: 1 });
+      useLeadStore.getState().setMessages(LEAD_ID, [{ type: 'text', text: 'new', sender: 'agent', timestamp: 2 }]);
+      const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].text).toBe('new');
+    });
+  });
+
+  describe('promoteQueuedMessages', () => {
+    it('clears queued flag from all messages', () => {
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'q1', sender: 'user', queued: true, timestamp: 1 });
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'q2', sender: 'user', queued: true, timestamp: 2 });
+      useLeadStore.getState().promoteQueuedMessages(LEAD_ID);
+      const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
+      expect(msgs.every((m) => !m.queued)).toBe(true);
+    });
+
+    it('does not affect non-queued messages', () => {
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'normal', sender: 'agent', timestamp: 1 });
+      useLeadStore.getState().promoteQueuedMessages(LEAD_ID);
+      expect(useLeadStore.getState().projects[LEAD_ID].messages[0].text).toBe('normal');
+    });
+  });
+
+  // ── Tool calls ───────────────────────────────────────────
+
+  describe('updateToolCall', () => {
+    it('adds a new tool call', () => {
+      useLeadStore.getState().updateToolCall(LEAD_ID, makeToolCall({ toolCallId: 'tc-1' }));
+      expect(useLeadStore.getState().projects[LEAD_ID].toolCalls).toHaveLength(1);
+    });
+
+    it('updates existing tool call by toolCallId', () => {
+      useLeadStore.getState().updateToolCall(LEAD_ID, makeToolCall({ toolCallId: 'tc-1', status: 'pending' }));
+      useLeadStore.getState().updateToolCall(LEAD_ID, makeToolCall({ toolCallId: 'tc-1', status: 'completed' }));
+      const calls = useLeadStore.getState().projects[LEAD_ID].toolCalls;
+      expect(calls).toHaveLength(1);
+      expect(calls[0].status).toBe('completed');
+    });
+
+    it('keeps only last 50 tool calls', () => {
+      for (let i = 0; i < 55; i++) {
+        useLeadStore.getState().updateToolCall(LEAD_ID, makeToolCall({ toolCallId: `tc-${i}` }));
+      }
+      const calls = useLeadStore.getState().projects[LEAD_ID].toolCalls;
+      expect(calls).toHaveLength(50);
+      expect(calls[0].toolCallId).toBe('tc-5');
+    });
+
+    it('sets pendingNewline to true', () => {
+      useLeadStore.getState().updateToolCall(LEAD_ID, makeToolCall());
+      expect(useLeadStore.getState().projects[LEAD_ID].pendingNewline).toBe(true);
+    });
+  });
+
+  // ── Activity ─────────────────────────────────────────────
+
+  describe('addActivity', () => {
+    it('adds an activity event', () => {
+      useLeadStore.getState().addActivity(LEAD_ID, makeActivity());
+      expect(useLeadStore.getState().projects[LEAD_ID].activity).toHaveLength(1);
+    });
+
+    it('keeps only last 100 events', () => {
+      for (let i = 0; i < 105; i++) {
+        useLeadStore.getState().addActivity(LEAD_ID, makeActivity({ id: `act-${i}` }));
+      }
+      const activity = useLeadStore.getState().projects[LEAD_ID].activity;
+      expect(activity).toHaveLength(100);
+      expect(activity[0].id).toBe('act-5');
+    });
+  });
+
+  // ── Comms ────────────────────────────────────────────────
+
+  describe('addComm', () => {
+    it('adds a communication event', () => {
+      useLeadStore.getState().addComm(LEAD_ID, makeComm());
+      expect(useLeadStore.getState().projects[LEAD_ID].comms).toHaveLength(1);
+    });
+
+    it('keeps only last 200 comms', () => {
+      for (let i = 0; i < 205; i++) {
+        useLeadStore.getState().addComm(LEAD_ID, makeComm({ id: `comm-${i}` }));
+      }
+      const comms = useLeadStore.getState().projects[LEAD_ID].comms;
+      expect(comms).toHaveLength(200);
+      expect(comms[0].id).toBe('comm-5');
+    });
+  });
+
+  // ── Agent reports ────────────────────────────────────────
+
+  describe('addAgentReport', () => {
+    it('adds a report', () => {
+      useLeadStore.getState().addAgentReport(LEAD_ID, makeReport());
+      expect(useLeadStore.getState().projects[LEAD_ID].agentReports).toHaveLength(1);
+    });
+
+    it('keeps only last 100 reports', () => {
+      for (let i = 0; i < 105; i++) {
+        useLeadStore.getState().addAgentReport(LEAD_ID, makeReport({ id: `rpt-${i}` }));
+      }
+      const reports = useLeadStore.getState().projects[LEAD_ID].agentReports;
+      expect(reports).toHaveLength(100);
+      expect(reports[0].id).toBe('rpt-5');
+    });
+  });
+
+  // ── Groups ───────────────────────────────────────────────
+
+  describe('setGroups', () => {
+    it('replaces groups for a lead', () => {
+      const groups: ChatGroup[] = [{ name: 'design', leadId: LEAD_ID, memberIds: ['a1'], createdAt: new Date().toISOString() }];
+      useLeadStore.getState().setGroups(LEAD_ID, groups);
+      expect(useLeadStore.getState().projects[LEAD_ID].groups).toHaveLength(1);
+    });
+  });
+
+  describe('addGroupMessage', () => {
+    it('adds a message to a group', () => {
+      const msg: GroupMessage = { id: 'gm-1', groupName: 'design', leadId: LEAD_ID, fromAgentId: 'a1', fromRole: 'Dev', content: 'hi', timestamp: new Date().toISOString() };
+      useLeadStore.getState().addGroupMessage(LEAD_ID, 'design', msg);
+      expect(useLeadStore.getState().projects[LEAD_ID].groupMessages['design']).toHaveLength(1);
+    });
+
+    it('deduplicates by message id', () => {
+      const msg: GroupMessage = { id: 'gm-1', groupName: 'design', leadId: LEAD_ID, fromAgentId: 'a1', fromRole: 'Dev', content: 'hi', timestamp: new Date().toISOString() };
+      useLeadStore.getState().addGroupMessage(LEAD_ID, 'design', msg);
+      useLeadStore.getState().addGroupMessage(LEAD_ID, 'design', msg);
+      expect(useLeadStore.getState().projects[LEAD_ID].groupMessages['design']).toHaveLength(1);
+    });
+
+    it('keeps only last 500 messages per group', () => {
+      for (let i = 0; i < 505; i++) {
+        useLeadStore.getState().addGroupMessage(LEAD_ID, 'design', {
+          id: `gm-${i}`, groupName: 'design', leadId: LEAD_ID, fromAgentId: 'a1', fromRole: 'Dev', content: `msg ${i}`, timestamp: new Date().toISOString(),
+        });
+      }
+      const msgs = useLeadStore.getState().projects[LEAD_ID].groupMessages['design'];
+      expect(msgs).toHaveLength(500);
+      expect(msgs[0].id).toBe('gm-5');
+    });
+  });
+
+  // ── DAG status ───────────────────────────────────────────
+
+  describe('setDagStatus', () => {
+    it('sets DAG status for a lead', () => {
+      const status: DagStatus = { tasks: [], fileLockMap: {}, summary: { pending: 0, ready: 0, running: 0, done: 0, failed: 0, blocked: 0, paused: 0, skipped: 0 } };
+      useLeadStore.getState().setDagStatus(LEAD_ID, status);
+      expect(useLeadStore.getState().projects[LEAD_ID].dagStatus).toEqual(status);
+    });
+  });
+
+  // ── appendToThinkingMessage (existing tests) ─────────────
 
   describe('appendToThinkingMessage', () => {
     it('creates a new thinking message when no thinking message exists', () => {
@@ -137,7 +538,7 @@ describe('leadStore', () => {
     it('addMessage inserts a system separator correctly', () => {
       // Simulate: agent sends a response, then interrupt adds separator + user message
       useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'agent response');
-      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'interrupt message', sender: 'user', timestamp: Date.now() });
 
       const msgs = useLeadStore.getState().projects[LEAD_ID].messages;
@@ -151,7 +552,7 @@ describe('leadStore', () => {
 
     it('separator causes next appendToLastAgentMessage to start a new bubble', () => {
       useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'old text');
-      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system' as any, timestamp: Date.now() });
+      useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       useLeadStore.getState().addMessage(LEAD_ID, { type: 'text', text: 'interrupt msg', sender: 'user', timestamp: Date.now() });
       // New agent response after interrupt
       useLeadStore.getState().appendToLastAgentMessage(LEAD_ID, 'new response');
@@ -171,13 +572,13 @@ describe('leadStore', () => {
       useLeadStore.getState().addMessage(LEAD_ID, {
         type: 'text',
         text: '📨 [From Developer abc12345] Hello lead',
-        sender: 'system' as any,
+        sender: 'system',
         timestamp: Date.now(),
       });
       useLeadStore.getState().addMessage(LEAD_ID, {
         type: 'text',
         text: '🗣️ [design-chat: Architect def67890] Let us discuss',
-        sender: 'system' as any,
+        sender: 'system',
         timestamp: Date.now(),
       });
 

@@ -1,45 +1,33 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Crown, MessageSquare, GitBranch, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, Download, FolderOpen, Eye } from 'lucide-react';
+import { Crown, Eye } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useLeadStore } from '../../stores/leadStore';
 import { useTimerStore, selectActiveTimerCount } from '../../stores/timerStore';
 import type { AgentReport, ProgressSnapshot, ActivityEvent, AgentComm } from '../../stores/leadStore';
-import type { AcpTextChunk, DagStatus, Decision, ChatGroup, GroupMessage, Delegation, LeadProgress } from '../../types';
+import type { AcpTextChunk, Decision, ChatGroup, GroupMessage, Delegation, LeadProgress } from '../../types';
 import { useAppStore } from '../../stores/appStore';
 import { useHistoricalAgents } from '../../hooks/useHistoricalAgents';
-import { parseAgentReport } from './AgentReportBlock';
-import { BannerDecisionActions } from './DecisionPanel';
 import { useFileDrop } from '../../hooks/useFileDrop';
 import { useAttachments } from '../../hooks/useAttachments';
 import { DropOverlay } from '../DropOverlay';
 import { InputComposer } from './InputComposer';
-import { ChatMessages, type CatchUpSummary } from './ChatMessages';
+import { ChatMessages } from './ChatMessages';
 import { SidebarTabs } from './SidebarTabs';
 import { CrewStatusContent } from './CrewStatusContent';
 import { NewProjectModal } from './NewProjectModal';
 import { ProgressDetailModal, AgentReportDetailModal } from './ProgressDetailModal';
 import { useLeadWebSocket } from './useLeadWebSocket';
 import { useDragResize } from './useDragResize';
-import type { useApi } from '../../hooks/useApi';
-import type { useWebSocket } from '../../hooks/useWebSocket';
-
-/** Shape returned by /api/agents/:id/messages and /api/projects/:id/messages */
-interface MessageHistoryResponse {
-  messages: Array<{
-    content: string;
-    sender: string;
-    timestamp: string;
-    fromRole?: string;
-  }>;
-}
-
-/** Shape returned by /api/lead — list of active lead agents */
-interface LeadListItem {
-  id: string;
-  status: string;
-  role?: string;
-  projectId?: string;
-}
+import { useWebSocketContext } from '../../contexts/WebSocketContext';
+import { useLeadPolling } from './useLeadPolling';
+import { useLeadMessages } from './useLeadMessages';
+import { useCatchUpSummary } from './useCatchUpSummary';
+import { useDecisionActions } from './useDecisionActions';
+import { useMessageActions } from './useMessageActions';
+import { LeadProgressBanner } from './LeadProgressBanner';
+import { LeadAgentReportsBanner } from './LeadAgentReportsBanner';
+import { LeadPendingDecisionsBanner } from './LeadPendingDecisionsBanner';
+import { LeadSessionInfoBar } from './LeadSessionInfoBar';
 
 // Stable empty references — avoids new [] / {} on every render (zustand equality trap)
 const EMPTY_MESSAGES: AcpTextChunk[] = [];
@@ -54,17 +42,16 @@ const EMPTY_DELEGATIONS: Delegation[] = [];
 const EMPTY_CREW_AGENTS: LeadProgress['crewAgents'] = [];
 
 interface Props {
-  api: ReturnType<typeof useApi>;
-  ws: ReturnType<typeof useWebSocket>;
   readOnly?: boolean;
 }
 
-export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
+export function LeadDashboard({ readOnly = false }: Props) {
+  const ws = useWebSocketContext();
   const { projects, selectedLeadId, drafts } = useLeadStore(
     useShallow((s) => ({ projects: s.projects, selectedLeadId: s.selectedLeadId, drafts: s.drafts }))
   );
   const agents = useAppStore((s) => s.agents);
-
+  const connected = useAppStore((s) => s.connected);
   // Resolve project ID for historical agent derivation:
   // - "project:xxx" → strip prefix to get the project UUID
   // - Live lead UUID → use the lead's projectId, or the lead UUID itself as fallback
@@ -84,7 +71,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     )?.id ?? selectedLeadId;
   }, [selectedLeadId, agents]);
 
-  const { agents: derivedAgents } = useHistoricalAgents(agents.length, historicalProjectId);
+  const { agents: derivedAgents } = useHistoricalAgents(agents.length, historicalProjectId, connected);
   const activeTimerCount = useTimerStore(selectActiveTimerCount);
   const input = selectedLeadId ? (drafts[selectedLeadId] ?? '') : '';
   const setInput = useCallback((text: string) => {
@@ -97,7 +84,6 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
   const [showNewProject, setShowNewProject] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const reportsScrollRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<string>('crew');
@@ -139,166 +125,23 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
   const [showTabConfig, setShowTabConfig] = useState(false);
   const [showProgressDetail, setShowProgressDetail] = useState(false);
   const [expandedReport, setExpandedReport] = useState<AgentReport | null>(null);
-  const [reportsExpanded, setReportsExpanded] = useState(true);
-  const [pendingBannerExpanded, setPendingBannerExpanded] = useState(false);
-
-  // ── Catch-up summary banner ──────────────────────────────────────────
-  const lastInteractionRef = useRef(Date.now());
-  const snapshotRef = useRef<{ tasks: number; decisions: number; comms: number; reports: number }>({ tasks: 0, decisions: 0, comms: 0, reports: 0 });
-  const [catchUpSummary, setCatchUpSummary] = useState<CatchUpSummary | null>(null);
-
-  // Track user interactions
-  useEffect(() => {
-    const markActive = () => {
-      lastInteractionRef.current = Date.now();
-    };
-    const markScroll = () => {
-      lastInteractionRef.current = Date.now();
-      // Auto-dismiss banner on scroll (designer spec)
-      if (catchUpSummary) setCatchUpSummary(null);
-    };
-    window.addEventListener('click', markActive);
-    window.addEventListener('keydown', markActive);
-    window.addEventListener('scroll', markScroll, true);
-    return () => {
-      window.removeEventListener('click', markActive);
-      window.removeEventListener('keydown', markActive);
-      window.removeEventListener('scroll', markScroll, true);
-    };
-  }, [catchUpSummary]);
-
-  // Snapshot current counts on each interaction; check for inactivity on data changes
-  useEffect(() => {
-    const project = selectedLeadId ? projects[selectedLeadId] : null;
-    if (!project) return;
-    const currentCounts = {
-      tasks: agents.filter(a => a.parentId === effectiveLeadId && (a.status === 'completed' || a.status === 'failed')).length,
-      decisions: (project.decisions ?? EMPTY_DECISIONS).filter((d) => d.needsConfirmation && d.status === 'recorded').length,
-      comms: (project.comms ?? EMPTY_COMMS).length,
-      reports: (project.agentReports ?? EMPTY_REPORTS).length,
-    };
-    const elapsed = Date.now() - lastInteractionRef.current;
-    if (elapsed >= 60_000 && !catchUpSummary) {
-      const prev = snapshotRef.current;
-      const tasksCompleted = Math.max(0, currentCounts.tasks - prev.tasks);
-      const newMessages = Math.max(0, currentCounts.comms - prev.comms);
-      const newReports = Math.max(0, currentCounts.reports - prev.reports);
-      const totalNew = tasksCompleted + newMessages + newReports;
-      if (totalNew >= 5 || currentCounts.decisions > 0) {
-        setCatchUpSummary({ tasksCompleted, pendingDecisions: currentCounts.decisions, newMessages, newReports });
-      }
-    }
-    // Always update snapshot when user is active
-    if (elapsed < 60_000) {
-      snapshotRef.current = currentCounts;
-    }
-  }, [agents, projects, selectedLeadId, catchUpSummary]);
-
-  // Reset snapshot when switching projects
-  useEffect(() => {
-    snapshotRef.current = { tasks: 0, decisions: 0, comms: 0, reports: 0 };
-    setCatchUpSummary(null);
-  }, [selectedLeadId]);
 
   const currentProject = selectedLeadId ? projects[selectedLeadId] : null;
   const leadAgent = agents.find((a) => a.id === selectedLeadId);
   const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
-  // On mount, load existing leads from server (skip in read-only mode — data pre-loaded)
-  useEffect(() => {
-    if (readOnly) return;
-    const controller = new AbortController();
-    // Load active leads
-    fetch('/api/lead', { signal: controller.signal }).then((r) => r.json()).then((leads: LeadListItem[]) => {
-      if (controller.signal.aborted) return;
-      if (Array.isArray(leads)) {
-        leads.forEach((l) => {
-          useLeadStore.getState().addProject(l.id);
-          // Pre-load message history for each lead
-          fetch(`/api/agents/${l.id}/messages?limit=200&includeSystem=true`, { signal: controller.signal })
-            .then((r) => r.json())
-            .then((data: MessageHistoryResponse) => {
-              if (controller.signal.aborted) return;
-              if (Array.isArray(data?.messages) && data.messages.length > 0) {
-                const msgs: AcpTextChunk[] = data.messages.map((m) => ({
-                  type: 'text' as const,
-                  text: m.content,
-                  sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
-                  timestamp: new Date(m.timestamp).getTime(),
-                }));
-                // Only set if WS hasn't already delivered messages (WS wins)
-                const current = useLeadStore.getState().projects[l.id];
-                if (!current || current.messages.length === 0) {
-                  useLeadStore.getState().setMessages(l.id, msgs);
-                }
-              }
-            })
-            .catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Message history fetch failed:', err); });
-        });
-        // Auto-select first running lead if none selected
-        if (!useLeadStore.getState().selectedLeadId) {
-          const running = leads.find((l) => l.status === 'running');
-          if (running) useLeadStore.getState().selectLead(running.id);
-        }
-      }
-    }).catch((err) => {
-      if (!controller.signal.aborted) console.warn('[LeadDashboard] Failed to load leads:', err);
-    });
-    return () => controller.abort();
-  }, [readOnly]);
+  const { catchUpSummary, dismissCatchUp } = useCatchUpSummary(selectedLeadId, effectiveLeadId, agents, currentProject);
 
-  // Subscribe to selected lead agent WS stream and load message history
-  useEffect(() => {
-    if (!selectedLeadId) return;
-    chatInitialScroll.current = false; // reset so we scroll to bottom on lead change
-
-    // In read-only mode, skip WS — data is pre-loaded by ReadOnlySession wrapper
-    if (!readOnly) {
-      ws.subscribe(selectedLeadId);
-    }
-
-    const controller = new AbortController();
-    // Load persisted message history if we don't have any messages yet
-    const proj = useLeadStore.getState().projects[selectedLeadId];
-    if (!proj || proj.messages.length === 0) {
-      // For historical projects (project:XYZ), use project messages endpoint
-      const isHistorical = selectedLeadId.startsWith('project:');
-      const url = isHistorical
-        ? `/api/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-        : `/api/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`;
-      fetch(url, { signal: controller.signal })
-        .then((r) => r.json())
-        .then((data: MessageHistoryResponse) => {
-          if (controller.signal.aborted) return;
-          if (Array.isArray(data?.messages) && data.messages.length > 0) {
-            const msgs: AcpTextChunk[] = data.messages.map((m) => ({
-              type: 'text' as const,
-              text: m.content,
-              sender: m.sender as 'agent' | 'user' | 'system' | 'external' | 'thinking',
-              ...(m.fromRole ? { fromRole: m.fromRole } : {}),
-              timestamp: new Date(m.timestamp).getTime(),
-            }));
-            // Re-check: only set if WS hasn't delivered messages while we were fetching
-            const current = useLeadStore.getState().projects[selectedLeadId];
-            if (!current || current.messages.length === 0) {
-              useLeadStore.getState().setMessages(selectedLeadId, msgs);
-            }
-          }
-        })
-        .catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Message history fetch failed:', err); });
-    }
-    return () => {
-      controller.abort();
-      if (!readOnly) ws.unsubscribe(selectedLeadId);
-    };
-  }, [selectedLeadId, ws, readOnly]);
-
-  // Auto-scroll on new messages only if near bottom
   const chatInitialScroll = useRef(false);
+  useLeadMessages(selectedLeadId, readOnly, ws, chatInitialScroll);
+
+  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:') && !readOnly && isActive === true;
+  useLeadPolling(selectedLeadId, isActiveAgent, historicalProjectId);
+
+  // Auto-scroll on new messages
   useEffect(() => {
     const el = chatContainerRef.current;
     if (!el) return;
-    // On first render or lead change, scroll to bottom unconditionally
     if (!chatInitialScroll.current) {
       chatInitialScroll.current = true;
       messagesEndRef.current?.scrollIntoView();
@@ -310,91 +153,11 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     }
   }, [currentProject?.messages]);
 
-  // Auto-scroll agent reports to show latest
+  const reportsScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = reportsScrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [currentProject?.agentReports?.length, reportsExpanded]);
-
-  // Poll progress for selected lead (skip for project: prefixed IDs, read-only mode, and terminated agents)
-  const isActiveAgent = selectedLeadId != null && !selectedLeadId.startsWith('project:') && !readOnly && isActive === true;
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    let stopped = false;
-    const fetchProgress = () => {
-      if (stopped) return;
-      fetch(`/api/lead/${selectedLeadId}/progress`, { signal: controller.signal }).then((r) => {
-        if (r.status === 404) { stopped = true; return null; }
-        return r.json();
-      }).then((data) => {
-        if (!controller.signal.aborted && data && !data.error) useLeadStore.getState().setProgress(selectedLeadId, data);
-      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Progress poll failed:', err); });
-    };
-    fetchProgress();
-    const interval = setInterval(fetchProgress, 5000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [selectedLeadId, isActiveAgent]);
-
-  // Poll decisions for selected lead
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    let stopped = false;
-    const fetchDecisions = () => {
-      if (stopped) return;
-      fetch(`/api/lead/${selectedLeadId}/decisions`, { signal: controller.signal }).then((r) => {
-        if (r.status === 404) { stopped = true; return null; }
-        return r.json();
-      }).then((data) => {
-        if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setDecisions(selectedLeadId, data);
-      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Decisions poll failed:', err); });
-    };
-    fetchDecisions();
-    const interval = setInterval(fetchDecisions, 5000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [selectedLeadId, isActiveAgent]);
-
-  // Fetch groups for selected lead
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    fetch(`/api/lead/${selectedLeadId}/groups`, { signal: controller.signal }).then((r) => {
-      if (r.status === 404) return null;
-      return r.json();
-    }).then((data) => {
-      if (!controller.signal.aborted && Array.isArray(data)) useLeadStore.getState().setGroups(selectedLeadId, data);
-    }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] Groups fetch failed:', err); });
-    return () => controller.abort();
-  }, [selectedLeadId, isActiveAgent]);
-
-  // Fetch DAG status for selected lead — always use agent UUID for /api/lead/:id/dag
-  useEffect(() => {
-    if (!isActiveAgent || !selectedLeadId) return;
-    const controller = new AbortController();
-    let stopped = false;
-    const fetchDag = () => {
-      if (stopped) return;
-      fetch(`/api/lead/${selectedLeadId}/dag`, { signal: controller.signal }).then((r) => {
-        if (r.status === 404) { stopped = true; return null; }
-        return r.json();
-      }).then((data: DagStatus | null) => {
-        if (!controller.signal.aborted && data && data.tasks) {
-          const store = useLeadStore.getState();
-          store.setDagStatus(selectedLeadId, data);
-          // Also store under projectId so DagMinimap can find it by either key
-          if (historicalProjectId && historicalProjectId !== selectedLeadId) {
-            store.setDagStatus(historicalProjectId, data);
-          }
-        }
-      }).catch((err: unknown) => { if (!(err instanceof DOMException)) console.warn('[LeadDashboard] DAG poll failed:', err); });
-    };
-    fetchDag();
-    const interval = setInterval(fetchDag, 10000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, [selectedLeadId, historicalProjectId, isActiveAgent]);
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [currentProject?.agentReports?.length]);
 
   // Listen for lead-specific WebSocket events (skip in read-only mode)
   const wsAgents = readOnly ? [] : agents;
@@ -408,10 +171,9 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
 
   const handleTabOrderChange = useCallback((newOrder: string[]) => {
     setTabOrder(newOrder);
-    localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder));
+    try { localStorage.setItem('flightdeck-sidebar-tabs', JSON.stringify(newOrder)); } catch {}
   }, []);
 
-  const handleDismissCatchUp = useCallback(() => setCatchUpSummary(null), []);
   const handleScrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -424,7 +186,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
       } else {
         next.add(tabId);
       }
-      localStorage.setItem('flightdeck-hidden-tabs', JSON.stringify([...next]));
+      try { localStorage.setItem('flightdeck-hidden-tabs', JSON.stringify([...next])); } catch {}
       // If hiding the active tab, switch to first visible tab
       if (next.has(tabId)) {
         setSidebarTab((current) => {
@@ -439,128 +201,11 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
     });
   }, []);
 
-  const sendMessage = useCallback(async (mode: 'queue' | 'interrupt' = 'queue', opts: { broadcast: boolean } = { broadcast: false }) => {
-    if (!input.trim() || !selectedLeadId) return;
-    const text = input.trim();
-    setInput('');
-    const store = useLeadStore.getState();
-    // For interrupts, insert a separator so post-interrupt response appears as a new bubble
-    if (mode === 'interrupt') {
-      const proj = store.projects[selectedLeadId];
-      const msgs = proj?.messages ?? EMPTY_MESSAGES;
-      const last = msgs[msgs.length - 1];
-      if (last?.sender === 'agent') {
-        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
-      }
-    }
-    store.addMessage(selectedLeadId, {
-      type: 'text',
-      text,
-      sender: 'user',
-      queued: mode === 'queue',
-      timestamp: Date.now(),
-      attachments: attachments.length > 0
-        ? attachments
-            .filter((a) => a.kind === 'image')
-            .map((a) => ({ name: a.name, mimeType: a.mimeType, thumbnailDataUrl: a.thumbnailDataUrl }))
-        : undefined,
-    });
-    const payload: Record<string, unknown> = { text, mode };
-    if (opts.broadcast) payload.broadcast = true;
-    if (attachments.length > 0) {
-      payload.attachments = attachments
-        .filter((a) => a.data)
-        .map((a) => ({ name: a.name, mimeType: a.mimeType, data: a.data }));
-    }
-    try {
-      const resp = await fetch(`/api/lead/${selectedLeadId}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (resp.ok) clearAttachments();
-    } catch {
-      // Network error — keep attachments so user can retry
-    }
-  }, [input, selectedLeadId, attachments, clearAttachments]);
+  const { sendMessage, removeQueuedMessage, reorderQueuedMessage } = useMessageActions(
+    selectedLeadId, input, setInput, attachments, clearAttachments,
+  );
 
-  const removeQueuedMessage = useCallback(async (queueIndex: number) => {
-    if (!selectedLeadId) return;
-    const resp = await fetch(`/api/agents/${selectedLeadId}/queue/${queueIndex}`, { method: 'DELETE' });
-    if (resp.ok) {
-      const store = useLeadStore.getState();
-      const msgs = store.projects[selectedLeadId]?.messages || [];
-      let seen = 0;
-      const updated = msgs.filter((m: AcpTextChunk) => {
-        if (!m.queued) return true;
-        return seen++ !== queueIndex;
-      });
-      store.setMessages(selectedLeadId, updated);
-    }
-  }, [selectedLeadId]);
-
-  const reorderQueuedMessage = useCallback(async (fromIndex: number, toIndex: number) => {
-    if (!selectedLeadId) return;
-    const resp = await fetch(`/api/agents/${selectedLeadId}/queue/reorder`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fromIndex, to: toIndex }),
-    });
-    if (resp.ok) {
-      const store = useLeadStore.getState();
-      const msgs = store.projects[selectedLeadId]?.messages || [];
-      const queued = msgs.filter((m: AcpTextChunk) => m.queued);
-      const nonQueued = msgs.filter((m: AcpTextChunk) => !m.queued);
-      if (fromIndex < queued.length && toIndex < queued.length) {
-        const [moved] = queued.splice(fromIndex, 1);
-        queued.splice(toIndex, 0, moved);
-        store.setMessages(selectedLeadId, [...nonQueued, ...queued]);
-      }
-    }
-  }, [selectedLeadId]);
-
-  const handleConfirmDecision = useCallback(async (decisionId: string, reason?: string) => {
-    if (!selectedLeadId) return;
-    // Optimistic update — hide buttons immediately
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'confirmed', confirmedAt: new Date().toISOString() });
-    const resp = await fetch(`/api/decisions/${decisionId}/confirm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    if (resp.ok) {
-      const decision = await resp.json();
-      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-    }
-  }, [selectedLeadId]);
-
-  const handleRejectDecision = useCallback(async (decisionId: string, reason?: string) => {
-    if (!selectedLeadId) return;
-    // Optimistic update — hide buttons immediately
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'rejected', confirmedAt: new Date().toISOString() });
-    const resp = await fetch(`/api/decisions/${decisionId}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    if (resp.ok) {
-      const decision = await resp.json();
-      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-    }
-  }, [selectedLeadId]);
-
-  const handleDismissDecision = useCallback(async (decisionId: string) => {
-    if (!selectedLeadId) return;
-    useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: 'dismissed', confirmedAt: new Date().toISOString() });
-    const resp = await fetch(`/api/decisions/${decisionId}/dismiss`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (resp.ok) {
-      const decision = await resp.json();
-      useLeadStore.getState().updateDecision(selectedLeadId, decisionId, { status: decision.status, confirmedAt: decision.confirmedAt });
-    }
-  }, [selectedLeadId]);
+  const { handleConfirmDecision, handleRejectDecision, handleDismissDecision } = useDecisionActions(selectedLeadId);
 
   const handleOpenAgentChat = useCallback((agentId: string) => {
     useAppStore.getState().setSelectedAgent(agentId);
@@ -612,164 +257,14 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
             onPaste={leadPaste}
           >
             {isLeadDragOver && <DropOverlay />}
-            {/* Progress banner — clickable to open detail */}
-            {progress && progress.totalDelegations > 0 && (
-              <div
-                className="border-b border-th-border px-4 py-1 flex items-center gap-3 text-xs font-mono bg-th-bg-alt/50 cursor-pointer hover:bg-th-bg-alt/80 transition-colors"
-                onClick={() => setShowProgressDetail(true)}
-                title="Click for detailed progress view"
-              >
-                <span className="text-blue-400">{progress.crewSize} agents</span>
-                <span className="text-yellow-600 dark:text-yellow-400">{progress.active} active</span>
-                <span className="text-green-400">{progress.completed} done</span>
-                {progress.failed > 0 && (
-                  <span className="text-red-400">{progress.failed} failed</span>
-                )}
-                <div className="ml-auto flex items-center gap-2">
-                  <div className="w-24 bg-th-bg-muted rounded-full h-1.5">
-                    <div
-                      className="bg-green-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${progress.completionPct}%` }}
-                    />
-                  </div>
-                  <span className="text-th-text-muted">{progress.completionPct}%</span>
-                </div>
-              </div>
-            )}
-            {progressSummary && (
-              <div
-                className="border-b border-th-border px-4 py-0.5 text-[11px] text-th-text-muted bg-th-bg-alt/30 font-mono truncate cursor-pointer hover:bg-th-bg-alt/50 transition-colors"
-                onClick={() => setShowProgressDetail(true)}
-                title="Click for detailed progress view"
-              >
-                📋 {progressSummary}
-              </div>
-            )}
+            <LeadProgressBanner progress={progress} progressSummary={progressSummary} onShowDetail={() => setShowProgressDetail(true)} />
 
-            {/* Session info bar — cwd + session ID merged into one line */}
-            <div className="border-b border-th-border px-4 py-0.5 flex items-center gap-3 text-[11px] font-mono text-th-text-muted bg-th-bg-alt/20 overflow-x-auto">
-              {leadAgent?.cwd && (
-                <span className="flex items-center gap-1 shrink-0">
-                  <FolderOpen className="w-3 h-3 shrink-0" />
-                  {leadAgent.cwd}
-                </span>
-              )}
-              {leadAgent?.sessionId && (
-                <span className="flex items-center gap-1 shrink-0 ml-auto">
-                  <GitBranch className="w-3 h-3 shrink-0" />
-                  {leadAgent.sessionId}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(leadAgent.sessionId!);
-                      const btn = e.currentTarget;
-                      btn.textContent = '✓';
-                      setTimeout(() => { btn.textContent = 'copy'; }, 1500);
-                    }}
-                    className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0"
-                  >
-                    copy
-                  </button>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        const res = await fetch(`/api/export/${selectedLeadId}`);
-                        const data = await res.json();
-                        if (data.error) {
-                          alert(`Export failed: ${data.error}`);
-                        } else {
-                          alert(`Session exported to:\n${data.outputDir}\n\n${data.files.length} files · ${data.agentCount} agents · ${data.eventCount} events`);
-                        }
-                      } catch {
-                        alert('Export failed — server may be unavailable');
-                      }
-                    }}
-                    className="text-th-text-muted hover:text-yellow-600 dark:hover:text-yellow-400 text-[10px] shrink-0 flex items-center gap-0.5"
-                    title="Export session to disk"
-                  >
-                    <Download className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              )}
-            </div>
+            <LeadSessionInfoBar leadAgent={leadAgent} selectedLeadId={selectedLeadId} />
 
-            {/* Agent Reports — compact toggle */}
-            {agentReports.length > 0 && (
-              <div className="border-b border-th-border bg-amber-500/5 dark:bg-amber-500/10">
-                <button
-                  className="w-full flex items-center gap-2 px-4 py-1 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
-                  onClick={() => setReportsExpanded(!reportsExpanded)}
-                >
-                  {reportsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  <MessageSquare className="w-3 h-3" />
-                  <span className="font-mono font-medium">Agent Reports</span>
-                  <span className="bg-amber-500/20 px-1.5 rounded text-[10px]">{agentReports.length}</span>
-                </button>
-                {reportsExpanded && (
-                  <div ref={reportsScrollRef} className="max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
-                    {agentReports.slice(-20).map((r) => {
-                      const time = new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                      const parsed = parseAgentReport(r.content);
-                      const summary = parsed.isReport
-                        ? [parsed.header, parsed.task].filter(Boolean).join(' — ')
-                        : r.content.split('\n')[0];
-                      return (
-                        <div
-                          key={r.id}
-                          className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/[0.06] border border-amber-400/20 border-l-2 border-l-amber-500/30 cursor-pointer hover:bg-amber-500/[0.10] transition-colors"
-                          onClick={() => setExpandedReport(r)}
-                        >
-                          <span className="text-[10px] font-mono text-th-text-muted shrink-0">{time}</span>
-                          <span className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400 shrink-0">{r.fromRole}</span>
-                          <span className="text-xs font-mono text-th-text-alt truncate min-w-0">{summary}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+            <LeadAgentReportsBanner agentReports={agentReports} reportsScrollRef={reportsScrollRef} onExpandReport={setExpandedReport} />
 
-            {/* Pending decisions banner */}
-            {pendingConfirmations.length > 0 && !readOnly && (
-              <div className="border-b border-amber-700/50 bg-amber-900/30">
-                <button
-                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-600 dark:text-amber-200 hover:bg-amber-900/40 transition-colors"
-                  onClick={() => setPendingBannerExpanded(!pendingBannerExpanded)}
-                >
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-mono font-medium">⚠ {pendingConfirmations.length} decision{pendingConfirmations.length !== 1 ? 's' : ''} need{pendingConfirmations.length === 1 ? 's' : ''} your confirmation</span>
-                  {pendingBannerExpanded ? <ChevronUp className="w-3.5 h-3.5 ml-auto text-amber-400" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto text-amber-400" />}
-                </button>
-                {pendingBannerExpanded && (
-                  <div className="px-4 pb-3 space-y-2">
-                    {pendingConfirmations.map((d) => (
-                      <div key={d.id} className="bg-th-bg-alt/80 border border-amber-700/40 rounded-lg p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-mono font-semibold text-th-text-alt">{d.title}</span>
-                              {d.agentRole && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 shrink-0">{d.agentRole}</span>
-                              )}
-                            </div>
-                            {d.rationale && (
-                              <p className="text-xs font-mono text-th-text-muted line-clamp-2">{d.rationale}</p>
-                            )}
-                          </div>
-                        </div>
-                        <BannerDecisionActions
-                          decisionId={d.id}
-                          onConfirm={handleConfirmDecision}
-                          onReject={handleRejectDecision}
-                          onDismiss={handleDismissDecision}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {!readOnly && (
+              <LeadPendingDecisionsBanner pendingConfirmations={pendingConfirmations} onConfirm={handleConfirmDecision} onReject={handleRejectDecision} onDismiss={handleDismissDecision} />
             )}
 
             <ChatMessages
@@ -779,7 +274,7 @@ export function LeadDashboard({ api: _api, ws, readOnly = false }: Props) {
               chatContainerRef={chatContainerRef}
               messagesEndRef={messagesEndRef}
               catchUpSummary={catchUpSummary}
-              onDismissCatchUp={handleDismissCatchUp}
+              onDismissCatchUp={dismissCatchUp}
               onScrollToBottom={handleScrollToBottom}
             />
 

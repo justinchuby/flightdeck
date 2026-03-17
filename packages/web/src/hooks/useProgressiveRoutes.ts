@@ -29,7 +29,6 @@ const ALL_ROUTES: ProgressiveRoute[] = [
   { path: '/tasks', label: 'Tasks', icon: '📋', tier: 'active' },
   { path: '/timeline', label: 'Timeline', icon: '📅', tier: 'active' },
   // Collaboration
-  { path: '/canvas', label: 'Canvas', icon: '🎨', tier: 'collaboration' },
   { path: '/mission-control', label: 'Mission Control', icon: '🚀', tier: 'collaboration' },
   // Power user
   { path: '/analytics', label: 'Analytics', icon: '📈', tier: 'power' },
@@ -72,8 +71,7 @@ export function useProgressiveRoutes() {
   }, [tier]);
 
   const expandAll = () => {
-    localStorage.setItem('sidebar-routes-expanded', 'true');
-    // Force re-render — caller should re-evaluate
+    try { localStorage.setItem('sidebar-routes-expanded', 'true'); } catch {}
   };
 
   return { tier, visibleRoutes, hiddenRoutes, expandAll, allRoutes: ALL_ROUTES };

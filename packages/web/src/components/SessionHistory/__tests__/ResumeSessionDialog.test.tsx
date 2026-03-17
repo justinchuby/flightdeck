@@ -105,6 +105,7 @@ describe('ResumeSessionDialog', () => {
           freshStart: false,
           resumeAll: true,
           agents: undefined,
+          sessionId: 1,
         }),
       });
     });
@@ -126,6 +127,7 @@ describe('ResumeSessionDialog', () => {
           freshStart: true,
           resumeAll: false,
           agents: undefined,
+          sessionId: 1,
         }),
       });
     });

@@ -347,6 +347,7 @@ export const agentRoster = sqliteTable('agent_roster', {
   index('idx_agent_roster_project').on(table.projectId),
   index('idx_agent_roster_project_team').on(table.projectId, table.teamId),
   index('idx_agent_roster_team').on(table.teamId),
+  index('idx_agent_roster_session').on(table.sessionId),
 ]);
 
 // ── Active Delegations (in-flight task assignments) ─────────────────

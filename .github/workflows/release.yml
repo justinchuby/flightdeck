@@ -30,6 +30,37 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: CLI smoke test
+        run: |
+          node bin/flightdeck.mjs --no-browser &
+          SERVER_PID=$!
+
+          # Wait for server to be ready (up to 10s)
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3001/health > /dev/null 2>&1; then
+              echo "✅ Server responded to /health after ~$((i / 2))s"
+              break
+            fi
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "❌ Server process died (PID $SERVER_PID) — check logs above for error"
+              exit 1
+            fi
+            sleep 0.5
+          done
+
+          # Final health check
+          HEALTH=$(curl -sf http://localhost:3001/health || true)
+          if [ -z "$HEALTH" ]; then
+            echo "❌ Server never responded to /health within 10s"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "Health response: $HEALTH"
+
+          kill $SERVER_PID 2>/dev/null || true
+          wait $SERVER_PID 2>/dev/null || true
+          echo "✅ Smoke test passed — server started and responded"
+
       - name: Run tests
         run: npm test
 

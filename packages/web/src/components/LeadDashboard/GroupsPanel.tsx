@@ -72,8 +72,7 @@ export function GroupsPanelContent({
         .catch((err) => console.warn('[GroupsPanel] fetch group messages', err));
     } else if (leadId) {
       // Fetch from live lead endpoint
-      fetch(`/api/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
-        .then((r) => r.json())
+      apiFetch(`/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
         .then((data) => {
           if (Array.isArray(data)) {
             const store = useLeadStore.getState();

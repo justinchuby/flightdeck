@@ -42,8 +42,7 @@ const PATTERNS: NLPattern[] = [
   { id: 'nl-tasks-left', phrases: ['how many tasks left', 'progress', 'tasks remaining'], category: 'query', destructive: false, description: 'Show DAG completion stats', icon: '📋' },
   { id: 'nl-eta', phrases: ['when will this be done', 'eta', 'time remaining'], category: 'query', destructive: false, description: 'Show completion estimate', icon: '⏳' },
 
-  // Navigate (5)
-  { id: 'nl-show-canvas', phrases: ['show me the canvas', 'open canvas'], category: 'navigate', destructive: false, description: 'Navigate to Canvas view', icon: '🎨' },
+  // Navigate (4)
   { id: 'nl-show-agent', phrases: ['show me'], category: 'navigate', destructive: false, description: 'Navigate to focus mode for an agent', icon: '👁' },
   { id: 'nl-go-settings', phrases: ['go to settings', 'open settings'], category: 'navigate', destructive: false, description: 'Navigate to Settings', icon: '⚙️' },
   { id: 'nl-show-timeline', phrases: ['show the timeline', 'open timeline'], category: 'navigate', destructive: false, description: 'Navigate to Timeline', icon: '📅' },

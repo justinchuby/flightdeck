@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { TimerDisplay } from '../TimerDisplay';
 import { useTimerStore } from '../../../stores/timerStore';
 import { useAppStore } from '../../../stores/appStore';
@@ -52,65 +52,65 @@ describe('TimerDisplay', () => {
     });
   });
 
-  it('shows empty state when no timers', () => {
-    render(<TimerDisplay />);
+  it('shows empty state when no timers', async () => {
+    await act(async () => { render(<TimerDisplay />); });
     expect(screen.getByText('No active timers')).toBeTruthy();
   });
 
-  it('renders timer label and countdown', () => {
+  it('renders timer label and countdown', async () => {
     setupTimers([makeTimer()]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     expect(screen.getByText('check-build')).toBeTruthy();
   });
 
-  it('shows agent role and short ID', () => {
+  it('shows agent role and short ID', async () => {
     setupTimers([makeTimer()]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     expect(screen.getByText(/Developer/)).toBeTruthy();
     expect(screen.getByText(/agent-ab…/)).toBeTruthy();
   });
 
-  it('shows timer message', () => {
+  it('shows timer message', async () => {
     setupTimers([makeTimer()]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     expect(screen.getByText(/Check if the build passed/)).toBeTruthy();
   });
 
-  it('shows cancel button for active timers', () => {
+  it('shows cancel button for active timers', async () => {
     setupTimers([makeTimer()]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     expect(screen.getByLabelText('Cancel timer check-build')).toBeTruthy();
   });
 
-  it('hides cancel button for fired timers', () => {
+  it('hides cancel button for fired timers', async () => {
     setupTimers([makeTimer({ status: 'fired', remainingMs: 0 })]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     fireEvent.click(screen.getByText(/All/));
     expect(screen.queryByLabelText('Cancel timer check-build')).toBeNull();
   });
 
   it('cancel button removes timer optimistically', async () => {
     setupTimers([makeTimer()]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     fireEvent.click(screen.getByLabelText('Cancel timer check-build'));
     await waitFor(() => {
       expect(useTimerStore.getState().timers).toHaveLength(0);
     });
   });
 
-  it('applies green flash class for recently fired timers', () => {
+  it('applies green flash class for recently fired timers', async () => {
     setupTimers([makeTimer({ id: 't1', status: 'fired', remainingMs: 0 })], ['t1']);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     fireEvent.click(screen.getByText(/All/));
     const card = screen.getByTestId('timer-t1');
     expect(card.className).toContain('border-green-500');
   });
 
-  it('filter buttons toggle between active, fired, and all', () => {
+  it('filter buttons toggle between active, fired, and all', async () => {
     const active = makeTimer({ id: 't1', label: 'active-timer', status: 'pending' });
     const fired = makeTimer({ id: 't2', label: 'fired-timer', status: 'fired', remainingMs: 0 });
     setupTimers([active, fired]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
 
     // Default: active filter — only active timer shown
     expect(screen.getByText('active-timer')).toBeTruthy();
@@ -127,15 +127,15 @@ describe('TimerDisplay', () => {
     expect(screen.getByText('fired-timer')).toBeTruthy();
   });
 
-  it('shows repeat indicator for repeating timers', () => {
+  it('shows repeat indicator for repeating timers', async () => {
     setupTimers([makeTimer({ repeat: true, delaySeconds: 300 })]);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     expect(screen.getByText('every 300s')).toBeTruthy();
   });
 
-  it('shows fired! text for recently fired timers', () => {
+  it('shows fired! text for recently fired timers', async () => {
     setupTimers([makeTimer({ id: 't1', status: 'fired', remainingMs: 0 })], ['t1']);
-    render(<TimerDisplay />);
+    await act(async () => { render(<TimerDisplay />); });
     fireEvent.click(screen.getByText(/All/));
     expect(screen.getByText('✓ fired!')).toBeTruthy();
   });

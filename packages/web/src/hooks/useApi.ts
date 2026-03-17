@@ -17,7 +17,7 @@ export function getAuthToken(): string | null {
   // In production, the server sets an HttpOnly cookie that handles auth automatically
   // (cookie is sent by the browser with every request, no JS access needed).
   const params = new URLSearchParams(window.location.search);
-  return params.get('token') || localStorage.getItem('flightdeck-token');
+  try { return params.get('token') || localStorage.getItem('flightdeck-token'); } catch { return params.get('token'); }
 }
 
 function authHeaders(): Record<string, string> {
@@ -27,7 +27,7 @@ function authHeaders(): Record<string, string> {
 }
 
 /** Standalone authenticated fetch — usable outside React hooks */
-export async function apiFetch<T = any>(path: string, opts?: ApiFetchOptions): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, opts?: ApiFetchOptions): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOpts } = opts ?? {};
 
   // Wire up abort controller for timeout (and caller-provided signals)

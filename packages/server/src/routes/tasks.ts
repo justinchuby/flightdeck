@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
+import { isTerminalStatus } from '../agents/Agent.js';
 
 /**
  * Global task routes — cross-project task queries and the attention items
@@ -13,21 +14,27 @@ export function tasksRoutes(ctx: AppContext): Router {
   // ── Global task query ─────────────────────────────────────────────
   /**
    * GET /tasks
-   *   ?scope=global|project
+   *   ?scope=global|project|lead
    *   &projectId=<id>        (required when scope=project)
+   *   &leadId=<id>           (required when scope=lead — session-scoped)
    *   &status=running,failed  (comma-separated filter)
    *   &role=developer          (filter by role)
    *   &assignedAgentId=<id>   (filter by assigned agent)
    *   &limit=200              (max results, default 200, capped at 1000)
    *   &offset=0               (skip N results for pagination)
    *
-   * Returns paginated tasks across all projects (scope=global) or filtered
-   * to a single project.
+   * Filtering semantics:
+   * - scope=global: During an active session (live agents in memory), show
+   *   only that session's tasks. When no session is running, show all
+   *   historical tasks across sessions so the user can see past work.
+   * - scope=project: ALL tasks for a project across all sessions.
+   * - scope=lead: Only tasks owned by the specified leadId.
    */
   router.get('/tasks', (req, res) => {
     const taskDAG = agentManager.getTaskDAG();
     const scope = (req.query.scope as string) || 'global';
     const projectId = req.query.projectId as string | undefined;
+    const leadId = req.query.leadId as string | undefined;
     const statusFilter = req.query.status as string | undefined;
     const roleFilter = req.query.role as string | undefined;
     const agentFilter = req.query.assignedAgentId as string | undefined;
@@ -38,12 +45,31 @@ export function tasksRoutes(ctx: AppContext): Router {
     let tasks: DagTask[];
 
     if (scope === 'project') {
+      // Project scope: ALL tasks for the project across ALL sessions.
       if (!projectId) {
         return res.status(400).json({ error: 'projectId is required when scope=project' });
       }
       tasks = taskDAG.getTasksByProject(projectId, { includeArchived });
+    } else if (scope === 'lead') {
+      // Lead scope: only tasks owned by a specific lead agent (session-scoped).
+      if (!leadId) {
+        return res.status(400).json({ error: 'leadId is required when scope=lead' });
+      }
+      const allTasks = taskDAG.getAll({ includeArchived });
+      tasks = allTasks.filter(t => t.leadId === leadId);
     } else {
-      tasks = taskDAG.getAll({ includeArchived });
+      // Global scope (default):
+      // During an active session (live agents in memory), show only that
+      // session's tasks. When no session is running, show all historical
+      // tasks across sessions so the user can see past work.
+      const allTasks = taskDAG.getAll({ includeArchived });
+      const liveAgents = agentManager.getAll().filter(a => !isTerminalStatus(a.status));
+      if (liveAgents.length > 0) {
+        const liveAgentIds = new Set(liveAgents.map(a => a.id));
+        tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
+      } else {
+        tasks = allTasks;
+      }
     }
 
     // Apply optional filters

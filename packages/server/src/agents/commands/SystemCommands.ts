@@ -16,11 +16,11 @@ import { PROVIDER_PRESETS } from '../../adapters/presets.js';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
-const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*⟧⟧/s;
-const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*⟧⟧/s;
-const RESUME_HEARTBEAT_REGEX = /⟦⟦\s*RESUME_HEARTBEAT\s*⟧⟧/s;
+const QUERY_CREW_REGEX = /⟦⟦\s*QUERY_CREW\s*(?:\{[^}]*\})?\s*⟧⟧/s;
+const HALT_HEARTBEAT_REGEX = /⟦⟦\s*HALT_HEARTBEAT\s*(?:\{[^}]*\})?\s*⟧⟧/s;
+const RESUME_HEARTBEAT_REGEX = /⟦⟦\s*RESUME_HEARTBEAT\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 const REQUEST_LIMIT_CHANGE_REGEX = /⟦⟦\s*REQUEST_LIMIT_CHANGE\s*(\{.*?\})\s*⟧⟧/s;
-const QUERY_PROVIDERS_REGEX = /⟦⟦\s*QUERY_PROVIDERS\s*⟧⟧/s;
+const QUERY_PROVIDERS_REGEX = /⟦⟦\s*QUERY_PROVIDERS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
 
 // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -220,10 +220,10 @@ function handleQueryProviders(ctx: CommandHandlerContext, agent: Agent): void {
 
 export function getSystemCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
-    { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a), help: { description: 'Get current crew status', example: 'QUERY_CREW {}', category: 'System' } },
-    { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a), help: { description: 'Stop all heartbeat reminders until RESUME_HEARTBEAT', example: 'HALT_HEARTBEAT {}', category: 'System' } },
-    { regex: RESUME_HEARTBEAT_REGEX, name: 'RESUME_HEARTBEAT', handler: (a, _d) => handleResumeHeartbeat(ctx, a), help: { description: 'Resume heartbeat reminders after HALT_HEARTBEAT', example: 'RESUME_HEARTBEAT {}', category: 'System' } },
+    { regex: QUERY_CREW_REGEX, name: 'QUERY_CREW', handler: (a, _d) => handleQueryCrew(ctx, a), help: { description: 'Get current crew status', example: 'QUERY_CREW', category: 'System' } },
+    { regex: HALT_HEARTBEAT_REGEX, name: 'HALT_HEARTBEAT', handler: (a, _d) => handleHaltHeartbeat(ctx, a), help: { description: 'Stop all heartbeat reminders until RESUME_HEARTBEAT', example: 'HALT_HEARTBEAT', category: 'System' } },
+    { regex: RESUME_HEARTBEAT_REGEX, name: 'RESUME_HEARTBEAT', handler: (a, _d) => handleResumeHeartbeat(ctx, a), help: { description: 'Resume heartbeat reminders after HALT_HEARTBEAT', example: 'RESUME_HEARTBEAT', category: 'System' } },
     { regex: REQUEST_LIMIT_CHANGE_REGEX, name: 'REQUEST_LIMIT_CHANGE', handler: (a, d) => handleRequestLimitChange(ctx, a, d), help: { description: 'Request a change to concurrency limits', example: 'REQUEST_LIMIT_CHANGE {"limit": 10, "reason": "need more agents"}', category: 'System', args: deriveArgs(requestLimitChangeSchema) } },
-    { regex: QUERY_PROVIDERS_REGEX, name: 'QUERY_PROVIDERS', handler: (a, _d) => handleQueryProviders(ctx, a), help: { description: 'Get available providers, models, and ranking', example: 'QUERY_PROVIDERS {}', category: 'System' } },
+    { regex: QUERY_PROVIDERS_REGEX, name: 'QUERY_PROVIDERS', handler: (a, _d) => handleQueryProviders(ctx, a), help: { description: 'Get available providers, models, and ranking', example: 'QUERY_PROVIDERS', category: 'System' } },
   ];
 }

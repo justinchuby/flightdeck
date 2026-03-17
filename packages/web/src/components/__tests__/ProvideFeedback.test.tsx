@@ -7,7 +7,7 @@ describe('buildFeedbackUrl', () => {
     const url = buildFeedbackUrl();
     expect(url).toContain('https://github.com/justinchuby/flightdeck/issues/new');
     expect(url).toContain('template=user-feedback.yml');
-    expect(url).toContain('labels=user-feedback');
+    expect(url).toContain('labels=feedback');
   });
 
   it('includes title when provided', () => {

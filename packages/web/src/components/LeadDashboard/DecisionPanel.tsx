@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Check, X, Lightbulb, EyeOff } from 'lucide-react';
+import type { Decision } from '../../types';
+
+/** Decision with optional detail fields that may arrive from the API */
+type DecisionDetail = Decision & { alternatives?: string[]; impact?: string };
 
 /** Inline comment + action buttons for pending decisions in the banner */
 export function BannerDecisionActions({ decisionId, onConfirm, onReject, onDismiss }: {
@@ -52,9 +56,9 @@ export function BannerDecisionActions({ decisionId, onConfirm, onReject, onDismi
   );
 }
 
-export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss }: { decisions: any[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void; onDismiss?: (id: string) => void }) {
+export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss }: { decisions: Decision[]; onConfirm?: (id: string, reason?: string) => void; onReject?: (id: string, reason?: string) => void; onDismiss?: (id: string) => void }) {
   const feedRef = useRef<HTMLDivElement>(null);
-  const [selectedDecision, setSelectedDecision] = useState<any | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<DecisionDetail | null>(null);
   const [decisionReasons, setDecisionReasons] = useState<Record<string, string>>({});
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -68,10 +72,10 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss
         {decisions.length === 0 ? (
           <p className="text-xs text-th-text-muted text-center py-4 font-mono">No decisions yet</p>
         ) : (
-          decisions.map((d: any, i: number) => (
+          decisions.map((d: Decision, i: number) => (
             <div
               key={d.id || `dec-${i}`}
-              className={`bg-th-bg-alt border rounded p-2 cursor-pointer hover:bg-th-bg-muted/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-th-border'}`}
+              className={`cv-auto-lg bg-th-bg-alt border rounded p-2 cursor-pointer hover:bg-th-bg-muted/50 transition-colors ${d.needsConfirmation && d.status === 'recorded' ? 'border-yellow-600' : d.status === 'rejected' ? 'border-red-700' : 'border-th-border'}`}
               onClick={() => setSelectedDecision(d)}
             >
               <div className="flex items-start gap-2">

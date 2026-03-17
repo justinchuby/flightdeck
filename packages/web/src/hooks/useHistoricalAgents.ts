@@ -24,14 +24,15 @@ function buildRole(partial: { id?: string; name?: string; icon?: string }): Role
 }
 
 /**
- * Derives an agent roster from keyframe events when no live WebSocket
- * agents are available. Fetches projects → keyframes → parses spawn/exit
- * events to build a historical agent list.
+ * Derives an agent roster from keyframe events for viewing past/ended sessions.
+ * Completely disabled when the session is active — historical agents should
+ * never be computed while live WS data is available or expected.
  *
- * @param liveAgentCount - number of live agents from appStore. When > 0, skips fetch.
+ * @param liveAgentCount - number of live agents from appStore. When > 0, session is active.
  * @param projectId - optional specific project ID to fetch for. If omitted, uses most recent.
+ * @param sessionActive - true when WS is connected or session is live. Disables all processing.
  */
-export function useHistoricalAgents(liveAgentCount: number, projectId?: string | null) {
+export function useHistoricalAgents(liveAgentCount: number, projectId?: string | null, sessionActive = false) {
   const [agents, setAgents] = useState<DerivedAgent[]>([]);
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
@@ -41,8 +42,14 @@ export function useHistoricalAgents(liveAgentCount: number, projectId?: string |
     return () => { mountedRef.current = false; };
   }, []);
 
+  const disabled = sessionActive || liveAgentCount > 0;
+
   useEffect(() => {
-    if (liveAgentCount > 0) return;
+    if (disabled) {
+      setAgents([]);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
@@ -51,7 +58,7 @@ export function useHistoricalAgents(liveAgentCount: number, projectId?: string |
       try {
         // When no specific project requested, try /api/agents for global data
         if (!projectId) {
-          const apiAgents = await apiFetch<any[]>('/agents').catch(() => []);
+          const apiAgents = await apiFetch<AgentInfo[]>('/agents').catch(() => []);
           const arr = Array.isArray(apiAgents) ? apiAgents : [];
           if (arr.length > 0) {
             if (!cancelled && mountedRef.current) {
@@ -81,7 +88,7 @@ export function useHistoricalAgents(liveAgentCount: number, projectId?: string |
     })();
 
     return () => { cancelled = true; };
-  }, [liveAgentCount, projectId]);
+  }, [disabled, projectId]);
 
   return { agents, loading };
 }
@@ -97,8 +104,22 @@ async function getFirstProjectId(): Promise<string | null> {
   }
 }
 
+/** Raw agent record from API — loosely typed for normalization */
+interface RawAgent {
+  id?: string;
+  status?: string;
+  role?: { id?: string; name?: string; icon?: string };
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  createdAt?: string;
+  contextWindowSize?: number;
+  contextWindowUsed?: number;
+  outputPreview?: string;
+}
+
 /** Normalize a raw API agent object to DerivedAgent shape */
-function normalize(a: any): DerivedAgent {
+function normalize(a: RawAgent): DerivedAgent {
   const roleId = a.role?.id ?? 'agent';
   return {
     id: a.id ?? 'unknown',

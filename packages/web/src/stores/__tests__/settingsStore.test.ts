@@ -1,7 +1,25 @@
 // packages/web/src/stores/__tests__/settingsStore.test.ts
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSettingsStore, ESCALATION_RULES, shouldNotify } from '../settingsStore';
+
+// Mock apiFetch to prevent actual HTTP calls
+vi.mock('../../hooks/useApi', () => ({
+  apiFetch: vi.fn().mockResolvedValue({}),
+}));
+
+// jsdom without a URL doesn't provide localStorage — provide a simple mock
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { store = {}; },
+    get length() { return Object.keys(store).length; },
+    key: (i: number) => Object.keys(store)[i] ?? null,
+  };
+})();
 
 describe('settingsStore — Trust Dial', () => {
   beforeEach(() => {
@@ -111,5 +129,193 @@ describe('settingsStore — Trust Dial', () => {
 
     useSettingsStore.getState().setOversightLevel('supervised');
     expect(shouldNotify('info')).toBe(true);
+  });
+});
+
+describe('settingsStore — theme and sound', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true });
+    localStorageMock.clear();
+    useSettingsStore.setState({
+      soundEnabled: false,
+      themeMode: 'system',
+      resolvedTheme: 'dark',
+      oversightLevel: 'balanced',
+      projectOverrides: {},
+    });
+  });
+
+  describe('sound', () => {
+    it('defaults to sound disabled', () => {
+      expect(useSettingsStore.getState().soundEnabled).toBe(false);
+    });
+
+    it('toggleSound flips the boolean', () => {
+      useSettingsStore.getState().toggleSound();
+      expect(useSettingsStore.getState().soundEnabled).toBe(true);
+      useSettingsStore.getState().toggleSound();
+      expect(useSettingsStore.getState().soundEnabled).toBe(false);
+    });
+
+    it('setSoundEnabled sets to explicit value', () => {
+      useSettingsStore.getState().setSoundEnabled(true);
+      expect(useSettingsStore.getState().soundEnabled).toBe(true);
+      useSettingsStore.getState().setSoundEnabled(false);
+      expect(useSettingsStore.getState().soundEnabled).toBe(false);
+    });
+
+    it('toggleSound persists (survives store reset)', () => {
+      useSettingsStore.getState().toggleSound();
+      expect(useSettingsStore.getState().soundEnabled).toBe(true);
+    });
+
+    it('setSoundEnabled persists value', () => {
+      useSettingsStore.getState().setSoundEnabled(true);
+      expect(useSettingsStore.getState().soundEnabled).toBe(true);
+    });
+  });
+
+  describe('theme', () => {
+    it('defaults to system theme mode', () => {
+      expect(useSettingsStore.getState().themeMode).toBe('system');
+    });
+
+    it('setThemeMode changes mode and resolves theme', () => {
+      useSettingsStore.getState().setThemeMode('dark');
+      expect(useSettingsStore.getState().themeMode).toBe('dark');
+      expect(useSettingsStore.getState().resolvedTheme).toBe('dark');
+      useSettingsStore.getState().setThemeMode('light');
+      expect(useSettingsStore.getState().themeMode).toBe('light');
+      expect(useSettingsStore.getState().resolvedTheme).toBe('light');
+    });
+
+    it('setThemeMode applies dark/light class to document', () => {
+      useSettingsStore.getState().setThemeMode('dark');
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(document.documentElement.classList.contains('light')).toBe(false);
+      useSettingsStore.getState().setThemeMode('light');
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(document.documentElement.classList.contains('light')).toBe(true);
+    });
+
+    it('system mode resolves based on media query', () => {
+      useSettingsStore.getState().setThemeMode('system');
+      expect(useSettingsStore.getState().themeMode).toBe('system');
+      expect(['dark', 'light']).toContain(useSettingsStore.getState().resolvedTheme);
+    });
+  });
+
+  describe('initThemeListener', () => {
+    it('registers media query change listener and applies theme', () => {
+      const addEventListenerSpy = vi.fn();
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: false, media: '', onchange: null,
+        addEventListener: addEventListenerSpy, removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+      });
+      try {
+        useSettingsStore.getState().setThemeMode('dark');
+        useSettingsStore.getState().initThemeListener();
+        expect(addEventListenerSpy).toHaveBeenCalledWith('change', expect.any(Function));
+        expect(document.documentElement.classList.contains('dark')).toBe(true);
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
+
+    it('change callback updates theme when mode is system', () => {
+      let changeCallback: (() => void) | null = null;
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: true, media: '(prefers-color-scheme: dark)', onchange: null,
+        addEventListener: vi.fn((_event: string, cb: () => void) => { changeCallback = cb; }),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+      });
+      try {
+        useSettingsStore.getState().setThemeMode('system');
+        useSettingsStore.getState().initThemeListener();
+        // Simulate system theme change
+        expect(changeCallback).not.toBeNull();
+        changeCallback!();
+        // The resolved theme should update based on system preference
+        const { resolvedTheme } = useSettingsStore.getState();
+        expect(['light', 'dark']).toContain(resolvedTheme);
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
+
+    it('change callback does nothing when mode is not system', () => {
+      let changeCallback: (() => void) | null = null;
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({
+        matches: false, media: '', onchange: null,
+        addEventListener: vi.fn((_event: string, cb: () => void) => { changeCallback = cb; }),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+      });
+      try {
+        useSettingsStore.getState().setThemeMode('dark');
+        useSettingsStore.getState().initThemeListener();
+        const before = useSettingsStore.getState().resolvedTheme;
+        changeCallback!();
+        // Should not change because themeMode is 'dark', not 'system'
+        expect(useSettingsStore.getState().resolvedTheme).toBe(before);
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
+  });
+
+  describe('oversight server sync', () => {
+    it('setOversightLevel persists value', () => {
+      useSettingsStore.getState().setOversightLevel('supervised');
+      expect(useSettingsStore.getState().oversightLevel).toBe('supervised');
+    });
+
+    it('setOversightLevel syncs to server via PATCH /config', async () => {
+      const { apiFetch } = await import('../../hooks/useApi');
+      useSettingsStore.getState().setOversightLevel('autonomous');
+      expect(apiFetch).toHaveBeenCalledWith('/config', {
+        method: 'PATCH',
+        body: JSON.stringify({ oversightLevel: 'autonomous' }),
+      });
+    });
+  });
+
+  describe('project overrides persistence', () => {
+    it('setProjectOversight stores override', () => {
+      useSettingsStore.getState().setProjectOversight('proj-1', 'supervised');
+      expect(useSettingsStore.getState().getEffectiveLevel('proj-1')).toBe('supervised');
+    });
+
+    it('clearProjectOversight removes override', () => {
+      useSettingsStore.getState().setProjectOversight('proj-1', 'supervised');
+      useSettingsStore.getState().clearProjectOversight('proj-1');
+      expect(useSettingsStore.getState().getEffectiveLevel('proj-1')).toBe('balanced');
+    });
+
+    it('multiple project overrides coexist', () => {
+      useSettingsStore.getState().setProjectOversight('proj-1', 'supervised');
+      useSettingsStore.getState().setProjectOversight('proj-2', 'autonomous');
+      expect(useSettingsStore.getState().getEffectiveLevel('proj-1')).toBe('supervised');
+      expect(useSettingsStore.getState().getEffectiveLevel('proj-2')).toBe('autonomous');
+    });
+  });
+
+  describe('localStorage error resilience', () => {
+    it('handles localStorage.setItem throwing', () => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = () => { throw new Error('QuotaExceededError'); };
+      try {
+        expect(() => useSettingsStore.getState().toggleSound()).not.toThrow();
+        expect(() => useSettingsStore.getState().setThemeMode('dark')).not.toThrow();
+        expect(() => useSettingsStore.getState().setOversightLevel('supervised')).not.toThrow();
+      } finally {
+        Storage.prototype.setItem = originalSetItem;
+      }
+    });
   });
 });

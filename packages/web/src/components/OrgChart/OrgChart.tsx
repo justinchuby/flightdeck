@@ -310,12 +310,8 @@ function CommsMatrix({ entries, agents }: { entries: CommEntry[]; agents: AgentI
 // ---------------------------------------------------------------------------
 // Main OrgChart page
 // ---------------------------------------------------------------------------
-interface Props {
-  api: any;
-  ws: any;
-}
 
-export function OrgChart({ api: _api, ws: _ws }: Props) {
+export function OrgChart() {
   const contextProjectId = useOptionalProjectId();
   const agents = useAppStore((s) => s.agents);
   const projects = useLeadStore((s) => s.projects);

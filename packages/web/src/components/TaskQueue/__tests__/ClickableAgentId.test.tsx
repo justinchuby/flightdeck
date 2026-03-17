@@ -84,7 +84,7 @@ describe('DagGraph clickable agent ID', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     capturedOnNodeClick = undefined;
-    capturedOnNodeMouseEnter = undefined;
+    _capturedOnNodeMouseEnter = undefined;
   });
 
   afterEach(() => {

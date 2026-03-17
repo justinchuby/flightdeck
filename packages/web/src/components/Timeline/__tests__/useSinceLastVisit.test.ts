@@ -98,7 +98,7 @@ describe('useSinceLastVisit', () => {
       writable: true,
       configurable: true,
     });
-    document.dispatchEvent(new Event('visibilitychange'));
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
 
     expect(store['timeline-last-seen-event-session-1']).toBe('e3');
   });
@@ -108,7 +108,7 @@ describe('useSinceLastVisit', () => {
       useSinceLastVisit(['e1', 'e2', 'e3'], 'session-1'),
     );
 
-    window.dispatchEvent(new Event('beforeunload'));
+    act(() => { window.dispatchEvent(new Event('beforeunload')); });
 
     expect(store['timeline-last-seen-event-session-1']).toBe('e3');
   });
