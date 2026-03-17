@@ -590,4 +590,77 @@ describe('leadStore', () => {
       expect(msgs[1].sender).toBe('system');
     });
   });
+
+  describe('migrateProject', () => {
+    it('migrates messages from project:xxx to agent UUID', () => {
+      const store = useLeadStore.getState();
+      store.addProject('project:abc');
+      store.addMessage('project:abc', { type: 'text', text: 'hello', sender: 'agent', timestamp: 1 });
+      store.addMessage('project:abc', { type: 'text', text: 'world', sender: 'user', timestamp: 2 });
+
+      store.addProject('lead-uuid');
+      store.migrateProject('project:abc', 'lead-uuid');
+
+      const state = useLeadStore.getState();
+      expect(state.projects['lead-uuid'].messages).toHaveLength(2);
+      expect(state.projects['lead-uuid'].messages[0].text).toBe('hello');
+      expect(state.projects['project:abc']).toBeUndefined();
+    });
+
+    it('preserves target messages when non-empty', () => {
+      const store = useLeadStore.getState();
+      store.addProject('project:abc');
+      store.addMessage('project:abc', { type: 'text', text: 'old', sender: 'agent', timestamp: 1 });
+
+      store.addProject('lead-uuid');
+      store.addMessage('lead-uuid', { type: 'text', text: 'new', sender: 'agent', timestamp: 2 });
+
+      store.migrateProject('project:abc', 'lead-uuid');
+
+      const state = useLeadStore.getState();
+      expect(state.projects['lead-uuid'].messages).toHaveLength(1);
+      expect(state.projects['lead-uuid'].messages[0].text).toBe('new');
+    });
+
+    it('no-op when source does not exist', () => {
+      const store = useLeadStore.getState();
+      store.addProject('lead-uuid');
+      const before = useLeadStore.getState().projects;
+      store.migrateProject('nonexistent', 'lead-uuid');
+      const after = useLeadStore.getState().projects;
+      expect(after['lead-uuid']).toEqual(before['lead-uuid']);
+    });
+
+    it('no-op when fromId equals toId', () => {
+      const store = useLeadStore.getState();
+      store.addProject('lead-uuid');
+      store.addMessage('lead-uuid', { type: 'text', text: 'keep', sender: 'agent', timestamp: 1 });
+      store.migrateProject('lead-uuid', 'lead-uuid');
+      expect(useLeadStore.getState().projects['lead-uuid'].messages).toHaveLength(1);
+    });
+
+    it('creates target if it did not exist', () => {
+      const store = useLeadStore.getState();
+      store.addProject('project:abc');
+      store.addMessage('project:abc', { type: 'text', text: 'data', sender: 'agent', timestamp: 1 });
+
+      store.migrateProject('project:abc', 'brand-new');
+
+      const state = useLeadStore.getState();
+      expect(state.projects['brand-new'].messages).toHaveLength(1);
+      expect(state.projects['brand-new'].messages[0].text).toBe('data');
+      expect(state.projects['project:abc']).toBeUndefined();
+    });
+
+    it('migrates activity and decisions', () => {
+      const store = useLeadStore.getState();
+      store.addProject('project:abc');
+      store.addActivity('project:abc', { id: 'a1', type: 'delegated', timestamp: 1 } as any);
+
+      store.migrateProject('project:abc', 'lead-uuid');
+
+      const state = useLeadStore.getState();
+      expect(state.projects['lead-uuid'].activity).toHaveLength(1);
+    });
+  });
 });
