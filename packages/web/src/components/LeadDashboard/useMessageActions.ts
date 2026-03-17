@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useLeadStore } from '../../stores/leadStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { apiFetch } from '../../hooks/useApi';
 import type { AcpTextChunk } from '../../types';
 import type { Attachment } from '../../hooks/useAttachments';
@@ -24,17 +25,17 @@ export function useMessageActions(
     if (!input.trim() || !selectedLeadId) return;
     const text = input.trim();
     setInput('');
-    const store = useLeadStore.getState();
+    const ms = useMessageStore.getState();
+    ms.ensureChannel(selectedLeadId);
     // For interrupts, insert a separator so post-interrupt response appears as a new bubble
     if (mode === 'interrupt') {
-      const proj = store.projects[selectedLeadId];
-      const msgs = proj?.messages ?? EMPTY_MESSAGES;
+      const msgs = ms.channels[selectedLeadId]?.messages ?? EMPTY_MESSAGES;
       const last = msgs[msgs.length - 1];
       if (last?.sender === 'agent') {
-        store.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
+        ms.addMessage(selectedLeadId, { type: 'text', text: '---', sender: 'system', timestamp: Date.now() });
       }
     }
-    store.addMessage(selectedLeadId, {
+    ms.addMessage(selectedLeadId, {
       type: 'text',
       text,
       sender: 'user',
@@ -68,14 +69,14 @@ export function useMessageActions(
     if (!selectedLeadId) return;
     try {
       await apiFetch(`/agents/${selectedLeadId}/queue/${queueIndex}`, { method: 'DELETE' });
-      const store = useLeadStore.getState();
-      const msgs = store.projects[selectedLeadId]?.messages || [];
+      const ms = useMessageStore.getState();
+      const msgs = ms.channels[selectedLeadId]?.messages || [];
       let seen = 0;
       const updated = msgs.filter((m: AcpTextChunk) => {
         if (!m.queued) return true;
         return seen++ !== queueIndex;
       });
-      store.setMessages(selectedLeadId, updated);
+      ms.setMessages(selectedLeadId, updated);
     } catch { /* ignore */ }
   }, [selectedLeadId]);
 
@@ -86,14 +87,14 @@ export function useMessageActions(
         method: 'POST',
         body: JSON.stringify({ from: fromIndex, to: toIndex }),
       });
-      const store = useLeadStore.getState();
-      const msgs = store.projects[selectedLeadId]?.messages || [];
+      const ms = useMessageStore.getState();
+      const msgs = ms.channels[selectedLeadId]?.messages || [];
       const queued = msgs.filter((m: AcpTextChunk) => m.queued);
       const nonQueued = msgs.filter((m: AcpTextChunk) => !m.queued);
       if (fromIndex < queued.length && toIndex < queued.length) {
         const [moved] = queued.splice(fromIndex, 1);
         queued.splice(toIndex, 0, moved);
-        store.setMessages(selectedLeadId, [...nonQueued, ...queued]);
+        ms.setMessages(selectedLeadId, [...nonQueued, ...queued]);
       }
     } catch { /* ignore */ }
   }, [selectedLeadId]);

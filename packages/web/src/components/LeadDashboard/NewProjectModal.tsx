@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Crown, Loader2, ChevronDown, ChevronRight, Wrench, Check, FolderOpen } from 'lucide-react';
 import { useLeadStore } from '../../stores/leadStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { apiFetch } from '../../hooks/useApi';
 import { ModelConfigPanel } from './ModelConfigPanel';
 import { FolderPicker } from '../FolderPicker/FolderPicker';
@@ -55,7 +56,7 @@ export function NewProjectModal({ onClose }: NewProjectModalProps) {
         useLeadStore.getState().addProject(data.id);
         useLeadStore.getState().selectLead(data.id);
         if (task) {
-          useLeadStore.getState().addMessage(data.id, { type: 'text', text: task, sender: 'user' });
+          useMessageStore.getState().addMessage(data.id, { type: 'text', text: task, sender: 'user' });
         }
         if (newProjectModelConfig && data.projectId) {
           apiFetch(`/projects/${data.projectId}/model-config`, {
