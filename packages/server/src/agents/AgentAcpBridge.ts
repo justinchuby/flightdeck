@@ -5,6 +5,7 @@
 import { mkdirSync, existsSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { createAdapterForProvider, buildStartOptions } from '../adapters/AdapterFactory.js';
+import { asSessionId } from '../types/brandedIds.js';
 import { createRoleFileWriter, listRoleFileWriterProviders } from '../adapters/RoleFileWriter.js';
 import type { RoleDefinition } from '../adapters/RoleFileWriter.js';
 import type { AgentAdapter, ToolCallInfo, PlanEntry } from '../adapters/types.js';
@@ -165,7 +166,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
   await writeRoleFilesForProvider(effectiveProvider, agent, agentCwd);
 
   conn.start(startOpts).then(async (sessionId) => {
-    agent.sessionId = sessionId;
+    agent.sessionId = asSessionId(sessionId);
     agent._notifySessionReady(sessionId);
     if (initialPrompt) {
       // Fresh agent — clear resume flag (it's false anyway) and start prompting.

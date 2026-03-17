@@ -5,6 +5,7 @@ import { AgentRosterRepository } from '../db/AgentRosterRepository.js';
 import { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
 import { SessionResumeManager, ResumeError } from '../agents/SessionResumeManager.js';
 import type { AgentJSON } from '../agents/Agent.js';
+import { asAgentId, asProjectId } from '../types/brandedIds.js';
 import type { Role } from '../agents/RoleRegistry.js';
 import type { ServerConfig } from '../config.js';
 import type { ProjectSession } from '@flightdeck/shared';
@@ -37,7 +38,7 @@ const leadRole: Role = {
 
 function makeAgentJSON(overrides: Partial<AgentJSON> = {}): AgentJSON {
   return {
-    id: 'agent-1',
+    id: asAgentId('agent-1'),
     role: testRole,
     status: 'running',
     phase: 'running',
@@ -128,10 +129,9 @@ describe('SessionResumeManager', () => {
 
   describe('lifecycle persistence', () => {
     it('persists agent on spawn event', () => {
-      const json = makeAgentJSON({
-        id: 'agent-abc',
+      const json = makeAgentJSON({ id: asAgentId('agent-abc'),
         model: 'claude-sonnet',
-        projectId: 'project-1',
+        projectId: asProjectId('project-1'),
         task: 'Build API',
         cwd: '/home/code',
       });
@@ -160,7 +160,7 @@ describe('SessionResumeManager', () => {
 
     it('updates sessionId on session_ready event', () => {
       // Spawn first to create the roster entry
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1') }));
 
       mockAgentManager.emit('agent:session_ready', {
         agentId: 'agent-1',
@@ -172,7 +172,7 @@ describe('SessionResumeManager', () => {
     });
 
     it('updates status on status change event', () => {
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1') }));
 
       mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'idle' });
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('idle');
@@ -182,7 +182,7 @@ describe('SessionResumeManager', () => {
     });
 
     it('ignores creating status (transient)', () => {
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1', status: 'running' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1'), status: 'running' }));
       mockAgentManager.emit('agent:status', { agentId: 'agent-1', status: 'creating' });
 
       // Status should not change from the spawn state
@@ -190,21 +190,21 @@ describe('SessionResumeManager', () => {
     });
 
     it('marks agent terminated on terminated event', () => {
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1') }));
       mockAgentManager.emit('agent:terminated', 'agent-1');
 
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('terminated');
     });
 
     it('marks agent terminated on non-zero exit', () => {
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1') }));
       mockAgentManager.emit('agent:exit', { agentId: 'agent-1', code: 1 });
 
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('terminated');
     });
 
     it('does not mark agent terminated on clean exit (code 0)', () => {
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1') }));
       mockAgentManager.emit('agent:exit', { agentId: 'agent-1', code: 0 });
 
       // Should still be running (from running spawn status)
@@ -369,7 +369,7 @@ describe('SessionResumeManager', () => {
       manager.dispose();
 
       // Emit events — they should NOT be persisted
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'after-dispose' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('after-dispose') }));
       expect(rosterRepo.getAgent('after-dispose')).toBeUndefined();
     });
 
@@ -384,7 +384,7 @@ describe('SessionResumeManager', () => {
   describe('full lifecycle integration', () => {
     it('persists through spawn → session_ready → status_change → terminate', () => {
       // 1. Agent spawned
-      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: 'agent-1', status: 'running', model: 'claude-sonnet' }));
+      mockAgentManager.emit('agent:spawned', makeAgentJSON({ id: asAgentId('agent-1'), status: 'running', model: 'claude-sonnet' }));
       expect(rosterRepo.getAgent('agent-1')!.status).toBe('running');
 
       // 2. Session ready

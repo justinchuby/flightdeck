@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Agent, type AgentContextInfo } from '../agents/Agent.js';
+import { asAgentId } from '../types/brandedIds.js';
 
 function makeRole(overrides: Record<string, any> = {}) {
   return {
@@ -27,7 +28,7 @@ function makeConfig() {
 
 function makePeers(...overrides: Array<Partial<AgentContextInfo>>): AgentContextInfo[] {
   return overrides.map((o, i) => ({
-    id: o.id ?? `peer-${i}`,
+    id: o.id ?? asAgentId(`peer-${i}`),
     role: o.role ?? 'developer',
     roleName: o.roleName ?? 'Developer',
     status: o.status ?? 'running',
@@ -48,13 +49,13 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns true on first update (always sends)', () => {
-    const peers = makePeers({ id: 'p1', task: 'some task' });
+    const peers = makePeers({ id: asAgentId('p1'), task: 'some task' });
     const result = agent.injectContextUpdate(peers, ['activity line 1']);
     expect(result).toBe(true);
   });
 
   it('returns false when content is identical (skips duplicate)', () => {
-    const peers = makePeers({ id: 'p1', task: 'some task' });
+    const peers = makePeers({ id: asAgentId('p1'), task: 'some task' });
     const activity = ['activity line 1'];
 
     const first = agent.injectContextUpdate(peers, activity);
@@ -65,8 +66,8 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns true when peer task changes', () => {
-    const peers1 = makePeers({ id: 'p1', task: 'original task' });
-    const peers2 = makePeers({ id: 'p1', task: 'updated task' });
+    const peers1 = makePeers({ id: asAgentId('p1'), task: 'original task' });
+    const peers2 = makePeers({ id: asAgentId('p1'), task: 'updated task' });
     const activity = ['activity line 1'];
 
     const first = agent.injectContextUpdate(peers1, activity);
@@ -77,8 +78,8 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns true when peer status changes', () => {
-    const peers1 = makePeers({ id: 'p1', status: 'running', task: 'task' });
-    const peers2 = makePeers({ id: 'p1', status: 'idle', task: 'task' });
+    const peers1 = makePeers({ id: asAgentId('p1'), status: 'running', task: 'task' });
+    const peers2 = makePeers({ id: asAgentId('p1'), status: 'idle', task: 'task' });
 
     agent.injectContextUpdate(peers1, []);
     const result = agent.injectContextUpdate(peers2, []);
@@ -86,7 +87,7 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns false when only activity changes (activity excluded from hash)', () => {
-    const peers = makePeers({ id: 'p1', task: 'task' });
+    const peers = makePeers({ id: asAgentId('p1'), task: 'task' });
 
     agent.injectContextUpdate(peers, ['activity 1']);
     const result = agent.injectContextUpdate(peers, ['activity 1', 'activity 2']);
@@ -94,10 +95,10 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns true when a new peer is added', () => {
-    const peers1 = makePeers({ id: 'p1', task: 'task 1' });
+    const peers1 = makePeers({ id: asAgentId('p1'), task: 'task 1' });
     const peers2 = makePeers(
-      { id: 'p1', task: 'task 1' },
-      { id: 'p2', task: 'task 2' },
+      { id: asAgentId('p1'), task: 'task 1' },
+      { id: asAgentId('p2'), task: 'task 2' },
     );
 
     agent.injectContextUpdate(peers1, []);
@@ -106,7 +107,7 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns true when health header changes', () => {
-    const peers = makePeers({ id: 'p1', task: 'task' });
+    const peers = makePeers({ id: asAgentId('p1'), task: 'task' });
     const activity: string[] = [];
 
     agent.injectContextUpdate(peers, activity, 'Health: OK');
@@ -115,7 +116,7 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns false when health header is identical', () => {
-    const peers = makePeers({ id: 'p1', task: 'task' });
+    const peers = makePeers({ id: asAgentId('p1'), task: 'task' });
     const activity: string[] = [];
 
     agent.injectContextUpdate(peers, activity, 'Health: OK');
@@ -124,8 +125,8 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('returns true when locked files change', () => {
-    const peers1 = makePeers({ id: 'p1', task: 'task', lockedFiles: [] });
-    const peers2 = makePeers({ id: 'p1', task: 'task', lockedFiles: ['src/index.ts'] });
+    const peers1 = makePeers({ id: asAgentId('p1'), task: 'task', lockedFiles: [] });
+    const peers2 = makePeers({ id: asAgentId('p1'), task: 'task', lockedFiles: ['src/index.ts'] });
 
     agent.injectContextUpdate(peers1, []);
     const result = agent.injectContextUpdate(peers2, []);
@@ -133,7 +134,7 @@ describe('CREW_UPDATE content hashing', () => {
   });
 
   it('resets hash after dispose, so next update is sent', () => {
-    const peers = makePeers({ id: 'p1', task: 'task' });
+    const peers = makePeers({ id: asAgentId('p1'), task: 'task' });
 
     agent.injectContextUpdate(peers, []);
     agent.dispose();
@@ -146,8 +147,8 @@ describe('CREW_UPDATE content hashing', () => {
     const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, []);
 
     const peers = makePeers(
-      { id: 'child-1', task: 'task A', parentId: lead.id },
-      { id: 'child-2', task: 'task B', parentId: lead.id },
+      { id: asAgentId('child-1'), task: 'task A', parentId: lead.id },
+      { id: asAgentId('child-2'), task: 'task B', parentId: lead.id },
     );
 
     const first = lead.injectContextUpdate(peers, []);
@@ -168,7 +169,7 @@ describe('CREW_UPDATE content hashing', () => {
     const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, []);
     lead.budget = { maxConcurrent: 10, runningCount: 3 };
 
-    const peers = makePeers({ id: 'child-1', task: 'task', parentId: lead.id });
+    const peers = makePeers({ id: asAgentId('child-1'), task: 'task', parentId: lead.id });
 
     lead.injectContextUpdate(peers, []);
 

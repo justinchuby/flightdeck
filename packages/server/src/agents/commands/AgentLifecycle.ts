@@ -9,6 +9,7 @@ import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
+import { asTaskId } from '../../types/brandedIds.js';
 import { deriveArgs } from './CommandHelp.js';
 import { notifySecretary } from './secretaryNotifier.js';
 import {
@@ -115,7 +116,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       if (agent.role.id === 'lead') {
         const dagLink = linkDelegationToDag(ctx, agent.id, role.id, req.task, child.id, 'CREATE_AGENT', req.dagTaskId, req.dependsOn);
         dagNote = dagLink.dagNote;
-        if (dagLink.dagTaskId) child.dagTaskId = dagLink.dagTaskId;
+        if (dagLink.dagTaskId) child.dagTaskId = asTaskId(dagLink.dagTaskId);
       }
 
       const dagPrefix = child.dagTaskId ? `[DAG Task: ${child.dagTaskId}]\n` : '';
@@ -238,7 +239,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     if (agent.role.id === 'lead') {
       const dagLink = linkDelegationToDag(ctx, agent.id, child.role.id, req.task, child.id, 'DELEGATE', req.dagTaskId, req.dependsOn);
       dagNote = dagLink.dagNote;
-      if (dagLink.dagTaskId) child.dagTaskId = dagLink.dagTaskId;
+      if (dagLink.dagTaskId) child.dagTaskId = asTaskId(dagLink.dagTaskId);
     }
 
     // Persist delegation to DB AFTER DAG linking so dagTaskId is resolved

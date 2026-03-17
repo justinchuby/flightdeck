@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Agent, type AgentContextInfo } from '../agents/Agent.js';
+import { asAgentId } from '../types/brandedIds.js';
 
 function makeRole(overrides: Record<string, any> = {}) {
   return {
@@ -27,7 +28,7 @@ function makeConfig() {
 
 function makePeer(overrides: Partial<AgentContextInfo> = {}): AgentContextInfo {
   return {
-    id: overrides.id ?? 'peer-0',
+    id: overrides.id ?? asAgentId('peer-0'),
     role: overrides.role ?? 'developer',
     roleName: overrides.roleName ?? 'Developer',
     status: overrides.status ?? 'running',
@@ -40,7 +41,7 @@ function makePeer(overrides: Partial<AgentContextInfo> = {}): AgentContextInfo {
 }
 
 describe('Agent.buildContextManifest', () => {
-  const LEAD_ID = 'lead-1111-2222-3333';
+  const LEAD_ID = asAgentId('lead-1111-2222-3333');
 
   function makeLeadAgent(overrides: Record<string, any> = {}) {
     const role = makeRole(overrides);
@@ -52,7 +53,7 @@ describe('Agent.buildContextManifest', () => {
 
   it('shows children under YOUR AGENTS', () => {
     const lead = makeLeadAgent();
-    const child = makePeer({ id: 'child-aaa', parentId: LEAD_ID, task: 'write code' });
+    const child = makePeer({ id: asAgentId('child-aaa'), parentId: LEAD_ID, task: 'write code' });
     const result = lead.buildContextManifest([child]);
     expect(result).toContain('== YOUR AGENTS ==');
     expect(result).toContain('child-aa');
@@ -61,12 +62,12 @@ describe('Agent.buildContextManifest', () => {
 
   it('shows sibling leads under OTHER TEAM MEMBERS', () => {
     const lead = makeLeadAgent();
-    const child = makePeer({ id: 'child-aaa', parentId: LEAD_ID, task: 'write code' });
+    const child = makePeer({ id: asAgentId('child-aaa'), parentId: LEAD_ID, task: 'write code' });
     const sibling = makePeer({
-      id: 'sibling-bbb',
+      id: asAgentId('sibling-bbb'),
       role: 'lead',
       roleName: 'Project Lead',
-      parentId: 'some-other-parent',
+      parentId: asAgentId('some-other-parent'),
       task: 'handle testing',
     });
     const result = lead.buildContextManifest([child, sibling]);
@@ -78,7 +79,7 @@ describe('Agent.buildContextManifest', () => {
 
   it('does NOT show OTHER TEAM MEMBERS when there are no siblings', () => {
     const lead = makeLeadAgent();
-    const child = makePeer({ id: 'child-aaa', parentId: LEAD_ID, task: 'write code' });
+    const child = makePeer({ id: asAgentId('child-aaa'), parentId: LEAD_ID, task: 'write code' });
     const result = lead.buildContextManifest([child]);
     expect(result).not.toContain('OTHER TEAM MEMBERS');
   });
@@ -89,7 +90,7 @@ describe('Agent.buildContextManifest', () => {
     // buildContextManifest should handle it too)
     const self = makePeer({ id: LEAD_ID, role: 'lead', roleName: 'Project Lead', task: 'manage' });
     const sibling = makePeer({
-      id: 'sibling-ccc',
+      id: asAgentId('sibling-ccc'),
       role: 'lead',
       roleName: 'Project Lead',
       task: 'testing domain',
@@ -106,8 +107,8 @@ describe('Agent.buildContextManifest', () => {
   it('non-leads see all peers under ACTIVE CREW MEMBERS (no sibling section)', () => {
     const devRole = makeRole({ id: 'developer', name: 'Developer' });
     const dev = new Agent(devRole, makeConfig() as any, 'code task', undefined, []);
-    const peer1 = makePeer({ id: 'peer-aaa', task: 'task A' });
-    const peer2 = makePeer({ id: 'peer-bbb', task: 'task B' });
+    const peer1 = makePeer({ id: asAgentId('peer-aaa'), task: 'task A' });
+    const peer2 = makePeer({ id: asAgentId('peer-bbb'), task: 'task B' });
     const result = dev.buildContextManifest([peer1, peer2]);
     expect(result).toContain('== ACTIVE CREW MEMBERS ==');
     expect(result).not.toContain('OTHER TEAM MEMBERS');
@@ -120,10 +121,10 @@ describe('Agent.buildContextManifest', () => {
     const lead = makeLeadAgent();
     const longTask = 'A'.repeat(120);
     const sibling = makePeer({
-      id: 'sibling-ddd',
+      id: asAgentId('sibling-ddd'),
       role: 'developer',
       roleName: 'Developer',
-      parentId: 'other-parent',
+      parentId: asAgentId('other-parent'),
       task: longTask,
     });
     const result = lead.buildContextManifest([sibling]);
@@ -136,10 +137,10 @@ describe('Agent.buildContextManifest', () => {
   it('sibling with no task shows idle', () => {
     const lead = makeLeadAgent();
     const sibling = makePeer({
-      id: 'sibling-eee',
+      id: asAgentId('sibling-eee'),
       role: 'developer',
       roleName: 'Developer',
-      parentId: 'other-parent',
+      parentId: asAgentId('other-parent'),
     });
     const result = lead.buildContextManifest([sibling]);
     expect(result).toContain('OTHER TEAM MEMBERS');
