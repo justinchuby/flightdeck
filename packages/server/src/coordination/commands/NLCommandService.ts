@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface NLPattern {
+interface NLPattern {
   id: string;
   phrases: string[];
   category: 'control' | 'query' | 'navigate' | 'create';
@@ -14,13 +14,13 @@ export interface NLPattern {
   entityParam?: 'agent' | 'role' | 'topic';
 }
 
-export interface NLActionStep {
+interface NLActionStep {
   action: string;
   target: string;
   params?: Record<string, any>;
 }
 
-export interface NLActionPlan {
+interface NLActionPlan {
   commandId: string;
   patternId: string;
   steps: NLActionStep[];
@@ -29,13 +29,13 @@ export interface NLActionPlan {
   reversible: boolean;
 }
 
-export interface NLExecuteResult {
+interface NLExecuteResult {
   plan: NLActionPlan;
   executed: boolean;
   results: Array<{ step: NLActionStep; success: boolean; detail?: string }>;
 }
 
-export interface UndoEntry {
+interface UndoEntry {
   commandId: string;
   description: string;
   undoSteps: NLActionStep[];
@@ -43,7 +43,7 @@ export interface UndoEntry {
   ttl: number;
 }
 
-export interface Suggestion {
+interface Suggestion {
   id: string;
   label: string;
   description?: string;

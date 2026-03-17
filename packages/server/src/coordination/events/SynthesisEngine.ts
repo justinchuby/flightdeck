@@ -92,7 +92,7 @@ export function classifyEvent(event: ActivityEntry): EventTier {
 
 // ── Health synthesis ────────────────────────────────────────────────
 
-export interface ProjectHealthSnapshot {
+interface ProjectHealthSnapshot {
   criticalEvents: ActivityEntry[];
   recentCompletions: ActivityEntry[];
   pendingActions: { pendingDecisions: number; blockedTasks: number };

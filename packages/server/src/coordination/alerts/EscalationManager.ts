@@ -3,10 +3,10 @@ import type { DecisionLog } from '../decisions/DecisionLog.js';
 import type { TaskDAG } from '../../tasks/TaskDAG.js';
 import { logger } from '../../utils/logger.js';
 
-export type EscalationCondition = 'stale_decision' | 'blocked_task' | 'agent_stuck' | 'build_failure';
-export type EscalationTarget = 'lead' | 'user' | 'architect';
+type EscalationCondition = 'stale_decision' | 'blocked_task' | 'agent_stuck' | 'build_failure';
+type EscalationTarget = 'lead' | 'user' | 'architect';
 
-export interface EscalationRule {
+interface EscalationRule {
   id: string;
   name: string;
   condition: EscalationCondition;
@@ -14,7 +14,7 @@ export interface EscalationRule {
   escalateTo: EscalationTarget;
 }
 
-export interface Escalation {
+interface Escalation {
   id: string;
   ruleId: string;
   subject: string;

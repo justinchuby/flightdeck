@@ -7,7 +7,7 @@ const OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000;  // ~$15/MTok
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface BudgetConfig {
+interface BudgetConfig {
   /** Budget limit in USD. null = unlimited */
   limit: number | null;
   /** Threshold ratios for escalation */
@@ -18,7 +18,7 @@ export interface BudgetConfig {
   };
 }
 
-export interface BudgetStatus {
+interface BudgetStatus {
   limit: number | null;
   currency: 'USD';
   currentSpend: number;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BudgetEnforcer, type BudgetConfig } from '../coordination/scheduling/BudgetEnforcer.js';
+import { BudgetEnforcer } from '../coordination/scheduling/BudgetEnforcer.js';
 
 // Minimal mocks
 function createMockDb() {
@@ -41,7 +41,7 @@ describe('BudgetEnforcer', () => {
     const enforcer = new BudgetEnforcer(db as any, costTracker as any);
     enforcer.setConfig({ limit: 50 });
     expect(db.setSetting).toHaveBeenCalledWith('budget_config', expect.any(String));
-    const saved = JSON.parse(db.setSetting.mock.calls[0][1]) as BudgetConfig;
+    const saved = JSON.parse(db.setSetting.mock.calls[0][1]) as { limit: number };
     expect(saved.limit).toBe(50);
   });
 
@@ -114,7 +114,7 @@ describe('BudgetEnforcer', () => {
   });
 
   it('loads config from settings on construction', () => {
-    const config: BudgetConfig = { limit: 10, thresholds: { warn: 0.5, alert: 0.8, pause: 0.95 } };
+    const config = { limit: 10, thresholds: { warn: 0.5, alert: 0.8, pause: 0.95 } };
     db.getSetting.mockReturnValue(JSON.stringify(config));
     const enforcer = new BudgetEnforcer(db as any, costTracker as any);
     expect(enforcer.getConfig().limit).toBe(10);

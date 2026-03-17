@@ -6,7 +6,7 @@ import { decisions } from '../../db/schema.js';
 import { type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
 export { DECISION_CATEGORIES, type Decision, type DecisionStatus, type DecisionCategory } from '@flightdeck/shared';
 
-export interface BatchResult {
+interface BatchResult {
   updated: number;
   results: Decision[];
 }

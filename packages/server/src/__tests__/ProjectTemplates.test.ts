@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ProjectTemplateRegistry } from '../coordination/playbooks/ProjectTemplates.js';
-import type { ProjectTemplate } from '../coordination/playbooks/ProjectTemplates.js';
 
 describe('ProjectTemplateRegistry', () => {
   let registry: ProjectTemplateRegistry;
@@ -61,7 +60,7 @@ describe('ProjectTemplateRegistry', () => {
   // ── add ────────────────────────────────────────────────────────────────────
 
   it('add registers a new custom template', () => {
-    const custom: ProjectTemplate = {
+    const custom = {
       id: 'my-template',
       name: 'My Template',
       description: 'Custom workflow',
@@ -76,7 +75,7 @@ describe('ProjectTemplateRegistry', () => {
   });
 
   it('add throws when a template with the same ID already exists', () => {
-    const dup: ProjectTemplate = {
+    const dup = {
       id: 'bug-fix',
       name: 'Duplicate',
       description: '',

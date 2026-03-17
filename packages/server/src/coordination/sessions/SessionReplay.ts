@@ -5,21 +5,21 @@ import type { FileLockRegistry, FileLock } from '../files/FileLockRegistry.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface ReplayAgent {
+interface ReplayAgent {
   id: string;
   role: string;
   status: 'running' | 'completed' | 'failed' | 'terminated' | 'unknown';
   spawnedAt: string;
 }
 
-export interface Keyframe {
+interface Keyframe {
   timestamp: string;
   label: string;
   type: 'spawn' | 'agent_exit' | 'delegation' | 'task' | 'milestone' | 'decision' | 'progress' | 'error' | 'commit';
   agentId?: string;
 }
 
-export interface WorldState {
+interface WorldState {
   timestamp: string;
   agents: ReplayAgent[];
   dagTasks: DagTask[];
@@ -59,7 +59,7 @@ const KEYFRAME_TYPES: Record<string, Keyframe['type']> = {
 // ── Minimal interface for crew resolution ─────────────────────────
 // Only the subset of AgentManager that SessionReplay needs.
 
-export interface ReplayAgentSource {
+interface ReplayAgentSource {
   getAll(): Array<{ id: string; parentId?: string; projectId?: string }>;
 }
 

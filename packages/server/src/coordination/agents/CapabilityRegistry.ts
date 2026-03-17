@@ -5,7 +5,7 @@ import type { FileLockRegistry } from '../files/FileLockRegistry.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export interface FileTouchRecord {
+interface FileTouchRecord {
   agentId: string;
   agentRole: string;
   leadId: string;
@@ -15,7 +15,7 @@ export interface FileTouchRecord {
   touchCount: number;
 }
 
-export interface CapabilityQuery {
+interface CapabilityQuery {
   file?: string;
   technology?: string;
   keyword?: string;
@@ -24,7 +24,7 @@ export interface CapabilityQuery {
   excludeAgentId?: string;
 }
 
-export interface CapabilityResult {
+interface CapabilityResult {
   agentId: string;
   shortId: string;
   roleName: string;

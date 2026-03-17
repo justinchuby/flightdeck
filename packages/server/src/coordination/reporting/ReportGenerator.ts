@@ -1,7 +1,7 @@
 // ── ReportGenerator ───────────────────────────────────────────────
 // Generates HTML and Markdown session summary reports from structured data.
 
-export interface ReportAgent {
+interface ReportAgent {
   id: string;
   role: string;
   model: string;
@@ -9,25 +9,25 @@ export interface ReportAgent {
   tokensUsed: number;
 }
 
-export interface ReportTask {
+interface ReportTask {
   id: string;
   description: string;
   status: string;
   assignee?: string;
 }
 
-export interface ReportDecision {
+interface ReportDecision {
   title: string;
   rationale: string;
   confirmedBy?: string;
 }
 
-export interface ReportCommit {
+interface ReportCommit {
   hash: string;
   message: string;
 }
 
-export interface ReportTestResults {
+interface ReportTestResults {
   total: number;
   passed: number;
   failed: number;

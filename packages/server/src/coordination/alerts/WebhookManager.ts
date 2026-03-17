@@ -1,6 +1,6 @@
 import { logger } from '../../utils/logger.js';
 
-export interface WebhookConfig {
+interface WebhookConfig {
   id: string;
   url: string;
   events: string[];  // e.g., ['task_completed', 'error', 'ci:complete']

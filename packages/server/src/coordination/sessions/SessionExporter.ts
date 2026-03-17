@@ -14,14 +14,14 @@ function safeMax(arr: number[]): number { return arr.reduce((a, b) => Math.max(a
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface ExportResult {
+interface ExportResult {
   outputDir: string;
   files: string[];
   agentCount: number;
   eventCount: number;
 }
 
-export interface ExportMetadata {
+interface ExportMetadata {
   leadId: string;
   startTime: string;
   exportTime: string;

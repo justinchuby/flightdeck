@@ -39,7 +39,7 @@ export interface SessionSummary {
   dagTasksFailed: number;
 }
 
-export interface BottleneckEntry {
+interface BottleneckEntry {
   agentId: string;
   role: string;
   type: 'idle_time' | 'context_pressure' | 'stuck';
@@ -47,7 +47,7 @@ export interface BottleneckEntry {
   description: string;
 }
 
-export interface SessionRetroData {
+interface SessionRetroData {
   generatedAt: string;
   summary: SessionSummary;
   scorecards: AgentScorecard[];

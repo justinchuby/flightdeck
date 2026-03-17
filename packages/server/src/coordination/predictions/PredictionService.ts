@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export type PredictionType =
+type PredictionType =
   | 'context_exhaustion'
   | 'cost_overrun'
   | 'agent_stall'
@@ -12,7 +12,7 @@ export type PredictionType =
   | 'completion_estimate'
 ;
 
-export interface PredictionAction {
+interface PredictionAction {
   label: string;
   description: string;
   actionType: 'api_call' | 'dismiss';
@@ -23,7 +23,7 @@ export interface PredictionAction {
   confidence?: number;
 }
 
-export interface Prediction {
+interface Prediction {
   id: string;
   type: PredictionType;
   severity: 'info' | 'warning' | 'critical';
@@ -40,13 +40,13 @@ export interface Prediction {
   outcome?: 'correct' | 'avoided' | 'wrong' | 'expired' | null;
 }
 
-export interface PredictionConfig {
+interface PredictionConfig {
   enabled: boolean;
   intervalMs: number;
   types: Record<PredictionType, { enabled: boolean; thresholds?: Record<string, number> }>;
 }
 
-export interface AccuracyStats {
+interface AccuracyStats {
   total: number;
   correct: number;
   avoided: number;

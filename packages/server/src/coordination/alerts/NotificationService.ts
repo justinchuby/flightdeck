@@ -6,8 +6,8 @@ import crypto from 'node:crypto';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export type ChannelType = 'desktop' | 'slack' | 'discord' | 'telegram';
-export type NotificationTier = 'interrupt' | 'summon';
+type ChannelType = 'desktop' | 'slack' | 'discord' | 'telegram';
+type NotificationTier = 'interrupt' | 'summon';
 export type NotifiableEvent =
   | 'decision_pending'
   | 'agent_crashed'
@@ -18,19 +18,19 @@ export type NotifiableEvent =
   | 'task_completed'
   | 'context_critical';
 
-export interface DesktopConfig {
+interface DesktopConfig {
   sound: boolean;
   showPreview: boolean;
 }
 
-export interface SlackConfig {
+interface SlackConfig {
   webhookUrl: string;
   channel: string;
   mentionOnInterrupt: boolean;
   threadPerSession: boolean;
 }
 
-export interface DiscordConfig {
+interface DiscordConfig {
   webhookUrl: string;
   threadPerSession: boolean;
 }
@@ -58,14 +58,14 @@ export interface NotificationPreference {
   enabled: boolean;
 }
 
-export interface QuietHoursConfig {
+interface QuietHoursConfig {
   enabled: boolean;
   start: string;   // "22:00"
   end: string;     // "08:00"
   timezone: string; // "America/New_York"
 }
 
-export interface NotificationLogEntry {
+interface NotificationLogEntry {
   id: string;
   event: NotifiableEvent;
   channelId: string;
