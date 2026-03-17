@@ -12,7 +12,6 @@ import type { DecisionLog } from '../coordination/decisions/DecisionLog.js';
 import type { AgentMemory } from './AgentMemory.js';
 import type { ChatGroupRegistry, ChatGroup, GroupMessage } from '../comms/ChatGroupRegistry.js';
 import type { Database } from '../db/database.js';
-import { ConversationStore } from '../db/ConversationStore.js';
 import { TaskDAG } from '../tasks/TaskDAG.js';
 import type { TimerRegistry } from '../coordination/scheduling/TimerRegistry.js';
 import type { CapabilityInjector } from './capabilities/CapabilityInjector.js';
@@ -27,17 +26,17 @@ import { logger } from '../utils/logger.js';
 import { writeAgentFiles } from './agentFiles.js';
 import { CommandDispatcher } from './CommandDispatcher.js';
 import type { Delegation } from './CommandDispatcher.js';
-import { HeartbeatMonitor } from './HeartbeatMonitor.js';
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import type { ToolCallInfo, PlanEntry } from '../adapters/types.js';
 import { agentPlans } from '../db/schema.js';
 import { runWithAgentContext } from '../middleware/requestContext.js';
-import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExtractor.js';
-import type { SessionData, SessionMessage } from '../knowledge/types.js';
-import type { KnowledgeInjector, InjectionContext } from '../knowledge/KnowledgeInjector.js';
+import type { KnowledgeInjector } from '../knowledge/KnowledgeInjector.js';
 import type { SkillsLoader } from '../knowledge/SkillsLoader.js';
-import type { CollectiveMemory, MemoryCategory } from '../coordination/knowledge/CollectiveMemory.js';
-import { KNOWLEDGE_TO_MEMORY_CATEGORY } from '../coordination/knowledge/CollectiveMemory.js';
+import type { CollectiveMemory } from '../coordination/knowledge/CollectiveMemory.js';
+import type { SessionKnowledgeExtractor } from '../knowledge/SessionKnowledgeExtractor.js';
+import { AgentMessageService } from './services/AgentMessageService.js';
+import { AgentKnowledgeService } from './services/AgentKnowledgeService.js';
+import { AgentMonitorService } from './services/AgentMonitorService.js';
 
 
 // Re-export Delegation so existing consumers (api.ts, etc.) continue to work
@@ -103,28 +102,20 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   private timerRegistry: TimerRegistry;
   private capabilityInjector?: CapabilityInjector;
   private db?: Database;
-  private conversationStore?: ConversationStore;
-  private agentThreads: Map<string, string> = new Map(); // agentId → conversationId
-  private messageBuffers: Map<string, string> = new Map(); // agentId → buffered text
-  private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private thinkingBuffers: Map<string, string> = new Map(); // agentId → buffered thinking text
-  private thinkingFlushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private idleNudgeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  // Extracted services
+  private messageService: AgentMessageService;
+  private knowledgeService: AgentKnowledgeService;
+  private monitorService: AgentMonitorService;
   private crashCounts: Map<string, number> = new Map();
   private maxRestarts: number;
   private autoRestart: boolean;
   private dispatcher: CommandDispatcher;
-  private heartbeat: HeartbeatMonitor;
   private projectRegistry?: import('../projects/ProjectRegistry.js').ProjectRegistry;
   private worktreeManager?: WorktreeManager;
   private costTracker?: CostTracker;
   private messageQueueStore?: MessageQueueStore;
   private agentRosterRepository?: AgentRosterRepository;
   private activeDelegationRepository?: ActiveDelegationRepository;
-  private knowledgeInjector?: KnowledgeInjector;
-  private skillsLoader?: SkillsLoader;
-  private sessionKnowledgeExtractor?: SessionKnowledgeExtractor;
-  private collectiveMemory?: CollectiveMemory;
   private configStore?: import('../config/ConfigStore.js').ConfigStore;
   private providerManager?: import('../providers/ProviderManager.js').ProviderManager;
   private _systemPaused = false;
@@ -159,45 +150,16 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     this.messageQueueStore = messageQueueStore;
     this.agentRosterRepository = agentRosterRepository;
     this.activeDelegationRepository = activeDelegationRepository;
-    this.knowledgeInjector = knowledgeInjector;
     this.db = db;
-    if (db) this.conversationStore = new ConversationStore(db);
     this.maxConcurrent = config.maxConcurrentAgents;
     this.maxRestarts = maxRestarts;
     this.autoRestart = autoRestart;
-    const _self = this;
-    this.dispatcher = new CommandDispatcher({
-      getAgent: (id) => this.agents.get(id),
-      getAllAgents: () => this.getAll(),
-      getProjectIdForAgent: (agentId) => this.getProjectIdForAgent(agentId),
-      getRunningCount: () => this.getRunningCount(),
-      spawnAgent: (role, task, parentId, model, cwd, options) => this.spawn(role, task, parentId, model, cwd, undefined, undefined, options),
-      terminateAgent: (id) => this.terminate(id),
-      emit: (event: string, ...args: unknown[]) => this.emit(event as keyof AgentManagerEvents & string, args[0] as AgentManagerEvents[keyof AgentManagerEvents]),
-      roleRegistry: this.roleRegistry,
-      config: this.config,
-      lockRegistry: this.lockRegistry,
-      activityLedger: this.activityLedger,
-      messageBus: this.messageBus,
-      decisionLog: this.decisionLog,
-      agentMemory: this.agentMemory,
-      chatGroupRegistry: this.chatGroupRegistry,
-      taskDAG: this.taskDAG,
-      timerRegistry: this.timerRegistry,
-      capabilityInjector: this.capabilityInjector,
-      taskTemplateRegistry,
-      taskDecomposer,
-      maxConcurrent: this.maxConcurrent,
-      markHumanInterrupt: (id) => this.markHumanInterrupt(id),
-      haltHeartbeat: (id) => this.heartbeat.haltHeartbeat(id),
-      resumeHeartbeat: (id) => this.heartbeat.resumeHeartbeat(id),
-      governancePipeline,
-      activeDelegationRepository,
-      agentRosterRepository,
-    });
 
-    // Start heartbeat monitor to detect stalled teams
-    this.heartbeat = new HeartbeatMonitor({
+    // Initialize extracted services
+    this.messageService = new AgentMessageService(db);
+    this.knowledgeService = new AgentKnowledgeService();
+    if (knowledgeInjector) this.knowledgeService.setKnowledgeInjector(knowledgeInjector);
+    this.monitorService = new AgentMonitorService({
       getAllAgents: () => this.getAll(),
       getDelegationsMap: () => this.dispatcher.getDelegationsMap(),
       getDagSummary: (leadId: string) => {
@@ -226,7 +188,37 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       },
       emit: (event: string, ...args: unknown[]) => this.emit(event as keyof AgentManagerEvents & string, args[0] as AgentManagerEvents[keyof AgentManagerEvents]),
     });
-    this.heartbeat.start();
+
+    const _self = this;
+    this.dispatcher = new CommandDispatcher({
+      getAgent: (id) => this.agents.get(id),
+      getAllAgents: () => this.getAll(),
+      getProjectIdForAgent: (agentId) => this.getProjectIdForAgent(agentId),
+      getRunningCount: () => this.getRunningCount(),
+      spawnAgent: (role, task, parentId, model, cwd, options) => this.spawn(role, task, parentId, model, cwd, undefined, undefined, options),
+      terminateAgent: (id) => this.terminate(id),
+      emit: (event: string, ...args: unknown[]) => this.emit(event as keyof AgentManagerEvents & string, args[0] as AgentManagerEvents[keyof AgentManagerEvents]),
+      roleRegistry: this.roleRegistry,
+      config: this.config,
+      lockRegistry: this.lockRegistry,
+      activityLedger: this.activityLedger,
+      messageBus: this.messageBus,
+      decisionLog: this.decisionLog,
+      agentMemory: this.agentMemory,
+      chatGroupRegistry: this.chatGroupRegistry,
+      taskDAG: this.taskDAG,
+      timerRegistry: this.timerRegistry,
+      capabilityInjector: this.capabilityInjector,
+      taskTemplateRegistry,
+      taskDecomposer,
+      maxConcurrent: this.maxConcurrent,
+      markHumanInterrupt: (id) => this.markHumanInterrupt(id),
+      haltHeartbeat: (id) => this.monitorService.haltHeartbeat(id),
+      resumeHeartbeat: (id) => this.monitorService.resumeHeartbeat(id),
+      governancePipeline,
+      activeDelegationRepository,
+      agentRosterRepository,
+    });
 
     // Notify agents when their file locks expire
     this.lockRegistry.on('lock:expired', ({ filePath, agentId }: { filePath: string; agentId: string }) => {
@@ -264,15 +256,15 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
   }
 
   setSessionKnowledgeExtractor(extractor: SessionKnowledgeExtractor): void {
-    this.sessionKnowledgeExtractor = extractor;
+    this.knowledgeService.setSessionKnowledgeExtractor(extractor);
   }
 
   setSkillsLoader(loader: SkillsLoader): void {
-    this.skillsLoader = loader;
+    this.knowledgeService.setSkillsLoader(loader);
   }
 
   setCollectiveMemory(memory: CollectiveMemory): void {
-    this.collectiveMemory = memory;
+    this.knowledgeService.setCollectiveMemory(memory);
   }
 
   setConfigStore(store: import('../config/ConfigStore.js').ConfigStore): void {
@@ -434,70 +426,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       effectiveRole = { ...role, systemPrompt: prompt };
     }
 
-    // Inject relevant project knowledge into the agent's system prompt
-    if (this.knowledgeInjector && effectiveProjectId) {
-      const injectionCtx: InjectionContext = {
-        task: task || undefined,
-        role: role.id,
-      };
-      const injection = this.knowledgeInjector.injectKnowledge(effectiveProjectId, injectionCtx);
-      if (injection.text) {
-        effectiveRole = {
-          ...effectiveRole,
-          systemPrompt: `${effectiveRole.systemPrompt}\n\n${injection.text}`,
-        };
-        logger.info({
-          module: 'knowledge',
-          msg: 'Injected project knowledge into agent prompt',
-          projectId: effectiveProjectId,
-          role: role.id,
-          entriesIncluded: injection.entriesIncluded,
-          totalTokens: injection.totalTokens,
-        });
-      }
-    }
-
-    // Inject .github/skills/ content into the agent's system prompt
-    if (this.skillsLoader) {
-      const skillsBlock = this.skillsLoader.formatForInjection();
-      if (skillsBlock) {
-        effectiveRole = {
-          ...effectiveRole,
-          systemPrompt: `${effectiveRole.systemPrompt}\n\n${skillsBlock}`,
-        };
-        logger.info({
-          module: 'knowledge',
-          msg: 'Injected skills into agent prompt',
-          role: role.id,
-          skillCount: this.skillsLoader.count,
-        });
-      }
-    }
-
-    // Recall collective memories (cross-session patterns, decisions, gotchas)
-    if (this.collectiveMemory && effectiveProjectId) {
-      const categories: MemoryCategory[] = ['pattern', 'decision', 'gotcha'];
-      const memories = categories.flatMap((cat) =>
-        this.collectiveMemory!.recall(cat, undefined, effectiveProjectId),
-      );
-      if (memories.length > 0) {
-        const memoriesBlock = memories
-          .slice(0, 20) // cap to avoid prompt bloat
-          .map((m) => `- [${m.category}] ${m.key}: ${m.value}`)
-          .join('\n');
-        effectiveRole = {
-          ...effectiveRole,
-          systemPrompt: `${effectiveRole.systemPrompt}\n\n<collective_memory>\n${memoriesBlock}\n</collective_memory>`,
-        };
-        logger.info({
-          module: 'knowledge',
-          msg: 'Injected collective memories into agent prompt',
-          projectId: effectiveProjectId,
-          role: role.id,
-          memoriesIncluded: Math.min(memories.length, 20),
-        });
-      }
-    }
+    // Delegate knowledge injection (project knowledge, skills, collective memory) to service
+    effectiveRole = this.knowledgeService.enrichPrompt(effectiveRole, effectiveProjectId, task);
 
     // Inject oversight tier behavioral instructions into agent prompt
     const effectiveOversightLevel = this.getEffectiveOversightLevel(effectiveProjectId);
@@ -589,16 +519,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     // Create a conversation thread for this agent (for persistent message history)
-    if (this.conversationStore) {
-      const thread = this.conversationStore.createThread(agent.id, agent.task);
-      this.agentThreads.set(agent.id, thread.id);
-    }
+    this.messageService.createThread(agent.id, agent.task);
 
     // Listen for data to detect sub-agent spawn requests and coordination commands
     agent.onData((data) => {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
         this.emit('agent:text', { agentId: agent.id, text: data });
-        this.bufferAgentMessage(agent.id, data);
+        this.messageService.bufferAgentMessage(agent.id, data);
         this.dispatcher.appendToBuffer(agent.id, data);
         this.dispatcher.scanBuffer(agent);
       });
@@ -635,7 +562,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onThinking((text) => {
       this.emit('agent:thinking', { agentId: agent.id, text });
-      this.bufferThinkingMessage(agent.id, text);
+      this.messageService.bufferThinkingMessage(agent.id, text);
     });
 
     agent.onPlan((entries) => {
@@ -735,7 +662,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
       // Context compression drops conversation history, so remind the agent of
       // available commands. Uses the same reminder as the 2-hour heartbeat interval.
-      this.heartbeat.sendCommandReminderTo(agent);
+      this.monitorService.sendCommandReminderTo(agent);
     });
 
     // Wire cost tracking: attribute token usage to the agent's current dagTaskId
@@ -761,8 +688,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         this.emit('agent:status', { agentId: agent.id, status });
         this.activityLedger.log(agent.id, agent.role.id, 'status_change', `Status: ${status}`, {}, this.getProjectIdForAgent(agent.id) ?? '');
         if (status === 'idle' || isTerminalStatus(status)) {
-          this.flushThinkingMessage(agent.id);
-          this.flushAgentMessage(agent.id);
+          this.messageService.flushThinkingMessage(agent.id);
+          this.messageService.flushAgentMessage(agent.id);
         }
 
         // Persist status to roster DB
@@ -775,9 +702,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
         if (agent.role.id === 'lead') {
           if (status === 'idle' && !agent.isResuming) {
-            this.heartbeat.trackIdle(agent.id);
+            this.monitorService.trackIdle(agent.id);
           } else if (status === 'running') {
-            this.heartbeat.trackActive(agent.id);
+            this.monitorService.trackActive(agent.id);
           }
         }
 
@@ -785,29 +712,13 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         // idle transition properly re-notifies the parent.
         if (status === 'running') {
           this.dispatcher.clearCompletionTracking(agent.id);
-          this.clearIdleNudgeTimer(agent.id);
+          this.monitorService.clearIdleNudgeTimer(agent.id);
         }
 
         // Idle task nudge: if agent stays idle for 30s with uncompleted DAG
         // tasks, send a reminder. Nudge once per idle period (not spam).
         if (status === 'idle' && agent.parentId && !agent.isResuming) {
-          if (!this.idleNudgeTimers.has(agent.id)) {
-            const timer = setTimeout(() => {
-              this.idleNudgeTimers.delete(agent.id);
-              if (agent.status !== 'idle' || isTerminalStatus(agent.status)) return;
-              if (!this.agents.has(agent.id)) return; // agent was removed
-              const leadId = agent.parentId;
-              if (!leadId) return;
-              const dagTask = this.taskDAG.getTaskByAgent(leadId, agent.id);
-              if (dagTask && dagTask.dagStatus === 'running') {
-                agent.sendMessage(
-                  `[System] You have an uncompleted task: "${dagTask.title || dagTask.id}". ` +
-                  `Please mark it done with COMPLETE_TASK, report PROGRESS, or explain what is blocking you.`
-                );
-              }
-            }, 30_000);
-            this.idleNudgeTimers.set(agent.id, timer);
-          }
+          this.monitorService.startIdleNudge(agent, this.taskDAG, this.agents);
         }
 
         // Suppress the first idle notification for resumed agents — their prior
@@ -820,10 +731,10 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
     agent.onExit((code) => {
       runWithAgentContext(agent.id, agent.role.name, agent.projectId, () => {
-      this.flushThinkingMessage(agent.id);
-      this.flushAgentMessage(agent.id);
+      this.messageService.flushThinkingMessage(agent.id);
+      this.messageService.flushAgentMessage(agent.id);
       this.dispatcher.clearBuffer(agent.id);
-      this.clearIdleNudgeTimer(agent.id);
+      this.monitorService.clearIdleNudgeTimer(agent.id);
       logger.info({ module: 'agent', msg: 'Agent exited', exitCode: code, role: agent.role.id, status: agent.status });
 
       // Release any file locks held by the exiting agent
@@ -855,7 +766,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
       // Clean up heartbeat tracking for leads
       if (agent.role.id === 'lead') {
-        this.heartbeat.trackRemoved(agent.id);
+        this.monitorService.trackRemoved(agent.id);
       }
 
       this.emit('agent:exit', { agentId: agent.id, code, error: agent.exitError });
@@ -871,8 +782,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       }
 
       // Extract knowledge from completed sessions (all agents, not just leads)
-      if (this.sessionKnowledgeExtractor && agent.projectId) {
-        this.extractSessionKnowledge(agent);
+      if (agent.projectId) {
+        const history = this.messageService.getMessageHistory(agent.id, 200);
+        this.knowledgeService.extractSessionKnowledge(agent, history, this.activityLedger);
       }
 
       // Clean up dedup tracking after a delay
@@ -939,7 +851,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const postSpawn = () => {
       logger.info({ module: 'agent', msg: 'Agent spawned', role: role.name, parentAgentId: parentId, task });
       this.emit('agent:spawned', agent.toJSON());
-      this.updateLeadBudgets();
+      this.monitorService.updateLeadBudgets(this.getAll(), this.maxConcurrent, this.getRunningCount());
       // Auto-add to groups with matching role criteria (B4: group auto-add)
       // Skip during resume — agents pick up context from restored ACP session.
       if (parentId && !agent.isResuming) {
@@ -981,7 +893,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const agent = this.agents.get(id);
     if (!agent) return false;
     this.dispatcher.clearBuffer(id);
-    this.clearIdleNudgeTimer(id);
+    this.monitorService.clearIdleNudgeTimer(id);
 
     // Release any file locks held by the terminated agent
     const releasedCount = this.lockRegistry.releaseAll(id);
@@ -1053,7 +965,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     }
 
     // Clean up heartbeat tracking
-    this.heartbeat.trackRemoved(id);
+    this.monitorService.trackRemoved(id);
 
     // Schedule removal from Map after a grace period for event consumers
     setTimeout(() => {
@@ -1061,7 +973,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       agent.dispose();
     }, 30_000);
 
-    this.updateLeadBudgets();
+    this.monitorService.updateLeadBudgets(this.getAll(), this.maxConcurrent, this.getRunningCount());
     return true;
   }
 
@@ -1235,12 +1147,8 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   async shutdownAll(): Promise<void> {
     this._shuttingDown = true;
-    this.heartbeat.stop();
-    // Clear all idle nudge timers to prevent firing on disposed agents
-    for (const [_id, timer] of this.idleNudgeTimers) {
-      clearTimeout(timer);
-    }
-    this.idleNudgeTimers.clear();
+    this.monitorService.stop();
+    this.monitorService.clearAllTimers();
     const active = [...this.agents.values()]
       .filter(agent => !isTerminalStatus(agent.status));
     logger.info({ module: 'agent', msg: `Terminating ${active.length} active agent(s)...` });
@@ -1291,17 +1199,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   /** Persist a human message to the agent's conversation history */
   persistHumanMessage(agentId: string, text: string): void {
-    this.flushThinkingMessage(agentId);
-    this.flushAgentMessage(agentId); // flush any buffered agent/thinking text first
-    const threadId = this.agentThreads.get(agentId);
-    if (threadId && this.conversationStore) {
-      this.conversationStore.addMessage(threadId, 'user', text);
-    }
+    this.messageService.persistHumanMessage(agentId, text);
   }
 
   /** Mark a lead as human-interrupted so the heartbeat won't nudge it */
   markHumanInterrupt(agentId: string): void {
-    this.heartbeat.trackHumanInterrupt(agentId);
+    this.monitorService.trackHumanInterrupt(agentId);
   }
 
   /** Get and remove a pending system action by decision ID (for confirm/reject handling) */
@@ -1311,26 +1214,17 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
 
   /** Persist a system message to the agent's conversation history */
   persistSystemMessage(agentId: string, text: string): void {
-    const threadId = this.agentThreads.get(agentId);
-    if (threadId && this.conversationStore) {
-      this.conversationStore.addMessage(threadId, 'system', text);
-    }
+    this.messageService.persistSystemMessage(agentId, text);
   }
 
   /** Persist an external (inter-agent DM) message to the target's conversation history */
   persistExternalMessage(agentId: string, content: string, fromRole: string): void {
-    const threadId = this.agentThreads.get(agentId);
-    if (threadId && this.conversationStore) {
-      this.conversationStore.addMessage(threadId, 'external', content, fromRole);
-    }
+    this.messageService.persistExternalMessage(agentId, content, fromRole);
   }
 
   /** Get recent messages from an agent's conversation history */
   getMessageHistory(agentId: string, limit = 200): import('../db/ConversationStore.js').ThreadMessage[] {
-    if (!this.conversationStore) return [];
-    this.flushThinkingMessage(agentId);
-    this.flushAgentMessage(agentId); // flush pending buffers before reading
-    return this.conversationStore.getRecentMessages(agentId, limit).reverse(); // chronological order
+    return this.messageService.getMessageHistory(agentId, limit);
   }
 
   /**
@@ -1352,158 +1246,9 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return true;
   }
 
-  /** Buffer agent output text, flushing after 2s of silence */
-  private bufferAgentMessage(agentId: string, data: string): void {
-    // Flush any pending thinking text first so messages stay chronological
-    this.flushThinkingMessage(agentId);
-
-    const existing = this.messageBuffers.get(agentId) || '';
-    this.messageBuffers.set(agentId, existing + data);
-
-    // Reset debounce timer
-    const prev = this.flushTimers.get(agentId);
-    if (prev) clearTimeout(prev);
-    this.flushTimers.set(agentId, setTimeout(() => this.flushAgentMessage(agentId), 2000));
-  }
-
-  /** Clear a pending idle nudge timer for an agent */
-  private clearIdleNudgeTimer(agentId: string): void {
-    const timer = this.idleNudgeTimers.get(agentId);
-    if (timer) {
-      clearTimeout(timer);
-      this.idleNudgeTimers.delete(agentId);
-    }
-  }
-
-  /** Flush buffered agent text to the conversation store */
-  private flushAgentMessage(agentId: string): void {
-    const timer = this.flushTimers.get(agentId);
-    if (timer) { clearTimeout(timer); this.flushTimers.delete(agentId); }
-
-    const text = this.messageBuffers.get(agentId);
-    if (!text) return;
-    this.messageBuffers.delete(agentId);
-
-    const threadId = this.agentThreads.get(agentId);
-    if (threadId && this.conversationStore) {
-      this.conversationStore.addMessage(threadId, 'agent', text);
-    }
-  }
-
-  /** Buffer thinking text, flushing after 2s of silence */
-  private bufferThinkingMessage(agentId: string, data: string): void {
-    // Flush any pending agent text first so thinking and agent messages
-    // are stored in chronological order
-    this.flushAgentMessage(agentId);
-
-    const existing = this.thinkingBuffers.get(agentId) || '';
-    this.thinkingBuffers.set(agentId, existing + data);
-
-    const prev = this.thinkingFlushTimers.get(agentId);
-    if (prev) clearTimeout(prev);
-    this.thinkingFlushTimers.set(agentId, setTimeout(() => this.flushThinkingMessage(agentId), 2000));
-  }
-
-  /** Flush buffered thinking text to the conversation store */
-  private flushThinkingMessage(agentId: string): void {
-    const timer = this.thinkingFlushTimers.get(agentId);
-    if (timer) { clearTimeout(timer); this.thinkingFlushTimers.delete(agentId); }
-
-    const text = this.thinkingBuffers.get(agentId);
-    if (!text) return;
-    this.thinkingBuffers.delete(agentId);
-
-    const threadId = this.agentThreads.get(agentId);
-    if (threadId && this.conversationStore) {
-      this.conversationStore.addMessage(threadId, 'thinking', text);
-    }
-  }
-
   /** Flush all buffered agent messages (e.g. on new client connection) */
   flushAllMessages(): void {
-    for (const agentId of this.messageBuffers.keys()) {
-      this.flushAgentMessage(agentId);
-    }
-    for (const agentId of this.thinkingBuffers.keys()) {
-      this.flushThinkingMessage(agentId);
-    }
-  }
-
-  /**
-   * Extract knowledge from a completed agent session and store it.
-   * Gathers conversation history and builds SessionData for the extractor.
-   */
-  private extractSessionKnowledge(agent: Agent): void {
-    if (!this.sessionKnowledgeExtractor || !agent.projectId) return;
-
-    try {
-      const messages = this.getMessageHistory(agent.id, 200);
-      const sessionMessages: SessionMessage[] = messages.map((m) => ({
-        sender: m.sender,
-        content: m.content,
-        timestamp: m.timestamp,
-      }));
-
-      // Skip extraction for sessions with very few messages (likely aborted)
-      if (sessionMessages.length < 3) {
-        logger.debug({ module: 'knowledge', msg: 'Skipping extraction — too few messages', agentId: agent.id, messageCount: sessionMessages.length });
-        return;
-      }
-
-      const sessionData: SessionData = {
-        sessionId: agent.sessionId || agent.id,
-        projectId: agent.projectId,
-        task: agent.task,
-        role: agent.role.id,
-        agentId: agent.id,
-        messages: sessionMessages,
-        completionSummary: agent.completionSummary,
-        startedAt: agent.createdAt.toISOString(),
-        endedAt: new Date().toISOString(),
-      };
-
-      const result = this.sessionKnowledgeExtractor.extractFromSession(sessionData);
-      if (result.entriesStored > 0) {
-        this.activityLedger.log(
-          agent.id, agent.role.id, 'task_completed',
-          `Extracted ${result.entriesStored} knowledge entries (${result.decisions.length} decisions, ${result.patterns.length} patterns, ${result.errors.length} errors)`,
-          { entriesStored: result.entriesStored }, agent.projectId,
-        );
-      }
-
-      // Persist extracted knowledge into collective memory for cross-session recall
-      if (this.collectiveMemory) {
-        const entries = [...result.decisions, ...result.patterns, ...result.errors];
-        for (const entry of entries) {
-          const memCat = KNOWLEDGE_TO_MEMORY_CATEGORY[entry.category] ?? 'pattern';
-          this.collectiveMemory.remember(memCat, entry.key, entry.content, agent.id, agent.projectId!);
-        }
-        if (entries.length > 0) {
-          logger.info({
-            module: 'knowledge',
-            msg: 'Stored entries in collective memory',
-            agentId: agent.id,
-            count: entries.length,
-          });
-        }
-      }
-    } catch (err) {
-      logger.warn({
-        module: 'knowledge',
-        msg: 'Session knowledge extraction failed',
-        agentId: agent.id,
-        err: (err as Error).message,
-      });
-    }
-  }
-
-  /** Keep all agents' budget info in sync with current state */
-  private updateLeadBudgets(): void {
-    const running = this.getRunningCount();
-    const budget = { maxConcurrent: this.maxConcurrent, runningCount: running };
-    for (const agent of this.getAll()) {
-      agent.budget = { ...budget };
-    }
+    this.messageService.flushAllMessages();
   }
 
   /** Auto-add a newly spawned agent to groups that have matching role criteria */
