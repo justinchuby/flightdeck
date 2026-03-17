@@ -7,6 +7,7 @@ import type { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { FileLockRegistry } from '../files/FileLockRegistry.js';
 import { sessionRetros } from '../../db/schema.js';
 import { logger } from '../../utils/logger.js';
+import { asAgentId } from '../../types/brandedIds.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -105,7 +106,7 @@ export class SessionRetro {
 
     const allEvents = this.activityLedger.getRecent(100_000);
     const crewAgentIds = new Set(crewAgents.map(a => a.id));
-    const crewEvents = allEvents.filter(e => crewAgentIds.has(e.agentId));
+    const crewEvents = allEvents.filter(e => crewAgentIds.has(asAgentId(e.agentId)));
 
     const scorecards = crewAgents.map(agent => this.buildScorecard(agent, crewEvents));
     const summary = this.buildSummary(leadId, crewAgents, crewEvents);

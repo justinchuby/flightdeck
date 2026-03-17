@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { isTerminalStatus } from '../agents/Agent.js';
+import { asAgentId } from '../types/brandedIds.js';
 
 /**
  * Global task routes — cross-project task queries and the attention items
@@ -66,7 +67,7 @@ export function tasksRoutes(ctx: AppContext): Router {
       const liveAgents = agentManager.getAll().filter(a => !isTerminalStatus(a.status));
       if (liveAgents.length > 0) {
         const liveAgentIds = new Set(liveAgents.map(a => a.id));
-        tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(t.leadId));
+        tasks = allTasks.filter(t => t.leadId && liveAgentIds.has(asAgentId(t.leadId)));
       } else {
         tasks = allTasks;
       }

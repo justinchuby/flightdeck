@@ -1,5 +1,6 @@
 import { Agent, isTerminalStatus } from './Agent.js';
 import { generateProjectId } from '../utils/projectId.js';
+import { asProjectId } from '../types/brandedIds.js';
 import { join } from 'path';
 
 import type { AgentContextInfo } from './Agent.js';
@@ -523,7 +524,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     if (resumeSessionId) agent.resumeSessionId = resumeSessionId;
     if (resumeSessionId) agent._setResuming();
     if (options?.projectName) agent.projectName = options.projectName;
-    if (options?.projectId) agent.projectId = options.projectId;
+    if (options?.projectId) agent.projectId = asProjectId(options.projectId);
     if (options?.provider) agent.provider = options.provider;
     // Default provider from ServerConfig so even queued agents show a provider in the UI.
     // The post-ACP roster update (onSessionReady) overwrites with the final resolved value.
@@ -548,7 +549,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       if (!agent.projectId && parent) {
         const parentProjectId = this.getProjectIdForAgent(parentId);
         if (parentProjectId) {
-          agent.projectId = parentProjectId;
+          agent.projectId = asProjectId(parentProjectId);
         }
       }
     }
@@ -557,7 +558,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     // This prevents "untitled project" scenarios where activities are logged
     // with projectId: '' and become invisible to scoped queries.
     if (!parentId && !agent.projectId) {
-      agent.projectId = generateProjectId(agent.task || 'untitled');
+      agent.projectId = asProjectId(generateProjectId(agent.task || 'untitled'));
       logger.warn({ module: 'agent', msg: 'Root agent spawned without projectId', generatedProjectId: agent.projectId });
     }
 

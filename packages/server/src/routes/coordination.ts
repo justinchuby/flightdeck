@@ -4,6 +4,7 @@ import type { ActionType } from '../coordination/activity/ActivityLedger.js';
 import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
+import { asAgentId } from '../types/brandedIds.js';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -93,7 +94,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
           const scoped: Record<string, any> = {};
           for (const [agentId, data] of Object.entries(value as Record<string, any>)) {
-            if (projectAgentIds.has(agentId)) scoped[agentId] = data;
+            if (projectAgentIds.has(asAgentId(agentId))) scoped[agentId] = data;
           }
           filtered[key] = scoped;
         } else {

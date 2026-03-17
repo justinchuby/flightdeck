@@ -6,6 +6,7 @@
  *           FORCE_READY, ASSIGN_TASK, REASSIGN_TASK
  */
 import type { Agent } from '../Agent.js';
+import { asTaskId } from '../../types/brandedIds.js';
 import type { DagTaskInput } from '../../tasks/TaskDAG.js';
 import { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { CommandEntry, CommandHandlerContext } from './types.js';
@@ -641,7 +642,7 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
       createdAt: new Date().toISOString(),
     };
     ctx.delegations.set(delegation.id, delegation);
-    newAgent.dagTaskId = req.taskId;
+    newAgent.dagTaskId = asTaskId(req.taskId);
     newAgent.task = taskText;
     newAgent.sendMessage(`[DAG Task: ${req.taskId}]\n${taskText}`);
 
@@ -696,7 +697,7 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
 
     if (task) {
       // Set dagTaskId on agent, create delegation record, notify agent
-      targetAgent.dagTaskId = req.taskId;
+      targetAgent.dagTaskId = asTaskId(req.taskId);
       const taskText = existing.description || req.taskId;
       targetAgent.task = taskText;
       const delegation: import('./types.js').Delegation = {
