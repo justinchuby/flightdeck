@@ -73,7 +73,7 @@ import type { ServerConfig } from '../config.js';
 // ── Helpers ───────────────────────────────────────────────────────
 
 function createFakeAgent(overrides: Record<string, any> = {}) {
-  return {
+  const fake = {
     id: 'agent-12345678-abcd',
     role: { id: 'lead', name: 'Project Lead', description: 'Leads the project', model: undefined, systemPrompt: 'You are a lead.' },
     autopilot: true,
@@ -82,7 +82,10 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     cwd: '/test/project',
     status: 'idle',
     sessionId: undefined,
-    _isResuming: false,
+    _resuming: false,
+    get isResuming() { return this._resuming; },
+    _setResuming() { this._resuming = true; },
+    _clearResuming() { this._resuming = false; },
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
@@ -91,6 +94,7 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     buildFullPrompt: vi.fn(() => 'You are a lead.\n\n[context]\n\nYour task: do the thing'),
     ...overrides,
   } as any;
+  return fake;
 }
 
 const fakeConfig: ServerConfig = {
@@ -294,7 +298,7 @@ describe('AgentAcpBridge — startAcp', () => {
   it('sets agent idle on successful resume (no initialPrompt)', async () => {
     const agent = createFakeAgent({
       resumeSessionId: 'valid-session-id',
-      _isResuming: true,
+      _resuming: true,
     });
     mockStart.mockResolvedValue('valid-session-id');
 
@@ -309,6 +313,6 @@ describe('AgentAcpBridge — startAcp', () => {
 
     // Should be idle
     expect(agent.status).toBe('idle');
-    expect(agent._isResuming).toBe(false);
+    expect(agent.isResuming).toBe(false);
   });
 });
