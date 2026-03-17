@@ -91,15 +91,10 @@ export function useLeadMessages(
     };
   }, [selectedLeadId, ws, readOnly, chatInitialScroll]);
 
-  // Load message history for selected lead.
-  // Always fetch once (staleTime prevents re-fetches) — even if WS messages
-  // arrived first, we need the full history from the DB to show older messages.
-  const needsHistory = !!selectedLeadId;
-  const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
+  // Load message history for selected lead — always fetch + merge with live WS messages
+  const selectedProj = selectedLeadId ? projects[selectedLeadId] : null;
   const msgApiPath = selectedLeadId
-    ? isHistorical
-      ? `/projects/${selectedLeadId.slice(8)}/messages?limit=200`
-      : `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
+    ? `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
     : '';
 
   useQuery({
@@ -114,28 +109,19 @@ export function useLeadMessages(
           ...(m.fromRole ? { fromRole: m.fromRole } : {}),
           timestamp: new Date(m.timestamp).getTime(),
         }));
-        const store = useLeadStore.getState();
-        const current = store.projects[selectedLeadId!];
-        const existing = current?.messages ?? [];
-        if (existing.length === 0) {
-          // No live messages yet — use history directly
-          store.setMessages(selectedLeadId!, msgs);
+        const current = useLeadStore.getState().projects[selectedLeadId!];
+        if (!current || current.messages.length === 0) {
+          useLeadStore.getState().setMessages(selectedLeadId!, msgs);
         } else {
-          // Live WS messages arrived before history loaded — merge.
-          // History messages go first, then any WS messages with timestamps
-          // newer than the latest historical message.
-          const latestHistTs = msgs[msgs.length - 1]?.timestamp ?? 0;
-          const newer = existing.filter((m) => (m.timestamp ?? 0) > latestHistTs);
-          if (newer.length < existing.length) {
-            // There are historical messages not yet in store — merge them in
-            store.setMessages(selectedLeadId!, [...msgs, ...newer]);
-          }
-          // else: all existing messages are newer, history is a subset — skip
+          // Merge: DB history first, then any live WS messages newer than the latest historical
+          const latestHistTs = Math.max(...msgs.map((m) => m.timestamp ?? 0));
+          const liveOnly = current.messages.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+          useLeadStore.getState().setMessages(selectedLeadId!, [...msgs, ...liveOnly]);
         }
       }
       return data;
     },
-    enabled: needsHistory,
+    enabled: !!selectedLeadId,
     staleTime: 60_000,
   });
 }

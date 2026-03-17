@@ -165,8 +165,7 @@ export function ProjectLayout() {
     if (!id) return;
     const store = useLeadStore.getState();
 
-    // Find matching leadStore key: either a lead agent ID with this projectId,
-    // or the `project:${id}` key for persisted projects
+    // Find lead agent matching this project's ID
     const lead = agents.find(
       (a) => a.role?.id === 'lead' && !a.parentId && (a.projectId === id || a.id === id),
     );
@@ -182,19 +181,9 @@ export function ProjectLayout() {
       if (store.selectedLeadId !== lead.id) {
         store.selectLead(lead.id);
       }
-    } else {
-      // No live lead yet — fall back to project:xxx ONLY if we don't already
-      // have a real agent ID selected (e.g. set during resume before agent:spawned arrives)
-      const currentKey = store.selectedLeadId;
-      const currentIsRealAgentForProject = currentKey && !currentKey.startsWith('project:');
-      if (!currentIsRealAgentForProject) {
-        const fallbackKey = `project:${id}`;
-        store.addProject(fallbackKey);
-        if (currentKey !== fallbackKey) {
-          store.selectLead(fallbackKey);
-        }
-      }
     }
+    // If no live lead found, do nothing — selectedLeadId stays null
+    // until the lead agent spawns and agents list updates
   }, [id, agents]);
 
   // Sync project context → navigationStore
