@@ -65,7 +65,7 @@ describe('User message priority', () => {
     it('queues normal messages at the back', () => {
       const agent = createTestAgent();
       // Make agent busy so messages queue
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       agent.queueMessage('agent-msg-1');
       agent.queueMessage('agent-msg-2');
@@ -77,7 +77,7 @@ describe('User message priority', () => {
 
     it('queues priority messages at the front', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       agent.queueMessage('agent-msg-1');
       agent.queueMessage('agent-msg-2');
@@ -103,7 +103,7 @@ describe('User message priority', () => {
 
     it('sends priority message immediately when idle', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'idle';
+      (agent as any)._phase = 'idle';
 
       agent.queueMessage('user-msg', { priority: true });
 
@@ -112,7 +112,7 @@ describe('User message priority', () => {
 
     it('sends normal message immediately when idle', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'idle';
+      (agent as any)._phase = 'idle';
 
       agent.queueMessage('agent-msg');
 
@@ -141,7 +141,7 @@ describe('User message priority', () => {
   describe('multiple priority messages maintain FIFO among themselves', () => {
     it('first priority message stays at front, second goes after it (FIFO)', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       agent.queueMessage('agent-msg-1');
       agent.queueMessage('user-msg-1', { priority: true });
@@ -158,7 +158,7 @@ describe('User message priority', () => {
 
     it('three priority messages stay in insertion order', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       agent.queueMessage('normal-1');
       agent.queueMessage('priority-A', { priority: true });
@@ -178,7 +178,7 @@ describe('User message priority', () => {
   describe('rate limiting', () => {
     it('drops non-priority messages when queue is full', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       // Fill queue to MAX_PENDING_MESSAGES (200)
       for (let i = 0; i < 200; i++) {
@@ -194,7 +194,7 @@ describe('User message priority', () => {
 
     it('never drops priority messages even when queue is full', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       for (let i = 0; i < 200; i++) {
         agent.queueMessage(`msg-${i}`);
@@ -209,7 +209,7 @@ describe('User message priority', () => {
 
     it('allows messages again after queue drains', () => {
       const agent = createTestAgent();
-      (agent as any).status = 'running';
+      (agent as any)._phase = 'running';
 
       for (let i = 0; i < 200; i++) {
         agent.queueMessage(`msg-${i}`);
