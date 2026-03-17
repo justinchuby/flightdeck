@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import { useMessageStore } from '../../stores/messageStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
+import { normalizeWsText } from '../../hooks/ws-handlers/normalizeText';
 
 type StoreApi = ReturnType<typeof useLeadStore.getState>;
 
@@ -154,13 +155,11 @@ function handleDecision(msg: WsDecision, store: StoreApi) {
 }
 
 function handleText(msg: WsAgentText, _store: StoreApi, storeKey: string) {
-  const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-  useMessageStore.getState().appendToLastAgentMessage(storeKey, rawText);
+  useMessageStore.getState().appendToLastAgentMessage(storeKey, normalizeWsText(msg.text));
 }
 
 function handleThinking(msg: WsAgentThinking, _store: StoreApi, storeKey: string) {
-  const rawText = typeof msg.text === 'string' ? msg.text : msg.text?.text ?? JSON.stringify(msg.text);
-  useMessageStore.getState().appendToThinkingMessage(storeKey, rawText);
+  useMessageStore.getState().appendToThinkingMessage(storeKey, normalizeWsText(msg.text));
 }
 
 function handleContent(msg: WsAgentContent, _store: StoreApi, storeKey: string) {
