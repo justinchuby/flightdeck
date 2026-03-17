@@ -1,6 +1,7 @@
 import type { WsHandlerContext, AcpTextChunk } from './types';
 import { useToastStore } from '../../components/Toast';
 import { shortAgentId } from '../../utils/agentLabel';
+import { useMessageStore } from '../../stores/messageStore';
 
 /**
  * Handlers for agent lifecycle events:
@@ -43,9 +44,11 @@ export function handleAgentStatus(msg: any, ctx: WsHandlerContext): void {
 
   // When agent transitions from idle back to running, insert a turn separator.
   if (msg.status === 'running' && wasIdle) {
-    const existing = ctx.getAppState().agents.find((a: any) => a.id === msg.agentId);
-    if (existing?.messages?.length) {
-      const msgs = [...existing.messages];
+    const store = useMessageStore.getState();
+    const channel = store.channels[msg.agentId];
+    const messages = channel?.messages ?? [];
+    if (messages.length) {
+      const msgs = [...messages];
       const last = msgs[msgs.length - 1];
       if (last?.sender === 'agent') {
         const separator: AcpTextChunk = { type: 'text', text: '---', sender: 'system' };
@@ -59,7 +62,7 @@ export function handleAgentStatus(msg: any, ctx: WsHandlerContext): void {
         } else {
           msgs.push(separator);
         }
-        ctx.updateAgent(msg.agentId, { messages: msgs });
+        store.setMessages(msg.agentId, msgs);
       }
     }
   }

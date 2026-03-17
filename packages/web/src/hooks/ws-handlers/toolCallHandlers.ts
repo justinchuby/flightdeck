@@ -1,4 +1,5 @@
 import type { WsHandlerContext } from './types';
+import { useMessageStore } from '../../stores/messageStore';
 
 /**
  * Handler for agent:tool_call events.
@@ -20,7 +21,9 @@ export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
   const tc = msg.toolCall;
   const prevTc = idx >= 0 ? calls[idx] : undefined;
   if (!prevTc || prevTc.status !== tc.status) {
-    const msgs = [...(existing?.messages ?? [])];
+    const store = useMessageStore.getState();
+    const channel = store.channels[msg.agentId];
+    const msgs = [...(channel?.messages ?? [])];
     const statusIcon = tc.status === 'completed' ? '✓' : tc.status === 'cancelled' ? '✗' : '⟳';
     const title = typeof tc.title === 'string' ? tc.title : String(tc.title);
 
@@ -46,7 +49,8 @@ export function handleToolCall(msg: any, ctx: WsHandlerContext): void {
         toolKind: tc.kind,
       });
     }
-    ctx.updateAgent(msg.agentId, { toolCalls: updated, messages: msgs });
+    store.setMessages(msg.agentId, msgs);
+    ctx.updateAgent(msg.agentId, { toolCalls: updated });
   } else {
     ctx.updateAgent(msg.agentId, { toolCalls: updated });
   }
