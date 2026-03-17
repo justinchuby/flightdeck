@@ -199,7 +199,7 @@ export function StepConfigure({ config, onUpdate, onNext, onBack }: StepProps) {
               </div>
             </div>
             <p className="text-[10px] text-th-text-muted mt-1.5">
-              ⚠️ Critical notifications (crashes, approvals needed) are always delivered, even during quiet hours.
+              ⚠️ Critical notifications (crashes, approvals) are always delivered during quiet hours.
             </p>
           </>
         )}

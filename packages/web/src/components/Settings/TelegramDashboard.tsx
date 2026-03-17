@@ -24,6 +24,7 @@ export function TelegramDashboard({ config, status, onReconfigure, onRefresh }: 
   const [showAddChat, setShowAddChat] = useState(false);
   const [newChatId, setNewChatId] = useState('');
   const [editingNotifications, setEditingNotifications] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isConnected = status.adapters.some(a => a.platform === 'telegram' && a.running);
   const botAdapter = status.adapters.find(a => a.platform === 'telegram');
@@ -40,9 +41,10 @@ export function TelegramDashboard({ config, status, onReconfigure, onRefresh }: 
       });
       setNewChatId('');
       setShowAddChat(false);
+      setError(null);
       onRefresh?.();
-    } catch {
-      // Error handling in real implementation
+    } catch (err) {
+      setError(`Failed to add chat: ${(err as Error).message}`);
     }
   }, [newChatId, config.allowedChatIds, onRefresh]);
 
@@ -53,18 +55,20 @@ export function TelegramDashboard({ config, status, onReconfigure, onRefresh }: 
         method: 'PATCH',
         body: JSON.stringify({ allowedChatIds: updatedIds }),
       });
+      setError(null);
       onRefresh?.();
-    } catch {
-      // Error handling
+    } catch (err) {
+      setError(`Failed to remove chat: ${(err as Error).message}`);
     }
   }, [config.allowedChatIds, onRefresh]);
 
   const handleUnbind = useCallback(async (chatId: string) => {
     try {
       await apiFetch(`/integrations/sessions/${chatId}`, { method: 'DELETE' });
+      setError(null);
       onRefresh?.();
-    } catch {
-      // Endpoint may not exist yet — graceful degradation
+    } catch (err) {
+      setError(`Failed to unbind chat: ${(err as Error).message}`);
     }
   }, [onRefresh]);
 
@@ -75,9 +79,10 @@ export function TelegramDashboard({ config, status, onReconfigure, onRefresh }: 
         method: 'PATCH',
         body: JSON.stringify({ enabled: false }),
       });
+      setError(null);
       onRefresh?.();
-    } catch {
-      // Error handling
+    } catch (err) {
+      setError(`Failed to disable integration: ${(err as Error).message}`);
     }
   }, [onRefresh]);
 
@@ -109,6 +114,14 @@ export function TelegramDashboard({ config, status, onReconfigure, onRefresh }: 
           </span>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-400/10 px-3 py-2 rounded" role="alert">
+          {error}
+          <button onClick={() => setError(null)} className="ml-auto text-red-400/60 hover:text-red-400">✕</button>
+        </div>
+      )}
 
       {/* Linked chats */}
       <div>

@@ -82,12 +82,6 @@ export function VerificationCodeInput({
     }
   }, [digits, length, onComplete]);
 
-  const clear = useCallback(() => {
-    setDigits(Array(length).fill(''));
-    focusInput(0);
-  }, [length]);
-
-  // Expose clear method via data attribute for parent access
   return (
     <div
       role="group"
