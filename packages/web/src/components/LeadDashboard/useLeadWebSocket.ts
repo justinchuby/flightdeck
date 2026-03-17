@@ -154,12 +154,12 @@ function handleDecision(msg: WsDecision, store: StoreApi) {
   });
 }
 
-function handleText(msg: WsAgentText, store: StoreApi, storeKey: string) {
-  store.appendToLastAgentMessage(storeKey, normalizeWsText(msg.text));
+function handleText(msg: WsAgentText, _store: StoreApi, storeKey: string) {
+  useMessageStore.getState().appendToLastAgentMessage(storeKey, normalizeWsText(msg.text));
 }
 
-function handleThinking(msg: WsAgentThinking, store: StoreApi, storeKey: string) {
-  store.appendToThinkingMessage(storeKey, normalizeWsText(msg.text));
+function handleThinking(msg: WsAgentThinking, _store: StoreApi, storeKey: string) {
+  useMessageStore.getState().appendToThinkingMessage(storeKey, normalizeWsText(msg.text));
 }
 
 function handleContent(msg: WsAgentContent, _store: StoreApi, storeKey: string) {

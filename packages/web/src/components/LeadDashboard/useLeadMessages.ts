@@ -87,7 +87,6 @@ export function useLeadMessages(
   // Load message history for selected lead (if messageStore channel is empty)
   const selectedCh = selectedLeadId ? channels[selectedLeadId] : null;
   const needsHistory = !!selectedLeadId && (!selectedCh || selectedCh.messages.length === 0);
-  const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
   const msgApiPath = selectedLeadId
     ? `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
     : '';
@@ -111,7 +110,7 @@ export function useLeadMessages(
       }
       return data;
     },
-    enabled: !!selectedLeadId,
+    enabled: needsHistory,
     staleTime: 60_000,
   });
 }

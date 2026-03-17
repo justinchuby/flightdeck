@@ -153,9 +153,8 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
     }
 
-    // Record task in agent memory — role and model are omitted since they're
-    // already shown in the crew roster and the stored model can be wrong after
-    // system upgrades (it captures the requested model, not the actual one).
+    ctx.agentMemory.store(agent.id, child.id, 'role', role.name);
+    if (req.model) ctx.agentMemory.store(agent.id, child.id, 'model', req.model);
     if (req.task) ctx.agentMemory.store(agent.id, child.id, 'task', req.task.slice(0, 200));
 
     maybeSuggestDagGroup(ctx, agent.id);
