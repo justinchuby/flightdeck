@@ -2,6 +2,7 @@ import { apiFetch } from '../../hooks/useApi';
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useAppStore } from '../../stores/appStore';
+import { useMessageStore } from '../../stores/messageStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench } from 'lucide-react';
@@ -174,7 +175,7 @@ export function AcpOutput({ agentId }: Props) {
   const [dismissedPinId, setDismissedPinId] = useState<number | null>(null);
 
   const plan = agent?.plan ?? [];
-  const messages = agent?.messages ?? [];
+  const messages = useMessageStore((s) => s.channels[agentId]?.messages ?? []);
 
   // Fetch message history when agent panel opens — always merge with live WS messages
   const historyFetchedRef = useRef<string | null>(null);
@@ -190,15 +191,7 @@ export function AcpOutput({ agentId }: Props) {
             sender: (m.sender || 'agent') as 'agent' | 'user' | 'system' | 'thinking',
             timestamp: m.timestamp ? new Date(m.timestamp).getTime() : Date.now(),
           }));
-          const existing = useAppStore.getState().agents.find((a) => a.id === agentId);
-          if (!existing?.messages?.length) {
-            useAppStore.getState().updateAgent(agentId, { messages: msgs });
-          } else {
-            // Merge: DB history first, then any live WS messages newer than the latest historical
-            const latestHistTs = Math.max(...msgs.map((m) => m.timestamp ?? 0));
-            const liveOnly = existing.messages.filter((m) => (m.timestamp ?? 0) > latestHistTs);
-            useAppStore.getState().updateAgent(agentId, { messages: [...msgs, ...liveOnly] });
-          }
+          useMessageStore.getState().mergeHistory(agentId, msgs);
         }
       })
       .catch(() => { /* data will load on next poll */ });
@@ -296,8 +289,7 @@ export function AcpOutput({ agentId }: Props) {
     const lastNonQueued = [...messages].reverse().find(m => !m.queued);
     if (lastNonQueued && lastNonQueued.sender !== 'user') {
       // Agent has responded — promote all queued messages
-      const updated = messages.map(m => m.queued ? { ...m, queued: false } : m);
-      useAppStore.getState().updateAgent(agentId, { messages: updated });
+      useMessageStore.getState().promoteQueuedMessages(agentId);
     }
   }, [messages, agentId]);
 
@@ -309,7 +301,7 @@ export function AcpOutput({ agentId }: Props) {
         if (!m.queued) return true;
         return seen++ !== queueIndex;
       });
-      useAppStore.getState().updateAgent(agentId, { messages: updated });
+      useMessageStore.getState().setMessages(agentId, updated);
     } catch { /* ignore */ }
   }, [agentId, messages]);
 
@@ -324,7 +316,7 @@ export function AcpOutput({ agentId }: Props) {
       if (fromIndex < queued.length && toIndex < queued.length) {
         const [moved] = queued.splice(fromIndex, 1);
         queued.splice(toIndex, 0, moved);
-        useAppStore.getState().updateAgent(agentId, { messages: [...nonQueued, ...queued] });
+        useMessageStore.getState().setMessages(agentId, [...nonQueued, ...queued]);
       }
     } catch { /* ignore */ }
   }, [agentId, messages]);
