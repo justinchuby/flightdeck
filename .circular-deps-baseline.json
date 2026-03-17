@@ -1,0 +1,6 @@
+{
+  "description": "Baseline circular dependency counts. CI fails only if counts increase. Reduce these numbers as cycles are fixed.",
+  "server": 27,
+  "web": 9,
+  "shared": 0
+}
