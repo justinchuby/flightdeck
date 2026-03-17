@@ -76,13 +76,24 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     model: undefined,
     resumeSessionId: undefined,
     cwd: '/test/project',
-    status: 'idle',
+    _phase: 'idle' as string,
+    get phase() { return this._phase; },
+    get status() {
+      switch (this._phase) {
+        case 'starting': return 'creating';
+        case 'running': case 'thinking': case 'resuming': return 'running';
+        case 'idle': return 'idle';
+        case 'stopping': case 'stopped': return 'terminated';
+        case 'error': return 'failed';
+        default: return 'idle';
+      }
+    },
+    transitionTo(phase: string) { this._phase = phase; },
     sessionId: undefined,
     exitError: undefined,
-    _resuming: false,
-    get isResuming() { return this._resuming; },
-    _setResuming() { this._resuming = true; },
-    _clearResuming() { this._resuming = false; },
+    get isResuming() { return this._phase === 'resuming'; },
+    _setResuming() { this._phase = 'resuming'; },
+    _clearResuming() { if (this._phase === 'resuming') this._phase = 'idle'; },
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
@@ -97,7 +108,7 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     _notifyResponseStart: vi.fn(),
     _notifyUsage: vi.fn(),
     _notifyContextCompacted: vi.fn(),
-    _isTerminated: false,
+    get _isTerminated() { return this._phase === 'stopped' || this._phase === 'error'; },
     _maxMessages: 500,
     _maxToolCalls: 200,
     messages: [] as string[],
@@ -134,7 +145,7 @@ describe('_isResuming lifecycle', () => {
     it('clears isResuming after successful resume (idle path)', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'sess-123',
-        _resuming: true,
+        _phase: 'resuming',
       });
       mockStart.mockResolvedValue('sess-123');
 
@@ -150,7 +161,7 @@ describe('_isResuming lifecycle', () => {
 
     it('clears isResuming after successful fresh start', async () => {
       const agent = createFakeAgent({
-        _resuming: false,
+        _phase: 'idle',
       });
       agent.buildFullPrompt.mockReturnValue('Do the thing');
       mockStart.mockResolvedValue('new-sess');
@@ -169,7 +180,7 @@ describe('_isResuming lifecycle', () => {
     it('clears isResuming when adapter start rejects', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'fail-sess',
-        _resuming: true,
+        _phase: 'resuming',
       });
       mockStart.mockRejectedValue(new Error('Connection refused'));
 
@@ -187,7 +198,7 @@ describe('_isResuming lifecycle', () => {
     it('sets status to failed and notifies exit on start failure', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'crash-sess',
-        _resuming: true,
+        _phase: 'resuming',
       });
       mockStart.mockRejectedValue(new Error('Process crashed'));
 
@@ -206,7 +217,7 @@ describe('_isResuming lifecycle', () => {
     it('suppresses text events while isResuming is true', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'sess-suppress',
-        _resuming: true,
+        _phase: 'resuming',
       });
 
       // Capture the 'text' event handler
@@ -237,7 +248,7 @@ describe('_isResuming lifecycle', () => {
     it('suppresses thinking events while isResuming is true', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'sess-think',
-        _resuming: true,
+        _phase: 'resuming',
       });
 
       const eventHandlers: Record<string, Function> = {};
@@ -260,7 +271,7 @@ describe('_isResuming lifecycle', () => {
     it('suppresses content events while isResuming is true', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'sess-content',
-        _resuming: true,
+        _phase: 'resuming',
       });
 
       const eventHandlers: Record<string, Function> = {};
@@ -283,7 +294,7 @@ describe('_isResuming lifecycle', () => {
     it('suppresses tool_call events while isResuming is true', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'sess-tool',
-        _resuming: true,
+        _phase: 'resuming',
       });
 
       const eventHandlers: Record<string, Function> = {};
@@ -307,7 +318,7 @@ describe('_isResuming lifecycle', () => {
     it('cancels in-flight prompting during resume', async () => {
       const agent = createFakeAgent({
         resumeSessionId: 'sess-prompt',
-        _resuming: true,
+        _phase: 'resuming',
       });
 
       const eventHandlers: Record<string, Function> = {};
@@ -345,7 +356,7 @@ describe('_isResuming lifecycle', () => {
     });
 
     it('_clearResuming is idempotent', () => {
-      const agent = createFakeAgent({ _resuming: true });
+      const agent = createFakeAgent({ _phase: 'resuming' });
       expect(agent.isResuming).toBe(true);
 
       agent._clearResuming();
