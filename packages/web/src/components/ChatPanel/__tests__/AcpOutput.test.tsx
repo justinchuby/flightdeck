@@ -301,10 +301,16 @@ describe('AcpOutput', () => {
     );
   });
 
-  it('does NOT call apiFetch when messages already exist', async () => {
+  it('fetches history and merges even when messages already exist', async () => {
+    mockApiFetch.mockResolvedValue({
+      messages: [
+        { sender: 'agent', content: 'old history', timestamp: 500 },
+      ],
+    });
     seedAgent([makeMsg('Already here', 'agent', 1000)]);
     await renderAcpOutput();
-    expect(mockApiFetch).not.toHaveBeenCalled();
+    // Should fetch to load historical messages even when store has WS data
+    expect(mockApiFetch).toHaveBeenCalled();
   });
 
   /* ---------- System message filtering ---------- */

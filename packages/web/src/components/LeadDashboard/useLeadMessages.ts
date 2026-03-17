@@ -53,9 +53,17 @@ export function useLeadMessages(
                 sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                 timestamp: new Date(m.timestamp).getTime(),
               }));
-              const current = useLeadStore.getState().projects[l.id];
-              if (!current || current.messages.length === 0) {
-                useLeadStore.getState().setMessages(l.id, msgs);
+              const st = useLeadStore.getState();
+              const current = st.projects[l.id];
+              const existing = current?.messages ?? [];
+              if (existing.length === 0) {
+                st.setMessages(l.id, msgs);
+              } else {
+                const latestHistTs = msgs[msgs.length - 1]?.timestamp ?? 0;
+                const newer = existing.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+                if (newer.length < existing.length) {
+                  st.setMessages(l.id, [...msgs, ...newer]);
+                }
               }
             }
           })
@@ -83,9 +91,10 @@ export function useLeadMessages(
     };
   }, [selectedLeadId, ws, readOnly, chatInitialScroll]);
 
-  // Load message history for selected lead (if store is empty)
-  const selectedProj = selectedLeadId ? projects[selectedLeadId] : null;
-  const needsHistory = !!selectedLeadId && (!selectedProj || selectedProj.messages.length === 0);
+  // Load message history for selected lead.
+  // Always fetch once (staleTime prevents re-fetches) — even if WS messages
+  // arrived first, we need the full history from the DB to show older messages.
+  const needsHistory = !!selectedLeadId;
   const isHistorical = selectedLeadId?.startsWith('project:') ?? false;
   const msgApiPath = selectedLeadId
     ? isHistorical
@@ -105,9 +114,23 @@ export function useLeadMessages(
           ...(m.fromRole ? { fromRole: m.fromRole } : {}),
           timestamp: new Date(m.timestamp).getTime(),
         }));
-        const current = useLeadStore.getState().projects[selectedLeadId!];
-        if (!current || current.messages.length === 0) {
-          useLeadStore.getState().setMessages(selectedLeadId!, msgs);
+        const store = useLeadStore.getState();
+        const current = store.projects[selectedLeadId!];
+        const existing = current?.messages ?? [];
+        if (existing.length === 0) {
+          // No live messages yet — use history directly
+          store.setMessages(selectedLeadId!, msgs);
+        } else {
+          // Live WS messages arrived before history loaded — merge.
+          // History messages go first, then any WS messages with timestamps
+          // newer than the latest historical message.
+          const latestHistTs = msgs[msgs.length - 1]?.timestamp ?? 0;
+          const newer = existing.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+          if (newer.length < existing.length) {
+            // There are historical messages not yet in store — merge them in
+            store.setMessages(selectedLeadId!, [...msgs, ...newer]);
+          }
+          // else: all existing messages are newer, history is a subset — skip
         }
       }
       return data;
