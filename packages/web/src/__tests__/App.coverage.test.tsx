@@ -465,9 +465,13 @@ describe('AppCoverage', () => {
       });
     });
 
-    it('resolves selectedLeadId with project: prefix', async () => {
-      useLeadStore.setState({ selectedLeadId: 'project:proj-123' });
-      useAppStore.setState({ agents: [] });
+    it('resolves selectedLeadId as agent ID to projectId', async () => {
+      useAppStore.setState({
+        agents: [
+          { id: 'lead-123', role: { id: 'lead', name: 'Lead', icon: '👑' }, status: 'running', parentId: undefined, projectId: 'proj-123' },
+        ] as any,
+      });
+      useLeadStore.setState({ selectedLeadId: 'lead-123' });
 
       renderApp('/tasks');
       await waitFor(() => {
@@ -475,7 +479,7 @@ describe('AppCoverage', () => {
       });
     });
 
-    it('resolves selectedLeadId as agent ID to projectId', async () => {
+    it('resolves selectedLeadId as agent ID to projectId for overview', async () => {
       useAppStore.setState({
         agents: [
           { id: 'lead-sel', role: { id: 'lead', name: 'Lead', icon: '👑' }, status: 'running', parentId: undefined, projectId: 'proj-from-agent' },
