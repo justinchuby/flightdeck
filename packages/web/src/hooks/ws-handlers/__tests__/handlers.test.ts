@@ -184,6 +184,125 @@ describe('agentStatusHandlers', () => {
     handleSessionResumeFailed({ agentId: 'abc12345-long-id', error: 'timeout' }, ctx);
     expect(mockToastAdd).toHaveBeenCalledWith('error', expect.stringContaining('timeout'));
   });
+
+  it('handleAgentExit sets exitCode null when code is undefined', () => {
+    const ctx = makeCtx([{ id: 'a1', status: 'running' }]);
+    handleAgentExit({ agentId: 'a1' } as any, ctx);
+    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', expect.objectContaining({ exitCode: null }));
+  });
+
+  it('handleAgentStatus inserts turn separator on idle→running', () => {
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [
+          { type: 'text', text: 'hello', sender: 'agent', timestamp: Date.now() - 5000 },
+        ],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', status: 'idle' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', { status: 'running' });
+    expect(mockMessageStore.setMessages).toHaveBeenCalledWith('a1', expect.arrayContaining([
+      expect.objectContaining({ text: '---', sender: 'system' }),
+    ]));
+  });
+
+  it('handleAgentStatus splices separator before last when within 2s and prev is agent', () => {
+    const now = Date.now();
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [
+          { type: 'text', text: 'first', sender: 'agent', timestamp: now - 5000 },
+          { type: 'text', text: 'second', sender: 'agent', timestamp: now - 100 },
+        ],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', status: 'idle' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    const msgs = mockMessageStore.setMessages.mock.calls[0][1];
+    // Separator inserted before last message (splice)
+    expect(msgs[msgs.length - 2]).toEqual(expect.objectContaining({ text: '---', sender: 'system' }));
+  });
+
+  it('handleAgentStatus pushes separator when within 2s but prev is system', () => {
+    const now = Date.now();
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [
+          { type: 'text', text: 'sys', sender: 'system', timestamp: now - 5000 },
+          { type: 'text', text: 'last', sender: 'agent', timestamp: now - 100 },
+        ],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', status: 'idle' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    const msgs = mockMessageStore.setMessages.mock.calls[0][1];
+    // Separator pushed at end (not spliced) because prev is system
+    expect(msgs[msgs.length - 1]).toEqual(expect.objectContaining({ text: '---', sender: 'system' }));
+  });
+
+  it('handleAgentStatus does not insert separator when no messages', () => {
+    mockMessageStore.channels = { 'a1': { messages: [] } };
+    const ctx = makeCtx([{ id: 'a1', status: 'idle' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    expect(mockMessageStore.setMessages).not.toHaveBeenCalled();
+  });
+
+  it('handleAgentStatus does not insert separator when last message is not agent', () => {
+    mockMessageStore.channels = {
+      'a1': { messages: [{ type: 'text', text: 'sys', sender: 'system' }] },
+    };
+    const ctx = makeCtx([{ id: 'a1', status: 'idle' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    expect(mockMessageStore.setMessages).not.toHaveBeenCalled();
+  });
+
+  it('handleAgentStatus does not insert separator for non-running status', () => {
+    const ctx = makeCtx([{ id: 'a1', status: 'running' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'idle' } as any, ctx);
+    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', { status: 'idle' });
+    expect(mockMessageStore.setMessages).not.toHaveBeenCalled();
+  });
+
+  it('handleAgentStatus inserts separator on completed→running', () => {
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [{ type: 'text', text: 'done', sender: 'agent', timestamp: Date.now() - 5000 }],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', status: 'completed' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    expect(mockMessageStore.setMessages).toHaveBeenCalledWith('a1', expect.arrayContaining([
+      expect.objectContaining({ text: '---' }),
+    ]));
+  });
+
+  it('handleAgentStatus does not insert separator when channel is undefined', () => {
+    // channels has no entry for a1 → channel?.messages ?? []
+    mockMessageStore.channels = {};
+    const ctx = makeCtx([{ id: 'a1', status: 'idle' }]);
+    handleAgentStatus({ agentId: 'a1', status: 'running' } as any, ctx);
+    expect(mockMessageStore.setMessages).not.toHaveBeenCalled();
+  });
+
+  it('handleSpawnError falls back to shortAgentId when agent has no role', () => {
+    const ctx = makeCtx([{ id: 'a1' }]);
+    handleSpawnError({ agentId: 'a1', message: 'fail' }, ctx);
+    expect(mockToastAdd).toHaveBeenCalledWith('error', expect.stringContaining('a1'));
+  });
+
+  it('handleSubSpawned defaults to empty childIds when parent has none', () => {
+    const ctx = makeCtx([{ id: 'p1' }]);
+    handleSubSpawned({ parentId: 'p1', child: { id: 'c1' } } as any, ctx);
+    expect(ctx.addAgent).toHaveBeenCalledWith({ id: 'c1' });
+    expect(ctx.updateAgent).toHaveBeenCalledWith('p1', { childIds: ['c1'] });
+  });
+
+  it('handleSubSpawned appends to existing childIds', () => {
+    const ctx = makeCtx([{ id: 'p1', childIds: ['c0'] }]);
+    handleSubSpawned({ parentId: 'p1', child: { id: 'c1' } } as any, ctx);
+    expect(ctx.updateAgent).toHaveBeenCalledWith('p1', { childIds: ['c0', 'c1'] });
+  });
 });
 
 // ── Agent Text Handlers ───────────────────────────────────────────
@@ -221,6 +340,17 @@ describe('agentTextHandlers', () => {
     handleAgentContent({ agentId: 'a1', content: { text: 'img', contentType: 'image', mimeType: 'image/png', data: 'base64' } }, ctx);
     expect(mockMessageStore.addMessage).toHaveBeenCalledWith('a1', expect.objectContaining({
       contentType: 'image', mimeType: 'image/png',
+    }));
+  });
+
+  it('handleAgentContent includes data, uri, and falls back to empty text', () => {
+    const ctx = makeCtx([{ id: 'a1' }]);
+    handleAgentContent({ agentId: 'a1', content: { contentType: 'resource', mimeType: 'text/plain', data: 'abc', uri: 'file:///test.txt' } } as any, ctx);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('a1', expect.objectContaining({
+      text: '',
+      contentType: 'resource',
+      data: 'abc',
+      uri: 'file:///test.txt',
     }));
   });
 });
@@ -303,6 +433,76 @@ describe('toolCallHandlers', () => {
     expect(call.messages).toBeUndefined();
     expect(mockMessageStore.setMessages).not.toHaveBeenCalled();
   });
+
+  it('handleToolCall updates existing message on status transition to completed', () => {
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [
+          { type: 'text', text: '⟳ bash', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running' },
+        ],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', toolCalls: [{ toolCallId: 'tc1', status: 'running', title: 'bash' }] }]);
+    handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc1', title: 'bash', status: 'completed', kind: 'bash' } }, ctx);
+    expect(mockMessageStore.setMessages).toHaveBeenCalledWith('a1',
+      expect.arrayContaining([
+        expect.objectContaining({ text: '✓ bash', toolStatus: 'completed' }),
+      ]),
+    );
+  });
+
+  it('handleToolCall shows cancelled icon on status transition', () => {
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [
+          { type: 'text', text: '⟳ run', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running' },
+        ],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', toolCalls: [{ toolCallId: 'tc1', status: 'running', title: 'run' }] }]);
+    handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc1', title: 'run', status: 'cancelled' } }, ctx);
+    expect(mockMessageStore.setMessages).toHaveBeenCalledWith('a1',
+      expect.arrayContaining([
+        expect.objectContaining({ text: '✗ run' }),
+      ]),
+    );
+  });
+
+  it('handleToolCall coerces non-string title', () => {
+    const ctx = makeCtx([{ id: 'a1', toolCalls: [] }]);
+    handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc2', title: 42 as any, status: 'running' } }, ctx);
+    expect(mockMessageStore.setMessages).toHaveBeenCalledWith('a1',
+      expect.arrayContaining([
+        expect.objectContaining({ text: '⟳ 42' }),
+      ]),
+    );
+  });
+
+  it('handleToolCall defaults to empty toolCalls when agent has none', () => {
+    const ctx = makeCtx([{ id: 'a1' }]);
+    handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc1', title: 'bash', status: 'running' } }, ctx);
+    expect(ctx.updateAgent).toHaveBeenCalledWith('a1', {
+      toolCalls: [expect.objectContaining({ toolCallId: 'tc1' })],
+    });
+  });
+  it('handleToolCall updates in-place among multiple tool calls', () => {
+    mockMessageStore.channels = {
+      'a1': {
+        messages: [
+          { type: 'text', text: '⟳ first', sender: 'tool', toolCallId: 'tc1', toolStatus: 'running' },
+          { type: 'text', text: '⟳ second', sender: 'tool', toolCallId: 'tc2', toolStatus: 'running' },
+        ],
+      },
+    };
+    const ctx = makeCtx([{ id: 'a1', toolCalls: [
+      { toolCallId: 'tc1', status: 'running', title: 'first' },
+      { toolCallId: 'tc2', status: 'running', title: 'second' },
+    ] }]);
+    handleToolCall({ agentId: 'a1', toolCall: { toolCallId: 'tc1', title: 'first', status: 'completed' } }, ctx);
+    const updated = (ctx.updateAgent as any).mock.calls[0][1].toolCalls;
+    expect(updated[0]).toEqual(expect.objectContaining({ toolCallId: 'tc1', status: 'completed' }));
+    expect(updated[1]).toEqual(expect.objectContaining({ toolCallId: 'tc2', status: 'running' }));
+  });
 });
 
 // ── Messaging Handlers ────────────────────────────────────────────
@@ -336,6 +536,70 @@ describe('messagingHandlers', () => {
     expect(mockMessageStore.addMessage).toHaveBeenCalledWith('to1',
       expect.objectContaining({ sender: 'system', text: expect.stringContaining('⚙️') }),
     );
+  });
+
+  it('handleMessageSent shows broadcast label when to is all', () => {
+    const ctx = makeCtx([{ id: 'from1', role: { name: 'Lead' } }]);
+    handleMessageSent({ from: 'from1', to: 'all', content: 'hey everyone' }, ctx);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('from1',
+      expect.objectContaining({ text: expect.stringContaining('All') }),
+    );
+  });
+
+  it('handleMessageSent uses shortAgentId when recipient has no role', () => {
+    const ctx = makeCtx([
+      { id: 'from1', role: { name: 'Dev' } },
+      { id: 'to1' },
+    ]);
+    handleMessageSent({ from: 'from1', to: 'to1', content: 'hi' }, ctx);
+    // sender panel label falls back to shortAgentId
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('from1',
+      expect.objectContaining({ text: expect.stringContaining('📤') }),
+    );
+  });
+
+  it('handleMessageSent from system only adds to recipient panel', () => {
+    const ctx = makeCtx([{ id: 'to1' }]);
+    handleMessageSent({ from: 'system', to: 'to1', content: 'note' }, ctx);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledTimes(1);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('to1', expect.any(Object));
+  });
+  it('handleMessageSent skips recipient panel when to is system', () => {
+    const ctx = makeCtx([{ id: 'from1', role: { name: 'Dev' } }]);
+    handleMessageSent({ from: 'from1', to: 'system', content: 'msg' }, ctx);
+    // Only sender panel gets a message, not the 'system' channel
+    expect(mockMessageStore.addMessage).toHaveBeenCalledTimes(1);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('from1', expect.objectContaining({ text: expect.stringContaining('📤') }));
+  });
+
+  it('handleMessageSent uses System label when fromId is empty', () => {
+    const ctx = makeCtx([{ id: 'to1' }]);
+    handleMessageSent({ from: '', to: 'to1', content: 'hi' } as any, ctx);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('to1',
+      expect.objectContaining({ text: expect.stringContaining('System') }),
+    );
+  });
+
+  it('handleMessageSent handles undefined content', () => {
+    const ctx = makeCtx([{ id: 'to1' }]);
+    handleMessageSent({ from: 'system', to: 'to1' } as any, ctx);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('to1', expect.objectContaining({ sender: 'system' }));
+  });
+
+  it('handleMessageSent with fromRole and null fromId', () => {
+    const ctx = makeCtx([{ id: 'to1' }]);
+    handleMessageSent({ from: null as any, to: 'to1', fromRole: 'Admin', content: 'x' } as any, ctx);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('to1',
+      expect.objectContaining({ text: expect.stringContaining('Admin') }),
+    );
+  });
+
+  it('handleMessageSent sender panel with toId null skips recipient', () => {
+    const ctx = makeCtx([{ id: 'from1', role: { name: 'Dev' } }]);
+    handleMessageSent({ from: 'from1', to: null as any, content: 'x' } as any, ctx);
+    // recipient panel skipped (toId is falsy), but sender panel still runs
+    expect(mockMessageStore.addMessage).toHaveBeenCalledTimes(1);
+    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('from1', expect.objectContaining({ text: expect.stringContaining('📤') }));
   });
 });
 
@@ -371,6 +635,40 @@ describe('groupHandlers', () => {
     handleGroupReaction({ leadId: 'l1', groupName: 'team', messageId: 'm1', emoji: '👎', agentId: 'a1', action: 'remove' });
     expect(mockGroupStore.removeReaction).toHaveBeenCalledWith('l1:team', 'm1', '👎', 'a1');
   });
+
+  it('handleGroupMessage does nothing when message field is missing', () => {
+    handleGroupMessage({} as any);
+    expect(mockGroupStore.addMessage).not.toHaveBeenCalled();
+  });
+
+  it('handleGroupMessage passes through fromAgentId', () => {
+    handleGroupMessage({ message: { leadId: 'l1', groupName: 'team', text: 'hi', fromAgentId: 'a1' } });
+    expect(mockGroupStore.addMessage).toHaveBeenCalledWith('l1:team', expect.objectContaining({ fromAgentId: 'a1' }));
+  });
+
+  it('handleGroupMemberAdded does nothing when group is missing', () => {
+    handleGroupMemberAdded({ leadId: 'l1', agentId: 'a1' } as any);
+    expect(mockGroupStore.addMember).not.toHaveBeenCalled();
+  });
+
+  it('handleGroupMemberRemoved does nothing when agentId is missing', () => {
+    handleGroupMemberRemoved({ leadId: 'l1', group: 'team' } as any);
+    expect(mockGroupStore.removeMember).not.toHaveBeenCalled();
+  });
+
+  it('handleGroupReaction does nothing when required fields are missing', () => {
+    handleGroupReaction({ leadId: 'l1', groupName: 'team' } as any);
+    expect(mockGroupStore.addReaction).not.toHaveBeenCalled();
+    expect(mockGroupStore.removeReaction).not.toHaveBeenCalled();
+  });
+
+  it('handleGroupCreated defaults memberIds and createdAt', () => {
+    handleGroupCreated({ name: 'chat', leadId: 'l1' } as any);
+    expect(mockGroupStore.addGroup).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'chat',
+      memberIds: [],
+    }));
+  });
 });
 
 // ── System Handlers ───────────────────────────────────────────────
@@ -403,6 +701,51 @@ describe('systemHandlers', () => {
     expect(mockTimerStore.removeTimer).toHaveBeenCalledWith('t1');
   });
 
+  it('handleTimerCreated does nothing when timer is missing', () => {
+    handleTimerCreated({} as any);
+    expect(mockTimerStore.addTimer).not.toHaveBeenCalled();
+  });
+
+  it('handleTimerFired does nothing when no id available', () => {
+    handleTimerFired({} as any);
+    expect(mockTimerStore.fireTimer).not.toHaveBeenCalled();
+  });
+
+  it('handleTimerCancelled uses timer.id fallback', () => {
+    handleTimerCancelled({ timer: { id: 't3' } } as any);
+    expect(mockTimerStore.removeTimer).toHaveBeenCalledWith('t3');
+  });
+
+  it('handleTimerCancelled does nothing when no id available', () => {
+    handleTimerCancelled({} as any);
+    expect(mockTimerStore.removeTimer).not.toHaveBeenCalled();
+  });
+
+  it('handleLeadDecision does nothing when needsConfirmation is false', () => {
+    const ctx = makeCtx();
+    handleLeadDecision({ needsConfirmation: false, id: 'd1' } as any, ctx);
+    expect(ctx.getAppState().addPendingDecision).not.toHaveBeenCalled();
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('handleLeadDecision does nothing when id is missing', () => {
+    const ctx = makeCtx();
+    handleLeadDecision({ needsConfirmation: true } as any, ctx);
+    expect(ctx.getAppState().addPendingDecision).not.toHaveBeenCalled();
+  });
+
+  it('handleDecisionsBatch skips decisions without id', () => {
+    const ctx = makeCtx();
+    handleDecisionsBatch({ decisions: [{ id: 'd1' }, {} as any, { id: 'd2' }] }, ctx);
+    expect(ctx.getAppState().removePendingDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('handleDecisionsBatch handles undefined decisions', () => {
+    const ctx = makeCtx();
+    handleDecisionsBatch({} as any, ctx);
+    expect(ctx.getAppState().removePendingDecision).not.toHaveBeenCalled();
+  });
+
   it('handleLeadDecision adds pending decision', () => {
     const ctx = makeCtx();
     handleLeadDecision({ needsConfirmation: true, id: 'd1', title: 'Use React', agentId: 'a1' }, ctx);
@@ -417,10 +760,49 @@ describe('systemHandlers', () => {
     expect(ctx.getAppState().addPendingDecision).not.toHaveBeenCalled();
   });
 
+  it('handleLeadDecision populates default fields when optional fields missing', () => {
+    const ctx = makeCtx();
+    handleLeadDecision({ needsConfirmation: true, id: 'd1', agentId: 'a1' } as any, ctx);
+    expect(ctx.getAppState().addPendingDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentRole: 'Unknown',
+        title: 'Untitled decision',
+        rationale: '',
+        status: 'recorded',
+        autoApproved: false,
+        confirmedAt: null,
+      }),
+    );
+  });
+
   it('handleDecisionResolved removes decision', () => {
     const ctx = makeCtx();
     handleDecisionResolved({ decisionId: 'd1' }, ctx);
     expect(ctx.getAppState().removePendingDecision).toHaveBeenCalledWith('d1');
+  });
+
+  it('handleDecisionResolved extracts id from flat id field', () => {
+    const ctx = makeCtx();
+    handleDecisionResolved({ id: 'd5' } as any, ctx);
+    expect(ctx.getAppState().removePendingDecision).toHaveBeenCalledWith('d5');
+  });
+
+  it('handleDecisionResolved extracts from nested decision.decisionId', () => {
+    const ctx = makeCtx();
+    handleDecisionResolved({ decision: { decisionId: 'd6' } } as any, ctx);
+    expect(ctx.getAppState().removePendingDecision).toHaveBeenCalledWith('d6');
+  });
+
+  it('handleDecisionResolved extracts from nested decision.id', () => {
+    const ctx = makeCtx();
+    handleDecisionResolved({ decision: { id: 'd7' } } as any, ctx);
+    expect(ctx.getAppState().removePendingDecision).toHaveBeenCalledWith('d7');
+  });
+
+  it('handleDecisionResolved does nothing when no id found', () => {
+    const ctx = makeCtx();
+    handleDecisionResolved({} as any, ctx);
+    expect(ctx.getAppState().removePendingDecision).not.toHaveBeenCalled();
   });
 
   it('handleDecisionsBatch removes all decisions', () => {
