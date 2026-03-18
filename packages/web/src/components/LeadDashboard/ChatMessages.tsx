@@ -43,6 +43,7 @@ function buildChatItems(messages: AcpTextChunk[], isActive: boolean): ChatItem[]
 
     if (msg.sender === 'system') {
       const sysText = typeof msg.text === 'string' ? msg.text : '';
+
       items.push({ kind: sysText.length > 200 ? 'system-long' : 'system', msg, ts, originalIndex: i });
       continue;
     }

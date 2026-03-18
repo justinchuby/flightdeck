@@ -5,7 +5,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useMessageStore, EMPTY_MESSAGES } from '../../stores/messageStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
-import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench, FolderIcon } from 'lucide-react';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
 import { splitCommandBlocks } from '../../utils/commandParser';
 import { PromptNav, hasUserMention } from '../PromptNav';
@@ -588,12 +588,24 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
   );
 });
 
-/** Styled tool call badge — renders with proper icon, status color, and tool kind */
+/** Styled tool call badge — renders with proper icon, status color, and tool kind.
+ *  Collapsible via <details> when tool call content is available. */
 function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
   const status = msg.toolStatus ?? 'in_progress';
   const kind = msg.toolKind ?? '';
   const title = typeof msg.text === 'string' ? msg.text : String(msg.text);
   const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+  // Look up tool call content from the agent's live toolCalls array
+  const agents = useAppStore((s) => s.agents);
+  const content = useMemo(() => {
+    if (!msg.toolCallId) return undefined;
+    for (const agent of agents) {
+      const tc = agent.toolCalls?.find((t) => t.toolCallId === msg.toolCallId);
+      if (tc?.content) return tc.content;
+    }
+    return undefined;
+  }, [agents, msg.toolCallId]);
 
   const statusColors: Record<string, string> = {
     pending: 'text-yellow-500',
@@ -603,13 +615,25 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
   };
   const color = statusColors[status] || 'text-th-text-muted';
 
-  return (
+  const badge = (
     <div className="flex items-center gap-1.5 py-0.5 px-1">
+      {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted details-open-rotate" />}
       <Wrench size={11} className={`shrink-0 ${color}`} />
       <span className={`text-[10px] font-mono ${color}`}>{title}</span>
       {kind && <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{kind}</span>}
       {ts && <span className="text-[10px] text-th-text-muted ml-auto shrink-0">{ts}</span>}
     </div>
+  );
+
+  if (!content) return badge;
+
+  return (
+    <details className="text-[11px]">
+      <summary className="cursor-pointer select-none list-none">{badge}</summary>
+      <pre className="ml-5 mt-0.5 mb-1 text-[10px] text-th-text-muted font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+        {content.length > 2000 ? content.slice(0, 2000) + '…' : content}
+      </pre>
+    </details>
   );
 }
 
@@ -730,6 +754,92 @@ function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; 
   );
 }
 
+// ── Tool output parsing for "Info:" lines ──────────────────────────────
+
+type TextPart = { type: 'text'; text: string } | { type: 'tool-output'; lines: string[] };
+
+/** Split agent text into alternating plain-text and consecutive "Info:" line groups */
+export function splitToolOutput(text: string): TextPart[] {
+  const lines = text.split('\n');
+  const parts: TextPart[] = [];
+  let textLines: string[] = [];
+  let infoLines: string[] = [];
+
+  const INFO_RE = /^Info:\s+.+$/;
+  const PATH_RE = /^\/\S+$/;
+
+  const flushText = () => {
+    if (textLines.length > 0) {
+      parts.push({ type: 'text', text: textLines.join('\n') });
+      textLines = [];
+    }
+  };
+  const flushInfo = () => {
+    if (infoLines.length > 0) {
+      parts.push({ type: 'tool-output', lines: infoLines });
+      infoLines = [];
+    }
+  };
+
+  for (const line of lines) {
+    if (INFO_RE.test(line) || PATH_RE.test(line)) {
+      flushText();
+      infoLines.push(line);
+    } else {
+      flushInfo();
+      textLines.push(line);
+    }
+  }
+
+  flushText();
+  flushInfo();
+
+  return parts;
+}
+
+/** Find the longest common directory prefix across an array of paths */
+export function findCommonPrefix(paths: string[]): string {
+  if (paths.length <= 1) return '';
+  const splits = paths.map((p) => p.split('/'));
+  const minLen = Math.min(...splits.map((s) => s.length));
+  let depth = 0;
+  for (let i = 0; i < minLen; i++) {
+    if (splits.every((s) => s[i] === splits[0][i])) {
+      depth = i + 1;
+    } else {
+      break;
+    }
+  }
+  if (depth <= 1) return '';
+  return splits[0].slice(0, depth).join('/') + '/';
+}
+
+/** Collapsed-by-default block for consecutive Info:/path lines */
+function CollapsibleToolOutput({ lines }: { lines: string[] }) {
+  const paths = lines.map((l) => l.replace(/^Info:\s+/, ''));
+  const prefix = findCommonPrefix(paths);
+  const shortPaths = paths.map((p) => (prefix ? p.slice(prefix.length) : p));
+
+  const summary =
+    lines.length === 1 ? `📁 ${shortPaths[0]}` : `📁 ${lines.length} files`;
+
+  return (
+    <details className="my-0.5 text-[11px]">
+      <summary className="cursor-pointer text-th-text-muted hover:text-th-text-alt select-none list-none flex items-center gap-1">
+        <ChevronRight className="w-3 h-3 shrink-0 details-open-rotate" />
+        <span>{summary}</span>
+      </summary>
+      <div className="ml-4 mt-0.5 text-th-text-muted font-mono">
+        {shortPaths.map((p, i) => (
+          <div key={i} className="truncate">
+            {p}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 /** Collapsed-by-default ⟦⟦ command ⟧⟧ block with click to expand */
 function CollapsibleCommandBlockSimple({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -771,27 +881,38 @@ function isRealCommandBlock(text: string): boolean {
 
 /** Render agent text with ⟦⟦ ⟧⟧ blocks separated and inline markdown + tables */
 function AgentTextBlockSimple({ text }: { text: string }) {
-  // Depth-aware split handles nested ⟦⟦ ⟧⟧ inside command JSON payloads
+  // First: split out consecutive "Info:" / path-only line groups
+  const topParts = splitToolOutput(text);
+  return (
+    <>
+      {topParts.map((part, pi) => {
+        if (part.type === 'tool-output') {
+          return <CollapsibleToolOutput key={`to-${pi}`} lines={part.lines} />;
+        }
+        return <AgentTextSegment key={`ts-${pi}`} text={part.text} />;
+      })}
+    </>
+  );
+}
+
+/** Render a text segment with ⟦⟦ ⟧⟧ command blocks, tables, and inline markdown */
+function AgentTextSegment({ text }: { text: string }) {
   const segments = splitCommandBlocks(text);
   return (
     <>
       {segments.map((seg, i) => {
-        // Complete ⟦⟦ ⟧⟧ block — only collapse if it looks like a real command
         if (seg.startsWith('⟦⟦') && seg.endsWith('⟧⟧')) {
           if (isRealCommandBlock(seg)) {
             return <CollapsibleCommandBlockSimple key={i} text={seg} />;
           }
-          // Not a real command — render as plain text
           return <BlockMarkdownSimple key={i} text={seg} />;
         }
-        // Unclosed ⟦⟦ block (still streaming or split across messages)
         if (seg.startsWith('⟦⟦')) {
           if (isRealCommandBlock(seg)) {
             return <CollapsibleCommandBlockSimple key={i} text={seg} />;
           }
           return seg.trim() ? <BlockMarkdownSimple key={i} text={seg} /> : null;
         }
-        // Dangling ⟧⟧ from a block that started in a previous message
         if (seg.includes('⟧⟧') && !seg.includes('⟦⟦')) {
           const idx = seg.indexOf('⟧⟧') + 2;
           const cmdBlock = seg.slice(0, idx);
@@ -804,7 +925,6 @@ function AgentTextBlockSimple({ text }: { text: string }) {
           );
         }
         if (!seg.trim()) return null;
-        // Check for tables
         const TABLE_RE = /((?:^|\n)\|[^\n]+\|[ \t]*(?:\n\|[^\n]+\|[ \t]*)+)/g;
         const parts = seg.split(TABLE_RE);
         return (

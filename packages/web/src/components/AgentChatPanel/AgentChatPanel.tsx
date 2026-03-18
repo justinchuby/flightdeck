@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, AlertCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Send, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useMessageStore, EMPTY_MESSAGES } from '../../stores/messageStore';
 import { useToastStore } from '../Toast';
@@ -289,6 +289,7 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
   }
 
   // Tool call messages render as compact inline indicators with status colors
+  // Collapsible when tool call content is available
   if (sender === 'tool') {
     const text = typeof msg.text === 'string' ? msg.text : '';
     const status = msg.toolStatus ?? 'in_progress';
@@ -299,8 +300,20 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
       cancelled: 'text-gray-400',
     };
     const color = statusColors[status] || 'text-sky-400';
-    return (
+
+    const agents = useAppStore((s) => s.agents);
+    const content = useMemo(() => {
+      if (!msg.toolCallId) return undefined;
+      for (const a of agents) {
+        const tc = a.toolCalls?.find((t) => t.toolCallId === msg.toolCallId);
+        if (tc?.content) return tc.content;
+      }
+      return undefined;
+    }, [agents, msg.toolCallId]);
+
+    const badge = (
       <div className="flex items-center gap-1.5 py-0.5">
+        {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted details-open-rotate" />}
         <span className={`text-[10px] ${color} truncate`}>
           🔧 {text.slice(0, 200)}
         </span>
@@ -313,6 +326,17 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
           </span>
         )}
       </div>
+    );
+
+    if (!content) return badge;
+
+    return (
+      <details className="text-[11px]">
+        <summary className="cursor-pointer select-none list-none">{badge}</summary>
+        <pre className="ml-5 mt-0.5 mb-1 text-[10px] text-th-text-muted font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+          {content.length > 2000 ? content.slice(0, 2000) + '…' : content}
+        </pre>
+      </details>
     );
   }
 
