@@ -6,6 +6,7 @@ import { useToastStore } from '../Toast';
 import { apiFetch } from '../../hooks/useApi';
 import { AgentIdBadge } from '../../utils/markdown';
 import { Markdown } from '../ui/Markdown';
+import { splitToolOutput, CollapsibleToolOutput } from '../ChatPanel/AcpOutput';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type { AcpTextChunk, AgentInfo } from '../../types';
 
@@ -368,9 +369,27 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
           isUser ? 'rounded-tr-sm' : 'rounded-tl-sm'
         } ${compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'}`}
       >
-        <Markdown text={text} monospace />
+        <AgentTextWithToolOutput text={text} />
       </div>
     </div>
+  );
+}
+
+/** Renders agent text with Info:/path lines collapsed, regular text via Markdown */
+function AgentTextWithToolOutput({ text }: { text: string }) {
+  const parts = splitToolOutput(text);
+  // If no tool output detected, render directly (fast path)
+  if (parts.length === 1 && parts[0].type === 'text') {
+    return <Markdown text={text} monospace />;
+  }
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.type === 'tool-output'
+          ? <CollapsibleToolOutput key={i} lines={part.lines} />
+          : <Markdown key={i} text={part.text} monospace />
+      )}
+    </>
   );
 }
 

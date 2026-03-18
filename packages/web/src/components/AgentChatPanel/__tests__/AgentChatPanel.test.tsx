@@ -413,4 +413,25 @@ describe('AgentChatPanel', () => {
     await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
     expect(screen.queryByTestId('agent-chat-input')).not.toBeInTheDocument();
   });
+
+  it('renders Info: lines as collapsible tool output in stored messages', async () => {
+    const messages = [
+      makeMessage({
+        text: 'Creating files:\nInfo: /src/components/Foo.tsx\nInfo: /src/components/Bar.tsx\nDone.',
+        sender: 'agent',
+      }),
+    ];
+    mockAgents = [makeAgent({ messages })];
+    setAgentMessages(messages);
+
+    await act(async () => { render(<AgentChatPanel agentId="agent-abc123" />); });
+
+    // The Info: lines should be collapsed into a summary, not shown as raw text
+    expect(screen.getByText(/2 files/)).toBeInTheDocument();
+    // Surrounding text should still be visible
+    expect(screen.getByText(/Creating files/)).toBeInTheDocument();
+    expect(screen.getByText(/Done/)).toBeInTheDocument();
+    // Raw "Info:" lines should NOT be directly visible (they're inside collapsed <details>)
+    expect(screen.queryByText(/Info: \/src\/components\/Foo\.tsx/)).not.toBeInTheDocument();
+  });
 });

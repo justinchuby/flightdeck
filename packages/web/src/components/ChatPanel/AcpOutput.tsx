@@ -815,7 +815,7 @@ export function findCommonPrefix(paths: string[]): string {
 }
 
 /** Collapsed-by-default block for consecutive Info:/path lines */
-function CollapsibleToolOutput({ lines }: { lines: string[] }) {
+export function CollapsibleToolOutput({ lines }: { lines: string[] }) {
   const paths = lines.map((l) => l.replace(/^Info:\s+/, ''));
   const prefix = findCommonPrefix(paths);
   const shortPaths = paths.map((p) => (prefix ? p.slice(prefix.length) : p));
