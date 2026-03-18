@@ -96,10 +96,14 @@ describe('useLeadWebSocket', () => {
     }));
   });
 
-  it('handles agent:text messages for selected lead', () => {
+  // agent:text, agent:thinking, and agent:content are handled by the global WS
+  // dispatcher (ws-handlers/agentTextHandlers), NOT by useLeadWebSocket.
+  // This avoids double-writes to the messageStore channel.
+
+  it('does not handle agent:text (handled by global dispatcher)', () => {
     renderHook(() => useLeadWebSocket(agents, 'proj-1'));
     emitWsMessage({ type: 'agent:text', agentId: 'lead-1', text: 'hello world' });
-    expect(mockMessageStore.appendToLastAgentMessage).toHaveBeenCalledWith('lead-1', 'hello world');
+    expect(mockMessageStore.appendToLastAgentMessage).not.toHaveBeenCalled();
   });
 
   it('ignores agent:text messages for non-selected agents', () => {
@@ -108,29 +112,20 @@ describe('useLeadWebSocket', () => {
     expect(mockMessageStore.appendToLastAgentMessage).not.toHaveBeenCalled();
   });
 
-  it('handles agent:text with object payload', () => {
-    renderHook(() => useLeadWebSocket(agents, 'proj-1'));
-    emitWsMessage({ type: 'agent:text', agentId: 'lead-1', text: { text: 'from object' } });
-    expect(mockMessageStore.appendToLastAgentMessage).toHaveBeenCalledWith('lead-1', 'from object');
-  });
-
-  it('handles agent:thinking messages', () => {
+  it('does not handle agent:thinking (handled by global dispatcher)', () => {
     renderHook(() => useLeadWebSocket(agents, 'proj-1'));
     emitWsMessage({ type: 'agent:thinking', agentId: 'lead-1', text: 'thinking...' });
-    expect(mockMessageStore.appendToThinkingMessage).toHaveBeenCalledWith('lead-1', 'thinking...');
+    expect(mockMessageStore.appendToThinkingMessage).not.toHaveBeenCalled();
   });
 
-  it('handles agent:content messages', () => {
+  it('does not handle agent:content (handled by global dispatcher)', () => {
     renderHook(() => useLeadWebSocket(agents, 'proj-1'));
     emitWsMessage({
       type: 'agent:content',
       agentId: 'lead-1',
       content: { text: 'content text', contentType: 'text' },
     });
-    expect(mockMessageStore.addMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
-      text: 'content text',
-      sender: 'agent',
-    }));
+    expect(mockMessageStore.addMessage).not.toHaveBeenCalled();
   });
 
   it('handles agent:status running → promoteQueuedMessages', () => {

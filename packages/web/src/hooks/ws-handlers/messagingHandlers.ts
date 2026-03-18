@@ -18,11 +18,13 @@ export function handleMessageSent(msg: WsServerMessageOf<'agent:message_sent'>, 
   const store = useMessageStore.getState();
 
   // Show in recipient's panel
+  // Use 'system' sender for all agent messages — 'user' is reserved for human input.
+  // This prevents agent-to-agent and agent-to-lead DMs from appearing as blue bubbles.
   if (toId && toId !== 'system') {
     store.addMessage(toId, {
       type: 'text',
       text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
-      sender: isFromSystem ? 'system' : 'user',
+      sender: 'system',
       timestamp: Date.now(),
     });
   }

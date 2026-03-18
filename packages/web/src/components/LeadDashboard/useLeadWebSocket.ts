@@ -4,7 +4,6 @@ import { useLeadStore } from '../../stores/leadStore';
 import { useMessageStore } from '../../stores/messageStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
-import { normalizeWsText } from '../../hooks/ws-handlers/normalizeText';
 
 type StoreApi = ReturnType<typeof useLeadStore.getState>;
 
@@ -20,24 +19,6 @@ interface WsDecision {
   rationale: string;
   needsConfirmation: boolean;
   status: string;
-}
-
-interface WsAgentText {
-  type: 'agent:text';
-  agentId: string;
-  text: string | { text?: string };
-}
-
-interface WsAgentThinking {
-  type: 'agent:thinking';
-  agentId: string;
-  text: string | { text?: string };
-}
-
-interface WsAgentContent {
-  type: 'agent:content';
-  agentId: string;
-  content: { text?: string; contentType?: string; mimeType?: string; data?: string; uri?: string };
 }
 
 interface WsAgentStatus {
@@ -118,9 +99,6 @@ interface WsContextCompacted {
 
 type WsMsg =
   | WsDecision
-  | WsAgentText
-  | WsAgentThinking
-  | WsAgentContent
   | WsAgentStatus
   | WsToolCall
   | WsDelegation
@@ -130,7 +108,9 @@ type WsMsg =
   | WsGroupCreated
   | WsGroupMessage
   | WsDagUpdated
-  | WsContextCompacted;
+  | WsContextCompacted
+  // agent:text, agent:thinking, agent:content are handled by the global dispatcher
+  | { type: 'agent:text' | 'agent:thinking' | 'agent:content'; [k: string]: unknown };
 
 // ── Individual message handlers ─────────────────────────────────
 
@@ -154,25 +134,9 @@ function handleDecision(msg: WsDecision, store: StoreApi) {
   });
 }
 
-function handleText(msg: WsAgentText, _store: StoreApi, storeKey: string) {
-  useMessageStore.getState().appendToLastAgentMessage(storeKey, normalizeWsText(msg.text));
-}
-
-function handleThinking(msg: WsAgentThinking, _store: StoreApi, storeKey: string) {
-  useMessageStore.getState().appendToThinkingMessage(storeKey, normalizeWsText(msg.text));
-}
-
-function handleContent(msg: WsAgentContent, _store: StoreApi, storeKey: string) {
-  useMessageStore.getState().addMessage(storeKey, {
-    type: 'text',
-    text: msg.content.text || '',
-    sender: 'agent',
-    contentType: msg.content.contentType as 'text' | 'image' | 'audio' | 'resource' | undefined,
-    mimeType: msg.content.mimeType,
-    data: msg.content.data,
-    uri: msg.content.uri,
-  });
-}
+// NOTE: handleText, handleThinking, handleContent were removed — they are now
+// handled exclusively by the global WS dispatcher (ws-handlers/agentTextHandlers)
+// to avoid double-writes to the messageStore channel.
 
 function handleStatus(msg: WsAgentStatus, _store: StoreApi, storeKey: string) {
   if (msg.status === 'running') {
@@ -411,15 +375,9 @@ export function useLeadWebSocket(agents: AgentInfo[], historicalProjectId: strin
         case 'lead:decision':
           handleDecision(msg, store);
           break;
-        case 'agent:text':
-          if (msg.agentId === leadId) handleText(msg, store, leadId!);
-          break;
-        case 'agent:thinking':
-          if (msg.agentId === leadId) handleThinking(msg, store, leadId!);
-          break;
-        case 'agent:content':
-          if (msg.agentId === leadId) handleContent(msg, store, leadId!);
-          break;
+        // NOTE: agent:text, agent:thinking, agent:content are handled by the
+        // global WS dispatcher (ws-handlers/agentTextHandlers) which writes to
+        // messageStore for ALL agents including the lead. Do NOT duplicate here.
         case 'agent:status':
           if (msg.agentId === leadId) handleStatus(msg, store, leadId!);
           break;
