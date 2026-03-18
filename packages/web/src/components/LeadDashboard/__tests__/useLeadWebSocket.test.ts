@@ -240,9 +240,9 @@ describe('useLeadWebSocket', () => {
       toId: 'child-1',
       type: 'message',
     }));
-    // Lead-to-agent messages appear in chat
+    // Lead-to-agent messages appear in chat as 'external' (filtered from lead panel)
     expect(mockMessageStore.addMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
-      sender: 'system',
+      sender: 'external',
     }));
   });
 

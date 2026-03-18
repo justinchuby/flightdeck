@@ -435,12 +435,10 @@ describe('ChatMessages – extra coverage', () => {
 
   /* ── Filtered system messages ─────────────────────────────────── */
 
-  it('filters system messages starting with specific emoji prefixes', () => {
+  it('filters external messages by sender type, not emoji prefix', () => {
     const messages: AcpTextChunk[] = [
-      makeMessage({ sender: 'system', text: '📤 Sent to agent' }),
-      makeMessage({ sender: 'system', text: '💬 Group chat message' }),
-      makeMessage({ sender: 'system', text: '📢 Broadcast' }),
-      makeMessage({ sender: 'system', text: '🗣️ Speaking' }),
+      makeMessage({ sender: 'external', text: '📤 Sent to agent' }),
+      makeMessage({ sender: 'external', text: '📨 Received from agent' }),
       makeMessage({ sender: 'system', text: '🔄 Restarting' }),
     ];
 
@@ -448,12 +446,10 @@ describe('ChatMessages – extra coverage', () => {
       <ChatMessages {...defaultProps} messages={messages} />,
     );
 
-    // Only the 🔄 message should remain (not filtered)
+    // External messages filtered by sender type — all system messages shown
     expect(container.textContent).toContain('Restarting');
     expect(container.textContent).not.toContain('Sent to agent');
-    expect(container.textContent).not.toContain('Group chat message');
-    expect(container.textContent).not.toContain('Broadcast');
-    expect(container.textContent).not.toContain('Speaking');
+    expect(container.textContent).not.toContain('Received from agent');
   });
 
   /* ── Queued messages filtered ─────────────────────────────────── */

@@ -406,11 +406,11 @@ describe('messageStore', () => {
       expect(ch.messages[0].sender).toBe('agent');
     });
 
-    it('looks past interleaved system messages with 📨/📤/⚙️ prefixes', () => {
+    it('looks past interleaved external and system notification messages', () => {
       useMessageStore.getState().appendToLastAgentMessage(CH, 'agent text');
-      // Add system messages that should be looked past
-      useMessageStore.getState().addMessage(CH, { type: 'text', text: '📨 [From Dev] hello', sender: 'system', timestamp: Date.now() });
-      useMessageStore.getState().addMessage(CH, { type: 'text', text: '📤 [To Dev] reply', sender: 'system', timestamp: Date.now() + 1 });
+      // Add external/system messages that should be looked past
+      useMessageStore.getState().addMessage(CH, { type: 'text', text: '📨 [From Dev] hello', sender: 'external', timestamp: Date.now() });
+      useMessageStore.getState().addMessage(CH, { type: 'text', text: '📤 [To Dev] reply', sender: 'external', timestamp: Date.now() + 1 });
       useMessageStore.getState().addMessage(CH, { type: 'text', text: '⚙️ [System] notice', sender: 'system', timestamp: Date.now() + 2 });
       // Append more agent text — should find the original agent message
       useMessageStore.getState().appendToLastAgentMessage(CH, ' more');

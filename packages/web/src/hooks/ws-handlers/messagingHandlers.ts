@@ -17,14 +17,15 @@ export function handleMessageSent(msg: WsServerMessageOf<'agent:message_sent'>, 
   const preview = (msg.content ?? '').slice(0, 2000);
   const store = useMessageStore.getState();
 
-  // Show in recipient's panel
-  // Use 'system' sender for all agent messages — 'user' is reserved for human input.
-  // This prevents agent-to-agent and agent-to-lead DMs from appearing as blue bubbles.
+  // Show in recipient's agent side panel.
+  // Use 'external' sender — these are DM notifications, not the lead's own conversation.
+  // The lead panel filters out 'external' messages (buildChatItems), while agent
+  // side panels show them. 'user' is reserved for human-typed input only.
   if (toId && toId !== 'system') {
     store.addMessage(toId, {
       type: 'text',
       text: isFromSystem ? `⚙️ [System] ${preview}` : `📨 [From ${senderLabel}] ${preview}`,
-      sender: 'system',
+      sender: isFromSystem ? 'system' : 'external',
       timestamp: Date.now(),
     });
   }
@@ -43,7 +44,7 @@ export function handleMessageSent(msg: WsServerMessageOf<'agent:message_sent'>, 
     store.addMessage(fromId, {
       type: 'text',
       text: `📤 [To ${recipientLabel}] ${preview}`,
-      sender: 'system',
+      sender: 'external',
       timestamp: Date.now(),
     });
   }

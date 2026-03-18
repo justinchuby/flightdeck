@@ -286,7 +286,7 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
   } else if (msg.from === leadId) {
     const recipientRole = msg.toRole || toAgent?.role?.name || 'Agent';
     const recipientId = shortAgentId(msg.to ?? '');
-    useMessageStore.getState().addMessage(leadId, { type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'system', timestamp: Date.now() });
+    useMessageStore.getState().addMessage(leadId, { type: 'text', text: `📤 [To ${recipientRole} ${recipientId}] ${preview}`, sender: 'external', timestamp: Date.now() });
   }
   // Inter-agent DMs tracked in comms panel — don't duplicate in chat
 }

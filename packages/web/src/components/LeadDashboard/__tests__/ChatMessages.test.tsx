@@ -108,12 +108,12 @@ describe('ChatMessages', () => {
     expect(container.textContent).toContain('Ready to work');
   });
 
-  it('filters out system messages with outgoing DM prefixes', () => {
+  it('filters out external messages (DM notifications)', () => {
     const messages: AcpTextChunk[] = [
-      makeMessage({ sender: 'system', text: '📤 [To Developer abc12345] Fix the bug' }),
-      makeMessage({ sender: 'system', text: '💬 Group message sent' }),
-      makeMessage({ sender: 'system', text: '📢 Broadcast sent' }),
-      makeMessage({ sender: 'system', text: '🗣️ Speaking to agents' }),
+      makeMessage({ sender: 'external', text: '📤 [To Developer abc12345] Fix the bug' }),
+      makeMessage({ sender: 'external', text: '📨 [From Developer abc12345] Done' }),
+      makeMessage({ sender: 'external', text: '💬 Group message sent' }),
+      makeMessage({ sender: 'external', text: '📢 Broadcast sent' }),
       makeMessage({ sender: 'agent', text: 'Working on fix' }),
     ];
 
@@ -121,11 +121,11 @@ describe('ChatMessages', () => {
       <ChatMessages {...defaultProps} messages={messages} />,
     );
 
-    // The 📤, 💬, 📢, 🗣️ prefixed system messages should be filtered
+    // External messages (DM notifications) are filtered by sender type, not emoji prefix
     expect(container.textContent).not.toContain('Fix the bug');
+    expect(container.textContent).not.toContain('Done');
     expect(container.textContent).not.toContain('Group message sent');
     expect(container.textContent).not.toContain('Broadcast sent');
-    expect(container.textContent).not.toContain('Speaking to agents');
 
     // Normal agent message should still appear
     expect(container.textContent).toContain('Working on fix');

@@ -559,12 +559,12 @@ describe('useWebSocket — message handling', () => {
     expect(msgs[0].text).toBe('wrapped value');
   });
 
-  it('agent:text skips notification messages when finding append target', () => {
+  it('agent:text skips external notification messages when finding append target', () => {
     setup();
     const now = Date.now();
     setAgentWithMessages('a1', { status: 'running' }, [
       { type: 'text', text: 'hello', sender: 'agent', timestamp: now - 1000 },
-      { type: 'text', text: '📨 [From dev] msg', sender: 'system', timestamp: now - 500 },
+      { type: 'text', text: '📨 [From dev] msg', sender: 'external', timestamp: now - 500 },
     ]);
     simulateMsg({ type: 'agent:text', agentId: 'a1', text: ' world' });
     const msgs = getAgentMessages('a1');
