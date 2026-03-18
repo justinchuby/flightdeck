@@ -93,7 +93,7 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     exitError: undefined,
     get isResuming() { return this._phase === 'resuming'; },
     _setResuming() { this._phase = 'resuming'; },
-    _clearResuming() { if (this._phase === 'resuming') this._phase = 'idle'; },
+    _finishResuming() { if (this._phase === 'resuming') this._phase = 'idle'; },
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),
     _notifySessionReady: vi.fn(),
@@ -351,19 +351,19 @@ describe('_isResuming lifecycle', () => {
       agent._setResuming();
       expect(agent.isResuming).toBe(true);
 
-      agent._clearResuming();
+      agent._finishResuming();
       expect(agent.isResuming).toBe(false);
     });
 
-    it('_clearResuming is idempotent', () => {
+    it('_finishResuming is idempotent', () => {
       const agent = createFakeAgent({ _phase: 'resuming' });
       expect(agent.isResuming).toBe(true);
 
-      agent._clearResuming();
+      agent._finishResuming();
       expect(agent.isResuming).toBe(false);
 
       // Second clear should not throw
-      agent._clearResuming();
+      agent._finishResuming();
       expect(agent.isResuming).toBe(false);
     });
   });
@@ -409,11 +409,11 @@ describe('Agent isResuming encapsulation (real class)', () => {
     expect(agent.isResuming).toBe(true);
   });
 
-  it('_clearResuming sets isResuming to false', () => {
+  it('_finishResuming sets isResuming to false', () => {
     const agent = new Agent(makeRole(), makeConfig(), 'task');
     agent._setResuming();
     expect(agent.isResuming).toBe(true);
-    agent._clearResuming();
+    agent._finishResuming();
     expect(agent.isResuming).toBe(false);
   });
 
@@ -434,11 +434,11 @@ describe('Agent isResuming encapsulation (real class)', () => {
     }).toThrow();
   });
 
-  it('_clearResuming is idempotent on real Agent', () => {
+  it('_finishResuming is idempotent on real Agent', () => {
     const agent = new Agent(makeRole(), makeConfig(), 'task');
-    agent._clearResuming();
+    agent._finishResuming();
     expect(agent.isResuming).toBe(false);
-    agent._clearResuming();
+    agent._finishResuming();
     expect(agent.isResuming).toBe(false);
   });
 });

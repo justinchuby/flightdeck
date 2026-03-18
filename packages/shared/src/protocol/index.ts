@@ -37,9 +37,9 @@ export interface LockReleasedEvent { type: 'lock:released'; agentId: string; fil
 export interface LockExpiredEvent { type: 'lock:expired'; agentId: string; filePath?: string; agentRole?: string }
 export interface ActivityEvent { type: 'activity'; entry: Record<string, unknown> }
 export interface LeadDecisionEvent { type: 'lead:decision'; id: string | number; agentId: string; agentRole?: string; leadId?: string; title: string; rationale: string; needsConfirmation?: boolean; status?: string; category?: string; autoApproved?: boolean; confirmedAt?: string; timestamp?: string; projectId?: string }
-export interface DecisionConfirmedEvent { type: 'decision:confirmed'; decision: Record<string, unknown> }
-export interface DecisionRejectedEvent { type: 'decision:rejected'; decision: Record<string, unknown> }
-export interface DecisionDismissedEvent { type: 'decision:dismissed'; decision: Record<string, unknown> }
+export interface DecisionConfirmedEvent { type: 'decision:confirmed'; decisionId?: string; id?: string; decision?: { decisionId?: string; id?: string } & Record<string, unknown> }
+export interface DecisionRejectedEvent { type: 'decision:rejected'; decisionId?: string; id?: string; decision?: { decisionId?: string; id?: string } & Record<string, unknown> }
+export interface DecisionDismissedEvent { type: 'decision:dismissed'; decisionId?: string; id?: string; decision?: { decisionId?: string; id?: string } & Record<string, unknown> }
 export interface DecisionsBatchEvent { type: 'decisions:batch'; action: string; decisions: Array<Record<string, unknown>> }
 export interface IntentAlertEvent { type: 'intent:alert'; decision: Record<string, unknown>; rule: { pattern: string; action: string; label: string } }
 export interface AlertNewEvent { type: 'alert:new'; alert: Alert }

@@ -2,6 +2,7 @@
 export {
   type Branded,
   AgentId, ProjectId, SessionId, TaskId, MessageId, DelegationId, DecisionId,
+  asAgentId, asProjectId, asSessionId, asTaskId, asMessageId, asDelegationId, asDecisionId,
   isValidId,
 } from './entityIds.js';
 export {

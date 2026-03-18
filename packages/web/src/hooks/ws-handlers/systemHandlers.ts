@@ -57,11 +57,19 @@ export function handleLeadDecision(msg: WsServerMessageOf<'lead:decision'>, ctx:
   }
 }
 
-export function handleDecisionResolved(msg: WsServerMessageOf<'decision:confirmed'>, ctx: WsHandlerContext): void {
-  // Support both flat (msg.id) and nested (msg.decision.id) formats
-  const flat = msg as unknown as { decisionId?: string; id?: string };
-  const nested = msg.decision as { decisionId?: string; id?: string } | undefined;
-  const decisionId = flat.decisionId ?? flat.id ?? nested?.decisionId ?? nested?.id;
+/** Fields that may appear on decision:confirmed/rejected/dismissed events */
+interface DecisionResolvedFields {
+  decisionId?: string;
+  id?: string;
+  decision?: { decisionId?: string; id?: string };
+}
+
+type DecisionResolvedMsg = WsServerMessageOf<'decision:confirmed'> | WsServerMessageOf<'decision:rejected'> | WsServerMessageOf<'decision:dismissed'>;
+
+export function handleDecisionResolved(msg: DecisionResolvedMsg, ctx: WsHandlerContext): void {
+  // The server sends decision ID in multiple shapes; extract from flat or nested format
+  const fields = msg as unknown as DecisionResolvedFields;
+  const decisionId = fields.decisionId ?? fields.id ?? fields.decision?.decisionId ?? fields.decision?.id;
   if (decisionId) {
     ctx.getAppState().removePendingDecision(decisionId);
   }

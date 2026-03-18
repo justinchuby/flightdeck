@@ -638,7 +638,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     });
 
     agent.onSessionResumeFailed((info) => {
-      agent._clearResuming();
+      // _finishResuming() is already called inside AcpBridge's session_resume_failed handler
       this.emit('agent:session_resume_failed', { agentId: agent.id, ...info });
       // Notify parent so it can reassign or re-spawn this agent
       if (agent.parentId) {

@@ -44,7 +44,7 @@ describe('useCatchUpSummary', () => {
 
   it('returns null catchUpSummary initially', () => {
     const { result } = renderHook(() =>
-      useCatchUpSummary('lead-1', 'lead-1', [], null),
+      useCatchUpSummary('lead-1', [], null),
     );
     expect(result.current.catchUpSummary).toBeNull();
   });
@@ -52,7 +52,7 @@ describe('useCatchUpSummary', () => {
   it('returns null when currentProject is null', () => {
     const agents = [makeAgent('a1', 'completed', 'lead-1')];
     const { result } = renderHook(() =>
-      useCatchUpSummary('lead-1', 'lead-1', agents, null),
+      useCatchUpSummary('lead-1', agents, null),
     );
     expect(result.current.catchUpSummary).toBeNull();
   });
@@ -71,7 +71,7 @@ describe('useCatchUpSummary', () => {
     };
 
     const { result } = renderHook(() =>
-      useCatchUpSummary('lead-1', 'lead-1', agents, project),
+      useCatchUpSummary('lead-1', agents, project),
     );
     expect(result.current.catchUpSummary).toBeNull();
   });
@@ -83,7 +83,7 @@ describe('useCatchUpSummary', () => {
 
     const { result, rerender } = renderHook(
       ({ leadId, agents: a, project }) =>
-        useCatchUpSummary(leadId, leadId, a, project),
+        useCatchUpSummary(leadId, a, project),
       { initialProps: { leadId: 'lead-1', agents, project: initialProject } },
     );
 
@@ -123,7 +123,7 @@ describe('useCatchUpSummary', () => {
 
     const { result, rerender } = renderHook(
       ({ leadId, agents: a, project }) =>
-        useCatchUpSummary(leadId, leadId, a, project),
+        useCatchUpSummary(leadId, a, project),
       { initialProps: { leadId: 'lead-1', agents: [] as ReturnType<typeof makeAgent>[], project: initialProject } },
     );
 
@@ -149,7 +149,7 @@ describe('useCatchUpSummary', () => {
 
     const { result, rerender } = renderHook(
       ({ leadId, agents: a, project }) =>
-        useCatchUpSummary(leadId, leadId, a, project),
+        useCatchUpSummary(leadId, a, project),
       { initialProps: { leadId: 'lead-1', agents: [] as ReturnType<typeof makeAgent>[], project: initialProject } },
     );
 
@@ -179,7 +179,7 @@ describe('useCatchUpSummary', () => {
     const project = { comms: [] as any[], decisions: [] as any[], agentReports: [] as any[] };
 
     const { result, rerender } = renderHook(
-      ({ leadId }) => useCatchUpSummary(leadId, leadId, [], project),
+      ({ leadId }) => useCatchUpSummary(leadId, [], project),
       { initialProps: { leadId: 'lead-1' } },
     );
 
@@ -194,7 +194,7 @@ describe('useCatchUpSummary', () => {
 
     const { result, rerender } = renderHook(
       ({ leadId, agents: a, project }) =>
-        useCatchUpSummary(leadId, leadId, a, project),
+        useCatchUpSummary(leadId, a, project),
       { initialProps: { leadId: 'lead-1', agents: [] as ReturnType<typeof makeAgent>[], project: initialProject } },
     );
 
@@ -219,7 +219,7 @@ describe('useCatchUpSummary', () => {
   it('click and keydown update last interaction time', () => {
     const project = { comms: [] as any[], decisions: [] as any[], agentReports: [] as any[] };
 
-    renderHook(() => useCatchUpSummary('lead-1', 'lead-1', [], project));
+    renderHook(() => useCatchUpSummary('lead-1', [], project));
 
     // These should not throw
     act(() => {

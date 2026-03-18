@@ -119,7 +119,7 @@ export function LeadDashboard({ readOnly = false }: Props) {
   const leadAgent = agents.find((a) => a.id === selectedLeadId);
   const isActive = leadAgent && (leadAgent.status === 'running' || leadAgent.status === 'idle');
 
-  const { catchUpSummary, dismissCatchUp } = useCatchUpSummary(selectedLeadId, selectedLeadId, agents, currentProject);
+  const { catchUpSummary, dismissCatchUp } = useCatchUpSummary(selectedLeadId, agents, currentProject);
 
   const chatInitialScroll = useRef(false);
   useLeadMessages(selectedLeadId, readOnly, ws, chatInitialScroll);

@@ -96,7 +96,7 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     sessionId: undefined,
     get isResuming() { return this._phase === 'resuming'; },
     _setResuming() { this._phase = 'resuming'; },
-    _clearResuming() { if (this._phase === 'resuming') this._phase = 'idle'; },
+    _finishResuming() { if (this._phase === 'resuming') this._phase = 'idle'; },
     get _isTerminated() { return this._phase === 'stopped' || this._phase === 'error'; },
     _setAcpConnection: vi.fn(),
     _notifyExit: vi.fn(),

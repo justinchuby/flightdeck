@@ -128,8 +128,8 @@ export class Agent {
   /** @internal Mark agent as resuming (called once at spawn when resumeSessionId is set) */
   _setResuming(): void { this.transitionTo('resuming'); }
 
-  /** @internal Clear the resuming flag — transitions to idle (or stays if already past resuming) */
-  _clearResuming(): void {
+  /** @internal Finish the resuming phase — transitions to idle (no-op if already past resuming) */
+  _finishResuming(): void {
     if (this._phase === 'resuming') {
       this.transitionTo('idle');
     }
@@ -677,13 +677,14 @@ When you discover something important about the codebase, a pattern, a gotcha, o
 
   async terminate(): Promise<void> {
     if (this._isTerminated) return;
-    this.transitionTo('stopped');
+    this.transitionTo('stopping');
     this.events.notifyStatus(this.status);
     if (this.acpConnection) {
       const conn = this.acpConnection;
       this.acpConnection = null;
       await conn.terminate();
     }
+    this.transitionTo('stopped');
   }
 
   dispose(): void {

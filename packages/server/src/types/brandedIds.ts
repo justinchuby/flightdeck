@@ -1,30 +1,21 @@
 /**
- * Branded entity ID types for compile-time safety.
+ * Branded entity ID types — re-exported from @flightdeck/shared.
  *
- * Canonical definitions live in @flightdeck/shared (packages/shared/src/domain/entityIds.ts).
- * This file provides the same types and factory functions for use within the server
- * package, avoiding cross-package resolution issues in monorepo worktrees.
- *
- * The brand symbol is structurally identical to the one in shared — types created
- * here are assignment-compatible with the shared package's types.
+ * Types are imported from the canonical source in shared.
+ * Factory functions (`as*`) are defined here since the shared package
+ * also exports them but under different names (e.g. AgentId vs asAgentId).
+ * Both conventions are valid; the server uses the `as*` prefix.
  */
+export type {
+  Branded, AgentId, ProjectId, SessionId, TaskId,
+  MessageId, DelegationId, DecisionId,
+} from '@flightdeck/shared';
 
-declare const __brand: unique symbol;
-
-/** Generic branded string type. */
-export type Branded<Brand extends string> = string & {
-  readonly [__brand]: Brand;
-};
-
-// ── Entity ID types ──────────────────────────────────────────────────
-
-export type AgentId = Branded<'AgentId'>;
-export type ProjectId = Branded<'ProjectId'>;
-export type SessionId = Branded<'SessionId'>;
-export type TaskId = Branded<'TaskId'>;
-export type MessageId = Branded<'MessageId'>;
-export type DelegationId = Branded<'DelegationId'>;
-export type DecisionId = Branded<'DecisionId'>;
+// Re-import types locally for the factory function signatures
+import type {
+  AgentId, ProjectId, SessionId, TaskId,
+  MessageId, DelegationId, DecisionId,
+} from '@flightdeck/shared';
 
 // ── Factory functions (zero-cost casts) ──────────────────────────────
 

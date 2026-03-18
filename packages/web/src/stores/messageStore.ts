@@ -139,8 +139,15 @@ export const useMessageStore = create<MessageStoreState>((set, get) => ({
         };
       }
       // Merge: history first, then any live messages newer than the latest historical
-      const latestHistTs = Math.max(...history.map((m) => m.timestamp ?? 0));
-      const liveOnly = ch.messages.filter((m) => (m.timestamp ?? 0) > latestHistTs);
+      const latestHistTs = history.length > 0
+        ? Math.max(...history.map((m) => m.timestamp ?? 0))
+        : 0;
+      const histIds = buildIdSet(history);
+      const liveOnly = ch.messages.filter((m) => {
+        const ts = m.timestamp ?? 0;
+        // Keep messages strictly newer, or same-timestamp if not already in history
+        return ts > latestHistTs || (ts >= latestHistTs && !histIds.has(messageId(m)));
+      });
       const merged = [...history, ...liveOnly];
       return {
         channels: {

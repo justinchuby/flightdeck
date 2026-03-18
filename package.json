@@ -86,8 +86,5 @@
   },
   "bundledDependencies": [
     "@flightdeck/shared"
-  ],
-  "bundleDependencies": [
-    "@flightdeck/shared"
   ]
 }

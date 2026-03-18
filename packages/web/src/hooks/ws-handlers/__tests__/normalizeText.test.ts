@@ -22,8 +22,12 @@ describe('normalizeWsText', () => {
     expect(normalizeWsText(42)).toBe('42');
   });
 
-  it('JSON-serializes null', () => {
-    expect(normalizeWsText(null)).toBe('null');
+  it('returns empty string for null', () => {
+    expect(normalizeWsText(null)).toBe('');
+  });
+
+  it('returns empty string for undefined', () => {
+    expect(normalizeWsText(undefined)).toBe('');
   });
 
   it('JSON-serializes arrays', () => {

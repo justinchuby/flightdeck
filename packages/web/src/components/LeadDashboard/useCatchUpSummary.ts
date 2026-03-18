@@ -9,7 +9,6 @@ const EMPTY_REPORTS: AgentReport[] = [];
 
 export function useCatchUpSummary(
   selectedLeadId: string | null,
-  _effectiveLeadId: string | null | undefined,
   agents: Array<{ id: string; parentId?: string; status: string }>,
   currentProject: { decisions?: Decision[]; comms?: AgentComm[]; agentReports?: AgentReport[] } | null,
 ) {

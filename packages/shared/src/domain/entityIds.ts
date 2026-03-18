@@ -56,36 +56,50 @@ export type DecisionId = Branded<'DecisionId'>;
 export function AgentId(raw: string): AgentId {
   return raw as AgentId;
 }
+/** @alias AgentId — `as`-prefix form for consistency with server code. */
+export const asAgentId = AgentId;
 
 /** Create a branded ProjectId from a raw string. */
 export function ProjectId(raw: string): ProjectId {
   return raw as ProjectId;
 }
+/** @alias ProjectId */
+export const asProjectId = ProjectId;
 
 /** Create a branded SessionId from a raw string. */
 export function SessionId(raw: string): SessionId {
   return raw as SessionId;
 }
+/** @alias SessionId */
+export const asSessionId = SessionId;
 
 /** Create a branded TaskId from a raw string. */
 export function TaskId(raw: string): TaskId {
   return raw as TaskId;
 }
+/** @alias TaskId */
+export const asTaskId = TaskId;
 
 /** Create a branded MessageId from a raw string. */
 export function MessageId(raw: string): MessageId {
   return raw as MessageId;
 }
+/** @alias MessageId */
+export const asMessageId = MessageId;
 
 /** Create a branded DelegationId from a raw string. */
 export function DelegationId(raw: string): DelegationId {
   return raw as DelegationId;
 }
+/** @alias DelegationId */
+export const asDelegationId = DelegationId;
 
 /** Create a branded DecisionId from a raw string. */
 export function DecisionId(raw: string): DecisionId {
   return raw as DecisionId;
 }
+/** @alias DecisionId */
+export const asDecisionId = DecisionId;
 
 // ── Type guards ──────────────────────────────────────────────────────
 

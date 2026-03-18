@@ -15,5 +15,6 @@ export function normalizeWsText(text: unknown): string {
     const inner = (text as Record<string, unknown>).text;
     if (typeof inner === 'string') return inner;
   }
+  if (text === undefined || text === null) return '';
   return JSON.stringify(text);
 }

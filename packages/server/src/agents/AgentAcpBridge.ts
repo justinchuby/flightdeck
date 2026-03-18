@@ -170,7 +170,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent._notifySessionReady(sessionId);
     if (initialPrompt) {
       // Fresh agent — clear resume flag (it's false anyway) and start prompting.
-      agent._clearResuming();
+      agent._finishResuming();
       return conn.prompt(initialPrompt);
     }
     // Resumed agents have no initial prompt — they're waiting for input.
@@ -183,8 +183,8 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent._notifyStatusChange(agent.status);
     // Clear AFTER session-ready and idle notifications have fired synchronously,
     // so all resume-suppression guards see isResuming === true.
-    // Note: _clearResuming() is a no-op now since we already transitioned to 'idle'.
-    agent._clearResuming();
+    // Note: _finishResuming() is a no-op now since we already transitioned to 'idle'.
+    agent._finishResuming();
   }).catch((err) => {
     const errorMsg = err?.message || String(err);
     logger.error({ module: 'agent-bridge', msg: 'Adapter start failed', err: errorMsg, backend, cliCommand: config.cliCommand, cwd: agent.cwd || process.cwd(), role: agent.role?.id });
@@ -196,7 +196,7 @@ export async function startAcp(agent: Agent, config: ServerConfig, initialPrompt
     agent.exitError = errorMsg;
 
     // Clear resume flag so notification guards don't stay permanently suppressed
-    agent._clearResuming();
+    agent._finishResuming();
 
     agent.transitionTo('error');
     agent._notifyExit(1);
@@ -259,7 +259,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   }));
 
   conn.on('session_resume_failed', (info: { requestedSessionId: string; error: string }) => withCtx(() => {
-    agent._clearResuming();
+    agent._finishResuming();
     agent._notifySessionResumeFailed(info);
   }));
 

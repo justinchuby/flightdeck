@@ -31,11 +31,11 @@ export function isTerminalPhase(phase: AgentPhase): boolean {
  * Invalid transitions are logged as warnings but not blocked (defensive).
  */
 export const PHASE_TRANSITIONS: Record<AgentPhase, ReadonlySet<AgentPhase>> = {
-  starting: new Set(['running', 'resuming', 'stopped', 'error']),
-  resuming: new Set(['idle', 'running', 'thinking', 'stopped', 'error']),
-  idle:     new Set(['running', 'stopped', 'error']),
-  running:  new Set(['idle', 'thinking', 'stopped', 'error']),
-  thinking: new Set(['running', 'idle', 'stopped', 'error']),
+  starting: new Set(['running', 'resuming', 'stopping', 'stopped', 'error']),
+  resuming: new Set(['idle', 'running', 'thinking', 'stopping', 'stopped', 'error']),
+  idle:     new Set(['running', 'stopping', 'stopped', 'error']),
+  running:  new Set(['idle', 'thinking', 'stopping', 'stopped', 'error']),
+  thinking: new Set(['running', 'idle', 'stopping', 'stopped', 'error']),
   stopping: new Set(['stopped', 'error']),
   stopped:  new Set(['stopped']),  // re-entry allowed for terminate-after-completion
   error:    new Set(['stopped']),  // cleanup path only
