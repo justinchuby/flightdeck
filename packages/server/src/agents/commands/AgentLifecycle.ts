@@ -9,7 +9,7 @@ import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
 import { logger } from '../../utils/logger.js';
-import { asTaskId } from '../../types/brandedIds.js';
+import { asTaskId, type TaskId } from '../../types/brandedIds.js';
 import { deriveArgs } from './CommandHelp.js';
 import { notifySecretary } from './secretaryNotifier.js';
 import {
@@ -116,7 +116,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       if (agent.role.id === 'lead') {
         const dagLink = linkDelegationToDag(ctx, agent.id, role.id, req.task, child.id, 'CREATE_AGENT', req.dagTaskId, req.dependsOn);
         dagNote = dagLink.dagNote;
-        if (dagLink.dagTaskId) child.dagTaskId = asTaskId(dagLink.dagTaskId);
+        if (dagLink.dagTaskId) child.dagTaskId = dagLink.dagTaskId;
       }
 
       const dagPrefix = child.dagTaskId ? `[DAG Task: ${child.dagTaskId}]\n` : '';
@@ -239,7 +239,7 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     if (agent.role.id === 'lead') {
       const dagLink = linkDelegationToDag(ctx, agent.id, child.role.id, req.task, child.id, 'DELEGATE', req.dagTaskId, req.dependsOn);
       dagNote = dagLink.dagNote;
-      if (dagLink.dagTaskId) child.dagTaskId = asTaskId(dagLink.dagTaskId);
+      if (dagLink.dagTaskId) child.dagTaskId = dagLink.dagTaskId;
     }
 
     // Persist delegation to DB AFTER DAG linking so dagTaskId is resolved
@@ -486,7 +486,7 @@ function findSimilarActiveDelegation(ctx: CommandHandlerContext, task: string, e
 
 interface DagLinkResult {
   dagNote: string;
-  dagTaskId?: string;
+  dagTaskId?: TaskId;
 }
 
 /**
@@ -507,7 +507,7 @@ function linkDelegationToDag(
   dependsOn?: string[],
 ): DagLinkResult {
   let dagNote = '';
-  let linkedTaskId: string | undefined;
+  let linkedTaskId: TaskId | undefined;
 
   const dagTask = ctx.taskDAG.findReadyTask(leadId, {
     dagTaskId,
@@ -519,7 +519,7 @@ function linkDelegationToDag(
     const started = ctx.taskDAG.startTask(leadId, dagTask.id, childId);
     if (started) {
       dagNote = ` [DAG: "${dagTask.id}" → running]`;
-      linkedTaskId = dagTask.id;
+      linkedTaskId = asTaskId(dagTask.id);
       logger.info({ module: 'delegation', msg: 'DAG linked', taskId: dagTask.id, childAgentId: childId });
     }
   } else if (dagTaskId) {
@@ -534,12 +534,12 @@ function linkDelegationToDag(
     }
     if (autoResult.linked) {
       dagNote = ` [DAG: linked to "${autoResult.taskId}" → running]` + dagNote;
-      linkedTaskId = autoResult.taskId;
+      linkedTaskId = asTaskId(autoResult.taskId);
       logger.info({ module: 'delegation', msg: 'DAG auto-linked', taskId: autoResult.taskId, childAgentId: childId });
     } else if (autoResult.created) {
       dagNote = ` [DAG: auto-created "${autoResult.taskId}" → running]` + dagNote;
       if (autoResult.depNotes.length) dagNote += `\n  ${autoResult.depNotes.join('\n  ')}`;
-      linkedTaskId = autoResult.taskId;
+      linkedTaskId = asTaskId(autoResult.taskId);
       logger.info({ module: 'delegation', msg: 'DAG auto-created', taskId: autoResult.taskId, childAgentId: childId });
     } else if (autoResult.duplicate) {
       dagNote = `\n⚠️ Similar DAG task exists: "${autoResult.duplicate}". Use dagTaskId: "${autoResult.duplicate}" to link explicitly.` + dagNote;
