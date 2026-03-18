@@ -192,8 +192,9 @@ describe('ReplayScrubber', () => {
     await waitFor(() => {
       expect(screen.getByTestId('replay-scrubber')).toBeDefined();
     });
-    // Time display
-    expect(screen.getByText('0:00')).toBeDefined();
+    // Time display shows current time (0:00) and possibly duration (0:00)
+    const timeElements = screen.getAllByText('0:00');
+    expect(timeElements.length).toBeGreaterThanOrEqual(1);
     // Speed buttons (4× is default, 8× and 16× should be present)
     expect(screen.getByText('4×')).toBeDefined();
     expect(screen.getByText('8×')).toBeDefined();
