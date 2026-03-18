@@ -65,11 +65,11 @@ const ROUTINE_ACTION_TYPES: Set<ActionType> = new Set([
   'heartbeat_halted',
 ]);
 
-type EventTier = 'critical' | 'notable' | 'routine';
+export type EventTier = 'critical' | 'notable' | 'routine';
 
 // ── Classification ──────────────────────────────────────────────────
 
-function classifyEvent(event: ActivityEntry): EventTier {
+export function classifyEvent(event: ActivityEntry): EventTier {
   const text = event.summary;
 
   // Action-type shortcuts

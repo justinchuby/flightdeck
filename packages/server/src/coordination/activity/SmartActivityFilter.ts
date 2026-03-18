@@ -69,7 +69,7 @@ function isInterAgentNoise(entry: ActivityEntry): boolean {
   return false;
 }
 
-function getActivityPriority(actionType: ActionType): ActivityPriority {
+export function getActivityPriority(actionType: ActionType): ActivityPriority {
   return PRIORITY_MAP[actionType] ?? 'low';
 }
 

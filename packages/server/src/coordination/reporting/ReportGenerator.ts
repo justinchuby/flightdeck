@@ -33,7 +33,7 @@ interface ReportTestResults {
   failed: number;
 }
 
-interface ReportData {
+export interface ReportData {
   projectName: string;
   sessionStart: number;
   sessionEnd: number;
@@ -185,7 +185,7 @@ export class ReportGenerator {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
