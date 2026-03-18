@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, AlertCircle, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
-import { useMessageStore } from '../../stores/messageStore';
+import { useMessageStore, EMPTY_MESSAGES } from '../../stores/messageStore';
 import { useToastStore } from '../Toast';
 import { apiFetch } from '../../hooks/useApi';
 import { AgentIdBadge } from '../../utils/markdown';
@@ -59,7 +59,7 @@ function apiMessageToChunk(msg: ApiMessage): AcpTextChunk {
  */
 export function AgentChatPanel({ agentId, readOnly, maxHeight, compact, autoFocusInput }: AgentChatPanelProps) {
   const agent = useAppStore((s) => s.agents.find((a) => a.id === agentId));
-  const storeMessages = useMessageStore((s) => s.channels[agentId]?.messages ?? []);
+  const storeMessages = useMessageStore((s) => s.channels[agentId]?.messages ?? EMPTY_MESSAGES);
 
   const [fetchedMessages, setFetchedMessages] = useState<AcpTextChunk[]>([]);
   const [loading, setLoading] = useState(false);

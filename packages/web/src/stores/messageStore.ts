@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import type { AcpTextChunk } from '../types';
 import { hasUnclosedCommandBlock } from '../utils/commandParser';
 
+/**
+ * Stable empty array for Zustand selectors.
+ * NEVER use `?? []` in a selector — each call creates a new reference,
+ * defeating Zustand's strict-equality check and causing infinite re-renders.
+ */
+export const EMPTY_MESSAGES: readonly AcpTextChunk[] = Object.freeze([]);
+
 /** Generate a deterministic message ID for dedup */
 export function messageId(msg: AcpTextChunk): string {
   const ts = msg.timestamp ?? 0;

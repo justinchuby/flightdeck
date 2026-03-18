@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useMessageStore, messageId } from '../messageStore';
+import { useMessageStore, messageId, EMPTY_MESSAGES } from '../messageStore';
 import type { AcpTextChunk } from '../../types';
 
 const CH = 'lead-test-001';
@@ -480,6 +480,28 @@ describe('messageStore', () => {
       useMessageStore.getState().appendToLastAgentMessage(CH, 'text');
       const ts = useMessageStore.getState().getLastTextAt(CH);
       expect(ts).toBeGreaterThanOrEqual(before);
+    });
+  });
+
+  describe('EMPTY_MESSAGES stability', () => {
+    it('is a frozen empty array', () => {
+      expect(EMPTY_MESSAGES).toEqual([]);
+      expect(Object.isFrozen(EMPTY_MESSAGES)).toBe(true);
+    });
+
+    it('returns the same reference on repeated access', () => {
+      // This is the key invariant — Zustand selectors using `?? EMPTY_MESSAGES`
+      // must return the same ref to avoid infinite re-render loops
+      const a = EMPTY_MESSAGES;
+      const b = EMPTY_MESSAGES;
+      expect(a).toBe(b);
+    });
+
+    it('selector returns stable ref for missing channel', () => {
+      const s1 = useMessageStore.getState().channels['nonexistent']?.messages ?? EMPTY_MESSAGES;
+      const s2 = useMessageStore.getState().channels['nonexistent']?.messages ?? EMPTY_MESSAGES;
+      expect(s1).toBe(s2);
+      expect(s1).toBe(EMPTY_MESSAGES);
     });
   });
 });

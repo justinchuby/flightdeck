@@ -2,7 +2,7 @@ import { apiFetch } from '../../hooks/useApi';
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useAppStore } from '../../stores/appStore';
-import { useMessageStore } from '../../stores/messageStore';
+import { useMessageStore, EMPTY_MESSAGES } from '../../stores/messageStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
 import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench } from 'lucide-react';
@@ -175,7 +175,7 @@ export function AcpOutput({ agentId }: Props) {
   const [dismissedPinId, setDismissedPinId] = useState<number | null>(null);
 
   const plan = agent?.plan ?? [];
-  const messages = useMessageStore((s) => s.channels[agentId]?.messages ?? []);
+  const messages = useMessageStore((s) => s.channels[agentId]?.messages ?? EMPTY_MESSAGES);
 
   // Fetch message history when agent panel opens — always merge with live WS messages
   const historyFetchedRef = useRef<string | null>(null);
