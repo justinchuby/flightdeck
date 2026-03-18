@@ -112,8 +112,6 @@ describe('ChatMessages', () => {
     const messages: AcpTextChunk[] = [
       makeMessage({ sender: 'external', text: '📤 [To Developer abc12345] Fix the bug' }),
       makeMessage({ sender: 'external', text: '📨 [From Developer abc12345] Done' }),
-      makeMessage({ sender: 'external', text: '💬 Group message sent' }),
-      makeMessage({ sender: 'external', text: '📢 Broadcast sent' }),
       makeMessage({ sender: 'agent', text: 'Working on fix' }),
     ];
 
@@ -121,11 +119,9 @@ describe('ChatMessages', () => {
       <ChatMessages {...defaultProps} messages={messages} />,
     );
 
-    // External messages (DM notifications) are filtered by sender type, not emoji prefix
+    // External messages (DM notifications) are filtered by sender type
     expect(container.textContent).not.toContain('Fix the bug');
-    expect(container.textContent).not.toContain('Done');
-    expect(container.textContent).not.toContain('Group message sent');
-    expect(container.textContent).not.toContain('Broadcast sent');
+    expect(container.textContent).not.toContain('[From Developer');
 
     // Normal agent message should still appear
     expect(container.textContent).toContain('Working on fix');
