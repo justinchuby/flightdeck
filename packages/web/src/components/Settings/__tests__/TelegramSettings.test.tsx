@@ -549,10 +549,12 @@ describe('TelegramSettings', () => {
   // ── Save error handling ───────────────────────────────
 
   it('shows error on save failure', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG)
-      .mockRejectedValueOnce(new Error('Save failed')); // PATCH
+    mockApiFetch.mockImplementation((path: string, opts?: any) => {
+      if (opts?.method === 'PATCH') return Promise.reject(new Error('Save failed'));
+      if (typeof path === 'string' && path.includes('/integrations/status')) return Promise.resolve(MOCK_STATUS);
+      if (typeof path === 'string' && path.includes('/config')) return Promise.resolve(MOCK_CONFIG);
+      return Promise.resolve({});
+    });
     render(<TelegramSettings />);
     await waitFor(() => {
       expect(screen.getByTestId('telegram-save-btn')).toBeInTheDocument();
