@@ -33,7 +33,6 @@ export function useLeadMessages(
   ws: { subscribe: (id: string) => void; unsubscribe: (id: string) => void },
   chatInitialScroll: React.MutableRefObject<boolean>,
 ) {
-  const channels = useMessageStore((s) => s.channels);
 
   // On mount, load existing leads from server (skip in read-only mode — data pre-loaded)
   useQuery({
@@ -54,10 +53,7 @@ export function useLeadMessages(
                 sender: m.sender as 'agent' | 'user' | 'system' | 'thinking',
                 timestamp: new Date(m.timestamp).getTime(),
               }));
-              const ch = useMessageStore.getState().channels[l.id];
-              if (!ch || ch.messages.length === 0) {
-                useMessageStore.getState().mergeHistory(l.id, msgs);
-              }
+              useMessageStore.getState().mergeHistory(l.id, msgs);
             }
           })
           .catch(() => { /* non-critical — will load via WS */ });
@@ -84,9 +80,10 @@ export function useLeadMessages(
     };
   }, [selectedLeadId, ws, readOnly, chatInitialScroll]);
 
-  // Load message history for selected lead (if messageStore channel is empty)
-  const selectedCh = selectedLeadId ? channels[selectedLeadId] : null;
-  const needsHistory = !!selectedLeadId && (!selectedCh || selectedCh.messages.length === 0);
+  // Load message history for selected lead.
+  // Always fetch once (staleTime prevents re-fetches) — even if WS messages
+  // arrived first, we need the full history from the DB to show older messages.
+  const needsHistory = !!selectedLeadId;
   const msgApiPath = selectedLeadId
     ? `/agents/${selectedLeadId}/messages?limit=200&includeSystem=true`
     : '';
@@ -103,10 +100,7 @@ export function useLeadMessages(
           ...(m.fromRole ? { fromRole: m.fromRole } : {}),
           timestamp: new Date(m.timestamp).getTime(),
         }));
-        const ch = useMessageStore.getState().channels[selectedLeadId!];
-        if (!ch || ch.messages.length === 0) {
-          useMessageStore.getState().mergeHistory(selectedLeadId!, msgs);
-        }
+        useMessageStore.getState().mergeHistory(selectedLeadId!, msgs);
       }
       return data;
     },
