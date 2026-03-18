@@ -329,4 +329,163 @@ describe('useLeadWebSocket', () => {
   });
 
   // project:xxx resolution removed by eliminate-project-key refactor
+
+  /* ================================================================== */
+  /*  Branch coverage — partial conditions on changed lines             */
+  /* ================================================================== */
+
+  describe('agent:text/thinking/content from non-lead are ignored', () => {
+    it('ignores agent:thinking from non-lead agent', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'agent:thinking', agentId: 'other-agent', text: 'nope' });
+      expect(mockMessageStore.appendToThinkingMessage).not.toHaveBeenCalled();
+    });
+
+    it('ignores agent:content from non-lead agent', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({
+        type: 'agent:content',
+        agentId: 'other-agent',
+        content: { text: 'ignored', contentType: 'text' },
+      });
+      expect(mockMessageStore.addMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('agent:status branch coverage', () => {
+    it('does NOT call promoteQueuedMessages for non-running status', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'agent:status', agentId: 'lead-1', status: 'idle' });
+      expect(mockMessageStore.promoteQueuedMessages).not.toHaveBeenCalled();
+    });
+
+    it('ignores agent:status from non-lead agent', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'agent:status', agentId: 'other-agent', status: 'running' });
+      expect(mockMessageStore.promoteQueuedMessages).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolveToolSummary fallback branch', () => {
+    it('falls back to JSON.stringify when title and kind are undefined', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({
+        type: 'agent:tool_call',
+        agentId: 'lead-1',
+        toolCall: { toolCallId: 'tc-fallback', title: undefined, kind: undefined },
+      });
+      expect(mockStore.addActivity).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+        summary: '"Working..."',
+      }));
+    });
+
+    it('uses title.text when title is an object with text', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({
+        type: 'agent:tool_call',
+        agentId: 'lead-1',
+        toolCall: { toolCallId: 'tc-obj-title', title: { text: 'Object title' } },
+      });
+      expect(mockStore.addActivity).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+        summary: 'Object title',
+      }));
+    });
+  });
+
+  describe('lead:progress with blocked items', () => {
+    it('includes blocked items in activity summary', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({
+        type: 'lead:progress',
+        agentId: 'lead-1',
+        summary: 'Working',
+        completed: [],
+        in_progress: ['task-1'],
+        blocked: ['task-2', 'task-3'],
+      });
+      expect(mockStore.addActivity).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+        summary: expect.stringContaining('Blocked: task-2, task-3'),
+      }));
+    });
+  });
+
+  describe('agent:message_sent system→lead', () => {
+    it('surfaces system-to-lead message in chat with ⚙️ prefix', () => {
+      // 'system' must be a known child-of-lead so the guard at line 289 passes
+      const agentsWithSystem: AgentInfo[] = [
+        ...agents,
+        { id: 'system', status: 'running', parentId: 'lead-1', role: { id: 'system', name: 'System' } } as AgentInfo,
+      ];
+      renderHook(() => useLeadWebSocket(agentsWithSystem, 'proj-1'));
+      emitWsMessage({
+        type: 'agent:message_sent',
+        from: 'system',
+        to: 'lead-1',
+        fromRole: 'System',
+        content: 'Auto-approved decision',
+      });
+      expect(mockMessageStore.addMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+        sender: 'system',
+        text: expect.stringContaining('⚙️'),
+      }));
+      expect(mockMessageStore.addMessage).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+        text: expect.stringContaining('Auto-approved decision'),
+      }));
+    });
+  });
+
+  /* ================================================================== */
+  /*  Null leadId — false branches for if(leadId) guards                */
+  /* ================================================================== */
+
+  describe('null selectedLeadId', () => {
+    beforeEach(() => {
+      mockStore.selectedLeadId = null;
+    });
+
+    it('ignores agent:tool_call when leadId is null', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'agent:tool_call', agentId: 'lead-1', toolCall: { toolCallId: 'tc', title: 'test' } });
+      expect(mockStore.addActivity).not.toHaveBeenCalled();
+    });
+
+    it('ignores agent:message_sent when leadId is null', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'agent:message_sent', from: 'lead-1', to: 'child-1', content: 'hello' });
+      expect(mockStore.addComm).not.toHaveBeenCalled();
+    });
+
+    it('ignores group:created when leadId is null', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'group:created', leadId: null });
+      expect(mockStore.setGroups).not.toHaveBeenCalled();
+    });
+
+    it('ignores group:message when leadId is null', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'group:message', leadId: null, groupName: 'team', message: { fromAgentId: 'a', fromRole: 'Dev', content: 'hi' } });
+      expect(mockStore.addGroupMessage).not.toHaveBeenCalled();
+    });
+
+    it('ignores dag:updated when leadId is null', () => {
+      renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+      emitWsMessage({ type: 'dag:updated', leadId: null });
+      expect(mockStore.setDagStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  /* ================================================================== */
+  /*  message_sent from unrelated agent (line 287-289 early return)     */
+  /* ================================================================== */
+
+  it('ignores agent:message_sent from unrelated agents', () => {
+    renderHook(() => useLeadWebSocket(agents, 'proj-1'));
+    emitWsMessage({
+      type: 'agent:message_sent',
+      from: 'unrelated-agent',
+      to: 'another-unrelated',
+      content: 'private chat',
+    });
+    expect(mockStore.addComm).not.toHaveBeenCalled();
+  });
 });

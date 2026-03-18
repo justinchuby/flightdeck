@@ -305,4 +305,181 @@ describe('messageStore', () => {
       expect(useMessageStore.getState().channels).toEqual({});
     });
   });
+
+  /* ================================================================== */
+  /*  Branch coverage — partial conditions                              */
+  /* ================================================================== */
+
+  describe('messageId nullish coalescing branches', () => {
+    it('handles undefined timestamp', () => {
+      const msg: AcpTextChunk = { type: 'text', text: 'hi', sender: 'user' };
+      const id = messageId(msg);
+      expect(id).toContain('0-'); // ts defaults to 0
+    });
+
+    it('handles undefined sender', () => {
+      const msg = { type: 'text', text: 'hi', timestamp: 1 } as AcpTextChunk;
+      const id = messageId(msg);
+      expect(id).toContain('unknown');
+    });
+
+    it('handles undefined text', () => {
+      const msg = { type: 'text', sender: 'user', timestamp: 1 } as AcpTextChunk;
+      const id = messageId(msg);
+      expect(id).toBeDefined();
+    });
+
+    it('handles all fields undefined', () => {
+      const msg = { type: 'text' } as AcpTextChunk;
+      const id = messageId(msg);
+      expect(id).toContain('0-unknown-');
+    });
+  });
+
+  describe('removeChannel', () => {
+    it('removes an existing channel', () => {
+      expect(useMessageStore.getState().channels[CH]).toBeDefined();
+      useMessageStore.getState().removeChannel(CH);
+      expect(useMessageStore.getState().channels[CH]).toBeUndefined();
+    });
+
+    it('is safe to call on a non-existent channel', () => {
+      useMessageStore.getState().removeChannel('does-not-exist');
+      // Should not throw; original channel still intact
+      expect(useMessageStore.getState().channels[CH]).toBeDefined();
+    });
+  });
+
+  describe('addMessage on non-existent channel', () => {
+    it('auto-creates channel via emptyChannel() fallback', () => {
+      const newCh = 'brand-new-channel';
+      expect(useMessageStore.getState().channels[newCh]).toBeUndefined();
+      useMessageStore.getState().addMessage(newCh, { type: 'text', text: 'hello', sender: 'user', timestamp: 1 });
+      const ch = useMessageStore.getState().channels[newCh];
+      expect(ch).toBeDefined();
+      expect(ch.messages).toHaveLength(1);
+    });
+  });
+
+  describe('mergeHistory branch coverage', () => {
+    it('merges into a non-existent channel via emptyChannel() fallback', () => {
+      const newCh = 'merge-new';
+      const history: AcpTextChunk[] = [
+        { type: 'text', text: 'h1', sender: 'agent', timestamp: 100 },
+      ];
+      useMessageStore.getState().mergeHistory(newCh, history);
+      expect(useMessageStore.getState().channels[newCh].messages).toEqual(history);
+    });
+
+    it('handles empty history array when live messages exist', () => {
+      useMessageStore.getState().addMessage(CH, { type: 'text', text: 'live', sender: 'agent', timestamp: 500 });
+      useMessageStore.getState().mergeHistory(CH, []);
+      const msgs = useMessageStore.getState().channels[CH].messages;
+      // latestHistTs = 0 (empty history), so live msg (ts=500) > 0 → kept
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].text).toBe('live');
+    });
+
+    it('filters out live messages that are duplicates of history at same timestamp', () => {
+      // Add a live message
+      const liveMsg: AcpTextChunk = { type: 'text', text: 'same msg', sender: 'agent', timestamp: 100 };
+      useMessageStore.getState().addMessage(CH, liveMsg);
+      // Now merge history that contains the exact same message
+      const history: AcpTextChunk[] = [
+        { type: 'text', text: 'same msg', sender: 'agent', timestamp: 100 },
+      ];
+      useMessageStore.getState().mergeHistory(CH, history);
+      const msgs = useMessageStore.getState().channels[CH].messages;
+      // The live msg has same ts AND is in histIds → filtered out → only history copy remains
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].text).toBe('same msg');
+    });
+  });
+
+  describe('appendToLastAgentMessage branch coverage', () => {
+    it('auto-creates channel via emptyChannel() fallback', () => {
+      const newCh = 'append-new';
+      useMessageStore.getState().appendToLastAgentMessage(newCh, 'hello');
+      const ch = useMessageStore.getState().channels[newCh];
+      expect(ch).toBeDefined();
+      expect(ch.messages).toHaveLength(1);
+      expect(ch.messages[0].sender).toBe('agent');
+    });
+
+    it('looks past interleaved system messages with 📨/📤/⚙️ prefixes', () => {
+      useMessageStore.getState().appendToLastAgentMessage(CH, 'agent text');
+      // Add system messages that should be looked past
+      useMessageStore.getState().addMessage(CH, { type: 'text', text: '📨 [From Dev] hello', sender: 'system', timestamp: Date.now() });
+      useMessageStore.getState().addMessage(CH, { type: 'text', text: '📤 [To Dev] reply', sender: 'system', timestamp: Date.now() + 1 });
+      useMessageStore.getState().addMessage(CH, { type: 'text', text: '⚙️ [System] notice', sender: 'system', timestamp: Date.now() + 2 });
+      // Append more agent text — should find the original agent message
+      useMessageStore.getState().appendToLastAgentMessage(CH, ' more');
+      const msgs = useMessageStore.getState().channels[CH].messages;
+      const agentMsgs = msgs.filter((m) => m.sender === 'agent');
+      expect(agentMsgs).toHaveLength(1);
+      expect(agentMsgs[0].text).toBe('agent text more');
+    });
+
+    it('unclosedCommand=true AND pendingNewline=true → appends to existing message', () => {
+      // Create an agent message with an unclosed command block
+      useMessageStore.getState().appendToLastAgentMessage(CH, '⟦⟦ DELEGATE {"task": "hello');
+      // Set pendingNewline by appending thinking
+      useMessageStore.getState().appendToThinkingMessage(CH, 'thinking...');
+      // Now pendingNewline is true AND the agent text has an unclosed command
+      // Appending should still append to the agent message (unclosedCommand overrides pendingNewline)
+      useMessageStore.getState().appendToLastAgentMessage(CH, '"} ⟧⟧');
+      const msgs = useMessageStore.getState().channels[CH].messages;
+      const agentMsgs = msgs.filter((m) => m.sender === 'agent');
+      expect(agentMsgs).toHaveLength(1);
+      expect(agentMsgs[0].text).toContain('⟦⟦ DELEGATE');
+      expect(agentMsgs[0].text).toContain('⟧⟧');
+    });
+  });
+
+  describe('appendToThinkingMessage on non-existent channel', () => {
+    it('auto-creates channel via emptyChannel() fallback', () => {
+      const newCh = 'thinking-new';
+      useMessageStore.getState().appendToThinkingMessage(newCh, 'thought');
+      const ch = useMessageStore.getState().channels[newCh];
+      expect(ch).toBeDefined();
+      expect(ch.messages).toHaveLength(1);
+      expect(ch.messages[0].sender).toBe('thinking');
+    });
+  });
+
+  describe('promoteQueuedMessages on non-existent channel', () => {
+    it('auto-creates channel and handles mix of queued/non-queued', () => {
+      const newCh = 'promote-new';
+      // First add messages to a new channel (auto-created)
+      useMessageStore.getState().addMessage(newCh, { type: 'text', text: 'queued', sender: 'user', queued: true, timestamp: 1 });
+      useMessageStore.getState().addMessage(newCh, { type: 'text', text: 'not-queued', sender: 'agent', timestamp: 2 });
+      useMessageStore.getState().promoteQueuedMessages(newCh);
+      const msgs = useMessageStore.getState().channels[newCh].messages;
+      expect(msgs[0].queued).toBeFalsy();
+      expect(msgs[1].queued).toBeUndefined(); // never was queued — returns as-is
+    });
+  });
+
+  describe('setPendingNewline on non-existent channel', () => {
+    it('auto-creates channel via emptyChannel() fallback', () => {
+      const newCh = 'pending-new';
+      useMessageStore.getState().setPendingNewline(newCh, true);
+      const ch = useMessageStore.getState().channels[newCh];
+      expect(ch).toBeDefined();
+      expect(ch.pendingNewline).toBe(true);
+    });
+  });
+
+  describe('getLastTextAt', () => {
+    it('returns 0 for a non-existent channel', () => {
+      expect(useMessageStore.getState().getLastTextAt('no-such-channel')).toBe(0);
+    });
+
+    it('returns lastTextAt for an existing channel after agent text', () => {
+      const before = Date.now();
+      useMessageStore.getState().appendToLastAgentMessage(CH, 'text');
+      const ts = useMessageStore.getState().getLastTextAt(CH);
+      expect(ts).toBeGreaterThanOrEqual(before);
+    });
+  });
 });

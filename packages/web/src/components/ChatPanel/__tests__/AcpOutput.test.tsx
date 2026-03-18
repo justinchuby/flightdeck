@@ -897,4 +897,119 @@ describe('AcpOutput', () => {
     const removeBtns = screen.getAllByTitle('Remove');
     expect(removeBtns).toHaveLength(3);
   });
+
+  /* ================================================================== */
+  /*  Branch coverage — partial conditions on changed lines             */
+  /* ================================================================== */
+
+  it('channels[agentId]?.messages ?? [] returns stable empty when channel exists but empty', async () => {
+    // Ensures the ?? [] fallback path is exercised safely — channel exists but has no messages
+    seedAgent([]);
+    await renderAcpOutput();
+    expect(screen.getByTestId('virtuoso')).toBeInTheDocument();
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    expect(msgs).toEqual([]);
+  });
+
+  it('does not re-fetch history on re-render with same agentId', async () => {
+    seedAgent([]);
+    const { AcpOutput } = await import('../AcpOutput');
+    const { rerender } = render(<AcpOutput agentId={AGENT_ID} />);
+    await act(async () => {});
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+
+    // Re-render with same agentId — the historyFetchedRef.current === agentId guard should skip
+    mockApiFetch.mockClear();
+    rerender(<AcpOutput agentId={AGENT_ID} />);
+    await act(async () => {});
+    expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('promotes queued messages when agent responds after queued user msgs', async () => {
+    // Setup: queued user msg + agent response after it → promote fires
+    seedAgent([
+      makeMsg('Queued question', 'user', 1000, { queued: true }),
+      makeMsg('Agent answer', 'agent', 2000),
+    ]);
+    await renderAcpOutput();
+    // The useEffect should have called promoteQueuedMessages
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    expect(msgs.every((m) => !m.queued)).toBe(true);
+  });
+
+  it('does NOT promote when last non-queued is a user message', async () => {
+    // Last non-queued is 'user' → sender !== 'user' is false → no promote
+    seedAgent([
+      makeMsg('Agent text', 'agent', 500),
+      makeMsg('User follow-up', 'user', 1000),
+      makeMsg('Queued Q', 'user', 2000, { queued: true }),
+    ]);
+    await renderAcpOutput();
+    // Queued message should still be queued
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    const queued = msgs.filter((m) => m.queued);
+    expect(queued).toHaveLength(1);
+  });
+
+  /* ================================================================== */
+  /*  Additional branch coverage — uncovered partial conditions          */
+  /* ================================================================== */
+
+  it('handles API returning non-array messages gracefully', async () => {
+    mockApiFetch.mockResolvedValueOnce({ messages: null });
+    seedAgent([]);
+    await renderAcpOutput();
+    await act(async () => {});
+    // Should not crash — Array.isArray(null) is false, so mergeHistory is skipped
+    expect(screen.getByTestId('virtuoso')).toBeInTheDocument();
+  });
+
+  it('handles API returning empty messages array (length === 0 branch)', async () => {
+    mockApiFetch.mockResolvedValueOnce({ messages: [] });
+    seedAgent([]);
+    await renderAcpOutput();
+    await act(async () => {});
+    // messages.length > 0 is false — mergeHistory is not called
+    expect(screen.getByTestId('virtuoso')).toBeInTheDocument();
+  });
+
+  it('fills in default sender and timestamp for fetched messages', async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      messages: [
+        { content: 'No sender or ts' },
+        { sender: 'user', content: 'Has sender, no ts' },
+        { content: 'No sender, has ts', timestamp: 1000 },
+      ],
+    });
+    seedAgent([]);
+    await renderAcpOutput();
+    await vi.waitFor(() => {
+      const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+      expect(msgs.length).toBe(3);
+    });
+    const msgs = useMessageStore.getState().channels[AGENT_ID]?.messages ?? [];
+    // m.sender || 'agent' — missing sender defaults to 'agent'
+    expect(msgs[0].sender).toBe('agent');
+    // m.sender provided → used as-is
+    expect(msgs[1].sender).toBe('user');
+    // m.sender || 'agent' — missing sender defaults to 'agent'
+    expect(msgs[2].sender).toBe('agent');
+    // m.timestamp ? new Date(m.timestamp).getTime() : Date.now()
+    // msg with timestamp=1000 should have that value
+    expect(msgs[2].timestamp).toBe(new Date(1000).getTime());
+    // msgs without timestamp get Date.now() — just verify it's a recent number
+    expect(msgs[0].timestamp).toBeGreaterThan(0);
+  });
+
+  it('promote effect returns early when no queued messages exist', async () => {
+    // No queued messages → messages.some(m => m.queued) is false → early return
+    seedAgent([
+      makeMsg('Normal agent msg', 'agent', 1000),
+      makeMsg('Another msg', 'agent', 2000),
+    ]);
+    const spy = vi.spyOn(useMessageStore.getState(), 'promoteQueuedMessages');
+    await renderAcpOutput();
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });
