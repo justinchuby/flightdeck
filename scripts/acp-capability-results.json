@@ -1,0 +1,356 @@
+{
+  "timestamp": "2026-03-19T15:24:33.407Z",
+  "timeoutMs": 20000,
+  "results": [
+    {
+      "providerId": "copilot",
+      "providerName": "GitHub Copilot",
+      "binary": "copilot",
+      "installed": true,
+      "durationMs": 1654,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "Copilot",
+        "title": "Copilot",
+        "version": "1.0.9"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "list": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "copilot-login",
+          "name": "Log in with Copilot CLI",
+          "description": "Run `copilot login` in the terminal",
+          "_meta": {
+            "terminal-auth": {
+              "command": "/opt/homebrew/Caskroom/copilot-cli/1.0.2/copilot",
+              "args": [
+                "login"
+              ],
+              "label": "Copilot Login"
+            }
+          }
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": false,
+            "embeddedContext": true
+          },
+          "sessionCapabilities": {
+            "list": {}
+          }
+        },
+        "agentInfo": {
+          "name": "Copilot",
+          "title": "Copilot",
+          "version": "1.0.9"
+        },
+        "authMethods": [
+          {
+            "id": "copilot-login",
+            "name": "Log in with Copilot CLI",
+            "description": "Run `copilot login` in the terminal",
+            "_meta": {
+              "terminal-auth": {
+                "command": "/opt/homebrew/Caskroom/copilot-cli/1.0.2/copilot",
+                "args": [
+                  "login"
+                ],
+                "label": "Copilot Login"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "providerId": "claude",
+      "providerName": "Claude Code",
+      "binary": "claude-agent-acp",
+      "installed": true,
+      "durationMs": 189,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "@zed-industries/claude-agent-acp",
+        "title": "Claude Agent",
+        "version": "0.21.0"
+      },
+      "agentCapabilities": {
+        "_meta": {
+          "claudeCode": {
+            "promptQueueing": true
+          }
+        },
+        "promptCapabilities": {
+          "image": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "loadSession": true,
+        "sessionCapabilities": {
+          "fork": {},
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "_meta": {
+            "claudeCode": {
+              "promptQueueing": true
+            }
+          },
+          "promptCapabilities": {
+            "image": true,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": true,
+            "sse": true
+          },
+          "loadSession": true,
+          "sessionCapabilities": {
+            "fork": {},
+            "list": {},
+            "resume": {}
+          }
+        },
+        "agentInfo": {
+          "name": "@zed-industries/claude-agent-acp",
+          "title": "Claude Agent",
+          "version": "0.21.0"
+        },
+        "authMethods": []
+      }
+    },
+    {
+      "providerId": "gemini",
+      "providerName": "Gemini CLI",
+      "binary": "gemini",
+      "installed": true,
+      "durationMs": 5228,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "gemini-cli",
+        "title": "Gemini CLI",
+        "version": "0.34.0"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        }
+      },
+      "authMethods": [
+        {
+          "id": "oauth-personal",
+          "name": "Log in with Google",
+          "description": "Log in with your Google account"
+        },
+        {
+          "id": "gemini-api-key",
+          "name": "Gemini API key",
+          "description": "Use an API key with Gemini Developer API",
+          "_meta": {
+            "api-key": {
+              "provider": "google"
+            }
+          }
+        },
+        {
+          "id": "vertex-ai",
+          "name": "Vertex AI",
+          "description": "Use an API key with Vertex AI GenAI API"
+        },
+        {
+          "id": "gateway",
+          "name": "AI API Gateway",
+          "description": "Use a custom AI API Gateway",
+          "_meta": {
+            "gateway": {
+              "protocol": "google",
+              "restartRequired": "false"
+            }
+          }
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "authMethods": [
+          {
+            "id": "oauth-personal",
+            "name": "Log in with Google",
+            "description": "Log in with your Google account"
+          },
+          {
+            "id": "gemini-api-key",
+            "name": "Gemini API key",
+            "description": "Use an API key with Gemini Developer API",
+            "_meta": {
+              "api-key": {
+                "provider": "google"
+              }
+            }
+          },
+          {
+            "id": "vertex-ai",
+            "name": "Vertex AI",
+            "description": "Use an API key with Vertex AI GenAI API"
+          },
+          {
+            "id": "gateway",
+            "name": "AI API Gateway",
+            "description": "Use a custom AI API Gateway",
+            "_meta": {
+              "gateway": {
+                "protocol": "google",
+                "restartRequired": "false"
+              }
+            }
+          }
+        ],
+        "agentInfo": {
+          "name": "gemini-cli",
+          "title": "Gemini CLI",
+          "version": "0.34.0"
+        },
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": true,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": true,
+            "sse": true
+          }
+        }
+      }
+    },
+    {
+      "providerId": "codex",
+      "providerName": "Codex CLI",
+      "binary": "codex-acp",
+      "installed": true,
+      "durationMs": 162,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "codex-acp",
+        "title": "Codex",
+        "version": "0.9.5"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false
+        },
+        "sessionCapabilities": {
+          "list": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "chatgpt",
+          "name": "Login with ChatGPT",
+          "description": "Use your ChatGPT login with Codex CLI (requires a paid ChatGPT subscription)"
+        },
+        {
+          "id": "codex-api-key",
+          "name": "Use CODEX_API_KEY",
+          "description": "Requires setting the `CODEX_API_KEY` environment variable."
+        },
+        {
+          "id": "openai-api-key",
+          "name": "Use OPENAI_API_KEY",
+          "description": "Requires setting the `OPENAI_API_KEY` environment variable."
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": false,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": true,
+            "sse": false
+          },
+          "sessionCapabilities": {
+            "list": {}
+          }
+        },
+        "authMethods": [
+          {
+            "id": "chatgpt",
+            "name": "Login with ChatGPT",
+            "description": "Use your ChatGPT login with Codex CLI (requires a paid ChatGPT subscription)"
+          },
+          {
+            "id": "codex-api-key",
+            "name": "Use CODEX_API_KEY",
+            "description": "Requires setting the `CODEX_API_KEY` environment variable."
+          },
+          {
+            "id": "openai-api-key",
+            "name": "Use OPENAI_API_KEY",
+            "description": "Requires setting the `OPENAI_API_KEY` environment variable."
+          }
+        ],
+        "agentInfo": {
+          "name": "codex-acp",
+          "title": "Codex",
+          "version": "0.9.5"
+        }
+      }
+    },
+    {
+      "providerId": "cursor",
+      "providerName": "Cursor Agent",
+      "binary": "agent",
+      "installed": false,
+      "error": "Binary 'agent' not found in PATH"
+    },
+    {
+      "providerId": "opencode",
+      "providerName": "OpenCode",
+      "binary": "opencode",
+      "installed": false,
+      "error": "Binary 'opencode' not found in PATH"
+    }
+  ]
+}
