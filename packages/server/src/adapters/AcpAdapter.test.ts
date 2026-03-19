@@ -1,7 +1,7 @@
 /**
  * AcpAdapter unit tests.
  *
- * Tests the ACP protocol adapter that serves 5 of 6 providers
+ * Tests the ACP protocol adapter that serves 5 of 8 providers
  * (Copilot, Gemini, OpenCode, Cursor, Codex) via subprocess stdio.
  *
  * Mock pattern: child_process.spawn/execFileSync + @agentclientprotocol/sdk

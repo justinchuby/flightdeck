@@ -31,7 +31,6 @@ export function servicesRoutes(ctx: AppContext): Router {
     notificationManager,
     escalationManager,
     modelSelector,
-    tokenBudgetOptimizer,
     reportGenerator,
     projectTemplateRegistry,
     knowledgeTransfer,
@@ -351,21 +350,6 @@ export function servicesRoutes(ctx: AppContext): Router {
     res.json({
       models: modelSelector.getModels(),
       overrides: modelSelector.getRoleOverrides(),
-    });
-  });
-
-  // ── Token Budget Optimizer ──────────────────────────────────────────
-
-  router.get('/coordination/token-budgets', (_req, res) => {
-    if (!tokenBudgetOptimizer) {
-      res.json({ budgets: [], totalBudget: 0, totalUsed: 0, utilization: 0 });
-      return;
-    }
-    res.json({
-      budgets: tokenBudgetOptimizer.getAllBudgets(),
-      totalBudget: tokenBudgetOptimizer.getTotalBudget(),
-      totalUsed: tokenBudgetOptimizer.getTotalUsed(),
-      utilization: tokenBudgetOptimizer.getUtilization(),
     });
   });
 

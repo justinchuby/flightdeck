@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../hooks/useApi';
 import { getProvider } from '@flightdeck/shared';
+import { ProviderIcon } from './ui/ProviderIcon';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                       >
                         <div className="flex items-center justify-between px-4 py-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-lg flex-shrink-0">{def?.icon ?? '🔧'}</span>
+                            <span className="text-lg flex-shrink-0"><ProviderIcon provider={def} className="w-5 h-5 inline" /></span>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-th-text">{p.name}</span>

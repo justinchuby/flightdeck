@@ -10,7 +10,7 @@
 // ── Types ──────────────────────────────────────────────────────
 
 /** Canonical provider identifiers. Add new providers here. */
-export type ProviderId = 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude';
+export type ProviderId = 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude' | 'kimi' | 'qwen-code';
 
 /** Tailwind color classes for provider-branded UI elements. */
 export interface ProviderColors {
@@ -53,8 +53,10 @@ export interface ProviderDefinition {
   id: ProviderId;
   /** Human-readable display name (e.g. "GitHub Copilot") */
   name: string;
-  /** Emoji icon for UI lists */
+  /** Emoji icon for UI lists (fallback when iconUrl unavailable) */
   icon: string;
+  /** Path to SVG icon (e.g. '/provider-icons/copilot.svg') — preferred over emoji */
+  iconUrl?: string;
 
   // ── CLI Configuration ──────────────────────────
   /** CLI binary name or path */
@@ -66,7 +68,7 @@ export interface ProviderDefinition {
   /** Env var keys the user must configure (values come from user env) */
   requiredEnvVars: string[];
   /** Whether the CLI supports session resume via session/load */
-  supportsResume: boolean;
+  supportsLoadSession: boolean;
   /** CLI flag for model selection (e.g. '--model'), undefined if N/A */
   modelFlag?: string;
   /** Default model when none specified */
@@ -129,11 +131,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'copilot',
     name: 'GitHub Copilot',
     icon: '🐙',
+    iconUrl: '/provider-icons/copilot.svg',
     binary: 'copilot',
     args: ['--acp', '--stdio'],
     transport: 'stdio',
     requiredEnvVars: [],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelFlag: '--model',
     agentFileFormat: '.agent.md',
     supportsAgentFlag: true,
@@ -154,17 +157,18 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'gemini',
     name: 'Google Gemini CLI',
     icon: '💎',
+    iconUrl: '/provider-icons/gemini.svg',
     binary: 'gemini',
     args: ['--acp'],
     transport: 'stdio',
     requiredEnvVars: ['GEMINI_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelFlag: '--model',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro',
     agentFileFormat: '.gemini/agents/*.md',
     modelArgStrategy: 'flag',
     nativeModelProviders: ['google'],
-    tierModels: { fast: 'gemini-2.5-flash-lite', standard: 'gemini-2.5-flash', premium: 'gemini-2.5-pro' },
+    tierModels: { fast: 'gemini-3.1-flash-lite', standard: 'gemini-3.1-flash', premium: 'gemini-3.1-pro' },
     authCommand: 'gemini --version',
     authLabel: 'Authenticated via Google',
     color: { bg: 'bg-blue-500/15', text: 'text-blue-400', border: 'border-l-blue-500', tab: 'text-blue-400 border-blue-400' },
@@ -178,11 +182,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'claude',
     name: 'Claude Agent (ACP)',
     icon: '🟠',
+    iconUrl: '/provider-icons/claude.svg',
     binary: 'claude-agent-acp',
     args: [],
     transport: 'stdio',
     requiredEnvVars: ['ANTHROPIC_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelFlag: '--model',
     defaultModel: 'claude-sonnet-4',
     agentFileFormat: 'CLAUDE.md',
@@ -212,11 +217,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'codex',
     name: 'Codex (ACP)',
     icon: '🤖',
+    iconUrl: '/provider-icons/codex.svg',
     binary: 'codex-acp',
     args: [],
     transport: 'stdio',
     requiredEnvVars: ['OPENAI_API_KEY'],
-    supportsResume: false,
+    supportsLoadSession: true,
     defaultModel: 'gpt-5.3-codex',
     modelArgStrategy: 'config',
     configModelPrefix: ['-c', 'model='],
@@ -237,11 +243,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'cursor',
     name: 'Cursor',
     icon: '↗️',
+    iconUrl: '/provider-icons/cursor.svg',
     binary: 'agent',
     args: ['acp'],
     transport: 'stdio',
     requiredEnvVars: ['CURSOR_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     agentFileFormat: '.cursorrules',
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google'],
@@ -258,11 +265,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'opencode',
     name: 'OpenCode',
     icon: '🔓',
+    iconUrl: '/provider-icons/opencode.svg',
     binary: 'opencode',
     args: ['acp'],
     transport: 'stdio',
     requiredEnvVars: [],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google', 'local'],
     tierModels: { fast: 'anthropic/claude-haiku-4-5', standard: 'anthropic/claude-sonnet-4-6', premium: 'anthropic/claude-opus-4-6' },
@@ -273,6 +281,53 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     setupLinks: [{ label: 'Documentation', url: 'https://opencode.ai/docs/' }],
     isPreview: true,
     loginInstructions: 'Authentication is managed by OpenCode',
+  },
+
+  kimi: {
+    id: 'kimi',
+    name: 'Kimi CLI',
+    icon: '🌙',
+    iconUrl: '/provider-icons/kimi.svg',
+    binary: 'kimi',
+    args: ['acp'],
+    transport: 'stdio',
+    requiredEnvVars: [],
+    supportsLoadSession: true, // Probe: sessionCapabilities.list + resume, loadSession: true
+    modelFlag: '--model',
+    defaultModel: 'kimi-latest',
+    modelArgStrategy: 'flag',
+    nativeModelProviders: ['moonshot'],
+    tierModels: { fast: 'moonshot-v1-8k', standard: 'kimi-latest', premium: 'kimi-latest' },
+    authCommand: 'kimi --version',
+    authLabel: 'Authenticated via Kimi',
+    color: { bg: 'bg-violet-500/15', text: 'text-violet-400', border: 'border-l-violet-500', tab: 'text-violet-400 border-violet-400' },
+    docsUrl: 'https://github.com/MoonshotAI/kimi-cli',
+    setupLinks: [{ label: 'GitHub', url: 'https://github.com/MoonshotAI/kimi-cli' }],
+    isPreview: false,
+    loginInstructions: 'Run kimi login in your terminal',
+  },
+
+  'qwen-code': {
+    id: 'qwen-code',
+    name: 'Qwen Code',
+    icon: '🔮',
+    iconUrl: '/provider-icons/qwen-code.svg',
+    binary: 'qwen',
+    args: ['--acp', '--experimental-skills'],
+    transport: 'stdio',
+    requiredEnvVars: [],
+    supportsLoadSession: true, // Probe: sessionCapabilities.list + resume, loadSession: true
+    modelFlag: '--model',
+    defaultModel: 'qwen-coder-plus-latest',
+    modelArgStrategy: 'flag',
+    nativeModelProviders: ['qwen', 'openai'],
+    tierModels: { fast: 'qwen-coder-plus-latest', standard: 'qwen-coder-plus-latest', premium: 'qwen-coder-plus-latest' },
+    authLabel: 'Qwen OAuth or OPENAI_API_KEY',
+    color: { bg: 'bg-indigo-500/15', text: 'text-indigo-400', border: 'border-l-indigo-500', tab: 'text-indigo-400 border-indigo-400' },
+    docsUrl: 'https://github.com/QwenLM/qwen-code',
+    setupLinks: [{ label: 'GitHub', url: 'https://github.com/QwenLM/qwen-code' }],
+    isPreview: false,
+    loginInstructions: 'Run qwen --auth-type=qwen-oauth or set OPENAI_API_KEY',
   },
 };
 
@@ -294,4 +349,154 @@ export function getAllProviders(): ProviderDefinition[] {
 /** Type guard — check if a string is a valid ProviderId. */
 export function isValidProviderId(id: string): id is ProviderId {
   return id in PROVIDER_REGISTRY;
+}
+
+// ── ACP Capabilities (from live probe, March 2026) ─────────────
+
+/**
+ * ACP capability probe results per provider.
+ *
+ * Data from live ACP probes against installed CLIs.
+ * `undefined` fields mean the provider was not probed (preview/not installed).
+ */
+export interface AcpProviderCapabilities {
+  /** CLI version probed */
+  probeVersion?: string;
+  /** Provider supports image content in prompts */
+  images: boolean;
+  /** Provider supports audio content in prompts */
+  audio: boolean;
+  /** Provider supports MCP server passthrough (HTTP) */
+  mcpHttp: boolean;
+  /** Provider supports MCP server passthrough (SSE) */
+  mcpSse: boolean;
+  /** Provider supports embedded context injection */
+  embeddedContext: boolean;
+  /** Provider supports loadSession (resume from session ID) */
+  loadSession: boolean;
+  /** Provider supports session list/resume/fork operations */
+  sessionList: boolean;
+  sessionResume: boolean;
+  sessionFork: boolean;
+  /** How the system prompt is delivered to the agent */
+  systemPromptMethod: string;
+  /** How the provider authenticates */
+  authMethod: string;
+  /** Whether this data is from a live probe or estimated */
+  probed: boolean;
+}
+
+// ── Derive ACP_CAPABILITIES from probe JSON ────────────────────
+//
+// The probe script (scripts/query-acp-capabilities.ts) writes
+// acp-capability-results.json. That file is the single source of truth
+// for probe data. We import it and transform it at build time.
+
+import probeResults from '../data/acp-capability-results.json' with { type: 'json' };
+
+/** Raw probe result shape (subset we need). */
+interface ProbeResult {
+  providerId: string;
+  installed: boolean;
+  agentInfo?: { version?: string };
+  agentCapabilities?: {
+    loadSession?: boolean;
+    mcpCapabilities?: { http?: boolean; sse?: boolean };
+    promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean };
+    sessionCapabilities?: { list?: object; resume?: object; fork?: object };
+  };
+}
+
+/**
+ * Non-probe metadata that cannot be determined automatically.
+ * Keyed by ProviderId. Only providers with non-default values need entries.
+ */
+const CAPABILITY_OVERRIDES: Partial<Record<ProviderId, { systemPromptMethod?: string; authMethod?: string }>> = {
+  copilot:      { systemPromptMethod: '--agent flag + .agent.md', authMethod: 'gh auth status (GitHub OAuth)' },
+  claude:       { systemPromptMethod: '_meta.systemPrompt ACP extension', authMethod: 'ANTHROPIC_API_KEY env var' },
+  gemini:       { authMethod: 'GEMINI_API_KEY env var' },
+  codex:        { authMethod: 'OPENAI_API_KEY env var' },
+  cursor:       { authMethod: 'CURSOR_API_KEY env var' },
+  opencode:     { authMethod: 'Self-managed (opencode auth login)' },
+  kimi:         { authMethod: 'kimi login (Moonshot account)' },
+  'qwen-code':  { authMethod: 'Qwen OAuth or OPENAI_API_KEY' },
+};
+
+/** Defaults for unprobed/uninstalled providers. */
+const UNPROBED_DEFAULTS: AcpProviderCapabilities = {
+  images: false, audio: false,
+  mcpHttp: false, mcpSse: false,
+  embeddedContext: false,
+  loadSession: false,
+  sessionList: false, sessionResume: false, sessionFork: false,
+  systemPromptMethod: 'First user message',
+  authMethod: 'Unknown',
+  probed: false,
+};
+
+function deriveCapabilities(result: ProbeResult): AcpProviderCapabilities {
+  const id = result.providerId as ProviderId;
+  const overrides = CAPABILITY_OVERRIDES[id] ?? {};
+
+  if (!result.installed || !result.agentCapabilities) {
+    return {
+      ...UNPROBED_DEFAULTS,
+      systemPromptMethod: overrides.systemPromptMethod ?? UNPROBED_DEFAULTS.systemPromptMethod,
+      authMethod: overrides.authMethod ?? UNPROBED_DEFAULTS.authMethod,
+    };
+  }
+
+  const caps = result.agentCapabilities;
+  const prompt = caps.promptCapabilities ?? {};
+  const mcp = caps.mcpCapabilities ?? {};
+  const session = caps.sessionCapabilities ?? {};
+
+  return {
+    probeVersion: result.agentInfo?.version,
+    images: prompt.image ?? false,
+    audio: prompt.audio ?? false,
+    mcpHttp: mcp.http ?? false,
+    mcpSse: mcp.sse ?? false,
+    embeddedContext: prompt.embeddedContext ?? false,
+    loadSession: caps.loadSession ?? false,
+    sessionList: 'list' in session,
+    sessionResume: 'resume' in session,
+    sessionFork: 'fork' in session,
+    systemPromptMethod: overrides.systemPromptMethod ?? 'First user message',
+    authMethod: overrides.authMethod ?? 'Unknown',
+    probed: true,
+  };
+}
+
+/**
+ * ACP capabilities per provider — derived from acp-capability-results.json.
+ *
+ * The probe script generates the JSON; this constant is built from it.
+ * Consumed by both ProvidersSection (Settings) and FindingsPage.
+ */
+export const ACP_CAPABILITIES: Record<ProviderId, AcpProviderCapabilities> = (() => {
+  const results = (probeResults as { results: ProbeResult[] }).results;
+  const map = {} as Record<ProviderId, AcpProviderCapabilities>;
+  for (const r of results) {
+    if (PROVIDER_IDS.includes(r.providerId as ProviderId)) {
+      map[r.providerId as ProviderId] = deriveCapabilities(r);
+    }
+  }
+  // Fill any providers missing from the probe file with defaults
+  for (const id of PROVIDER_IDS) {
+    if (!map[id]) {
+      const overrides = CAPABILITY_OVERRIDES[id] ?? {};
+      map[id] = {
+        ...UNPROBED_DEFAULTS,
+        systemPromptMethod: overrides.systemPromptMethod ?? UNPROBED_DEFAULTS.systemPromptMethod,
+        authMethod: overrides.authMethod ?? UNPROBED_DEFAULTS.authMethod,
+      };
+    }
+  }
+  return map;
+})();
+
+/** Get ACP capabilities for a provider. */
+export function getAcpCapabilities(id: string): AcpProviderCapabilities | undefined {
+  return ACP_CAPABILITIES[id as ProviderId];
 }

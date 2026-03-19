@@ -33,6 +33,8 @@ const MOCK_CONFIGS = [
   { id: 'opencode', name: 'OpenCode', enabled: true },
   { id: 'cursor', name: 'Cursor', enabled: true },
   { id: 'codex', name: 'Codex', enabled: true },
+  { id: 'kimi', name: 'Kimi', enabled: true },
+  { id: 'qwen-code', name: 'Qwen Code', enabled: true },
 ];
 
 /** Phase 2: status (async CLI detection) */
@@ -43,6 +45,8 @@ const MOCK_STATUSES = [
   { id: 'opencode', installed: false, authenticated: null, binaryPath: null },
   { id: 'cursor', installed: false, authenticated: null, binaryPath: null },
   { id: 'codex', installed: false, authenticated: null, binaryPath: null },
+  { id: 'kimi', installed: false, authenticated: null, binaryPath: null },
+  { id: 'qwen-code', installed: false, authenticated: null, binaryPath: null },
 ];
 
 const ALL_NOT_INSTALLED_STATUSES = MOCK_STATUSES.map((s) => ({ ...s, installed: false, binaryPath: null }));
@@ -87,7 +91,7 @@ describe('SetupWizard', () => {
 
     // After status loads, should show installed count
     await waitFor(() => {
-      expect(screen.getByText(/2 of 6 providers detected/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 of 8 providers detected/i)).toBeInTheDocument();
     });
   });
 

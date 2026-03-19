@@ -1,0 +1,180 @@
+{
+  "timestamp": "2026-03-19T16:10:19.109Z",
+  "results": [
+    {
+      "providerId": "copilot",
+      "providerName": "GitHub Copilot",
+      "installed": true,
+      "durationMs": 1624,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "1.0.9"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "list": {}
+        }
+      }
+    },
+    {
+      "providerId": "claude",
+      "providerName": "Claude Code",
+      "installed": true,
+      "durationMs": 190,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "0.21.0"
+      },
+      "agentCapabilities": {
+        "promptCapabilities": {
+          "image": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "loadSession": true,
+        "sessionCapabilities": {
+          "fork": {},
+          "list": {},
+          "resume": {}
+        }
+      }
+    },
+    {
+      "providerId": "gemini",
+      "providerName": "Gemini CLI",
+      "installed": true,
+      "durationMs": 6332,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "0.34.0"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        }
+      }
+    },
+    {
+      "providerId": "codex",
+      "providerName": "Codex CLI",
+      "installed": true,
+      "durationMs": 163,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "0.9.5"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false
+        },
+        "sessionCapabilities": {
+          "list": {}
+        }
+      }
+    },
+    {
+      "providerId": "cursor",
+      "providerName": "Cursor Agent",
+      "installed": false,
+      "durationMs": null,
+      "protocolVersion": null
+    },
+    {
+      "providerId": "opencode",
+      "providerName": "OpenCode",
+      "installed": true,
+      "durationMs": 1369,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "1.2.27"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "promptCapabilities": {
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "fork": {},
+          "list": {},
+          "resume": {}
+        }
+      }
+    },
+    {
+      "providerId": "kimi",
+      "providerName": "Kimi CLI",
+      "installed": true,
+      "durationMs": 1001,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "1.24.0"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false
+        },
+        "promptCapabilities": {
+          "audio": false,
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        }
+      }
+    },
+    {
+      "providerId": "qwen-code",
+      "providerName": "Qwen Code",
+      "installed": true,
+      "durationMs": 1142,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "version": "0.12.6"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        }
+      }
+    }
+  ]
+}

@@ -49,7 +49,7 @@ import { RetryManager } from './agents/RetryManager.js';
 import { CrashForensics } from './agents/CrashForensics.js';
 import { NotificationManager } from './coordination/alerts/NotificationManager.js';
 import { ModelSelector } from './agents/ModelSelector.js';
-import { TokenBudgetOptimizer } from './agents/TokenBudgetOptimizer.js';
+
 import { ReportGenerator } from './coordination/reporting/ReportGenerator.js';
 import { ProjectTemplateRegistry } from './coordination/playbooks/ProjectTemplates.js';
 import { KnowledgeTransfer } from './coordination/knowledge/KnowledgeTransfer.js';
@@ -213,7 +213,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const crashForensics = new CrashForensics();
   const notificationManager = new NotificationManager();
   const modelSelector = new ModelSelector();
-  const tokenBudgetOptimizer = new TokenBudgetOptimizer();
+
   const reportGenerator = new ReportGenerator();
   const projectTemplateRegistry = new ProjectTemplateRegistry();
   const knowledgeTransfer = new KnowledgeTransfer();
@@ -394,7 +394,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     notificationManager,
     escalationManager,
     modelSelector,
-    tokenBudgetOptimizer,
+
     reportGenerator,
     projectTemplateRegistry,
     knowledgeTransfer,

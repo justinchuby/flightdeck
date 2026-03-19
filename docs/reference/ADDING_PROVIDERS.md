@@ -28,7 +28,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['--acp'],                 // Args for ACP stdio mode
     transport: 'stdio',
     requiredEnvVars: ['MY_API_KEY'], // Env vars users must set ([] if none)
-    supportsResume: true,            // Does the CLI support session/load RPC?
+    supportsLoadSession: true,            // Does the CLI support session/load RPC?
     modelFlag: '--model',            // CLI flag for model selection (omit if N/A)
     defaultModel: 'my-model-v2',     // Default model when none specified
     agentFileFormat: '.my-provider/agents/*.md',  // Agent file format hint

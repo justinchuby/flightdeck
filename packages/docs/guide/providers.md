@@ -170,4 +170,11 @@ When an agent requests a model that's native to a different provider backend (e.
 
 ### Session Resume
 
-Providers that support session resume (`supportsResume: true`) can persist and restore agent sessions across restarts. Currently supported by: Copilot, Gemini, Claude, Cursor, and OpenCode.
+All providers support `loadSession` (the ability to load a previous session). However, richer session capabilities vary:
+
+- **Full session management** (fork + list + resume): Claude, OpenCode
+- **Partial** (list + resume, no fork): Kimi, Qwen Code
+- **List only** (can list sessions but not resume/fork): Copilot, Codex
+- **loadSession only** (no sessionCapabilities): Gemini
+
+The `supportsLoadSession` flag in `PROVIDER_REGISTRY` is `true` for all providers. The distinction between `loadSession` and `sessionCapabilities.resume` is important — see the [ACP Capabilities reference](/reference/acp-capabilities) for probe-verified details.

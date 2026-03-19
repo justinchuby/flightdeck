@@ -34,7 +34,7 @@ Run `npm run docs:generate-api` to regenerate.
 - [Predictions](#predictions) (8 endpoints)
 - [Session Replay](#session-replay) (3 endpoints)
 - [Shared Replay Links](#shared-replay-links) (5 endpoints)
-- [Services & Coordination (extended)](#services-coordination-extended) (45 endpoints)
+- [Services & Coordination (extended)](#services-coordination-extended) (44 endpoints)
 - [Summary & Catch-up](#summary-catch-up) (2 endpoints)
 - [File Browser](#file-browser) (1 endpoints)
 
@@ -2392,12 +2392,6 @@ List coordination
 
 ---
 
-### `GET /coordination/token-budgets`
-
-List coordination
-
----
-
 ### `GET /coordination/parallel-analysis`
 
 List coordination
@@ -2541,4 +2535,4 @@ List browse
 
 ---
 
-*220 endpoints across 25 domains. Generated from `packages/server/src/routes/`.*
+*219 endpoints across 25 domains. Generated from `packages/server/src/routes/`.*

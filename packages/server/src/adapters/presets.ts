@@ -39,7 +39,7 @@ export interface ProviderPreset {
   /** Transport protocol (all use stdio for now) */
   transport: 'stdio';
   /** Whether the CLI supports session resume via session/load */
-  supportsResume?: boolean;
+  supportsLoadSession?: boolean;
   /** CLI flag for model selection (e.g., '--model') */
   modelFlag?: string;
   /** Default model for this provider */
@@ -60,7 +60,7 @@ function toPreset(def: ProviderDefinition): ProviderPreset {
     args: def.args,
     requiredEnvVars: def.requiredEnvVars.length > 0 ? def.requiredEnvVars : undefined,
     transport: def.transport,
-    supportsResume: def.supportsResume,
+    supportsLoadSession: def.supportsLoadSession,
     modelFlag: def.modelFlag,
     defaultModel: def.defaultModel,
     agentFileFormat: def.agentFileFormat,

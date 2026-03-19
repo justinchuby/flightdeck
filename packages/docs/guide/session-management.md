@@ -170,7 +170,7 @@ User clicks "Resume" on a stopped session
 5. For each agent to resume (in parallel batches of 3):
     ├── Read agent_roster.session_id (the provider session ID)
     ├── Agent ID is immutable — same ID is reused from before
-    ├── Check if adapter supports resume (preset.supportsResume)
+    ├── Check if adapter supports resume (preset.supportsLoadSession)
     ├── Pass session_id to adapter.start(opts) via AdapterStartOptions
     ├── AcpAdapter calls loadSession(sessionId)
     ├── If resume fails → falls back to newSession(cwd) with fresh ID

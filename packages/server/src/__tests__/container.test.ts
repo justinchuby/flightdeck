@@ -69,7 +69,6 @@ describe('createContainer', () => {
     expect(container.crashForensics).toBeDefined();
     expect(container.notificationManager).toBeDefined();
     expect(container.modelSelector).toBeDefined();
-    expect(container.tokenBudgetOptimizer).toBeDefined();
     expect(container.reportGenerator).toBeDefined();
     expect(container.projectTemplateRegistry).toBeDefined();
     expect(container.knowledgeTransfer).toBeDefined();
