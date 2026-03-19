@@ -14,5 +14,5 @@ export function ProviderIcon({ provider, fallback = '🔧', className = 'w-5 h-5
   if (provider?.iconUrl) {
     return <img src={provider.iconUrl} alt={provider.name} className={className} />;
   }
-  return <span>{provider?.icon ?? fallback}</span>;
+  return <span className={className} role="img" aria-label={provider?.name ?? 'Provider'}>{provider?.icon ?? fallback}</span>;
 }

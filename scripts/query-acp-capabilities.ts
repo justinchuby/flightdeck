@@ -1,4 +1,3 @@
-#!/usr/bin/env npx tsx
 /**
  * ACP Provider Capability Probe
  *

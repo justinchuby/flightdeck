@@ -184,7 +184,7 @@ function ProviderCard({
         >
           <GripVertical className="w-4 h-4" />
         </button>
-        <span className="text-lg flex items-center" role="img" aria-label={provider.name}>
+        <span className="text-lg flex items-center">
           <ProviderIcon provider={providerDef} fallback="🔌" className="w-5 h-5" />
         </span>
         <div className="flex-1 min-w-0">
@@ -276,7 +276,7 @@ function ProviderCard({
               <div className="text-xs">
                 <span className="text-th-text-muted block mb-1.5">ACP Capabilities:</span>
                 <div className="flex flex-wrap gap-1">
-                  <CapChip supported={supportsLoadSession} label="Resume" />
+                  <CapChip supported={caps.loadSession} label="Resume" />
                   <CapChip supported={caps.images} label="Images" />
                   <CapChip supported={caps.audio} label="Audio" />
                   <CapChip supported={hasMcp} label="MCP" />
