@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { getProvider } from '@flightdeck/shared';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
+import { ProviderIcon } from '../ui/ProviderIcon';
 import { EmptyState } from '../ui/EmptyState';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -151,7 +152,6 @@ function ProviderCard({
   }, [provider.id]);
 
   const providerDef = getProvider(provider.id);
-  const icon = providerDef?.icon ?? '🔌';
   const links = providerDef?.setupLinks ?? [];
   const authLabel = providerDef?.authLabel ?? 'Provider-managed auth';
   const defaultArgs = providerDef?.args ?? [];
@@ -193,8 +193,8 @@ function ProviderCard({
         >
           <GripVertical className="w-4 h-4" />
         </button>
-        <span className="text-lg" role="img" aria-label={provider.name}>
-          {icon}
+        <span className="text-lg flex items-center" role="img" aria-label={provider.name}>
+          <ProviderIcon provider={providerDef} fallback="🔌" className="w-5 h-5" />
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
