@@ -4,7 +4,10 @@ export default defineConfig({
   title: 'Flightdeck',
   description: 'Multi-Agent Orchestration Platform',
   base: '/',
-  head: [['link', { rel: 'icon', href: '/favicon.ico' }]],
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }],
+  ],
   themeConfig: {
     logo: '/logo.svg',
     nav: [
