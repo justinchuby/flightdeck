@@ -13,7 +13,6 @@ import type { WebhookManager } from '../coordination/alerts/WebhookManager.js';
 import type { SearchEngine } from '../coordination/knowledge/SearchEngine.js';
 import type { DecisionRecordStore } from '../coordination/decisions/DecisionRecords.js';
 import type { ModelSelector } from '../agents/ModelSelector.js';
-import type { TokenBudgetOptimizer } from '../agents/TokenBudgetOptimizer.js';
 import type { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
 import type { StorageManager } from '../storage/StorageManager.js';
 import type { KnowledgeStore } from '../knowledge/KnowledgeStore.js';
@@ -53,7 +52,6 @@ export interface AppContext {
   notificationManager?: import('../coordination/alerts/NotificationManager.js').NotificationManager;
   escalationManager?: import('../coordination/alerts/EscalationManager.js').EscalationManager;
   modelSelector?: ModelSelector;
-  tokenBudgetOptimizer?: TokenBudgetOptimizer;
   reportGenerator?: ReportGenerator;
   projectTemplateRegistry?: import('../coordination/playbooks/ProjectTemplates.js').ProjectTemplateRegistry;
   knowledgeTransfer?: import('../coordination/knowledge/KnowledgeTransfer.js').KnowledgeTransfer;
