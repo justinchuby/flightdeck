@@ -10,6 +10,7 @@
  */
 import { getAllProviders, type ProviderDefinition } from '@flightdeck/shared';
 import { Check, X, Minus, Info, Zap, Shield, Layers, AlertTriangle, Terminal, Code } from 'lucide-react';
+import { ProviderIcon } from '../ui/ProviderIcon';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -17,35 +18,52 @@ interface ProviderCapabilities {
   id: string;
   name: string;
   icon: string;
+  iconUrl?: string;
   isPreview: boolean;
-  /** Static preset — not runtime-verified */
+  /** Runtime-verified via ACP probe (March 2026) */
   resume: boolean;
-  /** All providers advertise this, but Flightdeck never sends images */
-  images: 'advertised';
-  /** Protocol field exists, no providers implement */
-  audio: 'none';
-  /** Protocol available, untapped */
-  mcpServers: 'untapped';
-  /** Protocol available, untapped */
-  embeddedContext: 'untapped';
+  /** Runtime-verified: all 4 probed providers support images */
+  images: boolean;
+  /** Runtime-verified: only Gemini supports audio */
+  audio: boolean | 'not-probed';
+  /** Runtime-verified: Claude+Gemini http+sse, Codex http only, Copilot none */
+  mcpServers: boolean | 'partial' | 'not-probed';
+  /** Runtime-verified: all 4 probed providers support embeddedContext */
+  embeddedContext: boolean | 'not-probed';
   systemPromptMethod: string;
   authMethod: string;
   modelSelectionStyle: string;
   modelTiers: string;
   uniqueFeatures: string[];
+  /** Version from ACP probe (undefined if not probed) */
+  probeVersion?: string;
 }
 
-type CapStatus = boolean | 'advertised' | 'none' | 'untapped';
+type CapStatus = boolean | 'advertised' | 'none' | 'untapped' | 'partial' | 'not-probed';
 
 // ── Data ─────────────────────────────────────────────────────────
 
-/** Per-provider research data (from architecture team analysis, March 2026). */
+/** Per-provider research data (verified via live ACP probe, March 2026). */
 const RESEARCH_DATA: Record<string, {
   systemPromptMethod: string;
   authMethod: string;
   modelSelectionStyle: string;
   modelTiers: string;
   uniqueFeatures: string[];
+  /** Live probe results (undefined = not installed/probed) */
+  probe?: {
+    version: string;
+    images: boolean;
+    audio: boolean;
+    mcpHttp: boolean;
+    mcpSse: boolean;
+    embeddedContext: boolean;
+    sessionList: boolean;
+    sessionResume: boolean;
+    sessionFork: boolean;
+    loadSession: boolean;
+    extras?: string[];
+  };
 }> = {
   copilot: {
     systemPromptMethod: '--agent flag + .agent.md',
@@ -53,27 +71,60 @@ const RESEARCH_DATA: Record<string, {
     modelSelectionStyle: '--model flag',
     modelTiers: 'haiku, sonnet, opus, gpt-4.1, gemini-pro',
     uniqueFeatures: ['Multi-backend (Anthropic, OpenAI, Google, xAI)', 'Agent file support (--agent)', 'GitHub-managed auth'],
+    probe: {
+      version: '1.0.9',
+      images: true, audio: false,
+      mcpHttp: false, mcpSse: false,
+      embeddedContext: true,
+      sessionList: true, sessionResume: false, sessionFork: false,
+      loadSession: true,
+    },
   },
   claude: {
     systemPromptMethod: '_meta.systemPrompt ACP extension',
     authMethod: 'ANTHROPIC_API_KEY env var',
     modelSelectionStyle: '--model flag with alias system',
     modelTiers: 'haiku, sonnet (default), opus',
-    uniqueFeatures: ['Model alias system (opus → claude-opus-4.6)', '_meta.systemPrompt extension', 'CLAUDE.md agent file'],
+    uniqueFeatures: ['Model alias system (opus → claude-opus-4.6)', '_meta.systemPrompt extension', 'CLAUDE.md agent file', 'promptQueueing support'],
+    probe: {
+      version: '0.21.0',
+      images: true, audio: false,
+      mcpHttp: true, mcpSse: true,
+      embeddedContext: true,
+      sessionList: true, sessionResume: true, sessionFork: true,
+      loadSession: true,
+      extras: ['_meta.claudeCode.promptQueueing'],
+    },
   },
   gemini: {
     systemPromptMethod: 'First user message',
     authMethod: 'GEMINI_API_KEY env var',
     modelSelectionStyle: '--model flag',
     modelTiers: 'flash-lite, flash, gemini-pro',
-    uniqueFeatures: ['Google-native models only', 'Agent directory (.gemini/agents/*.md)'],
+    uniqueFeatures: ['Google-native models only', 'Agent directory (.gemini/agents/*.md)', 'Audio input support', '4 auth methods (OAuth, API key, Vertex AI, Gateway)'],
+    probe: {
+      version: '0.34.0',
+      images: true, audio: true,
+      mcpHttp: true, mcpSse: true,
+      embeddedContext: true,
+      sessionList: false, sessionResume: false, sessionFork: false,
+      loadSession: true,
+    },
   },
   codex: {
     systemPromptMethod: 'First user message',
     authMethod: 'OPENAI_API_KEY env var',
     modelSelectionStyle: '-c model=name (config style)',
     modelTiers: 'codex-mini, codex, gpt-5.x',
-    uniqueFeatures: ['⚠️ No session resume (only provider)', 'Config-style model args (-c model=name)'],
+    uniqueFeatures: ['Config-style model args (-c model=name)', '3 auth methods (ChatGPT login, CODEX_API_KEY, OPENAI_API_KEY)'],
+    probe: {
+      version: '0.9.5',
+      images: true, audio: false,
+      mcpHttp: true, mcpSse: false,
+      embeddedContext: true,
+      sessionList: true, sessionResume: false, sessionFork: false,
+      loadSession: true,
+    },
   },
   cursor: {
     systemPromptMethod: 'First user message',
@@ -94,21 +145,26 @@ const RESEARCH_DATA: Record<string, {
 function buildCapabilities(): ProviderCapabilities[] {
   return getAllProviders().map((p: ProviderDefinition) => {
     const research = RESEARCH_DATA[p.id];
+    const probe = research?.probe;
     return {
       id: p.id,
       name: p.name,
       icon: p.icon,
+      iconUrl: p.iconUrl,
       isPreview: p.isPreview,
       resume: p.supportsResume,
-      images: 'advertised' as const,
-      audio: 'none' as const,
-      mcpServers: 'untapped' as const,
-      embeddedContext: 'untapped' as const,
+      images: probe?.images ?? false,
+      audio: probe ? probe.audio : 'not-probed' as const,
+      mcpServers: probe
+        ? (probe.mcpHttp && probe.mcpSse ? true : probe.mcpHttp ? 'partial' as const : false)
+        : 'not-probed' as const,
+      embeddedContext: probe ? probe.embeddedContext : 'not-probed' as const,
       systemPromptMethod: research?.systemPromptMethod ?? 'Unknown',
       authMethod: research?.authMethod ?? 'Unknown',
       modelSelectionStyle: research?.modelSelectionStyle ?? 'Unknown',
       modelTiers: research?.modelTiers ?? 'Unknown',
       uniqueFeatures: research?.uniqueFeatures ?? [],
+      probeVersion: probe?.version,
     };
   });
 }
@@ -124,9 +180,9 @@ function CapBadge({ status, label }: { status: CapStatus; label?: string }) {
       </span>
     );
   }
-  if (status === 'untapped') {
+  if (status === 'untapped' || status === 'not-probed') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-th-text-muted/50" title="Protocol supports this, but not implemented">
+      <span className="inline-flex items-center gap-1 text-xs text-th-text-muted/50" title={status === 'not-probed' ? 'Provider not installed — not probed' : 'Protocol supports this, but not implemented'}>
         <Minus className="w-3.5 h-3.5" />
         {label}
       </span>
@@ -137,6 +193,14 @@ function CapBadge({ status, label }: { status: CapStatus; label?: string }) {
       <span className="inline-flex items-center gap-1 text-xs text-th-text-muted/50">
         <X className="w-3.5 h-3.5" />
         {label}
+      </span>
+    );
+  }
+  if (status === 'partial') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-yellow-400" title="Partial support (e.g., HTTP only, no SSE)">
+        <Minus className="w-3.5 h-3.5" />
+        {label ?? 'Partial'}
       </span>
     );
   }
@@ -167,9 +231,9 @@ function SectionCard({ title, icon, children }: { title: string; icon: React.Rea
 function CapabilityMatrix({ capabilities }: { capabilities: ProviderCapabilities[] }) {
   return (
     <div className="overflow-x-auto">
-      <div className="mb-2 flex items-center gap-2 text-[10px] text-yellow-400">
-        <AlertTriangle className="w-3 h-3" />
-        <span>Static config — not runtime-verified. Flightdeck sends empty clientCapabilities.</span>
+      <div className="mb-2 flex items-center gap-2 text-[10px] text-green-400">
+        <Check className="w-3 h-3" />
+        <span>Verified via live ACP probe (March 2026). Resume column uses preset config; all others from runtime handshake.</span>
       </div>
       <table className="w-full text-xs" data-testid="capability-matrix">
         <thead>
@@ -188,8 +252,11 @@ function CapabilityMatrix({ capabilities }: { capabilities: ProviderCapabilities
             <tr key={cap.id} className="border-b border-th-border/50 hover:bg-th-bg-alt/30 transition-colors">
               <td className="py-2 pr-3">
                 <span className="flex items-center gap-2">
-                  <span>{cap.icon}</span>
+                  <ProviderIcon provider={cap} className="w-4 h-4" />
                   <span className="text-th-text-alt font-medium">{cap.name}</span>
+                  {cap.probeVersion && (
+                    <span className="text-[9px] text-th-text-muted font-mono">v{cap.probeVersion}</span>
+                  )}
                   {cap.isPreview && (
                     <span className="text-[9px] text-blue-400 bg-blue-500/10 px-1 py-0.5 rounded-full">Preview</span>
                   )}
@@ -208,8 +275,8 @@ function CapabilityMatrix({ capabilities }: { capabilities: ProviderCapabilities
       <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-th-text-muted">
         <span className="flex items-center gap-1"><Check className="w-3 h-3 text-green-400" /> Supported</span>
         <span className="flex items-center gap-1"><X className="w-3 h-3 text-red-400" /> Not supported</span>
-        <span className="flex items-center gap-1"><Minus className="w-3 h-3 text-yellow-400" /> Advertised but unused</span>
-        <span className="flex items-center gap-1"><Minus className="w-3 h-3 text-th-text-muted/50" /> Protocol available, untapped</span>
+        <span className="flex items-center gap-1"><Minus className="w-3 h-3 text-yellow-400" /> Partial (e.g., HTTP only)</span>
+        <span className="flex items-center gap-1"><Minus className="w-3 h-3 text-th-text-muted/50" /> Not probed (binary not installed)</span>
       </div>
     </div>
   );
@@ -232,7 +299,7 @@ function ProviderDetailsTable({ capabilities }: { capabilities: ProviderCapabili
             <tr key={cap.id} className="border-b border-th-border/50">
               <td className="py-2 pr-3">
                 <span className="flex items-center gap-2">
-                  <span>{cap.icon}</span>
+                  <ProviderIcon provider={cap} className="w-4 h-4" />
                   <span className="text-th-text-alt font-medium">{cap.name}</span>
                   {cap.isPreview && (
                     <span className="text-[9px] text-blue-400 bg-blue-500/10 px-1 py-0.5 rounded-full">Preview</span>
@@ -264,7 +331,7 @@ function UniqueFeatures({ capabilities }: { capabilities: ProviderCapabilities[]
       {capabilities.map((cap) => (
         <div key={cap.id} className="bg-th-bg-alt border border-th-border rounded-md p-3">
           <div className="flex items-center gap-2 mb-2">
-            <span>{cap.icon}</span>
+            <ProviderIcon provider={cap} className="w-4 h-4" />
             <span className="text-xs text-th-text font-medium">{cap.name}</span>
             {cap.isPreview && (
               <span className="text-[9px] text-blue-400 bg-blue-500/10 px-1 py-0.5 rounded-full">Preview</span>
@@ -318,25 +385,24 @@ export function FindingsPage() {
             </div>
             <div className="bg-th-bg-alt border border-th-border rounded-md p-3">
               <div className="text-th-text font-medium mb-1">Session Resume</div>
-              <div className="text-th-text-muted">5 of 6 support loadSession (Codex is the exception)</div>
+              <div className="text-th-text-muted">Only Claude has full resume+fork. Copilot/Codex have list only. Gemini has none.</div>
             </div>
           </div>
         </div>
       </SectionCard>
 
       {/* Critical Gap */}
-      <SectionCard title="Critical Gap: Static vs Runtime" icon={<AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />}>
+      <SectionCard title="Gap: Unused Capabilities" icon={<AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />}>
         <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-md p-3 text-xs text-th-text-alt space-y-2">
           <p>
             <strong className="text-yellow-400">Flightdeck sends empty <code className="text-yellow-300">clientCapabilities: {'{}'}</code></strong> — it
             does not advertise its own capabilities (filesystem access, terminal, etc.) to providers.
           </p>
           <p>
-            Only <code className="text-accent">supportsImages</code> is consumed from agent responses. The
-            <code className="text-accent"> supportsResume</code> shown below is <em>static config</em> from presets,
-            not a runtime capability check. Fields like <code className="text-accent">audio</code>,
+            The capability matrix above now uses <strong>live probe data</strong> from the ACP initialize handshake.
+            Fields like <code className="text-accent">audio</code>,
             <code className="text-accent"> embeddedContext</code>, <code className="text-accent">mcpCapabilities</code>,
-            and <code className="text-accent">sessionCapabilities</code> are captured in AcpAdapter.ts but never consumed.
+            and <code className="text-accent">sessionCapabilities</code> are captured by AcpAdapter.ts but not yet consumed by Flightdeck.
           </p>
         </div>
       </SectionCard>
@@ -359,18 +425,29 @@ export function FindingsPage() {
       {/* ACP SDK Types */}
       <SectionCard title="ACP SDK Type Definitions" icon={<Code className="w-3.5 h-3.5" />}>
         <div className="bg-th-bg-alt border border-th-border rounded-md p-3 font-mono text-[11px] text-th-text-alt overflow-x-auto whitespace-pre">
-{`interface AgentCapabilities {
+{`// Verified via live ACP probe — actual agentCapabilities responses
+interface AgentCapabilities {
+  loadSession?: boolean;        // All 4 probed: true
   promptCapabilities?: {
-    image?: boolean;    // All providers: true
+    image?: boolean;            // All 4: true
+    audio?: boolean;            // Only Gemini: true
+    embeddedContext?: boolean;   // All 4: true
   };
-  audio?: boolean;      // No providers implement
-  loadSession?: boolean; // 5/6 providers: true (not Codex)
-  mcpServers?: boolean;  // Protocol available, untapped
-  embeddedContext?: boolean; // Protocol available, untapped
+  sessionCapabilities?: {       // Claude: fork+list+resume, Copilot/Codex: list only, Gemini: absent
+    list?: {};
+    resume?: {};
+    fork?: {};
+  };
+  mcpCapabilities?: {           // Claude+Gemini: http+sse, Codex: http only, Copilot: absent
+    http?: boolean;
+    sse?: boolean;
+  };
+  _meta?: Record<string, unknown>; // Claude: { claudeCode: { promptQueueing: true } }
 }`}
         </div>
         <p className="text-[10px] text-th-text-muted mt-2">
-          From <code className="text-accent">@agentclientprotocol/sdk</code> — captured in AcpAdapter.ts on session init.
+          From <code className="text-accent">@agentclientprotocol/sdk v0.16.1</code> — verified by running{' '}
+          <code className="text-accent">scripts/query-acp-capabilities.ts</code> against installed providers.
         </p>
       </SectionCard>
 
@@ -399,8 +476,8 @@ export function FindingsPage() {
               priority: 'Low',
             },
             {
-              title: '5. Fix Codex Resume Gap',
-              description: 'Codex is the only provider without session resume. Consider a compatibility shim that replays context on reconnection, or document this as a known limitation.',
+              title: '5. Fix Resume Gaps',
+              description: 'Both Gemini and Codex lack session resume. Consider a compatibility shim that replays context on reconnection, or document this as a known limitation for these providers.',
               priority: 'Low',
             },
           ].map((item) => (
@@ -424,13 +501,15 @@ export function FindingsPage() {
       {/* Key Findings */}
       <SectionCard title="Key Findings" icon={<Info className="w-3.5 h-3.5" />}>
         <ul className="text-xs text-th-text-alt space-y-1.5 list-disc list-inside">
-          <li>Only <code className="text-accent">supportsImages</code> is consumed from agent responses; other capability fields are captured but unused</li>
-          <li><strong>Codex</strong> is the only provider that does NOT support session resume — all others support <code className="text-accent">loadSession</code></li>
+          <li><strong>Gemini does NOT support session resume</strong> — no sessionCapabilities at all (preset was incorrectly set to true, now fixed)</li>
+          <li><strong>Claude</strong> is the only provider with full session management (fork + list + resume) and unique <code className="text-accent">promptQueueing</code> support</li>
+          <li><strong>Gemini</strong> is the only provider supporting <code className="text-accent">audio</code> input</li>
+          <li>All 4 probed providers support <code className="text-accent">loadSession</code>, <code className="text-accent">images</code>, and <code className="text-accent">embeddedContext</code></li>
+          <li>MCP support varies: Claude+Gemini have HTTP+SSE, Codex has HTTP only, Copilot has none</li>
           <li>System prompt delivery varies: Claude uses <code className="text-accent">_meta.systemPrompt</code> extension, Copilot uses <code className="text-accent">--agent</code> flag, others use first user message</li>
           <li>Model selection style differs: flag-based (Copilot, Claude, Gemini), config-based (Codex <code className="text-accent">-c model=</code>), or not configurable (Cursor, OpenCode)</li>
           <li>Copilot is the most versatile — accesses Anthropic, OpenAI, Google, and xAI backends through a single CLI</li>
           <li>OpenCode uniquely supports <strong>local models</strong>, enabling air-gapped or offline operation</li>
-          <li>Claude&apos;s model alias system (<code className="text-accent">opus → claude-opus-4.6</code>) requires special mapping in Flightdeck&apos;s model resolver</li>
         </ul>
       </SectionCard>
     </div>

@@ -53,8 +53,10 @@ export interface ProviderDefinition {
   id: ProviderId;
   /** Human-readable display name (e.g. "GitHub Copilot") */
   name: string;
-  /** Emoji icon for UI lists */
+  /** Emoji icon for UI lists (fallback when iconUrl unavailable) */
   icon: string;
+  /** Path to SVG icon (e.g. '/provider-icons/copilot.svg') — preferred over emoji */
+  iconUrl?: string;
 
   // ── CLI Configuration ──────────────────────────
   /** CLI binary name or path */
@@ -129,6 +131,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'copilot',
     name: 'GitHub Copilot',
     icon: '🐙',
+    iconUrl: '/provider-icons/copilot.svg',
     binary: 'copilot',
     args: ['--acp', '--stdio'],
     transport: 'stdio',
@@ -154,11 +157,12 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'gemini',
     name: 'Google Gemini CLI',
     icon: '💎',
+    iconUrl: '/provider-icons/gemini.svg',
     binary: 'gemini',
     args: ['--acp'],
     transport: 'stdio',
     requiredEnvVars: ['GEMINI_API_KEY'],
-    supportsResume: true,
+    supportsResume: false, // Probe confirmed: no sessionCapabilities (no list/resume/fork)
     modelFlag: '--model',
     defaultModel: 'gemini-2.5-pro',
     agentFileFormat: '.gemini/agents/*.md',
@@ -178,6 +182,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'claude',
     name: 'Claude Agent (ACP)',
     icon: '🟠',
+    iconUrl: '/provider-icons/claude.svg',
     binary: 'claude-agent-acp',
     args: [],
     transport: 'stdio',
@@ -212,6 +217,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'codex',
     name: 'Codex (ACP)',
     icon: '🤖',
+    iconUrl: '/provider-icons/codex.svg',
     binary: 'codex-acp',
     args: [],
     transport: 'stdio',
@@ -237,6 +243,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'cursor',
     name: 'Cursor',
     icon: '↗️',
+    iconUrl: '/provider-icons/cursor.svg',
     binary: 'agent',
     args: ['acp'],
     transport: 'stdio',
@@ -258,6 +265,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     id: 'opencode',
     name: 'OpenCode',
     icon: '🔓',
+    iconUrl: '/provider-icons/opencode.svg',
     binary: 'opencode',
     args: ['acp'],
     transport: 'stdio',

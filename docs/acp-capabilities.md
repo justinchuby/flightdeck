@@ -1,6 +1,6 @@
 # Agent Client Protocol — Provider Capability Matrix
 
-> Research conducted March 19, 2026
+> Research conducted March 19, 2026. **Live probe verified** using `scripts/query-acp-capabilities.ts` against installed provider binaries.
 
 ## Protocol Overview
 
@@ -100,8 +100,13 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | Field | Value |
 |-------|-------|
 | **Binary** | `copilot --acp --stdio` |
+| **Probe Version** | v1.0.9 |
 | **Auth** | `gh auth status` (GitHub CLI login) |
-| **Resume** | ✅ |
+| **Resume** | ✅ (loadSession + session list, no fork/resume) |
+| **Images** | ✅ |
+| **Audio** | ❌ |
+| **MCP** | ❌ (no mcpCapabilities) |
+| **Embedded Context** | ✅ |
 | **Model Selection** | `--model <name>` flag |
 | **Models** | Anthropic (sonnet, haiku, opus), OpenAI (gpt-4.1), Google (gemini-3-pro-preview), xAI |
 | **System Prompt** | First user message |
@@ -113,38 +118,53 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | Field | Value |
 |-------|-------|
 | **Binary** | `claude-agent-acp` |
+| **Probe Version** | v0.21.0 |
 | **Auth** | `ANTHROPIC_API_KEY` env var |
-| **Resume** | ✅ |
+| **Resume** | ✅ (full: fork + list + resume — richest session support) |
+| **Images** | ✅ |
+| **Audio** | ❌ |
+| **MCP** | ✅ HTTP + SSE |
+| **Embedded Context** | ✅ |
 | **Model Selection** | `--model <alias>` (uses short aliases: `default`, `opus`, `haiku`) |
 | **Models** | Anthropic only (sonnet, haiku, opus) |
 | **System Prompt** | `_meta.systemPrompt` extension (unique to Claude) |
 | **Agent File** | `CLAUDE.md` |
-| **Unique** | Only provider using `_meta.systemPrompt`; model aliases instead of full IDs |
+| **Unique** | Only provider with full session fork/resume, `_meta.systemPrompt`, `promptQueueing`, model aliases |
 
 ### 💎 Google Gemini CLI
 
 | Field | Value |
 |-------|-------|
 | **Binary** | `gemini --acp` |
-| **Auth** | `GEMINI_API_KEY` env var |
-| **Resume** | ✅ |
+| **Probe Version** | v0.34.0 |
+| **Auth** | `GEMINI_API_KEY` env var (4 auth methods: OAuth, API key, Vertex AI, Gateway) |
+| **Resume** | ❌ (no sessionCapabilities — probe verified) |
+| **Images** | ✅ |
+| **Audio** | ✅ (only provider with audio support) |
+| **MCP** | ✅ HTTP + SSE |
+| **Embedded Context** | ✅ |
 | **Model Selection** | `--model <name>` flag |
 | **Models** | Google only (gemini-2.5-pro, flash, flash-lite) |
 | **System Prompt** | First user message |
 | **Agent File** | `.gemini/agents/*.md` |
-| **Unique** | Google-native models, directory-based agent files |
+| **Unique** | Google-native models, audio support, directory-based agent files |
 
 ### 🤖 Codex (OpenAI)
 
 | Field | Value |
 |-------|-------|
 | **Binary** | `codex-acp` |
-| **Auth** | `OPENAI_API_KEY` env var |
-| **Resume** | ❌ (only provider without resume) |
+| **Probe Version** | v0.9.5 |
+| **Auth** | `OPENAI_API_KEY` env var (3 auth methods: ChatGPT login, CODEX_API_KEY, OPENAI_API_KEY) |
+| **Resume** | ❌ (session list only, no resume/fork) |
+| **Images** | ✅ |
+| **Audio** | ❌ |
+| **MCP** | ⚠️ HTTP only (no SSE) |
+| **Embedded Context** | ✅ |
 | **Model Selection** | Config-style: `-c model=<name>` |
 | **Models** | OpenAI only (gpt-5.x-codex, gpt-5.4) |
 | **System Prompt** | First user message |
-| **Unique** | No session resume; config-based model selection instead of flag |
+| **Unique** | Config-based model selection; HTTP-only MCP |
 
 ### ↗️ Cursor (PREVIEW)
 
@@ -171,16 +191,18 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | **Model Name Format** | Prefixed: `anthropic/claude-sonnet-4-6`, `openai/gpt-5.2`, `google/gemini-2.5-pro` |
 | **Unique** | Supports local models; provider-prefixed model names; self-managed auth |
 
-## Capability Matrix Summary
+## Capability Matrix Summary (Probe-Verified)
 
-| Provider | Status | Resume | Images | Audio | MCP | Embedded Context | Auth Method | Multi-Backend |
-|----------|--------|--------|--------|-------|-----|-----------------|-------------|---------------|
-| **Copilot** | GA | ✅ | ✅ | ❌ | ❌ | ❌ | GitHub CLI | ✅ (4 backends) |
-| **Claude** | GA | ✅ | ✅ | ❌ | ❌ | ❌ | API key | ❌ |
-| **Gemini** | GA | ✅ | ✅ | ❌ | ❌ | ❌ | API key | ❌ |
-| **Codex** | GA | ❌ | ✅ | ❌ | ❌ | ❌ | API key | ❌ |
-| **Cursor** | Preview | ✅ | ✅ | ❌ | ❌ | ❌ | API key | ✅ (3 backends) |
-| **OpenCode** | Preview | ✅ | ✅ | ❌ | ❌ | ❌ | Self-managed | ✅ (4 backends + local) |
+| Provider | Version | Resume | Images | Audio | MCP | Embedded Ctx | Session Caps | Auth Method | Multi-Backend |
+|----------|---------|--------|--------|-------|-----|--------------|--------------|-------------|---------------|
+| **Copilot** | v1.0.9 | ✅ | ✅ | ❌ | ❌ | ✅ | list | GitHub CLI | ✅ (4 backends) |
+| **Claude** | v0.21.0 | ✅ | ✅ | ❌ | ✅ http+sse | ✅ | fork+list+resume | API key | ❌ |
+| **Gemini** | v0.34.0 | ❌ | ✅ | ✅ | ✅ http+sse | ✅ | none | API key (4 methods) | ❌ |
+| **Codex** | v0.9.5 | ❌ | ✅ | ❌ | ⚠️ http only | ✅ | list | API key (3 methods) | ❌ |
+| **Cursor** | — | ✅* | — | — | — | — | — | API key | ✅ (3 backends) |
+| **OpenCode** | — | ✅* | — | — | — | — | — | Self-managed | ✅ (4 backends + local) |
+
+*Not probed (binary not installed). Resume status from static preset only.
 
 ## Key Findings
 
@@ -192,13 +214,13 @@ Flightdeck sends `clientCapabilities: {}` — agents don't know the client has f
 
 Of the rich `AgentCapabilities` response, only `promptCapabilities.image` is read. `loadSession`, `audio`, `embeddedContext`, `mcpCapabilities`, and `sessionCapabilities` are captured but unused.
 
-### 3. Codex is the Only Provider Without Resume
+### 3. Gemini and Codex Lack Session Resume
 
-All 5 other providers (including both preview providers) support session resume. Codex agents must be restarted with full context replay after disconnection.
+Gemini has NO sessionCapabilities at all (probe-verified — our preset was incorrectly set to `true`, now fixed). Codex has session list but no resume/fork. Only Claude has full session management (fork + list + resume). Copilot has list + loadSession.
 
-### 4. MCP Server Passthrough Available but Untapped
+### 4. MCP Server Support Varies
 
-ACP supports passing MCP server configurations to agents. The protocol supports both HTTP and SSE transports. No current Flightdeck configuration leverages this.
+Probe verified: Claude and Gemini support both HTTP and SSE MCP transports. Codex supports HTTP only (no SSE). Copilot has no MCP capabilities. No current Flightdeck configuration leverages MCP server passthrough.
 
 ### 5. Claude Uses `_meta.systemPrompt` Extension
 
@@ -223,7 +245,7 @@ OpenCode uniquely supports local models alongside cloud providers. Its prefixed 
 
 3. **Leverage MCP server passthrough** — Allow project configuration to specify MCP servers that agents should connect to, enabling tool augmentation (database access, API integrations, custom tools).
 
-4. **Handle Codex resume gracefully** — Since Codex doesn't support resume, the UI should indicate this limitation and offer context-replay as an alternative.
+4. **Handle resume gaps gracefully** — Both Gemini and Codex don't support session resume. The UI should indicate this limitation and offer context-replay as an alternative.
 
 5. **Consume runtime capabilities** — Use the full `AgentCapabilities` response to override static presets, enabling the system to adapt to provider updates without code changes.
 

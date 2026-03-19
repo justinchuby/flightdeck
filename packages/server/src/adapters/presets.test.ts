@@ -58,7 +58,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.gemini;
       expect(preset.binary).toBe('gemini');
       expect(preset.args).toEqual(['--acp']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsResume).toBe(false);
       expect(preset.requiredEnvVars).toContain('GEMINI_API_KEY');
     });
   });
