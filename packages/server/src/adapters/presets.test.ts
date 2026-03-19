@@ -58,7 +58,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.gemini;
       expect(preset.binary).toBe('gemini');
       expect(preset.args).toEqual(['--acp']);
-      expect(preset.supportsResume).toBe(false);
+      expect(preset.supportsResume).toBe(true);
       expect(preset.requiredEnvVars).toContain('GEMINI_API_KEY');
     });
   });
@@ -86,7 +86,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.codex;
       expect(preset.binary).toBe('codex-acp');
       expect(preset.args).toEqual([]);
-      expect(preset.supportsResume).toBe(false);
+      expect(preset.supportsResume).toBe(true);
       expect(preset.requiredEnvVars).toContain('OPENAI_API_KEY');
     });
   });

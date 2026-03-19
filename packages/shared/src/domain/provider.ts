@@ -162,7 +162,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['--acp'],
     transport: 'stdio',
     requiredEnvVars: ['GEMINI_API_KEY'],
-    supportsResume: false, // Probe confirmed: no sessionCapabilities (no list/resume/fork)
+    supportsResume: true,
     modelFlag: '--model',
     defaultModel: 'gemini-2.5-pro',
     agentFileFormat: '.gemini/agents/*.md',
@@ -222,7 +222,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: [],
     transport: 'stdio',
     requiredEnvVars: ['OPENAI_API_KEY'],
-    supportsResume: false,
+    supportsResume: true,
     defaultModel: 'gpt-5.3-codex',
     modelArgStrategy: 'config',
     configModelPrefix: ['-c', 'model='],
