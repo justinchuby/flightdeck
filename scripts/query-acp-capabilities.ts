@@ -291,21 +291,41 @@ async function main() {
   // Print comparison table
   console.log(formatTable(results));
 
-  // Save raw results — shared data dir is the source of truth
+  // Save results
   const sharedDataPath = join(__dirname, '..', 'packages', 'shared', 'src', 'data', 'acp-capability-results.json');
-  const legacyPath = join(__dirname, 'acp-capability-results.json');
-  const output = {
+  const rawPath = join(__dirname, 'acp-capability-results.json');
+
+  const rawOutput = {
     timestamp: new Date().toISOString(),
     timeoutMs,
-    results: results.map((r) => ({
-      ...r,
-      // Include raw response for full inspection
-    })),
+    results: results.map((r) => ({ ...r })),
   };
-  const json = JSON.stringify(output, null, 2) + '\n';
-  writeFileSync(sharedDataPath, json);
-  writeFileSync(legacyPath, json);
-  console.log(`\nRaw results saved to:\n  ${sharedDataPath}\n  ${legacyPath}`);
+
+  // Sanitized version for shared/data — strip paths, authMethods, rawResponse, _meta
+  const sanitizedOutput = {
+    timestamp: rawOutput.timestamp,
+    results: results.map((r) => {
+      const clean: Record<string, unknown> = {
+        providerId: r.providerId,
+        providerName: r.providerName,
+        installed: r.installed,
+        durationMs: r.durationMs,
+        protocolVersion: r.protocolVersion,
+      };
+      if (r.agentInfo) clean.agentInfo = { version: r.agentInfo?.version };
+      if (r.agentCapabilities) {
+        const caps = { ...r.agentCapabilities };
+        delete (caps as Record<string, unknown>)._meta;
+        clean.agentCapabilities = caps;
+      }
+      return clean;
+    }),
+  };
+
+  writeFileSync(sharedDataPath, JSON.stringify(sanitizedOutput, null, 2) + '\n');
+  writeFileSync(rawPath, JSON.stringify(rawOutput, null, 2) + '\n');
+  console.log(`\nSanitized results saved to: ${sharedDataPath}`);
+  console.log(`Raw results saved to: ${rawPath} (gitignored)`)
 
   // Force exit — spawned provider processes may keep event loop alive
   process.exit(0);

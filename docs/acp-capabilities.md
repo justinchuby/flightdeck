@@ -99,7 +99,7 @@ SessionCapabilities {
 
 - **Live probe data for all 7 installed providers** — no more assumptions or static guesses
 - **ACP_CAPABILITIES derived from probe JSON** — single source of truth, no hand-maintained constants that drift
-- **Gemini resume preset fixed** — was incorrectly `true`, probe proved it has no sessionCapabilities
+- **Gemini resume preset clarified** — the old `supportsResume` field was ambiguous. It has been renamed to `supportsLoadSession` (which IS true for Gemini — it advertises `loadSession`). Gemini does NOT have `sessionCapabilities.resume` (no session resume/fork), which is what the old preset incorrectly implied.
 
 ### ⚠️ Remaining Gaps
 
@@ -172,14 +172,14 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | **Binary** | `gemini --acp` |
 | **Probe Version** | v0.34.0 |
 | **Auth** | `GEMINI_API_KEY` env var (4 auth methods: OAuth, API key, Vertex AI, Gateway) |
-| **Resume** | ❌ (no sessionCapabilities — probe verified) |
+| **Resume** | ⚠️ (loadSession ✅, but no sessionCapabilities — no resume/fork) |
 | **Images** | ✅ |
 | **Audio** | ✅ (only provider with audio support) |
 | **MCP** | ✅ HTTP + SSE |
 | **Embedded Context** | ✅ |
 | **Model Selection** | `--model <name>` flag |
-| **Models** | Google only (gemini-2.5-pro, flash, flash-lite) |
-| **Model Tiers** | fast: `gemini-2.5-flash-lite`, standard: `gemini-2.5-flash`, premium: `gemini-2.5-pro` |
+| **Models** | Google only (gemini-3.1-pro, gemini-3.1-flash, gemini-3.1-flash-lite) |
+| **Model Tiers** | fast: `gemini-3.1-flash-lite`, standard: `gemini-3.1-flash`, premium: `gemini-3.1-pro` |
 | **System Prompt** | First user message |
 | **Agent File** | `.gemini/agents/*.md` |
 | **Unique** | Google-native models, audio support, directory-based agent files |
@@ -276,7 +276,7 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 |----------|---------|--------|--------|-------|-----|--------------|--------------|-------------|---------------|
 | **Copilot** | v1.0.9 | ✅ | ✅ | ❌ | ❌ | ✅ | list | GitHub CLI | ✅ (4 backends) |
 | **Claude** | v0.21.0 | ✅ | ✅ | ❌ | ✅ http+sse | ✅ | fork+list+resume | API key | ❌ |
-| **Gemini** | v0.34.0 | ❌ | ✅ | ✅ | ✅ http+sse | ✅ | none | API key (4 methods) | ❌ |
+| **Gemini** | v0.34.0 | ⚠️ loadSession only | ✅ | ✅ | ✅ http+sse | ✅ | none | API key (4 methods) | ❌ |
 | **Codex** | v0.9.5 | ❌ | ✅ | ❌ | ⚠️ http only | ✅ | list | API key (3 methods) | ❌ |
 | **Kimi** | v1.24.0 | ✅ | ✅ | ❌ | ⚠️ http only | ✅ | list+resume | Moonshot login | ❌ |
 | **Qwen Code** | v0.12.6 | ✅ | ✅ | ✅ | ❌ | ✅ | list+resume | Qwen OAuth / OPENAI_API_KEY | ✅ (2 backends) |

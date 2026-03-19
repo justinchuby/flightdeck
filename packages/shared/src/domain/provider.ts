@@ -405,7 +405,6 @@ interface ProbeResult {
     promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean };
     sessionCapabilities?: { list?: object; resume?: object; fork?: object };
   };
-  authMethods?: Array<{ name?: string; description?: string }>;
 }
 
 /**

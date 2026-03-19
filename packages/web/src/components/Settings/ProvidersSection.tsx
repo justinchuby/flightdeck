@@ -10,7 +10,7 @@
  * Drag-and-drop reordering via @dnd-kit/sortable.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn, Check, X } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn, Check, X, Minus } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -62,14 +62,15 @@ interface TestResult {
 // ACP capabilities come from ACP_CAPABILITIES via getAcpCapabilities().
 
 /** Inline capability badge for provider cards. */
-function CapChip({ supported, label }: { supported: boolean; label: string }) {
+function CapChip({ supported, label }: { supported: boolean | 'unknown'; label: string }) {
+  const style = supported === 'unknown'
+    ? 'text-th-text-muted/50 bg-th-bg-alt'
+    : supported
+      ? 'text-green-400 bg-green-400/10'
+      : 'text-th-text-muted/40 bg-th-bg-alt';
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-      supported
-        ? 'text-green-400 bg-green-400/10'
-        : 'text-th-text-muted/40 bg-th-bg-alt'
-    }`}>
-      {supported ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
+    <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${style}`}>
+      {supported === 'unknown' ? <Minus className="w-2.5 h-2.5" /> : supported ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
       {label}
     </span>
   );
@@ -276,13 +277,23 @@ function ProviderCard({
               <div className="text-xs">
                 <span className="text-th-text-muted block mb-1.5">ACP Capabilities:</span>
                 <div className="flex flex-wrap gap-1">
-                  <CapChip supported={caps.loadSession} label="Resume" />
-                  <CapChip supported={caps.images} label="Images" />
-                  <CapChip supported={caps.audio} label="Audio" />
-                  <CapChip supported={hasMcp} label="MCP" />
-                  <CapChip supported={caps.embeddedContext} label="Embedded Ctx" />
-                  {!caps.probed && (
-                    <span className="text-[10px] text-th-text-muted/50 italic">not probed</span>
+                  {caps.probed ? (
+                    <>
+                      <CapChip supported={caps.loadSession} label="Resume" />
+                      <CapChip supported={caps.images} label="Images" />
+                      <CapChip supported={caps.audio} label="Audio" />
+                      <CapChip supported={hasMcp} label="MCP" />
+                      <CapChip supported={caps.embeddedContext} label="Embedded Ctx" />
+                    </>
+                  ) : (
+                    <>
+                      <CapChip supported="unknown" label="Resume" />
+                      <CapChip supported="unknown" label="Images" />
+                      <CapChip supported="unknown" label="Audio" />
+                      <CapChip supported="unknown" label="MCP" />
+                      <CapChip supported="unknown" label="Embedded Ctx" />
+                      <span className="text-[10px] text-th-text-muted/50 italic">not probed</span>
+                    </>
                   )}
                 </div>
                 <div className="mt-1.5 text-[10px] text-th-text-muted">
