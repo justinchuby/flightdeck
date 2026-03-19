@@ -24,7 +24,7 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 </p>
 
 <p align="center">
-  <img src="packages/docs/public/screenshots/timeline-live.png" alt="Timeline — zoom, scroll, and replay agent activity over time" width="720" />
+  <img src="packages/docs/public/screenshots/timeline.png" alt="Timeline — zoom, scroll, and replay agent activity over time" width="720" />
   <br /><em>Timeline — zoom, scroll, and replay agent activity with session scrubber</em>
 </p>
 
