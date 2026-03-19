@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitToolOutput, findCommonPrefix } from '../AcpOutput';
+import { splitToolOutput, findCommonPrefix } from '../../Shared/toolOutput';
 
 describe('splitToolOutput', () => {
   it('returns a single text part when there are no Info: lines', () => {

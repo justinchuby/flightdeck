@@ -6,7 +6,7 @@ import { useToastStore } from '../Toast';
 import { apiFetch } from '../../hooks/useApi';
 import { AgentIdBadge } from '../../utils/markdown';
 import { Markdown } from '../ui/Markdown';
-import { splitToolOutput, CollapsibleToolOutput } from '../ChatPanel/AcpOutput';
+import { splitToolOutput, CollapsibleToolOutput } from '../Shared/toolOutput';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type { AcpTextChunk, AgentInfo } from '../../types';
 
@@ -291,7 +291,7 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
 
   // Tool call messages render via dedicated component (hooks must be unconditional)
   if (sender === 'tool') {
-    return <ToolMessageBubble msg={msg} />;
+    return <ToolMessageBubble msg={msg} agentId={agent?.id ?? ''} />;
   }
 
   const text = typeof msg.text === 'string' ? msg.text : '';
@@ -329,7 +329,7 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
 }
 
 /** Tool call message bubble — extracted so hooks are called unconditionally */
-function ToolMessageBubble({ msg }: { msg: AcpTextChunk }) {
+function ToolMessageBubble({ msg, agentId }: { msg: AcpTextChunk; agentId: string }) {
   const text = typeof msg.text === 'string' ? msg.text : '';
   const status = msg.toolStatus ?? 'in_progress';
   const statusColors: Record<string, string> = {
@@ -340,18 +340,15 @@ function ToolMessageBubble({ msg }: { msg: AcpTextChunk }) {
   };
   const color = statusColors[status] || 'text-sky-400';
 
-  const agents = useAppStore((s) => s.agents);
+  // Narrow lookup to the current agent's toolCalls (O(1) agent + O(toolCalls))
+  const toolCalls = useAppStore((s) => s.agents.find((a) => a.id === agentId)?.toolCalls);
   const content = useMemo(() => {
-    if (!msg.toolCallId) return undefined;
-    for (const a of agents) {
-      const tc = a.toolCalls?.find((t) => t.toolCallId === msg.toolCallId);
-      if (tc?.content) return tc.content;
-    }
-    return undefined;
-  }, [agents, msg.toolCallId]);
+    if (!msg.toolCallId || !toolCalls) return undefined;
+    return toolCalls.find((t) => t.toolCallId === msg.toolCallId)?.content;
+  }, [toolCalls, msg.toolCallId]);
 
   const badge = (
-    <div className="flex items-center gap-1.5 py-0.5">
+    <span className="flex items-center gap-1.5 py-0.5">
       {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted group-open:rotate-90 transition-transform" />}
       <span className={`text-[10px] ${color} truncate`}>
         🔧 {text.slice(0, 200)}
@@ -364,7 +361,7 @@ function ToolMessageBubble({ msg }: { msg: AcpTextChunk }) {
           {formatRelativeTime(new Date(msg.timestamp).toISOString())}
         </span>
       )}
-    </div>
+    </span>
   );
 
   if (!content) return badge;
