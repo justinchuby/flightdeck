@@ -117,6 +117,7 @@ export default defineConfig({
             { text: 'Configuration', link: '/reference/configuration' },
             { text: 'Architecture Decisions', link: '/reference/architecture-decisions' },
             { text: 'Design Decisions', link: '/reference/design-decisions' },
+            { text: 'ACP Capabilities', link: '/reference/acp-capabilities' },
           ],
         },
       ],

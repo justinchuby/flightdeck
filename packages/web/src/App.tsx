@@ -48,7 +48,6 @@ const ProjectsPanel = lazy(() => import('./components/ProjectsPanel').then(m => 
 const KnowledgePanel = lazy(() => import('./components/KnowledgePanel').then(m => ({ default: m.KnowledgePanel })));
 const ArtifactsPanel = lazy(() => import('./components/ArtifactsPanel').then(m => ({ default: m.ArtifactsPanel })));
 const HomeDashboard = lazy(() => import('./components/HomeDashboard').then(m => ({ default: m.HomeDashboard })));
-const FindingsPage = lazy(() => import('./components/FindingsPage').then(m => ({ default: m.FindingsPage })));
 const _CrewPage = lazy(() => import('./pages/CrewPage').then(m => ({ default: m.CrewPage })));
 const _CrewRoster = lazy(() => import('./components/CrewRoster/CrewRoster').then(m => ({ default: m.CrewRoster })));
 const UnifiedCrewPage = lazy(() => import('./components/CrewRoster/UnifiedCrewPage').then(m => ({ default: m.UnifiedCrewPage })));
@@ -379,7 +378,6 @@ function AppContent() {
             {/* ── Global (non-project-scoped) routes ───────────── */}
             <Route path="/projects" element={<RouteErrorBoundary name="Projects"><ProjectsPanel /></RouteErrorBoundary>} />
             <Route path="/settings" element={<RouteErrorBoundary name="Settings"><SettingsPanel /></RouteErrorBoundary>} />
-            <Route path="/findings" element={<RouteErrorBoundary name="Findings"><FindingsPage /></RouteErrorBoundary>} />
             <Route path="/shared/:token" element={<RouteErrorBoundary name="Shared Replay"><SharedReplayViewer /></RouteErrorBoundary>} />
 
             {/* ── Backward-compat redirects from old flat routes ─ */}

@@ -1,1 +1,0 @@
-export { FindingsPage } from './FindingsPage';
