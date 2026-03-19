@@ -147,7 +147,7 @@ function ProviderCard({
   const authLabel = providerDef?.authLabel ?? 'Provider-managed auth';
   const defaultArgs = providerDef?.args ?? [];
   const loginLabel = providerDef?.loginInstructions ?? 'Log in via the provider CLI';
-  const supportsResume = providerDef?.supportsResume ?? false;
+  const supportsLoadSession = providerDef?.supportsLoadSession ?? false;
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -261,7 +261,7 @@ function ProviderCard({
               <span className="text-th-text-alt">
                 {[
                   'ACP',
-                  supportsResume && 'Resume',
+                  supportsLoadSession && 'Resume',
                 ].filter(Boolean).join(', ')}
               </span>
             </div>
@@ -276,7 +276,7 @@ function ProviderCard({
               <div className="text-xs">
                 <span className="text-th-text-muted block mb-1.5">ACP Capabilities:</span>
                 <div className="flex flex-wrap gap-1">
-                  <CapChip supported={supportsResume} label="Resume" />
+                  <CapChip supported={supportsLoadSession} label="Resume" />
                   <CapChip supported={caps.images} label="Images" />
                   <CapChip supported={caps.audio} label="Audio" />
                   <CapChip supported={hasMcp} label="MCP" />

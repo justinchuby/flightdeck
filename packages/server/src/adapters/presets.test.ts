@@ -49,7 +49,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.copilot;
       expect(preset.binary).toBe('copilot');
       expect(preset.args).toEqual(['--acp', '--stdio']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
     });
   });
 
@@ -58,7 +58,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.gemini;
       expect(preset.binary).toBe('gemini');
       expect(preset.args).toEqual(['--acp']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
       expect(preset.requiredEnvVars).toContain('GEMINI_API_KEY');
     });
   });
@@ -68,7 +68,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.opencode;
       expect(preset.binary).toBe('opencode');
       expect(preset.args).toEqual(['acp']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
     });
   });
 
@@ -77,7 +77,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.cursor;
       expect(preset.binary).toBe('agent');
       expect(preset.args).toEqual(['acp']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
     });
   });
 
@@ -86,7 +86,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.codex;
       expect(preset.binary).toBe('codex-acp');
       expect(preset.args).toEqual([]);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
       expect(preset.requiredEnvVars).toContain('OPENAI_API_KEY');
     });
   });
@@ -96,7 +96,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.claude;
       expect(preset.binary).toBe('claude-agent-acp');
       expect(preset.args).toEqual([]);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
       expect(preset.requiredEnvVars).toContain('ANTHROPIC_API_KEY');
       expect(preset.agentFileFormat).toBe('CLAUDE.md');
     });
@@ -107,7 +107,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS.kimi;
       expect(preset.binary).toBe('kimi');
       expect(preset.args).toEqual(['acp']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
     });
   });
 
@@ -116,7 +116,7 @@ describe('Provider Presets', () => {
       const preset = PROVIDER_PRESETS['qwen-code'];
       expect(preset.binary).toBe('qwen');
       expect(preset.args).toEqual(['--acp', '--experimental-skills']);
-      expect(preset.supportsResume).toBe(true);
+      expect(preset.supportsLoadSession).toBe(true);
     });
   });
 

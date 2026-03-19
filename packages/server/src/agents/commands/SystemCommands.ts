@@ -193,7 +193,7 @@ function handleQueryProviders(ctx: CommandHandlerContext, agent: Agent): void {
     if (preset.defaultModel) {
       lines.push(`     Default model: ${preset.defaultModel}`);
     }
-    lines.push(`     Resume support: ${preset.supportsResume ? 'yes' : 'no'}`);
+    lines.push(`     Resume support: ${preset.supportsLoadSession ? 'yes' : 'no'}`);
   }
 
   // Include project model config if available

@@ -170,4 +170,4 @@ When an agent requests a model that's native to a different provider backend (e.
 
 ### Session Resume
 
-Providers that support session resume (`supportsResume: true`) can persist and restore agent sessions across restarts. Currently supported by: Copilot, Gemini, Claude, Cursor, and OpenCode.
+Providers that support session resume (`supportsLoadSession: true`) can persist and restore agent sessions across restarts. Currently supported by: Copilot, Gemini, Claude, Cursor, and OpenCode.

@@ -105,7 +105,7 @@ function buildCapabilities(): ProviderCapabilities[] {
       icon: p.icon,
       iconUrl: p.iconUrl,
       isPreview: p.isPreview,
-      resume: p.supportsResume,
+      resume: p.supportsLoadSession,
       images: caps?.images ?? false,
       audio: caps?.probed ? caps.audio : ('not-probed' as const),
       mcpServers: hasMcp,

@@ -68,7 +68,7 @@ export interface ProviderDefinition {
   /** Env var keys the user must configure (values come from user env) */
   requiredEnvVars: string[];
   /** Whether the CLI supports session resume via session/load */
-  supportsResume: boolean;
+  supportsLoadSession: boolean;
   /** CLI flag for model selection (e.g. '--model'), undefined if N/A */
   modelFlag?: string;
   /** Default model when none specified */
@@ -136,7 +136,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['--acp', '--stdio'],
     transport: 'stdio',
     requiredEnvVars: [],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelFlag: '--model',
     agentFileFormat: '.agent.md',
     supportsAgentFlag: true,
@@ -162,7 +162,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['--acp'],
     transport: 'stdio',
     requiredEnvVars: ['GEMINI_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelFlag: '--model',
     defaultModel: 'gemini-2.5-pro',
     agentFileFormat: '.gemini/agents/*.md',
@@ -187,7 +187,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: [],
     transport: 'stdio',
     requiredEnvVars: ['ANTHROPIC_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelFlag: '--model',
     defaultModel: 'claude-sonnet-4',
     agentFileFormat: 'CLAUDE.md',
@@ -222,7 +222,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: [],
     transport: 'stdio',
     requiredEnvVars: ['OPENAI_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     defaultModel: 'gpt-5.3-codex',
     modelArgStrategy: 'config',
     configModelPrefix: ['-c', 'model='],
@@ -248,7 +248,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['acp'],
     transport: 'stdio',
     requiredEnvVars: ['CURSOR_API_KEY'],
-    supportsResume: true,
+    supportsLoadSession: true,
     agentFileFormat: '.cursorrules',
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google'],
@@ -270,7 +270,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['acp'],
     transport: 'stdio',
     requiredEnvVars: [],
-    supportsResume: true,
+    supportsLoadSession: true,
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google', 'local'],
     tierModels: { fast: 'anthropic/claude-haiku-4-5', standard: 'anthropic/claude-sonnet-4-6', premium: 'anthropic/claude-opus-4-6' },
@@ -292,7 +292,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['acp'],
     transport: 'stdio',
     requiredEnvVars: [],
-    supportsResume: true, // Probe: sessionCapabilities.list + resume, loadSession: true
+    supportsLoadSession: true, // Probe: sessionCapabilities.list + resume, loadSession: true
     modelFlag: '--model',
     defaultModel: 'kimi-latest',
     modelArgStrategy: 'flag',
@@ -316,7 +316,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     args: ['--acp', '--experimental-skills'],
     transport: 'stdio',
     requiredEnvVars: [],
-    supportsResume: true, // Probe: sessionCapabilities.list + resume, loadSession: true
+    supportsLoadSession: true, // Probe: sessionCapabilities.list + resume, loadSession: true
     modelFlag: '--model',
     defaultModel: 'qwen-coder-plus-latest',
     modelArgStrategy: 'flag',
