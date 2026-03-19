@@ -292,8 +292,9 @@ async function main() {
   // Print comparison table
   console.log(formatTable(results));
 
-  // Save raw results
-  const outPath = join(__dirname, 'acp-capability-results.json');
+  // Save raw results — shared data dir is the source of truth
+  const sharedDataPath = join(__dirname, '..', 'packages', 'shared', 'src', 'data', 'acp-capability-results.json');
+  const legacyPath = join(__dirname, 'acp-capability-results.json');
   const output = {
     timestamp: new Date().toISOString(),
     timeoutMs,
@@ -302,8 +303,10 @@ async function main() {
       // Include raw response for full inspection
     })),
   };
-  writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');
-  console.log(`\nRaw results saved to: ${outPath}`);
+  const json = JSON.stringify(output, null, 2) + '\n';
+  writeFileSync(sharedDataPath, json);
+  writeFileSync(legacyPath, json);
+  console.log(`\nRaw results saved to:\n  ${sharedDataPath}\n  ${legacyPath}`);
 
   // Force exit — spawned provider processes may keep event loop alive
   process.exit(0);

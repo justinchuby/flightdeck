@@ -386,101 +386,116 @@ export interface AcpProviderCapabilities {
   probed: boolean;
 }
 
+// ── Derive ACP_CAPABILITIES from probe JSON ────────────────────
+//
+// The probe script (scripts/query-acp-capabilities.ts) writes
+// acp-capability-results.json. That file is the single source of truth
+// for probe data. We import it and transform it at build time.
+
+import probeResults from '../data/acp-capability-results.json' with { type: 'json' };
+
+/** Raw probe result shape (subset we need). */
+interface ProbeResult {
+  providerId: string;
+  installed: boolean;
+  agentInfo?: { version?: string };
+  agentCapabilities?: {
+    loadSession?: boolean;
+    mcpCapabilities?: { http?: boolean; sse?: boolean };
+    promptCapabilities?: { image?: boolean; audio?: boolean; embeddedContext?: boolean };
+    sessionCapabilities?: { list?: object; resume?: object; fork?: object };
+  };
+  authMethods?: Array<{ name?: string; description?: string }>;
+}
+
 /**
- * ACP capabilities per provider — single source of truth.
- *
- * Consumed by both ProvidersSection (Settings) and FindingsPage.
- * Cursor and OpenCode are not yet probed (preview providers).
+ * Non-probe metadata that cannot be determined automatically.
+ * Keyed by ProviderId. Only providers with non-default values need entries.
  */
-export const ACP_CAPABILITIES: Record<ProviderId, AcpProviderCapabilities> = {
-  copilot: {
-    probeVersion: '1.0.9',
-    images: true, audio: false,
-    mcpHttp: false, mcpSse: false,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: true, sessionResume: false, sessionFork: false,
-    systemPromptMethod: '--agent flag + .agent.md',
-    authMethod: 'gh auth status (GitHub OAuth)',
-    probed: true,
-  },
-  claude: {
-    probeVersion: '0.21.0',
-    images: true, audio: false,
-    mcpHttp: true, mcpSse: true,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: true, sessionResume: true, sessionFork: true,
-    systemPromptMethod: '_meta.systemPrompt ACP extension',
-    authMethod: 'ANTHROPIC_API_KEY env var',
-    probed: true,
-  },
-  gemini: {
-    probeVersion: '0.34.0',
-    images: true, audio: true,
-    mcpHttp: true, mcpSse: true,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: false, sessionResume: false, sessionFork: false,
-    systemPromptMethod: 'First user message',
-    authMethod: 'GEMINI_API_KEY env var',
-    probed: true,
-  },
-  codex: {
-    probeVersion: '0.9.5',
-    images: true, audio: false,
-    mcpHttp: true, mcpSse: false,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: true, sessionResume: false, sessionFork: false,
-    systemPromptMethod: 'First user message',
-    authMethod: 'OPENAI_API_KEY env var',
-    probed: true,
-  },
-  cursor: {
-    images: true, audio: false,
-    mcpHttp: false, mcpSse: false,
-    embeddedContext: false,
-    loadSession: true,
-    sessionList: false, sessionResume: false, sessionFork: false,
-    systemPromptMethod: 'First user message',
-    authMethod: 'CURSOR_API_KEY env var',
-    probed: false,
-  },
-  opencode: {
-    probeVersion: '1.2.27',
-    images: true, audio: false,
-    mcpHttp: true, mcpSse: true,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: true, sessionResume: true, sessionFork: true,
-    systemPromptMethod: 'First user message',
-    authMethod: 'Self-managed (opencode auth login)',
-    probed: true,
-  },
-  kimi: {
-    probeVersion: '1.24.0',
-    images: true, audio: false,
-    mcpHttp: true, mcpSse: false,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: true, sessionResume: true, sessionFork: false,
-    systemPromptMethod: 'First user message',
-    authMethod: 'kimi login (Moonshot account)',
-    probed: true,
-  },
-  'qwen-code': {
-    probeVersion: '0.12.6',
-    images: true, audio: true,
-    mcpHttp: false, mcpSse: false,
-    embeddedContext: true,
-    loadSession: true,
-    sessionList: true, sessionResume: true, sessionFork: false,
-    systemPromptMethod: 'First user message',
-    authMethod: 'Qwen OAuth or OPENAI_API_KEY',
-    probed: true,
-  },
+const CAPABILITY_OVERRIDES: Partial<Record<ProviderId, { systemPromptMethod?: string; authMethod?: string }>> = {
+  copilot:      { systemPromptMethod: '--agent flag + .agent.md', authMethod: 'gh auth status (GitHub OAuth)' },
+  claude:       { systemPromptMethod: '_meta.systemPrompt ACP extension', authMethod: 'ANTHROPIC_API_KEY env var' },
+  gemini:       { authMethod: 'GEMINI_API_KEY env var' },
+  codex:        { authMethod: 'OPENAI_API_KEY env var' },
+  cursor:       { authMethod: 'CURSOR_API_KEY env var' },
+  opencode:     { authMethod: 'Self-managed (opencode auth login)' },
+  kimi:         { authMethod: 'kimi login (Moonshot account)' },
+  'qwen-code':  { authMethod: 'Qwen OAuth or OPENAI_API_KEY' },
 };
+
+/** Defaults for unprobed/uninstalled providers. */
+const UNPROBED_DEFAULTS: AcpProviderCapabilities = {
+  images: false, audio: false,
+  mcpHttp: false, mcpSse: false,
+  embeddedContext: false,
+  loadSession: false,
+  sessionList: false, sessionResume: false, sessionFork: false,
+  systemPromptMethod: 'First user message',
+  authMethod: 'Unknown',
+  probed: false,
+};
+
+function deriveCapabilities(result: ProbeResult): AcpProviderCapabilities {
+  const id = result.providerId as ProviderId;
+  const overrides = CAPABILITY_OVERRIDES[id] ?? {};
+
+  if (!result.installed || !result.agentCapabilities) {
+    return {
+      ...UNPROBED_DEFAULTS,
+      systemPromptMethod: overrides.systemPromptMethod ?? UNPROBED_DEFAULTS.systemPromptMethod,
+      authMethod: overrides.authMethod ?? UNPROBED_DEFAULTS.authMethod,
+    };
+  }
+
+  const caps = result.agentCapabilities;
+  const prompt = caps.promptCapabilities ?? {};
+  const mcp = caps.mcpCapabilities ?? {};
+  const session = caps.sessionCapabilities ?? {};
+
+  return {
+    probeVersion: result.agentInfo?.version,
+    images: prompt.image ?? false,
+    audio: prompt.audio ?? false,
+    mcpHttp: mcp.http ?? false,
+    mcpSse: mcp.sse ?? false,
+    embeddedContext: prompt.embeddedContext ?? false,
+    loadSession: caps.loadSession ?? false,
+    sessionList: 'list' in session,
+    sessionResume: 'resume' in session,
+    sessionFork: 'fork' in session,
+    systemPromptMethod: overrides.systemPromptMethod ?? 'First user message',
+    authMethod: overrides.authMethod ?? 'Unknown',
+    probed: true,
+  };
+}
+
+/**
+ * ACP capabilities per provider — derived from acp-capability-results.json.
+ *
+ * The probe script generates the JSON; this constant is built from it.
+ * Consumed by both ProvidersSection (Settings) and FindingsPage.
+ */
+export const ACP_CAPABILITIES: Record<ProviderId, AcpProviderCapabilities> = (() => {
+  const results = (probeResults as { results: ProbeResult[] }).results;
+  const map = {} as Record<ProviderId, AcpProviderCapabilities>;
+  for (const r of results) {
+    if (PROVIDER_IDS.includes(r.providerId as ProviderId)) {
+      map[r.providerId as ProviderId] = deriveCapabilities(r);
+    }
+  }
+  // Fill any providers missing from the probe file with defaults
+  for (const id of PROVIDER_IDS) {
+    if (!map[id]) {
+      const overrides = CAPABILITY_OVERRIDES[id] ?? {};
+      map[id] = {
+        ...UNPROBED_DEFAULTS,
+        systemPromptMethod: overrides.systemPromptMethod ?? UNPROBED_DEFAULTS.systemPromptMethod,
+        authMethod: overrides.authMethod ?? UNPROBED_DEFAULTS.authMethod,
+      };
+    }
+  }
+  return map;
+})();
 
 /** Get ACP capabilities for a provider. */
 export function getAcpCapabilities(id: string): AcpProviderCapabilities | undefined {

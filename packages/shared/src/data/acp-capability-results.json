@@ -1,0 +1,594 @@
+{
+  "timestamp": "2026-03-19T16:10:19.109Z",
+  "timeoutMs": 20000,
+  "results": [
+    {
+      "providerId": "copilot",
+      "providerName": "GitHub Copilot",
+      "binary": "copilot",
+      "installed": true,
+      "durationMs": 1624,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "Copilot",
+        "title": "Copilot",
+        "version": "1.0.9"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "list": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "copilot-login",
+          "name": "Log in with Copilot CLI",
+          "description": "Run `copilot login` in the terminal",
+          "_meta": {
+            "terminal-auth": {
+              "command": "/opt/homebrew/Caskroom/copilot-cli/1.0.2/copilot",
+              "args": [
+                "login"
+              ],
+              "label": "Copilot Login"
+            }
+          }
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": false,
+            "embeddedContext": true
+          },
+          "sessionCapabilities": {
+            "list": {}
+          }
+        },
+        "agentInfo": {
+          "name": "Copilot",
+          "title": "Copilot",
+          "version": "1.0.9"
+        },
+        "authMethods": [
+          {
+            "id": "copilot-login",
+            "name": "Log in with Copilot CLI",
+            "description": "Run `copilot login` in the terminal",
+            "_meta": {
+              "terminal-auth": {
+                "command": "/opt/homebrew/Caskroom/copilot-cli/1.0.2/copilot",
+                "args": [
+                  "login"
+                ],
+                "label": "Copilot Login"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "providerId": "claude",
+      "providerName": "Claude Code",
+      "binary": "claude-agent-acp",
+      "installed": true,
+      "durationMs": 190,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "@zed-industries/claude-agent-acp",
+        "title": "Claude Agent",
+        "version": "0.21.0"
+      },
+      "agentCapabilities": {
+        "_meta": {
+          "claudeCode": {
+            "promptQueueing": true
+          }
+        },
+        "promptCapabilities": {
+          "image": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "loadSession": true,
+        "sessionCapabilities": {
+          "fork": {},
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "_meta": {
+            "claudeCode": {
+              "promptQueueing": true
+            }
+          },
+          "promptCapabilities": {
+            "image": true,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": true,
+            "sse": true
+          },
+          "loadSession": true,
+          "sessionCapabilities": {
+            "fork": {},
+            "list": {},
+            "resume": {}
+          }
+        },
+        "agentInfo": {
+          "name": "@zed-industries/claude-agent-acp",
+          "title": "Claude Agent",
+          "version": "0.21.0"
+        },
+        "authMethods": []
+      }
+    },
+    {
+      "providerId": "gemini",
+      "providerName": "Gemini CLI",
+      "binary": "gemini",
+      "installed": true,
+      "durationMs": 6332,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "gemini-cli",
+        "title": "Gemini CLI",
+        "version": "0.34.0"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        }
+      },
+      "authMethods": [
+        {
+          "id": "oauth-personal",
+          "name": "Log in with Google",
+          "description": "Log in with your Google account"
+        },
+        {
+          "id": "gemini-api-key",
+          "name": "Gemini API key",
+          "description": "Use an API key with Gemini Developer API",
+          "_meta": {
+            "api-key": {
+              "provider": "google"
+            }
+          }
+        },
+        {
+          "id": "vertex-ai",
+          "name": "Vertex AI",
+          "description": "Use an API key with Vertex AI GenAI API"
+        },
+        {
+          "id": "gateway",
+          "name": "AI API Gateway",
+          "description": "Use a custom AI API Gateway",
+          "_meta": {
+            "gateway": {
+              "protocol": "google",
+              "restartRequired": "false"
+            }
+          }
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "authMethods": [
+          {
+            "id": "oauth-personal",
+            "name": "Log in with Google",
+            "description": "Log in with your Google account"
+          },
+          {
+            "id": "gemini-api-key",
+            "name": "Gemini API key",
+            "description": "Use an API key with Gemini Developer API",
+            "_meta": {
+              "api-key": {
+                "provider": "google"
+              }
+            }
+          },
+          {
+            "id": "vertex-ai",
+            "name": "Vertex AI",
+            "description": "Use an API key with Vertex AI GenAI API"
+          },
+          {
+            "id": "gateway",
+            "name": "AI API Gateway",
+            "description": "Use a custom AI API Gateway",
+            "_meta": {
+              "gateway": {
+                "protocol": "google",
+                "restartRequired": "false"
+              }
+            }
+          }
+        ],
+        "agentInfo": {
+          "name": "gemini-cli",
+          "title": "Gemini CLI",
+          "version": "0.34.0"
+        },
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": true,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": true,
+            "sse": true
+          }
+        }
+      }
+    },
+    {
+      "providerId": "codex",
+      "providerName": "Codex CLI",
+      "binary": "codex-acp",
+      "installed": true,
+      "durationMs": 163,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "codex-acp",
+        "title": "Codex",
+        "version": "0.9.5"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false
+        },
+        "sessionCapabilities": {
+          "list": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "chatgpt",
+          "name": "Login with ChatGPT",
+          "description": "Use your ChatGPT login with Codex CLI (requires a paid ChatGPT subscription)"
+        },
+        {
+          "id": "codex-api-key",
+          "name": "Use CODEX_API_KEY",
+          "description": "Requires setting the `CODEX_API_KEY` environment variable."
+        },
+        {
+          "id": "openai-api-key",
+          "name": "Use OPENAI_API_KEY",
+          "description": "Requires setting the `OPENAI_API_KEY` environment variable."
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": false,
+            "embeddedContext": true
+          },
+          "mcpCapabilities": {
+            "http": true,
+            "sse": false
+          },
+          "sessionCapabilities": {
+            "list": {}
+          }
+        },
+        "authMethods": [
+          {
+            "id": "chatgpt",
+            "name": "Login with ChatGPT",
+            "description": "Use your ChatGPT login with Codex CLI (requires a paid ChatGPT subscription)"
+          },
+          {
+            "id": "codex-api-key",
+            "name": "Use CODEX_API_KEY",
+            "description": "Requires setting the `CODEX_API_KEY` environment variable."
+          },
+          {
+            "id": "openai-api-key",
+            "name": "Use OPENAI_API_KEY",
+            "description": "Requires setting the `OPENAI_API_KEY` environment variable."
+          }
+        ],
+        "agentInfo": {
+          "name": "codex-acp",
+          "title": "Codex",
+          "version": "0.9.5"
+        }
+      }
+    },
+    {
+      "providerId": "cursor",
+      "providerName": "Cursor Agent",
+      "binary": "agent",
+      "installed": false,
+      "error": "Binary 'agent' not found in PATH"
+    },
+    {
+      "providerId": "opencode",
+      "providerName": "OpenCode",
+      "binary": "opencode",
+      "installed": true,
+      "durationMs": 1369,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "OpenCode",
+        "version": "1.2.27"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "promptCapabilities": {
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "fork": {},
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [
+        {
+          "description": "Run `opencode auth login` in the terminal",
+          "name": "Login with opencode",
+          "id": "opencode-login"
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "mcpCapabilities": {
+            "http": true,
+            "sse": true
+          },
+          "promptCapabilities": {
+            "embeddedContext": true,
+            "image": true
+          },
+          "sessionCapabilities": {
+            "fork": {},
+            "list": {},
+            "resume": {}
+          }
+        },
+        "authMethods": [
+          {
+            "description": "Run `opencode auth login` in the terminal",
+            "name": "Login with opencode",
+            "id": "opencode-login"
+          }
+        ],
+        "agentInfo": {
+          "name": "OpenCode",
+          "version": "1.2.27"
+        }
+      }
+    },
+    {
+      "providerId": "kimi",
+      "providerName": "Kimi CLI",
+      "binary": "kimi",
+      "installed": true,
+      "durationMs": 1001,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "Kimi Code CLI",
+        "version": "1.24.0"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false
+        },
+        "promptCapabilities": {
+          "audio": false,
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [
+        {
+          "_meta": {
+            "terminal-auth": {
+              "command": "/Users/justinc/.local/bin/kimi",
+              "args": [
+                "login"
+              ],
+              "label": "Kimi Code Login",
+              "env": {},
+              "type": "terminal"
+            }
+          },
+          "description": "Run `kimi login` command in the terminal, then follow the instructions to finish login.",
+          "id": "login",
+          "name": "Login with Kimi account"
+        }
+      ],
+      "rawResponse": {
+        "agentCapabilities": {
+          "loadSession": true,
+          "mcpCapabilities": {
+            "http": true,
+            "sse": false
+          },
+          "promptCapabilities": {
+            "audio": false,
+            "embeddedContext": true,
+            "image": true
+          },
+          "sessionCapabilities": {
+            "list": {},
+            "resume": {}
+          }
+        },
+        "agentInfo": {
+          "name": "Kimi Code CLI",
+          "version": "1.24.0"
+        },
+        "authMethods": [
+          {
+            "_meta": {
+              "terminal-auth": {
+                "command": "/Users/justinc/.local/bin/kimi",
+                "args": [
+                  "login"
+                ],
+                "label": "Kimi Code Login",
+                "env": {},
+                "type": "terminal"
+              }
+            },
+            "description": "Run `kimi login` command in the terminal, then follow the instructions to finish login.",
+            "id": "login",
+            "name": "Login with Kimi account"
+          }
+        ],
+        "protocolVersion": 1
+      }
+    },
+    {
+      "providerId": "qwen-code",
+      "providerName": "Qwen Code",
+      "binary": "qwen",
+      "installed": true,
+      "durationMs": 1142,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "qwen-code",
+        "title": "Qwen Code",
+        "version": "0.12.6"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "openai",
+          "name": "Use OpenAI API key",
+          "description": "Requires setting the `OPENAI_API_KEY` environment variable",
+          "_meta": {
+            "type": "terminal",
+            "args": [
+              "--auth-type=openai"
+            ]
+          }
+        },
+        {
+          "id": "qwen-oauth",
+          "name": "Qwen OAuth",
+          "description": "OAuth authentication for Qwen models with free daily requests",
+          "_meta": {
+            "type": "terminal",
+            "args": [
+              "--auth-type=qwen-oauth"
+            ]
+          }
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentInfo": {
+          "name": "qwen-code",
+          "title": "Qwen Code",
+          "version": "0.12.6"
+        },
+        "authMethods": [
+          {
+            "id": "openai",
+            "name": "Use OpenAI API key",
+            "description": "Requires setting the `OPENAI_API_KEY` environment variable",
+            "_meta": {
+              "type": "terminal",
+              "args": [
+                "--auth-type=openai"
+              ]
+            }
+          },
+          {
+            "id": "qwen-oauth",
+            "name": "Qwen OAuth",
+            "description": "OAuth authentication for Qwen models with free daily requests",
+            "_meta": {
+              "type": "terminal",
+              "args": [
+                "--auth-type=qwen-oauth"
+              ]
+            }
+          }
+        ],
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": true,
+            "embeddedContext": true
+          },
+          "sessionCapabilities": {
+            "list": {},
+            "resume": {}
+          }
+        }
+      }
+    }
+  ]
+}
