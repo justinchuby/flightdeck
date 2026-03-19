@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, FolderOpen, Users, Settings, Plus, type LucideIcon } from 'lucide-react';
+import { Home, FolderOpen, Users, Settings, Plus, FlaskConical, type LucideIcon } from 'lucide-react';
 import { NewProjectModal } from './LeadDashboard/NewProjectModal';
 import { SubmitIssueButton } from './ProvideFeedback';
 
@@ -54,6 +54,7 @@ export function Sidebar() {
       </button>
 
       <div className="flex-1" />
+      <NavItem to="/findings" icon={FlaskConical} label="Findings" />
       <SubmitIssueButton />
       <NavItem to="/settings" icon={Settings} label="Settings" />
 

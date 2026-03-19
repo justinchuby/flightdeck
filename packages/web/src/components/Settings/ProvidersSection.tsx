@@ -10,7 +10,7 @@
  * Drag-and-drop reordering via @dnd-kit/sortable.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn } from 'lucide-react';
+import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn, Check, X } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -58,6 +58,30 @@ interface TestResult {
 
 // ── Provider display metadata ───────────────────────────────────────
 // All metadata comes from PROVIDER_REGISTRY via getProvider() in @flightdeck/shared.
+
+/** ACP capability research data per provider (static config, not runtime). */
+const PROVIDER_CAPABILITIES: Record<string, { images: boolean; audio: boolean; mcpServers: boolean; embeddedContext: boolean; systemPrompt: string }> = {
+  copilot:  { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: '--agent flag' },
+  claude:   { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: '_meta.systemPrompt' },
+  gemini:   { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
+  codex:    { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
+  cursor:   { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
+  opencode: { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
+};
+
+/** Inline capability badge for provider cards. */
+function CapChip({ supported, label }: { supported: boolean; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+      supported
+        ? 'text-green-400 bg-green-400/10'
+        : 'text-th-text-muted/40 bg-th-bg-alt'
+    }`}>
+      {supported ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
+      {label}
+    </span>
+  );
+}
 
 /** Small pill badge for preview providers. */
 function PreviewBadge() {
@@ -251,6 +275,37 @@ function ProviderCard({
               </span>
             </div>
           </div>
+
+          {/* ACP Capabilities */}
+          {(() => {
+            const caps = PROVIDER_CAPABILITIES[provider.id];
+            if (!caps) return null;
+            return (
+              <div className="text-xs">
+                <span className="text-th-text-muted block mb-1.5">ACP Capabilities:</span>
+                <div className="flex flex-wrap gap-1">
+                  <CapChip supported={supportsResume} label="Resume" />
+                  <CapChip supported={caps.images} label="Images" />
+                  <CapChip supported={caps.audio} label="Audio" />
+                  <CapChip supported={caps.mcpServers} label="MCP" />
+                  <CapChip supported={caps.embeddedContext} label="Embedded Ctx" />
+                </div>
+                <div className="mt-1.5 text-[10px] text-th-text-muted">
+                  System prompt: <span className="text-th-text-alt">{caps.systemPrompt}</span>
+                </div>
+                {providerDef?.tierModels && (
+                  <div className="mt-1.5 text-[10px] text-th-text-muted">
+                    Model tiers:{' '}
+                    {(['fast', 'standard', 'premium'] as const).map((tier) => (
+                      <span key={tier} className="inline-block bg-th-bg-alt border border-th-border rounded px-1 py-0.5 text-th-text-alt font-mono mr-1">
+                        {tier}: {providerDef.tierModels[tier]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Authentication info */}
           {provider.authenticated === false && (
