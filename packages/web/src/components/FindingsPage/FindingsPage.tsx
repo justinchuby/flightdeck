@@ -8,7 +8,7 @@
  * Flightdeck sends empty clientCapabilities: {} — actual runtime capabilities
  * are captured in AcpAdapter.ts but not surfaced to the UI.
  */
-import { getAllProviders, type ProviderDefinition } from '@flightdeck/shared';
+import { getAllProviders, getAcpCapabilities, type ProviderDefinition, type AcpProviderCapabilities } from '@flightdeck/shared';
 import { Check, X, Minus, Info, Zap, Shield, Layers, AlertTriangle, Terminal, Code } from 'lucide-react';
 import { ProviderIcon } from '../ui/ProviderIcon';
 
@@ -43,99 +43,41 @@ type CapStatus = boolean | 'advertised' | 'none' | 'untapped' | 'partial' | 'not
 
 // ── Data ─────────────────────────────────────────────────────────
 
-/** Per-provider research data (verified via live ACP probe, March 2026). */
-const RESEARCH_DATA: Record<string, {
-  systemPromptMethod: string;
-  authMethod: string;
+/**
+ * Supplemental per-provider metadata not in the shared ACP_CAPABILITIES.
+ * Model tiers and unique features are UI-specific display data.
+ */
+const PROVIDER_DISPLAY_DATA: Record<string, {
   modelSelectionStyle: string;
   modelTiers: string;
   uniqueFeatures: string[];
-  /** Live probe results (undefined = not installed/probed) */
-  probe?: {
-    version: string;
-    images: boolean;
-    audio: boolean;
-    mcpHttp: boolean;
-    mcpSse: boolean;
-    embeddedContext: boolean;
-    sessionList: boolean;
-    sessionResume: boolean;
-    sessionFork: boolean;
-    loadSession: boolean;
-    extras?: string[];
-  };
 }> = {
   copilot: {
-    systemPromptMethod: '--agent flag + .agent.md',
-    authMethod: 'gh auth status (GitHub OAuth)',
     modelSelectionStyle: '--model flag',
     modelTiers: 'haiku, sonnet, opus, gpt-4.1, gemini-pro',
     uniqueFeatures: ['Multi-backend (Anthropic, OpenAI, Google, xAI)', 'Agent file support (--agent)', 'GitHub-managed auth'],
-    probe: {
-      version: '1.0.9',
-      images: true, audio: false,
-      mcpHttp: false, mcpSse: false,
-      embeddedContext: true,
-      sessionList: true, sessionResume: false, sessionFork: false,
-      loadSession: true,
-    },
   },
   claude: {
-    systemPromptMethod: '_meta.systemPrompt ACP extension',
-    authMethod: 'ANTHROPIC_API_KEY env var',
     modelSelectionStyle: '--model flag with alias system',
     modelTiers: 'haiku, sonnet (default), opus',
     uniqueFeatures: ['Model alias system (opus → claude-opus-4.6)', '_meta.systemPrompt extension', 'CLAUDE.md agent file', 'promptQueueing support'],
-    probe: {
-      version: '0.21.0',
-      images: true, audio: false,
-      mcpHttp: true, mcpSse: true,
-      embeddedContext: true,
-      sessionList: true, sessionResume: true, sessionFork: true,
-      loadSession: true,
-      extras: ['_meta.claudeCode.promptQueueing'],
-    },
   },
   gemini: {
-    systemPromptMethod: 'First user message',
-    authMethod: 'GEMINI_API_KEY env var',
     modelSelectionStyle: '--model flag',
     modelTiers: 'flash-lite, flash, gemini-pro',
     uniqueFeatures: ['Google-native models only', 'Agent directory (.gemini/agents/*.md)', 'Audio input support', '4 auth methods (OAuth, API key, Vertex AI, Gateway)'],
-    probe: {
-      version: '0.34.0',
-      images: true, audio: true,
-      mcpHttp: true, mcpSse: true,
-      embeddedContext: true,
-      sessionList: false, sessionResume: false, sessionFork: false,
-      loadSession: true,
-    },
   },
   codex: {
-    systemPromptMethod: 'First user message',
-    authMethod: 'OPENAI_API_KEY env var',
     modelSelectionStyle: '-c model=name (config style)',
     modelTiers: 'codex-mini, codex, gpt-5.x',
     uniqueFeatures: ['Config-style model args (-c model=name)', '3 auth methods (ChatGPT login, CODEX_API_KEY, OPENAI_API_KEY)'],
-    probe: {
-      version: '0.9.5',
-      images: true, audio: false,
-      mcpHttp: true, mcpSse: false,
-      embeddedContext: true,
-      sessionList: true, sessionResume: false, sessionFork: false,
-      loadSession: true,
-    },
   },
   cursor: {
-    systemPromptMethod: 'First user message',
-    authMethod: 'CURSOR_API_KEY env var',
     modelSelectionStyle: 'Not configurable via CLI',
     modelTiers: 'haiku, sonnet, opus (via Cursor backend)',
     uniqueFeatures: ['Multi-backend (Anthropic, OpenAI, Google)', '.cursorrules agent file', 'Model selection managed by Cursor'],
   },
   opencode: {
-    systemPromptMethod: 'First user message',
-    authMethod: 'Self-managed (provider handles keys)',
     modelSelectionStyle: 'Not configurable via CLI',
     modelTiers: 'anthropic/*, openai/*, google/*, local/*',
     uniqueFeatures: ['Local model support', 'Self-managed authentication', 'Model prefix system (provider/model)'],
@@ -144,8 +86,9 @@ const RESEARCH_DATA: Record<string, {
 
 function buildCapabilities(): ProviderCapabilities[] {
   return getAllProviders().map((p: ProviderDefinition) => {
-    const research = RESEARCH_DATA[p.id];
-    const probe = research?.probe;
+    const caps = getAcpCapabilities(p.id);
+    const display = PROVIDER_DISPLAY_DATA[p.id];
+    const hasMcp = caps ? (caps.mcpHttp && caps.mcpSse ? true : caps.mcpHttp ? ('partial' as const) : false) : ('not-probed' as const);
     return {
       id: p.id,
       name: p.name,
@@ -153,18 +96,16 @@ function buildCapabilities(): ProviderCapabilities[] {
       iconUrl: p.iconUrl,
       isPreview: p.isPreview,
       resume: p.supportsResume,
-      images: probe?.images ?? false,
-      audio: probe ? probe.audio : 'not-probed' as const,
-      mcpServers: probe
-        ? (probe.mcpHttp && probe.mcpSse ? true : probe.mcpHttp ? 'partial' as const : false)
-        : 'not-probed' as const,
-      embeddedContext: probe ? probe.embeddedContext : 'not-probed' as const,
-      systemPromptMethod: research?.systemPromptMethod ?? 'Unknown',
-      authMethod: research?.authMethod ?? 'Unknown',
-      modelSelectionStyle: research?.modelSelectionStyle ?? 'Unknown',
-      modelTiers: research?.modelTiers ?? 'Unknown',
-      uniqueFeatures: research?.uniqueFeatures ?? [],
-      probeVersion: probe?.version,
+      images: caps?.images ?? false,
+      audio: caps?.probed ? caps.audio : ('not-probed' as const),
+      mcpServers: hasMcp,
+      embeddedContext: caps?.probed ? caps.embeddedContext : ('not-probed' as const),
+      systemPromptMethod: caps?.systemPromptMethod ?? 'Unknown',
+      authMethod: caps?.authMethod ?? 'Unknown',
+      modelSelectionStyle: display?.modelSelectionStyle ?? 'Unknown',
+      modelTiers: display?.modelTiers ?? 'Unknown',
+      uniqueFeatures: display?.uniqueFeatures ?? [],
+      probeVersion: caps?.probeVersion,
     };
   });
 }

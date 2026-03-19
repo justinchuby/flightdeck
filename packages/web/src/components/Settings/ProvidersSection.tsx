@@ -15,7 +15,7 @@ import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, us
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getProvider } from '@flightdeck/shared';
+import { getProvider, getAcpCapabilities } from '@flightdeck/shared';
 import { apiFetch } from '../../hooks/useApi';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { ProviderIcon } from '../ui/ProviderIcon';
@@ -59,16 +59,7 @@ interface TestResult {
 
 // ── Provider display metadata ───────────────────────────────────────
 // All metadata comes from PROVIDER_REGISTRY via getProvider() in @flightdeck/shared.
-
-/** ACP capability research data per provider (static config, not runtime). */
-const PROVIDER_CAPABILITIES: Record<string, { images: boolean; audio: boolean; mcpServers: boolean; embeddedContext: boolean; systemPrompt: string }> = {
-  copilot:  { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: '--agent flag' },
-  claude:   { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: '_meta.systemPrompt' },
-  gemini:   { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
-  codex:    { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
-  cursor:   { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
-  opencode: { images: true, audio: false, mcpServers: false, embeddedContext: false, systemPrompt: 'First user message' },
-};
+// ACP capabilities come from ACP_CAPABILITIES via getAcpCapabilities().
 
 /** Inline capability badge for provider cards. */
 function CapChip({ supported, label }: { supported: boolean; label: string }) {
@@ -278,8 +269,9 @@ function ProviderCard({
 
           {/* ACP Capabilities */}
           {(() => {
-            const caps = PROVIDER_CAPABILITIES[provider.id];
+            const caps = getAcpCapabilities(provider.id);
             if (!caps) return null;
+            const hasMcp = caps.mcpHttp || caps.mcpSse;
             return (
               <div className="text-xs">
                 <span className="text-th-text-muted block mb-1.5">ACP Capabilities:</span>
@@ -287,11 +279,14 @@ function ProviderCard({
                   <CapChip supported={supportsResume} label="Resume" />
                   <CapChip supported={caps.images} label="Images" />
                   <CapChip supported={caps.audio} label="Audio" />
-                  <CapChip supported={caps.mcpServers} label="MCP" />
+                  <CapChip supported={hasMcp} label="MCP" />
                   <CapChip supported={caps.embeddedContext} label="Embedded Ctx" />
+                  {!caps.probed && (
+                    <span className="text-[10px] text-th-text-muted/50 italic">not probed</span>
+                  )}
                 </div>
                 <div className="mt-1.5 text-[10px] text-th-text-muted">
-                  System prompt: <span className="text-th-text-alt">{caps.systemPrompt}</span>
+                  System prompt: <span className="text-th-text-alt">{caps.systemPromptMethod}</span>
                 </div>
                 {providerDef?.tierModels && (
                   <div className="mt-1.5 text-[10px] text-th-text-muted">

@@ -303,3 +303,116 @@ export function getAllProviders(): ProviderDefinition[] {
 export function isValidProviderId(id: string): id is ProviderId {
   return id in PROVIDER_REGISTRY;
 }
+
+// ── ACP Capabilities (from live probe, March 2026) ─────────────
+
+/**
+ * ACP capability probe results per provider.
+ *
+ * Data from live ACP probes against installed CLIs.
+ * `undefined` fields mean the provider was not probed (preview/not installed).
+ */
+export interface AcpProviderCapabilities {
+  /** CLI version probed */
+  probeVersion?: string;
+  /** Provider supports image content in prompts */
+  images: boolean;
+  /** Provider supports audio content in prompts */
+  audio: boolean;
+  /** Provider supports MCP server passthrough (HTTP) */
+  mcpHttp: boolean;
+  /** Provider supports MCP server passthrough (SSE) */
+  mcpSse: boolean;
+  /** Provider supports embedded context injection */
+  embeddedContext: boolean;
+  /** Provider supports loadSession (resume from session ID) */
+  loadSession: boolean;
+  /** Provider supports session list/resume/fork operations */
+  sessionList: boolean;
+  sessionResume: boolean;
+  sessionFork: boolean;
+  /** How the system prompt is delivered to the agent */
+  systemPromptMethod: string;
+  /** How the provider authenticates */
+  authMethod: string;
+  /** Whether this data is from a live probe or estimated */
+  probed: boolean;
+}
+
+/**
+ * ACP capabilities per provider — single source of truth.
+ *
+ * Consumed by both ProvidersSection (Settings) and FindingsPage.
+ * Cursor and OpenCode are not yet probed (preview providers).
+ */
+export const ACP_CAPABILITIES: Record<ProviderId, AcpProviderCapabilities> = {
+  copilot: {
+    probeVersion: '1.0.9',
+    images: true, audio: false,
+    mcpHttp: false, mcpSse: false,
+    embeddedContext: true,
+    loadSession: true,
+    sessionList: true, sessionResume: false, sessionFork: false,
+    systemPromptMethod: '--agent flag + .agent.md',
+    authMethod: 'gh auth status (GitHub OAuth)',
+    probed: true,
+  },
+  claude: {
+    probeVersion: '0.21.0',
+    images: true, audio: false,
+    mcpHttp: true, mcpSse: true,
+    embeddedContext: true,
+    loadSession: true,
+    sessionList: true, sessionResume: true, sessionFork: true,
+    systemPromptMethod: '_meta.systemPrompt ACP extension',
+    authMethod: 'ANTHROPIC_API_KEY env var',
+    probed: true,
+  },
+  gemini: {
+    probeVersion: '0.34.0',
+    images: true, audio: true,
+    mcpHttp: true, mcpSse: true,
+    embeddedContext: true,
+    loadSession: true,
+    sessionList: false, sessionResume: false, sessionFork: false,
+    systemPromptMethod: 'First user message',
+    authMethod: 'GEMINI_API_KEY env var',
+    probed: true,
+  },
+  codex: {
+    probeVersion: '0.9.5',
+    images: true, audio: false,
+    mcpHttp: true, mcpSse: false,
+    embeddedContext: true,
+    loadSession: true,
+    sessionList: true, sessionResume: false, sessionFork: false,
+    systemPromptMethod: 'First user message',
+    authMethod: 'OPENAI_API_KEY env var',
+    probed: true,
+  },
+  cursor: {
+    images: true, audio: false,
+    mcpHttp: false, mcpSse: false,
+    embeddedContext: false,
+    loadSession: true,
+    sessionList: false, sessionResume: false, sessionFork: false,
+    systemPromptMethod: 'First user message',
+    authMethod: 'CURSOR_API_KEY env var',
+    probed: false,
+  },
+  opencode: {
+    images: true, audio: false,
+    mcpHttp: false, mcpSse: false,
+    embeddedContext: false,
+    loadSession: true,
+    sessionList: false, sessionResume: false, sessionFork: false,
+    systemPromptMethod: 'First user message',
+    authMethod: 'Self-managed (provider handles keys)',
+    probed: false,
+  },
+};
+
+/** Get ACP capabilities for a provider. */
+export function getAcpCapabilities(id: string): AcpProviderCapabilities | undefined {
+  return ACP_CAPABILITIES[id as ProviderId];
+}

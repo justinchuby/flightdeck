@@ -6,10 +6,10 @@ export {
   isValidId,
 } from './entityIds.js';
 export {
-  PROVIDER_REGISTRY, PROVIDER_IDS,
-  getProvider, getAllProviders, isValidProviderId,
+  PROVIDER_REGISTRY, PROVIDER_IDS, ACP_CAPABILITIES,
+  getProvider, getAllProviders, isValidProviderId, getAcpCapabilities,
   type ProviderId, type ProviderDefinition, type ProviderColors,
-  type ProviderLink, type ProviderTierModels,
+  type ProviderLink, type ProviderTierModels, type AcpProviderCapabilities,
 } from './provider.js';
 export {
   AgentStatusSchema, type AgentStatus,
