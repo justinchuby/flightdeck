@@ -93,11 +93,19 @@ SessionCapabilities {
 }
 ```
 
-## ⚠️ Critical Gap: Flightdeck's Capability Usage
+## Opportunities: Capability Utilization
 
-**Flightdeck sends empty `clientCapabilities: {}`** during session initialization (`AcpAdapter.ts:330`). Agents don't know the client has filesystem and terminal access.
+### ✅ Resolved
 
-**Only `supportsImages` is consumed** from the agent's capability response (`AcpAdapter.ts:113`):
+- **Live probe data for all 7 installed providers** — no more assumptions or static guesses
+- **ACP_CAPABILITIES derived from probe JSON** — single source of truth, no hand-maintained constants that drift
+- **Gemini resume preset fixed** — was incorrectly `true`, probe proved it has no sessionCapabilities
+
+### ⚠️ Remaining Gaps
+
+**1. Empty client capabilities.** Flightdeck sends `clientCapabilities: {}` during session initialization (`AcpAdapter.ts:330`). Agents don't know the client has filesystem and terminal access. Should be `{ fs: { readTextFile: true, writeTextFile: true }, terminal: true }`.
+
+**2. Only `supportsImages` consumed at runtime.** From the rich `AgentCapabilities` response, only `promptCapabilities.image` is read (`AcpAdapter.ts:113`):
 
 ```typescript
 get supportsImages(): boolean {
@@ -105,7 +113,7 @@ get supportsImages(): boolean {
 }
 ```
 
-All other fields (`loadSession`, `audio`, `embeddedContext`, `mcpCapabilities`, `sessionCapabilities`) are captured but **not utilized** in the UI or adapter logic.
+**3. Captured but unused fields:** `loadSession`, `audio`, `embeddedContext`, `mcpCapabilities`, and `sessionCapabilities` are stored on the adapter instance but not surfaced in the UI or used in adapter logic.
 
 ## Static Presets vs Runtime Capabilities
 
