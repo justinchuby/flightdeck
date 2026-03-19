@@ -5,7 +5,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useMessageStore, EMPTY_MESSAGES } from '../../stores/messageStore';
 import { useLeadStore, type ActivityEvent } from '../../stores/leadStore';
 import type { AcpToolCall, AcpPlanEntry, AcpTextChunk } from '../../types';
-import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench, FolderIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, FolderOpen, Clock, Loader2, X, MessageSquare, Wrench } from 'lucide-react';
 import { InlineMarkdownWithMentions, MentionText } from '../../utils/markdown';
 import { splitCommandBlocks } from '../../utils/commandParser';
 import { PromptNav, hasUserMention } from '../PromptNav';
@@ -617,7 +617,7 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
 
   const badge = (
     <div className="flex items-center gap-1.5 py-0.5 px-1">
-      {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted details-open-rotate" />}
+      {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted group-open:rotate-90 transition-transform" />}
       <Wrench size={11} className={`shrink-0 ${color}`} />
       <span className={`text-[10px] font-mono ${color}`}>{title}</span>
       {kind && <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{kind}</span>}
@@ -628,7 +628,7 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
   if (!content) return badge;
 
   return (
-    <details className="text-[11px]">
+    <details className="group text-[11px]">
       <summary className="cursor-pointer select-none list-none">{badge}</summary>
       <pre className="ml-5 mt-0.5 mb-1 text-[10px] text-th-text-muted font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
         {content.length > 2000 ? content.slice(0, 2000) + '…' : content}
@@ -824,9 +824,9 @@ export function CollapsibleToolOutput({ lines }: { lines: string[] }) {
     lines.length === 1 ? `📁 ${shortPaths[0]}` : `📁 ${lines.length} files`;
 
   return (
-    <details className="my-0.5 text-[11px]">
+    <details className="group my-0.5 text-[11px]">
       <summary className="cursor-pointer text-th-text-muted hover:text-th-text-alt select-none list-none flex items-center gap-1">
-        <ChevronRight className="w-3 h-3 shrink-0 details-open-rotate" />
+        <ChevronRight className="w-3 h-3 shrink-0 group-open:rotate-90 transition-transform" />
         <span>{summary}</span>
       </summary>
       <div className="ml-4 mt-0.5 text-th-text-muted font-mono">

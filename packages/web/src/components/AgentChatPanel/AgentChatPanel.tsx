@@ -289,56 +289,9 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
     );
   }
 
-  // Tool call messages render as compact inline indicators with status colors
-  // Collapsible when tool call content is available
+  // Tool call messages render via dedicated component (hooks must be unconditional)
   if (sender === 'tool') {
-    const text = typeof msg.text === 'string' ? msg.text : '';
-    const status = msg.toolStatus ?? 'in_progress';
-    const statusColors: Record<string, string> = {
-      pending: 'text-yellow-500',
-      in_progress: 'text-blue-400',
-      completed: 'text-emerald-500',
-      cancelled: 'text-gray-400',
-    };
-    const color = statusColors[status] || 'text-sky-400';
-
-    const agents = useAppStore((s) => s.agents);
-    const content = useMemo(() => {
-      if (!msg.toolCallId) return undefined;
-      for (const a of agents) {
-        const tc = a.toolCalls?.find((t) => t.toolCallId === msg.toolCallId);
-        if (tc?.content) return tc.content;
-      }
-      return undefined;
-    }, [agents, msg.toolCallId]);
-
-    const badge = (
-      <div className="flex items-center gap-1.5 py-0.5">
-        {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted details-open-rotate" />}
-        <span className={`text-[10px] ${color} truncate`}>
-          🔧 {text.slice(0, 200)}
-        </span>
-        {msg.toolKind && (
-          <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{msg.toolKind}</span>
-        )}
-        {msg.timestamp && (
-          <span className="text-[10px] text-th-text-muted shrink-0">
-            {formatRelativeTime(new Date(msg.timestamp).toISOString())}
-          </span>
-        )}
-      </div>
-    );
-
-    if (!content) return badge;
-
-    return (
-      <details className="text-[11px]">
-        <summary className="cursor-pointer select-none list-none">{badge}</summary>
-        <pre className="ml-5 mt-0.5 mb-1 text-[10px] text-th-text-muted font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
-          {content.length > 2000 ? content.slice(0, 2000) + '…' : content}
-        </pre>
-      </details>
-    );
+    return <ToolMessageBubble msg={msg} />;
   }
 
   const text = typeof msg.text === 'string' ? msg.text : '';
@@ -372,6 +325,57 @@ function ChatBubble({ msg, agent, compact }: { msg: AcpTextChunk; agent?: AgentI
         <AgentTextWithToolOutput text={text} />
       </div>
     </div>
+  );
+}
+
+/** Tool call message bubble — extracted so hooks are called unconditionally */
+function ToolMessageBubble({ msg }: { msg: AcpTextChunk }) {
+  const text = typeof msg.text === 'string' ? msg.text : '';
+  const status = msg.toolStatus ?? 'in_progress';
+  const statusColors: Record<string, string> = {
+    pending: 'text-yellow-500',
+    in_progress: 'text-blue-400',
+    completed: 'text-emerald-500',
+    cancelled: 'text-gray-400',
+  };
+  const color = statusColors[status] || 'text-sky-400';
+
+  const agents = useAppStore((s) => s.agents);
+  const content = useMemo(() => {
+    if (!msg.toolCallId) return undefined;
+    for (const a of agents) {
+      const tc = a.toolCalls?.find((t) => t.toolCallId === msg.toolCallId);
+      if (tc?.content) return tc.content;
+    }
+    return undefined;
+  }, [agents, msg.toolCallId]);
+
+  const badge = (
+    <div className="flex items-center gap-1.5 py-0.5">
+      {content && <ChevronRight className="w-3 h-3 shrink-0 text-th-text-muted group-open:rotate-90 transition-transform" />}
+      <span className={`text-[10px] ${color} truncate`}>
+        🔧 {text.slice(0, 200)}
+      </span>
+      {msg.toolKind && (
+        <span className="text-[9px] text-th-text-muted bg-th-bg-alt px-1 rounded">{msg.toolKind}</span>
+      )}
+      {msg.timestamp && (
+        <span className="text-[10px] text-th-text-muted shrink-0">
+          {formatRelativeTime(new Date(msg.timestamp).toISOString())}
+        </span>
+      )}
+    </div>
+  );
+
+  if (!content) return badge;
+
+  return (
+    <details className="group text-[11px]">
+      <summary className="cursor-pointer select-none list-none">{badge}</summary>
+      <pre className="ml-5 mt-0.5 mb-1 text-[10px] text-th-text-muted font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+        {content.length > 2000 ? content.slice(0, 2000) + '…' : content}
+      </pre>
+    </details>
   );
 }
 
