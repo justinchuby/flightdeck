@@ -60,30 +60,29 @@ describe('Server EADDRINUSE error handling', () => {
   });
 
   it('listenWithRetry throws when all ports are exhausted', async () => {
-    // Occupy 3 consecutive ports using OS-assigned base port
-    const firstBlocker = createServer();
-    servers.push(firstBlocker);
-    await new Promise<void>((resolve) => firstBlocker.listen(0, '127.0.0.1', resolve));
-    const basePort = (firstBlocker.address() as AddressInfo).port;
-
-    for (let i = 1; i < 3; i++) {
-      const b = createServer();
-      servers.push(b);
-      await new Promise<void>((resolve, reject) => {
-        b.once('error', reject);
-        b.listen(basePort + i, '127.0.0.1', () => {
-          b.removeListener('error', reject);
-          resolve();
-        });
-      });
-    }
-
+    // Create a server that always rejects with EADDRINUSE
     const server = createServer();
     servers.push(server);
 
+    const originalListen = server.listen.bind(server);
+    let attempts = 0;
+    server.listen = function fakeListen(...args: any[]) {
+      attempts++;
+      // Emit EADDRINUSE on next tick to mimic real behavior
+      process.nextTick(() => server.emit('error',
+        Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' }),
+      ));
+      return server;
+    } as any;
+
     await expect(
-      listenWithRetry(server, basePort, '127.0.0.1', 3),
+      listenWithRetry(server, 50000, '127.0.0.1', 3),
     ).rejects.toThrow(/No available port found/);
+
+    expect(attempts).toBe(3);
+
+    // Restore so cleanup doesn't fail
+    server.listen = originalListen;
   });
 
   it('WebSocketServer shares the HTTP server port automatically', async () => {
