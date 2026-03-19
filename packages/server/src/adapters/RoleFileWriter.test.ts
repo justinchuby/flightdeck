@@ -9,6 +9,7 @@ import {
   CursorRoleFileWriter,
   CodexRoleFileWriter,
   OpenCodeRoleFileWriter,
+  GenericMarkdownRoleFileWriter,
   createRoleFileWriter,
   listRoleFileWriterProviders,
   FLIGHTDECK_MARKER,
@@ -851,5 +852,65 @@ describe('Cross-platform path construction', () => {
     } finally {
       await rm(fakeHome, { recursive: true, force: true });
     }
+  });
+});
+
+// ── GenericMarkdownRoleFileWriter ───────────────────────────────────
+
+describe('GenericMarkdownRoleFileWriter', () => {
+  let fakeHome: string;
+
+  beforeEach(async () => {
+    fakeHome = await mkdtemp(join(tmpdir(), 'generic-writer-'));
+  });
+
+  afterEach(async () => {
+    await rm(fakeHome, { recursive: true, force: true });
+  });
+
+  it('writes AGENTS.md in the specified directory', async () => {
+    const writer = new GenericMarkdownRoleFileWriter('.kimi', fakeHome);
+    const files = await writer.writeRoleFiles(sampleRoles, '/ignored');
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain(join('.kimi', 'AGENTS.md'));
+    const content = await readFile(files[0], 'utf-8');
+    expect(content).toContain(FLIGHTDECK_MARKER);
+    expect(content).toContain('## Developer');
+    expect(content).toContain('## Architect');
+  });
+
+  it('includes role instructions in output', async () => {
+    const writer = new GenericMarkdownRoleFileWriter('.qwen-code', fakeHome);
+    const files = await writer.writeRoleFiles(singleRole, '/ignored');
+    const content = await readFile(files[0], 'utf-8');
+    expect(content).toContain('You review code for correctness and style.');
+    expect(content).toContain('Reviewer');
+  });
+
+  it('getFormat() returns expected format string', () => {
+    const writer = new GenericMarkdownRoleFileWriter('.kimi');
+    expect(writer.getFormat()).toBe('kimi-agents-md');
+
+    const writer2 = new GenericMarkdownRoleFileWriter('.qwen-code');
+    expect(writer2.getFormat()).toBe('qwen-code-agents-md');
+  });
+
+  it('cleanRoleFiles removes the AGENTS.md file', async () => {
+    const writer = new GenericMarkdownRoleFileWriter('.kimi', fakeHome);
+    await writer.writeRoleFiles(sampleRoles, '/ignored');
+    const filePath = join(fakeHome, '.kimi', 'AGENTS.md');
+    const before = await readFile(filePath, 'utf-8');
+    expect(before).toContain(FLIGHTDECK_MARKER);
+
+    await writer.cleanRoleFiles('/ignored');
+    await expect(readFile(filePath, 'utf-8')).rejects.toThrow();
+  });
+
+  it('factory creates GenericMarkdownRoleFileWriter for kimi and qwen-code', () => {
+    const kimiWriter = createRoleFileWriter('kimi');
+    expect(kimiWriter).toBeInstanceOf(GenericMarkdownRoleFileWriter);
+
+    const qwenWriter = createRoleFileWriter('qwen-code');
+    expect(qwenWriter).toBeInstanceOf(GenericMarkdownRoleFileWriter);
   });
 });

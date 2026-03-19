@@ -40,6 +40,16 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
   'gpt-5.1-codex-mini',
   'gpt-5-mini',
   'gpt-4.1',
+  // Moonshot (Kimi)
+  'moonshot-v1-8k',
+  'moonshot-v1-32k',
+  'moonshot-v1-128k',
+  'kimi-latest',
+  // Qwen
+  'qwen-turbo',
+  'qwen-plus',
+  'qwen-max',
+  'qwen-coder-plus-latest',
 ] as const;
 
 const knownSet = new Set<string>(KNOWN_MODEL_IDS);

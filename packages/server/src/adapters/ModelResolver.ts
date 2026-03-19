@@ -70,6 +70,8 @@ function detectModelProvider(model: string): string {
   if (model.startsWith('gpt-') || model.startsWith('o3') || model.startsWith('o4')) return 'openai';
   if (model.startsWith('gemini-')) return 'google';
   if (model.startsWith('grok-')) return 'xai';
+  if (model.startsWith('moonshot-') || model.startsWith('kimi-') || model === 'kimi-latest') return 'moonshot';
+  if (model.startsWith('qwen-')) return 'qwen';
   return 'unknown';
 }
 

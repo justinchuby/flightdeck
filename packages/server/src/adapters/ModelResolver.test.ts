@@ -455,6 +455,23 @@ describe('ModelResolver', () => {
       expect(hasOpenAI).toBe(true);
       expect(hasGoogle).toBe(true);
     });
+    it('kimi returns only Moonshot models', () => {
+      const models = getModelsForProvider('kimi');
+      expect(models).toContain('moonshot-v1-8k');
+      expect(models).toContain('moonshot-v1-32k');
+      expect(models).toContain('moonshot-v1-128k');
+      expect(models).toContain('kimi-latest');
+      expect(models.every(m => m.startsWith('moonshot-') || m.startsWith('kimi-'))).toBe(true);
+    });
+
+    it('qwen-code returns Qwen and OpenAI models', () => {
+      const models = getModelsForProvider('qwen-code');
+      const hasQwen = models.some(m => m.startsWith('qwen-'));
+      const hasOpenAI = models.some(m => m.startsWith('gpt-'));
+      expect(hasQwen).toBe(true);
+      expect(hasOpenAI).toBe(true);
+      expect(models).toContain('qwen-coder-plus-latest');
+    });
   });
 
   describe('getModelsByProvider()', () => {
