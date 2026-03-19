@@ -77,32 +77,32 @@ function detectModelProvider(model: string): string {
 
 const EQUIVALENCES: Record<string, Record<string, string>> = {
   // Anthropic → others
-  'claude-opus-4.6': { openai: 'gpt-5.2-codex', google: 'gemini-2.5-pro' },
-  'claude-opus-4.5': { openai: 'gpt-5.1-codex-max', google: 'gemini-2.5-pro' },
-  'claude-sonnet-4.6': { openai: 'gpt-5.3-codex', google: 'gemini-2.5-flash' },
-  'claude-sonnet-4.5': { openai: 'gpt-5.3-codex', google: 'gemini-2.5-flash' },
-  'claude-sonnet-4': { openai: 'gpt-4.1', google: 'gemini-2.5-flash' },
-  'claude-haiku-4.5': { openai: 'gpt-5.1-codex-mini', google: 'gemini-2.5-flash-lite' },
+  'claude-opus-4.6': { openai: 'gpt-5.2-codex', google: 'gemini-3.1-pro' },
+  'claude-opus-4.5': { openai: 'gpt-5.1-codex-max', google: 'gemini-3.1-pro' },
+  'claude-sonnet-4.6': { openai: 'gpt-5.3-codex', google: 'gemini-3.1-flash' },
+  'claude-sonnet-4.5': { openai: 'gpt-5.3-codex', google: 'gemini-3.1-flash' },
+  'claude-sonnet-4': { openai: 'gpt-4.1', google: 'gemini-3.1-flash' },
+  'claude-haiku-4.5': { openai: 'gpt-5.1-codex-mini', google: 'gemini-3.1-flash-lite' },
 
   // OpenAI → others
-  'gpt-5.4': { anthropic: 'claude-opus-4.6', google: 'gemini-2.5-pro' },
-  'gpt-5.3-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-2.5-pro' },
-  'gpt-5.2-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-2.5-pro' },
-  'gpt-5.2': { anthropic: 'claude-sonnet-4.6', google: 'gemini-2.5-flash' },
-  'gpt-5.1-codex-max': { anthropic: 'claude-opus-4.5', google: 'gemini-2.5-pro' },
-  'gpt-5.1-codex': { anthropic: 'claude-sonnet-4.6', google: 'gemini-2.5-flash' },
+  'gpt-5.4': { anthropic: 'claude-opus-4.6', google: 'gemini-3.1-pro' },
+  'gpt-5.3-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-3.1-pro' },
+  'gpt-5.2-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-3.1-pro' },
+  'gpt-5.2': { anthropic: 'claude-sonnet-4.6', google: 'gemini-3.1-flash' },
+  'gpt-5.1-codex-max': { anthropic: 'claude-opus-4.5', google: 'gemini-3.1-pro' },
+  'gpt-5.1-codex': { anthropic: 'claude-sonnet-4.6', google: 'gemini-3.1-flash' },
 
-  'gpt-5.1-codex-mini': { anthropic: 'claude-haiku-4.5', google: 'gemini-2.5-flash-lite' },
-  'gpt-5.1': { anthropic: 'claude-sonnet-4.6', google: 'gemini-2.5-flash' },
-  'gpt-5-mini': { anthropic: 'claude-haiku-4.5', google: 'gemini-2.5-flash-lite' },
-  'gpt-4.1': { anthropic: 'claude-sonnet-4', google: 'gemini-2.5-flash' },
+  'gpt-5.1-codex-mini': { anthropic: 'claude-haiku-4.5', google: 'gemini-3.1-flash-lite' },
+  'gpt-5.1': { anthropic: 'claude-sonnet-4.6', google: 'gemini-3.1-flash' },
+  'gpt-5-mini': { anthropic: 'claude-haiku-4.5', google: 'gemini-3.1-flash-lite' },
+  'gpt-4.1': { anthropic: 'claude-sonnet-4', google: 'gemini-3.1-flash' },
 
   // Google → others
   'gemini-3-pro-preview': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
   'gemini-3-flash-preview': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
-  'gemini-2.5-pro': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
-  'gemini-2.5-flash': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
-  'gemini-2.5-flash-lite': { anthropic: 'claude-haiku-4.5', openai: 'gpt-5.1-codex-mini' },
+  'gemini-3.1-pro': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
+  'gemini-3.1-flash': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
+  'gemini-3.1-flash-lite': { anthropic: 'claude-haiku-4.5', openai: 'gpt-5.1-codex-mini' },
 };
 
 // ── Core Resolution ─────────────────────────────────────────

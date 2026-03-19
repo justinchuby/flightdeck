@@ -26,7 +26,7 @@ describe('ModelResolver', () => {
     it('resolves "fast" to provider-specific models', () => {
       expect(resolveModel('fast', 'copilot')?.model).toBe('claude-haiku-4.5');
       expect(resolveModel('fast', 'claude')?.model).toBe('haiku');
-      expect(resolveModel('fast', 'gemini')?.model).toBe('gemini-2.5-flash-lite');
+      expect(resolveModel('fast', 'gemini')?.model).toBe('gemini-3.1-flash-lite');
       expect(resolveModel('fast', 'cursor')?.model).toBe('claude-haiku-4.5');
       expect(resolveModel('fast', 'codex')?.model).toBe('gpt-5.1-codex-mini');
       expect(resolveModel('fast', 'opencode')?.model).toBe('anthropic/claude-haiku-4-5');
@@ -35,7 +35,7 @@ describe('ModelResolver', () => {
     it('resolves "standard" to provider-specific models', () => {
       expect(resolveModel('standard', 'copilot')?.model).toBe('claude-sonnet-4.6');
       expect(resolveModel('standard', 'claude')?.model).toBe('default');
-      expect(resolveModel('standard', 'gemini')?.model).toBe('gemini-2.5-flash');
+      expect(resolveModel('standard', 'gemini')?.model).toBe('gemini-3.1-flash');
       expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-4.6');
       expect(resolveModel('standard', 'codex')?.model).toBe('gpt-5.3-codex');
       expect(resolveModel('standard', 'opencode')?.model).toBe('anthropic/claude-sonnet-4-6');
@@ -44,7 +44,7 @@ describe('ModelResolver', () => {
     it('resolves "premium" to provider-specific models', () => {
       expect(resolveModel('premium', 'copilot')?.model).toBe('claude-opus-4.6');
       expect(resolveModel('premium', 'claude')?.model).toBe('opus');
-      expect(resolveModel('premium', 'gemini')?.model).toBe('gemini-2.5-pro');
+      expect(resolveModel('premium', 'gemini')?.model).toBe('gemini-3.1-pro');
       expect(resolveModel('premium', 'cursor')?.model).toBe('claude-opus-4.6');
       expect(resolveModel('premium', 'codex')?.model).toBe('gpt-5.4');
       expect(resolveModel('premium', 'opencode')?.model).toBe('anthropic/claude-opus-4-6');
@@ -86,8 +86,8 @@ describe('ModelResolver', () => {
     });
 
     it('passes Google models through on Gemini', () => {
-      const result = resolveModel('gemini-2.5-pro', 'gemini')!;
-      expect(result.model).toBe('gemini-2.5-pro');
+      const result = resolveModel('gemini-3.1-pro', 'gemini')!;
+      expect(result.model).toBe('gemini-3.1-pro');
       expect(result.translated).toBe(false);
     });
   });
@@ -138,8 +138,8 @@ describe('ModelResolver', () => {
     });
 
     it('adds google/ prefix for Google models', () => {
-      const result = resolveModel('gemini-2.5-pro', 'opencode')!;
-      expect(result.model).toBe('google/gemini-2.5-pro');
+      const result = resolveModel('gemini-3.1-pro', 'opencode')!;
+      expect(result.model).toBe('google/gemini-3.1-pro');
       expect(result.translated).toBe(true);
     });
   });
@@ -147,9 +147,9 @@ describe('ModelResolver', () => {
   // ── Cross-Provider Equivalences ────────────────────────
 
   describe('cross-provider equivalence mapping', () => {
-    it('maps claude-opus-4.6 to gemini-2.5-pro on Gemini', () => {
+    it('maps claude-opus-4.6 to gemini-3.1-pro on Gemini', () => {
       const result = resolveModel('claude-opus-4.6', 'gemini')!;
-      expect(result.model).toBe('gemini-2.5-pro');
+      expect(result.model).toBe('gemini-3.1-pro');
       expect(result.translated).toBe(true);
       expect(result.reason).toContain('equivalent');
     });
@@ -166,9 +166,9 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('maps gpt-4.1 to gemini-2.5-flash on Gemini', () => {
+    it('maps gpt-4.1 to gemini-3.1-flash on Gemini', () => {
       const result = resolveModel('gpt-4.1', 'gemini')!;
-      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.model).toBe('gemini-3.1-flash');
       expect(result.translated).toBe(true);
     });
 
@@ -178,15 +178,15 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(false);
     });
 
-    it('maps gemini-2.5-pro to equivalent on Copilot (not in restricted catalog)', () => {
+    it('maps gemini-3.1-pro to equivalent on Copilot (not in restricted catalog)', () => {
       // Copilot only supports gemini-3-pro-preview from Google's catalog
-      const result = resolveModel('gemini-2.5-pro', 'copilot')!;
+      const result = resolveModel('gemini-3.1-pro', 'copilot')!;
       expect(result.model).toBe('claude-opus-4.6');
       expect(result.translated).toBe(true);
     });
 
-    it('maps gemini-2.5-pro to gpt-5.2-codex on Codex', () => {
-      const result = resolveModel('gemini-2.5-pro', 'codex')!;
+    it('maps gemini-3.1-pro to gpt-5.2-codex on Codex', () => {
+      const result = resolveModel('gemini-3.1-pro', 'codex')!;
       expect(result.model).toBe('gpt-5.2-codex');
       expect(result.translated).toBe(true);
     });
@@ -215,7 +215,7 @@ describe('ModelResolver', () => {
   describe('fallback to standard tier', () => {
     it('falls back for completely unknown models', () => {
       const result = resolveModel('llama-3.3-70b', 'gemini')!;
-      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.model).toBe('gemini-3.1-flash');
       expect(result.translated).toBe(true);
       expect(result.reason).toContain('standard tier');
     });
@@ -294,7 +294,7 @@ describe('ModelResolver', () => {
     it('architect (claude-opus-4.6) maps correctly across providers', () => {
       expect(resolveModel('claude-opus-4.6', 'copilot')?.model).toBe('claude-opus-4.6');
       expect(resolveModel('claude-opus-4.6', 'claude')?.model).toBe('opus');
-      expect(resolveModel('claude-opus-4.6', 'gemini')?.model).toBe('gemini-2.5-pro');
+      expect(resolveModel('claude-opus-4.6', 'gemini')?.model).toBe('gemini-3.1-pro');
       expect(resolveModel('claude-opus-4.6', 'cursor')?.model).toBe('claude-opus-4.6');
       expect(resolveModel('claude-opus-4.6', 'codex')?.model).toBe('gpt-5.2-codex');
       expect(resolveModel('claude-opus-4.6', 'opencode')?.model).toBe('anthropic/claude-opus-4.6');
@@ -303,7 +303,7 @@ describe('ModelResolver', () => {
     it('secretary (gpt-4.1) maps correctly across providers', () => {
       expect(resolveModel('gpt-4.1', 'copilot')?.model).toBe('gpt-4.1');
       expect(resolveModel('gpt-4.1', 'claude')?.model).toBe('claude-sonnet-4');
-      expect(resolveModel('gpt-4.1', 'gemini')?.model).toBe('gemini-2.5-flash');
+      expect(resolveModel('gpt-4.1', 'gemini')?.model).toBe('gemini-3.1-flash');
       expect(resolveModel('gpt-4.1', 'cursor')?.model).toBe('gpt-4.1');
       expect(resolveModel('gpt-4.1', 'codex')?.model).toBe('gpt-4.1');
       expect(resolveModel('gpt-4.1', 'opencode')?.model).toBe('openai/gpt-4.1');
@@ -335,7 +335,7 @@ describe('ModelResolver', () => {
       const models = getTierModels('premium');
       expect(models).toBeDefined();
       expect(models!['copilot']).toBe('claude-opus-4.6');
-      expect(models!['gemini']).toBe('gemini-2.5-pro');
+      expect(models!['gemini']).toBe('gemini-3.1-pro');
       expect(models!['codex']).toBe('gpt-5.4');
     });
 
@@ -371,7 +371,7 @@ describe('ModelResolver', () => {
     it('returns true for native models', () => {
       expect(isValidModel('claude-opus-4.6', 'copilot')).toBe(true);
       expect(isValidModel('gpt-5.2-codex', 'codex')).toBe(true);
-      expect(isValidModel('gemini-2.5-pro', 'gemini')).toBe(true);
+      expect(isValidModel('gemini-3.1-pro', 'gemini')).toBe(true);
     });
 
     it('returns true for models with equivalence mappings', () => {
@@ -416,10 +416,10 @@ describe('ModelResolver', () => {
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('gpt-5.1-codex');
       expect(models).toContain('gemini-3-pro-preview');
-      // Copilot does NOT have gemini-2.5-* models
-      expect(models).not.toContain('gemini-2.5-pro');
-      expect(models).not.toContain('gemini-2.5-flash');
-      expect(models).not.toContain('gemini-2.5-flash-lite');
+      // Copilot does NOT have gemini-3.1-* models
+      expect(models).not.toContain('gemini-3.1-pro');
+      expect(models).not.toContain('gemini-3.1-flash');
+      expect(models).not.toContain('gemini-3.1-flash-lite');
       expect(models).not.toContain('gemini-3-flash-preview');
     });
 
@@ -433,8 +433,8 @@ describe('ModelResolver', () => {
     it('gemini returns only Google models', () => {
       const models = getModelsForProvider('gemini');
       expect(models.every(m => m.startsWith('gemini-'))).toBe(true);
-      expect(models).toContain('gemini-2.5-pro');
-      expect(models).toContain('gemini-2.5-flash');
+      expect(models).toContain('gemini-3.1-pro');
+      expect(models).toContain('gemini-3.1-flash');
     });
 
     it('codex returns only OpenAI models', () => {
