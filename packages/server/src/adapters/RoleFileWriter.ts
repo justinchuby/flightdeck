@@ -374,6 +374,58 @@ export class OpenCodeRoleFileWriter implements RoleFileWriter {
   }
 }
 
+// ── Generic Markdown: ~/.<dirName>/AGENTS.md ────────────────────────
+//
+// For providers that don't have a specific agent file format (Kimi, Qwen Code).
+// Uses the same single-file approach as Codex.
+
+export class GenericMarkdownRoleFileWriter implements RoleFileWriter {
+  private readonly homeDir: string;
+  private readonly dirName: string;
+
+  constructor(dirName: string, homeDir?: string) {
+    this.dirName = dirName;
+    this.homeDir = homeDir ?? homedir();
+  }
+
+  getFormat(): string {
+    return `${this.dirName.replace('.', '')}-agents-md`;
+  }
+
+  async writeRoleFiles(roles: RoleDefinition[], _targetDir: string): Promise<string[]> {
+    for (const role of roles) {
+      validateRoleName(role.role);
+    }
+    const dir = join(this.homeDir, this.dirName);
+    await mkdir(dir, { recursive: true });
+    const filePath = join(dir, 'AGENTS.md');
+
+    const sections = roles.map(
+      (role) =>
+        [`## ${capitalize(role.role)}`, '', `> Flightdeck ${capitalize(role.role)}: ${role.description}`, '', role.instructions].join(
+          '\n',
+        ),
+    );
+
+    const content = [
+      FLIGHTDECK_MARKER,
+      '',
+      '# Flightdeck Agents',
+      '',
+      sections.join('\n\n---\n\n'),
+      '',
+    ].join('\n');
+
+    await writeFile(filePath, content, 'utf-8');
+    return [filePath];
+  }
+
+  async cleanRoleFiles(_targetDir: string): Promise<void> {
+    const filePath = join(this.homeDir, this.dirName, 'AGENTS.md');
+    await removeIfFlightdeckGenerated(filePath);
+  }
+}
+
 // ── Factory ─────────────────────────────────────────────────────────
 
 const WRITER_FACTORIES: Record<string, () => RoleFileWriter> = {
@@ -383,6 +435,8 @@ const WRITER_FACTORIES: Record<string, () => RoleFileWriter> = {
   cursor: () => new CursorRoleFileWriter(),
   codex: () => new CodexRoleFileWriter(),
   opencode: () => new OpenCodeRoleFileWriter(),
+  kimi: () => new GenericMarkdownRoleFileWriter('.kimi'),
+  'qwen-code': () => new GenericMarkdownRoleFileWriter('.qwen-code'),
 };
 
 /**

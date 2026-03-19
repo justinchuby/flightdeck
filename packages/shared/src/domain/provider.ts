@@ -10,7 +10,7 @@
 // ── Types ──────────────────────────────────────────────────────
 
 /** Canonical provider identifiers. Add new providers here. */
-export type ProviderId = 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude';
+export type ProviderId = 'copilot' | 'gemini' | 'opencode' | 'cursor' | 'codex' | 'claude' | 'kimi' | 'qwen-code';
 
 /** Tailwind color classes for provider-branded UI elements. */
 export interface ProviderColors {
@@ -282,6 +282,53 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     isPreview: true,
     loginInstructions: 'Authentication is managed by OpenCode',
   },
+
+  kimi: {
+    id: 'kimi',
+    name: 'Kimi CLI',
+    icon: '🌙',
+    iconUrl: '/provider-icons/kimi.svg',
+    binary: 'kimi',
+    args: ['acp'],
+    transport: 'stdio',
+    requiredEnvVars: [],
+    supportsResume: true, // Probe: sessionCapabilities.list + resume, loadSession: true
+    modelFlag: '--model',
+    defaultModel: 'kimi-latest',
+    modelArgStrategy: 'flag',
+    nativeModelProviders: ['moonshot'],
+    tierModels: { fast: 'moonshot-v1-8k', standard: 'kimi-latest', premium: 'kimi-latest' },
+    authCommand: 'kimi --version',
+    authLabel: 'Authenticated via Kimi',
+    color: { bg: 'bg-violet-500/15', text: 'text-violet-400', border: 'border-l-violet-500', tab: 'text-violet-400 border-violet-400' },
+    docsUrl: 'https://github.com/MoonshotAI/kimi-cli',
+    setupLinks: [{ label: 'GitHub', url: 'https://github.com/MoonshotAI/kimi-cli' }],
+    isPreview: false,
+    loginInstructions: 'Run kimi login in your terminal',
+  },
+
+  'qwen-code': {
+    id: 'qwen-code',
+    name: 'Qwen Code',
+    icon: '🔮',
+    iconUrl: '/provider-icons/qwen-code.svg',
+    binary: 'qwen',
+    args: ['--acp', '--experimental-skills'],
+    transport: 'stdio',
+    requiredEnvVars: [],
+    supportsResume: true, // Probe: sessionCapabilities.list + resume, loadSession: true
+    modelFlag: '--model',
+    defaultModel: 'qwen-coder-plus-latest',
+    modelArgStrategy: 'flag',
+    nativeModelProviders: ['qwen', 'openai'],
+    tierModels: { fast: 'qwen-coder-plus-latest', standard: 'qwen-coder-plus-latest', premium: 'qwen-coder-plus-latest' },
+    authLabel: 'Qwen OAuth or OPENAI_API_KEY',
+    color: { bg: 'bg-indigo-500/15', text: 'text-indigo-400', border: 'border-l-indigo-500', tab: 'text-indigo-400 border-indigo-400' },
+    docsUrl: 'https://github.com/QwenLM/qwen-code',
+    setupLinks: [{ label: 'GitHub', url: 'https://github.com/QwenLM/qwen-code' }],
+    isPreview: false,
+    loginInstructions: 'Run qwen --auth-type=qwen-oauth or set OPENAI_API_KEY',
+  },
 };
 
 // ── Lookup Helpers ──────────────────────────────────────────────
@@ -401,14 +448,37 @@ export const ACP_CAPABILITIES: Record<ProviderId, AcpProviderCapabilities> = {
     probed: false,
   },
   opencode: {
+    probeVersion: '1.2.27',
     images: true, audio: false,
-    mcpHttp: false, mcpSse: false,
-    embeddedContext: false,
+    mcpHttp: true, mcpSse: true,
+    embeddedContext: true,
     loadSession: true,
-    sessionList: false, sessionResume: false, sessionFork: false,
+    sessionList: true, sessionResume: true, sessionFork: true,
     systemPromptMethod: 'First user message',
-    authMethod: 'Self-managed (provider handles keys)',
-    probed: false,
+    authMethod: 'Self-managed (opencode auth login)',
+    probed: true,
+  },
+  kimi: {
+    probeVersion: '1.24.0',
+    images: true, audio: false,
+    mcpHttp: true, mcpSse: false,
+    embeddedContext: true,
+    loadSession: true,
+    sessionList: true, sessionResume: true, sessionFork: false,
+    systemPromptMethod: 'First user message',
+    authMethod: 'kimi login (Moonshot account)',
+    probed: true,
+  },
+  'qwen-code': {
+    probeVersion: '0.12.6',
+    images: true, audio: true,
+    mcpHttp: false, mcpSse: false,
+    embeddedContext: true,
+    loadSession: true,
+    sessionList: true, sessionResume: true, sessionFork: false,
+    systemPromptMethod: 'First user message',
+    authMethod: 'Qwen OAuth or OPENAI_API_KEY',
+    probed: true,
   },
 };
 

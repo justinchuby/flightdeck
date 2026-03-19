@@ -756,9 +756,9 @@ describe('createRoleFileWriter', () => {
 // ── listRoleFileWriterProviders ─────────────────────────────────────
 
 describe('listRoleFileWriterProviders', () => {
-  it('returns all 6 provider IDs', () => {
+  it('returns all 8 provider IDs', () => {
     const providers = listRoleFileWriterProviders();
-    expect(providers).toHaveLength(6);
+    expect(providers).toHaveLength(8);
     expect(providers).toContain('copilot');
     expect(providers).toContain('claude');
     expect(providers).toContain('gemini');

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-19T15:24:33.407Z",
+  "timestamp": "2026-03-19T16:10:19.109Z",
   "timeoutMs": 20000,
   "results": [
     {
@@ -7,7 +7,7 @@
       "providerName": "GitHub Copilot",
       "binary": "copilot",
       "installed": true,
-      "durationMs": 1654,
+      "durationMs": 1624,
       "protocolVersion": 1,
       "agentInfo": {
         "name": "Copilot",
@@ -82,7 +82,7 @@
       "providerName": "Claude Code",
       "binary": "claude-agent-acp",
       "installed": true,
-      "durationMs": 189,
+      "durationMs": 190,
       "protocolVersion": 1,
       "agentInfo": {
         "name": "@zed-industries/claude-agent-acp",
@@ -147,7 +147,7 @@
       "providerName": "Gemini CLI",
       "binary": "gemini",
       "installed": true,
-      "durationMs": 5228,
+      "durationMs": 6332,
       "protocolVersion": 1,
       "agentInfo": {
         "name": "gemini-cli",
@@ -258,7 +258,7 @@
       "providerName": "Codex CLI",
       "binary": "codex-acp",
       "installed": true,
-      "durationMs": 162,
+      "durationMs": 163,
       "protocolVersion": 1,
       "agentInfo": {
         "name": "codex-acp",
@@ -349,8 +349,246 @@
       "providerId": "opencode",
       "providerName": "OpenCode",
       "binary": "opencode",
-      "installed": false,
-      "error": "Binary 'opencode' not found in PATH"
+      "installed": true,
+      "durationMs": 1369,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "OpenCode",
+        "version": "1.2.27"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "promptCapabilities": {
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "fork": {},
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [
+        {
+          "description": "Run `opencode auth login` in the terminal",
+          "name": "Login with opencode",
+          "id": "opencode-login"
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentCapabilities": {
+          "loadSession": true,
+          "mcpCapabilities": {
+            "http": true,
+            "sse": true
+          },
+          "promptCapabilities": {
+            "embeddedContext": true,
+            "image": true
+          },
+          "sessionCapabilities": {
+            "fork": {},
+            "list": {},
+            "resume": {}
+          }
+        },
+        "authMethods": [
+          {
+            "description": "Run `opencode auth login` in the terminal",
+            "name": "Login with opencode",
+            "id": "opencode-login"
+          }
+        ],
+        "agentInfo": {
+          "name": "OpenCode",
+          "version": "1.2.27"
+        }
+      }
+    },
+    {
+      "providerId": "kimi",
+      "providerName": "Kimi CLI",
+      "binary": "kimi",
+      "installed": true,
+      "durationMs": 1001,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "Kimi Code CLI",
+        "version": "1.24.0"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false
+        },
+        "promptCapabilities": {
+          "audio": false,
+          "embeddedContext": true,
+          "image": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [
+        {
+          "_meta": {
+            "terminal-auth": {
+              "command": "/Users/justinc/.local/bin/kimi",
+              "args": [
+                "login"
+              ],
+              "label": "Kimi Code Login",
+              "env": {},
+              "type": "terminal"
+            }
+          },
+          "description": "Run `kimi login` command in the terminal, then follow the instructions to finish login.",
+          "id": "login",
+          "name": "Login with Kimi account"
+        }
+      ],
+      "rawResponse": {
+        "agentCapabilities": {
+          "loadSession": true,
+          "mcpCapabilities": {
+            "http": true,
+            "sse": false
+          },
+          "promptCapabilities": {
+            "audio": false,
+            "embeddedContext": true,
+            "image": true
+          },
+          "sessionCapabilities": {
+            "list": {},
+            "resume": {}
+          }
+        },
+        "agentInfo": {
+          "name": "Kimi Code CLI",
+          "version": "1.24.0"
+        },
+        "authMethods": [
+          {
+            "_meta": {
+              "terminal-auth": {
+                "command": "/Users/justinc/.local/bin/kimi",
+                "args": [
+                  "login"
+                ],
+                "label": "Kimi Code Login",
+                "env": {},
+                "type": "terminal"
+              }
+            },
+            "description": "Run `kimi login` command in the terminal, then follow the instructions to finish login.",
+            "id": "login",
+            "name": "Login with Kimi account"
+          }
+        ],
+        "protocolVersion": 1
+      }
+    },
+    {
+      "providerId": "qwen-code",
+      "providerName": "Qwen Code",
+      "binary": "qwen",
+      "installed": true,
+      "durationMs": 1142,
+      "protocolVersion": 1,
+      "agentInfo": {
+        "name": "qwen-code",
+        "title": "Qwen Code",
+        "version": "0.12.6"
+      },
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "openai",
+          "name": "Use OpenAI API key",
+          "description": "Requires setting the `OPENAI_API_KEY` environment variable",
+          "_meta": {
+            "type": "terminal",
+            "args": [
+              "--auth-type=openai"
+            ]
+          }
+        },
+        {
+          "id": "qwen-oauth",
+          "name": "Qwen OAuth",
+          "description": "OAuth authentication for Qwen models with free daily requests",
+          "_meta": {
+            "type": "terminal",
+            "args": [
+              "--auth-type=qwen-oauth"
+            ]
+          }
+        }
+      ],
+      "rawResponse": {
+        "protocolVersion": 1,
+        "agentInfo": {
+          "name": "qwen-code",
+          "title": "Qwen Code",
+          "version": "0.12.6"
+        },
+        "authMethods": [
+          {
+            "id": "openai",
+            "name": "Use OpenAI API key",
+            "description": "Requires setting the `OPENAI_API_KEY` environment variable",
+            "_meta": {
+              "type": "terminal",
+              "args": [
+                "--auth-type=openai"
+              ]
+            }
+          },
+          {
+            "id": "qwen-oauth",
+            "name": "Qwen OAuth",
+            "description": "OAuth authentication for Qwen models with free daily requests",
+            "_meta": {
+              "type": "terminal",
+              "args": [
+                "--auth-type=qwen-oauth"
+              ]
+            }
+          }
+        ],
+        "agentCapabilities": {
+          "loadSession": true,
+          "promptCapabilities": {
+            "image": true,
+            "audio": true,
+            "embeddedContext": true
+          },
+          "sessionCapabilities": {
+            "list": {},
+            "resume": {}
+          }
+        }
+      }
     }
   ]
 }

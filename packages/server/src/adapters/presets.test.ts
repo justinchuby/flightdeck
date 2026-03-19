@@ -10,8 +10,8 @@ import type { ProviderPreset, ProviderId } from './presets.js';
 
 describe('Provider Presets', () => {
   describe('PROVIDER_PRESETS', () => {
-    it('contains exactly 6 providers', () => {
-      expect(Object.keys(PROVIDER_PRESETS)).toHaveLength(6);
+    it('contains exactly 8 providers', () => {
+      expect(Object.keys(PROVIDER_PRESETS)).toHaveLength(8);
     });
 
     it('contains all expected provider IDs', () => {
@@ -102,6 +102,24 @@ describe('Provider Presets', () => {
     });
   });
 
+  describe('Kimi preset', () => {
+    it('uses kimi binary with acp subcommand', () => {
+      const preset = PROVIDER_PRESETS.kimi;
+      expect(preset.binary).toBe('kimi');
+      expect(preset.args).toEqual(['acp']);
+      expect(preset.supportsResume).toBe(true);
+    });
+  });
+
+  describe('Qwen Code preset', () => {
+    it('uses qwen binary with --acp flag', () => {
+      const preset = PROVIDER_PRESETS['qwen-code'];
+      expect(preset.binary).toBe('qwen');
+      expect(preset.args).toEqual(['--acp', '--experimental-skills']);
+      expect(preset.supportsResume).toBe(true);
+    });
+  });
+
   describe('getPreset()', () => {
     it('returns the preset for a valid provider ID', () => {
       const preset = getPreset('copilot');
@@ -127,9 +145,9 @@ describe('Provider Presets', () => {
   });
 
   describe('listPresets()', () => {
-    it('returns all 6 presets', () => {
+    it('returns all 8 presets', () => {
       const presets = listPresets();
-      expect(presets).toHaveLength(6);
+      expect(presets).toHaveLength(8);
     });
 
     it('returns ProviderPreset objects', () => {
@@ -196,7 +214,7 @@ describe('Provider Presets', () => {
     it('returns all presets when all binaries are available', async () => {
       const checker = async () => true;
       const installed = await detectInstalledProviders(checker);
-      expect(installed).toHaveLength(6);
+      expect(installed).toHaveLength(8);
     });
 
     it('detects a single provider correctly', async () => {

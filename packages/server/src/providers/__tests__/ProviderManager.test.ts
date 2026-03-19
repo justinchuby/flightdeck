@@ -37,11 +37,11 @@ describe('ProviderManager', () => {
   // ── getProviderConfigs ────────────────────────────────────
 
   describe('getProviderConfigs', () => {
-    it('returns config for all 6 providers', () => {
+    it('returns config for all 8 providers', () => {
       const configs = createManager().getProviderConfigs();
-      expect(configs).toHaveLength(6);
+      expect(configs).toHaveLength(8);
       expect(configs.map((c) => c.id).sort()).toEqual(
-        ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode'],
+        ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'kimi', 'opencode', 'qwen-code'],
       );
     });
 
@@ -173,11 +173,11 @@ describe('ProviderManager', () => {
   // ── getAllProviderStatuses ────────────────────────────────
 
   describe('getAllProviderStatuses', () => {
-    it('returns status for all 6 providers', () => {
+    it('returns status for all 8 providers', () => {
       const statuses = createManager().getAllProviderStatuses();
-      expect(statuses).toHaveLength(6);
+      expect(statuses).toHaveLength(8);
       expect(statuses.map((s) => s.id).sort()).toEqual(
-        ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode'],
+        ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'kimi', 'opencode', 'qwen-code'],
       );
     });
   });
@@ -273,12 +273,12 @@ describe('ProviderManager', () => {
   // ── getAllProviderStatusesAsync ────────────────────────────
 
   describe('getAllProviderStatusesAsync', () => {
-    it('returns status for all 6 providers in parallel', async () => {
+    it('returns status for all 8 providers in parallel', async () => {
       execAsync.mockResolvedValue('');
       const statuses = await createManager().getAllProviderStatusesAsync();
-      expect(statuses).toHaveLength(6);
+      expect(statuses).toHaveLength(8);
       expect(statuses.map((s) => s.id).sort()).toEqual(
-        ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode'],
+        ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'kimi', 'opencode', 'qwen-code'],
       );
     });
   });
@@ -322,11 +322,11 @@ describe('ProviderManager', () => {
       mgr.invalidateCache();
       await mgr.getAllProviderStatusesAsync();
 
-      // Two rounds of `which` calls (6 providers each)
+      // Two rounds of `which` calls (8 providers each)
       const whichCalls = execAsync.mock.calls.filter(
         (c: string[]) => c[0] === 'which',
       );
-      expect(whichCalls).toHaveLength(12);
+      expect(whichCalls).toHaveLength(16);
     });
 
     it('cache expires after TTL', async () => {

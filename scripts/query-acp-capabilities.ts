@@ -39,6 +39,8 @@ const PROVIDERS: ProviderDef[] = [
   { id: 'codex', name: 'Codex CLI', binary: 'codex-acp', args: [] },
   { id: 'cursor', name: 'Cursor Agent', binary: 'agent', args: ['acp'] },
   { id: 'opencode', name: 'OpenCode', binary: 'opencode', args: ['acp'] },
+  { id: 'kimi', name: 'Kimi CLI', binary: 'kimi', args: ['acp'] },
+  { id: 'qwen-code', name: 'Qwen Code', binary: 'qwen', args: ['--acp', '--experimental-skills'] },
 ];
 
 // ── Result Types ────────────────────────────────────────────────

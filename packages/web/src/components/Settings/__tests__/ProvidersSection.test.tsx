@@ -20,6 +20,8 @@ const MOCK_CONFIGS = [
   { id: 'opencode', name: 'OpenCode', enabled: true },
   { id: 'cursor', name: 'Cursor', enabled: false },
   { id: 'codex', name: 'Codex CLI', enabled: true },
+  { id: 'kimi', name: 'Kimi CLI', enabled: true },
+  { id: 'qwen-code', name: 'Qwen Code', enabled: true },
 ];
 
 /** Phase 2: async CLI detection results. */
@@ -30,10 +32,12 @@ const MOCK_STATUSES = [
   { id: 'opencode', installed: false, authenticated: null, binaryPath: null, version: null },
   { id: 'cursor', installed: false, authenticated: null, binaryPath: null, version: null },
   { id: 'codex', installed: true, authenticated: false, binaryPath: '/usr/bin/codex', version: '0.5.0' },
+  { id: 'kimi', installed: true, authenticated: true, binaryPath: '/usr/bin/kimi', version: '1.24.0' },
+  { id: 'qwen-code', installed: true, authenticated: true, binaryPath: '/usr/bin/qwen', version: '0.12.6' },
 ];
 
 const MOCK_RANKING = {
-  ranking: ['copilot', 'claude', 'gemini', 'opencode', 'cursor', 'codex'],
+  ranking: ['copilot', 'claude', 'gemini', 'opencode', 'cursor', 'codex', 'kimi', 'qwen-code'],
 };
 
 /**
@@ -70,7 +74,7 @@ describe('ProvidersSection', () => {
     expect(screen.getByText('Loading providers…')).toBeInTheDocument();
   });
 
-  it('renders all 6 provider cards after config loads', async () => {
+  it('renders all 8 provider cards after config loads', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
@@ -90,16 +94,16 @@ describe('ProvidersSection', () => {
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
-    // All 6 cards should have skeleton badges
+    // All 8 cards should have skeleton badges
     const skeletons = screen.getAllByTestId('status-badge-skeleton');
-    expect(skeletons.length).toBe(6);
+    expect(skeletons.length).toBe(8);
   });
 
   it('shows "N providers" count while status loads, then "X/N installed"', async () => {
     mockProviderApisConfigOnly();
     render(<ProvidersSection />);
     await waitFor(() => {
-      expect(screen.getByTestId('installed-count')).toHaveTextContent('6 providers');
+      expect(screen.getByTestId('installed-count')).toHaveTextContent('8 providers');
     });
   });
 
@@ -107,7 +111,7 @@ describe('ProvidersSection', () => {
     mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
-      expect(screen.getByText('3/6 installed')).toBeInTheDocument();
+      expect(screen.getByText('5/8 installed')).toBeInTheDocument();
     });
   });
 
@@ -116,7 +120,7 @@ describe('ProvidersSection', () => {
     render(<ProvidersSection />);
     await waitFor(() => {
       const readyBadges = screen.getAllByText('Ready');
-      expect(readyBadges.length).toBe(2); // Copilot and Claude
+      expect(readyBadges.length).toBe(4); // Copilot, Claude, Kimi, Qwen Code
     });
   });
 
@@ -168,7 +172,7 @@ describe('ProvidersSection', () => {
     render(<ProvidersSection />);
     // Wait for status to load so installed = true and test button appears
     await waitFor(() => {
-      expect(screen.getAllByText('Ready').length).toBe(2);
+      expect(screen.getAllByText('Ready').length).toBe(4);
     });
     // Expand Claude card
     const claudeCard = screen.getByTestId('provider-card-claude');
@@ -182,7 +186,7 @@ describe('ProvidersSection', () => {
     render(<ProvidersSection />);
     // Wait for status to load
     await waitFor(() => {
-      expect(screen.getAllByText('Ready').length).toBe(2);
+      expect(screen.getAllByText('Ready').length).toBe(4);
     });
 
     // Queue the test connection response

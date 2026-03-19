@@ -4,7 +4,7 @@
 
 ## Protocol Overview
 
-The [Agent Client Protocol (ACP)](https://agentclientprotocol.com/protocol/overview) is a standardized protocol for client-agent communication. Flightdeck uses ACP as its unified adapter layer — all 6 provider backends are accessed through the same ACP interface, enabling provider-agnostic agent orchestration.
+The [Agent Client Protocol (ACP)](https://agentclientprotocol.com/protocol/overview) is a standardized protocol for client-agent communication. Flightdeck uses ACP as its unified adapter layer — all 8 provider backends are accessed through the same ACP interface, enabling provider-agnostic agent orchestration.
 
 ACP defines capability negotiation during session initialization: the client advertises what it supports (filesystem access, terminal, etc.) and the server responds with agent capabilities (image support, audio, MCP servers, session resume).
 
@@ -166,6 +166,40 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | **System Prompt** | First user message |
 | **Unique** | Config-based model selection; HTTP-only MCP |
 
+### 🌙 Kimi CLI (Moonshot AI)
+
+| Field | Value |
+|-------|-------|
+| **Binary** | `kimi acp` |
+| **Probe Version** | v1.24.0 |
+| **Auth** | `kimi login` (Moonshot account) |
+| **Resume** | ✅ (session list + resume, loadSession) |
+| **Images** | ✅ |
+| **Audio** | ❌ |
+| **MCP** | ⚠️ HTTP only (no SSE) |
+| **Embedded Context** | ✅ |
+| **Model Selection** | `--model <name>` flag |
+| **Models** | Moonshot native (kimi-latest, moonshot-v1-8k) |
+| **System Prompt** | First user message |
+| **Unique** | Moonshot AI models, terminal-based login auth |
+
+### 🔮 Qwen Code (Alibaba)
+
+| Field | Value |
+|-------|-------|
+| **Binary** | `qwen --acp --experimental-skills` |
+| **Probe Version** | v0.12.6 |
+| **Auth** | Qwen OAuth (free daily requests) or OPENAI_API_KEY |
+| **Resume** | ✅ (session list + resume, loadSession) |
+| **Images** | ✅ |
+| **Audio** | ✅ (one of two providers with audio support) |
+| **MCP** | ❌ |
+| **Embedded Context** | ✅ |
+| **Model Selection** | `--model <name>` flag |
+| **Models** | Qwen (qwen-coder-plus-latest) + OpenAI backend |
+| **System Prompt** | First user message |
+| **Unique** | Audio support, Qwen OAuth with free tier, dual-backend (Qwen + OpenAI) |
+
 ### ↗️ Cursor (PREVIEW)
 
 | Field | Value |
@@ -199,10 +233,12 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | **Claude** | v0.21.0 | ✅ | ✅ | ❌ | ✅ http+sse | ✅ | fork+list+resume | API key | ❌ |
 | **Gemini** | v0.34.0 | ❌ | ✅ | ✅ | ✅ http+sse | ✅ | none | API key (4 methods) | ❌ |
 | **Codex** | v0.9.5 | ❌ | ✅ | ❌ | ⚠️ http only | ✅ | list | API key (3 methods) | ❌ |
+| **Kimi** | v1.24.0 | ✅ | ✅ | ❌ | ⚠️ http only | ✅ | list+resume | Moonshot login | ❌ |
+| **Qwen Code** | v0.12.6 | ✅ | ✅ | ✅ | ❌ | ✅ | list+resume | Qwen OAuth / OPENAI_API_KEY | ✅ (2 backends) |
 | **Cursor** | — | ✅* | — | — | — | — | — | API key | ✅ (3 backends) |
-| **OpenCode** | — | ✅* | — | — | — | — | — | Self-managed | ✅ (4 backends + local) |
+| **OpenCode** | v1.2.27 | ✅ | ✅ | ❌ | ✅ http+sse | ✅ | fork+list+resume | opencode auth login | ✅ (4 backends + local) |
 
-*Not probed (binary not installed). Resume status from static preset only.
+*Cursor not probed (binary not installed). Resume status from static preset only.
 
 ## Key Findings
 

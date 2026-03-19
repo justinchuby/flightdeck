@@ -344,10 +344,10 @@ describe('ModelResolver', () => {
       expect(getTierModels('')).toBeUndefined();
     });
 
-    it('returns all 6 providers for each tier', () => {
+    it('returns all 8 providers for each tier', () => {
       for (const tier of listTiers()) {
         const models = getTierModels(tier)!;
-        expect(Object.keys(models)).toHaveLength(6);
+        expect(Object.keys(models)).toHaveLength(8);
       }
     });
   });
@@ -458,9 +458,9 @@ describe('ModelResolver', () => {
   });
 
   describe('getModelsByProvider()', () => {
-    it('returns model lists for all 6 providers', () => {
+    it('returns model lists for all 8 providers', () => {
       const result = getModelsByProvider();
-      expect(Object.keys(result)).toHaveLength(6);
+      expect(Object.keys(result)).toHaveLength(8);
       expect(result).toHaveProperty('copilot');
       expect(result).toHaveProperty('claude');
       expect(result).toHaveProperty('gemini');

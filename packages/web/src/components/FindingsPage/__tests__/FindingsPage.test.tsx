@@ -40,7 +40,7 @@ describe('FindingsPage', () => {
     expect(screen.getByTestId('capability-matrix')).toBeInTheDocument();
   });
 
-  it('renders all 6 providers in the matrix', () => {
+  it('renders all 8 providers in the matrix', () => {
     renderPage();
     const providers = getAllProviders();
     for (const p of providers) {
@@ -64,7 +64,7 @@ describe('FindingsPage', () => {
 });
 
 describe('ACP_CAPABILITIES (shared source of truth)', () => {
-  it('has entries for all 6 providers', () => {
+  it('has entries for all 8 providers', () => {
     for (const id of PROVIDER_IDS) {
       expect(ACP_CAPABILITIES[id]).toBeDefined();
     }
@@ -113,7 +113,6 @@ describe('ACP_CAPABILITIES (shared source of truth)', () => {
 
   it('unprobed providers have probed=false', () => {
     expect(ACP_CAPABILITIES.cursor.probed).toBe(false);
-    expect(ACP_CAPABILITIES.opencode.probed).toBe(false);
   });
 
   it('every entry has required fields', () => {

@@ -59,6 +59,8 @@ const MOCK_CONFIGS = [
   { id: 'opencode', name: 'OpenCode', enabled: true },
   { id: 'cursor', name: 'Cursor', enabled: false },
   { id: 'codex', name: 'Codex (ACP)', enabled: true },
+  { id: 'kimi', name: 'Kimi CLI', enabled: true },
+  { id: 'qwen-code', name: 'Qwen Code', enabled: true },
 ];
 
 const MOCK_STATUSES = [
@@ -68,6 +70,8 @@ const MOCK_STATUSES = [
   { id: 'opencode', name: 'OpenCode', installed: false, authenticated: null, enabled: true, binaryPath: null, version: null },
   { id: 'cursor', name: 'Cursor', installed: false, authenticated: null, enabled: false, binaryPath: null, version: null },
   { id: 'codex', name: 'Codex (ACP)', installed: true, authenticated: false, enabled: true, binaryPath: '/usr/bin/codex-acp', version: '0.5.0' },
+  { id: 'kimi', name: 'Kimi CLI', installed: true, authenticated: true, enabled: true, binaryPath: '/usr/bin/kimi', version: '1.24.0' },
+  { id: 'qwen-code', name: 'Qwen Code', installed: true, authenticated: true, enabled: true, binaryPath: '/usr/bin/qwen', version: '0.12.6' },
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -133,11 +137,11 @@ describe('settings routes', () => {
   // ── GET /settings/providers (instant config) ──────────────
 
   describe('GET /settings/providers', () => {
-    it('returns all 6 provider configs', async () => {
+    it('returns all 8 provider configs', async () => {
       const res = await fetch(`${baseUrl}/settings/providers`);
       expect(res.status).toBe(200);
       const configs = await res.json();
-      expect(configs).toHaveLength(6);
+      expect(configs).toHaveLength(8);
     });
 
     it('returns only config fields (id, name, enabled) — no CLI status', async () => {
@@ -171,11 +175,11 @@ describe('settings routes', () => {
   // ── GET /settings/providers/status (async detection) ──────
 
   describe('GET /settings/providers/status', () => {
-    it('returns all 6 provider statuses', async () => {
+    it('returns all 8 provider statuses', async () => {
       const res = await fetch(`${baseUrl}/settings/providers/status`);
       expect(res.status).toBe(200);
       const statuses = await res.json();
-      expect(statuses).toHaveLength(6);
+      expect(statuses).toHaveLength(8);
     });
 
     it('includes installed/authenticated/version fields', async () => {

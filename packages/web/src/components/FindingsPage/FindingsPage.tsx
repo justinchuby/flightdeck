@@ -82,6 +82,16 @@ const PROVIDER_DISPLAY_DATA: Record<string, {
     modelTiers: 'anthropic/*, openai/*, google/*, local/*',
     uniqueFeatures: ['Local model support', 'Self-managed authentication', 'Model prefix system (provider/model)'],
   },
+  kimi: {
+    modelSelectionStyle: '--model flag',
+    modelTiers: 'moonshot-v1-8k, kimi-latest',
+    uniqueFeatures: ['Moonshot AI models', 'Session list + resume', 'MCP HTTP support', 'Terminal-based login'],
+  },
+  'qwen-code': {
+    modelSelectionStyle: '--model flag',
+    modelTiers: 'qwen-coder-plus-latest',
+    uniqueFeatures: ['Audio input support', 'Qwen OAuth (free daily requests)', 'OpenAI API key fallback', 'Session list + resume'],
+  },
 };
 
 function buildCapabilities(): ProviderCapabilities[] {
@@ -302,7 +312,7 @@ export function FindingsPage() {
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-th-text">ACP Capability Research</h2>
         <p className="text-xs text-th-text-muted mt-1">
-          Analysis of Agent Client Protocol capabilities across Flightdeck&apos;s 6 provider adapters.
+          Analysis of Agent Client Protocol capabilities across Flightdeck&apos;s 8 provider adapters.
           Research conducted March 19, 2026.
         </p>
       </div>
@@ -317,8 +327,8 @@ export function FindingsPage() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
             <div className="bg-th-bg-alt border border-th-border rounded-md p-3">
-              <div className="text-th-text font-medium mb-1">6 Adapters</div>
-              <div className="text-th-text-muted">Copilot, Claude, Gemini, Codex + Cursor, OpenCode (preview)</div>
+              <div className="text-th-text font-medium mb-1">8 Adapters</div>
+              <div className="text-th-text-muted">Copilot, Claude, Gemini, Codex, Kimi, Qwen Code + Cursor, OpenCode (preview)</div>
             </div>
             <div className="bg-th-bg-alt border border-th-border rounded-md p-3">
               <div className="text-th-text font-medium mb-1">stdio Transport</div>
@@ -413,7 +423,7 @@ interface AgentCapabilities {
             },
             {
               title: '4. Image Content Support',
-              description: 'All 6 providers advertise supportsImages:true but Flightdeck never sends image content. Adding screenshot/diagram sharing would leverage existing provider capabilities.',
+              description: 'All 8 providers advertise supportsImages:true but Flightdeck never sends image content. Adding screenshot/diagram sharing would leverage existing provider capabilities.',
               priority: 'Low',
             },
             {
