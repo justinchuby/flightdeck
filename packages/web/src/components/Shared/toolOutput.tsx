@@ -77,7 +77,7 @@ export function CollapsibleToolOutput({ lines }: { lines: string[] }) {
       </summary>
       <div className="ml-4 mt-0.5 text-th-text-muted font-mono">
         {shortPaths.map((p, i) => (
-          <div key={i} className="truncate">
+          <div key={i} className="break-all" title={paths[i]}>
             {p}
           </div>
         ))}

@@ -602,7 +602,7 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
   const title = typeof msg.text === 'string' ? msg.text : String(msg.text);
   const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
-  // Narrow lookup to the current agent's toolCalls (O(1) agent + O(toolCalls))
+  // Narrow lookup to the current agent's toolCalls — O(agents) find + O(toolCalls) find
   const agentId = useContext(AgentIdContext);
   const toolCalls = useAppStore((s) => s.agents.find((a) => a.id === agentId)?.toolCalls);
   const content = useMemo(() => {
@@ -634,7 +634,7 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
     <details className="group text-[11px]">
       <summary className="cursor-pointer select-none list-none">{badge}</summary>
       <pre className="ml-5 mt-0.5 mb-1 text-[10px] text-th-text-muted font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
-        {content.length > 2000 ? content.slice(0, 2000) + '…' : content}
+        {content}
       </pre>
     </details>
   );
