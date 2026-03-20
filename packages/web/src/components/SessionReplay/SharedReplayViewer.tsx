@@ -4,6 +4,7 @@ import { Users, Clock, Play, Pause, SkipBack, SkipForward, MapPin } from 'lucide
 import type { ShareableReplay } from './types';
 import { AnnotationPin } from './AnnotationPin';
 import { ReplayContent } from './ReplayContent';
+import { ReplayTimeline } from './ReplayTimeline';
 import { useSharedReplay } from '../../hooks/useSharedReplay';
 
 /**
@@ -17,7 +18,7 @@ export function SharedReplayViewer() {
 
   // Single source of truth for playback state and world data
   const {
-    worldState, playing, currentTime, duration,
+    keyframes, worldState, playing, currentTime, duration,
     loading, error, play, pause, seek, sharedData,
   } = useSharedReplay(token ?? null);
 
@@ -81,6 +82,9 @@ export function SharedReplayViewer() {
           )}
         </div>
       </header>
+
+      {/* Agent swim-lane timeline */}
+      <ReplayTimeline keyframes={keyframes} duration={duration} currentTime={currentTime} onSeek={seek} />
 
       {/* Session content — rendered from replay world state */}
       <ReplayContent worldState={worldState} />
