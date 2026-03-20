@@ -26,9 +26,6 @@ export interface ReplayAgentState {
 export interface ReplayWorldState {
   timestamp: string;
   agents: ReplayAgentState[];
-  pendingDecisions: number;
-  completedTasks: number;
-  totalTasks: number;
   /** Full task DAG state at this point in time (from server WorldState) */
   dagTasks?: ReplayDagTask[];
   /** Decision log entries at this point in time */
@@ -42,13 +39,13 @@ export interface ReplayDagTask {
   description?: string;
   role?: string;
   dagStatus: string;
-  assignedTo?: string;
+  assignedAgentId?: string;
   dependencies?: string[];
 }
 
 export interface ReplayDecision {
   id: string;
-  summary: string;
+  title: string;
   status: string;
   agentRole?: string;
   timestamp?: string;

@@ -12,17 +12,14 @@ const baseWorldState: ReplayWorldState = {
     { id: 'dev-uuid-5678', role: 'developer', status: 'running', contextUsedPct: 45 },
     { id: 'rev-uuid-9012', role: 'code-reviewer', status: 'idle' },
   ],
-  pendingDecisions: 1,
-  completedTasks: 3,
-  totalTasks: 7,
   dagTasks: [
-    { id: 'setup-auth', description: 'Set up authentication', dagStatus: 'done', assignedTo: 'dev-uuid-5678' },
+    { id: 'setup-auth', description: 'Set up authentication', dagStatus: 'done', assignedAgentId: 'dev-uuid-5678' },
     { id: 'build-api', description: 'Build REST API', dagStatus: 'running', role: 'developer' },
     { id: 'write-tests', dagStatus: 'pending' },
   ],
   decisions: [
-    { id: 'dec-1', summary: 'Use JWT for auth tokens', status: 'confirmed', agentRole: 'lead' },
-    { id: 'dec-2', summary: 'Add rate limiting?', status: 'pending', agentRole: 'developer' },
+    { id: 'dec-1', title: 'Use JWT for auth tokens', status: 'confirmed', agentRole: 'lead' },
+    { id: 'dec-2', title: 'Add rate limiting?', status: 'pending', agentRole: 'developer' },
   ],
   recentActivity: [
     { id: 1, agentId: 'dev-uuid-5678', agentRole: 'developer', actionType: 'task_completed', summary: 'Auth module complete', timestamp: '2026-03-20T11:58:00Z' },
@@ -78,10 +75,12 @@ describe('ReplayContent', () => {
     expect(screen.getByText('Phase 1 done')).toBeTruthy();
   });
 
-  it('renders summary bar with counts', () => {
+  it('renders summary bar with counts derived from arrays', () => {
     render(<ReplayContent worldState={baseWorldState} />);
     expect(screen.getByText('3 agents (2 running)')).toBeTruthy();
-    expect(screen.getByText('3/7 tasks')).toBeTruthy();
+    // 1 done out of 3 tasks (derived from dagTasks array)
+    expect(screen.getByText('1/3 tasks')).toBeTruthy();
+    // 1 pending decision (derived from decisions array)
     expect(screen.getByText('1 pending decisions')).toBeTruthy();
   });
 
@@ -89,9 +88,6 @@ describe('ReplayContent', () => {
     const minimal: ReplayWorldState = {
       timestamp: '2026-03-20T12:00:00Z',
       agents: [{ id: 'a1', role: 'lead', status: 'running' }],
-      pendingDecisions: 0,
-      completedTasks: 0,
-      totalTasks: 0,
     };
     render(<ReplayContent worldState={minimal} />);
     expect(screen.getByTestId('replay-content')).toBeTruthy();
