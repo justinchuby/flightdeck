@@ -13,7 +13,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
-import { useLeadStore } from '../../stores/leadStore';
+import { useLeadStore, resolveProject } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectId } from '../../contexts/ProjectContext';
@@ -143,11 +143,9 @@ export function OverviewPage() {
   }, [effectiveId]);
 
   // ── Attention alerts ──────────────────────────────────────────
-  // The leadStore is keyed by leadId (agent ID), not projectId.
-  // Try activeLeadId first, fall back to effectiveId for compatibility.
   const activeLeadId = activeLeadAgent?.id ?? null;
   const { dagStatus, storeDecisions } = useLeadStore(s => {
-    const proj = s.projects[activeLeadId ?? ''] ?? s.projects[effectiveId ?? ''];
+    const proj = resolveProject(s, activeLeadId) ?? resolveProject(s, effectiveId);
     return {
       dagStatus: proj?.dagStatus ?? null,
       storeDecisions: proj?.decisions ?? EMPTY_DECISIONS,
