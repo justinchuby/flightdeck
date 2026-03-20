@@ -6,6 +6,7 @@ import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
 import { asAgentId } from '../types/brandedIds.js';
+import { isCrewMember, getCrewIds as resolveCrewIds } from '../agents/crewUtils.js';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -128,12 +129,8 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Resolve crew membership for leadId filtering
     const crewAgentIds = new Set<string>();
     if (leadId) {
-      crewAgentIds.add(leadId);
-      for (const agent of agentManager.getAll()) {
-        if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
-          crewAgentIds.add(agent.id);
-        }
-      }
+      const resolved = resolveCrewIds(agentManager.getAll(), leadId);
+      for (const id of resolved) crewAgentIds.add(id);
 
       // Historical fallback: when no live agents match, treat leadId as projectId
       // and discover crew members from the events themselves
@@ -353,7 +350,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
       if (crewAgentIds.size > 0 && !crewAgentIds.has(entry.agentId)) {
         // Check if this is a new agent spawned under the lead
         const agent = agentManager.get(entry.agentId);
-        if (!agent || (agent.parentId !== leadId && agent.id !== leadId && agent.projectId !== leadId)) return;
+        if (!agent || !isCrewMember(agent, leadId)) return;
         // New crew member — add to tracked set
         crewAgentIds.add(entry.agentId);
       }

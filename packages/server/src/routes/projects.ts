@@ -9,6 +9,7 @@ import { FLIGHTDECK_STATE_DIR } from '../config.js';
 import type { AppContext } from './context.js';
 import { spawnLimiter } from './context.js';
 import { KNOWN_MODEL_IDS, DEFAULT_MODEL_CONFIG, validateModelConfig, validateModelConfigShape } from '../projects/ModelConfigDefaults.js';
+import { isCrewMember } from '../agents/crewUtils.js';
 import { getModelsByProvider } from '../adapters/ModelResolver.js';
 import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMembers, conversations, messages } from '../db/schema.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
@@ -149,9 +150,8 @@ export function projectsRoutes(ctx: AppContext): Router {
       // Agent composition: filter roster by metadata.parentId === leadId OR agentId === leadId
       const agents = rosterAgents
         .filter(a => {
-          if (a.agentId === session.leadId) return true;
-          const meta = a.metadata ?? {};
-          return meta.parentId === session.leadId;
+          const meta = a.metadata ?? {} as Record<string, unknown>;
+          return isCrewMember({ id: a.agentId, parentId: meta.parentId as string | undefined }, session.leadId);
         })
         .map(a => ({
           role: a.role,

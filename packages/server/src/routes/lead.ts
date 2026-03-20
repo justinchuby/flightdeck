@@ -6,6 +6,7 @@ import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
+import { isCrewMember } from '../agents/crewUtils.js';
 
 /** Build ContentBlock array from text + optional attachments */
 function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
@@ -417,7 +418,7 @@ export function leadRoutes(ctx: AppContext): Router {
     }
 
     let children: ProgressAgent[] = agentManager.getAll()
-      .filter((a) => a.parentId === leadId)
+      .filter((a) => isCrewMember(a, leadId) && a.id !== leadId)
       .map((a) => ({
         id: a.id,
         role: a.role,
@@ -435,8 +436,8 @@ export function leadRoutes(ctx: AppContext): Router {
     if (children.length === 0 && ctx.agentRoster) {
       const rosterAgents = ctx.agentRoster.getAllAgents();
       const rosterChildren = rosterAgents.filter((a) => {
-        const meta = a.metadata ?? {};
-        return meta.parentId === leadId && a.agentId !== leadId;
+        const meta = a.metadata ?? {} as Record<string, unknown>;
+        return isCrewMember({ id: a.agentId, parentId: meta.parentId as string | undefined }, leadId) && a.agentId !== leadId;
       });
       if (rosterChildren.length > 0) {
         // Pull real token data from CostTracker if available

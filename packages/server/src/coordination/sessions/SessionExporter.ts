@@ -9,6 +9,7 @@ import type { ChatGroupRegistry } from '../../comms/ChatGroupRegistry.js';
 import { logger } from '../../utils/logger.js';
 import { asAgentId } from '../../types/brandedIds.js';
 import { shortAgentId } from '@flightdeck/shared';
+import { getCrewAgents } from '../../agents/crewUtils.js';
 
 // Safe min/max for large arrays (avoids stack overflow from spread operator)
 function safeMin(arr: number[]): number { return arr.reduce((a, b) => Math.min(a, b), Infinity); }
@@ -62,9 +63,7 @@ export class SessionExporter {
 
     // Collect crew agents (lead + direct children)
     const allAgents = this.agentManager.getAll();
-    const crewAgents = allAgents.filter(
-      a => a.id === leadId || a.parentId === leadId,
-    );
+    const crewAgents = getCrewAgents(allAgents, leadId);
 
     // Collect all events for crew
     const crewIds = new Set(crewAgents.map(a => a.id));
