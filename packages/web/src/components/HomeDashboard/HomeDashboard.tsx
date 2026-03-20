@@ -314,7 +314,7 @@ export function HomeDashboard() {
               if (total === 0) return null;
               return { projectId: proj.id, projectName: proj.name, leadId, summary: dag.summary };
             })
-            .catch((err) => { console.warn('[HomeDashboard] DAG fetch failed for project:', err); return null; });
+            .catch((err) => { console.error('[HomeDashboard] DAG fetch failed for project:', err); return null; });
         })
         .filter(Boolean);
       const progressResults = (await Promise.all(dagPromises)).filter(

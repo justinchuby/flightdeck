@@ -36,7 +36,7 @@ export function AddTaskForm({ projectId, onCreated, onClose }: AddTaskFormProps)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message ?? 'Failed to create task');
-      console.warn('Failed to create task', err);
+      console.error('Failed to create task', err);
     } finally {
       setSubmitting(false);
     }
