@@ -280,10 +280,11 @@ export function HomeDashboard() {
     try {
       setLoading(true);
       setFetchError(null);
-      const [projectsData, decisionsData, activityData, pendingDecisionsData] = await Promise.all([
+      const [projectsData, decisionsData, progressData, completionData, pendingDecisionsData] = await Promise.all([
         apiFetch<EnrichedProject[]>('/projects').catch(() => []),
         apiFetch<Decision[]>('/decisions').catch(() => []),
         apiFetch<ActivityEntry[]>('/coordination/activity?type=progress_update&limit=15').catch(() => []),
+        apiFetch<ActivityEntry[]>('/coordination/activity?type=task_completed&limit=15').catch(() => []),
         apiFetch<Decision[]>('/decisions?needs_confirmation=true').catch(() => []),
       ]);
 
@@ -297,10 +298,13 @@ export function HomeDashboard() {
       const pending = Array.isArray(pendingDecisionsData) ? pendingDecisionsData : [];
       useAppStore.getState().setPendingDecisions(pending);
 
-      // Server already filters to progress_update; show all agent roles
-      const progressActivity = (Array.isArray(activityData) ? activityData : [])
+      // Merge progress updates and task completions, sort by timestamp
+      const progress = Array.isArray(progressData) ? progressData : [];
+      const completions = Array.isArray(completionData) ? completionData : [];
+      const merged = [...progress, ...completions]
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 15);
-      setRecentActivity(progressActivity);
+      setRecentActivity(merged);
 
       // Fetch DAG progress for projects with active leads (parallelized)
       const dagPromises = activeProjects
@@ -625,11 +629,11 @@ export function HomeDashboard() {
           </div>
         )}
 
-        {/* Section 4: Recent Progress */}
+        {/* Section 4: Recent Activity */}
         <div data-testid="activity-feed-section">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="w-4 h-4 text-th-text-muted" />
-            <h2 className="text-sm font-medium text-th-text-alt">Recent Progress</h2>
+            <h2 className="text-sm font-medium text-th-text-alt">Recent Activity</h2>
           </div>
           {recentActivity.length > 0 ? (
             <div className="bg-surface-raised border border-th-border rounded-lg divide-y divide-th-border max-h-64 overflow-y-auto">
@@ -647,7 +651,7 @@ export function HomeDashboard() {
             </div>
           ) : (
             <div className="bg-surface-raised border border-th-border rounded-lg px-3 py-4 text-center text-xs text-th-text-muted">
-              No progress updates yet. Updates appear here when the lead reports progress.
+              No activity yet. Progress updates and task completions appear here.
             </div>
           )}
         </div>
