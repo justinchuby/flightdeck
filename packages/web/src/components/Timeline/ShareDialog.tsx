@@ -24,20 +24,20 @@ const EXPIRY_OPTIONS = [
   { label: '24 hours', hours: 24 },
   { label: '7 days', hours: 168 },
   { label: '30 days', hours: 720 },
-  { label: 'Never', hours: 0 },
+  { label: 'Never', hours: 876_000 }, // ~100 years
 ] as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function formatExpiry(expiresAt: string): string {
   const exp = new Date(expiresAt);
-  if (exp.getFullYear() > 2099) return 'Never';
   const now = Date.now();
   const diffMs = exp.getTime() - now;
   if (diffMs <= 0) return 'Expired';
+  const days = Math.floor(diffMs / 86_400_000);
+  if (days > 365) return 'Never';
   const hours = Math.floor(diffMs / 3_600_000);
   if (hours < 24) return `${hours}h remaining`;
-  const days = Math.floor(hours / 24);
   return `${days}d remaining`;
 }
 
@@ -87,8 +87,7 @@ export function ShareDialog({ leadId, onClose }: ShareDialogProps) {
     setCreating(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = {};
-      if (expiryHours > 0) body.expiresInHours = expiryHours;
+      const body: Record<string, unknown> = { expiresInHours: expiryHours };
       if (label.trim()) body.label = label.trim();
 
       const link = await apiFetch<ShareLink>(`/replay/${leadId}/share`, {
