@@ -111,7 +111,7 @@ export class SessionReplay {
     if (this.agentSource) {
       const crewIds = new Set<string>([leadId]);
       for (const agent of this.agentSource.getAll()) {
-        if (agent.parentId === leadId || agent.id === leadId) {
+        if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
           crewIds.add(agent.id);
         }
       }

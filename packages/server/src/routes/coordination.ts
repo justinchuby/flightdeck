@@ -129,7 +129,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
     if (leadId) {
       crewAgentIds.add(leadId);
       for (const agent of agentManager.getAll()) {
-        if (agent.parentId === leadId || agent.id === leadId) {
+        if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
           crewAgentIds.add(agent.id);
         }
       }
@@ -352,7 +352,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
       if (crewAgentIds.size > 0 && !crewAgentIds.has(entry.agentId)) {
         // Check if this is a new agent spawned under the lead
         const agent = agentManager.get(entry.agentId);
-        if (!agent || (agent.parentId !== leadId && agent.id !== leadId)) return;
+        if (!agent || (agent.parentId !== leadId && agent.id !== leadId && agent.projectId !== leadId)) return;
         // New crew member — add to tracked set
         crewAgentIds.add(entry.agentId);
       }
