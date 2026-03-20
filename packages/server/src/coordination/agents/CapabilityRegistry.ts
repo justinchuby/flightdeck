@@ -2,6 +2,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { Database } from '../../db/database.js';
 import { agentFileHistory, utcNow } from '../../db/schema.js';
 import type { FileLockRegistry } from '../files/FileLockRegistry.js';
+import { isCrewMember } from '../../agents/crewUtils.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -119,8 +120,7 @@ export class CapabilityRegistry {
   /** Query agents by capability — ranked by relevance score. */
   query(leadId: string, q: CapabilityQuery): CapabilityResult[] {
     const agents = this.getAgents().filter(a => {
-      const isChild = a.parentId === leadId || a.id === leadId;
-      if (!isChild) return false;
+      if (!isCrewMember(a, leadId)) return false;
       if (q.availableOnly && a.status !== 'idle') return false;
       if (q.excludeAgentId && a.id === q.excludeAgentId) return false;
       return true;

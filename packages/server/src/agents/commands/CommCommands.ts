@@ -3,6 +3,7 @@ import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { deriveArgs } from './CommandHelp.js';
+import { isCrewMember } from '../crewUtils.js';
 import {
   parseCommandPayload,
   agentMessageSchema,
@@ -213,7 +214,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
     const recipients = ctx.getAllAgents().filter((a) =>
       a.id !== agent.id &&
       a.id !== leadId &&
-      a.parentId === leadId &&
+      isCrewMember(a, leadId) &&
       (a.status === 'running' || a.status === 'idle')
     );
 
@@ -259,7 +260,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
     if (req.roles && Array.isArray(req.roles)) {
       const roleNames = req.roles.map((r: string) => r.toLowerCase());
       for (const a of ctx.getAllAgents()) {
-        if ((a.parentId === leadId || a.id === leadId) && roleNames.includes(a.role.id.toLowerCase()) && !isTerminalStatus(a.status)) {
+        if (isCrewMember(a, leadId) && roleNames.includes(a.role.id.toLowerCase()) && !isTerminalStatus(a.status)) {
           if (!resolvedIds.includes(a.id)) resolvedIds.push(a.id);
         }
       }
@@ -267,7 +268,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
 
     for (const memberId of (req.members ?? [])) {
       const resolved = ctx.getAllAgents().find((a) =>
-        (a.id === memberId || a.id.startsWith(memberId)) && (a.parentId === leadId || a.id === leadId)
+        (a.id === memberId || a.id.startsWith(memberId)) && isCrewMember(a, leadId)
       );
       if (resolved) {
         resolvedIds.push(resolved.id);
@@ -320,7 +321,7 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
     }
 
     const resolvedIds = req.members.map((m: string) => {
-      const found = ctx.getAllAgents().find((a) => (a.id === m || a.id.startsWith(m)) && (a.parentId === leadId || a.id === leadId));
+      const found = ctx.getAllAgents().find((a) => (a.id === m || a.id.startsWith(m)) && isCrewMember(a, leadId));
       return found?.id;
     }).filter(Boolean) as string[];
 

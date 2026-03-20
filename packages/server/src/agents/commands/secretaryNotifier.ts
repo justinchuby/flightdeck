@@ -6,6 +6,7 @@
  * rely solely on polling via ContextRefresher.
  */
 import type { CommandHandlerContext } from './types.js';
+import { isCrewMember } from '../crewUtils.js';
 
 /**
  * Find the secretary agent for a given lead and send it a notification.
@@ -22,7 +23,7 @@ export function notifySecretary(
   if (!allAgents) return;
 
   const secretary = allAgents.find(a =>
-    a.parentId === leadId &&
+    isCrewMember(a, leadId) && a.id !== leadId &&
     a.role.id === 'secretary' &&
     a.status !== 'terminated' && a.status !== 'failed' && a.status !== 'completed'
   );

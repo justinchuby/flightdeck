@@ -5,6 +5,7 @@ import { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
 import { ParallelAnalyzer } from '../tasks/ParallelAnalyzer.js';
 import { getRecentCommits } from './context.js';
 import type { AppContext } from './context.js';
+import { isCrewMember } from '../agents/crewUtils.js';
 
 export function servicesRoutes(ctx: AppContext): Router {
   const {
@@ -377,7 +378,7 @@ export function servicesRoutes(ctx: AppContext): Router {
 
     // Collect agents for the session (lead + its children, or all agents)
     const crewAgents = lead
-      ? allAgents.filter(a => a.id === lead.id || a.parentId === lead.id)
+      ? allAgents.filter(a => isCrewMember(a, lead.id))
       : allAgents;
 
     // Determine session time bounds from agent creation times

@@ -8,6 +8,7 @@ import type { ActivityEntry, ActionType } from '../activity/ActivityLedger.js';
 import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import type { AgentManager } from '../../agents/AgentManager.js';
 import { isTerminalStatus } from '../../agents/Agent.js';
+import { isCrewMember } from '../../agents/crewUtils.js';
 import { asAgentId } from '../../types/brandedIds.js';
 
 // ── Classification patterns ─────────────────────────────────────────
@@ -115,7 +116,7 @@ export class SynthesisEngine {
     const projectAgents = projectId
       ? this.agentManager.getByProject(projectId)
       : this.agentManager.getAll();
-    const myAgents = projectAgents.filter(a => a.parentId === leadId || a.id === leadId);
+    const myAgents = projectAgents.filter(a => isCrewMember(a, leadId));
     const myAgentIds = new Set(myAgents.map(a => a.id));
     const myEvents = recentEvents.filter(e => myAgentIds.has(asAgentId(e.agentId)));
 

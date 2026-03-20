@@ -3,6 +3,7 @@ import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { buildCommandHelp } from './commands/CommandHelp.js';
 import { logger } from '../utils/logger.js';
+import { isCrewMember } from './crewUtils.js';
 
 export interface DagSummary {
   pending: number; ready: number; running: number; done: number;
@@ -160,7 +161,7 @@ export class HeartbeatMonitor {
       if (idleDuration < 60_000) continue;
 
       // Find children of this lead
-      const children = this.ctx.getAllAgents().filter((a) => a.parentId === lead.id);
+      const children = this.ctx.getAllAgents().filter((a) => isCrewMember(a, lead.id) && a.id !== lead.id);
       if (children.length === 0) continue; // no team → legitimately idle
 
       // If any child is still actively working (running or being created), wait
