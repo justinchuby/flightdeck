@@ -265,7 +265,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     // Not suppressed during resume — usage/cost data should always be recorded
     agent.inputTokens = usage.inputTokens;
     agent.outputTokens = usage.outputTokens;
-    agent.hasRealUsageData = true;
     // TODO: AcpAdapter emits thoughtTokens and totalTokens from the provider,
     // but they are not wired through here because UsageInfo/CostTracker/DB schema
     // don't support them yet. Wire them when we add extended token breakdowns.
