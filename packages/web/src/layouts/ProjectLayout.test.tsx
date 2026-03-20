@@ -43,8 +43,9 @@ vi.mock('../stores/appStore', () => ({
 vi.mock('../stores/leadStore', () => ({
   useLeadStore: Object.assign(
     () => null,
-    { getState: () => ({ selectedLeadId: null, addProject: vi.fn(), selectLead: vi.fn() }) },
+    { getState: () => ({ selectedLeadId: null, addProject: vi.fn(), selectLead: vi.fn(), linkProjectId: vi.fn() }) },
   ),
+  resolveProject: () => undefined,
 }));
 
 vi.mock('../hooks/useProjects', () => ({
