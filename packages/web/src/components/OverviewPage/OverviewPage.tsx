@@ -146,13 +146,12 @@ export function OverviewPage() {
   // The leadStore is keyed by leadId (agent ID), not projectId.
   // Try activeLeadId first, fall back to effectiveId for compatibility.
   const activeLeadId = activeLeadAgent?.id ?? null;
-  const dagStatus = useLeadStore(s => {
+  const { dagStatus, storeDecisions } = useLeadStore(s => {
     const proj = s.projects[activeLeadId ?? ''] ?? s.projects[effectiveId ?? ''];
-    return proj?.dagStatus ?? null;
-  });
-  const storeDecisions = useLeadStore(s => {
-    const proj = s.projects[activeLeadId ?? ''] ?? s.projects[effectiveId ?? ''];
-    return proj?.decisions ?? EMPTY_DECISIONS;
+    return {
+      dagStatus: proj?.dagStatus ?? null,
+      storeDecisions: proj?.decisions ?? EMPTY_DECISIONS,
+    };
   });
 
   const alerts = useMemo(
