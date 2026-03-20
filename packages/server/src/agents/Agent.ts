@@ -189,11 +189,9 @@ export class Agent {
   public backend?: string;
   /** Organized artifact storage path ($FLIGHTDECK_STATE_DIR/artifacts/{projectId}/sessions/{leadId}/{role}-{shortId}/) */
   public artifactDir?: string;
-  /** Cumulative token usage from ACP PromptResponse */
+  /** Cumulative token usage from provider usage events */
   public inputTokens = 0;
   public outputTokens = 0;
-  /** Whether real usage data has been received from the provider (not estimated) */
-  public hasRealUsageData = false;
   /** Context window info from ACP usage_update */
   public contextWindowSize = 0;
   public contextWindowUsed = 0;

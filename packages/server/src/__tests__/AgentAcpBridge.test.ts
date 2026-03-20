@@ -110,7 +110,6 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     _notifyUsage: vi.fn(),
     _notifyContextCompacted: vi.fn(),
     buildFullPrompt: vi.fn(() => 'You are a lead.\n\n[context]\n\nYour task: do the thing'),
-    hasRealUsageData: false,
     inputTokens: 0,
     outputTokens: 0,
     dagTaskId: undefined as string | undefined,
@@ -354,7 +353,6 @@ describe('AgentAcpBridge — startAcp', () => {
   describe('prompt_complete — no estimation fallback', () => {
     it('does NOT notify usage on prompt_complete even when no real usage data arrived', async () => {
       const agent = createFakeAgent({
-        hasRealUsageData: false,
         inputTokens: 0,
         outputTokens: 0,
       });
@@ -373,9 +371,8 @@ describe('AgentAcpBridge — startAcp', () => {
       expect(agent._notifyUsage).not.toHaveBeenCalled();
     });
 
-    it('does NOT notify usage on prompt_complete when real usage data was received', async () => {
+    it('does NOT notify usage on prompt_complete even when agent has token counts', async () => {
       const agent = createFakeAgent({
-        hasRealUsageData: true,
         inputTokens: 500,
         outputTokens: 1200,
       });
