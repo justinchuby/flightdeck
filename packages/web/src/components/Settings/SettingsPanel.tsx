@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type { ThemeMode, OversightLevel } from '../../stores/settingsStore';
@@ -19,7 +20,9 @@ export function SettingsPanel() {
   const api = useApiContext();
   const config = useAppStore((s) => s.config);
   const roles = useAppStore((s) => s.roles);
-  const { soundEnabled, toggleSound, oversightLevel, setOversightLevel } = useSettingsStore();
+  const { soundEnabled, toggleSound, oversightLevel, setOversightLevel } = useSettingsStore(
+    useShallow(s => ({ soundEnabled: s.soundEnabled, toggleSound: s.toggleSound, oversightLevel: s.oversightLevel, setOversightLevel: s.setOversightLevel }))
+  );
   const [maxAgents, setMaxAgents] = useState(config?.maxConcurrentAgents || 10);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [customInstructions, setCustomInstructions] = useState('');
