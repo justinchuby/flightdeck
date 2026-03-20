@@ -110,9 +110,9 @@ function TaskDagPanel({ tasks }: { tasks: ReplayDagTask[] }) {
               </span>
             )}
           </div>
-          {task.assignedTo && (
+          {task.assignedAgentId && (
             <span className="text-[10px] text-th-text-muted font-mono shrink-0">
-              → {task.assignedTo.slice(0, 8)}
+              → {task.assignedAgentId.slice(0, 8)}
             </span>
           )}
         </div>
@@ -135,7 +135,7 @@ function DecisionPanel({ decisions }: { decisions: ReplayDecision[] }) {
             {d.status === 'confirmed' ? '✅' : d.status === 'rejected' ? '❌' : '⚖️'}
           </span>
           <div className="flex-1 min-w-0">
-            <span className="text-xs text-th-text-alt block truncate">{d.summary}</span>
+            <span className="text-xs text-th-text-alt block truncate">{d.title}</span>
             {d.agentRole && (
               <span className="text-[10px] text-th-text-muted">by {d.agentRole}</span>
             )}
@@ -207,6 +207,9 @@ export function ReplayContent({ worldState, loading }: ReplayContentProps) {
   const decisions = worldState.decisions ?? [];
   const activity = worldState.recentActivity ?? [];
   const runningCount = agents.filter(a => a.status === 'running').length;
+  const completedTasks = tasks.filter(t => t.dagStatus === 'done').length;
+  const totalTasks = tasks.length;
+  const pendingDecisions = decisions.filter(d => d.status === 'pending').length;
 
   return (
     <div className="flex-1 overflow-hidden" data-testid="replay-content">
@@ -216,16 +219,16 @@ export function ReplayContent({ worldState, loading }: ReplayContentProps) {
           <Users className="w-3 h-3" />
           {agents.length} agents ({runningCount} running)
         </span>
-        {worldState.totalTasks > 0 && (
+        {totalTasks > 0 && (
           <span className="flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
-            {worldState.completedTasks}/{worldState.totalTasks} tasks
+            {completedTasks}/{totalTasks} tasks
           </span>
         )}
-        {worldState.pendingDecisions > 0 && (
+        {pendingDecisions > 0 && (
           <span className="flex items-center gap-1 text-amber-400">
             <AlertTriangle className="w-3 h-3" />
-            {worldState.pendingDecisions} pending decisions
+            {pendingDecisions} pending decisions
           </span>
         )}
         <span className="flex items-center gap-1 ml-auto">
