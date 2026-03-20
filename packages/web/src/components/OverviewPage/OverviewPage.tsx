@@ -12,6 +12,7 @@
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, resolveProject } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
@@ -144,13 +145,13 @@ export function OverviewPage() {
 
   // ── Attention alerts ──────────────────────────────────────────
   const activeLeadId = activeLeadAgent?.id ?? null;
-  const { dagStatus, storeDecisions } = useLeadStore(s => {
+  const { dagStatus, storeDecisions } = useLeadStore(useShallow(s => {
     const proj = resolveProject(s, activeLeadId) ?? resolveProject(s, effectiveId);
     return {
       dagStatus: proj?.dagStatus ?? null,
       storeDecisions: proj?.decisions ?? EMPTY_DECISIONS,
     };
-  });
+  }));
 
   const alerts = useMemo(
     () => detectAlerts(projectAgents, storeDecisions, dagStatus),
