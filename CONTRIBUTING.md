@@ -42,7 +42,7 @@ npm run build:shared
 npm run dev
 ```
 
-The dev server starts the Express backend and the Vite frontend with hot-reload. The web UI is available at `http://localhost:5173` and the API server at `http://localhost:4040`.
+The dev server starts the Express backend and the Vite frontend with hot-reload. The web UI is available at `http://localhost:5173` and the API server at `http://localhost:3001`.
 
 ### Per-Package Development
 
