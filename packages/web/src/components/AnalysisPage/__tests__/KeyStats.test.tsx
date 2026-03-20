@@ -36,13 +36,14 @@ describe('KeyStats', () => {
     expect(screen.getByText('200k in / 75k out')).toBeInTheDocument();
   });
 
-  it('does not show token stat when no agents have token data', () => {
+  it('shows "No data available" when no agents have token data', () => {
     const agents: AgentInfo[] = [
       makeAgent({ id: 'a1', inputTokens: 0, outputTokens: 0 }),
     ];
     render(<KeyStats agents={agents} />);
 
-    expect(screen.queryByText('Tokens')).not.toBeInTheDocument();
+    expect(screen.getByText('Tokens')).toBeInTheDocument();
+    expect(screen.getByText('No data available')).toBeInTheDocument();
   });
 
   it('formats millions correctly', () => {

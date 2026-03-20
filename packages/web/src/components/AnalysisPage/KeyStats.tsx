@@ -65,6 +65,13 @@ export function KeyStats({ agents, totalTokens, sessionStart }: KeyStatsProps) {
         icon: <Zap size={14} />,
         color: 'text-amber-400',
       });
+    } else {
+      items.push({
+        label: 'Tokens',
+        value: 'No data available',
+        icon: <Zap size={14} />,
+        color: 'text-th-text-muted',
+      });
     }
 
     return items;

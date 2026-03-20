@@ -351,18 +351,16 @@ describe('AgentAcpBridge — startAcp', () => {
     return call ? call[1] : undefined;
   }
 
-  describe('prompt_complete — estimated token notification', () => {
-    it('notifies usage with estimated tokens when no real usage data arrived', async () => {
+  describe('prompt_complete — no estimation fallback', () => {
+    it('does NOT notify usage on prompt_complete even when no real usage data arrived', async () => {
       const agent = createFakeAgent({
         hasRealUsageData: false,
-        inputTokens: 500,
-        outputTokens: 1200,
-        dagTaskId: 'task-abc',
+        inputTokens: 0,
+        outputTokens: 0,
       });
       agent._phase = 'running';
       mockStart.mockResolvedValue('session-123');
       mockAdapter.isPrompting = false;
-      // Ensure flushSystemNotes exists on the mock adapter
       mockAdapter.flushSystemNotes = vi.fn().mockReturnValue(null);
 
       await startAcp(agent, fakeConfig);
@@ -371,12 +369,8 @@ describe('AgentAcpBridge — startAcp', () => {
       expect(handler).toBeDefined();
       handler!('end_turn');
 
-      expect(agent._notifyUsage).toHaveBeenCalledWith({
-        agentId: agent.id,
-        inputTokens: 500,
-        outputTokens: 1200,
-        dagTaskId: 'task-abc',
-      });
+      // No estimation fallback — _notifyUsage should NOT be called from prompt_complete
+      expect(agent._notifyUsage).not.toHaveBeenCalled();
     });
 
     it('does NOT notify usage on prompt_complete when real usage data was received', async () => {
@@ -395,25 +389,7 @@ describe('AgentAcpBridge — startAcp', () => {
       const handler = getEventHandler('prompt_complete');
       handler!('end_turn');
 
-      expect(agent._notifyUsage).not.toHaveBeenCalled();
-    });
-
-    it('does NOT notify usage on prompt_complete when outputTokens is 0', async () => {
-      const agent = createFakeAgent({
-        hasRealUsageData: false,
-        inputTokens: 0,
-        outputTokens: 0,
-      });
-      agent._phase = 'running';
-      mockStart.mockResolvedValue('session-123');
-      mockAdapter.isPrompting = false;
-      mockAdapter.flushSystemNotes = vi.fn().mockReturnValue(null);
-
-      await startAcp(agent, fakeConfig);
-
-      const handler = getEventHandler('prompt_complete');
-      handler!('end_turn');
-
+      // Real usage was already notified via the 'usage' event, not prompt_complete
       expect(agent._notifyUsage).not.toHaveBeenCalled();
     });
   });
