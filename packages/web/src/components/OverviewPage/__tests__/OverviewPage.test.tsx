@@ -93,7 +93,7 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
 
 function resetStores() {
   useAppStore.setState({ agents: [], connected: true, loading: false });
-  useLeadStore.setState({ projects: {}, selectedLeadId: null, drafts: {} });
+  useLeadStore.setState({ projects: {}, projectToLead: {}, selectedLeadId: null, drafts: {} });
 }
 
 async function renderPage() {
