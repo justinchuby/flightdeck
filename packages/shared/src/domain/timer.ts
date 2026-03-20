@@ -10,6 +10,7 @@ export const TimerSchema = z.object({
   agentId: z.string(),
   agentRole: z.string(),
   leadId: z.string().nullable(),
+  projectId: z.string().nullable().optional(),
   label: z.string(),
   message: z.string(),
   delaySeconds: z.number(),

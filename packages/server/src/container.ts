@@ -500,9 +500,9 @@ function wireEvents(c: ServiceContainer): void {
   });
 
   // Timer events → agent message delivery + WS broadcast
-  timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string }) => {
+  timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string; projectId?: string | null }) => {
     const agent = agentManager.get(timer.agentId);
-    const projectId = agentManager.getProjectIdForAgent(timer.agentId);
+    const projectId = timer.projectId ?? agentManager.getProjectIdForAgent(timer.agentId);
     runWithAgentContext(timer.agentId, agent?.role.name ?? 'unknown', projectId, () => {
       if (agent && agent.status !== 'completed' && agent.status !== 'failed' && agent.status !== 'terminated') {
         agent.queueMessage(`[System Timer "${timer.label}"] ${timer.message}`);
@@ -510,12 +510,12 @@ function wireEvents(c: ServiceContainer): void {
       c.internal.wsServer?.broadcastEvent({ type: 'timer:fired', timer }, projectId);
     });
   });
-  timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string }) => {
-    const projectId = agentManager.getProjectIdForAgent(timer.agentId);
+  timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string; projectId?: string | null }) => {
+    const projectId = timer.projectId ?? agentManager.getProjectIdForAgent(timer.agentId);
     c.internal.wsServer?.broadcastEvent({ type: 'timer:created', timer }, projectId);
   });
-  timerRegistry.on('timer:cancelled', (timer: { id: string; agentId: string; label: string }) => {
-    const projectId = agentManager.getProjectIdForAgent(timer.agentId);
+  timerRegistry.on('timer:cancelled', (timer: { id: string; agentId: string; label: string; projectId?: string | null }) => {
+    const projectId = timer.projectId ?? agentManager.getProjectIdForAgent(timer.agentId);
     c.internal.wsServer?.broadcastEvent({ type: 'timer:cancelled', timer }, projectId);
   });
 

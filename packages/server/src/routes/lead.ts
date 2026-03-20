@@ -359,11 +359,14 @@ export function leadRoutes(ctx: AppContext): Router {
       }
     }
 
+    const resolvedProjectId = projectId ?? agentManager.getProjectIdForAgent(agentId) ?? null;
+
     const timer = registry.create(
       agentId,
       { label, message: message || '', delaySeconds, repeat: !!repeat },
       agent.role.id,
       agent.parentId ?? null,
+      resolvedProjectId,
     );
     if (!timer) {
       return res.status(429).json({ error: 'Timer limit reached for this agent (max 20)' });
