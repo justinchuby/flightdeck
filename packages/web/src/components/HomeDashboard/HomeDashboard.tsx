@@ -46,6 +46,11 @@ import {
 import type { ActivityEntry } from '../Shared';
 import type { AgentInfo, Decision, DagStatus } from '../../types';
 
+// ── Constants ────────────────────────────────────────────────────────
+
+/** High-signal activity types for the homepage feed — excludes noisy status_change, lock, message events */
+const HIGH_SIGNAL_TYPES = new Set(['progress_update', 'task_completed', 'task_started', 'decision_made']);
+
 // ── Types ───────────────────────────────────────────────────────────
 
 /** Enriched project data from GET /api/projects */
