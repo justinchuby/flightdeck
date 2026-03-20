@@ -140,6 +140,41 @@ describe('ShareDialog', () => {
     expect(callBody.expiresInHours).toBe(24);
   });
 
+  it('sends large expiresInHours for "Never" option', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce([]) // initial fetch
+      .mockResolvedValueOnce(baseLink); // create
+
+    render(<ShareDialog leadId="lead-1" onClose={onClose} />);
+    await act(async () => {});
+
+    const expirySelect = screen.getByTestId('share-expiry-select');
+    fireEvent.change(expirySelect, { target: { value: '876000' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('share-create-btn'));
+    });
+
+    const callBody = JSON.parse(mockApiFetch.mock.calls[1][1].body as string);
+    expect(callBody.expiresInHours).toBe(876000);
+  });
+
+  it('always sends expiresInHours with default value', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce([]) // initial fetch
+      .mockResolvedValueOnce(baseLink); // create
+
+    render(<ShareDialog leadId="lead-1" onClose={onClose} />);
+    await act(async () => {});
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('share-create-btn'));
+    });
+
+    const callBody = JSON.parse(mockApiFetch.mock.calls[1][1].body as string);
+    expect(callBody.expiresInHours).toBe(168); // default 7 days
+  });
+
   it('copies link to clipboard on copy button click', async () => {
     mockApiFetch.mockResolvedValue([baseLink]);
     render(<ShareDialog leadId="lead-1" onClose={onClose} />);
