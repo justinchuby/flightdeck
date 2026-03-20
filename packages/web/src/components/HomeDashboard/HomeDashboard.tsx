@@ -280,10 +280,11 @@ export function HomeDashboard() {
     try {
       setLoading(true);
       setFetchError(null);
-      const [projectsData, decisionsData, activityData] = await Promise.all([
+      const [projectsData, decisionsData, activityData, pendingDecisionsData] = await Promise.all([
         apiFetch<EnrichedProject[]>('/projects').catch(() => []),
         apiFetch<Decision[]>('/decisions').catch(() => []),
         apiFetch<ActivityEntry[]>('/coordination/activity?type=progress_update&limit=15').catch(() => []),
+        apiFetch<Decision[]>('/decisions?needs_confirmation=true').catch(() => []),
       ]);
 
       const activeProjects = Array.isArray(projectsData)
@@ -292,9 +293,12 @@ export function HomeDashboard() {
       setProjects(activeProjects);
       setAllDecisions(Array.isArray(decisionsData) ? decisionsData : []);
 
-      // Server already filters to progress_update; keep lead-only filter client-side
+      // Hydrate pending decisions from DB so they persist across page refreshes
+      const pending = Array.isArray(pendingDecisionsData) ? pendingDecisionsData : [];
+      useAppStore.getState().setPendingDecisions(pending);
+
+      // Server already filters to progress_update; show all agent roles
       const progressActivity = (Array.isArray(activityData) ? activityData : [])
-        .filter((a) => a.agentRole === 'lead')
         .slice(0, 15);
       setRecentActivity(progressActivity);
 

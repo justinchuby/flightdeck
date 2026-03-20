@@ -462,4 +462,45 @@ describe('OverviewPage', () => {
     // Only actionable decisions shown (not the informational one)
     expect(screen.queryByText('Informational')).not.toBeInTheDocument();
   });
+
+  // ── LeadStore key lookup ─────────────────────────────────────────
+
+  it('reads leadStore by activeLeadId (agent ID) not just projectId', async () => {
+    const lead = makeAgent({
+      id: 'lead-abc',
+      role: { id: 'lead', name: 'Lead', icon: '👑', description: '' },
+      status: 'running',
+      projectId: 'proj-1',
+    });
+    useAppStore.setState({ agents: [lead] });
+    // Store keyed by leadId (agent ID), NOT projectId
+    useLeadStore.setState({
+      projects: {
+        'lead-abc': {
+          dagStatus: {
+            tasks: [],
+            fileLockMap: {},
+            summary: { pending: 0, ready: 0, running: 1, done: 7, failed: 0, blocked: 0, paused: 0, skipped: 0 },
+          },
+          decisions: [],
+          messages: [],
+          progress: null,
+          progressSummary: null,
+          progressHistory: [],
+          agentReports: [],
+          toolCalls: [],
+          activity: [],
+          comms: [],
+          groups: [],
+          groupMessages: {},
+          lastTextAt: 0,
+          pendingNewline: false,
+        },
+      },
+    });
+
+    await renderPage();
+    // Should find the data via leadId key, showing "7/8 tasks"
+    expect(screen.getByText('7/8 tasks')).toBeInTheDocument();
+  });
 });
