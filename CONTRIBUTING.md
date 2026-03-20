@@ -108,7 +108,7 @@ flightdeck/
 │   │       └── constants/       # App constants
 │   │
 │   └── docs/            # VitePress documentation site
-│       ├── guide/           # User guide (39+ pages)
+│       ├── guide/           # User guide (37 pages)
 │       └── reference/       # API and database reference
 │
 ├── .github/
@@ -453,7 +453,7 @@ Project → Session → Lead Agent → Crew (specialized agents)
                                     ├── Code Reviewer (quality checks)
                                     ├── QA Tester (testing)
                                     ├── Tech Writer (documentation)
-                                    └── ... (13 roles total)
+                                    └── ... (14 roles total)
 ```
 
 1. **Projects** group related work. Each project has configuration, knowledge, and session history.
