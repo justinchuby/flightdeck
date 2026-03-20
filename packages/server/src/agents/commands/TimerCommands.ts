@@ -37,7 +37,7 @@ function handleSetTimer(ctx: CommandHandlerContext, agent: Agent, data: string):
       message: req.message,
       delaySeconds: delay,
       repeat: req.repeat === true,
-    }, agent.role.id, agent.parentId ?? null);
+    }, agent.role.id, agent.parentId ?? null, agent.projectId ?? null);
 
     if (!timer) {
       agent.sendMessage('[System] Timer limit reached (max 20 per agent). Cancel some timers first with CANCEL_TIMER.');
