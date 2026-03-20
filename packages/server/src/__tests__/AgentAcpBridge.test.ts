@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mock logger ───────────────────────────────────────────────────
-vi.mock('../utils/logger.js', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+vi.mock('../utils/logger.js', () => {
+  const { AsyncLocalStorage } = require('node:async_hooks');
+  return {
+    logger: {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+    logContext: new AsyncLocalStorage(),
+  };
+});
 
 // ── Mock agentFiles ───────────────────────────────────────────────
 vi.mock('../agents/agentFiles.js', () => ({
@@ -103,7 +107,20 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     _notifySessionReady: vi.fn(),
     _notifyModelFallback: vi.fn(),
     _notifyStatusChange: vi.fn(),
+    _notifyUsage: vi.fn(),
+    _notifyContextCompacted: vi.fn(),
     buildFullPrompt: vi.fn(() => 'You are a lead.\n\n[context]\n\nYour task: do the thing'),
+    hasRealUsageData: false,
+    inputTokens: 0,
+    outputTokens: 0,
+    dagTaskId: undefined as string | undefined,
+    systemPaused: false,
+    pendingMessageCount: 0,
+    contextWindowSize: 0,
+    contextWindowUsed: 0,
+    _drainOneMessage: vi.fn(),
+    queueMessage: vi.fn(),
+    recordTokenSample: vi.fn(),
     ...overrides,
   } as any;
   return fake;
@@ -326,5 +343,97 @@ describe('AgentAcpBridge — startAcp', () => {
     // Should be idle
     expect(agent.status).toBe('idle');
     expect(agent.isResuming).toBe(false);
+  });
+
+  // ── Helper to get registered event handlers from mockOn ──────────
+  function getEventHandler(eventName: string): ((...args: any[]) => void) | undefined {
+    const call = mockOn.mock.calls.find((c: any[]) => c[0] === eventName);
+    return call ? call[1] : undefined;
+  }
+
+  describe('prompt_complete — estimated token notification', () => {
+    it('notifies usage with estimated tokens when no real usage data arrived', async () => {
+      const agent = createFakeAgent({
+        hasRealUsageData: false,
+        inputTokens: 500,
+        outputTokens: 1200,
+        dagTaskId: 'task-abc',
+      });
+      agent._phase = 'running';
+      mockStart.mockResolvedValue('session-123');
+      mockAdapter.isPrompting = false;
+      // Ensure flushSystemNotes exists on the mock adapter
+      mockAdapter.flushSystemNotes = vi.fn().mockReturnValue(null);
+
+      await startAcp(agent, fakeConfig);
+
+      const handler = getEventHandler('prompt_complete');
+      expect(handler).toBeDefined();
+      handler!('end_turn');
+
+      expect(agent._notifyUsage).toHaveBeenCalledWith({
+        agentId: agent.id,
+        inputTokens: 500,
+        outputTokens: 1200,
+        dagTaskId: 'task-abc',
+      });
+    });
+
+    it('does NOT notify usage on prompt_complete when real usage data was received', async () => {
+      const agent = createFakeAgent({
+        hasRealUsageData: true,
+        inputTokens: 500,
+        outputTokens: 1200,
+      });
+      agent._phase = 'running';
+      mockStart.mockResolvedValue('session-123');
+      mockAdapter.isPrompting = false;
+      mockAdapter.flushSystemNotes = vi.fn().mockReturnValue(null);
+
+      await startAcp(agent, fakeConfig);
+
+      const handler = getEventHandler('prompt_complete');
+      handler!('end_turn');
+
+      expect(agent._notifyUsage).not.toHaveBeenCalled();
+    });
+
+    it('does NOT notify usage on prompt_complete when outputTokens is 0', async () => {
+      const agent = createFakeAgent({
+        hasRealUsageData: false,
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+      agent._phase = 'running';
+      mockStart.mockResolvedValue('session-123');
+      mockAdapter.isPrompting = false;
+      mockAdapter.flushSystemNotes = vi.fn().mockReturnValue(null);
+
+      await startAcp(agent, fakeConfig);
+
+      const handler = getEventHandler('prompt_complete');
+      handler!('end_turn');
+
+      expect(agent._notifyUsage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('usage_update — cost field', () => {
+    it('accepts cost field in usage_update without error', async () => {
+      const agent = createFakeAgent();
+      agent._phase = 'running';
+      mockStart.mockResolvedValue('session-123');
+      mockAdapter.flushSystemNotes = vi.fn().mockReturnValue(null);
+
+      await startAcp(agent, fakeConfig);
+
+      const handler = getEventHandler('usage_update');
+      expect(handler).toBeDefined();
+
+      // Should not throw when cost is provided
+      expect(() => handler!({ size: 128000, used: 45000, cost: 0.0032 })).not.toThrow();
+      expect(agent.contextWindowSize).toBe(128000);
+      expect(agent.contextWindowUsed).toBe(45000);
+    });
   });
 });

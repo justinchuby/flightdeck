@@ -281,7 +281,7 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     });
   }));
 
-  conn.on('usage_update', (info: { size: number; used: number }) => withCtx(() => {
+  conn.on('usage_update', (info: { size: number; used: number; cost?: number | null }) => withCtx(() => {
     const previousUsed = agent.contextWindowUsed;
     agent.contextWindowSize = info.size;
     agent.contextWindowUsed = info.used;
@@ -313,6 +313,17 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     const notes = conn.flushSystemNotes();
     if (notes) {
       agent.queueMessage(notes);
+    }
+
+    // If no real usage data arrived for this turn, push estimated totals
+    // so CostTracker can record them to the database and WebSocket pipeline
+    if (!agent.hasRealUsageData && agent.outputTokens > 0) {
+      agent._notifyUsage({
+        agentId: agent.id,
+        inputTokens: agent.inputTokens,
+        outputTokens: agent.outputTokens,
+        dagTaskId: agent.dagTaskId,
+      });
     }
 
     if ((agent.phase === 'running' || agent.phase === 'thinking') && !conn.isPrompting) {

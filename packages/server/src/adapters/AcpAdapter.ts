@@ -366,7 +366,14 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
 
       const usage = result.usage ?? undefined;
       if (usage) {
-        this.emit('usage', { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens });
+        this.emit('usage', {
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cacheReadTokens: usage.cachedReadTokens ?? undefined,
+          cacheWriteTokens: usage.cachedWriteTokens ?? undefined,
+          thoughtTokens: usage.thoughtTokens ?? undefined,
+          totalTokens: usage.totalTokens ?? undefined,
+        });
       }
 
       // Drain adapter queue BEFORE emitting prompt_complete to prevent
