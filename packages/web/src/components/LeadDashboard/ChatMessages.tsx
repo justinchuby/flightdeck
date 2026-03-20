@@ -17,7 +17,7 @@ export interface CatchUpSummary {
 
 // Pre-computed chat item after filtering and merging
 interface ChatItem {
-  kind: 'user' | 'system' | 'system-long' | 'thinking' | 'agent-rich' | 'agent-text' | 'working';
+  kind: 'user' | 'system' | 'system-long' | 'separator' | 'thinking' | 'agent-rich' | 'agent-text' | 'working';
   msg: AcpTextChunk;
   ts: string;
   mergedText?: string;
@@ -43,6 +43,11 @@ function buildChatItems(messages: AcpTextChunk[], isActive: boolean): ChatItem[]
 
     if (msg.sender === 'system') {
       const sysText = typeof msg.text === 'string' ? msg.text : '';
+
+      if (sysText === '---') {
+        items.push({ kind: 'separator', msg, ts, originalIndex: i });
+        continue;
+      }
 
       items.push({ kind: sysText.length > 200 ? 'system-long' : 'system', msg, ts, originalIndex: i });
       continue;
@@ -164,6 +169,10 @@ export function ChatMessages({
 
     if (item.kind === 'system-long') {
       return <CollapsibleSystemBlock text={item.msg.text} timestamp={item.ts} />;
+    }
+
+    if (item.kind === 'separator') {
+      return <div className="border-t border-th-border/50 my-2" />;
     }
 
     if (item.kind === 'system') {

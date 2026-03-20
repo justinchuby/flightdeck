@@ -452,6 +452,46 @@ describe('ChatMessages – extra coverage', () => {
     expect(container.textContent).not.toContain('Received from agent');
   });
 
+  /* ── Separator system messages ('---') ──────────────────────────── */
+
+  it('renders "---" system messages as separator lines, not pill blobs', () => {
+    const messages: AcpTextChunk[] = [
+      makeMessage({ sender: 'agent', text: 'Before separator' }),
+      makeMessage({ sender: 'system', text: '---' }),
+      makeMessage({ sender: 'agent', text: 'After separator' }),
+    ];
+
+    const { container } = render(
+      <ChatMessages {...defaultProps} messages={messages} />,
+    );
+
+    // The separator should render as a border-t div, not a pill with RefreshCw icon
+    const separators = container.querySelectorAll('.border-t');
+    expect(separators.length).toBe(1);
+
+    // The '---' text should NOT appear as visible text content
+    expect(container.textContent).not.toContain('---');
+
+    // Normal messages should still render
+    expect(container.textContent).toContain('Before separator');
+    expect(container.textContent).toContain('After separator');
+  });
+
+  it('still renders non-separator system messages as pill blobs', () => {
+    const messages: AcpTextChunk[] = [
+      makeMessage({ sender: 'system', text: '🔄 Agent restarted' }),
+    ];
+
+    const { container } = render(
+      <ChatMessages {...defaultProps} messages={messages} />,
+    );
+
+    // Regular system messages should still have the pill styling (rounded-full class)
+    const pills = container.querySelectorAll('.rounded-full');
+    expect(pills.length).toBeGreaterThanOrEqual(1);
+    expect(container.textContent).toContain('Agent restarted');
+  });
+
   /* ── Queued messages filtered ─────────────────────────────────── */
 
   it('filters out queued messages from display', () => {
