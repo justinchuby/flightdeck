@@ -192,10 +192,8 @@ export class Agent {
   /** Cumulative token usage from ACP PromptResponse */
   public inputTokens = 0;
   public outputTokens = 0;
-  /** Whether real usage data has been received from ACP (vs. estimated) */
+  /** Whether real usage data has been received from the provider (not estimated) */
   public hasRealUsageData = false;
-  /** Estimated output tokens from content length (~4 chars per token) */
-  private estimatedOutputTokens = 0;
   /** Context window info from ACP usage_update */
   public contextWindowSize = 0;
   public contextWindowUsed = 0;
@@ -772,14 +770,6 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     const remaining = this.contextWindowSize - this.contextWindowUsed;
     if (remaining <= 0) return 0;
     return remaining / this.contextBurnRate / 60;
-  }
-
-  /** Estimate tokens from content length when ACP doesn't provide usage events (~4 chars/token) */
-  estimateTokensFromContent(text: string): void {
-    if (this.hasRealUsageData) return;
-    const estimated = Math.ceil(text.length / 4);
-    this.estimatedOutputTokens += estimated;
-    this.outputTokens = this.estimatedOutputTokens;
   }
 
   toJSON(): AgentJSON {

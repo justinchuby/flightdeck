@@ -117,7 +117,6 @@ function createFakeAgent(overrides: Record<string, any> = {}) {
     inputTokens: 0,
     outputTokens: 0,
     hasRealUsageData: false,
-    estimateTokensFromContent: vi.fn(),
     buildFullPrompt: vi.fn(() => 'prompt'),
     provider: undefined,
     projectId: undefined,

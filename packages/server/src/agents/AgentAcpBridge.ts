@@ -214,8 +214,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     if (agent.messages.length > agent._maxMessages) {
       agent.messages = agent.messages.slice(-agent._maxMessages);
     }
-    // Estimate tokens from content length when ACP doesn't provide usage events
-    agent.estimateTokensFromContent(text);
     agent._notifyData(text);
   }));
 
@@ -268,6 +266,9 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     agent.inputTokens = usage.inputTokens;
     agent.outputTokens = usage.outputTokens;
     agent.hasRealUsageData = true;
+    // TODO: AcpAdapter emits thoughtTokens and totalTokens from the provider,
+    // but they are not wired through here because UsageInfo/CostTracker/DB schema
+    // don't support them yet. Wire them when we add extended token breakdowns.
     agent._notifyUsage({
       agentId: agent.id,
       inputTokens: usage.inputTokens,
@@ -313,17 +314,6 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     const notes = conn.flushSystemNotes();
     if (notes) {
       agent.queueMessage(notes);
-    }
-
-    // If no real usage data arrived for this turn, push estimated totals
-    // so CostTracker can record them to the database and WebSocket pipeline
-    if (!agent.hasRealUsageData && agent.outputTokens > 0) {
-      agent._notifyUsage({
-        agentId: agent.id,
-        inputTokens: agent.inputTokens,
-        outputTokens: agent.outputTokens,
-        dagTaskId: agent.dagTaskId,
-      });
     }
 
     if ((agent.phase === 'running' || agent.phase === 'thinking') && !conn.isPrompting) {
