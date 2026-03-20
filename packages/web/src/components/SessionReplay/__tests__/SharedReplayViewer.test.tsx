@@ -23,6 +23,34 @@ vi.mock('../AnnotationPin', () => ({
   ),
 }));
 
+// Mock useSessionReplay hook
+const mockSeek = vi.fn();
+vi.mock('../../../hooks/useSessionReplay', () => ({
+  useSessionReplay: () => ({
+    keyframes: [],
+    worldState: null,
+    playing: false,
+    currentTime: 0,
+    duration: 0,
+    loading: false,
+    error: null,
+    play: vi.fn(),
+    pause: vi.fn(),
+    seek: mockSeek,
+    setSpeed: vi.fn(),
+    speed: 4,
+  }),
+}));
+
+// Mock ReplayContent to simplify testing
+vi.mock('../ReplayContent', () => ({
+  ReplayContent: ({ worldState, loading }: { worldState: unknown; loading?: boolean }) => (
+    <div data-testid="replay-content-mock">
+      {loading ? 'loading' : worldState ? 'content' : 'empty'}
+    </div>
+  ),
+}));
+
 import { SharedReplayViewer } from '../SharedReplayViewer';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -120,12 +148,12 @@ describe('SharedReplayViewer', () => {
     });
   });
 
-  it('displays task count', async () => {
+  it('renders ReplayContent component', async () => {
     mockApiFetch.mockResolvedValue(baseReplay);
     render(<SharedReplayViewer />);
     await act(async () => {});
     await waitFor(() => {
-      expect(screen.getByText(/12 tasks/)).toBeInTheDocument();
+      expect(screen.getByTestId('replay-content-mock')).toBeInTheDocument();
     });
   });
 

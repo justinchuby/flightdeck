@@ -3,7 +3,9 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Users, Clock, Play, Pause, SkipBack, SkipForward, MapPin } from 'lucide-react';
 import type { ShareableReplay } from './types';
 import { AnnotationPin } from './AnnotationPin';
+import { ReplayContent } from './ReplayContent';
 import { apiFetch } from '../../hooks/useApi';
+import { useSessionReplay } from '../../hooks/useSessionReplay';
 
 /**
  * Read-only shared replay viewer — /shared/:token route.
@@ -18,6 +20,9 @@ export function SharedReplayViewer() {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [showAnnotations, setShowAnnotations] = useState(false);
+
+  // Session replay hook — fetches world state as scrubber moves
+  const replayState = useSessionReplay(replay?.leadId ?? null);
 
   useEffect(() => {
     if (!token) return;
@@ -57,6 +62,13 @@ export function SharedReplayViewer() {
   const duration = replay.stats.duration * 1000;
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Sync scrubber position with replay hook
+  const seekTo = (ms: number) => {
+    const clamped = Math.max(0, Math.min(ms, duration));
+    setCurrentTime(clamped);
+    replayState.seek(clamped);
+  };
+
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
     return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
@@ -80,21 +92,16 @@ export function SharedReplayViewer() {
         </div>
       </header>
 
-      {/* Content placeholder — simplified read-only view */}
-      <div className="flex-1 flex items-center justify-center text-center p-8">
-        <div>
-          <p className="text-4xl mb-3">📼</p>
-          <p className="text-sm text-th-text-alt">Session replay at {formatTime(currentTime)}</p>
-          <p className="text-xs text-th-text-muted mt-1">
-            {replay.stats.taskCount} tasks
-          </p>
-        </div>
-      </div>
+      {/* Session content — rendered from replay world state */}
+      <ReplayContent
+        worldState={replayState.worldState}
+        loading={replayState.loading}
+      />
 
       {/* Scrubber */}
       <div className="border-t border-th-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => setCurrentTime(Math.max(0, currentTime - 5000))} className="p-1 text-th-text-muted hover:text-th-text">
+          <button onClick={() => seekTo(currentTime - 5000)} className="p-1 text-th-text-muted hover:text-th-text">
             <SkipBack className="w-4 h-4" />
           </button>
           <button
@@ -103,7 +110,7 @@ export function SharedReplayViewer() {
           >
             {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           </button>
-          <button onClick={() => setCurrentTime(Math.min(duration, currentTime + 5000))} className="p-1 text-th-text-muted hover:text-th-text">
+          <button onClick={() => seekTo(currentTime + 5000)} className="p-1 text-th-text-muted hover:text-th-text">
             <SkipForward className="w-4 h-4" />
           </button>
 
@@ -116,7 +123,7 @@ export function SharedReplayViewer() {
             className="flex-1 h-6 bg-th-bg-alt rounded relative cursor-pointer"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              setCurrentTime(((e.clientX - rect.left) / rect.width) * duration);
+              seekTo(((e.clientX - rect.left) / rect.width) * duration);
             }}
           >
             <div className="absolute inset-y-0 left-0 bg-accent/15 rounded" style={{ width: `${progressPct}%` }} />
@@ -129,7 +136,7 @@ export function SharedReplayViewer() {
                   key={ann.id}
                   annotation={ann}
                   position={Math.max(0, Math.min(100, pos))}
-                  onClick={() => setCurrentTime(Math.max(0, annTime))}
+                  onClick={() => seekTo(Math.max(0, annTime))}
                 />
               );
             })}
