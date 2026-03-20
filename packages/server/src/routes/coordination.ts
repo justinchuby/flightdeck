@@ -5,7 +5,7 @@ import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
 import { asAgentId } from '../types/brandedIds.js';
-import { isCrewMember, getCrewIds as resolveCrewIds } from '../agents/crewUtils.js';
+import { isCrewMember, getCrewIds } from '../agents/crewUtils.js';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -128,7 +128,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Resolve crew membership for leadId filtering
     const crewAgentIds = new Set<string>();
     if (leadId) {
-      const resolved = resolveCrewIds(agentManager.getAll(), leadId);
+      const resolved = getCrewIds(agentManager.getAll(), leadId);
       for (const id of resolved) crewAgentIds.add(id);
 
       // Historical fallback: when no live agents match, treat leadId as projectId
