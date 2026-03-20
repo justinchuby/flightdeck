@@ -530,9 +530,10 @@ describe('HomeDashboard', () => {
         if (path === '/projects') return Promise.resolve(sampleProjects);
         if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
         if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
-        if (path.includes('/coordination/activity')) return Promise.resolve([
+        if (path.includes('type=progress_update')) return Promise.resolve([
           { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress_update', summary: 'Implemented auth module', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
         ]);
+        if (path.includes('type=task_completed')) return Promise.resolve([]);
         return Promise.resolve([]);
       });
 
@@ -551,14 +552,41 @@ describe('HomeDashboard', () => {
       expect(within(modal).getByText('Progress Update')).toBeTruthy();
     });
 
+    it('shows task_completed events merged with progress updates', async () => {
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
+        if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
+        if (path.includes('type=progress_update')) return Promise.resolve([
+          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress_update', summary: 'Auth module done', timestamp: '2026-03-08T05:00:00Z', projectId: 'proj-1' },
+        ]);
+        if (path.includes('type=task_completed')) return Promise.resolve([
+          { id: 2, agentId: 'agent-2', agentRole: 'developer', actionType: 'task_completed', summary: 'Completed login endpoint', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
+        ]);
+        return Promise.resolve([]);
+      });
+
+      renderWithRouter(<HomeDashboard />);
+      await waitFor(() => {
+        expect(screen.getByTestId('activity-feed-section')).toBeTruthy();
+      });
+
+      const items = screen.getAllByTestId('activity-feed-item');
+      expect(items.length).toBe(2);
+      // task_completed is newer, should appear first
+      expect(within(items[0]).getByText('Completed login endpoint')).toBeTruthy();
+      expect(within(items[1]).getByText('Auth module done')).toBeTruthy();
+    });
+
     it('closes ActivityDetailModal when clicking outside', async () => {
       mockApiFetch.mockImplementation((path: string) => {
         if (path === '/projects') return Promise.resolve(sampleProjects);
         if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
         if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
-        if (path.includes('/coordination/activity')) return Promise.resolve([
+        if (path.includes('type=progress_update')) return Promise.resolve([
           { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress_update', summary: 'Done', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
         ]);
+        if (path.includes('type=task_completed')) return Promise.resolve([]);
         return Promise.resolve([]);
       });
 
