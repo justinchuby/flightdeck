@@ -49,7 +49,7 @@ export function commsRoutes(ctx: AppContext): Router {
     const ids = new Set<string>();
     ids.add(leadId);
     for (const agent of agentManager.getAll()) {
-      if (agent.parentId === leadId || agent.id === leadId) {
+      if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
         ids.add(agent.id);
       }
     }
