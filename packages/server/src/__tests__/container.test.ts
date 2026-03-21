@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createContainer, createTestContainer, type ServiceContainer, type ContainerConfig } from '../container.js';
 import type { ServerConfig } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 // Mock config module so container's updateConfig/getConfig don't affect global state
 vi.mock('../config.js', async (importOriginal) => {
@@ -143,7 +144,7 @@ describe('createContainer', () => {
     });
 
     // Should not throw — just warns
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     await expect(container.shutdown()).resolves.toBeUndefined();
     warnSpy.mockRestore();
 
@@ -160,13 +161,15 @@ describe('createContainer', () => {
       () => new Promise((_resolve, reject) => setTimeout(() => reject(asyncError), 10)) as any,
     );
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     await expect(container.shutdown()).resolves.toBeUndefined();
 
     // The async rejection should have been caught and warned
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('shutdown failed'),
-      asyncError,
+      expect.objectContaining({
+        module: 'container',
+        msg: expect.stringContaining('shutdown failed'),
+      }),
     );
     warnSpy.mockRestore();
     container = null;

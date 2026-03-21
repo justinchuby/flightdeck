@@ -294,6 +294,41 @@ describe('SessionReplay', () => {
       expect(keyframes[0].type).toBe('spawn');
       expect(keyframes[1].type).toBe('milestone');
     });
+
+    it('resolves crew via projectId when leadId is a project slug', () => {
+      const devSpawn = makeActivity({
+        id: 1, agentId: 'dev-1', actionType: 'sub_agent_spawned', projectId: 'proj-abc',
+        summary: 'Dev spawned', timestamp: T1,
+      });
+      const devMilestone = makeActivity({
+        id: 2, agentId: 'dev-2', actionType: 'task_completed', projectId: 'proj-abc',
+        summary: 'Dev 2 milestone', timestamp: T2,
+      });
+      const foreignEvent = makeActivity({
+        id: 3, agentId: 'foreign-1', actionType: 'error', projectId: 'other-proj',
+        summary: 'Foreign error', timestamp: T3,
+      });
+
+      const mocks = makeMocks({
+        agents: [
+          { id: 'dev-1', parentId: 'lead-uuid', projectId: 'proj-abc' },
+          { id: 'dev-2', parentId: 'lead-uuid', projectId: 'proj-abc' },
+          { id: 'foreign-1', parentId: 'other-lead', projectId: 'other-proj' },
+        ],
+      });
+
+      (mocks.activityLedger.getUntil as ReturnType<typeof vi.fn>)
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([devSpawn, devMilestone, foreignEvent]);
+
+      const replay = new SessionReplay(mocks.activityLedger, mocks.taskDAG, mocks.decisionLog, mocks.lockRegistry, mocks.agentSource);
+      // leadId is a project slug, not a UUID — should match via projectId
+      const keyframes = replay.getKeyframes('proj-abc');
+
+      expect(keyframes).toHaveLength(2);
+      expect(keyframes[0].agentId).toBe('dev-1');
+      expect(keyframes[1].agentId).toBe('dev-2');
+    });
   });
 
   describe('getEventsInRange', () => {

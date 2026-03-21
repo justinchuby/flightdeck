@@ -49,7 +49,7 @@ export function GroupsPanelContent({
           })));
         }
       })
-      .catch((err) => console.warn('[GroupsPanel] fetch groups', err));
+      .catch((err) => console.error('[GroupsPanel] fetch groups', err));
   }, [groups.length, projectId]);
 
   const effectiveGroups = groups.length > 0 ? groups : historicalGroups;
@@ -69,7 +69,7 @@ export function GroupsPanelContent({
             setHistoricalMessages((prev) => ({ ...prev, [expandedGroup]: data }));
           }
         })
-        .catch((err) => console.warn('[GroupsPanel] fetch group messages', err));
+        .catch((err) => console.error('[GroupsPanel] fetch group messages', err));
     } else if (leadId) {
       // Fetch from live lead endpoint
       apiFetch(`/lead/${leadId}/groups/${encodeURIComponent(expandedGroup)}/messages`)
@@ -84,7 +84,7 @@ export function GroupsPanelContent({
             }
           }
         })
-        .catch((err) => console.warn('[GroupsPanel] fetch live group messages', err));
+        .catch((err) => console.error('[GroupsPanel] fetch live group messages', err));
     }
   }, [expandedGroup, leadId, projectId, isHistorical, fetchedGroups]);
 

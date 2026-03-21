@@ -41,9 +41,14 @@ const mockAppState = {
   connected: true,
   pendingDecisions: [] as any[],
 };
-vi.mock('../../../stores/appStore', () => ({
-  useAppStore: vi.fn((selector: any) => selector(mockAppState)),
-}));
+const mockSetPendingDecisions = vi.fn((decisions: any[]) => { mockAppState.pendingDecisions = decisions; });
+vi.mock('../../../stores/appStore', () => {
+  const useAppStore = Object.assign(
+    vi.fn((selector: any) => selector(mockAppState)),
+    { getState: () => ({ ...mockAppState, setPendingDecisions: mockSetPendingDecisions }) },
+  );
+  return { useAppStore };
+});
 
 import { HomeDashboard } from '../HomeDashboard';
 
@@ -152,6 +157,7 @@ function renderWithRouter(component: React.ReactElement) {
 function setupDefaultMocks() {
   mockApiFetch.mockImplementation((path: string) => {
     if (path === '/projects') return Promise.resolve(sampleProjects);
+    if (path === '/decisions?needs_confirmation=true') return Promise.resolve(sampleDecisions);
     if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
     if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
     return Promise.resolve([]);
@@ -317,6 +323,14 @@ describe('HomeDashboard', () => {
 
     it('hides action section when no pending items', async () => {
       mockAppState.pendingDecisions = [];
+      // Override API to also return empty pending decisions
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions?needs_confirmation=true') return Promise.resolve([]);
+        if (path === '/decisions') return Promise.resolve(sampleAllDecisions);
+        if (path.includes('/dag')) return Promise.resolve(sampleDagStatus);
+        return Promise.resolve([]);
+      });
       renderWithRouter(<HomeDashboard />);
       await waitFor(() => {
         expect(screen.getByTestId('home-dashboard')).toBeTruthy();
@@ -572,6 +586,63 @@ describe('HomeDashboard', () => {
 
       fireEvent.mouseDown(screen.getByTestId('activity-detail-modal'));
       expect(screen.queryByTestId('activity-detail-modal')).toBeNull();
+    });
+  });
+
+  describe('pendingDecisions DB hydration', () => {
+    it('hydrates pendingDecisions from /decisions?needs_confirmation=true on mount', async () => {
+      setupDefaultMocks();
+      renderWithRouter(<HomeDashboard />);
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith('/decisions?needs_confirmation=true');
+      });
+
+      await waitFor(() => {
+        expect(mockSetPendingDecisions).toHaveBeenCalledWith(sampleDecisions);
+      });
+    });
+
+    it('sets empty pendingDecisions when API returns empty', async () => {
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions?needs_confirmation=true') return Promise.resolve([]);
+        if (path === '/decisions') return Promise.resolve([]);
+        return Promise.resolve([]);
+      });
+      mockAppState.agents = sampleAgents as any;
+
+      renderWithRouter(<HomeDashboard />);
+
+      await waitFor(() => {
+        expect(mockSetPendingDecisions).toHaveBeenCalledWith([]);
+      });
+    });
+  });
+
+  describe('progress activity filtering', () => {
+    it('shows progress from all agent roles, not just lead', async () => {
+      mockApiFetch.mockImplementation((path: string) => {
+        if (path === '/projects') return Promise.resolve(sampleProjects);
+        if (path === '/decisions') return Promise.resolve([]);
+        if (path.includes('/coordination/activity')) return Promise.resolve([
+          { id: 1, agentId: 'agent-1', agentRole: 'lead', actionType: 'progress_update', summary: 'Lead progress', timestamp: '2026-03-08T06:00:00Z', projectId: 'proj-1' },
+          { id: 2, agentId: 'agent-2', agentRole: 'developer', actionType: 'progress_update', summary: 'Developer progress', timestamp: '2026-03-08T05:00:00Z', projectId: 'proj-1' },
+          { id: 3, agentId: 'agent-3', agentRole: 'architect', actionType: 'progress_update', summary: 'Architect progress', timestamp: '2026-03-08T04:00:00Z', projectId: 'proj-1' },
+        ]);
+        return Promise.resolve([]);
+      });
+      mockAppState.agents = sampleAgents as any;
+
+      renderWithRouter(<HomeDashboard />);
+
+      await waitFor(() => {
+        const section = screen.getByTestId('activity-feed-section');
+        // All roles' progress should appear, not just lead
+        expect(section.textContent).toContain('Lead progress');
+        expect(section.textContent).toContain('Developer progress');
+        expect(section.textContent).toContain('Architect progress');
+      });
     });
   });
 });

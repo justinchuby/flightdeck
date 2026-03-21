@@ -229,7 +229,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   const fileDependencyGraph = new FileDependencyGraph(repoRoot);
   const worktreeManager = new WorktreeManager(repoRoot, lockRegistry);
   worktreeManager.cleanupOrphans().catch(err => {
-    console.warn(`[container] Orphan cleanup failed: ${err.message}`);
+    logger.warn({ module: 'container', msg: 'Orphan cleanup failed', error: err.message });
   });
 
   const escalationManager = new EscalationManager(decisionLog, taskDAG);
@@ -417,7 +417,7 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
     async shutdown() {
       for (const { name, fn } of [...stopList].reverse()) {
         try { await Promise.resolve(fn()); } catch (err) {
-          console.warn(`[container] ${name} shutdown failed:`, err);
+          logger.warn({ module: 'container', msg: `${name} shutdown failed`, error: String(err) });
         }
       }
     },

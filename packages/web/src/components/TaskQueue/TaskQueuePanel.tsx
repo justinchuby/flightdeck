@@ -176,7 +176,7 @@ function DagPanel({
           setGlobalOffset(data.offset + data.limit);
         }
       } catch (err) {
-        console.warn('Failed to fetch global tasks', err);
+        console.error('Failed to fetch global tasks', err);
       }
     };
     fetchGlobal();
@@ -221,7 +221,7 @@ function DagPanel({
         setGlobalOffset(data.offset + data.limit);
       }
     } catch (err) {
-      console.warn('Failed to load more global tasks', err);
+      console.error('Failed to load more global tasks', err);
     }
   };
 
