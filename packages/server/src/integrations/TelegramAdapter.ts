@@ -4,6 +4,7 @@
 
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import { logger } from '../utils/logger.js';
+import { chunkMessage } from './messageChunker.js';
 import type {
   MessagingAdapter,
   MessagingPlatform,
@@ -54,6 +55,10 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   private rateLimitCleanupTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private startError: string | null = null;
+
+  /** Bounded set of recently-seen Telegram update IDs for deduplication. */
+  private seenUpdateIds: Set<number> = new Set();
+  private static readonly MAX_SEEN_IDS = 1000;
 
   // Retry queue for failed outbound messages (in-memory, 5-min TTL)
   private retryQueue: Array<{ message: OutboundMessage; attempts: number; expiresAt: number }> = [];
@@ -108,6 +113,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
       throw new Error(`Telegram bot initialization failed: ${safeMsg}`);
     }
 
+    this.setupDeduplicationMiddleware();
     this.setupCommandHandlers();
     this.setupMessageHandler();
     this.setupErrorHandler();
@@ -121,16 +127,9 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     }, 60_000);
     this.rateLimitCleanupTimer.unref();
 
-    // Drop any leftover webhook/getUpdates connection from a previous
-    // instance (e.g. after a crash) to avoid 409 Conflict errors.
-    try {
-      await this.bot.api.deleteWebhook({ drop_pending_updates: false });
-    } catch {
-      // Best-effort — if this fails, bot.start() will still attempt polling
-    }
-
     // Start long polling (non-blocking)
     this.bot.start({
+      allowed_updates: ['message'],
       onStart: () => {
         logger.info({ module: 'telegram', msg: 'Telegram bot started (long polling)' });
         this.running = true;
@@ -168,36 +167,43 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
 
     this.bot = null;
     this.retryQueue = [];
+    this.seenUpdateIds.clear();
     this.emit('stopped', undefined as unknown as void);
     logger.info({ module: 'telegram', msg: 'Telegram bot stopped' });
   }
 
-  /** Send a message to a Telegram chat. Supports reply threading via replyToMessageId. */
+  /** Send a message to a Telegram chat. Splits long messages into chunks. */
   async sendMessage(message: OutboundMessage): Promise<void> {
     if (!this.bot) {
       logger.warn({ module: 'telegram', msg: 'Cannot send message — bot not running' });
       return;
     }
 
-    try {
-      const opts: Record<string, unknown> = {};
-      if (message.parseMode) opts.parse_mode = message.parseMode;
-      if (message.replyToMessageId) {
-        opts.reply_parameters = { message_id: Number(message.replyToMessageId) };
+    const chunks = chunkMessage(message.text);
+    for (let i = 0; i < chunks.length; i++) {
+      try {
+        const opts: Record<string, unknown> = {};
+        if (message.parseMode) opts.parse_mode = message.parseMode;
+        // Only thread-reply the first chunk
+        if (i === 0 && message.replyToMessageId) {
+          opts.reply_parameters = { message_id: Number(message.replyToMessageId) };
+        }
+        await this.bot.api.sendMessage(
+          message.chatId,
+          chunks[i],
+          Object.keys(opts).length > 0 ? opts : undefined,
+        );
+      } catch (err) {
+        logger.warn({
+          module: 'telegram',
+          msg: 'Failed to send Telegram message',
+          chatId: message.chatId,
+          error: (err as Error).message,
+        });
+        // Enqueue remaining chunks as a single retry message
+        this.enqueueRetry({ ...message, text: chunks.slice(i).join('\n\n') });
+        break;
       }
-      await this.bot.api.sendMessage(
-        message.chatId,
-        message.text,
-        Object.keys(opts).length > 0 ? opts : undefined,
-      );
-    } catch (err) {
-      logger.warn({
-        module: 'telegram',
-        msg: 'Failed to send Telegram message',
-        chatId: message.chatId,
-        error: (err as Error).message,
-      });
-      this.enqueueRetry(message);
     }
   }
 
@@ -206,7 +212,7 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
     return this.running;
   }
 
-  /** Check if a chat ID is in the allowlist. Empty list = allow all. */
+  /** Check if a chat ID is in the allowlist. Empty list = deny all (secure default). */
   isChatAllowed(chatId: string): boolean {
     // Empty allowlist = deny all (secure default). Configure allowed chat IDs in settings.
     if (this.config.allowedChatIds.length === 0) return false;
@@ -214,6 +220,36 @@ export class TelegramAdapter extends TypedEmitter<TelegramAdapterEvents> impleme
   }
 
   // ── Private ──────────────────────────────────────────────
+
+  /**
+   * grammY middleware that drops updates with previously-seen update_id.
+   * Uses a bounded Set (FIFO eviction at 1000 entries) to prevent
+   * double-processing during restart-during-burst scenarios.
+   */
+  private setupDeduplicationMiddleware(): void {
+    if (!this.bot) return;
+
+    // Hand-rolled ctx type — avoids importing grammY's Context at the type level
+    // since grammY is lazy-imported at runtime to keep it optional.
+    this.bot.use(async (ctx: { update: { update_id: number } }, next: () => Promise<void>) => {
+      const updateId = ctx.update.update_id;
+
+      if (this.seenUpdateIds.has(updateId)) {
+        logger.debug({ module: 'telegram', msg: 'Duplicate update skipped', updateId });
+        return;
+      }
+
+      this.seenUpdateIds.add(updateId);
+
+      // FIFO eviction when over capacity
+      if (this.seenUpdateIds.size > TelegramAdapter.MAX_SEEN_IDS) {
+        const oldest = this.seenUpdateIds.values().next().value;
+        if (oldest !== undefined) this.seenUpdateIds.delete(oldest);
+      }
+
+      await next();
+    });
+  }
 
   private setupCommandHandlers(): void {
     if (!this.bot) return;

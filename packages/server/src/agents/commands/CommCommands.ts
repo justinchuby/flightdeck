@@ -524,6 +524,12 @@ function handleReact(ctx: CommandHandlerContext, agent: Agent, data: string): vo
 // ── TELEGRAM_REPLY ──────────────────────────────────────────────────
 
 function handleTelegramReply(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  // Role gate: only lead agents can reply to Telegram
+  if (agent.role.id !== 'lead') {
+    agent.sendMessage('[System] Only the project lead can reply to Telegram messages. Use AGENT_MESSAGE to communicate through your lead.');
+    return;
+  }
+
   try {
     const parsed = JSON.parse(data);
     const messageId = parsed.messageId ?? parsed.message_id;
@@ -553,6 +559,12 @@ function handleTelegramReply(ctx: CommandHandlerContext, agent: Agent, data: str
 // ── TELEGRAM_SEND ──────────────────────────────────────────────────
 
 function handleTelegramSend(ctx: CommandHandlerContext, agent: Agent, data: string): void {
+  // Role gate: only lead agents can send to Telegram
+  if (agent.role.id !== 'lead') {
+    agent.sendMessage('[System] Only the project lead can send messages to Telegram. Use AGENT_MESSAGE to communicate through your lead.');
+    return;
+  }
+
   try {
     const parsed = JSON.parse(data);
     const content = parsed.content ?? parsed.text;

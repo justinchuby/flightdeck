@@ -126,6 +126,30 @@ export function integrationRoutes(ctx: AppContext): Router {
     }
   });
 
+  // DELETE /api/integrations/sessions/:chatId — revoke a session binding
+  router.delete('/integrations/sessions/:chatId', (_req, res) => {
+    try {
+      const agent = ctx.integrationRouter;
+      if (!agent) {
+        return res.status(503).json({ error: 'Integration agent not available' });
+      }
+
+      const { chatId } = _req.params;
+      if (!chatId) {
+        return res.status(400).json({ error: 'chatId is required' });
+      }
+
+      const removed = agent.removeSession(chatId);
+      if (!removed) {
+        return res.status(404).json({ error: 'No active session found for this chatId' });
+      }
+
+      res.status(204).end();
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to revoke session', detail: (err as Error).message });
+    }
+  });
+
   // ── Subscriptions ─────────────────────────────────────────
 
   // POST /api/integrations/subscriptions
@@ -221,6 +245,50 @@ export function integrationRoutes(ctx: AppContext): Router {
   });
 
   // ── Telegram Config ────────────────────────────────────────
+
+  // POST /api/integrations/telegram/validate-token — validate bot token via Telegram getMe API
+  router.post('/integrations/telegram/validate-token', async (req, res) => {
+    try {
+      const { botToken } = req.body ?? {};
+      if (!botToken || typeof botToken !== 'string') {
+        return res.status(400).json({ valid: false, error: 'botToken is required' });
+      }
+
+      // Call Telegram Bot API directly — no adapter needed for validation.
+      // Validate token format (digits:alphanumeric) to prevent URL injection.
+      if (!/^\d+:[A-Za-z0-9_-]+$/.test(botToken)) {
+        return res.json({ valid: false, error: 'Invalid token format. Expected format: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11' });
+      }
+
+      const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(botToken)}/getMe`);
+      const data = await response.json() as {
+        ok: boolean;
+        result?: { id: number; is_bot: boolean; first_name: string; username?: string };
+        description?: string;
+      };
+
+      if (!data.ok || !data.result) {
+        return res.json({
+          valid: false,
+          error: data.description ?? 'Invalid bot token',
+        });
+      }
+
+      res.json({
+        valid: true,
+        bot: {
+          id: data.result.id,
+          username: data.result.username ?? '',
+          firstName: data.result.first_name,
+        },
+      });
+    } catch (err) {
+      res.json({
+        valid: false,
+        error: `Failed to validate token: ${(err as Error).message}`,
+      });
+    }
+  });
 
   // PATCH /api/integrations/telegram — update telegram config in flightdeck.config.yaml
   router.patch('/integrations/telegram', async (req, res) => {

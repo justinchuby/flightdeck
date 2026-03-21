@@ -160,3 +160,29 @@ providerRanking:
 # Example: Switch to OpenCode
 # provider:
 #   id: opencode
+
+# ── Telegram Integration ──────────────────────────────────────────
+# Connect Flightdeck to Telegram for mobile notifications and bidirectional
+# messaging with your AI crew. See docs/guides/telegram-setup.md for the
+# full setup walkthrough.
+#
+# Quick start:
+#   1. Create a bot via @BotFather on Telegram → get a bot token
+#   2. Set TELEGRAM_BOT_TOKEN env var (preferred) or botToken below
+#   3. Find your chat ID (see setup guide) and add it to allowedChatIds
+#   4. Enable via Settings UI or PATCH /api/integrations/telegram
+#
+# Security: The bot is disabled by default and requires manual enablement
+# each server start. The allowlist denies all chats when empty.
+#
+telegram:
+  enabled: false                # Must be enabled each server start (intentional)
+  botToken: ''                  # Bot token from @BotFather
+                                # Prefer TELEGRAM_BOT_TOKEN env var — keeps
+                                # secrets out of config files committed to git
+  allowedChatIds: []            # Telegram chat IDs allowed to interact with the bot
+                                # Empty list = deny all chats (secure default)
+                                # Use strings: ['123456789', '-1001234567890']
+                                # Negative IDs are group chats
+  rateLimitPerMinute: 20        # Max inbound messages per user per minute (1–120)
+                                # Protects against message floods

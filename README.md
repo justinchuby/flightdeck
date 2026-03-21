@@ -104,7 +104,7 @@ npm run dev
 - **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
 - **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
 - **Broadcasts** — Send a message to every active agent at once
-- **Telegram Integration** — Receive notifications via Telegram bot with batched delivery, challenge-response auth, and configurable settings
+- **Telegram Integration** — Receive notifications via Telegram bot with batched delivery, challenge-response auth, and configurable settings ([setup guide](docs/guides/telegram-setup.md))
 
 ### 📈 Visualization & Monitoring
 - **Home Dashboard** — At-a-glance view of active projects, decisions made, decisions needing approval, action-required items, and progress milestones. Onboarding guide when no projects exist
@@ -259,7 +259,7 @@ See [`flightdeck.config.example.yaml`](flightdeck.config.example.yaml) for the f
 | `ANTHROPIC_API_KEY` | — | Required for Claude provider |
 | `GEMINI_API_KEY` | — | Required for Gemini provider |
 | `OPENAI_API_KEY` | — | Required for Codex provider |
-| `TELEGRAM_BOT_TOKEN` | — | Telegram integration (optional) |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram integration (optional; [setup guide](docs/guides/telegram-setup.md)) |
 | `AUTH` | enabled | Set to `none` to disable authentication |
 | `SERVER_SECRET` | auto-generated | Fixed auth token (optional) |
 | `MAX_AGENTS` | `50` | Max concurrent agents (1–200) |

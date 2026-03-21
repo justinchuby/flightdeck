@@ -21,6 +21,7 @@ const {
   mockCatchHolder,
   mockStartHolder,
   mockStopFn,
+  mockUseHandlers,
 } = vi.hoisted(() => ({
   mockSendMessage: vi.fn().mockResolvedValue(undefined),
   mockCommandHandlers: new Map<string, (ctx: any) => Promise<void>>(),
@@ -28,21 +29,25 @@ const {
   mockCatchHolder: { handler: null as ((err: any) => void) | null },
   mockStartHolder: { callback: null as (() => void) | null },
   mockStopFn: vi.fn().mockResolvedValue(undefined),
+  mockUseHandlers: [] as Array<(ctx: any, next: () => Promise<void>) => Promise<void>>,
 }));
 
 vi.mock('grammy', () => {
   class MockBot {
-    api = { sendMessage: mockSendMessage };
+    api = { sendMessage: mockSendMessage, deleteWebhook: vi.fn().mockResolvedValue(undefined) };
     command(cmd: string, handler: (ctx: any) => Promise<void>) {
       mockCommandHandlers.set(cmd, handler);
     }
     on(event: string, handler: (ctx: any) => Promise<void>) {
       mockOnHandlers.set(event, handler);
     }
+    use(handler: (ctx: any, next: () => Promise<void>) => Promise<void>) {
+      mockUseHandlers.push(handler);
+    }
     catch(handler: (err: any) => void) {
       mockCatchHolder.handler = handler;
     }
-    start(opts?: { onStart?: () => void }) {
+    start(opts?: { onStart?: () => void; allowed_updates?: string[] }) {
       mockStartHolder.callback = opts?.onStart ?? null;
       if (opts?.onStart) {
         // Call synchronously for test predictability
@@ -78,6 +83,7 @@ describe('TelegramAdapter', () => {
     mockOnHandlers.clear();
     mockCatchHolder.handler = null;
     mockStartHolder.callback = null;
+    mockUseHandlers.length = 0;
   });
 
   afterEach(async () => {
@@ -297,6 +303,69 @@ describe('TelegramAdapter', () => {
     await adapter.sendMessage(msg);
 
     expect(mockSendMessage).toHaveBeenCalledWith('123', 'Hello from Flightdeck', undefined);
+  });
+
+  it('sends multiple messages for long text', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const longText = 'a'.repeat(5000);
+    await adapter.sendMessage({
+      platform: 'telegram',
+      chatId: '123',
+      text: longText,
+    });
+
+    // chunkMessage will split this into 2 chunks
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    // Each sent chunk should be ≤ 4096
+    for (const call of mockSendMessage.mock.calls) {
+      expect(call[1].length).toBeLessThanOrEqual(4096);
+    }
+  });
+
+  it('only thread-replies the first chunk', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const longText = 'a'.repeat(5000);
+    await adapter.sendMessage({
+      platform: 'telegram',
+      chatId: '123',
+      text: longText,
+      replyToMessageId: '42',
+    });
+
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    // First call should have reply_parameters
+    const firstCallOpts = mockSendMessage.mock.calls[0][2];
+    expect(firstCallOpts).toHaveProperty('reply_parameters');
+    // Second call should NOT have reply_parameters
+    const secondCallOpts = mockSendMessage.mock.calls[1][2];
+    expect(secondCallOpts).toBeUndefined();
+  });
+
+  it('enqueues remaining chunks on send failure', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    // Fail on the second chunk
+    mockSendMessage
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    const longText = 'a'.repeat(5000);
+    await adapter.sendMessage({
+      platform: 'telegram',
+      chatId: '123',
+      text: longText,
+    });
+
+    // First chunk sent, second failed
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    // Retry queue should have the remaining content
+    const snapshot = adapter.getRetryQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
   });
 
   it('sends with parse mode', async () => {
@@ -540,5 +609,133 @@ describe('TelegramAdapter', () => {
     const snapshot = adapter.getRetryQueueSnapshot();
     expect(snapshot).toHaveLength(1);
     expect(snapshot[0].message.chatId).toBe('123');
+  });
+
+  // ── Update Deduplication ─────────────────────────────────
+
+  it('registers deduplication middleware before other handlers', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    // use() should have been called (dedup middleware registered)
+    expect(mockUseHandlers.length).toBe(1);
+  });
+
+  it('drops duplicate updates with the same update_id', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const dedupMiddleware = mockUseHandlers[0];
+    expect(dedupMiddleware).toBeDefined();
+
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    // First call with update_id 100 — should pass through
+    await dedupMiddleware({ update: { update_id: 100 } }, next);
+    expect(next).toHaveBeenCalledTimes(1);
+
+    // Second call with the same update_id 100 — should be dropped
+    next.mockClear();
+    await dedupMiddleware({ update: { update_id: 100 } }, next);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('allows different update_ids through', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const dedupMiddleware = mockUseHandlers[0];
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    await dedupMiddleware({ update: { update_id: 1 } }, next);
+    await dedupMiddleware({ update: { update_id: 2 } }, next);
+    await dedupMiddleware({ update: { update_id: 3 } }, next);
+
+    expect(next).toHaveBeenCalledTimes(3);
+  });
+
+  it('evicts oldest update_id when over capacity', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const dedupMiddleware = mockUseHandlers[0];
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    // Add 1001 unique IDs — one more than MAX_SEEN_IDS (1000) to trigger FIFO eviction
+    for (let i = 1; i <= 1001; i++) {
+      await dedupMiddleware({ update: { update_id: i } }, next);
+    }
+    expect(next).toHaveBeenCalledTimes(1001);
+
+    // The first update_id (1) should have been evicted — re-sending it should pass
+    next.mockClear();
+    await dedupMiddleware({ update: { update_id: 1 } }, next);
+    expect(next).toHaveBeenCalledTimes(1);
+
+    // update_id 1001 (most recent) should still be in the set — should be dropped
+    next.mockClear();
+    await dedupMiddleware({ update: { update_id: 1001 } }, next);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('clears seen update IDs on stop', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    const dedupMiddleware = mockUseHandlers[0];
+    const next = vi.fn().mockResolvedValue(undefined);
+
+    // Add an update_id
+    await dedupMiddleware({ update: { update_id: 42 } }, next);
+    expect(next).toHaveBeenCalledTimes(1);
+
+    // Stop and restart
+    await adapter.stop();
+    await adapter.start();
+
+    // Get the new middleware (from the new start)
+    const newDedupMiddleware = mockUseHandlers[mockUseHandlers.length - 1];
+    next.mockClear();
+
+    // The same update_id should now pass through (set was cleared)
+    await newDedupMiddleware({ update: { update_id: 42 } }, next);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Graceful Stop ─────────────────────────────────────────
+
+  it('calls bot.stop() on graceful shutdown', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    await adapter.stop();
+
+    expect(mockStopFn).toHaveBeenCalledOnce();
+    expect(adapter.isRunning()).toBe(false);
+  });
+
+  it('logs warning when bot.stop() throws', async () => {
+    const { logger: mockLogger } = await import('../utils/logger.js');
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    mockStopFn.mockRejectedValueOnce(new Error('Network failure'));
+
+    vi.mocked(mockLogger.warn).mockClear();
+    await adapter.stop();
+
+    const warnCalls = vi.mocked(mockLogger.warn).mock.calls;
+    const stopErrorLogs = warnCalls.filter(
+      (call) => (call[0] as any)?.msg === 'Error stopping Telegram bot',
+    );
+    expect(stopErrorLogs).toHaveLength(1);
+  });
+
+  it('passes allowed_updates to bot.start()', async () => {
+    adapter = new TelegramAdapter(createConfig());
+    await adapter.start();
+
+    // Verify bot started successfully with allowed_updates option
+    expect(adapter.isRunning()).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { TelegramSettings } from '../TelegramSettings';
 
 // ── Mocks ─────────────────────────────────────────────────
@@ -12,7 +13,7 @@ vi.mock('../../../hooks/useApi', () => ({
 
 // ── Fixtures ──────────────────────────────────────────────
 
-const MOCK_STATUS = {
+const MOCK_STATUS_CONFIGURED = {
   enabled: true,
   adapters: [{ platform: 'telegram', running: true }],
   sessions: [
@@ -28,16 +29,20 @@ const MOCK_STATUS = {
   subscriptions: 1,
 };
 
-const MOCK_CONFIG = {
+const MOCK_CONFIG_CONFIGURED = {
   telegram: {
     enabled: true,
     botToken: 'bot123456:ABC-DEF1234ghIkl-zyx57W2v',
     allowedChatIds: ['111', '222'],
     rateLimitPerMinute: 20,
+    notifications: {
+      enabledCategories: ['agent_crashed', 'decision_needs_approval', 'system_alert'],
+      quietHours: { enabled: true, startHour: 22, endHour: 8 },
+    },
   },
 };
 
-const MOCK_STATUS_DISABLED = {
+const MOCK_STATUS_UNCONFIGURED = {
   enabled: false,
   adapters: [],
   sessions: [],
@@ -45,7 +50,7 @@ const MOCK_STATUS_DISABLED = {
   subscriptions: 0,
 };
 
-const MOCK_CONFIG_DISABLED = {
+const MOCK_CONFIG_UNCONFIGURED = {
   telegram: {
     enabled: false,
     botToken: '',
@@ -58,8 +63,11 @@ const MOCK_CONFIG_DISABLED = {
 
 describe('TelegramSettings', () => {
   beforeEach(() => {
+    cleanup();
     mockApiFetch.mockReset();
   });
+
+  // ── Loading ─────────────────────────────────────────────
 
   it('renders loading state initially', () => {
     mockApiFetch.mockReturnValue(new Promise(() => {})); // never resolves
@@ -68,359 +76,72 @@ describe('TelegramSettings', () => {
   });
 
   it('renders Telegram Integration header after loading', async () => {
+    // loadConfig called first, loadStatus second (Promise.all order)
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
+      .mockResolvedValueOnce(MOCK_CONFIG_UNCONFIGURED)
+      .mockResolvedValueOnce(MOCK_STATUS_UNCONFIGURED);
     render(<TelegramSettings />);
     await waitFor(() => {
       expect(screen.getByText('Telegram Integration')).toBeInTheDocument();
     });
   });
 
-  it('shows Connected status when adapter is running', async () => {
+  // ── Mode Selection ──────────────────────────────────────
+
+  it('shows wizard mode when not configured (no token)', async () => {
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
+      .mockResolvedValueOnce(MOCK_CONFIG_UNCONFIGURED)
+      .mockResolvedValueOnce(MOCK_STATUS_UNCONFIGURED);
     render(<TelegramSettings />);
     await waitFor(() => {
-      const statusEl = screen.getByTestId('telegram-status');
-      expect(statusEl.textContent).toContain('Connected');
+      expect(screen.getByTestId('telegram-setup-wizard')).toBeInTheDocument();
     });
   });
 
-  it('shows Disabled status when not enabled', async () => {
+  it('shows dashboard mode when fully configured', async () => {
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS_DISABLED)
-      .mockResolvedValueOnce(MOCK_CONFIG_DISABLED);
+      .mockResolvedValueOnce(MOCK_CONFIG_CONFIGURED)
+      .mockResolvedValueOnce(MOCK_STATUS_CONFIGURED);
     render(<TelegramSettings />);
     await waitFor(() => {
-      const statusEl = screen.getByTestId('telegram-status');
-      expect(statusEl.textContent).toContain('Disabled');
+      expect(screen.getByTestId('telegram-dashboard')).toBeInTheDocument();
     });
   });
 
-  it('has enable/disable toggle', async () => {
+  it('shows wizard when token exists but no chat IDs', async () => {
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
+      .mockResolvedValueOnce({
+        telegram: { ...MOCK_CONFIG_CONFIGURED.telegram, allowedChatIds: [] },
+      })
+      .mockResolvedValueOnce(MOCK_STATUS_UNCONFIGURED);
     render(<TelegramSettings />);
     await waitFor(() => {
-      expect(screen.getByTestId('telegram-toggle')).toBeInTheDocument();
+      expect(screen.getByTestId('telegram-setup-wizard')).toBeInTheDocument();
     });
   });
 
-  it('toggles enabled state and calls API', async () => {
+  // ── Bug Fixes ───────────────────────────────────────────
+
+  it('does not show "In Development" badge', async () => {
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG)
-      .mockResolvedValueOnce({}); // PATCH response
+      .mockResolvedValueOnce(MOCK_CONFIG_UNCONFIGURED)
+      .mockResolvedValueOnce(MOCK_STATUS_UNCONFIGURED);
     render(<TelegramSettings />);
     await waitFor(() => {
-      expect(screen.getByTestId('telegram-toggle')).toBeInTheDocument();
+      expect(screen.getByText('Telegram Integration')).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByTestId('telegram-toggle'));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith(
-        '/integrations/telegram',
-        expect.objectContaining({ method: 'PATCH' }),
-      );
-    });
+    expect(screen.queryByText('In Development')).not.toBeInTheDocument();
   });
 
-  it('renders bot token input', async () => {
+  it('does not show incorrect "all chats will be allowed" message', async () => {
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
+      .mockResolvedValueOnce(MOCK_CONFIG_UNCONFIGURED)
+      .mockResolvedValueOnce(MOCK_STATUS_UNCONFIGURED);
     render(<TelegramSettings />);
     await waitFor(() => {
-      expect(screen.getByTestId('telegram-token-input')).toBeInTheDocument();
+      expect(screen.getByText('Telegram Integration')).toBeInTheDocument();
     });
-  });
-
-  it('masks bot token by default', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      const input = screen.getByTestId('telegram-token-input') as HTMLInputElement;
-      expect(input.type).toBe('password');
-    });
-  });
-
-  it('has Test Connection button', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-test-btn')).toBeInTheDocument();
-    });
-  });
-
-  it('sends test message on Test button click', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG)
-      .mockResolvedValueOnce({ sent: true }); // test response
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-test-btn')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('telegram-test-btn'));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith(
-        '/integrations/test-message',
-        expect.objectContaining({ method: 'POST' }),
-      );
-    });
-  });
-
-  it('shows test result on success', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG)
-      .mockResolvedValueOnce({ sent: true });
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-test-btn')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('telegram-test-btn'));
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-test-result')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Test message sent successfully')).toBeInTheDocument();
-  });
-
-  it('shows test result on failure', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG)
-      .mockRejectedValueOnce(new Error('Bot token invalid'));
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-test-btn')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('telegram-test-btn'));
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-test-result')).toBeInTheDocument();
-    });
-    expect(screen.getByText(/Bot token invalid/)).toBeInTheDocument();
-  });
-
-  // ── Allowed Chat IDs ──────────────────────────────────
-
-  it('renders allowed chat IDs from config', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-chatid-list')).toBeInTheDocument();
-    });
-    expect(screen.getByText('111')).toBeInTheDocument();
-    expect(screen.getByText('222')).toBeInTheDocument();
-  });
-
-  it('adds new chat ID', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-chatid-input')).toBeInTheDocument();
-    });
-    const input = screen.getByTestId('telegram-chatid-input');
-    fireEvent.change(input, { target: { value: '333' } });
-    fireEvent.click(screen.getByTestId('telegram-add-chatid'));
-    expect(screen.getByText('333')).toBeInTheDocument();
-  });
-
-  it('removes a chat ID', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByText('111')).toBeInTheDocument();
-    });
-    const removeBtn = screen.getByLabelText('Remove chat ID 111');
-    fireEvent.click(removeBtn);
-    expect(screen.queryByText('111')).not.toBeInTheDocument();
-  });
-
-  it('shows empty message when no chat IDs configured', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS_DISABLED)
-      .mockResolvedValueOnce(MOCK_CONFIG_DISABLED);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByText(/all chats will be allowed/)).toBeInTheDocument();
-    });
-  });
-
-  // ── Rate Limit ────────────────────────────────────────
-
-  it('renders rate limit slider', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-rate-limit')).toBeInTheDocument();
-    });
-    expect(screen.getByText('20/min')).toBeInTheDocument();
-  });
-
-  // ── Notification Categories ───────────────────────────
-
-  it('renders notification category toggles', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByText('Notification Types')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Decisions needing approval')).toBeInTheDocument();
-    expect(screen.getByText('Agent crashes')).toBeInTheDocument();
-    expect(screen.getByText('Task completions')).toBeInTheDocument();
-  });
-
-  it('marks critical notifications as always-on', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByText('Notification Types')).toBeInTheDocument();
-    });
-    const alwaysOnBadges = screen.getAllByText('always on');
-    expect(alwaysOnBadges.length).toBe(3); // decisions, crashes, system alerts
-  });
-
-  // ── Quiet Hours ───────────────────────────────────────
-
-  it('has quiet hours toggle', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-quiet-toggle')).toBeInTheDocument();
-    });
-  });
-
-  it('shows time selectors when quiet hours enabled', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-quiet-toggle')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('telegram-quiet-toggle'));
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-quiet-start')).toBeInTheDocument();
-      expect(screen.getByTestId('telegram-quiet-end')).toBeInTheDocument();
-    });
-  });
-
-  it('shows critical notification warning during quiet hours', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-quiet-toggle')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('telegram-quiet-toggle'));
-    await waitFor(() => {
-      expect(screen.getByText(/Critical notifications.*always delivered/)).toBeInTheDocument();
-    });
-  });
-
-  // ── Active Sessions ───────────────────────────────────
-
-  it('shows active sessions', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByText('Active Sessions (1)')).toBeInTheDocument();
-    });
-    expect(screen.getByText('123456')).toBeInTheDocument();
-    expect(screen.getByText('→ project-1')).toBeInTheDocument();
-  });
-
-  // ── Save ──────────────────────────────────────────────
-
-  it('has save button', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-save-btn')).toBeInTheDocument();
-    });
-  });
-
-  it('saves config on click', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG)
-      .mockResolvedValueOnce({}) // PATCH
-      .mockResolvedValueOnce(MOCK_STATUS); // refresh status
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-save-btn')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('telegram-save-btn'));
-    await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith(
-        '/integrations/telegram',
-        expect.objectContaining({
-          method: 'PATCH',
-        }),
-      );
-    });
-  });
-
-  // ── Error Handling ────────────────────────────────────
-
-  it('shows error state on API failure', async () => {
-    mockApiFetch.mockRejectedValue(new Error('Network error'));
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-error')).toBeInTheDocument();
-    });
-    expect(screen.getByText(/Network error/)).toBeInTheDocument();
-  });
-
-  // ── Security ──────────────────────────────────────────
-
-  it('does not expose raw bot token in DOM', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    const { container } = render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByTestId('telegram-token-input')).toBeInTheDocument();
-    });
-    const html = container.innerHTML;
-    // Full token should not appear in visible text
-    expect(html).not.toContain('bot123456:ABC-DEF1234ghIkl-zyx57W2v');
-  });
-
-  it('recommends environment variable for token', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(MOCK_STATUS)
-      .mockResolvedValueOnce(MOCK_CONFIG);
-    render(<TelegramSettings />);
-    await waitFor(() => {
-      expect(screen.getByText(/TELEGRAM_BOT_TOKEN/)).toBeInTheDocument();
-    });
+    expect(screen.queryByText(/all chats will be allowed/)).not.toBeInTheDocument();
   });
 
   // ── Notification category toggle (non-critical) ───────
