@@ -46,6 +46,11 @@ import {
 import type { ActivityEntry } from '../Shared';
 import type { AgentInfo, Decision, DagStatus } from '../../types';
 
+// ── Constants ────────────────────────────────────────────────────────
+
+/** High-signal activity types for the homepage feed — excludes noisy status_change, lock, message events */
+const HIGH_SIGNAL_TYPES = new Set(['progress_update', 'task_completed', 'task_started', 'decision_made']);
+
 // ── Types ───────────────────────────────────────────────────────────
 
 /** Enriched project data from GET /api/projects */
@@ -283,7 +288,7 @@ export function HomeDashboard() {
       const [projectsData, decisionsData, activityData, pendingDecisionsData] = await Promise.all([
         apiFetch<EnrichedProject[]>('/projects').catch(() => []),
         apiFetch<Decision[]>('/decisions').catch(() => []),
-        apiFetch<ActivityEntry[]>('/coordination/activity?type=progress_update&limit=15').catch(() => []),
+        apiFetch<ActivityEntry[]>('/coordination/activity?limit=50').catch(() => []),
         apiFetch<Decision[]>('/decisions?needs_confirmation=true').catch(() => []),
       ]);
 
@@ -297,8 +302,9 @@ export function HomeDashboard() {
       const pending = Array.isArray(pendingDecisionsData) ? pendingDecisionsData : [];
       useAppStore.getState().setPendingDecisions(pending);
 
-      // Server already filters to progress_update; show all agent roles
+      // Filter to high-signal event types only
       const progressActivity = (Array.isArray(activityData) ? activityData : [])
+        .filter((a) => HIGH_SIGNAL_TYPES.has(a.actionType))
         .slice(0, 15);
       setRecentActivity(progressActivity);
 
