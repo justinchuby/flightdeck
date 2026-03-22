@@ -12,6 +12,7 @@ export {
   type ProviderLink, type ProviderTierModels, type AcpProviderCapabilities,
 } from './provider.js';
 export {
+  SHORT_ID_LENGTH, shortAgentId,
   AgentStatusSchema, type AgentStatus,
   AgentPhaseSchema, type AgentPhase,
   isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus,
