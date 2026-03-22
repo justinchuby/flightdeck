@@ -268,40 +268,50 @@ describe('Timer creation via POST /timers (route handler logic)', () => {
   });
 });
 
-describe('Timer project scoping (route-level logic)', () => {
-  it('rejects timer when agent belongs to a different project', () => {
-    // Simulate the route logic: if projectId is provided and agent's project doesn't match, reject
-    const requestProjectId: string = 'project-abc';
-    const agentProjectId: string = 'project-xyz';
+describe('Timer session scoping', () => {
+  it('stores leadId (session identity) on created timer', () => {
+    const db = createTestTimerDb();
+    const registry = new TimerRegistry(db);
+    registry.start();
 
-    const agentExists = true;
-    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
+    const timer = registry.create('agent-1', {
+      label: 'session-check',
+      message: 'verify leadId',
+      delaySeconds: 60,
+    }, 'developer', 'lead-abc');
 
-    expect(agentExists).toBe(true);
-    expect(projectMismatch).toBe(true);
+    expect(timer).not.toBeNull();
+    expect(timer!.leadId).toBe('lead-abc');
   });
 
-  it('allows timer when agent belongs to the same project', () => {
-    const requestProjectId = 'project-abc';
-    const agentProjectId = 'project-abc';
+  it('timer has no projectId field', () => {
+    const db = createTestTimerDb();
+    const registry = new TimerRegistry(db);
+    registry.start();
 
-    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
-    expect(projectMismatch).toBe(false);
+    const timer = registry.create('agent-1', {
+      label: 'no-project',
+      message: 'session only',
+      delaySeconds: 60,
+    }, 'developer', 'lead-xyz');
+
+    expect(timer).not.toBeNull();
+    expect('projectId' in timer!).toBe(false);
   });
 
-  it('allows timer when no projectId is provided in request', () => {
-    const requestProjectId: string | undefined = undefined;
-    // Route skips check when no projectId
-    const shouldCheck = requestProjectId && typeof requestProjectId === 'string';
-    expect(shouldCheck).toBeFalsy();
-  });
+  it('persists leadId to DB and recovers it', () => {
+    const db = createTestTimerDb();
+    const registry = new TimerRegistry(db);
+    registry.start();
 
-  it('allows timer when agent has no project (unscoped agent)', () => {
-    const requestProjectId = 'project-abc';
-    const agentProjectId: string | undefined = undefined;
+    registry.create('agent-1', {
+      label: 'persist-check',
+      message: 'verify DB roundtrip',
+      delaySeconds: 300,
+    }, 'developer', 'lead-session-1');
 
-    // Route only rejects when agentProjectId exists AND mismatches
-    const projectMismatch = agentProjectId && agentProjectId !== requestProjectId;
-    expect(projectMismatch).toBeFalsy();
+    const allTimers = registry.getAllTimers();
+    expect(allTimers.length).toBe(1);
+    expect(allTimers[0].leadId).toBe('lead-session-1');
   });
 });
