@@ -9,8 +9,8 @@ export const TimerSchema = z.object({
   id: z.string(),
   agentId: z.string(),
   agentRole: z.string(),
+  /** Lead agent ID — identifies the session this timer belongs to */
   leadId: z.string().nullable(),
-  projectId: z.string().nullable().optional(),
   label: z.string(),
   message: z.string(),
   delaySeconds: z.number(),

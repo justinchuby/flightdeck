@@ -296,8 +296,8 @@ export const timers = sqliteTable('timers', {
   id: text('id').primaryKey(),
   agentId: text('agent_id').notNull(),
   agentRole: text('agent_role').notNull(),
+  /** Lead agent ID — session identity for routing */
   leadId: text('lead_id'),
-  projectId: text('project_id'),
   label: text('label').notNull(),
   message: text('message').notNull(),
   delaySeconds: integer('delay_seconds').notNull(),

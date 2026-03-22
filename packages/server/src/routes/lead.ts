@@ -352,23 +352,11 @@ export function leadRoutes(ctx: AppContext): Router {
     const agent = agentManager.get(agentId);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-    // Project scoping: if projectId provided, verify agent belongs to that project
-    const { projectId } = req.body;
-    if (projectId && typeof projectId === 'string') {
-      const agentProjectId = agentManager.getProjectIdForAgent(agentId);
-      if (agentProjectId && agentProjectId !== projectId) {
-        return res.status(403).json({ error: 'Agent does not belong to this project' });
-      }
-    }
-
-    const resolvedProjectId = projectId ?? agentManager.getProjectIdForAgent(agentId) ?? null;
-
     const timer = registry.create(
       agentId,
       { label, message: message || '', delaySeconds, repeat: !!repeat },
       agent.role.id,
       agent.parentId ?? null,
-      resolvedProjectId,
     );
     if (!timer) {
       return res.status(429).json({ error: 'Timer limit reached for this agent (max 20)' });

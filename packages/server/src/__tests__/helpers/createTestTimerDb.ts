@@ -10,7 +10,6 @@ export function createTestTimerDb() {
     agent_id TEXT NOT NULL,
     agent_role TEXT NOT NULL,
     lead_id TEXT,
-    project_id TEXT,
     label TEXT NOT NULL,
     message TEXT NOT NULL,
     delay_seconds INTEGER NOT NULL,

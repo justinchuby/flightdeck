@@ -82,7 +82,7 @@ export class TimerRegistry extends EventEmitter {
   }
 
   /** Create a timer. Returns the timer or null if limit reached. */
-  create(agentId: string, input: TimerInput, agentRole = 'unknown', leadId: string | null = null, projectId: string | null = null): Timer | null {
+  create(agentId: string, input: TimerInput, agentRole = 'unknown', leadId: string | null = null): Timer | null {
     if (!Number.isFinite(input.delaySeconds) || input.delaySeconds < 0 || input.delaySeconds > 86400) {
       return null;
     }
@@ -98,7 +98,6 @@ export class TimerRegistry extends EventEmitter {
       agentId,
       agentRole,
       leadId,
-      projectId,
       label: input.label,
       message: input.message,
       delaySeconds: input.delaySeconds,
@@ -114,7 +113,6 @@ export class TimerRegistry extends EventEmitter {
       agentId: timer.agentId,
       agentRole: timer.agentRole,
       leadId: timer.leadId,
-      projectId: timer.projectId,
       label: timer.label,
       message: timer.message,
       delaySeconds: timer.delaySeconds,
@@ -213,7 +211,6 @@ export class TimerRegistry extends EventEmitter {
       agentId: row.agentId,
       agentRole: row.agentRole,
       leadId: row.leadId,
-      projectId: row.projectId ?? null,
       label: row.label,
       message: row.message,
       delaySeconds: row.delaySeconds,
