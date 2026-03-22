@@ -19,6 +19,7 @@ import {
   commitSchema,
   progressSchema,
 } from './commandSchemas.js';
+import { getProvider } from '@flightdeck/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -255,10 +256,16 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
       return;
     }
 
-    const coAuthor = 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>';
     const modelName = agent.model || agent.role.model || 'unknown';
-    const signoff = `Agent-signed-off: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName}]`;
-    const commitMsg = `${message}\n\n${signoff}\n${coAuthor}`;
+    const providerName = agent.provider || 'unknown';
+    const signoff = `Agent-signed-off: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName} via ${providerName}]`;
+
+    // Only include Co-authored-by trailer if the provider defines one
+    const providerDef = getProvider(providerName);
+    const coAuthorLine = providerDef?.coAuthoredBy;
+    const commitMsg = coAuthorLine
+      ? `${message}\n\n${signoff}\n${coAuthorLine}`
+      : `${message}\n\n${signoff}`;
 
     // Cross-platform: use execFile with args arrays (no shell quoting needed)
     await execFileAsync('git', ['add', ...files], { cwd, timeout: 30_000 })

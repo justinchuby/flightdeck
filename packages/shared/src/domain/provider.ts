@@ -111,6 +111,14 @@ export interface ProviderDefinition {
   /** Human-readable auth status label for UI */
   authLabel: string;
 
+  // ── Git Attribution ─────────────────────────────
+  /**
+   * Git trailer for commits made via this provider (e.g. Co-authored-by line).
+   * Only set for providers that require attribution in commit messages.
+   * When undefined, no Co-authored-by trailer is appended.
+   */
+  coAuthoredBy?: string;
+
   // ── UI Metadata ────────────────────────────────
   /** Tailwind color classes for branded elements */
   color: ProviderColors;
@@ -146,6 +154,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.6' },
     authCommand: 'gh auth status',
     authLabel: 'Authenticated via GitHub',
+    coAuthoredBy: 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>',
     color: { bg: 'bg-purple-500/15', text: 'text-purple-400', border: 'border-l-purple-500', tab: 'text-purple-400 border-purple-400' },
     docsUrl: 'https://docs.github.com/en/copilot/github-copilot-in-the-cli',
     setupLinks: [{ label: 'Documentation', url: 'https://github.com/features/copilot/cli' }],
