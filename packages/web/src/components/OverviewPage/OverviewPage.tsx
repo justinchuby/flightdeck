@@ -3,17 +3,22 @@
  *
  * Answers: "What needs my attention right now?"
  * - Quick Status Bar — running/stopped, agent count, task progress, duration
+ * - Accumulated Stats — cross-session agent/task/decision totals
  * - Session Controls — start/stop/resume
  * - Attention Items — alerts from detectAlerts (failed agents, pending decisions, blocked tasks)
  * - Two-column feed: Decisions + Progress (including milestones)
- * - Session History (collapsible, always visible)
+ * - Session History (prominent, always visible)
+ *
+ * Data sources:
+ * - REST APIs (projectId-scoped): decisions, activity, locks — cross-session
+ * - LeadStore (WebSocket): dagStatus — current active session only
  *
  * All visualization charts moved to AnalysisPage.
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
-import { useLeadStore } from '../../stores/leadStore';
+import { useLeadStore, resolveProject } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useProjects } from '../../hooks/useProjects';
 import { useProjectId } from '../../contexts/ProjectContext';
@@ -41,6 +46,7 @@ import {
   Pencil,
   Check,
   X,
+  History,
 } from 'lucide-react';
 import type { Decision } from '../../types';
 import { TokenUsageSection } from './TokenUsageSection';
@@ -55,8 +61,6 @@ const SEVERITY_BG: Record<AlertSeverity, string> = {
   warning: 'bg-amber-500/10 border border-amber-500/20',
   info: 'bg-blue-500/10 border border-blue-500/20',
 };
-
-const EMPTY_DECISIONS: Decision[] = [];
 
 // ── Component ──────────────────────────────────────────────────────
 
@@ -142,23 +146,12 @@ export function OverviewPage() {
     finally { setStopping(false); }
   }, [effectiveId]);
 
-  // ── Attention alerts ──────────────────────────────────────────
-  // The leadStore is keyed by leadId (agent ID), not projectId.
-  // Try activeLeadId first, fall back to effectiveId for compatibility.
+  // ── Live session data (current session DAG from LeadStore) ─────
   const activeLeadId = activeLeadAgent?.id ?? null;
   const dagStatus = useLeadStore(s => {
-    const proj = s.projects[activeLeadId ?? ''] ?? s.projects[effectiveId ?? ''];
+    const proj = resolveProject(s, activeLeadId) ?? resolveProject(s, effectiveId);
     return proj?.dagStatus ?? null;
   });
-  const storeDecisions = useLeadStore(s => {
-    const proj = s.projects[activeLeadId ?? ''] ?? s.projects[effectiveId ?? ''];
-    return proj?.decisions ?? EMPTY_DECISIONS;
-  });
-
-  const alerts = useMemo(
-    () => detectAlerts(projectAgents, storeDecisions, dagStatus),
-    [projectAgents, storeDecisions, dagStatus],
-  );
 
   // ── Decisions feed ────────────────────────────────────────────
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -185,7 +178,13 @@ export function OverviewPage() {
     [decisions],
   );
 
-  // ── Progress feed (activity only — lead-emitted progress reports) ──
+  // ── Attention alerts (cross-session: uses REST decisions) ─────
+  const alerts = useMemo(
+    () => detectAlerts(projectAgents, decisions, dagStatus),
+    [projectAgents, decisions, dagStatus],
+  );
+
+  // ── Activity feed (all types — used for progress feed + accumulated stats) ──
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
   // ── File locks ──
@@ -211,7 +210,7 @@ export function OverviewPage() {
     const poll = async () => {
       try {
         const data = await apiFetch<ActivityEntry[]>(
-          `/coordination/activity?projectId=${effectiveId}&type=progress_update`,
+          `/coordination/activity?projectId=${effectiveId}&limit=200`,
         );
         if (mountedRef.current) setActivity(Array.isArray(data) ? data : []);
       } catch { /* ignore */ }
@@ -221,7 +220,27 @@ export function OverviewPage() {
     return () => clearInterval(interval);
   }, [effectiveId]);
 
-  // ── Quick status bar data ─────────────────────────────────────
+  // ── Derived data: progress feed + accumulated stats ────────────
+  const progressActivity = useMemo(
+    () => activity.filter(a => a.actionType === 'progress_update'),
+    [activity],
+  );
+
+  const accumulatedStats = useMemo(() => {
+    const agentIds = new Set(activity.map(a => a.agentId));
+    for (const agent of projectAgents) agentIds.add(agent.id);
+    return {
+      totalAgents: agentIds.size,
+      totalTasksCompleted: activity.filter(a => a.actionType === 'task_completed').length,
+      totalDecisions: decisions.length,
+    };
+  }, [activity, decisions, projectAgents]);
+
+  const hasAccumulatedData = accumulatedStats.totalAgents > 0 ||
+    accumulatedStats.totalDecisions > 0 ||
+    accumulatedStats.totalTasksCompleted > 0;
+
+  // ── Quick status bar data (current session) ───────────────────
   const tasksDone = dagStatus?.summary?.done ?? 0;
   const tasksTotal = dagStatus?.summary
     ? dagStatus.summary.done + dagStatus.summary.running + dagStatus.summary.ready +
@@ -257,6 +276,25 @@ export function OverviewPage() {
           </span>
         )}
       </div>
+
+      {/* ── Accumulated Project Stats (all sessions) ──────────── */}
+      {hasAccumulatedData && (
+        <div
+          className="flex items-center gap-4 px-4 py-1.5 bg-th-bg/50 border border-th-border/50 rounded-md text-xs text-th-text-muted"
+          data-testid="accumulated-stats"
+        >
+          <span className="font-medium text-th-text-alt">All Sessions</span>
+          {accumulatedStats.totalAgents > 0 && (
+            <span>{accumulatedStats.totalAgents} agent{accumulatedStats.totalAgents !== 1 ? 's' : ''} total</span>
+          )}
+          {accumulatedStats.totalTasksCompleted > 0 && (
+            <span>{accumulatedStats.totalTasksCompleted} task{accumulatedStats.totalTasksCompleted !== 1 ? 's' : ''} completed</span>
+          )}
+          {accumulatedStats.totalDecisions > 0 && (
+            <span>{accumulatedStats.totalDecisions} decision{accumulatedStats.totalDecisions !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+      )}
 
       {/* ── Session Controls ───────────────────────────────────── */}
       {effectiveId && hasActiveLead && activeLeadAgent && (
@@ -441,11 +479,11 @@ export function OverviewPage() {
           <h3 className="text-xs font-medium text-th-text-muted uppercase tracking-wider px-4 py-2 border-b border-th-border">
             Recent Progress
           </h3>
-          {activity.length === 0 ? (
+          {progressActivity.length === 0 ? (
             <p className="text-th-text-muted text-sm px-4 py-6 text-center">No progress events yet</p>
           ) : (
             <div className="max-h-96 overflow-y-auto divide-y divide-th-border/30">
-              {activity.map(entry => (
+              {progressActivity.map(entry => (
                 <ActivityFeedItem
                   key={entry.id}
                   entry={entry}
@@ -468,13 +506,17 @@ export function OverviewPage() {
         </div>
       )}
 
-      {/* ── Session History (always visible, scrollable) ──────── */}
+      {/* ── Session History (prominent — multi-session context) ── */}
       {effectiveId && (
-        <div className="mt-2">
+        <section className="mt-4" data-testid="session-history-section">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-th-text mb-2">
+            <History size={14} className="text-th-text-muted" />
+            Session History
+          </h3>
           <SectionErrorBoundary name="Session history">
             <SessionHistory projectId={effectiveId} hasActiveLead={hasActiveLead} />
           </SectionErrorBoundary>
-        </div>
+        </section>
       )}
 
       </div>

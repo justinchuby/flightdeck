@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { GitBranch } from 'lucide-react';
-import { useLeadStore } from '../../stores/leadStore';
+import { useLeadStore, resolveProject } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { dagMinimapColor } from '../../utils/statusColors';
 import type { DagStatus } from '../../types';
@@ -57,14 +57,14 @@ function DagStatusBar({ summary }: { summary: DagStatus['summary'] }) {
 interface DagMinimapProps {
   /** Project UUID — used to fetch DAG from /projects/:id/dag */
   projectId: string;
-  /** Optional lead agent UUID — used as fallback store key */
+  /** Optional lead agent UUID — kept for backward compat but resolved via store alias */
   leadId?: string;
 }
 
 export function DagMinimap({ projectId, leadId }: DagMinimapProps) {
-  // Try store first (populated by LeadDashboard for live sessions)
+  // resolveProject handles the projectId→leadId mapping via the alias table
   const storeDag = useLeadStore((s) =>
-    s.projects[projectId]?.dagStatus ?? (leadId ? s.projects[leadId]?.dagStatus : null),
+    resolveProject(s, projectId)?.dagStatus ?? resolveProject(s, leadId)?.dagStatus ?? null,
   );
 
   // Fetch directly by projectId when store has no data
