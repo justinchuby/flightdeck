@@ -105,6 +105,12 @@ interface ChatMessagesProps {
   catchUpSummary: CatchUpSummary | null;
   onDismissCatchUp: () => void;
   onScrollToBottom: () => void;
+  /** Called when user scrolls to the top — load older messages */
+  onLoadOlder?: () => void;
+  /** Whether there are more older messages to load */
+  hasMore?: boolean;
+  /** Whether older messages are currently being fetched */
+  loadingOlder?: boolean;
 }
 
 /** Context passed to Virtuoso Footer for the working indicator */
@@ -127,6 +133,9 @@ export function ChatMessages({
   catchUpSummary,
   onDismissCatchUp,
   onScrollToBottom,
+  onLoadOlder,
+  hasMore,
+  loadingOlder,
 }: ChatMessagesProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
@@ -234,16 +243,35 @@ export function ChatMessages({
     return isAtBottom ? 'smooth' : false;
   }, []);
 
+  // Stable firstItemIndex — allows Virtuoso to prepend items without scroll jump.
+  // We use a large base value so prepended items get lower indices.
+  const FIRST_ITEM_INDEX = 100_000;
+  const firstItemIndex = FIRST_ITEM_INDEX - items.length;
+
+  const handleStartReached = useCallback(() => {
+    if (hasMore && !loadingOlder && onLoadOlder) {
+      onLoadOlder();
+    }
+  }, [hasMore, loadingOlder, onLoadOlder]);
+
   return (
     <div className="flex-1 relative min-h-0">
+      {loadingOlder && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-th-bg-alt/90 border border-th-border/50 text-xs font-mono text-th-text-muted shadow-lg">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Loading older messages…
+        </div>
+      )}
       <Virtuoso
         ref={virtuosoRef}
         className="absolute inset-0 [&>div]:p-4 [&>div]:space-y-1"
         data={items}
-        itemContent={itemContent}
+        firstItemIndex={firstItemIndex}
+        itemContent={(_index, item) => itemContent(_index, item)}
         context={context}
         components={{ Footer: ChatVirtuosoFooter }}
         followOutput={followOutput}
+        startReached={handleStartReached}
         increaseViewportBy={200}
         defaultItemHeight={32}
         overscan={200}

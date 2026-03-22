@@ -31,6 +31,7 @@ vi.mock('../../../stores/leadStore', () => ({
 // ── Message store mock ──────────────────────────────────────────
 
 const mockMergeHistory = vi.fn();
+const mockPrependHistory = vi.fn();
 let mockChannels: Record<string, { messages: any[] }> = {};
 
 vi.mock('../../../stores/messageStore', () => ({
@@ -43,6 +44,7 @@ vi.mock('../../../stores/messageStore', () => ({
       getState: () => ({
         channels: mockChannels,
         mergeHistory: mockMergeHistory,
+        prependHistory: mockPrependHistory,
       }),
     },
   ),
@@ -283,5 +285,101 @@ describe('useLeadMessages', () => {
     await waitFor(() => {
       expect(mockMergeHistory).toHaveBeenCalledWith('lead-1', expect.any(Array));
     });
+  });
+
+  it('returns hasMore=true after initial load with full page', async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/lead')) return Promise.resolve([]);
+      if (url.includes('/messages')) {
+        const msgs = Array.from({ length: 200 }, (_, i) => ({
+          id: i + 1,
+          content: `Msg ${i}`,
+          sender: 'agent',
+          timestamp: new Date(1000 + i).toISOString(),
+        }));
+        return Promise.resolve({ messages: msgs, hasMore: true });
+      }
+      return Promise.resolve({ messages: [] });
+    });
+
+    const { result } = renderHook(
+      () => useLeadMessages('lead-1', false, makeWs(), makeScrollRef()),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+  });
+
+  it('loadOlderMessages calls API with before cursor and prepends results', async () => {
+    let callCount = 0;
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/lead')) return Promise.resolve([]);
+      if (url.includes('/messages') && url.includes('before=')) {
+        // Pagination request
+        return Promise.resolve({
+          messages: [
+            { id: 1, content: 'Old msg', sender: 'agent', timestamp: new Date(500).toISOString() },
+          ],
+          hasMore: false,
+        });
+      }
+      if (url.includes('/messages')) {
+        callCount++;
+        return Promise.resolve({
+          messages: [
+            { id: 10, content: 'Recent', sender: 'agent', timestamp: new Date(1000).toISOString() },
+          ],
+          hasMore: true,
+        });
+      }
+      return Promise.resolve({ messages: [] });
+    });
+
+    const { result } = renderHook(
+      () => useLeadMessages('lead-1', false, makeWs(), makeScrollRef()),
+      { wrapper: createWrapper() },
+    );
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(true);
+    });
+
+    // Trigger load older
+    await act(async () => {
+      await result.current.loadOlderMessages();
+    });
+
+    expect(mockPrependHistory).toHaveBeenCalledWith('lead-1', expect.any(Array));
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  it('resets pagination state when switching leads', async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/lead')) return Promise.resolve([]);
+      if (url.includes('/messages')) {
+        return Promise.resolve({
+          messages: [{ id: 5, content: 'Msg', sender: 'agent', timestamp: new Date(1000).toISOString() }],
+          hasMore: false,
+        });
+      }
+      return Promise.resolve({ messages: [] });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ leadId }: { leadId: string | null }) =>
+        useLeadMessages(leadId, false, makeWs(), makeScrollRef()),
+      { wrapper: createWrapper(), initialProps: { leadId: 'lead-1' } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.hasMore).toBe(false);
+    });
+
+    // Switch lead — hasMore should reset to true
+    rerender({ leadId: 'lead-2' });
+    expect(result.current.hasMore).toBe(true);
   });
 });

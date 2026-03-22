@@ -149,4 +149,61 @@ describe('ConversationStore', () => {
       expect(messages[0].fromRole).toBe('Reviewer (def67890)');
     });
   });
+
+  describe('getMessagesBefore', () => {
+    it('returns messages older than the cursor ID', () => {
+      const thread = store.createThread('agent-1');
+      const m1 = store.addMessage(thread.id, 'user', 'First');
+      const m2 = store.addMessage(thread.id, 'agent', 'Second');
+      const m3 = store.addMessage(thread.id, 'user', 'Third');
+
+      // getMessagesBefore returns desc order (newest first) — caller reverses
+      const before = store.getMessagesBefore('agent-1', m3.id);
+      expect(before.length).toBe(2);
+      expect(before[0].content).toBe('Second');
+      expect(before[1].content).toBe('First');
+    });
+
+    it('respects the limit parameter', () => {
+      const thread = store.createThread('agent-1');
+      for (let i = 0; i < 10; i++) {
+        store.addMessage(thread.id, 'user', `Message ${i}`);
+      }
+      const allMsgs = store.getRecentMessages('agent-1', 100);
+      const lastId = allMsgs[0].id; // highest ID (desc order)
+
+      const before = store.getMessagesBefore('agent-1', lastId, 3);
+      expect(before.length).toBe(3);
+    });
+
+    it('returns empty array when no older messages exist', () => {
+      const thread = store.createThread('agent-1');
+      const m1 = store.addMessage(thread.id, 'user', 'Only message');
+
+      const before = store.getMessagesBefore('agent-1', m1.id);
+      expect(before.length).toBe(0);
+    });
+
+    it('does not return messages from other agents', () => {
+      const t1 = store.createThread('agent-1');
+      const t2 = store.createThread('agent-2');
+      store.addMessage(t1.id, 'user', 'Agent 1 msg');
+      store.addMessage(t2.id, 'user', 'Agent 2 msg');
+      const m3 = store.addMessage(t1.id, 'user', 'Agent 1 msg 2');
+
+      const before = store.getMessagesBefore('agent-1', m3.id);
+      expect(before.length).toBe(1);
+      expect(before[0].content).toBe('Agent 1 msg');
+    });
+
+    it('preserves fromRole in paginated results', () => {
+      const thread = store.createThread('agent-1');
+      store.addMessage(thread.id, 'external', 'DM content', 'Developer (abc12345)');
+      const m2 = store.addMessage(thread.id, 'agent', 'Response');
+
+      const before = store.getMessagesBefore('agent-1', m2.id);
+      expect(before.length).toBe(1);
+      expect(before[0].fromRole).toBe('Developer (abc12345)');
+    });
+  });
 });

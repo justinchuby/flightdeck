@@ -135,28 +135,54 @@ export function agentsRoutes(ctx: AppContext): Router {
   router.get('/agents/:id/messages', (req, res) => {
     const limit = Math.min(parseInt(String(req.query.limit) || '200', 10) || 200, 1000);
     const includeSystem = req.query.includeSystem === 'true';
+    const beforeId = req.query.before ? parseInt(String(req.query.before), 10) : undefined;
     const agentId = req.params.id as string;
 
-    // Get messages for this agent
-    let messages = agentManager.getMessageHistory(agentId, limit);
+    let messages: ReturnType<typeof agentManager.getMessageHistory>;
     let fromPriorSession = false;
+    let resolvedAgentId = agentId;
 
-    // For resumed sessions: also include messages from prior sessions of the same project
-    if (messages.length === 0 && ctx.projectRegistry) {
-      const agent = agentManager.get(agentId);
-      const projectId = agent?.projectId;
-      if (projectId) {
-        const sessions = ctx.projectRegistry.getSessions(projectId);
-        // Sessions are ordered by recency (newest first from getSessions)
-        const priorLeadIds = sessions
-          .map(s => s.leadId)
-          .filter(id => id !== agentId);
-        for (const leadId of priorLeadIds) {
-          const prior = agentManager.getMessageHistory(leadId, limit);
-          if (prior.length > 0) {
-            messages = prior;
-            fromPriorSession = true;
-            break;
+    if (beforeId != null && !isNaN(beforeId)) {
+      // Cursor-based pagination: get messages older than beforeId
+      messages = agentManager.getMessagesBefore(agentId, beforeId, limit);
+
+      // Try prior sessions if empty
+      if (messages.length === 0 && ctx.projectRegistry) {
+        const agent = agentManager.get(agentId);
+        const projectId = agent?.projectId;
+        if (projectId) {
+          const sessions = ctx.projectRegistry.getSessions(projectId);
+          const priorLeadIds = sessions.map(s => s.leadId).filter(id => id !== agentId);
+          for (const leadId of priorLeadIds) {
+            const prior = agentManager.getMessagesBefore(leadId, beforeId, limit);
+            if (prior.length > 0) {
+              messages = prior;
+              fromPriorSession = true;
+              resolvedAgentId = leadId;
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      // Initial load: get most recent messages
+      messages = agentManager.getMessageHistory(agentId, limit);
+
+      // For resumed sessions: also include messages from prior sessions of the same project
+      if (messages.length === 0 && ctx.projectRegistry) {
+        const agent = agentManager.get(agentId);
+        const projectId = agent?.projectId;
+        if (projectId) {
+          const sessions = ctx.projectRegistry.getSessions(projectId);
+          const priorLeadIds = sessions.map(s => s.leadId).filter(id => id !== agentId);
+          for (const leadId of priorLeadIds) {
+            const prior = agentManager.getMessageHistory(leadId, limit);
+            if (prior.length > 0) {
+              messages = prior;
+              fromPriorSession = true;
+              resolvedAgentId = leadId;
+              break;
+            }
           }
         }
       }
@@ -167,7 +193,10 @@ export function agentsRoutes(ctx: AppContext): Router {
       messages = messages.filter(m => m.sender !== 'system');
     }
 
-    res.json({ agentId, messages, fromPriorSession });
+    // hasMore: true if we got a full page (may have more older messages)
+    const hasMore = messages.length >= limit;
+
+    res.json({ agentId: resolvedAgentId, messages, fromPriorSession, hasMore });
   });
 
   router.post('/agents/:id/input', validateBody(agentInputSchema), (req, res) => {
