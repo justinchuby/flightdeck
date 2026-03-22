@@ -126,7 +126,9 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
     events = events.filter(e => e.id !== 0);
 
-    // Resolve crew membership for leadId filtering
+    // Resolve crew membership for leadId filtering.
+    // When leadId is an agent UUID, this scopes to a single session's crew.
+    // When leadId is a project slug, the fallback includes agents from all sessions.
     const crewAgentIds = new Set<string>();
     if (leadId) {
       const resolved = getCrewIds(agentManager.getAll(), leadId);

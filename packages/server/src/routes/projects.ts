@@ -147,7 +147,7 @@ export function projectsRoutes(ctx: AppContext): Router {
     const rosterAgents = ctx.agentRoster?.getAllAgents() ?? [];
 
     const detailed = sessions.map((session: any) => {
-      // Agent composition: filter roster to crew members via isCrewMember
+      // Agent composition: filter roster to this session's crew members
       const agents = rosterAgents
         .filter(a => {
           const meta = a.metadata ?? {} as Record<string, unknown>;
