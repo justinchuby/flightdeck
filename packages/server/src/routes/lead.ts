@@ -83,6 +83,7 @@ export function leadRoutes(ctx: AppContext): Router {
       // (via the prompt_complete → _drainOneMessage pipeline).
       if (!resumingProject && task) {
         logger.info('lead', `Queuing initial task for ${agent.id.slice(0, 8)}: "${task.slice(0, 80)}"`);
+        agentManager.persistHumanMessage(agent.id, task);
         agent.queueMessage(task);
       }
 

@@ -261,7 +261,8 @@ export class SessionExporter {
     const history = this.agentManager.getMessageHistory(agent.id, 10_000);
     if (history.length > 0) {
       for (const msg of history) {
-        lines.push(`### [${msg.timestamp}] ${msg.sender}`);
+        const role = msg.fromRole ? ` (${msg.fromRole})` : '';
+        lines.push(`### [${msg.timestamp}] ${msg.sender}${role}`);
         lines.push('');
         lines.push(msg.content);
         lines.push('');

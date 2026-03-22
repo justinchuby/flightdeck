@@ -286,6 +286,30 @@ describe('SessionExporter', () => {
     expect(summary).toContain('Done: 1');
   });
 
+  it('includes fromRole in exported conversation headers', () => {
+    const lead = createAgent({ id: 'lead-001', roleName: 'lead', parentId: null });
+    const history = [
+      { id: 1, conversationId: 'c1', sender: 'user', content: 'Build the feature', fromRole: undefined, timestamp: '2026-01-01T00:00:00Z' },
+      { id: 2, conversationId: 'c1', sender: 'assistant', content: 'On it!', fromRole: 'developer', timestamp: '2026-01-01T00:01:00Z' },
+      { id: 3, conversationId: 'c1', sender: 'external', content: 'Status update', fromRole: 'architect', timestamp: '2026-01-01T00:02:00Z' },
+    ];
+    const mgr = createMockAgentManager([lead], history);
+
+    const exporter = new SessionExporter(mgr, activityLedger, decisionLog, taskDAG, chatGroupRegistry);
+    const result = exporter.export('lead-001', outputDir);
+
+    const agentFile = result.files.find(f => f.includes('lead-001'));
+    expect(agentFile).toBeDefined();
+    const content = readFileSync(join(result.outputDir, agentFile!), 'utf-8');
+
+    // Messages with fromRole should include it in the header
+    expect(content).toContain('assistant (developer)');
+    expect(content).toContain('external (architect)');
+    // Messages without fromRole should NOT have extra parens
+    expect(content).toMatch(/\] user\n/);
+    expect(content).not.toContain('user ()');
+  });
+
   it('summary includes confirmed decisions', () => {
     const lead = createAgent({ id: 'lead-001', roleName: 'lead', parentId: null });
     const mgr = createMockAgentManager([lead]);
