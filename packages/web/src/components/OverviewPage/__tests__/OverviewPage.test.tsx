@@ -378,7 +378,7 @@ describe('OverviewPage', () => {
 
   it('renders activity feed items from API data', async () => {
     const activities = [
-      { id: 'a1', summary: 'Built auth module', action: 'progress_update', timestamp: '2024-01-01' },
+      { id: 'a1', agentId: 'agent-1', summary: 'Built auth module', actionType: 'progress_update', timestamp: '2024-01-01' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/coordination/activity')) return Promise.resolve(activities);
@@ -394,7 +394,7 @@ describe('OverviewPage', () => {
 
   it('opens activity detail modal on activity click', async () => {
     const activities = [
-      { id: 'a1', summary: 'Built auth module', action: 'progress_update', timestamp: '2024-01-01' },
+      { id: 'a1', agentId: 'agent-1', summary: 'Built auth module', actionType: 'progress_update', timestamp: '2024-01-01' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/coordination/activity')) return Promise.resolve(activities);
@@ -412,7 +412,7 @@ describe('OverviewPage', () => {
 
   it('closes activity detail modal on close button', async () => {
     const activities = [
-      { id: 'a1', summary: 'Built auth module', action: 'progress_update', timestamp: '2024-01-01' },
+      { id: 'a1', agentId: 'agent-1', summary: 'Built auth module', actionType: 'progress_update', timestamp: '2024-01-01' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/coordination/activity')) return Promise.resolve(activities);
@@ -502,5 +502,85 @@ describe('OverviewPage', () => {
     await renderPage();
     // Should find the data via leadId key, showing "7/8 tasks"
     expect(screen.getByText('7/8 tasks')).toBeInTheDocument();
+  });
+
+  // ── Accumulated stats (cross-session) ───────────────────────────
+
+  it('shows accumulated stats when activity and decisions exist', async () => {
+    const activities = [
+      { id: 1, agentId: 'agent-1', agentRole: 'developer', actionType: 'progress_update', summary: 'Built feature', timestamp: '2024-01-01', projectId: 'proj-1' },
+      { id: 2, agentId: 'agent-2', agentRole: 'developer', actionType: 'task_completed', summary: 'Done task', timestamp: '2024-01-01', projectId: 'proj-1' },
+      { id: 3, agentId: 'agent-3', agentRole: 'lead', actionType: 'task_completed', summary: 'Done task 2', timestamp: '2024-01-01', projectId: 'proj-1' },
+    ];
+    const decisions = [
+      { id: 'd1', title: 'Use TS', status: 'recorded', needsConfirmation: false, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/coordination/activity')) return Promise.resolve(activities);
+      if (path.includes('/decisions')) return Promise.resolve(decisions);
+      return Promise.resolve([]);
+    });
+
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('accumulated-stats')).toBeInTheDocument();
+    });
+    expect(screen.getByText('All Sessions')).toBeInTheDocument();
+    expect(screen.getByText(/3 agents total/)).toBeInTheDocument();
+    expect(screen.getByText(/2 tasks completed/)).toBeInTheDocument();
+    expect(screen.getByText(/1 decision/)).toBeInTheDocument();
+  });
+
+  it('hides accumulated stats when no activity or decisions', async () => {
+    await renderPage();
+    expect(screen.queryByTestId('accumulated-stats')).not.toBeInTheDocument();
+  });
+
+  it('filters progress feed to progress_update events only', async () => {
+    const activities = [
+      { id: 1, agentId: 'agent-1', agentRole: 'developer', actionType: 'progress_update', summary: 'Progress report', timestamp: '2024-01-01', projectId: 'proj-1' },
+      { id: 2, agentId: 'agent-2', agentRole: 'developer', actionType: 'task_completed', summary: 'Task done', timestamp: '2024-01-01', projectId: 'proj-1' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/coordination/activity')) return Promise.resolve(activities);
+      return Promise.resolve([]);
+    });
+
+    await renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Progress report')).toBeInTheDocument();
+    });
+    // task_completed should NOT appear in the progress feed
+    expect(screen.queryByText('Task done')).not.toBeInTheDocument();
+  });
+
+  // ── Session history section ─────────────────────────────────────
+
+  it('renders session history with prominent section header', async () => {
+    await renderPage();
+    expect(screen.getByTestId('session-history-section')).toBeInTheDocument();
+    expect(screen.getByText('Session History')).toBeInTheDocument();
+  });
+
+  // ── Alerts use cross-session decisions ──────────────────────────
+
+  it('passes REST-fetched decisions to detectAlerts', async () => {
+    const decisions = [
+      { id: 'd1', title: 'Pending', status: 'recorded', needsConfirmation: true, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
+    ];
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/decisions')) return Promise.resolve(decisions);
+      return Promise.resolve([]);
+    });
+    useAppStore.setState({ agents: [makeAgent()] });
+
+    await renderPage();
+    await waitFor(() => {
+      // detectAlerts should be called with the REST-fetched decisions (not store decisions)
+      const calls = vi.mocked(detectAlerts).mock.calls;
+      expect(calls.some(call =>
+        Array.isArray(call[1]) && call[1].some((d: Decision) => d.id === 'd1'),
+      )).toBe(true);
+    });
   });
 });
