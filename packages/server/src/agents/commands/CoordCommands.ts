@@ -19,7 +19,7 @@ import {
   commitSchema,
   progressSchema,
 } from './commandSchemas.js';
-import { getProvider, shortAgentId } from '@flightdeck/shared';
+import { getProvider } from '@flightdeck/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -258,7 +258,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
     const modelName = agent.model || agent.role.model || 'unknown';
     const providerName = agent.provider || 'unknown';
-    const signoff = `Agent-signed-off: ${agent.role.name} (${shortAgentId(agent.id)}) [${modelName} via ${providerName}]`;
+    const signoff = `Agent-signed-off: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName} via ${providerName}]`;
 
     // Only include Co-authored-by trailer if the provider defines one
     const providerDef = getProvider(providerName);

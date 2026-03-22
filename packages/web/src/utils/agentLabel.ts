@@ -1,12 +1,17 @@
 /**
  * Agent label formatting utilities — shared across all agent UI components.
  *
- * shortAgentId and SHORT_ID_LENGTH are re-exported from @flightdeck/shared
- * so existing imports (`from '../utils/agentLabel'`) continue to work.
+ * Provides consistent agent ID shortening and role label formatting.
+ * Standard short ID length is 8 characters (enough for uniqueness in UUIDs).
  */
 
-export { shortAgentId, SHORT_ID_LENGTH } from '@flightdeck/shared';
-import { shortAgentId } from '@flightdeck/shared';
+/** Standard short ID length used across the UI. */
+export const SHORT_ID_LENGTH = 8;
+
+/** Shorten an agent ID for display. Default 8 chars. */
+export function shortAgentId(agentId: string, length: number = SHORT_ID_LENGTH): string {
+  return agentId.slice(0, length);
+}
 
 /** Title-case a string (e.g., 'project_lead' → 'Project Lead'). */
 function toTitleCase(s: string): string {
