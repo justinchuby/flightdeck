@@ -499,27 +499,23 @@ function wireEvents(c: ServiceContainer): void {
     },
   });
 
-  // Timer events → agent message delivery + WS broadcast
-  // Timers are session-scoped (leadId). Resolve projectId from the lead agent for WS routing.
+  // Timer events → direct agent message delivery (no broadcast)
+  // Timers deliver to the specific agent that created them.
   timerRegistry.on('timer:fired', (timer: { agentId: string; label: string; message: string; leadId?: string | null }) => {
     const agent = agentManager.get(timer.agentId);
-    const projectId = agentManager.getProjectIdForAgent(timer.leadId ?? timer.agentId)
-      ?? agentManager.getProjectIdForAgent(timer.agentId);
-    runWithAgentContext(timer.agentId, agent?.role.name ?? 'unknown', projectId, () => {
-      if (agent && agent.status !== 'completed' && agent.status !== 'failed' && agent.status !== 'terminated') {
-        agent.queueMessage(`[System Timer "${timer.label}"] ${timer.message}`);
-      }
-      c.internal.wsServer?.broadcastEvent({ type: 'timer:fired', timer }, projectId);
-    });
+    if (agent && agent.status !== 'completed' && agent.status !== 'failed' && agent.status !== 'terminated') {
+      agent.queueMessage(`[System Timer "${timer.label}"] ${timer.message}`);
+    } else {
+      logger.warn({ module: 'timer', msg: 'Timer fired but agent unavailable', label: timer.label, agentId: timer.agentId, agentStatus: agent?.status ?? 'not found' });
+    }
   });
+  // UI notifications for timer lifecycle (created/cancelled) — project-scoped for the timer panel
   timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string; leadId?: string | null }) => {
-    const projectId = agentManager.getProjectIdForAgent(timer.leadId ?? timer.agentId)
-      ?? agentManager.getProjectIdForAgent(timer.agentId);
+    const projectId = agentManager.getProjectIdForAgent(timer.agentId);
     c.internal.wsServer?.broadcastEvent({ type: 'timer:created', timer }, projectId);
   });
   timerRegistry.on('timer:cancelled', (timer: { id: string; agentId: string; label: string; leadId?: string | null }) => {
-    const projectId = agentManager.getProjectIdForAgent(timer.leadId ?? timer.agentId)
-      ?? agentManager.getProjectIdForAgent(timer.agentId);
+    const projectId = agentManager.getProjectIdForAgent(timer.agentId);
     c.internal.wsServer?.broadcastEvent({ type: 'timer:cancelled', timer }, projectId);
   });
 
