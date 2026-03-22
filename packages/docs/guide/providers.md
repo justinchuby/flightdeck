@@ -12,6 +12,8 @@ Flightdeck uses a multi-provider architecture that lets you swap between AI codi
 | **Codex (ACP)** | 🤖 | `codex-acp` | `OPENAI_API_KEY` | GA |
 | **Cursor** | ↗️ | `agent` | `CURSOR_API_KEY` | Preview |
 | **OpenCode** | 🔓 | `opencode` | None (manages own keys) | Preview |
+| **Kimi CLI** | 🌙 | `kimi` | None (uses `kimi login`) | GA |
+| **Qwen Code** | 🔮 | `qwen` | None (Qwen OAuth or `OPENAI_API_KEY`) | GA |
 
 ## Configuration
 
@@ -19,7 +21,7 @@ Set your active provider in `flightdeck.config.yaml`:
 
 ```yaml
 provider:
-  id: copilot    # One of: copilot, gemini, claude, codex, cursor, opencode
+  id: copilot    # One of: copilot, gemini, claude, codex, cursor, opencode, kimi, qwen-code
 ```
 
 ### Config File Locations

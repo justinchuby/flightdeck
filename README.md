@@ -8,14 +8,14 @@
 
 **One command. A whole engineering crew.**
 
-Flightdeck is the orchestration layer for AI coding agents — like Kubernetes for AI workers. It coordinates crews of agents working in parallel on your codebase, each with a specialized role, its own context window, and structured communication channels.
+Flightdeck is the orchestration layer for AI coding agents. It coordinates crews of agents working in parallel on your codebase, each with a specialized role, its own context window, and structured communication channels.
 
 ```bash
 npm install -g @flightdeck-ai/flightdeck
 flightdeck
 ```
 
-Give it a task, and a **Project Lead** agent breaks it down into a dependency graph, assembles the right specialists (developers, architects, reviewers, and more), and coordinates their parallel execution while you stay in the loop through a real-time web dashboard. Works with **GitHub Copilot**, **Claude Code**, **Gemini CLI**, **Codex**, **Cursor**, and **OpenCode** — mix and match providers in the same crew.
+Give it a task, and a **Project Lead** agent breaks it down into a dependency graph, assembles the right specialists (developers, architects, reviewers, and more), and coordinates their parallel execution while you stay in the loop through a real-time web dashboard. Works with **GitHub Copilot**, **Claude Code**, **Gemini CLI**, **Codex**, **Cursor**, **OpenCode**, **Kimi**, and **Qwen Code** — mix and match providers in the same crew.
 
 <!-- TODO: Replace with a demo GIF or link to a short video showing project creation → agents working → decision approval -->
 
@@ -27,8 +27,8 @@ Give it a task, and a **Project Lead** agent breaks it down into a dependency gr
 | **Context** | One shared context window | Each agent has its own context |
 | **Quality** | No built-in review | Reviewer catches issues while developer codes |
 | **Knowledge** | Lost between sessions | Persistent knowledge base carries forward |
-| **Providers** | Locked to one | Mix 6 providers in the same crew |
-| **Oversight** | All or nothing | Trust Dial: supervised → balanced → autonomous |
+| **Providers** | Locked to one | Mix 8 providers in the same crew |
+| **Oversight** | Manual intervention or full trust | Trust Dial: supervised → balanced → autonomous |
 
 ### Screenshots
 
@@ -68,7 +68,7 @@ Give it a task, and a **Project Lead** agent breaks it down into a dependency gr
 ### Prerequisites
 
 - **Node.js 20+** — [Download](https://nodejs.org)
-- **At least one AI coding CLI** — [GitHub Copilot](https://docs.github.com/en/copilot), [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex](https://github.com/openai/codex), [Cursor](https://www.cursor.com/), or [OpenCode](https://github.com/opencode-ai/opencode)
+- **At least one AI coding CLI** — [GitHub Copilot](https://docs.github.com/en/copilot), [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex](https://github.com/openai/codex), [Cursor](https://www.cursor.com/), [OpenCode](https://github.com/opencode-ai/opencode), [Kimi](https://github.com/MoonshotAI/kimi-cli), or [Qwen Code](https://github.com/QwenLM/qwen-code)
 
 ### Install & Run
 
@@ -116,10 +116,10 @@ npm run dev
 
 ### 🎯 Multi-Agent Crew Orchestration
 - **Project Lead** — Breaks down tasks, assembles a crew, creates a task DAG, delegates work, and synthesizes results
-- **13 Specialized Roles** — Developer, Architect, Code Reviewer, Critical Reviewer, Tech Writer, QA Tester, and more (see [Agent Roles](#agent-roles))
+- **14 Specialized Roles** — Developer, Architect, Code Reviewer, Critical Reviewer, Readability Reviewer, Tech Writer, QA Tester, and more (see [Agent Roles](#agent-roles))
 - **Task DAG** — Declarative task scheduling with dependencies; agents work in parallel when possible, sequentially when required
 - **Human-in-the-Loop** — Message any agent directly; queue, reorder, or remove messages before delivery
-- **6 AI Providers** — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, OpenCode — mix and match in the same crew
+- **8 AI Providers** — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, OpenCode, Kimi, Qwen Code — mix and match in the same crew
 
 ### 🔒 Coordination & Safety
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
@@ -199,18 +199,18 @@ Flightdeck uses a **three-tier architecture** with clear separation of concerns:
 ┌───────────────────────▼──────────────────────────────────────────┐
 │                    Agent Server (Daemon)                          │
 │  Spawns & manages CLI agent processes via ACP protocol           │
-│  Copilot · Claude · Gemini · Codex · Cursor · OpenCode          │
+│  Copilot · Claude · Gemini · Codex · Cursor · OpenCode · Kimi · Qwen  │
 │  Per-agent lifecycle · Auto-restart · Heartbeat monitoring        │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ### How the tiers interact
 
-1. **Client ↔ Orchestration Server** — The React frontend communicates with the Express server via REST endpoints (43 route modules covering agents, projects, sessions, tasks, decisions, knowledge, etc.) and a persistent WebSocket connection on `/ws` for real-time updates. WebSocket events are batched and throttled (agent text flushed every 100ms).
+1. **Client ↔ Orchestration Server** — The React frontend communicates with the Express server via REST endpoints (28 route modules covering agents, projects, sessions, tasks, decisions, knowledge, etc.) and a persistent WebSocket connection on `/ws` for real-time updates. WebSocket events are batched and throttled (agent text flushed every 100ms).
 
-2. **Orchestration Server ↔ Agent Server** — The orchestration server forks the agent server as a detached child process, communicating via stdio and monitoring health with heartbeat pings. The agent server manages individual CLI agent processes (Copilot, Claude, Gemini, Codex, Cursor, OpenCode) through the ACP (Agent Client Protocol) — each agent runs as a separate subprocess with its own context window and role.
+2. **Orchestration Server ↔ Agent Server** — The orchestration server forks the agent server as a detached child process, communicating via stdio and monitoring health with heartbeat pings. The agent server manages individual CLI agent processes (Copilot, Claude, Gemini, Codex, Cursor, OpenCode, Kimi, Qwen Code) through the ACP (Agent Client Protocol) — each agent runs as a separate subprocess with its own context window and role.
 
-3. **Command flow** — Agents emit structured commands (wrapped in doubled Unicode brackets) in their output stream. The `CommandDispatcher` parses these and routes them to 10 domain-specific command modules (`AgentCommands`, `TaskCommands`, `CommCommands`, etc.). The `GovernancePipeline` intercepts commands through ordered hooks: security → permission → validation → rate-limit → policy → approval, with post-hooks for audit and metrics.
+3. **Command flow** — Agents emit structured commands (wrapped in doubled Unicode brackets) in their output stream. The `CommandDispatcher` parses these and routes them to 9 domain-specific command modules (`AgentCommands`, `TaskCommands`, `CommCommands`, etc.). The `GovernancePipeline` intercepts commands through ordered hooks: security → permission → validation → rate-limit → policy → approval, with post-hooks for audit and metrics.
 
 ### Monorepo structure
 
@@ -225,8 +225,8 @@ Flightdeck uses a **three-tier architecture** with clear separation of concerns:
 
 | Component | Responsibility |
 |-----------|---------------|
-| **AgentManager** | Spawns agents, routes messages, manages delegations. 25+ typed events. Cascade termination with visited-set guard. |
-| **CommandDispatcher** | Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output, routes to 10 command modules. |
+| **AgentManager** | Spawns agents, routes messages, manages delegations. Cascade termination with visited-set guard. |
+| **CommandDispatcher** | Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output, routes to 9 command modules. |
 | **GovernancePipeline** | Single interception point for all commands — pre-hooks (security, permission, validation, rate-limit, policy, approval) and post-hooks (audit, metrics). |
 | **TaskDAG + EagerScheduler** | Directed acyclic graph for task scheduling with dependency resolution, parallel analysis, and eager pre-assignment of ready tasks. |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation. |
@@ -250,7 +250,7 @@ Flightdeck uses layered configuration: **hardcoded defaults ← YAML config ← 
 
 ```yaml
 server:
-  maxConcurrentAgents: 50        # 1–200
+  maxConcurrentAgents: 50        # 1–1000
 
 heartbeat:
   idleThresholdMs: 60000         # Idle agent detection threshold
@@ -265,7 +265,7 @@ models:
     # ... (14 roles total)
 
 provider:
-  id: copilot                    # Active provider: copilot | claude | gemini | codex | cursor | opencode
+  id: copilot                    # Active provider: copilot | claude | gemini | codex | cursor | opencode | kimi | qwen-code
 
 budget:
   limit: null                    # null = unlimited; set a dollar amount to cap spend
@@ -284,14 +284,14 @@ See [`flightdeck.config.example.yaml`](flightdeck.config.example.yaml) for the f
 | `PORT` | `3001` | Server port |
 | `HOST` | `127.0.0.1` | Bind address |
 | `DB_PATH` | `./flightdeck.db` | SQLite database location |
-| `CLI_PROVIDER` | `copilot` | Agent provider (`copilot`, `claude`, `gemini`, `codex`, `cursor`, `opencode`) |
+| `CLI_PROVIDER` | `copilot` | Agent provider (`copilot`, `claude`, `gemini`, `codex`, `cursor`, `opencode`, `kimi`, `qwen-code`) |
 | `ANTHROPIC_API_KEY` | — | Required for Claude provider |
 | `GEMINI_API_KEY` | — | Required for Gemini provider |
 | `OPENAI_API_KEY` | — | Required for Codex provider |
 | `TELEGRAM_BOT_TOKEN` | — | Telegram integration (optional) |
 | `AUTH` | enabled | Set to `none` to disable authentication |
 | `SERVER_SECRET` | auto-generated | Fixed auth token (optional) |
-| `MAX_AGENTS` | `50` | Max concurrent agents (1–200) |
+| `MAX_AGENTS` | `50` | Max concurrent agents (1–1000) |
 | `FLIGHTDECK_CONFIG` | — | Path to YAML config file |
 
 ## Agent Roles
@@ -305,6 +305,7 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 | **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | Claude Opus 4.6 |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
 | **Critical Reviewer** | 🛡️ | Secure-by-design review, performance, edge cases | Gemini 3 Pro |
+| **Readability Reviewer** | 👓 | Naming, code organization, documentation, simplicity, consistency | Gemini 3 Pro |
 | **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.3 Codex |
 | **Technical Writer** | 📝 | Documentation, API design review, developer experience | GPT-5.2 |
 | **Designer** | 🎨 | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
@@ -410,7 +411,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | **Timeline** | Swim-lane visualization — filter by role/comm-type/status, brush time selector, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, idle hatch patterns, hover tooltips |
 | **Group Chat** | Tabbed group chat with human participation, project-level tab grouping, real-time messaging |
 | **Overview** | Progress tracking, decision timeline grouped by project, global search |
-| **Settings** | Concurrency limits (1–50 agents), model defaults, theme (Light/Dark/System), custom role editor, draggable dashboard panel layout |
+| **Settings** | Concurrency limits, model defaults, theme (Light/Dark/System), custom role editor, draggable dashboard panel layout |
 
 ## Tech Stack
 
@@ -420,7 +421,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 - **Security**: Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
-- **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
+- **Events**: Typed event bus (TypedEmitter) with strongly-typed events
 - **Testing**: Vitest with v8 coverage, Codecov integration
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
 
@@ -446,7 +447,6 @@ Flightdeck has extensive documentation across guides, references, and design doc
 | [Database Schema](packages/docs/reference/database.md) | SQLite schema and Drizzle ORM |
 | [Architecture Decisions](packages/docs/reference/architecture-decisions.md) | Key ADRs |
 | [WebSocket Events](packages/docs/reference/websocket.md) | Real-time event reference |
-| [Governance](packages/docs/reference/governance.md) | Governance pipeline and hooks |
 
 ## Screenshots
 
@@ -461,6 +461,10 @@ Flightdeck has extensive documentation across guides, references, and design doc
 <img width="1412" height="826" alt="Agent fleet and controls" src="https://github.com/user-attachments/assets/14c5d4c1-b7fa-45a4-9027-393b46cc224f" />
 
 <img width="1406" height="817" alt="Settings and custom role editor" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
+
+## Built by AI
+
+Flightdeck is purely AI-created with human supervision. Every line of code, test, and documentation was written by AI agents coordinated through Flightdeck itself — a real-world demonstration of multi-agent software development.
 
 ## Contributing
 
