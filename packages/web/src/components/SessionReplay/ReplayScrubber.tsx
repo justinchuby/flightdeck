@@ -250,16 +250,16 @@ export function ReplayScrubber({ leadId, replay: externalReplay, liveMode, onExi
           <span className="flex items-center gap-1 text-th-text-muted">
             {worldState.agents.filter((a) => a.status === 'running').length} running
           </span>
-          {worldState.totalTasks > 0 && (
+          {(worldState.dagTasks ?? []).length > 0 && (
             <span className="flex items-center gap-1 text-th-text-muted">
               <CheckCircle2 className="w-3 h-3" />
-              {worldState.completedTasks}/{worldState.totalTasks} tasks
+              {(worldState.dagTasks ?? []).filter(t => t.dagStatus === 'done').length}/{(worldState.dagTasks ?? []).length} tasks
             </span>
           )}
-          {worldState.pendingDecisions > 0 && (
+          {(worldState.decisions ?? []).filter(d => d.status === 'pending').length > 0 && (
             <span className="flex items-center gap-1 text-amber-400">
               <AlertTriangle className="w-3 h-3" />
-              {worldState.pendingDecisions} pending
+              {(worldState.decisions ?? []).filter(d => d.status === 'pending').length} pending
             </span>
           )}
         </div>
