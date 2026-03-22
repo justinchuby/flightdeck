@@ -5,6 +5,7 @@ import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
 import { asAgentId } from '../types/brandedIds.js';
+import { isCrewMember, getCrewIds } from '../agents/crewUtils.js';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -124,15 +125,13 @@ export function coordinationRoutes(ctx: AppContext): Router {
     // Filter synthetic id:0 events (emitted before DB flush assigns a real ID)
     events = events.filter(e => e.id !== 0);
 
-    // Resolve crew membership for leadId filtering
+    // Resolve crew membership for leadId filtering.
+    // When leadId is an agent UUID, this scopes to a single session's crew.
+    // When leadId is a project slug, the fallback includes agents from all sessions.
     const crewAgentIds = new Set<string>();
     if (leadId) {
-      crewAgentIds.add(leadId);
-      for (const agent of agentManager.getAll()) {
-        if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
-          crewAgentIds.add(agent.id);
-        }
-      }
+      const resolved = getCrewIds(agentManager.getAll(), leadId);
+      for (const id of resolved) crewAgentIds.add(id);
 
       // Historical fallback: when no live agents match, treat leadId as projectId
       // and discover crew members from the events themselves
@@ -352,7 +351,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
       if (crewAgentIds.size > 0 && !crewAgentIds.has(entry.agentId)) {
         // Check if this is a new agent spawned under the lead
         const agent = agentManager.get(entry.agentId);
-        if (!agent || (agent.parentId !== leadId && agent.id !== leadId && agent.projectId !== leadId)) return;
+        if (!agent || !isCrewMember(agent, leadId)) return;
         // New crew member — add to tracked set
         crewAgentIds.add(entry.agentId);
       }

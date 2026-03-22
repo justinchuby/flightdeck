@@ -8,6 +8,7 @@ import type { Agent } from '../Agent.js';
 import type { CommandHandlerContext, Delegation } from './types.js';
 import type { DagTask } from '../../tasks/TaskDAG.js';
 import { logger } from '../../utils/logger.js';
+import { isCrewMember } from '../crewUtils.js';
 import { redact } from '../../utils/redaction.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -28,7 +29,7 @@ export function formatNewlyReadyMessage(
 
   // Find idle agents that could work on these tasks
   const idleAgents = ctx.getAllAgents().filter(a =>
-    a.parentId === leadId
+    isCrewMember(a, leadId)
     && a.status === 'idle'
     && a.id !== leadId
   );
@@ -315,7 +316,7 @@ const coverageWarningsSent = new Set<string>();
 function checkCoverageWarning(ctx: CommandHandlerContext, leadId: string): void {
   if (coverageWarningsSent.has(leadId)) return;
   const activeAgents = ctx.getAllAgents()
-    .filter(a => a.parentId === leadId && a.status !== 'terminated' && a.role.id !== 'secretary')
+    .filter(a => isCrewMember(a, leadId) && a.id !== leadId && a.status !== 'terminated' && a.role.id !== 'secretary')
     .map(a => ({ id: a.id, role: a.role.id }));
   const dagStatus = ctx.taskDAG.getStatus(leadId, activeAgents);
   if (dagStatus.coverage && dagStatus.coverage.percentage < 80 && dagStatus.coverage.total >= 3) {

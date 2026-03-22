@@ -8,6 +8,7 @@
 import type { Agent } from '../Agent.js';
 import { asTaskId } from '../../types/brandedIds.js';
 import type { DagTaskInput } from '../../tasks/TaskDAG.js';
+import { isCrewMember } from '../crewUtils.js';
 import { TaskDAG } from '../../tasks/TaskDAG.js';
 import type { CommandEntry, CommandHandlerContext } from './types.js';
 import { formatNewlyReadyMessage } from './CompletionTracking.js';
@@ -162,7 +163,7 @@ function handleTaskStatus(ctx: CommandHandlerContext, agent: Agent, _data: strin
 
   // Gather active child agents for coverage metric
   const activeAgents = ctx.getAllAgents()
-    .filter(a => a.parentId === leadId && a.status !== 'terminated' && a.role.id !== 'secretary')
+    .filter(a => isCrewMember(a, leadId) && a.id !== leadId && a.status !== 'terminated' && a.role.id !== 'secretary')
     .map(a => ({ id: a.id, role: a.role.id }));
 
   const status = ctx.taskDAG.getStatus(leadId, activeAgents);

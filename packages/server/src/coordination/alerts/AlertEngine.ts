@@ -5,6 +5,7 @@ import type { DecisionLog } from '../decisions/DecisionLog.js';
 import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import type { TaskDAG } from '../../tasks/TaskDAG.js';
 import { logger } from '../../utils/logger.js';
+import { isCrewMember } from '../../agents/crewUtils.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export class AlertEngine extends EventEmitter {
       if (readyTasks.length === 0) continue;
 
       // Find idle agents in this lead's team
-      const teamIdle = idleAgents.filter(a => a.parentId === lead.id);
+      const teamIdle = idleAgents.filter(a => isCrewMember(a, lead.id) && a.id !== lead.id);
       if (teamIdle.length === 0) continue;
 
       const taskNames = readyTasks.slice(0, 3).map(t => t.id).join(', ');
