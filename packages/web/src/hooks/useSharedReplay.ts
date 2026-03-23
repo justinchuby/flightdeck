@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch } from './useApi';
+import { apiFetch, ApiHttpError } from './useApi';
 import type {
   ReplayKeyframe,
   ReplayWorldState,
@@ -64,7 +64,7 @@ export function useSharedReplay(token: string | null): UseSessionReplayResult & 
     enabled: !!token,
     retry: (failureCount, error) => {
       // Don't retry on auth failures (expired/revoked tokens)
-      if (error instanceof Error && /40[134]/.test(error.message)) return false;
+      if (error instanceof ApiHttpError && [401, 403, 404].includes(error.status)) return false;
       return failureCount < 2;
     },
   });
@@ -73,18 +73,19 @@ export function useSharedReplay(token: string | null): UseSessionReplayResult & 
   const error = tokenError
     ?? (queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null);
 
-  // Set initial world state from the metadata response
+  // Set initial world state from metadata only if no keyframes (static snapshot).
+  // When keyframes exist, let the time-based fetch populate the state to stay in sync.
   useEffect(() => {
-    if (sharedData?.state) {
+    if (sharedData?.state && keyframes.length === 0) {
       setWorldState(sharedData.state);
     }
-  }, [sharedData]);
+  }, [sharedData, keyframes.length]);
 
   // Derive duration and sessionStart from keyframes
   useEffect(() => {
     setCurrentTime(0);
     setPlaying(false);
-    setWorldState(sharedData?.state ?? null);
+    setWorldState(null);
     sessionStartRef.current = 0;
     setTokenError(null);
 
@@ -96,7 +97,7 @@ export function useSharedReplay(token: string | null): UseSessionReplayResult & 
     } else {
       setDuration(0);
     }
-  }, [token, keyframes, sharedData?.state]);
+  }, [token, keyframes]);
 
   // Fetch world state at a given time offset — routed through share token
   const fetchStateAt = useCallback(async (timeMs: number) => {
@@ -110,7 +111,7 @@ export function useSharedReplay(token: string | null): UseSessionReplayResult & 
       setTokenError(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/40[134]/.test(msg)) {
+      if (err instanceof ApiHttpError && [401, 403, 404].includes(err.status)) {
         // Token expired or revoked — surface error, stop playback
         setTokenError('Share link has expired or been revoked');
         setPlaying(false);

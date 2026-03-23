@@ -1,10 +1,24 @@
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Users, Clock, Play, Pause, SkipBack, SkipForward, MapPin } from 'lucide-react';
-import type { ShareableReplay } from './types';
+import type { ShareableReplay, ReplayAnnotation } from './types';
 import { AnnotationPin } from './AnnotationPin';
 import { ReplayContent } from './ReplayContent';
-import { useSharedReplay } from '../../hooks/useSharedReplay';
+import { useSharedReplay, type SharedReplayData } from '../../hooks/useSharedReplay';
+
+/** Extract the ShareableReplay-compatible fields that the shared endpoint may provide */
+function toShareableFields(data: SharedReplayData): Partial<ShareableReplay> {
+  // The shared endpoint returns SharedReplayData which overlaps with ShareableReplay
+  // for optional fields like annotations, stats, createdBy, title, etc.
+  const raw = data as Record<string, unknown>;
+  return {
+    title: typeof raw.title === 'string' ? raw.title : undefined,
+    createdBy: typeof raw.createdBy === 'string' ? raw.createdBy : undefined,
+    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : undefined,
+    annotations: Array.isArray(raw.annotations) ? raw.annotations as ReplayAnnotation[] : [],
+    stats: raw.stats && typeof raw.stats === 'object' ? raw.stats as ShareableReplay['stats'] : undefined,
+  };
+}
 
 /**
  * Read-only shared replay viewer — /shared/:token route.
@@ -21,8 +35,8 @@ export function SharedReplayViewer() {
     loading, error, play, pause, seek, sharedData,
   } = useSharedReplay(token ?? null);
 
-  // Treat sharedData as metadata — cast for annotations/stats display
-  const replay = sharedData as unknown as ShareableReplay | null;
+  // Extract ShareableReplay-compatible fields safely (no unsafe cast)
+  const replay = sharedData ? toShareableFields(sharedData) : null;
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -56,7 +70,8 @@ export function SharedReplayViewer() {
   const title = replay?.title ?? sharedData.label ?? 'Session Replay';
   const annotations = replay?.annotations ?? [];
   const createdBy = replay?.createdBy;
-  const createdAt = replay?.createdAt ?? sharedData.keyframes[0]?.timestamp;
+  // Use session start (first keyframe) for annotation time offsets, not share creation time
+  const sessionStart = sharedData.keyframes[0]?.timestamp;
   const statsDuration = replay?.stats?.duration;
   const statsAgents = replay?.stats?.agentCount;
 
@@ -116,8 +131,8 @@ export function SharedReplayViewer() {
             <div className="absolute inset-y-0 left-0 bg-accent/15 rounded" style={{ width: `${progressPct}%` }} />
             {/* Annotation pins */}
             {annotations.map((ann) => {
-              const annTime = createdAt
-                ? new Date(ann.timestamp).getTime() - new Date(createdAt).getTime()
+              const annTime = sessionStart
+                ? new Date(ann.timestamp).getTime() - new Date(sessionStart).getTime()
                 : 0;
               const pos = duration > 0 ? (annTime / duration) * 100 : 0;
               return (

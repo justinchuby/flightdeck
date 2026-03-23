@@ -81,7 +81,7 @@ describe('ReplayContent', () => {
     // 1 done out of 3 tasks (derived from dagTasks array)
     expect(screen.getByText('1/3 tasks')).toBeTruthy();
     // 1 pending decision (derived from decisions array)
-    expect(screen.getByText('1 pending decisions')).toBeTruthy();
+    expect(screen.getByText('1 pending decision')).toBeTruthy();
   });
 
   it('handles world state with no tasks or decisions', () => {

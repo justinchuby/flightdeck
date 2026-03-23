@@ -228,7 +228,7 @@ export function ReplayContent({ worldState, loading }: ReplayContentProps) {
         {pendingDecisions > 0 && (
           <span className="flex items-center gap-1 text-amber-400">
             <AlertTriangle className="w-3 h-3" />
-            {pendingDecisions} pending decisions
+            {pendingDecisions} pending decision{pendingDecisions !== 1 ? 's' : ''}
           </span>
         )}
         <span className="flex items-center gap-1 ml-auto">
