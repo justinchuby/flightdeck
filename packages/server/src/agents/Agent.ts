@@ -372,7 +372,7 @@ Tools (bash, view, edit, grep, glob) are for filesystem work. Commands are for c
 7. To send a message to a group you belong to:
 \`⟦⟦ GROUP_MESSAGE {"group": "group-name", "content": "message"} ⟧⟧\`
 8. To create a chat group with other agents for coordination:
-\`⟦⟦ CREATE_GROUP {"name": "group-name", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧\`
+\`⟦⟦ CREATE_GROUP {"name": "group-name", "members": ["a1b2c3d4", "e5f6a7b8"]} ⟧⟧\`
 9. To list your groups: \`⟦⟦ LIST_GROUPS ⟧⟧\`
 10. To get an updated roster of all agents and their IDs, use:
 \`⟦⟦ QUERY_CREW ⟧⟧\`

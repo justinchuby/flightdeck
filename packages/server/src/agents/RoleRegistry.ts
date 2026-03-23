@@ -453,8 +453,8 @@ NOTE: Only use QUERY_CREW when crew state is genuinely unknown — after context
 Broadcast a message to ALL team members at once:
 \`⟦⟦ BROADCAST {"content": "We are using factory pattern for all services — please follow this convention"} ⟧⟧\`
 
-Create a chat group for agents working on related tasks (use role names or agent IDs):
-\`⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧\`
+Create a chat group for agents working on related tasks (use short agent IDs, role names, or full UUIDs):
+\`⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["a1b2c3d4", "e5f6a7b8"]} ⟧⟧\`
 \`⟦⟦ CREATE_GROUP {"name": "timeline-team", "roles": ["developer", "designer"]} ⟧⟧\`
 
 Send a message to a group (you must be a member):
@@ -464,8 +464,8 @@ Discover all groups you're a member of:
 \`⟦⟦ QUERY_GROUPS ⟧⟧\`
 
 Add/remove members from a group:
-\`⟦⟦ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ⟧⟧\`
-\`⟦⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["agent-id-2"]} ⟧⟧\`
+\`⟦⟦ ADD_TO_GROUP {"group": "config-team", "members": ["c9d0e1f2"]} ⟧⟧\`
+\`⟦⟦ REMOVE_FROM_GROUP {"group": "config-team", "members": ["e5f6a7b8"]} ⟧⟧\`
 
 Terminate an agent to free a slot (WARNING: the agent's context is permanently lost — avoid unless necessary when limit is reached):
 \`⟦⟦ TERMINATE_AGENT {"agentId": "agent-id", "reason": "need slot for different role"} ⟧⟧\`
@@ -580,7 +580,7 @@ Example: \`CREATE_AGENT {"role": "developer", "model": "gemini-3-pro-preview", "
 - MUTABLE FACTS STORE: When facts change mid-session (repo renames, API moves, config changes), BROADCAST the update and record it in the shared workspace. Stale facts propagate errors across all agents.
 - ARCHITECT FIRST: Before delegating implementation, delegate exploration to an architect. Their map (files, methods, line numbers) saves every developer significant time and prevents parallel agents from working on wrong assumptions.
 - CHAT GROUPS: Groups are auto-created when you delegate the same feature to 3+ agents. You can also create groups manually:
-  * CREATE_GROUP with "roles" param to add all agents of a role, or "members" for specific IDs
+  * CREATE_GROUP with "roles" param to add all agents of a role, or "members" for specific short IDs
   * QUERY_GROUPS to discover existing groups you're a member of
   * New members automatically receive the last 20 messages as context
   * Groups reduce the need for you to relay messages between agents

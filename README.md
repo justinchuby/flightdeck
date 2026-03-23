@@ -339,10 +339,10 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `AGENT_MESSAGE {"to": "agent-id", "content": "..."}` | Send a direct message to another agent by ID. |
 | `DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "..."}` | Queue a message to another agent without interrupting their current work. Matches by ID prefix. |
 | `BROADCAST {"content": "..."}` | Send a message to all active agents. |
-| `CREATE_GROUP {"name": "...", "members": ["id1"], "roles": ["developer"]}` | Create a named chat group. Specify members by ID, by role, or both. Lead is auto-included. |
+| `CREATE_GROUP {"name": "...", "members": ["a1b2c3d4"], "roles": ["developer"]}` | Create a named chat group. Specify members by short ID, role, or both. Lead is auto-included. |
 | `GROUP_MESSAGE {"group": "...", "content": "..."}` | Send a message to all members of a group. Sender must be a member. |
-| `ADD_TO_GROUP {"group": "...", "members": ["id"]}` | Add agents to an existing group. New members receive recent message history. |
-| `REMOVE_FROM_GROUP {"group": "...", "members": ["id"]}` | Remove agents from a group. The lead cannot be removed. |
+| `ADD_TO_GROUP {"group": "...", "members": ["e5f6a7b8"]}` | Add agents to an existing group. New members receive recent message history. |
+| `REMOVE_FROM_GROUP {"group": "...", "members": ["e5f6a7b8"]}` | Remove agents from a group. The lead cannot be removed. |
 | `QUERY_GROUPS` | List all groups the agent belongs to, with member counts and last message preview. |
 | `QUERY_PEERS` | Discover other active agents for direct messaging. |
 | `REACT {"group": "...", "emoji": "👍"}` | Add an emoji reaction to the latest (or specified) message in a group. |

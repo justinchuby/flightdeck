@@ -14,9 +14,9 @@ Any agent can create groups. The lead is auto-included for visibility. Groups su
 
 **Group creation (any agent):**
 ```
-⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧
+⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["a1b2c3d4", "e5f6a7b8"]} ⟧⟧
 ```
-Creates a named group. Members are agent IDs (short 8-char prefixes work). The lead is automatically added. Responds with a confirmation including the group name and resolved member list.
+Creates a named group. Members can be specified by short agent ID (8-char prefix), full UUID, role ID, or role name. The lead is automatically added. Responds with a confirmation including the group name and resolved member list.
 
 **Role-based membership:**
 ```
@@ -25,7 +25,7 @@ Creates a named group. Members are agent IDs (short 8-char prefixes work). The l
 Auto-adds all active agents with matching roles. Terminated/completed agents are excluded via `isTerminalStatus()` filter. Can be combined with explicit `members`.
 
 ```
-⟦⟦ ADD_TO_GROUP {"group": "config-team", "members": ["agent-id-3"]} ⟧⟧
+⟦⟦ ADD_TO_GROUP {"group": "config-team", "members": ["c9d0e1f2"]} ⟧⟧
 ```
 Adds members to an existing group. The new member receives the group's recent message history (last 20 messages) so they have context.
 
@@ -170,7 +170,7 @@ Send messages: ⟦⟦ GROUP_MESSAGE {"group": "config-team", "content": "..."} �
 In the lead's prompt, add to AVAILABLE COMMANDS:
 ```
 Create a chat group for agents working on related tasks:
-`⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["agent-id-1", "agent-id-2"]} ⟧⟧`
+`⟦⟦ CREATE_GROUP {"name": "config-team", "members": ["a1b2c3d4", "e5f6a7b8"]} ⟧⟧`
 
 Send a message to a group:
 `⟦⟦ GROUP_MESSAGE {"group": "config-team", "content": "Use factory pattern for services"} ⟧⟧`
