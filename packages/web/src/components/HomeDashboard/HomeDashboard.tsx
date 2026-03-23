@@ -285,7 +285,7 @@ export function HomeDashboard() {
     try {
       setLoading(true);
       setFetchError(null);
-      const [projectsData, decisionsData, progressData, pendingDecisionsData] = await Promise.all([
+      const [projectsData, decisionsData, activityData, pendingDecisionsData] = await Promise.all([
         apiFetch<EnrichedProject[]>('/projects').catch(() => []),
         apiFetch<Decision[]>('/decisions').catch(() => []),
         apiFetch<ActivityEntry[]>('/coordination/activity?limit=50').catch(() => []),
@@ -303,10 +303,10 @@ export function HomeDashboard() {
       useAppStore.getState().setPendingDecisions(pending);
 
       // Filter to high-signal event types only — excludes noisy status_change, lock, message events
-      const merged = (Array.isArray(progressData) ? progressData : [])
+      const highSignalActivity = (Array.isArray(activityData) ? activityData : [])
         .filter((a) => HIGH_SIGNAL_TYPES.has(a.actionType))
         .slice(0, 15);
-      setRecentActivity(merged);
+      setRecentActivity(highSignalActivity);
 
       // Fetch DAG progress for projects with active leads (parallelized)
       const dagPromises = activeProjects
