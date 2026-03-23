@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Link2, Copy, Check, Trash2, Plus, Clock, ExternalLink } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
 
@@ -55,6 +55,14 @@ export function ShareDialog({ leadId, onClose }: ShareDialogProps) {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [expiryHours, setExpiryHours] = useState(168); // default 7 days
   const [label, setLabel] = useState('');
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up the "copied" timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
 
   // ESC to close
   useEffect(() => {
@@ -67,6 +75,7 @@ export function ShareDialog({ leadId, onClose }: ShareDialogProps) {
 
   // Fetch existing links
   const fetchLinks = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await apiFetch<ShareLink[]>(`/replay/${leadId}/shares`);
       setLinks(data);
@@ -121,7 +130,8 @@ export function ShareDialog({ leadId, onClose }: ShareDialogProps) {
     try {
       await navigator.clipboard.writeText(buildShareUrl(token));
       setCopiedToken(token);
-      setTimeout(() => setCopiedToken(null), 2000);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopiedToken(null), 2000);
     } catch {
       // Fallback: select text for manual copy
       setError('Could not copy — please copy the URL manually');
@@ -140,6 +150,7 @@ export function ShareDialog({ leadId, onClose }: ShareDialogProps) {
         className="bg-th-bg-alt border border-th-border rounded-lg shadow-2xl w-full max-w-md flex flex-col"
         role="dialog"
         aria-label="Share session replay"
+        aria-modal="true"
       >
         {/* Header */}
         <div className="flex items-center gap-2 px-5 py-3 border-b border-th-border">
