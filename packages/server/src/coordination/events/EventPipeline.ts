@@ -3,7 +3,7 @@ import type { ActivityEntry, ActionType } from '../activity/ActivityLedger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export interface PipelineEvent {
+interface PipelineEvent {
   entry: ActivityEntry;
   /** Context bag for handlers to pass data downstream */
   meta: Record<string, unknown>;
