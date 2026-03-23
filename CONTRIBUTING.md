@@ -42,7 +42,7 @@ npm run build:shared
 npm run dev
 ```
 
-The dev server starts the Express backend and the Vite frontend with hot-reload. The web UI is available at `http://localhost:5173` and the API server at `http://localhost:3001`.
+The dev server starts the Express backend and the Vite frontend with hot-reload. The web UI is available at `http://localhost:5173` and the API server defaults to `http://localhost:3001` (if port 3001 is busy, the server automatically retries on incrementing ports — check the terminal output for the actual port).
 
 ### Per-Package Development
 
@@ -432,7 +432,7 @@ List relevant file paths in the codebase.
 - **Reusable** — helps future sessions, not just the current task
 - **Specific** — "how to add a new API endpoint" not "how APIs work"
 - **Actionable** — includes concrete steps, file paths, and code examples
-- **Concise** — aim for < 4KB; large skills get truncated during injection
+- **Concise** — aim for ~800 tokens (~3200 characters); the SkillsLoader has a per-skill token budget and larger skills get truncated during injection
 
 ### Current Skills
 
