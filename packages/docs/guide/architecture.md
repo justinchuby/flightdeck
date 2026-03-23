@@ -63,7 +63,7 @@ Services are initialized in dependency order (Tier 0 → Tier 5):
 | **0** | Config & DB | `Database`, `ConfigStore` (hot-reloadable) |
 | **1** | Core registries | `ProjectRegistry`, `TaskDAG`, `KnowledgeStore`, `FileLockRegistry`, `RoleRegistry` |
 | **2** | Stateless services | `MessageBus`, `EventPipeline`, `ModelSelector`, `TokenBudgetOptimizer` |
-| **3** | Composed services | `GovernancePipeline` (6 hooks), `SearchEngine`, `SkillsLoader`, `EscalationManager` |
+| **3** | Composed services | `GovernancePipeline` (6 hooks, *future feature*), `SearchEngine`, `SkillsLoader`, `EscalationManager` |
 | **4** | AgentManager | Central orchestrator — spawns agents, routes messages, manages delegations |
 | **5** | Manager-dependent | `AlertEngine`, `ContextRefresher`, `SessionResumeManager`, `IntegrationRouter` |
 
@@ -80,7 +80,7 @@ All routes receive the full `AppContext` (service container) for dependency inje
 | Subsystem | Purpose |
 |-----------|---------|
 | **AgentManager** | Spawns agents, detects commands in output streams, routes messages, manages delegations |
-| **GovernancePipeline** | 6 hooks (file write guard, shell blocklist, commit validation, rate limiting) intercepting agent actions |
+| **GovernancePipeline** | 6 hooks (file write guard, shell blocklist, commit validation, rate limiting) intercepting agent actions — *infrastructure exists, currently disabled* |
 | **KnowledgeStore** | FTS5 full-text search with 4-tier memory categories and token-budgeted injection |
 | **SessionResumeManager** | Persists agent state, orchestrates resume on startup |
 | **TaskDAG** | Declarative task scheduling with dependencies, status tracking, soft-delete |

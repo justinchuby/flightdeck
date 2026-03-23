@@ -125,7 +125,7 @@ npm run dev
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
 - **Scoped Commits** — `git add` only on files the agent has locked. Prevents `git add -A` from leaking other agents' work
 - **Trust Dial** — 3-level oversight (Supervised / Balanced / Autonomous) controls how much approval you give. Per-project overrides supported
-- **Governance Pipeline** — Every agent command flows through ordered hooks: security → permission → validation → rate-limit → policy → approval
+- **Governance Pipeline** *(future feature)* — Infrastructure for ordered command hooks (security → permission → validation → rate-limit → policy → approval) exists but is currently disabled
 - **Security** — Prompt injection sanitization (4-layer), secret redaction, CORS lockdown, rate limiting, path traversal validation
 
 ### 📊 Real-Time Dashboard

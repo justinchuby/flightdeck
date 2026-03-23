@@ -180,9 +180,11 @@ Set globally or per-project. The **AttentionBar** at the top of the dashboard sh
 
 → [Oversight Guide](/guide/oversight)
 
-### Governance Pipeline
+### Governance Pipeline <Badge type="warning" text="Future Feature" />
 
-Every agent command flows through ordered hooks before execution:
+> The governance infrastructure exists in the codebase but is currently disabled (`enabled: false`). It will be activated in a future release.
+
+The governance system is designed to route every agent command through ordered hooks before execution:
 
 1. **Security** — Blocked patterns, path traversal checks
 2. **Permission** — Role-based access control
@@ -191,7 +193,7 @@ Every agent command flows through ordered hooks before execution:
 5. **Policy** — Custom policy rules
 6. **Approval** — Human approval gates (when configured)
 
-Post-hooks handle audit logging and metrics collection.
+Post-hooks will handle audit logging and metrics collection.
 
 ### Decision Queue
 
@@ -211,9 +213,9 @@ When agents face architectural choices or need permission, they surface decision
 
 → [Coordination Guide](/guide/coordination)
 
-## Knowledge & Persistence
+## Knowledge & Persistence <Badge type="info" text="In Development" />
 
-What agents learn carries across sessions.
+What agents learn carries across sessions. The core knowledge infrastructure exists and is functional — the system design is being refined for the best developer experience.
 
 ### Knowledge Base
 
@@ -231,7 +233,7 @@ Browse, search (fuzzy search via Fuse.js), and manage entries from the **Knowled
 ### Knowledge Injection
 
 On agent spawn, the **KnowledgeInjector** automatically injects relevant knowledge into the agent's context:
-- Token-budgeted (default 1200 tokens) to avoid context overflow
+- Token-budgeted to avoid context overflow
 - Priority: Core (always) > Procedural > Semantic > Episodic
 - Sanitized against prompt injection
 

@@ -30,7 +30,6 @@ Flightdeck includes a **Contextual Coach** — a system of behavior-triggered ti
 | First approval action | Hints about batch approval for multiple items |
 | Multiple manual approvals | Suggests adjusting the Trust Dial to reduce interruptions |
 | First agent crash | Explains that recovery is automatic |
-| Budget threshold reached | Points to budget settings |
 | First ⌘K use | Mentions natural language command support |
 
 Tips appear once per trigger and are tracked in localStorage so they don't repeat.
@@ -42,8 +41,8 @@ Tips appear once per trigger and are tracked in localStorage so they don't repea
 The single most important setting to understand. It controls how much autonomy agents have:
 
 - **Supervised** — Agents request confirmation for significant actions. Best for learning how Flightdeck works.
-- **Balanced** (default) — Key decisions need your approval; routine work proceeds automatically. Good for most use cases.
-- **Autonomous** — Agents work independently. Only critical failures surface to you.
+- **Balanced** — Key decisions need your approval; routine work proceeds automatically. Good for most use cases.
+- **Autonomous** (default) — Agents work independently. Only critical failures surface to you.
 
 Toggle it from the **AttentionBar** at the top of the dashboard. You can set it globally or per-project.
 

@@ -152,8 +152,8 @@ The Trust Dial controls how much autonomy agents have:
 | Level | Behavior |
 |-------|----------|
 | **Supervised** | Agents explain reasoning before changes. Significant actions require explicit approval |
-| **Balanced** | Key decisions need approval; routine work proceeds automatically (default) |
-| **Autonomous** | Agents work independently, minimal human approval needed |
+| **Balanced** | Key decisions need approval; routine work proceeds automatically |
+| **Autonomous** | Agents work independently, minimal human approval needed (default) |
 
 Toggle the Trust Dial from the AttentionBar at the top of the dashboard.
 
