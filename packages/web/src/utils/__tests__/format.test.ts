@@ -212,4 +212,17 @@ describe('formatFullTimestamp', () => {
     const result = formatFullTimestamp(1741444200000);
     expect(result).toBeTruthy();
   });
+
+  it('returns empty string for null', () => {
+    expect(formatFullTimestamp(null)).toBe('');
+  });
+
+  it('returns empty string for undefined', () => {
+    expect(formatFullTimestamp(undefined)).toBe('');
+  });
+
+  it('treats 0 as valid epoch timestamp', () => {
+    const result = formatFullTimestamp(0);
+    expect(result).toBeTruthy();
+  });
 });
