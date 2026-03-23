@@ -1,6 +1,6 @@
 # Hierarchy Audit: Shallow parentId Filtering Bug
 
-> **Finding:** 14 code locations filter crew membership using `parentId === leadId`, which only finds direct children of the lead. Sub-agents created by sub-leads have `parentId === subLeadId`, so they are invisible in these views.
+> **Finding:** 15 code locations filter crew membership using `parentId === leadId`, which only finds direct children of the lead. Sub-agents created by sub-leads have `parentId === subLeadId`, so they are invisible in these views.
 
 ## The Problem
 
@@ -37,7 +37,7 @@ The crew roster API (`/crews/:crewId/agents`) handles this correctly because it 
 
 ## Affected Locations
 
-### Server-Side (5 locations)
+### Server-Side (6 locations)
 
 | # | File | Line | Code | Impact |
 |---|------|------|------|--------|
@@ -161,7 +161,7 @@ flowchart TD
     style Visit5 fill:#27ae60,stroke:#1e8449,color:#fff
 ```
 
-Replace all 14 affected locations with calls to `getCrewDescendants()`.
+Replace all 15 affected locations with calls to `getCrewDescendants()`.
 
 ## Impact Assessment
 
