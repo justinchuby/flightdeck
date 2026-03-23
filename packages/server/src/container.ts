@@ -509,6 +509,9 @@ function wireEvents(c: ServiceContainer): void {
     } else {
       logger.warn({ module: 'timer', msg: 'Timer fired but agent unavailable', label: timer.label, agentId: timer.agentId, agentStatus: agent?.status ?? 'not found' });
     }
+    // Broadcast to UI so TimerDisplay updates status from 'pending' to 'fired'
+    const projectId = agentManager.getProjectIdForAgent(timer.agentId);
+    c.internal.wsServer?.broadcastEvent({ type: 'timer:fired', timer }, projectId);
   });
   // UI notifications for timer lifecycle (created/cancelled) — project-scoped for the timer panel
   timerRegistry.on('timer:created', (timer: { id: string; agentId: string; label: string; leadId?: string | null }) => {

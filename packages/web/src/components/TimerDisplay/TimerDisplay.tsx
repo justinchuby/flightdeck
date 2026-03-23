@@ -45,10 +45,11 @@ function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: strin
             ? 'border-th-border/50 bg-th-bg-muted/30 opacity-60'
             : 'border-th-border bg-th-bg-muted/50'
       }`}
-      onClick={() => setExpanded(!expanded)}
+      onClick={() => setExpanded(prev => !prev)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded); }}
+      aria-expanded={expanded}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(prev => !prev); } }}
     >
       <div className="flex items-center justify-between">
         <span className="font-medium text-th-text-alt truncate">{timer.label}</span>
