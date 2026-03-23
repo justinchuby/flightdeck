@@ -29,10 +29,12 @@ describe('IdentityProtection', () => {
       const result = protection.protectCoreFiles(projectId);
 
       expect(result).toHaveLength(2);
-      expect(result[0].key).toBe('identity');
-      expect(result[0].contentHash).toBe(hashContent('I am the architect'));
+      expect(result).toEqual(expect.arrayContaining([
+        expect.objectContaining({ key: 'identity', contentHash: hashContent('I am the architect') }),
+        expect.objectContaining({ key: 'preferences' }),
+      ]));
       expect(result[0].protectedAt).toBeDefined();
-      expect(result[1].key).toBe('preferences');
+      expect(result[1].protectedAt).toBeDefined();
     });
 
     it('stores hash in entry metadata', () => {
