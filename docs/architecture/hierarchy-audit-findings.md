@@ -6,12 +6,31 @@
 
 When a sub-lead creates agents, those agents have `parentId` pointing to the sub-lead, not the root lead:
 
-```
-Root Lead (L1)
-├─ Developer (D1, parentId=L1)     ← Found by parentId === L1 ✅
-├─ Sub-Lead (L2, parentId=L1)      ← Found by parentId === L1 ✅
-│  ├─ Designer (S1, parentId=L2)   ← NOT found by parentId === L1 ❌
-│  └─ Tester (S2, parentId=L2)     ← NOT found by parentId === L1 ❌
+```mermaid
+graph TD
+    L1["👑 Root Lead (L1)"]
+    D1["🔧 Developer (D1)<br/>parentId → L1"]
+    L2["👑 Sub-Lead (L2)<br/>parentId → L1"]
+    S1["🎨 Designer (S1)<br/>parentId → L2"]
+    S2["🧪 Tester (S2)<br/>parentId → L2"]
+
+    L1 --> D1
+    L1 --> L2
+    L2 --> S1
+    L2 --> S2
+
+    D1 -.-|"parentId === L1 ✅"| Found["Found by<br/>shallow filter"]
+    L2 -.-|"parentId === L1 ✅"| Found
+    S1 -.-|"parentId === L2 ❌"| Missed["MISSED by<br/>shallow filter"]
+    S2 -.-|"parentId === L2 ❌"| Missed
+
+    style L1 fill:#d4a017,stroke:#a07d12,color:#fff
+    style L2 fill:#d4a017,stroke:#a07d12,color:#fff
+    style D1 fill:#2ecc71,stroke:#1a9c54,color:#fff
+    style S1 fill:#e74c3c,stroke:#c0392b,color:#fff
+    style S2 fill:#e74c3c,stroke:#c0392b,color:#fff
+    style Found fill:#2ecc71,stroke:#1a9c54,color:#fff
+    style Missed fill:#e74c3c,stroke:#c0392b,color:#fff
 ```
 
 The crew roster API (`/crews/:crewId/agents`) handles this correctly because it queries by `teamId` (the root lead's ID, resolved by walking the full parent chain). But most other code paths use the shallow `parentId === leadId` check.
@@ -116,6 +135,31 @@ const crewAgents = agents.filter(a => a.projectId === leadAgent.projectId);
 ### Recommendation
 
 **Use Option A** (walk-down utility) as the primary fix. It's explicit about hierarchy, works with the existing data model, and can be placed in `@flightdeck/shared` for use by both server and web.
+
+```mermaid
+flowchart TD
+    subgraph "Correct: getCrewDescendants(L1, agents)"
+        Start([Start with leadId = L1]) --> Q1[Queue: L1]
+        Q1 --> Visit1[Visit L1 → add to result]
+        Visit1 --> Find1[Find children: parentId === L1]
+        Find1 --> Q2[Queue: D1, L2]
+        Q2 --> Visit2[Visit D1 → add to result]
+        Visit2 --> Visit3[Visit L2 → add to result]
+        Visit3 --> Find2[Find children: parentId === L2]
+        Find2 --> Q3[Queue: S1, S2]
+        Q3 --> Visit4[Visit S1 → add to result]
+        Visit4 --> Visit5[Visit S2 → add to result]
+        Visit5 --> Done([Result: L1, D1, L2, S1, S2 ✅])
+    end
+
+    style Start fill:#6b5b95,stroke:#4a3d6e,color:#fff
+    style Done fill:#2ecc71,stroke:#1a9c54,color:#fff
+    style Visit1 fill:#d4a017,stroke:#a07d12,color:#fff
+    style Visit2 fill:#3498db,stroke:#2471a3,color:#fff
+    style Visit3 fill:#d4a017,stroke:#a07d12,color:#fff
+    style Visit4 fill:#27ae60,stroke:#1e8449,color:#fff
+    style Visit5 fill:#27ae60,stroke:#1e8449,color:#fff
+```
 
 Replace all 14 affected locations with calls to `getCrewDescendants()`.
 
