@@ -1,82 +1,361 @@
 # Features Overview
 
-Flightdeck ships 30+ features across three phases. This page provides a quick reference to everything available.
+Flightdeck is a multi-agent orchestration platform. This page covers everything it can do, organized by what matters to you as a user.
 
-![Lead Dashboard — your home screen for tracking projects and agents](/images/01-lead-dashboard.png)
+## Crew Orchestration
 
-## Phase 2 — Core Observability & Control
+At its core, Flightdeck turns a single task into a coordinated team effort.
 
-These features provide real-time visibility into your agent crew and give you controls to guide their work.
+### Project Lead
 
-### Batch Approval
-Approve or reject multiple pending agent actions at once. When agents request permission for file writes or shell commands, batch approval lets you review and act on all pending items from a single panel instead of one at a time.
+Every session starts with a **Project Lead** agent. You describe what you want built, and the lead:
+- Analyzes your task and breaks it into subtasks
+- Creates a **task DAG** (directed acyclic graph) with dependencies
+- Assembles a crew of specialist agents
+- Delegates work, coordinates progress, and synthesizes results
 
-![Batch Approval](/images/07-batch-approval.png)
+### 14 Specialized Roles
 
-### The Pulse
-A compact horizontal status strip at the top of every page showing real-time crew health: active agents, token usage, budget spend, context pressure, recovery status, PRs and conflicts — all at a glance.
+Each agent has a role with a purpose-built system prompt and recommended model:
 
-### Token Pressure Gauge
-Visual context window usage indicator per agent. Shows how much of an agent's context window is consumed, with color-coded warnings (green → amber → red) as agents approach their limit.
+| Role | Focus |
+|------|-------|
+| **Project Lead** 👑 | Orchestration, delegation, crew coordination |
+| **Developer** 💻 | Code implementation, tests, bug fixes |
+| **Architect** 🏗️ | System design, architecture decisions. Can also delegate. |
+| **Code Reviewer** 📖 | Readability, maintainability, code patterns |
+| **Critical Reviewer** 🛡️ | Security, performance, edge cases |
+| **Readability Reviewer** 📐 | Naming, organization, documentation quality |
+| **Product Manager** 🎯 | User needs, product quality, UX review |
+| **Technical Writer** 📝 | Documentation, API design, developer experience |
+| **Designer** 🎨 | UI/UX, interaction design, accessibility |
+| **QA Tester** 🧪 | Test strategy, quality assurance, coverage |
+| **Generalist** 🔧 | Cross-disciplinary problem solving |
+| **Radical Thinker** 🚀 | Challenge assumptions, propose bold alternatives |
+| **Secretary** 📋 | Plan tracking, status reports, session summaries |
+| **Agent** ⚙️ | Neutral general-purpose agent |
 
-### Focus Agent Panel
-Deep-dive view for any single agent: current task, recent messages, file diffs, pending decisions, and activity timeline. Click any agent in the agent list to open their Focus panel.
+Custom roles can be created via **Settings → Roles** with your own system prompts, colors, and icons.
 
-### Session Replay
-Scrub through past sessions like a video timeline. Keyframes capture agent state, messages, and DAG changes. Adjustable playback speed (0.5x–4x). Share replays via tokenized links.
+### Task DAG
 
-### Decision Queue
-Review and respond to agent decisions requiring human input. Each decision shows context, options, and impact. Approve, reject, or provide custom feedback.
+The lead creates a dependency graph that controls execution order. Tasks flow through states: `pending` → `ready` → `running` → `done` (or `failed`, `paused`, `skipped`). The **EagerScheduler** automatically assigns ready tasks to idle agents as soon as dependencies resolve.
 
-### Historical Data
-Browse historical project data even when no live session is running. All pages (Overview, Timeline, Tasks, Agents, Mission Control) load data from the REST API when WebSocket data is unavailable. Group chat history is preserved per project.
+Three views in the dashboard:
+- **Graph view** — Interactive dependency graph (ReactFlow) with status colors and critical path highlighting
+- **Kanban board** — Drag-and-drop columns by status with context menus
+- **Gantt chart** — Timeline view with dependencies
 
-### Coordination Timeline
-Chronological view of all inter-agent events: messages sent, tasks delegated, files locked, code reviewed. Filter by agent or event type.
+→ [Auto-DAG Guide](/guide/auto-dag)
 
-![Timeline](/screenshots/timeline.png)
+### Parallel Execution
 
-## Phase 3 — Automation & Trust
+Multiple agents work simultaneously — a developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. Up to 50 concurrent agents (configurable).
 
-These features let you automate agent behavior and build trust in autonomous operation.
+## Multi-Provider Support
 
-### Oversight System
-Three-tier autonomy control (Supervised / Balanced / Autonomous) with optional natural language custom instructions. The oversight tier injects behavioral instructions into agent system prompts, controlling how independently agents work. Per-project scope with a global default.
+Flightdeck is provider-agnostic. All agents communicate through the **Agent Client Protocol (ACP)** — a standardized message-passing interface that abstracts away provider differences — so you can mix and match providers in the same crew.
+
+### Supported Providers
+
+| Provider | Binary | Auth |
+|----------|--------|------|
+| **GitHub Copilot** 🐙 | `copilot` | GitHub CLI (`gh auth login`) |
+| **Claude Code** 🟠 | `claude-agent-acp` | `ANTHROPIC_API_KEY` |
+| **Google Gemini CLI** 💎 | `gemini` | `GEMINI_API_KEY` |
+| **Codex** 🤖 | `codex-acp` | `OPENAI_API_KEY` |
+| **Cursor** ↗️ | `agent` | `CURSOR_API_KEY` |
+| **OpenCode** 🔓 | `opencode` | (manages own keys) |
+| **Kimi CLI** 🌙 | `kimi` | Kimi auth |
+| **Qwen Code** 🔮 | `qwen` | Qwen auth |
+
+### Model Resolution
+
+Each role has a default model, but you can override per-role or per-agent. The **ModelResolver** handles cross-provider translation — request `claude-opus-4.6` from a Gemini agent and it maps to the closest equivalent. Standard/fast/premium tier aliases work across all providers.
+
+### Provider Ranking
+
+Set a preference order for providers. If the default is unavailable, Flightdeck falls through to the next in the ranking. Configure via `flightdeck.config.yaml` or **Settings → Providers** in the dashboard.
+
+→ [Provider Guide](/guide/providers)
+
+## Real-Time Dashboard
+
+The web dashboard is your control center, updating in real-time over WebSocket.
+
+### Home Dashboard
+
+At-a-glance view across all projects:
+- **Action Required** — Pending decisions and permission requests
+- **Active Work** — What agents are doing right now, grouped by project
+- **Decisions Made** — Recent decisions for awareness
+- **Recent Activity** — Latest events across all projects
+- **Progress** — Per-project DAG summaries
+
+### Lead Dashboard
+
+The main working interface for an active session:
+- **Chat panel** — Send messages to the Project Lead (queue or interrupt mode)
+- **Decision panel** — Approve, reject, or dismiss pending decisions with optional comments
+- **Sidebar tabs** — Seven tabs (reorderable): Crew, Comms, Groups, DAG, Models, Costs, Timers
+- **Catch-up banner** — "While you were away" summary of what happened
+
+### Timeline
+
+Swim-lane Gantt chart showing agent activity over time:
+- One lane per agent with color-coded events
+- Communication links between agents
+- Zoom, pan, and keyboard navigation (←→ pan, +/- zoom)
+- Session replay scrubber for reviewing past sessions
+- Live auto-scroll mode during active sessions
+
+→ [Timeline Guide](/guide/timeline)
+
+### Analytics
+
+Session-level analytics and cost tracking:
+- **Token usage trends** — Input/output tokens over time
+- **Cost breakdowns** — Per-agent and per-task token attribution from provider data
+- **Session comparison** — Side-by-side comparison of two sessions
+- **Auto-generated insights** — Efficiency observations
+
+### Overview Dashboard
+
+Per-project overview with:
+- Quick status bar (running/stopped, agent count, task progress, duration)
+- Attention items (failed agents, blocked tasks, pending decisions)
+- Decision feed and activity feed
+- Session history
+
+## Communication
+
+Agents communicate through structured messaging channels.
+
+### Direct Messaging
+
+Agents message each other by ID. Messages can be:
+- **Queued** — Delivered when the recipient is ready (non-blocking)
+- **Interrupt** — Breaks into the agent's current work immediately (priority)
+
+### Group Chat
+
+Create groups by member ID or role. Groups are auto-created when 3+ agents work on the same feature and auto-archived when all members finish. The dashboard shows a dedicated **Groups** tab for following multi-agent conversations.
+
+### Broadcasts
+
+Send a message to every active agent at once — useful for announcing decisions or sharing context that affects the whole crew.
+
+### @Mentions
+
+Type `@` in the chat to autocomplete agent names. Mentioned agents receive the message.
+
+→ [Agent Communication](/guide/agent-communication) · [Chat Groups](/guide/chat-groups)
+
+## Coordination & Safety
+
+These features prevent agents from stepping on each other and keep you in control.
+
+### File Locking
+
+Before editing a file, an agent must acquire a lock. Locks have:
+- **TTL** — Expired locks are automatically cleaned up (no deadlocks from crashed agents)
+- **Glob support** — Lock `src/auth/*` to claim an entire directory
+- **Conflict detection** — Overlapping lock requests are rejected with clear error messages
+
+### Scoped Commits
+
+When an agent commits, `git add` only stages files the agent has locked. Post-commit verification confirms the right files landed. This prevents `git add -A` from leaking other agents' uncommitted work.
+
+### Trust Dial (Oversight System)
+
+Three levels of human oversight:
+
+| Level | Behavior |
+|-------|----------|
+| **Supervised** | Agents explain reasoning before acting. Significant actions require approval. |
+| **Balanced** | Key decisions need approval; routine work proceeds automatically. |
+| **Autonomous** | Agents work independently. Only critical failures require intervention. |
+
+Set globally or per-project. The **AttentionBar** at the top of the dashboard shows the current level with an escalation indicator (green/yellow/red).
 
 → [Oversight Guide](/guide/oversight)
 
+### Governance Pipeline <Badge type="warning" text="Future Feature" />
+
+> The governance infrastructure exists in the codebase but is currently disabled (`enabled: false`). It will be activated in a future release.
+
+The governance system is designed to route every agent command through ordered hooks before execution:
+
+1. **Security** — Blocked patterns, path traversal checks
+2. **Permission** — Role-based access control
+3. **Validation** — Payload schema validation
+4. **Rate Limiting** — Per-command throttling
+5. **Policy** — Custom policy rules
+6. **Approval** — Human approval gates (when configured)
+
+Post-hooks will handle audit logging and metrics collection.
+
+### Decision Queue
+
+When agents face architectural choices or need permission, they surface decisions to you:
+- Review decisions in the **Approval Queue** (Shift+A shortcut)
+- **Approve** with optional comment, **reject** with reason, or **dismiss**
+- Auto-deny timer pauses while you're reviewing (no missed decisions)
+- Decisions are categorized automatically (architecture, style, testing, etc.)
+
+### Security
+
+- **Prompt injection sanitization** — 4-layer defense at write boundary
+- **Secret redaction** — 12 regex pattern categories (AWS, GitHub, API keys, etc.) redacted from WS broadcasts, DB writes, logs
+- **CORS lockdown** and rate limiting
+- **Path traversal validation** for CWD and file operations
+- **Challenge-response auth** for integrations
+
+→ [Coordination Guide](/guide/coordination)
+
+## Knowledge & Persistence <Badge type="info" text="In Development" />
+
+What agents learn carries across sessions. The core knowledge infrastructure exists and is functional — the system design is being refined for the best developer experience.
+
+### Knowledge Base
+
+Four-category knowledge system:
+
+| Category | Purpose | Example |
+|----------|---------|---------|
+| **Core** 🛡️ | Project rules, identity | "Use factory pattern for services" |
+| **Procedural** 🔧 | Patterns, corrections, how-to | "Always run lint before commit" |
+| **Semantic** 🗄️ | Architecture, facts, relationships | "Auth module uses JWT with bcrypt" |
+| **Episodic** 📜 | Session summaries, recent events | "Session 5 refactored the API layer" |
+
+Browse, search (fuzzy search via Fuse.js), and manage entries from the **Knowledge** page in the dashboard.
+
+### Knowledge Injection
+
+On agent spawn, the **KnowledgeInjector** automatically injects relevant knowledge into the agent's context:
+- Token-budgeted to avoid context overflow
+- Priority: Core (always) > Procedural > Semantic > Episodic
+- Sanitized against prompt injection
+
+### Skills System
+
+Drop Markdown files in `.github/skills/` and they're hot-reloaded into agent prompts:
+
+```
+.github/skills/
+├── testing-conventions/
+│   └── SKILL.md
+├── api-patterns/
+│   └── SKILL.md
+└── error-handling/
+    └── SKILL.md
+```
+
+Each skill has YAML frontmatter with `name` and `description` to control when it's loaded.
+
+### Collective Memory
+
+Cross-session knowledge that compounds over time. Agents can `remember()` facts and `recall()` them in future sessions. Knowledge is automatically extracted from completed sessions.
+
+### Session Management
+
+- **Session resume** — Resume from a previous session ID with full context recovery
+- **Session replay** — Scrub through past sessions with a timeline scrubber. Keyframes capture agent state, messages, and DAG changes. Adjustable playback speed. Shareable via tokenized links.
+- **Session history** — Browse past sessions with metadata (duration, tasks, token usage)
+- **Persistent projects** — Projects survive across sessions. Chat history, state, and knowledge auto-load on startup.
+
+→ [Session Management](/guide/session-management)
+
+## Monitoring & Notifications
+
+### AttentionBar
+
+Persistent status bar at the top of every page with three escalation states:
+- 🟢 **Green** — All clear
+- 🟡 **Yellow** — Needs attention (pending decisions, context pressure)
+- 🔴 **Red** — Action required (failed agents, blocked tasks)
+
+Updates via WebSocket push (<3s latency). Sensitivity adjusts with the Trust Dial level.
+
+### PulseStrip
+
+Compact horizontal strip showing real-time crew health: active agents, token usage, context window pressure per agent, and pending decision count.
+
 ### Notification Channels
-Configure how and when you receive alerts: in-app notifications, desktop notifications, sound alerts. Set per-event-type preferences (e.g., only alert on errors, not routine progress). External channels (Telegram, Slack) use separate routing preferences and fire regardless of oversight level.
+
+Configure alerts for:
+- **Desktop notifications** — Browser notifications with sound/preview options
+- **Telegram** — Bot integration with batched delivery and challenge-response auth
+- **Slack** — Webhooks with optional thread-per-session
+- **Discord** — Webhooks with optional thread-per-session
+
+Configurable quiet hours (timezone-aware) and per-event-type preferences.
+
+→ [Telegram Integration](/guide/telegram-integration)
+
+## Navigation & Productivity
+
+### Command Palette
+
+Press **⌘K** (Mac) or **Ctrl+K** (Windows/Linux) to:
+- Navigate to any page, agent, or setting
+- Search across entities
+- Execute natural language commands (27 NL commands across 4 categories — no LLM required)
+
+→ [Command Palette Guide](/guide/command-palette)
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| ⌘K / Ctrl+K | Command palette |
+| Shift+A | Approval queue |
+| Alt+1–5 | Switch project tabs |
+| Escape | Close modals/panels |
+
+### Global Search
+
+Search across messages, tasks, decisions, and activity from the search dialog (⌘+Shift+K).
+
+### Historical Data
+
+All pages load from the REST API when no live agents are present — no empty states for existing projects. You can browse any past project's timeline, tasks, decisions, and analytics even when nothing is running.
+
+## Onboarding
+
+### Contextual Coach
+
+Behavior-triggered tips appear as toasts when specific conditions are met — for example, after your first approval, after repeated manual approvals (suggesting you adjust the Trust Dial), or on first agent crash. Tips appear once per trigger and are tracked in localStorage.
+
+### QuickStart Templates
+
+Pre-configured project templates let new users launch their first crew in seconds. Five built-in templates cover common workflows:
+
+- **Code Review** — Lead + 2 developers + reviewer
+- **Bug Fix** — Architect + 2 developers + QA
+- **Quick Fix** — Lead + developer (recommended for first-time users)
+- **Docs Blitz** — Writer + developer
+- **Full Build** — Lead + architect + 3 developers + reviewer + QA
+
+### Spotlight Tour
+
+A 6-step interactive guided tour that highlights key UI elements — the pulse strip, agent cards, approval queue, chat panel, sidebar, and command palette. Each step spotlights one element with a tooltip explanation. Progress is tracked and the tour only appears once.
+
+### Progressive Route Disclosure
+
+The sidebar starts minimal and reveals more navigation items as you gain experience:
+
+| Tier | Visible Routes | Unlocked When |
+|------|---------------|---------------|
+| **Starter** | Lead, Overview, Crews, Settings | Always |
+| **Active** | + Tasks, Timeline | 2+ agents spawned or any tasks created |
+| **Collaboration** | + Mission Control | 3+ agents in a session |
+| **Power** | + Analytics, Groups, Org Chart, Database | 3+ sessions or manual expansion |
+
+All routes remain accessible via the command palette and direct URLs regardless of tier.
 
 ### Data Management
-Purge old session data from the database. Preview shows exact record counts before deletion. Configurable retention period (7 days to 1 year). Transactional cleanup ensures consistency.
 
-→ [Settings Guide](/guide/dashboard-settings)
+Purge old session data from **Settings → Data Management**. Preview shows exact record counts before deletion. Configurable retention period (7 days to 1 year).
 
-## Phase 4 — Intelligence & Community
-
-The final phase adds workflow automation, community features, and performance optimizations.
-
-### Command Palette V2
-The ⌘K command palette is the brain of the product. Fuzzy search (Fuse.js) across all entities — agents, tasks, routes, settings. AI-powered suggestions surface context-aware actions. Natural language commands. Preview panel shows details before executing. Recent commands on empty query.
-
-→ [Command Palette Guide](/guide/command-palette)
-
-### Natural Language Crew Control
-27 NL commands across 4 categories (control, query, navigate, create). Type "pause all agents" or "show me running tasks" directly in ⌘K. Pattern matching — no LLM required. Mandatory preview for destructive commands. Undo stack with 5-minute TTL.
-
-→ [Command Palette Guide](/guide/command-palette)
-
-### Smart Onboarding
-Three-layer onboarding system. QuickStart: guided project creation as first-run experience (productive in <60 seconds). SpotlightTour: 6-step overlay highlighting real UI elements. Progressive Route Disclosure: sidebar starts with 4 items, grows to 11 as mastery develops. Contextual Coach: behavior-triggered tips.
-
-→ [Onboarding Guide](/guide/onboarding)
-
-### Chat Virtualization
-High-performance chat rendering using react-virtuoso. Only visible messages plus a small overscan buffer are rendered in the DOM, keeping the UI responsive even with 1000+ messages. Pinned user message banners ensure important messages from the user are never buried under agent responses.
-
-### Conflict Detection
-Four detection levels: same directory, import overlap, lock contention, branch divergence. Real-time scanning. Conflict detail panel with resolution options. Integration with workflow triggers.
-
-### Custom Role Builder
-Create custom agent roles with visual editor. Emoji and color picker. Model selection with comparison cards. Prompt templates across 6 categories. Live preview card. Test role with dry-run before deploying.
+→ [Settings Guide](/guide/dashboard-settings) · [Data Management](/guide/data-management)

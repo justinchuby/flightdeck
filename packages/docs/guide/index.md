@@ -1,9 +1,6 @@
 # Introduction
 
-Flightdeck is a web-based orchestration framework that coordinates multiple AI coding agents across providers — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, and OpenCode. Give it a task, and it assembles a team of specialists — developers, architects, reviewers, and more — that collaborate like a real engineering team, working in parallel and checking each other's work.
-
-> [!WARNING]
-> This is AI-generated code. Use the project with this understanding in mind.
+Flightdeck is a web-based orchestration platform that coordinates multiple AI coding agents across providers — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, OpenCode, Kimi CLI, and Qwen Code. Give it a task, and it assembles a team of specialists — developers, architects, reviewers, and more — that collaborate like a real engineering team, working in parallel and checking each other's work.
 
 ## How It Works
 
@@ -16,11 +13,11 @@ Flightdeck is a web-based orchestration framework that coordinates multiple AI c
 ## Key Capabilities
 
 - **14 specialist roles** — developers, architects, code reviewers, designers, QA testers, product managers, and more — each configurable with different AI models for diverse perspectives
-- **6 provider backends** — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, and OpenCode — switchable per project or per role
+- **8 provider backends** — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, OpenCode, Kimi CLI, and Qwen Code — switchable per project or per role
 - **Parallel execution** — multiple agents coding, reviewing, and testing simultaneously with up to 50 concurrent agents
 - **File locking** — agents claim files before editing, preventing overwrites and merge conflicts
 - **Auto-DAG** — automatic dependency graph generation that tracks what's done, what's next, and what's blocked
-- **Trust Dial** — three-level oversight system (autonomous, supervised, strict) that controls how much autonomy agents have
+- **Trust Dial** — three-level oversight system (Supervised, Balanced, Autonomous) that controls how much autonomy agents have
 - **Built-in code review** — every change can be automatically reviewed before it ships
 - **Real-time dashboard** — see who's doing what, message any agent, interrupt work, or pause everything
 - **Session replay** — scrub through past sessions like a video timeline
