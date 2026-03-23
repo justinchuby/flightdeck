@@ -92,7 +92,7 @@ budget:
   });
 
   it('validates budget thresholds are numbers between 0 and 1 (removed — budget config no longer exists)', () => {
-    // Budget schema was removed; unknown sections are silently ignored by Zod passthrough
+    // Budget schema was removed; the top-level Zod object strips unknown sections (e.g. "budget")
     const result = loadConfig('budget:\n  thresholds:\n    warning: 1.5\n', null);
     expect(result.config).toBeDefined();
   });
