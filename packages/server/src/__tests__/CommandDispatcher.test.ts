@@ -1084,6 +1084,171 @@ describe('CommandDispatcher', () => {
     });
   });
 
+  // ── Short agent ID resolution in group commands ───────────────────
+
+  describe('group commands accept short agent IDs', () => {
+    const devAgent = makeAgent({
+      id: 'agent-dev-aaaa-0000-000000000020',
+      role: makeRole({ id: 'developer', name: 'Developer' }),
+      parentId: 'agent-lead-0001-0000-000000000001',
+      status: 'running',
+    });
+    const archAgent = makeAgent({
+      id: 'agent-arch-bbbb-0000-000000000021',
+      role: makeRole({ id: 'architect', name: 'Architect' }),
+      parentId: 'agent-lead-0001-0000-000000000001',
+      status: 'running',
+    });
+
+    it('CREATE_GROUP resolves short ID prefixes to full UUIDs', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, devAgent, archAgent]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === devAgent.id) return devAgent;
+        if (id === archAgent.id) return archAgent;
+        return undefined;
+      });
+      (ctx.chatGroupRegistry.create as any).mockReturnValue({
+        name: 'team', memberIds: [leadAgent.id, devAgent.id, archAgent.id],
+        leadId: leadAgent.id, createdAt: new Date().toISOString(),
+      });
+
+      const shortDev = devAgent.id.slice(0, 8);
+      const shortArch = archAgent.id.slice(0, 8);
+      dispatch(dispatcher, leadAgent, `⟦⟦ CREATE_GROUP {"name": "team", "members": ["${shortDev}", "${shortArch}"]} ⟧⟧`);
+
+      expect(ctx.chatGroupRegistry.create).toHaveBeenCalledWith(
+        leadAgent.id,
+        'team',
+        expect.arrayContaining([devAgent.id, archAgent.id, leadAgent.id]),
+        undefined,
+        undefined,
+      );
+    });
+
+    it('CREATE_GROUP still works with full UUIDs', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, devAgent]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === devAgent.id) return devAgent;
+        return undefined;
+      });
+      (ctx.chatGroupRegistry.create as any).mockReturnValue({
+        name: 'team', memberIds: [leadAgent.id, devAgent.id],
+        leadId: leadAgent.id, createdAt: new Date().toISOString(),
+      });
+
+      dispatch(dispatcher, leadAgent, `⟦⟦ CREATE_GROUP {"name": "team", "members": ["${devAgent.id}"]} ⟧⟧`);
+
+      expect(ctx.chatGroupRegistry.create).toHaveBeenCalledWith(
+        leadAgent.id,
+        'team',
+        expect.arrayContaining([devAgent.id, leadAgent.id]),
+        undefined,
+        undefined,
+      );
+    });
+
+    it('ADD_TO_GROUP resolves short ID prefixes', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, devAgent, archAgent]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === devAgent.id) return devAgent;
+        if (id === archAgent.id) return archAgent;
+        return undefined;
+      });
+      (ctx.chatGroupRegistry as any).findGroupForAgent = vi.fn().mockReturnValue({
+        name: 'team', leadId: leadAgent.id,
+        memberIds: [leadAgent.id], createdAt: new Date().toISOString(),
+      });
+      (ctx.chatGroupRegistry.addMembers as any).mockReturnValue([devAgent.id]);
+      (ctx.chatGroupRegistry.getMembers as any).mockReturnValue([leadAgent.id, devAgent.id]);
+      (ctx.chatGroupRegistry.getMessages as any).mockReturnValue([]);
+
+      const shortDev = devAgent.id.slice(0, 8);
+      dispatch(dispatcher, leadAgent, `⟦⟦ ADD_TO_GROUP {"group": "team", "members": ["${shortDev}"]} ⟧⟧`);
+
+      expect(ctx.chatGroupRegistry.addMembers).toHaveBeenCalledWith(
+        leadAgent.id,
+        'team',
+        [devAgent.id],
+      );
+    });
+
+    it('CREATE_GROUP reports ambiguous short IDs', () => {
+      // Two agents with same 8-char prefix
+      const agentA = makeAgent({
+        id: 'abcd1234-aaaa-0000-000000000030',
+        role: makeRole({ id: 'dev-a', name: 'Dev A' }),
+        parentId: leadAgent.id,
+        status: 'running',
+      });
+      const agentB = makeAgent({
+        id: 'abcd1234-bbbb-0000-000000000031',
+        role: makeRole({ id: 'dev-b', name: 'Dev B' }),
+        parentId: leadAgent.id,
+        status: 'running',
+      });
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, agentA, agentB]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === agentA.id) return agentA;
+        if (id === agentB.id) return agentB;
+        return undefined;
+      });
+      (ctx.chatGroupRegistry.create as any).mockReturnValue({
+        name: 'team', memberIds: [leadAgent.id],
+        leadId: leadAgent.id, createdAt: new Date().toISOString(),
+      });
+
+      dispatch(dispatcher, leadAgent, '⟦⟦ CREATE_GROUP {"name": "team", "members": ["abcd1234"]} ⟧⟧');
+
+      expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Ambiguous agent ID'),
+      );
+    });
+
+    it('CREATE_GROUP reports unresolvable IDs', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent]);
+      (ctx.getAgent as any).mockImplementation((id: string) =>
+        id === leadAgent.id ? leadAgent : undefined,
+      );
+      (ctx.chatGroupRegistry.create as any).mockReturnValue({
+        name: 'team', memberIds: [leadAgent.id],
+        leadId: leadAgent.id, createdAt: new Date().toISOString(),
+      });
+
+      dispatch(dispatcher, leadAgent, '⟦⟦ CREATE_GROUP {"name": "team", "members": ["nonexist"]} ⟧⟧');
+
+      expect(leadAgent.sendMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Cannot resolve agent'),
+      );
+    });
+
+    it('CREATE_GROUP resolves by role name', () => {
+      (ctx.getAllAgents as any).mockReturnValue([leadAgent, devAgent]);
+      (ctx.getAgent as any).mockImplementation((id: string) => {
+        if (id === leadAgent.id) return leadAgent;
+        if (id === devAgent.id) return devAgent;
+        return undefined;
+      });
+      (ctx.chatGroupRegistry.create as any).mockReturnValue({
+        name: 'team', memberIds: [leadAgent.id, devAgent.id],
+        leadId: leadAgent.id, createdAt: new Date().toISOString(),
+      });
+
+      dispatch(dispatcher, leadAgent, '⟦⟦ CREATE_GROUP {"name": "team", "members": ["developer"]} ⟧⟧');
+
+      expect(ctx.chatGroupRegistry.create).toHaveBeenCalledWith(
+        leadAgent.id,
+        'team',
+        expect.arrayContaining([devAgent.id, leadAgent.id]),
+        undefined,
+        undefined,
+      );
+    });
+  });
+
   // ── Auto-DAG-update on completion ──────────────────────────────────
 
   describe('auto-DAG-update on agent completion', () => {

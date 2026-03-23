@@ -152,6 +152,40 @@ export function resolveAgentInProject(
   return partial;
 }
 
+/**
+ * Resolve a list of member identifiers to full agent UUIDs.
+ * Accepts full UUIDs, short ID prefixes (8-char), role IDs, or role names.
+ * Reports ambiguous or unresolvable IDs back to the requesting agent.
+ */
+function resolveGroupMembers(
+  ctx: CommandHandlerContext,
+  memberIds: string[],
+  senderProjectId: string | undefined,
+  agent: Agent,
+): string[] {
+  const resolved: string[] = [];
+  for (const memberId of memberIds) {
+    // Check for ambiguous prefix matches before resolving
+    const candidates = ctx.getAllAgents().filter((a) =>
+      a.id.startsWith(memberId) && a.id !== memberId &&
+      (!senderProjectId || ctx.getProjectIdForAgent(a.id) === senderProjectId)
+    );
+    if (candidates.length > 1) {
+      const names = candidates.map((a) => `${a.role.name} (${shortAgentId(a.id)})`).join(', ');
+      agent.sendMessage(`[System] Ambiguous agent ID "${memberId}" matches ${candidates.length} agents: ${names}. Use a longer prefix or full UUID.`);
+      continue;
+    }
+
+    const found = resolveAgentInProject(ctx, memberId, senderProjectId);
+    if (found) {
+      if (!resolved.includes(found.id)) resolved.push(found.id);
+    } else {
+      agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
+    }
+  }
+  return resolved;
+}
+
 // ── Handler implementations ─────────────────────────────────────────
 
 function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -266,15 +300,10 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
       }
     }
 
-    for (const memberId of (req.members ?? [])) {
-      const resolved = ctx.getAllAgents().find((a) =>
-        (a.id === memberId || a.id.startsWith(memberId)) && (a.parentId === leadId || a.id === leadId)
-      );
-      if (resolved) {
-        resolvedIds.push(resolved.id);
-      } else {
-        agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
-      }
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const memberResolved = resolveGroupMembers(ctx, req.members ?? [], senderProjectId, agent);
+    for (const id of memberResolved) {
+      if (!resolvedIds.includes(id)) resolvedIds.push(id);
     }
     if (!resolvedIds.includes(agent.id)) {
       resolvedIds.push(agent.id);
@@ -320,10 +349,8 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
       return;
     }
 
-    const resolvedIds = req.members.map((m: string) => {
-      const found = ctx.getAllAgents().find((a) => (a.id === m || a.id.startsWith(m)) && (a.parentId === leadId || a.id === leadId));
-      return found?.id;
-    }).filter(Boolean) as string[];
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const resolvedIds = resolveGroupMembers(ctx, req.members, senderProjectId, agent);
 
     const added = ctx.chatGroupRegistry.addMembers(leadId, req.group, resolvedIds);
     if (added.length > 0) {
