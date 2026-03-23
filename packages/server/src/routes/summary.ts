@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import { CatchUpService } from '../coordination/sessions/CatchUpSummary.js';
+import { badRequest, internalError } from '../errors/index.js';
+import { logger } from '../utils/logger.js';
 
 export function summaryRoutes(ctx: AppContext): Router {
   const { agentManager, activityLedger, decisionLog } = ctx;
@@ -10,7 +12,7 @@ export function summaryRoutes(ctx: AppContext): Router {
     const { leadId } = req.params;
     const since = req.query.t as string;
     if (!since) {
-      return res.status(400).json({ error: 'Missing required query param: t (ISO timestamp)' });
+      throw badRequest('Missing required query param: t (ISO timestamp)');
     }
 
     const taskDAG = agentManager.getTaskDAG?.() ?? null;
@@ -20,7 +22,8 @@ export function summaryRoutes(ctx: AppContext): Router {
       const summary = service.getSummary(leadId, since);
       res.json(summary);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to generate summary', detail: (err as Error).message });
+      logger.error({ module: 'summary', msg: 'Failed to generate summary', err: (err as Error).message });
+      throw internalError('Failed to generate summary');
     }
   });
 
@@ -29,7 +32,7 @@ export function summaryRoutes(ctx: AppContext): Router {
     const { leadId } = req.params;
     const since = (req.query.since ?? req.query.t) as string;
     if (!since) {
-      return res.status(400).json({ error: 'Missing required query param: since (ISO timestamp)' });
+      throw badRequest('Missing required query param: since (ISO timestamp)');
     }
 
     const taskDAG = agentManager.getTaskDAG?.() ?? null;
@@ -39,7 +42,8 @@ export function summaryRoutes(ctx: AppContext): Router {
       const summary = service.getSummary(leadId, since);
       res.json(summary);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to generate summary', detail: (err as Error).message });
+      logger.error({ module: 'summary', msg: 'Failed to generate summary', err: (err as Error).message });
+      throw internalError('Failed to generate summary');
     }
   });
 

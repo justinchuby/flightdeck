@@ -5,6 +5,7 @@ import { ReportGenerator } from '../coordination/reporting/ReportGenerator.js';
 import { ParallelAnalyzer } from '../tasks/ParallelAnalyzer.js';
 import { getRecentCommits } from './context.js';
 import type { AppContext } from './context.js';
+import { badRequest, notFound, conflict, internalError, serviceUnavailable, tooManyRequests, forbidden } from '../errors/index.js';
 
 export function servicesRoutes(ctx: AppContext): Router {
   const {
@@ -62,10 +63,7 @@ export function servicesRoutes(ctx: AppContext): Router {
       return;
     }
     const leadId = req.query.leadId as string | undefined;
-    if (!leadId) {
-      res.status(400).json({ error: 'leadId query parameter required' });
-      return;
-    }
+    if (!leadId) throw badRequest('leadId query parameter required');
     const query = {
       file: req.query.file as string | undefined,
       technology: req.query.technology as string | undefined,
@@ -80,7 +78,7 @@ export function servicesRoutes(ctx: AppContext): Router {
   router.get('/coordination/match-agent', (req, res) => {
     if (!agentMatcher) { res.json([]); return; }
     const leadId = req.query.leadId as string;
-    if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
+    if (!leadId) throw badRequest('leadId required');
     const query = {
       task: (req.query.task as string) || '',
       requiredRole: req.query.role as string | undefined,
@@ -102,27 +100,17 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.post('/coordination/retros/:leadId', (req, res) => {
-    if (!sessionRetro) {
-      res.status(503).json({ error: 'Session retro not available' });
-      return;
-    }
+    if (!sessionRetro) throw serviceUnavailable('Session retro not available');
     const data = sessionRetro.generateRetro(req.params.leadId);
     res.json(data);
   });
 
   // --- Session Export ---
   router.get('/export/:leadId', (req, res) => {
-    if (!sessionExporter) {
-      res.status(503).json({ error: 'Session exporter not available' });
-      return;
-    }
-    try {
-      const outputDir = join(process.cwd(), '.flightdeck', 'exports');
-      const result = sessionExporter.export(req.params.leadId, outputDir);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    if (!sessionExporter) throw serviceUnavailable('Session exporter not available');
+    const outputDir = join(process.cwd(), '.flightdeck', 'exports');
+    const result = sessionExporter.export(req.params.leadId, outputDir);
+    res.json(result);
   });
 
   // --- File Dependency Graph ---
@@ -132,10 +120,7 @@ export function servicesRoutes(ctx: AppContext): Router {
       return;
     }
     const file = req.query.file as string;
-    if (!file) {
-      res.status(400).json({ error: 'file query parameter required' });
-      return;
-    }
+    if (!file) throw badRequest('file query parameter required');
     res.json(fileDependencyGraph.getImpact(file));
   });
 
@@ -159,15 +144,15 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.post('/webhooks', (req, res) => {
-    if (!webhookManager) { res.status(503).json({ error: 'Webhooks not available' }); return; }
+    if (!webhookManager) throw serviceUnavailable('Webhooks not available');
     const { url, events, secret, enabled } = req.body;
-    if (!url || !events?.length) { res.status(400).json({ error: 'url and events[] required' }); return; }
+    if (!url || !events?.length) throw badRequest('url and events[] required');
     const webhook = webhookManager.register({ url, events, secret, enabled: enabled ?? true });
     res.status(201).json(webhook);
   });
 
   router.delete('/webhooks/:id', (req, res) => {
-    if (!webhookManager) { res.status(503).json({ error: 'Webhooks not available' }); return; }
+    if (!webhookManager) throw serviceUnavailable('Webhooks not available');
     const removed = webhookManager.unregister(req.params.id);
     res.json({ removed });
   });
@@ -184,9 +169,9 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.post('/coordination/decompose', (req, res) => {
-    if (!taskDecomposer) { res.status(503).json({ error: 'Task decomposer not available' }); return; }
+    if (!taskDecomposer) throw serviceUnavailable('Task decomposer not available');
     const { task } = req.body;
-    if (!task) { res.status(400).json({ error: 'task description required' }); return; }
+    if (!task) throw badRequest('task description required');
     res.json(taskDecomposer.decompose(task));
   });
 
@@ -194,7 +179,7 @@ export function servicesRoutes(ctx: AppContext): Router {
   router.get('/coordination/scorecards', (req, res) => {
     if (!performanceTracker) { res.json([]); return; }
     const leadId = req.query.leadId as string;
-    if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
+    if (!leadId) throw badRequest('leadId required');
     res.json(performanceTracker.getCrewScorecards(leadId));
   });
 
@@ -206,7 +191,7 @@ export function servicesRoutes(ctx: AppContext): Router {
   router.get('/coordination/leaderboard', (req, res) => {
     if (!performanceTracker) { res.json([]); return; }
     const leadId = req.query.leadId as string;
-    if (!leadId) { res.status(400).json({ error: 'leadId required' }); return; }
+    if (!leadId) throw badRequest('leadId required');
     res.json(performanceTracker.getLeaderboard(leadId));
   });
 
@@ -221,7 +206,7 @@ export function servicesRoutes(ctx: AppContext): Router {
       since: req.query.since as string,
       limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
     };
-    if (!query.query) { res.status(400).json({ error: 'q parameter required' }); return; }
+    if (!query.query) throw badRequest('q parameter required');
     res.json(searchEngine.search(query));
   });
 
@@ -244,14 +229,14 @@ export function servicesRoutes(ctx: AppContext): Router {
   router.get('/coordination/decisions/search', (req, res) => {
     if (!decisionRecordStore) { res.json([]); return; }
     const q = req.query.q as string;
-    if (!q) { res.status(400).json({ error: 'q parameter required' }); return; }
+    if (!q) throw badRequest('q parameter required');
     res.json(decisionRecordStore.search(q));
   });
 
   router.get('/coordination/decisions/:id', (req, res) => {
-    if (!decisionRecordStore) { res.status(404).json(null); return; }
+    if (!decisionRecordStore) throw notFound('Decision store not available');
     const record = decisionRecordStore.get(req.params.id);
-    if (!record) { res.status(404).json({ error: 'not found' }); return; }
+    if (!record) throw notFound('not found');
     res.json(record);
   });
 
@@ -303,9 +288,9 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.put('/notifications/:id/read', (req, res) => {
-    if (!notificationManager) { res.status(404).json({ error: 'Notification manager not available' }); return; }
+    if (!notificationManager) throw notFound('Notification manager not available');
     const ok = notificationManager.markRead(req.params.id);
-    if (!ok) { res.status(404).json({ error: 'Notification not found' }); return; }
+    if (!ok) throw notFound('Notification not found');
     res.json({ ok: true });
   });
 
@@ -316,7 +301,7 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.put('/notifications/preferences', (req, res) => {
-    if (!notificationManager) { res.status(503).json({ error: 'Notification manager not available' }); return; }
+    if (!notificationManager) throw serviceUnavailable('Notification manager not available');
     const userId = (req.body.userId as string) || 'default';
     const prefs = notificationManager.setPreferences(userId, req.body);
     res.json(prefs);
@@ -334,9 +319,9 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.put('/coordination/escalations/:id/resolve', (req, res) => {
-    if (!escalationManager) { res.status(404).json({ error: 'Escalation manager not available' }); return; }
+    if (!escalationManager) throw notFound('Escalation manager not available');
     const ok = escalationManager.resolve(req.params.id);
-    if (!ok) { res.status(404).json({ error: 'Escalation not found' }); return; }
+    if (!ok) throw notFound('Escalation not found');
     res.json({ ok: true });
   });
 
@@ -437,40 +422,40 @@ export function servicesRoutes(ctx: AppContext): Router {
   // --- Project Templates ---
   // NOTE: /search must be registered before /:id so Express does not match "search" as an ID.
   router.get('/coordination/project-templates/search', (req, res) => {
-    if (!projectTemplateRegistry) return res.status(503).json({ error: 'Project template registry not available' });
+    if (!projectTemplateRegistry) throw serviceUnavailable('Project template registry not available');
     const keyword = (req.query.keyword as string ?? '').trim();
-    if (!keyword) return res.status(400).json({ error: 'keyword query parameter required' });
+    if (!keyword) throw badRequest('keyword query parameter required');
     res.json(projectTemplateRegistry.findByKeyword(keyword));
   });
 
   router.get('/coordination/project-templates', (_req, res) => {
-    if (!projectTemplateRegistry) return res.status(503).json({ error: 'Project template registry not available' });
+    if (!projectTemplateRegistry) throw serviceUnavailable('Project template registry not available');
     res.json(projectTemplateRegistry.getAll());
   });
 
   router.get('/coordination/project-templates/:id', (req, res) => {
-    if (!projectTemplateRegistry) return res.status(503).json({ error: 'Project template registry not available' });
+    if (!projectTemplateRegistry) throw serviceUnavailable('Project template registry not available');
     const template = projectTemplateRegistry.get(req.params.id);
-    if (!template) return res.status(404).json({ error: `Template '${req.params.id}' not found` });
+    if (!template) throw notFound(`Template '${req.params.id}' not found`);
     res.json(template);
   });
 
   // --- Knowledge Transfer ---
   router.get('/coordination/knowledge/search', (req, res) => {
-    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    if (!knowledgeTransfer) throw serviceUnavailable('Knowledge transfer not available');
     const q = (req.query.q as string ?? '').trim();
-    if (!q) return res.status(400).json({ error: 'q query parameter required' });
+    if (!q) throw badRequest('q query parameter required');
     res.json(knowledgeTransfer.search(q));
   });
 
   router.get('/coordination/knowledge/popular', (req, res) => {
-    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    if (!knowledgeTransfer) throw serviceUnavailable('Knowledge transfer not available');
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
     res.json(knowledgeTransfer.getPopular(limit));
   });
 
   router.get('/coordination/knowledge', (req, res) => {
-    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    if (!knowledgeTransfer) throw serviceUnavailable('Knowledge transfer not available');
     const { projectId, category, tag } = req.query;
     if (typeof projectId === 'string') return res.json(knowledgeTransfer.getByProject(projectId));
     if (typeof category === 'string') return res.json(knowledgeTransfer.getByCategory(category as import('../coordination/knowledge/KnowledgeTransfer.js').KnowledgeCategory));
@@ -479,15 +464,15 @@ export function servicesRoutes(ctx: AppContext): Router {
   });
 
   router.post('/coordination/knowledge', (req, res) => {
-    if (!knowledgeTransfer) return res.status(503).json({ error: 'Knowledge transfer not available' });
+    if (!knowledgeTransfer) throw serviceUnavailable('Knowledge transfer not available');
     const { projectId, category, title, content, tags } = req.body as Record<string, unknown>;
     const validCategories = ['pattern', 'pitfall', 'tool', 'architecture', 'process'];
-    if (typeof projectId !== 'string' || !projectId) return res.status(400).json({ error: 'projectId required' });
+    if (typeof projectId !== 'string' || !projectId) throw badRequest('projectId required');
     if (typeof category !== 'string' || !validCategories.includes(category)) {
-      return res.status(400).json({ error: `category must be one of: ${validCategories.join(', ')}` });
+      throw badRequest(`category must be one of: ${validCategories.join(', ')}`);
     }
-    if (typeof title !== 'string' || !title) return res.status(400).json({ error: 'title required' });
-    if (typeof content !== 'string') return res.status(400).json({ error: 'content required' });
+    if (typeof title !== 'string' || !title) throw badRequest('title required');
+    if (typeof content !== 'string') throw badRequest('content required');
     const entryTags = Array.isArray(tags) ? (tags as unknown[]).filter((t): t is string => typeof t === 'string') : [];
     const entry = knowledgeTransfer.capture({
       projectId,

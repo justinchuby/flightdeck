@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { ApiError, badRequest } from '../errors/index.js';
+import { ApiError, badRequest, internalError } from '../errors/index.js';
+import { logger } from '../utils/logger.js';
 import { sql, inArray, or, isNull } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import fs from 'node:fs';
@@ -151,7 +152,8 @@ export function dataRoutes(ctx: AppContext): Router {
         oldestSession: oldest?.startedAt ?? null,
       });
     } catch (err: any) {
-      throw new ApiError(500, 'Failed to load database stats', { details: (err as Error).message });
+      logger.error({ module: 'data', msg: 'Failed to load database stats', err: (err as Error).message });
+      throw internalError('Failed to load database stats');
     }
   });
 
@@ -287,7 +289,8 @@ export function dataRoutes(ctx: AppContext): Router {
       res.json({ deleted: counts, totalDeleted, sessionsDeleted: oldSessions.length, dryRun: false, cutoffDate: cutoff });
     } catch (err: any) {
       if (err instanceof ApiError) throw err;
-      throw new ApiError(500, 'Failed to purge data', { details: (err as Error).message });
+      logger.error({ module: 'data', msg: 'Failed to purge data', err: (err as Error).message });
+      throw internalError('Failed to purge data');
     }
   });
 

@@ -13,6 +13,7 @@ import { logger } from '../utils/logger.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { isTerminalStatus } from '../agents/Agent.js';
 import { ActiveDelegationRepository } from '../db/ActiveDelegationRepository.js';
+import { badRequest, notFound, conflict, internalError, serviceUnavailable } from '../errors/index.js';
 import type { AppContext } from './context.js';
 
 // ── Rate Limiters ───────────────────────────────────────────────────
@@ -62,52 +63,44 @@ export function crewRoutes(ctx: AppContext): Router {
   // ── GET /crews ──────────────────────────────────────────────────
 
   router.get('/crews', readLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
-    try {
-      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
 
-      // Project-scoped: query roster directly (includes terminated agents for history).
-      // Global: filter to agents with an active session in agentManager.
-      const allAgents = projectId
-        ? agentRoster.getByProject(projectId)
-        : filterToActiveSession(agentRoster.getAllAgents(), agentManager.getAll());
+    // Project-scoped: query roster directly (includes terminated agents for history).
+    // Global: filter to agents with an active session in agentManager.
+    const allAgents = projectId
+      ? agentRoster.getByProject(projectId)
+      : filterToActiveSession(agentRoster.getAllAgents(), agentManager.getAll());
 
-      // Group agents by teamId to build crew list
-      const crewMap = new Map<string, { crewId: string; agentCount: number; roles: Set<string> }>();
-      for (const agent of allAgents) {
-        const tid = agent.teamId ?? 'default';
-        if (!crewMap.has(tid)) {
-          crewMap.set(tid, { crewId: tid, agentCount: 0, roles: new Set() });
-        }
-        const crew = crewMap.get(tid)!;
-        crew.agentCount++;
-        crew.roles.add(agent.role);
+    // Group agents by teamId to build crew list
+    const crewMap = new Map<string, { crewId: string; agentCount: number; roles: Set<string> }>();
+    for (const agent of allAgents) {
+      const tid = agent.teamId ?? 'default';
+      if (!crewMap.has(tid)) {
+        crewMap.set(tid, { crewId: tid, agentCount: 0, roles: new Set() });
       }
-
-      const crews = [...crewMap.values()].map((t) => ({
-        crewId: t.crewId,
-        agentCount: t.agentCount,
-        roles: [...t.roles],
-      }));
-
-      res.json({ crews });
-    } catch (err: any) {
-      logger.error({ module: 'crews', msg: 'Failed to list crews', err: err.message });
-      res.status(500).json({ error: err.message });
+      const crew = crewMap.get(tid)!;
+      crew.agentCount++;
+      crew.roles.add(agent.role);
     }
+
+    const crews = [...crewMap.values()].map((t) => ({
+      crewId: t.crewId,
+      agentCount: t.agentCount,
+      roles: [...t.roles],
+    }));
+
+    res.json({ crews });
   });
 
   // ── GET /crews/summary — Crew groups with stats ──────────────────
 
   router.get('/crews/summary', readLimiter, (req, res) => {
-    if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
-    try {
-      const liveAgents = agentManager.getAll();
-      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+    const liveAgents = agentManager.getAll();
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
 
       // Project-scoped: query roster directly; Global: filter to active sessions
       const allAgents = projectId
@@ -176,75 +169,59 @@ export function crewRoutes(ctx: AppContext): Router {
       });
 
       res.json(crews);
-    } catch (err: any) {
-      logger.error({ module: 'crews', msg: 'Failed to get crew summary', err: err.message });
-      res.status(500).json({ error: err.message });
-    }
   });
 
   // ── GET /crews/:crewId ──────────────────────────────────────────
 
   router.get('/crews/:crewId', readLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const crewId = Array.isArray(req.params.crewId) ? req.params.crewId[0] : req.params.crewId;
 
-    try {
-      const agents = filterToActiveSession(
-        agentRoster.getAllAgents(undefined, crewId),
-        agentManager.getAll(),
-      );
+    const agents = filterToActiveSession(
+      agentRoster.getAllAgents(undefined, crewId),
+      agentManager.getAll(),
+    );
 
-      if (agents.length === 0) {
-        return res.status(404).json({ error: `Crew ${crewId} not found or has no agents` });
-      }
+    if (agents.length === 0) throw notFound(`Crew ${crewId} not found or has no agents`);
 
-      const knowledgeCount = knowledgeStore
-        ? knowledgeStore.count(crewId)
-        : 0;
+    const knowledgeCount = knowledgeStore
+      ? knowledgeStore.count(crewId)
+      : 0;
 
-      const trainingSummary = trainingCapture
-        ? trainingCapture.getTrainingSummary(crewId)
-        : null;
+    const trainingSummary = trainingCapture
+      ? trainingCapture.getTrainingSummary(crewId)
+      : null;
 
-      res.json({
-        crewId,
-        agentCount: agents.length,
-        agents: agents.map((a) => ({
-          agentId: a.agentId,
-          role: a.role,
-          model: a.model,
-          status: a.status,
-        })),
-        knowledgeCount,
-        trainingSummary,
-      });
-    } catch (err: any) {
-      logger.error({ module: 'crews', msg: 'Failed to get crew details', crewId, err: err.message });
-      res.status(500).json({ error: err.message });
-    }
+    res.json({
+      crewId,
+      agentCount: agents.length,
+      agents: agents.map((a) => ({
+        agentId: a.agentId,
+        role: a.role,
+        model: a.model,
+        status: a.status,
+      })),
+      knowledgeCount,
+      trainingSummary,
+    });
   });
 
   // ── GET /crews/:crewId/agents ─────────────────────────────────────
 
   router.get('/crews/:crewId/agents', readLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const crewId = paramStr(req.params.crewId);
     const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
     const validStatuses = new Set(['idle', 'running', 'terminated', 'failed']);
 
     if (statusFilter && !validStatuses.has(statusFilter)) {
-      return res.status(400).json({ error: `Invalid status filter: ${statusFilter}` });
+      throw badRequest(`Invalid status filter: ${statusFilter}`);
     }
 
-    try {
-      const allLive = agentManager.getAll();
-      const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
+    const allLive = agentManager.getAll();
+    const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
 
       // Project-scoped: query roster by project then filter by team/status;
       // Global: filter to agents with an active session in agentManager.
@@ -286,30 +263,20 @@ export function crewRoutes(ctx: AppContext): Router {
       });
 
       res.json(enriched);
-    } catch (err: any) {
-      logger.error({ module: 'crews', msg: 'Failed to list crew agents', err: err.message });
-      res.status(500).json({ error: err.message });
-    }
   });
 
   // ── GET /crews/:crewId/agents/:agentId/profile ────────────────────
 
   router.get('/crews/:crewId/agents/:agentId/profile', readLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const crewId = paramStr(req.params.crewId);
     const agentId = paramStr(req.params.agentId);
 
-    if (!AGENT_ID_RE.test(agentId)) {
-      return res.status(400).json({ error: 'Invalid agentId format' });
-    }
+    if (!AGENT_ID_RE.test(agentId)) throw badRequest('Invalid agentId format');
 
     const agent = agentRoster.getAgent(agentId);
-    if (!agent || agent.teamId !== crewId) {
-      return res.status(404).json({ error: 'Agent not found in this crew' });
-    }
+    if (!agent || agent.teamId !== crewId) throw notFound('Agent not found in this crew');
 
     // Live agent info
     const live = agentManager.getAll().find(l => l.id === agentId);
@@ -350,17 +317,12 @@ export function crewRoutes(ctx: AppContext): Router {
   // ── GET /crews/:crewId/health ────────────────────────────────────
 
   router.get('/crews/:crewId/health', readLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const crewId = Array.isArray(req.params.crewId) ? req.params.crewId[0] : req.params.crewId;
 
-    try {
-      const agents = agentRoster.getAllAgents(undefined, crewId);
-      if (agents.length === 0) {
-        return res.status(404).json({ error: `Crew ${crewId} not found or has no agents` });
-      }
+    const agents = agentRoster.getAllAgents(undefined, crewId);
+    if (agents.length === 0) throw notFound(`Crew ${crewId} not found or has no agents`);
 
       const statusCounts = agentRoster.getStatusCounts(crewId);
       const now = Date.now();
@@ -385,54 +347,39 @@ export function crewRoutes(ctx: AppContext): Router {
         statusCounts,
         agents: agentDetails,
       });
-    } catch (err: any) {
-      logger.error({ module: 'crews', msg: 'Failed to get crew health', crewId, err: err.message });
-      res.status(500).json({ error: err.message });
-    }
   });
 
   // ── POST /crews/:crewId/agents/:agentId/clone ──────────────────
 
   router.post('/crews/:crewId/agents/:agentId/clone', writeLimiter, (req, res) => {
-    if (!agentRoster) {
-      return res.status(503).json({ error: 'Agent roster not available' });
-    }
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const agentId = Array.isArray(req.params.agentId) ? req.params.agentId[0] : req.params.agentId;
 
-    try {
-      const source = agentRoster.getAgent(agentId);
-      if (!source) {
-        return res.status(404).json({ error: `Agent ${agentId} not found` });
-      }
+    const source = agentRoster.getAgent(agentId);
+    if (!source) throw notFound(`Agent ${agentId} not found`);
 
-      const newId = `${shortAgentId(agentId)}-clone-${Date.now().toString(36)}`;
-      const clone = agentRoster.cloneAgent(agentId, newId);
-      if (!clone) {
-        return res.status(500).json({ error: 'Failed to clone agent' });
-      }
+    const newId = `${shortAgentId(agentId)}-clone-${Date.now().toString(36)}`;
+    const clone = agentRoster.cloneAgent(agentId, newId);
+    if (!clone) throw internalError('Failed to clone agent');
 
-      logger.info({ module: 'crews', msg: 'Agent cloned', sourceId: agentId, cloneId: newId });
-      res.status(201).json({ ok: true, clone });
-    } catch (err: any) {
-      logger.error({ module: 'crews', msg: 'Failed to clone agent', agentId, err: err.message });
-      res.status(500).json({ error: err.message });
-    }
+    logger.info({ module: 'crews', msg: 'Agent cloned', sourceId: agentId, cloneId: newId });
+    res.status(201).json({ ok: true, clone });
   });
 
   // Delete a crew (lead + all child agents) from the roster
   router.delete('/crews/:leadId', writeLimiter, (req, res) => {
-    if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const leadId = paramStr(req.params.leadId);
     const lead = agentRoster.getAgent(leadId);
-    if (!lead) return res.status(404).json({ error: 'Crew not found — lead agent not in roster' });
+    if (!lead) throw notFound('Crew not found — lead agent not in roster');
 
     // Don't allow deleting active crews — only terminated
     const liveAgents = agentManager.getAll();
     const liveLeadAgent = liveAgents.find(a => a.id === leadId);
     if (liveLeadAgent && (liveLeadAgent.status === 'running' || liveLeadAgent.status === 'idle')) {
-      return res.status(409).json({ error: 'Cannot delete an active crew. Stop the project first.' });
+      throw conflict('Cannot delete an active crew. Stop the project first.');
     }
 
     const deleted = agentRoster.deleteCrew(leadId);
@@ -443,23 +390,19 @@ export function crewRoutes(ctx: AppContext): Router {
   // ── DELETE /roster/:agentId — Remove a single agent from roster ────
 
   router.delete('/roster/:agentId', writeLimiter, (req, res) => {
-    if (!agentRoster) return res.status(503).json({ error: 'Agent roster not available' });
+    if (!agentRoster) throw serviceUnavailable('Agent roster not available');
 
     const agentId = paramStr(req.params.agentId);
 
-    if (!AGENT_ID_RE.test(agentId)) {
-      return res.status(400).json({ error: 'Invalid agentId format' });
-    }
+    if (!AGENT_ID_RE.test(agentId)) throw badRequest('Invalid agentId format');
 
     const agent = agentRoster.getAgent(agentId);
-    if (!agent) {
-      return res.status(404).json({ error: 'Agent not found in roster' });
-    }
+    if (!agent) throw notFound('Agent not found in roster');
 
     // Don't allow deleting active agents — check AgentManager (O(1) lookup)
     const liveAgent = agentManager.get(agentId);
     if (liveAgent && !isTerminalStatus(liveAgent.status)) {
-      return res.status(409).json({ error: 'Cannot delete an active agent. Stop the agent first.' });
+      throw conflict('Cannot delete an active agent. Stop the agent first.');
     }
 
     // Don't allow deleting lead agents that have children (defense in depth)
@@ -475,9 +418,7 @@ export function crewRoutes(ctx: AppContext): Router {
       });
 
       if (hasChildren) {
-        return res.status(409).json({
-          error: 'Cannot delete a lead agent that has children. Delete the crew instead to remove the lead and all descendants.'
-        });
+        throw conflict('Cannot delete a lead agent that has children. Delete the crew instead to remove the lead and all descendants.');
       }
     }
 
@@ -489,9 +430,7 @@ export function crewRoutes(ctx: AppContext): Router {
     }
 
     const deleted = agentRoster.deleteAgent(agentId);
-    if (!deleted) {
-      return res.status(500).json({ error: 'Failed to delete agent from roster' });
-    }
+    if (!deleted) throw internalError('Failed to delete agent from roster');
 
     logger.info({ module: 'crews', msg: 'Agent removed from roster', agentId, role: agent.role });
     res.json({ ok: true, agentId });

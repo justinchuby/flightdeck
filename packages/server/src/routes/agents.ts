@@ -6,6 +6,7 @@ import { validateBody, spawnAgentSchema, sendMessageSchema, agentInputSchema } f
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
 import type { ContentBlock } from '../adapters/types.js';
+import { badRequest, notFound, internalError, tooManyRequests } from '../errors/index.js';
 
 /** Build ContentBlock array from text + optional attachments */
 function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
@@ -50,7 +51,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     const role = roleRegistry.get(roleId);
     if (!role) {
       logger.warn({ module: 'api', msg: 'POST /agents — unknown role', roleId });
-      return res.status(400).json({ error: `Unknown role: ${roleId}` });
+      throw badRequest(`Unknown role: ${roleId}`);
     }
     try {
       // Auto-create a project for lead agents so they always have a projectId.
@@ -72,8 +73,8 @@ export function agentsRoutes(ctx: AppContext): Router {
       res.status(201).json(agent.toJSON());
     } catch (err: any) {
       logger.error({ module: 'api', msg: 'POST /agents failed', err: err.message });
-      const status = err.message?.includes('disabled') ? 400 : 429;
-      res.status(status).json({ error: err.message });
+      if (err.message?.includes('disabled')) throw badRequest(err.message);
+      throw tooManyRequests(err.message);
     }
   });
 
@@ -89,7 +90,7 @@ export function agentsRoutes(ctx: AppContext): Router {
 
   router.post('/agents/:id/interrupt', async (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     try {
       await agent.interrupt();
       agentManager.markHumanInterrupt(agent.id);
@@ -102,16 +103,16 @@ export function agentsRoutes(ctx: AppContext): Router {
 
   router.post('/agents/:id/restart', async (req, res) => {
     const newAgent = await agentManager.restart(req.params.id);
-    if (!newAgent) return res.status(404).json({ error: 'Agent not found' });
+    if (!newAgent) throw notFound('Agent not found');
     res.status(201).json(newAgent.toJSON());
   });
 
   router.post('/agents/:id/compact', async (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     // Compact = restart with context handoff (same as restart but semantically different)
     const newAgent = await agentManager.restart(req.params.id);
-    if (!newAgent) return res.status(500).json({ error: 'Failed to compact agent context' });
+    if (!newAgent) throw internalError('Failed to compact agent context');
     res.status(201).json({ compacted: true, agent: newAgent.toJSON() });
   });
 
@@ -128,7 +129,7 @@ export function agentsRoutes(ctx: AppContext): Router {
     if (row) {
       return res.json({ agentId: row.agentId, plan: JSON.parse(row.planJson) });
     }
-    res.status(404).json({ error: 'Agent not found' });
+    throw notFound('Agent not found');
   });
 
   // Get message history for an agent (persisted across refreshes)
@@ -173,7 +174,7 @@ export function agentsRoutes(ctx: AppContext): Router {
   router.post('/agents/:id/input', validateBody(agentInputSchema), (req, res) => {
     const { text } = req.body;
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     logger.info({ module: 'api', msg: 'Input received', agentId: req.params.id, roleName: agent.role.name, textPreview: text.slice(0, 80) });
     agent.write(text);
     res.json({ ok: true });
@@ -183,7 +184,7 @@ export function agentsRoutes(ctx: AppContext): Router {
   router.post('/agents/:id/message', messageLimiter, validateBody(sendMessageSchema), async (req, res) => {
     const { text, mode = 'queue', attachments } = req.body;
     const agent = agentManager.get(req.params.id as string);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
 
     if (agent.role.id === 'lead') {
       agent.lastHumanMessageAt = new Date();
@@ -209,7 +210,7 @@ export function agentsRoutes(ctx: AppContext): Router {
 
   router.patch('/agents/:id', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     const { model } = req.body;
     if (model !== undefined) {
       agent.model = model;
@@ -221,27 +222,27 @@ export function agentsRoutes(ctx: AppContext): Router {
   // --- Pending message queue management ---
   router.get('/agents/:id/queue', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     res.json({ agentId: agent.id, queue: agent.getPendingMessageSummaries() });
   });
 
   router.delete('/agents/:id/queue/:index', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     const index = parseInt(req.params.index, 10);
-    if (isNaN(index)) return res.status(400).json({ error: 'Invalid index' });
+    if (isNaN(index)) throw badRequest('Invalid index');
     const ok = agent.removePendingMessage(index);
-    if (!ok) return res.status(404).json({ error: 'Index out of range' });
+    if (!ok) throw notFound('Index out of range');
     res.json({ ok: true, queue: agent.getPendingMessageSummaries() });
   });
 
   router.post('/agents/:id/queue/reorder', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
     const { from, to } = req.body;
-    if (typeof from !== 'number' || typeof to !== 'number') return res.status(400).json({ error: 'from and to must be numbers' });
+    if (typeof from !== 'number' || typeof to !== 'number') throw badRequest('from and to must be numbers');
     const ok = agent.reorderPendingMessage(from, to);
-    if (!ok) return res.status(400).json({ error: 'Invalid indices' });
+    if (!ok) throw badRequest('Invalid indices');
     res.json({ ok: true, queue: agent.getPendingMessageSummaries() });
   });
 
@@ -249,7 +250,7 @@ export function agentsRoutes(ctx: AppContext): Router {
 
   router.get('/agents/:id/focus', async (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
 
     const activityLimit = Math.min(Number(req.query.activityLimit) || 50, 200);
     const outputLimit = Number(req.query.outputLimit) || 8000;
@@ -277,31 +278,26 @@ export function agentsRoutes(ctx: AppContext): Router {
 
   router.get('/agents/:id/tasks', (req, res) => {
     const agentId = req.params.id as string;
-    try {
-      const tasks = _db.drizzle
-        .select()
-        .from(dagTasks)
-        .where(eq(dagTasks.assignedAgentId, agentId))
-        .orderBy(desc(dagTasks.createdAt))
-        .all();
+    const tasks = _db.drizzle
+      .select()
+      .from(dagTasks)
+      .where(eq(dagTasks.assignedAgentId, agentId))
+      .orderBy(desc(dagTasks.createdAt))
+      .all();
 
-      res.json(tasks.map(t => ({
-        id: t.id,
-        leadId: t.leadId,
-        title: t.title,
-        description: t.description,
-        dagStatus: t.dagStatus,
-        role: t.role,
-        priority: t.priority,
-        createdAt: t.createdAt,
-        startedAt: t.startedAt,
-        completedAt: t.completedAt,
-        failureReason: t.failureReason,
-      })));
-    } catch (err: any) {
-      logger.error({ module: 'agents', msg: 'Failed to get agent tasks', agentId, err: err.message });
-      res.status(500).json({ error: err.message });
-    }
+    res.json(tasks.map(t => ({
+      id: t.id,
+      leadId: t.leadId,
+      title: t.title,
+      description: t.description,
+      dagStatus: t.dagStatus,
+      role: t.role,
+      priority: t.priority,
+      createdAt: t.createdAt,
+      startedAt: t.startedAt,
+      completedAt: t.completedAt,
+      failureReason: t.failureReason,
+    })));
   });
 
   return router;
