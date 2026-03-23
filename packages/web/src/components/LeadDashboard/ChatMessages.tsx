@@ -267,7 +267,7 @@ export function ChatMessages({
         className="absolute inset-0 [&>div]:p-4 [&>div]:space-y-1"
         data={items}
         firstItemIndex={firstItemIndex}
-        itemContent={(_index, item) => itemContent(_index, item)}
+        itemContent={itemContent}
         context={context}
         components={{ Footer: ChatVirtuosoFooter }}
         followOutput={followOutput}

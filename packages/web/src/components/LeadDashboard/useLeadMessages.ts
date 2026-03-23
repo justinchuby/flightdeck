@@ -51,10 +51,14 @@ export function useLeadMessages(
   const [loadingOlder, setLoadingOlder] = useState(false);
   /** Oldest DB message ID we've seen — used as cursor for pagination */
   const oldestIdRef = useRef<number | null>(null);
+  /** Ref-based lock to prevent overlapping pagination requests (state is async) */
+  const loadingRef = useRef(false);
 
   // Reset pagination state when switching leads
   useEffect(() => {
     setHasMore(true);
+    setLoadingOlder(false);
+    loadingRef.current = false;
     oldestIdRef.current = null;
   }, [selectedLeadId]);
 
@@ -126,7 +130,8 @@ export function useLeadMessages(
 
   /** Load older messages (scroll-to-top pagination) */
   const loadOlderMessages = useCallback(async () => {
-    if (!selectedLeadId || !hasMore || loadingOlder || oldestIdRef.current == null) return;
+    if (!selectedLeadId || !hasMore || loadingRef.current || oldestIdRef.current == null) return;
+    loadingRef.current = true;
     setLoadingOlder(true);
     try {
       const data: MessageHistoryResponse = await apiFetch(
@@ -142,9 +147,10 @@ export function useLeadMessages(
     } catch {
       // Non-critical — user can retry by scrolling up again
     } finally {
+      loadingRef.current = false;
       setLoadingOlder(false);
     }
-  }, [selectedLeadId, hasMore, loadingOlder]);
+  }, [selectedLeadId, hasMore]);
 
   return { hasMore, loadingOlder, loadOlderMessages };
 }

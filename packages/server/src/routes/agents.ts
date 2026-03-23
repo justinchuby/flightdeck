@@ -188,13 +188,13 @@ export function agentsRoutes(ctx: AppContext): Router {
       }
     }
 
+    // hasMore: derived from pre-filter count so system message filtering can't hide it
+    const hasMore = messages.length >= limit;
+
     // Filter out system messages by default (they contain internal prompts/context)
     if (!includeSystem) {
       messages = messages.filter(m => m.sender !== 'system');
     }
-
-    // hasMore: true if we got a full page (may have more older messages)
-    const hasMore = messages.length >= limit;
 
     res.json({ agentId: resolvedAgentId, messages, fromPriorSession, hasMore });
   });
