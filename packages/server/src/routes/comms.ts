@@ -50,11 +50,12 @@ export function commsRoutes(ctx: AppContext): Router {
   function getCrewIds(leadId: string): Set<string> {
     const ids = new Set<string>();
     ids.add(leadId);
-    for (const agent of getCrewDescendants(leadId, agentManager.getAll())) {
+    const allAgents = agentManager.getAll();
+    for (const agent of getCrewDescendants(leadId, allAgents)) {
       ids.add(agent.id);
     }
     // Also include agents linked by projectId
-    for (const agent of agentManager.getAll()) {
+    for (const agent of allAgents) {
       if (agent.projectId === leadId) {
         ids.add(agent.id);
       }

@@ -78,7 +78,7 @@ export interface HierarchyAgent {
 }
 
 /**
- * Collect all descendants of `leadId` by walking the parentId chain recursively.
+ * Collect all descendants of `leadId` via depth-first traversal of a parent→children index.
  * Returns agents whose ancestry leads back to `leadId` (not including the lead itself).
  * Protected against circular references via a visited set.
  */

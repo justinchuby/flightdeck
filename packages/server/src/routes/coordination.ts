@@ -130,11 +130,12 @@ export function coordinationRoutes(ctx: AppContext): Router {
     const crewAgentIds = new Set<string>();
     if (leadId) {
       crewAgentIds.add(leadId);
-      for (const agent of getCrewDescendants(leadId, agentManager.getAll())) {
+      const allAgents = agentManager.getAll();
+      for (const agent of getCrewDescendants(leadId, allAgents)) {
         crewAgentIds.add(agent.id);
       }
       // Also include agents linked by projectId
-      for (const agent of agentManager.getAll()) {
+      for (const agent of allAgents) {
         if (agent.projectId === leadId) {
           crewAgentIds.add(agent.id);
         }

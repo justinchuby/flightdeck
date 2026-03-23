@@ -145,13 +145,14 @@ export function projectsRoutes(ctx: AppContext): Router {
     const sessions = projectRegistry.getSessions(project.id);
     const taskDAG = agentManager.getTaskDAG();
     const rosterAgents = ctx.agentRoster?.getAllAgents() ?? [];
+    // Precompute hierarchy shape once for all sessions
+    const rosterAsHierarchy = rosterAgents.map(a => ({
+      id: a.agentId,
+      parentId: (a.metadata ?? {}).parentId as string | undefined,
+    }));
 
     const detailed = sessions.map((session: any) => {
       // Agent composition: filter roster by hierarchy (lead + all descendants)
-      const rosterAsHierarchy = rosterAgents.map(a => ({
-        id: a.agentId,
-        parentId: (a.metadata ?? {}).parentId as string | undefined,
-      }));
       const descendantIds = new Set(getCrewDescendants(session.leadId, rosterAsHierarchy).map(a => a.id));
       const agents = rosterAgents
         .filter(a => a.agentId === session.leadId || descendantIds.has(a.agentId))

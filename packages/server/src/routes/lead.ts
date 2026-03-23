@@ -440,8 +440,9 @@ export function leadRoutes(ctx: AppContext): Router {
         id: a.agentId,
         parentId: (a.metadata ?? {}).parentId as string | undefined,
       }));
+      const rosterById = new Map(rosterAgents.map(r => [r.agentId, r]));
       const rosterChildren = getCrewDescendants(leadId, rosterAsHierarchy)
-        .map(h => rosterAgents.find(r => r.agentId === h.id)!)
+        .map(h => rosterById.get(h.id)!)
         .filter(Boolean);
       if (rosterChildren.length > 0) {
         // Pull real token data from CostTracker if available
