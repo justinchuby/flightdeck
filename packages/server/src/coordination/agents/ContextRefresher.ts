@@ -5,6 +5,7 @@ import type { FileLockRegistry } from '../files/FileLockRegistry.js';
 import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import { SynthesisEngine } from '../events/SynthesisEngine.js';
 import { SmartActivityFilter } from '../activity/SmartActivityFilter.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 /**
  * Periodic update interval when sub-leads are active (ms).
@@ -161,7 +162,7 @@ export class ContextRefresher {
     }
 
     return filtered.map((entry) => {
-      const shortId = entry.agentId.slice(0, 8);
+      const shortId = shortAgentId(entry.agentId);
       return `[${entry.timestamp}] Agent ${shortId} (${entry.agentRole}): ${entry.actionType} — ${entry.summary}`;
     });
   }
@@ -251,7 +252,7 @@ export class ContextRefresher {
     const lines = scopedLocks.map(lock => {
       const agent = this.agentManager.get(lock.agentId);
       const roleName = agent?.role.name ?? 'Unknown';
-      return `- ${lock.filePath} \u2192 ${lock.agentId.slice(0, 8)} (${roleName})`;
+      return `- ${lock.filePath} \u2192 ${shortAgentId(lock.agentId)} (${roleName})`;
     });
     return `== ACTIVE FILE LOCKS ==\n${lines.join('\n')}`;
   }
@@ -269,7 +270,7 @@ export class ContextRefresher {
     if (entries.length === 0) return '';
 
     const lines = entries.slice(0, 10).map(e => {
-      const shortId = e.agentId.slice(0, 8);
+      const shortId = shortAgentId(e.agentId);
       return `[${e.timestamp}] ${shortId} (${e.agentRole}): ${e.actionType} — ${e.summary}`;
     });
     return `== RECENT LOCK DENIALS ==\n${lines.join('\n')}`;

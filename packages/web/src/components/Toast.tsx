@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { X, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 
 export interface Toast {
@@ -38,7 +39,7 @@ const ICON_COLORS = {
 };
 
 export function ToastContainer() {
-  const { toasts, remove } = useToastStore();
+  const { toasts, remove } = useToastStore(useShallow(s => ({ toasts: s.toasts, remove: s.remove })));
 
   if (toasts.length === 0) return null;
 

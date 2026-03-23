@@ -1,3 +1,13 @@
+// ── Short Agent ID ────────────────────────────────────────────────
+
+/** Standard short ID length (8 hex chars — sufficient uniqueness for UUIDs). */
+export const SHORT_ID_LENGTH = 8;
+
+/** Shorten an agent ID for display or log attribution. Default 8 chars. */
+export function shortAgentId(agentId: string, length: number = SHORT_ID_LENGTH): string {
+  return agentId.slice(0, length);
+}
+
 import { z } from 'zod';
 
 // ── Agent Status (external/API — backward compatible) ─────────────

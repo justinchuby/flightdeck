@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { shortAgentId } from '@flightdeck/shared';
 import { eq, inArray, desc } from 'drizzle-orm';
 import { readFileSync, readdirSync, realpathSync, statSync, existsSync } from 'node:fs';
 import { join, normalize, sep, extname, relative } from 'node:path';
@@ -1069,7 +1070,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       const sessionDir = join(copilotStateDir, agent.sessionId);
       if (!existsSync(sessionDir)) continue;
 
-      const shortId = agent.agentId.slice(0, 8);
+      const shortId = shortAgentId(agent.agentId);
       const agentDir = `${agent.role}-${shortId}`;
       const sessionFiles: ArtifactFile[] = [];
 

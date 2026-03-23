@@ -1,6 +1,7 @@
 import type { Database } from '../../db/database.js';
 import type { ConfigStore } from '../../config/ConfigStore.js';
 import { logger } from '../../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -303,7 +304,7 @@ export class PredictionService {
         type: 'context_exhaustion',
         severity: severityFromMinutes(minutesUntilExhaustion),
         confidence,
-        title: `Context window exhaustion for ${agent.role} (${agent.id.slice(0, 8)})`,
+        title: `Context window exhaustion for ${agent.role} (${shortAgentId(agent.id)})`,
         detail: `Agent ${agent.id} is using ${Math.round(utilization * 100)}% of context window. ` +
           `At current burn rate (${Math.round(agent.contextBurnRate)} tokens/min), ` +
           `context will be exhausted in ~${Math.round(minutesUntilExhaustion)} minutes.`,
@@ -418,7 +419,7 @@ export class PredictionService {
         type: 'agent_stall',
         severity: stallMinutes >= 30 ? 'critical' : stallMinutes >= 15 ? 'warning' : 'info',
         confidence,
-        title: `Agent ${agent.role} (${agent.id.slice(0, 8)}) may be stalled`,
+        title: `Agent ${agent.role} (${shortAgentId(agent.id)}) may be stalled`,
         detail: `Agent ${agent.id} has not reported activity for ${Math.round(stallMinutes)} minutes. ` +
           `Current status: ${agent.status}. This may indicate a stuck process or lost connection.`,
         timeHorizon: 0, // already happening

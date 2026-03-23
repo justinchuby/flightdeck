@@ -43,6 +43,9 @@ import { shortAgentId } from '../../utils/agentLabel';
 
 // ── Types ────────────────────────────────────────────────────
 
+const EMPTY_COMMS: AgentComm[] = [];
+const EMPTY_ACTIVITY: ActivityEvent[] = [];
+
 export interface AgentDetailPanelProps {
   agentId: string;
   /** If present, fetches richer profile data from the crews API */
@@ -134,8 +137,8 @@ function AgentDetailPanelContent({ agentId, crewId, mode, onClose }: AgentDetail
   const leadId = useLeadStore((s) => s.selectedLeadId);
   const comms = useLeadStore((s) => leadId ? s.projects[leadId]?.comms : undefined);
   const activity = useLeadStore((s) => leadId ? s.projects[leadId]?.activity : undefined);
-  const agentComms = (comms ?? []).filter((c) => c.fromId === agentId || c.toId === agentId);
-  const agentActivity = (activity ?? []).filter((e) => e.agentId === agentId);
+  const agentComms = (comms ?? EMPTY_COMMS).filter((c) => c.fromId === agentId || c.toId === agentId);
+  const agentActivity = (activity ?? EMPTY_ACTIVITY).filter((e) => e.agentId === agentId);
 
   const [activeTab, setActiveTab] = useState<DetailTab>('details');
   const [profile, setProfile] = useState<AgentProfile | null>(null);

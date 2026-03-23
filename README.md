@@ -1,20 +1,34 @@
 # Flightdeck — Multi-Agent Orchestration Platform
 
 [![npm](https://img.shields.io/npm/v/%40flightdeck-ai%2Fflightdeck)](https://www.npmjs.com/package/@flightdeck-ai/flightdeck)
-
-> [!WARNING]
-> This is purely AI generated code. Use the project with this understanding in mind.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/justinchuby/flightdeck/pulls)
 
 **One command. A whole engineering crew.**
 
-Flightdeck orchestrates crews of AI coding agents through a real-time web UI — each with a specialized role, its own context window, and the ability to collaborate through structured messaging. It supports multiple providers including **GitHub Copilot**, **Claude Code**, **Google Gemini CLI**, **Codex**, **Cursor**, and **OpenCode**. Give it a task, and a **Project Lead** agent breaks it down, assembles developers, architects, reviewers, and more, then coordinates their work in parallel while you stay in the loop.
+Flightdeck is the orchestration layer for AI coding agents. It coordinates crews of agents working in parallel on your codebase, each with a specialized role, its own context window, and structured communication channels.
 
 ```bash
 npm install -g @flightdeck-ai/flightdeck
 flightdeck
 ```
 
-Instead of one AI agent doing everything sequentially, Flightdeck runs multiple agents at the same time — a developer writes code while a reviewer checks it, an architect designs the system, and a secretary tracks progress. The result: faster delivery, higher quality, and built-in checks and balances.
+Give it a task, and a **Project Lead** agent breaks it down into a dependency graph, assembles the right specialists (developers, architects, reviewers, and more), and coordinates their parallel execution while you stay in the loop through a real-time web dashboard. Works with **GitHub Copilot**, **Claude Code**, **Gemini CLI**, **Codex**, **Cursor**, **OpenCode**, **Kimi**, and **Qwen Code** — mix and match providers in the same crew.
+
+<!-- TODO: Replace with a demo GIF or link to a short video showing project creation → agents working → decision approval -->
+
+### Why Flightdeck?
+
+| | Single AI Agent | Flightdeck Crew |
+|---|---|---|
+| **Execution** | Sequential — one thing at a time | Parallel — 5+ agents work simultaneously |
+| **Context** | One shared context window | Each agent has its own context |
+| **Quality** | No built-in review | Reviewer catches issues while developer codes |
+| **Knowledge** | Lost between sessions | Persistent knowledge base carries forward |
+| **Providers** | Locked to one | Mix 8 providers in the same crew |
+| **Oversight** | Manual intervention or full trust | Trust Dial: supervised → balanced → autonomous |
 
 ### Screenshots
 
@@ -51,12 +65,19 @@ Instead of one AI agent doing everything sequentially, Flightdeck runs multiple 
 
 ## Quick Start
 
+### Prerequisites
+
+- **Node.js 20+** — [Download](https://nodejs.org)
+- **At least one AI coding CLI** — [GitHub Copilot](https://docs.github.com/en/copilot), [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex](https://github.com/openai/codex), [Cursor](https://www.cursor.com/), [OpenCode](https://github.com/opencode-ai/opencode), [Kimi](https://github.com/MoonshotAI/kimi-cli), or [Qwen Code](https://github.com/QwenLM/qwen-code)
+
+### Install & Run
+
 ```bash
 npm install -g @flightdeck-ai/flightdeck
 flightdeck
 ```
 
-That's it. This installs Flightdeck globally and starts the server, opening the dashboard in your browser.
+The dashboard opens at `http://localhost:3001`. That's it.
 
 ### What Happens Next
 
@@ -66,6 +87,8 @@ That's it. This installs Flightdeck globally and starts the server, opening the 
 4. **Stay in the loop** — Message any agent directly, approve decisions, and watch progress in real time
 
 > **Example:** *"Refactor the auth module to use JWT tokens, add tests, and update the docs"* → The lead creates a developer (implementation), a code reviewer (quality), and a tech writer (docs), sets up dependencies so the reviewer waits for the developer, and coordinates the whole flow.
+
+> **First time?** Flightdeck defaults to GitHub Copilot. Change the provider in Settings or in [`flightdeck.config.yaml`](flightdeck.config.example.yaml).
 
 **CLI options:** `--port=4000` · `--host=0.0.0.0` · `--no-browser` · `-v` / `--version` · `-h` / `--help`
 
@@ -89,65 +112,71 @@ npm run dev
 
 </details>
 
-## Features
+## Key Features
 
-### 🎯 Crew Orchestration
+### 🎯 Multi-Agent Crew Orchestration
 - **Project Lead** — Breaks down tasks, assembles a crew, creates a task DAG, delegates work, and synthesizes results
-- **Sub-Lead Delegation** — Architects can also create agents and delegate tasks, enabling hierarchical crew structures
-- **13 Specialized Roles** — Purpose-built agents with distinct system prompts and model diversity (see [Agent Roles](#agent-roles))
-- **Task DAG** — Declarative task scheduling with dependencies; auto-links agents via `DELEGATE`/`CREATE_AGENT`
+- **14 Specialized Roles** — Developer, Architect, Code Reviewer, Critical Reviewer, Readability Reviewer, Tech Writer, QA Tester, and more (see [Agent Roles](#agent-roles))
+- **Task DAG** — Declarative task scheduling with dependencies; agents work in parallel when possible, sequentially when required
 - **Human-in-the-Loop** — Message any agent directly; queue, reorder, or remove messages before delivery
-- **System Pause/Resume** — Halt all message delivery system-wide; agents hold position until resumed
-
-### 💬 Communication
-- **Direct Messaging** — Agents send structured messages to each other by ID
-- **@Mentions** — Type `@` in chat to autocomplete agent names; mentioned agents receive the message
-- **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature; auto-archived when all members finish
-- **Broadcasts** — Send a message to every active agent at once
-- **Telegram Integration** — Receive notifications via Telegram bot with batched delivery, challenge-response auth, and configurable settings
-
-### 📈 Visualization & Monitoring
-- **Home Dashboard** — At-a-glance view of active projects, decisions made, decisions needing approval, action-required items, and progress milestones. Onboarding guide when no projects exist
-- **AttentionBar** — Persistent system-wide status bar with 3 escalation states (green/yellow/red). WebSocket push for <3s latency. Adjusts sensitivity based on Trust Dial level
-- **Kanban Board** — Interactive task board with drag-and-drop (via @dnd-kit), context menus, scope switcher (global/per-project), add-task form, filters, pagination, and soft-delete with archive/restore
-- **Project Design Tab** — File browser with Markdown preview for project documentation
-- **Overview Dashboard** — Cumulative flow diagram, milestone timeline (progress events only), agent heatmap, token usage curve, and progress indicators with unified project tabs
-- **Mission Control** — Single-screen project overview with 8 configurable drag-and-drop panels: health summary, agent fleet, token economics, alerts, activity feed, DAG minimap, comm heatmap, and performance scorecards
-- **Timeline** — Swim-lane Gantt chart with decoupled vertical/horizontal scroll, Ctrl+wheel zoom, keyboard navigation, drag-to-pan, horizontal overflow for 10+ agents, and sticky Session Replay scrubber (4× default speed)
-- **DAG / Gantt Chart** — Scrollable, zoomable task Gantt chart with local timezone display
-- **Token Economics** — Per-agent token breakdown with estimation fallback (~4 chars/token from output preview), shown with `~` prefix and `(est.)` suffix
-- **Chat** — Virtual scrolling with `react-virtuoso`, pinned user message banner, grouped sequential messages, per-project group chat history
-- **Catch-Up Banner** — "While you were away" slide-down summary of tasks completed, decisions pending, and failures
-- **Historical Data** — All pages load from REST API when no live agents are present — no empty states for existing projects
-
-### 🧭 Navigation
-- **Breadcrumbs** — Contextual navigation trail showing current location within the project hierarchy
-- **Recent Projects** — Quick-access list in sidebar with one-click navigation
-- **Keyboard Shortcuts** — Alt+1–5 to switch between project tabs
-- **Tab Persistence** — Active tab saved per project in localStorage; restored on return
-- **Page Transitions** — Smooth animations between pages; respects `prefers-reduced-motion`
-- **Mobile Layout** — Touch-scrollable tabs for narrow viewports
-
-### ✅ Decision & Progress Tracking
-- **Decision Log** — Track architectural decisions with accept/reject actions and reason comments; grouped by project with project names (not IDs); optimistic UI updates
-- **PROGRESS/DAG Consolidation** — A single `PROGRESS` command auto-reads DAG state, eliminating the need for separate queries
-- **Global Search** — Search across messages, tasks, decisions, and activity
+- **8 AI Providers** — GitHub Copilot, Claude Code, Gemini CLI, Codex, Cursor, OpenCode, Kimi, Qwen Code — mix and match in the same crew
 
 ### 🔒 Coordination & Safety
 - **File Locking** — Pessimistic locks with TTL and glob support prevent concurrent edits
-- **Scoped COMMIT** — `git add` only on files the agent has locked, then post-commit verification. Prevents `git add -A` from leaking other agents' work.
-- **Trust Dial** — 3-level oversight (Detailed / Standard / Minimal) controls notification volume, card density, and escalation thresholds. Per-project overrides supported
-- **Event Pipeline** — Reactive handlers auto-trigger actions (e.g., run tests after commits, log summaries on task completion)
-- **Agent Controls** — Interrupt, terminate, restart agents; change models on the fly
-- **Security** — Challenge-response auth, prompt injection sanitization (4-layer), default-deny allowlists, secret redaction, CORS lockdown, rate limiting, archived-only project deletion, CWD path validation
+- **Scoped Commits** — `git add` only on files the agent has locked. Prevents `git add -A` from leaking other agents' work
+- **Trust Dial** — 3-level oversight (Supervised / Balanced / Autonomous) controls how much approval you give. Per-project overrides supported
+- **Governance Pipeline** — Every agent command flows through ordered hooks: security → permission → validation → rate-limit → policy → approval
+- **Security** — Prompt injection sanitization (4-layer), secret redaction, CORS lockdown, rate limiting, path traversal validation
 
-### 💾 Persistence & Recovery
-- **Session Resume** — Resume from a previous session ID with full context recovery. Native SDK resume for providers that support it (Claude, Copilot)
-- **Knowledge Pipeline** — Automatic knowledge injection on agent spawn (KnowledgeInjector), session knowledge extraction on agent exit, SkillsLoader for `.github/skills/` with hot-reload via `fs.watch`, and AgentReconciliation on reconnect
-- **CollectiveMemory** — Cross-session `remember()` / `recall()` for persistent agent knowledge
+### 📊 Real-Time Dashboard
+- **Lead Dashboard** — Chat with the Project Lead, approve decisions, and monitor crew status — all in one screen
+- **Timeline** — Swim-lane visualization with zoom, scroll, keyboard navigation, and session replay scrubber
+- **Task Views** — DAG graph, Kanban board, and Gantt chart — three ways to visualize your task pipeline
+- **Token Economics** — Per-agent and per-task token usage from provider data
+- **AttentionBar** — Persistent status bar with escalation states (green/yellow/red) — know at a glance if anything needs you
+
+### 💬 Structured Communication
+- **Direct Messaging** — Agents send structured messages to each other by ID
+- **Group Chat** — Create groups by member ID or role; auto-created when 3+ agents work on the same feature
+- **Broadcasts** — Send a message to every active agent at once
+- **Telegram Integration** — Receive notifications via Telegram bot with batched delivery and challenge-response auth
+
+### 🧠 Persistent Knowledge
+- **Knowledge Pipeline** — Automatic knowledge injection on agent spawn, extraction on agent exit
+- **4-Category Knowledge Base** — Core (project rules), Procedural (patterns), Semantic (facts), Episodic (session context)
+- **Skills System** — `.github/skills/` files are hot-reloaded into agent prompts
+- **CollectiveMemory** — Cross-session knowledge that compounds over time
+- **Session Resume** — Resume from a previous session with full context recovery
+
+<details>
+<summary><strong>More features</strong></summary>
+
+### 📈 Visualization & Monitoring
+- **Home Dashboard** — At-a-glance view of active projects, decisions needing approval, action-required items, and progress milestones
+- **Kanban Board** — Interactive task board with drag-and-drop, context menus, scope switcher, filters, and pagination
+- **Overview Dashboard** — Milestone timeline, progress indicators, and decision feed with unified project tabs
+- **Analytics** — Token usage trends, cost breakdowns, session comparison, and auto-generated insights
+- **Catch-Up Banner** — "While you were away" summary of tasks completed, decisions pending, and failures
+- **Historical Data** — All pages load from REST API when no live agents are present — no empty states for existing projects
+
+### 🧭 Navigation
+- **Command Palette** — Cmd/Ctrl+K to navigate anywhere instantly
+- **Breadcrumbs** — Contextual navigation trail
+- **Keyboard Shortcuts** — Alt+1–5 for tabs, Shift+A for approval queue
+- **Tab Persistence** — Active tab saved per project; restored on return
+
+### ✅ Decision & Progress Tracking
+- **Decision Log** — Track architectural decisions with accept/reject actions and reason comments
+- **Approval Queue** — Review pending decisions with auto-deny timer that pauses while you're reviewing
+- **Global Search** — Search across messages, tasks, decisions, and activity
+
+### 💾 Recovery & Data Management
 - **Persistent Projects** — Projects survive across sessions; chat history and state auto-load on startup
 - **Context Re-injection** — Automatic crew context recovery after context window compaction
-- **Data Retention** — Data management in Settings with storage stats and cleanup by age (7d/30d/90d/all)
+- **Data Retention** — Storage stats and cleanup by age (7d/30d/90d/all) in Settings
+- **System Pause/Resume** — Halt all agents mid-flight; resume when ready
+
+</details>
 
 ## Architecture
 
@@ -170,18 +199,18 @@ Flightdeck uses a **three-tier architecture** with clear separation of concerns:
 ┌───────────────────────▼──────────────────────────────────────────┐
 │                    Agent Server (Daemon)                          │
 │  Spawns & manages CLI agent processes via ACP protocol           │
-│  Copilot · Claude · Gemini · Codex · Cursor · OpenCode          │
+│  Copilot · Claude · Gemini · Codex · Cursor · OpenCode · Kimi · Qwen  │
 │  Per-agent lifecycle · Auto-restart · Heartbeat monitoring        │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ### How the tiers interact
 
-1. **Client ↔ Orchestration Server** — The React frontend communicates with the Express server via REST endpoints (43 route modules covering agents, projects, sessions, tasks, decisions, knowledge, etc.) and a persistent WebSocket connection on `/ws` for real-time updates. WebSocket events are batched and throttled (agent text flushed every 100ms).
+1. **Client ↔ Orchestration Server** — The React frontend communicates with the Express server via REST endpoints (28 route modules covering agents, projects, sessions, tasks, decisions, knowledge, etc.) and a persistent WebSocket connection on `/ws` for real-time updates. WebSocket events are batched and throttled (agent text flushed every 100ms).
 
-2. **Orchestration Server ↔ Agent Server** — The orchestration server forks the agent server as a detached child process, communicating via stdio and monitoring health with heartbeat pings. The agent server manages individual CLI agent processes (Copilot, Claude, Gemini, Codex, Cursor, OpenCode) through the ACP (Agent Client Protocol) — each agent runs as a separate subprocess with its own context window and role.
+2. **Orchestration Server ↔ Agent Server** — The orchestration server forks the agent server as a detached child process, communicating via stdio and monitoring health with heartbeat pings. The agent server manages individual CLI agent processes (Copilot, Claude, Gemini, Codex, Cursor, OpenCode, Kimi, Qwen Code) through the ACP (Agent Client Protocol) — each agent runs as a separate subprocess with its own context window and role.
 
-3. **Command flow** — Agents emit structured commands (wrapped in doubled Unicode brackets) in their output stream. The `CommandDispatcher` parses these and routes them to 10 domain-specific command modules (`AgentCommands`, `TaskCommands`, `CommCommands`, etc.). The `GovernancePipeline` intercepts commands through ordered hooks: security → permission → validation → rate-limit → policy → approval, with post-hooks for audit and metrics.
+3. **Command flow** — Agents emit structured commands (wrapped in doubled Unicode brackets) in their output stream. The `CommandDispatcher` parses these and routes them to 9 domain-specific command modules (`AgentCommands`, `TaskCommands`, `CommCommands`, etc.). The `GovernancePipeline` intercepts commands through ordered hooks: security → permission → validation → rate-limit → policy → approval, with post-hooks for audit and metrics.
 
 ### Monorepo structure
 
@@ -196,8 +225,8 @@ Flightdeck uses a **three-tier architecture** with clear separation of concerns:
 
 | Component | Responsibility |
 |-----------|---------------|
-| **AgentManager** | Spawns agents, routes messages, manages delegations. 25+ typed events. Cascade termination with visited-set guard. |
-| **CommandDispatcher** | Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output, routes to 10 command modules. |
+| **AgentManager** | Spawns agents, routes messages, manages delegations. Cascade termination with visited-set guard. |
+| **CommandDispatcher** | Parses doubled Unicode-bracket commands (U+27E6/U+27E7) from agent output, routes to 9 command modules. |
 | **GovernancePipeline** | Single interception point for all commands — pre-hooks (security, permission, validation, rate-limit, policy, approval) and post-hooks (audit, metrics). |
 | **TaskDAG + EagerScheduler** | Directed acyclic graph for task scheduling with dependency resolution, parallel analysis, and eager pre-assignment of ready tasks. |
 | **ProjectRegistry** | Persistent project management — CRUD, session tracking, briefing generation. |
@@ -221,7 +250,7 @@ Flightdeck uses layered configuration: **hardcoded defaults ← YAML config ← 
 
 ```yaml
 server:
-  maxConcurrentAgents: 50        # 1–200
+  maxConcurrentAgents: 50        # 1–1000
 
 heartbeat:
   idleThresholdMs: 60000         # Idle agent detection threshold
@@ -236,7 +265,7 @@ models:
     # ... (14 roles total)
 
 provider:
-  id: copilot                    # Active provider: copilot | claude | gemini | codex | cursor | opencode
+  id: copilot                    # Active provider: copilot | claude | gemini | codex | cursor | opencode | kimi | qwen-code
 
 budget:
   limit: null                    # null = unlimited; set a dollar amount to cap spend
@@ -255,14 +284,14 @@ See [`flightdeck.config.example.yaml`](flightdeck.config.example.yaml) for the f
 | `PORT` | `3001` | Server port |
 | `HOST` | `127.0.0.1` | Bind address |
 | `DB_PATH` | `./flightdeck.db` | SQLite database location |
-| `CLI_PROVIDER` | `copilot` | Agent provider (`copilot`, `claude`, `gemini`, `codex`, `cursor`, `opencode`) |
+| `CLI_PROVIDER` | `copilot` | Agent provider (`copilot`, `claude`, `gemini`, `codex`, `cursor`, `opencode`, `kimi`, `qwen-code`) |
 | `ANTHROPIC_API_KEY` | — | Required for Claude provider |
 | `GEMINI_API_KEY` | — | Required for Gemini provider |
 | `OPENAI_API_KEY` | — | Required for Codex provider |
 | `TELEGRAM_BOT_TOKEN` | — | Telegram integration (optional) |
 | `AUTH` | enabled | Set to `none` to disable authentication |
 | `SERVER_SECRET` | auto-generated | Fixed auth token (optional) |
-| `MAX_AGENTS` | `50` | Max concurrent agents (1–200) |
+| `MAX_AGENTS` | `50` | Max concurrent agents (1–1000) |
 | `FLIGHTDECK_CONFIG` | — | Path to YAML config file |
 
 ## Agent Roles
@@ -276,6 +305,7 @@ Each agent is assigned a role with a specialized system prompt. The lead creates
 | **Architect** | 🏗️ | System design, technical debt, architecture decisions. Can delegate tasks. | Claude Opus 4.6 |
 | **Code Reviewer** | 📖 | Readability, maintainability, code patterns | Gemini 3 Pro |
 | **Critical Reviewer** | 🛡️ | Secure-by-design review, performance, edge cases | Gemini 3 Pro |
+| **Readability Reviewer** | 👓 | Naming, code organization, documentation, simplicity, consistency | Gemini 3 Pro |
 | **Product Manager** | 🎯 | User needs, product quality, UX review | GPT-5.3 Codex |
 | **Technical Writer** | 📝 | Documentation, API design review, developer experience | GPT-5.2 |
 | **Designer** | 🎨 | UI/UX, interaction design, accessibility | Claude Opus 4.6 |
@@ -309,10 +339,10 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | `AGENT_MESSAGE {"to": "agent-id", "content": "..."}` | Send a direct message to another agent by ID. |
 | `DIRECT_MESSAGE {"to": "agent-id-prefix", "content": "..."}` | Queue a message to another agent without interrupting their current work. Matches by ID prefix. |
 | `BROADCAST {"content": "..."}` | Send a message to all active agents. |
-| `CREATE_GROUP {"name": "...", "members": ["id1"], "roles": ["developer"]}` | Create a named chat group. Specify members by ID, by role, or both. Lead is auto-included. |
+| `CREATE_GROUP {"name": "...", "members": ["a1b2c3d4"], "roles": ["developer"]}` | Create a named chat group. Specify members by short ID, role, or both. Lead is auto-included. |
 | `GROUP_MESSAGE {"group": "...", "content": "..."}` | Send a message to all members of a group. Sender must be a member. |
-| `ADD_TO_GROUP {"group": "...", "members": ["id"]}` | Add agents to an existing group. New members receive recent message history. |
-| `REMOVE_FROM_GROUP {"group": "...", "members": ["id"]}` | Remove agents from a group. The lead cannot be removed. |
+| `ADD_TO_GROUP {"group": "...", "members": ["e5f6a7b8"]}` | Add agents to an existing group. New members receive recent message history. |
+| `REMOVE_FROM_GROUP {"group": "...", "members": ["e5f6a7b8"]}` | Remove agents from a group. The lead cannot be removed. |
 | `QUERY_GROUPS` | List all groups the agent belongs to, with member counts and last message preview. |
 | `QUERY_PEERS` | Discover other active agents for direct messaging. |
 | `REACT {"group": "...", "emoji": "👍"}` | Add an emoji reaction to the latest (or specified) message in a group. |
@@ -381,7 +411,7 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 | **Timeline** | Swim-lane visualization — filter by role/comm-type/status, brush time selector, keyboard navigation (←→ pan, +/- zoom), live auto-scroll mode, idle hatch patterns, hover tooltips |
 | **Group Chat** | Tabbed group chat with human participation, project-level tab grouping, real-time messaging |
 | **Overview** | Progress tracking, decision timeline grouped by project, global search |
-| **Settings** | Concurrency limits (1–50 agents), model defaults, theme (Light/Dark/System), custom role editor, draggable dashboard panel layout |
+| **Settings** | Concurrency limits, model defaults, theme (Light/Dark/System), custom role editor, draggable dashboard panel layout |
 
 ## Tech Stack
 
@@ -391,20 +421,32 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 - **Security**: Auto-generated auth tokens, CORS lockdown, rate limiting, path traversal validation
 - **Validation**: Zod schemas on all API routes
 - **Agent Protocol**: ACP (Agent Communication Protocol) with streaming command detection
-- **Events**: Typed event bus (TypedEmitter) with 27+ strongly-typed events
+- **Events**: Typed event bus (TypedEmitter) with strongly-typed events
 - **Testing**: Vitest with v8 coverage, Codecov integration
 - **CI**: GitHub Actions on `main` and `team-work-*` branches — typecheck, unit tests, coverage upload
 
 ## Documentation
 
+Flightdeck has extensive documentation across guides, references, and design documents:
+
 | Document | Description |
 |----------|-------------|
-| [REST API Reference](packages/docs/reference/api.md) | Full REST API reference for all endpoints |
-| [Architecture Decisions](packages/docs/reference/architecture-decisions.md) | Key architecture decision records (ADRs) |
-| [Agent Communication](packages/docs/guide/agent-communication.md) | ACP agent communication protocol details |
+| **Getting Started** | |
+| [Quick Start](packages/docs/guide/quickstart.md) | Install and run your first session |
+| [Provider Setup](packages/docs/guide/providers.md) | Configure Copilot, Claude, Gemini, Codex, Cursor, or OpenCode |
+| [Configuration](packages/docs/reference/configuration.md) | Full configuration reference |
+| **Guides** | |
+| [Agent Communication](packages/docs/guide/agent-communication.md) | How agents communicate via ACP |
 | [Coordination](packages/docs/guide/coordination.md) | File locking, delegation, and coordination primitives |
-| [Database Schema](packages/docs/reference/database.md) | SQLite schema and Drizzle ORM setup |
-| [UI Design](packages/docs/guide/ui-design.md) | Frontend component architecture and design tokens |
+| [Oversight & Trust Dial](packages/docs/guide/oversight.md) | How the 3-level oversight system works |
+| [Session Management](packages/docs/guide/session-management.md) | Resume, replay, and manage sessions |
+| [Chat Groups](packages/docs/guide/chat-groups.md) | Multi-agent group communication |
+| [Timeline](packages/docs/guide/timeline.md) | Swim-lane visualization and session replay |
+| **Reference** | |
+| [REST API](packages/docs/reference/api.md) | Full REST API reference |
+| [Database Schema](packages/docs/reference/database.md) | SQLite schema and Drizzle ORM |
+| [Architecture Decisions](packages/docs/reference/architecture-decisions.md) | Key ADRs |
+| [WebSocket Events](packages/docs/reference/websocket.md) | Real-time event reference |
 
 ## Screenshots
 
@@ -420,6 +462,28 @@ Agents communicate via structured commands wrapped in doubled Unicode brackets (
 
 <img width="1406" height="817" alt="Settings and custom role editor" src="https://github.com/user-attachments/assets/0bc973a8-8338-4b52-a0b6-f9d0620e8209" />
 
+## Built by AI
+
+Flightdeck is purely AI-created with human supervision. Every line of code, test, and documentation was written by AI agents coordinated through Flightdeck itself — a real-world demonstration of multi-agent software development.
+
+## Contributing
+
+We welcome contributions! Flightdeck is MIT licensed and built in the open.
+
+- **Bug reports** — [Open an issue](https://github.com/justinchuby/flightdeck/issues)
+- **Feature requests** — [Open a discussion](https://github.com/justinchuby/flightdeck/issues)
+- **Pull requests** — Fork, branch, and submit a PR. Each feature gets its own branch.
+
+```bash
+# Local development
+npm install
+npm run dev    # Starts server + web with hot reload
+```
+
 ## Acknowledgments
 
 Flightdeck is built on many excellent open-source projects. See [docs/CREDITS.md](docs/CREDITS.md) for full attribution, including the research projects, agent SDKs, core libraries, and design references that made this possible.
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Justin Chuby

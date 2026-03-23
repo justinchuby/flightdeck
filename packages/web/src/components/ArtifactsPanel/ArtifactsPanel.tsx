@@ -21,6 +21,7 @@ import { useProjectId } from '../../contexts/ProjectContext';
 import { apiFetch } from '../../hooks/useApi';
 import { Markdown } from '../ui/Markdown';
 import { getRoleIcon } from '../../utils/getRoleIcon';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ export function ArtifactsPanel() {
       } else if (sid === 'unknown') {
         label = 'Untracked';
       } else if (/^[0-9a-f-]{20,}$/i.test(sid)) {
-        label = sid.replace(/-/g, '').slice(0, 8);
+        label = shortAgentId(sid.replace(/-/g, ''));
       } else {
         label = sid;
       }

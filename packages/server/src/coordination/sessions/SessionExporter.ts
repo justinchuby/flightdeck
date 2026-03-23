@@ -8,6 +8,7 @@ import type { TaskDAG, DagTask } from '../../tasks/TaskDAG.js';
 import type { ChatGroupRegistry } from '../../comms/ChatGroupRegistry.js';
 import { logger } from '../../utils/logger.js';
 import { asAgentId } from '../../types/brandedIds.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // Safe min/max for large arrays (avoids stack overflow from spread operator)
 function safeMin(arr: number[]): number { return arr.reduce((a, b) => Math.min(a, b), Infinity); }
@@ -52,7 +53,7 @@ export class SessionExporter {
    */
   export(leadId: string, outputDir: string): ExportResult {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const sessionDir = join(outputDir, `session-${leadId.slice(0, 8)}-${timestamp}`);
+    const sessionDir = join(outputDir, `session-${shortAgentId(leadId)}-${timestamp}`);
     const files: string[] = [];
 
     mkdirSync(sessionDir, { recursive: true });
@@ -91,7 +92,7 @@ export class SessionExporter {
 
     // 2. Per-agent conversation logs
     for (const agent of crewAgents) {
-      const filename = `${agent.id.slice(0, 8)}-${agent.role?.name ?? 'unknown'}.md`;
+      const filename = `${shortAgentId(agent.id)}-${agent.role?.name ?? 'unknown'}.md`;
       const filepath = join(sessionDir, 'agents', filename);
       writeFileSync(filepath, this.buildAgentMd(agent));
       files.push(`agents/${filename}`);
@@ -182,11 +183,11 @@ export class SessionExporter {
       : 'N/A';
 
     const lines: string[] = [
-      `# Session Export — ${leadId.slice(0, 8)}`,
+      `# Session Export — ${shortAgentId(leadId)}`,
       '',
       '## Overview',
       '',
-      `- **Lead**: ${lead?.role?.name ?? 'unknown'} (${leadId.slice(0, 8)})`,
+      `- **Lead**: ${lead?.role?.name ?? 'unknown'} (${shortAgentId(leadId)})`,
       `- **Start**: ${startTime}`,
       `- **Duration**: ${duration}`,
       `- **Agents**: ${agents.length}`,
@@ -206,7 +207,7 @@ export class SessionExporter {
       const tasksDone = agentEvents.filter(e => e.actionType === 'task_completed').length;
       const tokens = (agent.inputTokens ?? 0) + (agent.outputTokens ?? 0);
       lines.push(
-        `| ${agent.id.slice(0, 8)} | ${agent.role?.name ?? '?'} | ${agent.model ?? '?'} | ${agent.status} | ${tasksDone} | ${tokens.toLocaleString()} |`,
+        `| ${shortAgentId(agent.id)} | ${agent.role?.name ?? '?'} | ${agent.model ?? '?'} | ${agent.status} | ${tasksDone} | ${tokens.toLocaleString()} |`,
       );
     }
 
@@ -244,12 +245,12 @@ export class SessionExporter {
 
   private buildAgentMd(agent: any): string {
     const lines: string[] = [
-      `# Agent: ${agent.role?.name ?? 'unknown'} (${agent.id.slice(0, 8)})`,
+      `# Agent: ${agent.role?.name ?? 'unknown'} (${shortAgentId(agent.id)})`,
       '',
       `- **Status**: ${agent.status}`,
       `- **Model**: ${agent.model ?? 'unknown'}`,
       `- **Task**: ${agent.task ?? 'N/A'}`,
-      `- **Parent**: ${agent.parentId?.slice(0, 8) ?? 'none'}`,
+      `- **Parent**: ${agent.parentId ? shortAgentId(agent.parentId) : 'none'}`,
       `- **Input tokens**: ${agent.inputTokens ?? 0}`,
       `- **Output tokens**: ${agent.outputTokens ?? 0}`,
       '',
@@ -298,7 +299,7 @@ export class SessionExporter {
       lines.push('*No messages*');
     } else {
       for (const msg of messages) {
-        lines.push(`**[${msg.timestamp}] ${msg.fromRole}** (${msg.fromAgentId.slice(0, 8)}):`);
+        lines.push(`**[${msg.timestamp}] ${msg.fromRole}** (${shortAgentId(msg.fromAgentId)}):`);
         lines.push('');
         lines.push(msg.content);
         lines.push('');

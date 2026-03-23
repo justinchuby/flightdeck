@@ -172,20 +172,90 @@ describe('CoordCommands — COMMIT handler', () => {
     expect(getGitAddArgs()).toBeUndefined();
   });
 
-  it('includes Co-authored-by trailer in commit command', async () => {
+  it('includes Co-authored-by trailer for copilot provider', async () => {
     mockExecFileSuccess(undefined, ['file.ts']);
     const ctx = makeCtx({
       lockRegistry: {
         getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
       },
     });
-    const agent = makeAgent();
+    const agent = makeAgent({ provider: 'copilot' });
     const commit = getCommitHandler(ctx);
 
     await commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
 
     const commitArgs = getGitCommitArgs()!;
-    expect(commitArgs.join(' ')).toContain('Co-authored-by: Copilot');
+    const msgArg = commitArgs[commitArgs.indexOf('-m') + 1];
+    expect(msgArg).toContain('Co-authored-by: Copilot');
+  });
+
+  it('omits Co-authored-by trailer for non-copilot providers', async () => {
+    mockExecFileSuccess(undefined, ['file.ts']);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+      },
+    });
+    const agent = makeAgent({ provider: 'claude' });
+    const commit = getCommitHandler(ctx);
+
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
+
+    const commitArgs = getGitCommitArgs()!;
+    const msgArg = commitArgs[commitArgs.indexOf('-m') + 1];
+    expect(msgArg).not.toContain('Co-authored-by');
+  });
+
+  it('omits Co-authored-by trailer when provider is unknown', async () => {
+    mockExecFileSuccess(undefined, ['file.ts']);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+      },
+    });
+    const agent = makeAgent({ provider: undefined });
+    const commit = getCommitHandler(ctx);
+
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
+
+    const commitArgs = getGitCommitArgs()!;
+    const msgArg = commitArgs[commitArgs.indexOf('-m') + 1];
+    expect(msgArg).not.toContain('Co-authored-by');
+  });
+
+  it('includes provider in agent sign-off line', async () => {
+    mockExecFileSuccess(undefined, ['file.ts']);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+      },
+    });
+    const agent = makeAgent({ provider: 'copilot', model: 'claude-opus-4.6' });
+    const commit = getCommitHandler(ctx);
+
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
+
+    const commitArgs = getGitCommitArgs()!;
+    const msgArg = commitArgs[commitArgs.indexOf('-m') + 1];
+    expect(msgArg).toContain('Agent-signed-off: Developer (agent-d');
+    expect(msgArg).toContain('[claude-opus-4.6 via copilot]');
+  });
+
+  it('shows unknown provider in sign-off when provider not set', async () => {
+    mockExecFileSuccess(undefined, ['file.ts']);
+    const ctx = makeCtx({
+      lockRegistry: {
+        getByAgent: vi.fn().mockReturnValue([{ filePath: 'file.ts' }]),
+      },
+    });
+    const agent = makeAgent({ provider: undefined, model: 'gpt-5.4' });
+    const commit = getCommitHandler(ctx);
+
+    await commit.handler(agent, '⟦⟦ COMMIT {"message": "feat: stuff"} ⟧⟧');
+
+    const commitArgs = getGitCommitArgs()!;
+    const msgArg = commitArgs[commitArgs.indexOf('-m') + 1];
+    expect(msgArg).toContain('[gpt-5.4 via unknown]');
   });
 
   it('uses default message when none provided', async () => {

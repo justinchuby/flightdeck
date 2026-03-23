@@ -169,7 +169,7 @@ Create a chat group for focused discussion. Requires at least one of `members` o
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | ✅ | Group name |
-| `members` | ❌* | Array of agent IDs to include |
+| `members` | ❌* | Array of agent short IDs, full UUIDs, or role names |
 | `roles` | ❌* | Array of role names to include |
 
 \* At least one of `members` or `roles` must be provided.
@@ -192,26 +192,26 @@ Send a message to all members of a chat group.
 Add members to an existing group.
 
 ```
-⟦⟦ ADD_TO_GROUP {"group": "backend-team", "members": ["agent-id"]} ⟧⟧
+⟦⟦ ADD_TO_GROUP {"group": "backend-team", "members": ["c9d0e1f2"]} ⟧⟧
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `group` | ✅ | Group name |
-| `members` | ✅ | Array of agent IDs to add |
+| `members` | ✅ | Array of agent short IDs, full UUIDs, or role names |
 
 ### REMOVE_FROM_GROUP
 
 Remove members from a group.
 
 ```
-⟦⟦ REMOVE_FROM_GROUP {"group": "backend-team", "members": ["agent-id"]} ⟧⟧
+⟦⟦ REMOVE_FROM_GROUP {"group": "backend-team", "members": ["e5f6a7b8"]} ⟧⟧
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `group` | ✅ | Group name |
-| `members` | ✅ | Array of agent IDs to remove |
+| `members` | ✅ | Array of agent short IDs, full UUIDs, or role names |
 
 ### QUERY_GROUPS
 

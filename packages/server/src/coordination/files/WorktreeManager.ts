@@ -14,6 +14,7 @@ import path from 'path';
 import { existsSync, rmSync } from 'fs';
 import { EventEmitter } from 'events';
 import { logger } from '../../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -60,7 +61,7 @@ export class WorktreeManager extends EventEmitter {
 
   /** Create an isolated worktree for an agent. */
   async create(agentId: string): Promise<string> {
-    const shortId = agentId.slice(0, 8);
+    const shortId = shortAgentId(agentId);
     const branch = `agent-wt-${shortId}`;
     const worktreePath = toForwardSlash(path.join(this.repoRoot, '.worktrees', shortId));
 
@@ -134,7 +135,7 @@ export class WorktreeManager extends EventEmitter {
   /** Clean up a worktree and its branch. */
   async cleanup(agentId: string): Promise<void> {
     const info = this.worktrees.get(agentId);
-    const shortId = agentId.slice(0, 8);
+    const shortId = shortAgentId(agentId);
     const branch = info?.branch ?? `agent-wt-${shortId}`;
     const worktreePath = info?.path ?? toForwardSlash(path.join(this.repoRoot, '.worktrees', shortId));
 

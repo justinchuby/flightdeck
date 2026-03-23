@@ -3,6 +3,7 @@ import { isTerminalStatus } from './Agent.js';
 import type { Delegation } from './CommandDispatcher.js';
 import { buildCommandHelp } from './commands/CommandHelp.js';
 import { logger } from '../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 export interface DagSummary {
   pending: number; ready: number; running: number; done: number;
@@ -123,7 +124,7 @@ export class HeartbeatMonitor {
     agent.queueMessage(message);
     this.lastCommandReminder.set(agent.id, Date.now());
 
-    logger.info('heartbeat', `Command reminder (on-demand) → ${agent.role.name} (${agent.id.slice(0, 8)})`);
+    logger.info('heartbeat', `Command reminder (on-demand) → ${agent.role.name} (${shortAgentId(agent.id)})`);
 
     this.ctx.emit('agent:message_sent', {
       from: 'system',
@@ -191,7 +192,7 @@ export class HeartbeatMonitor {
 
       // Escalate after 5+ consecutive check cycles (fires regardless of backoff)
       if (nudgeCount >= 5) {
-        logger.warn('lead', `Lead ${lead.id.slice(0, 8)} unresponsive after ${nudgeCount} reminders`);
+        logger.warn('lead', `Lead ${shortAgentId(lead.id)} unresponsive after ${nudgeCount} reminders`);
         this.ctx.emit('lead:stalled', { leadId: lead.id, nudgeCount, idleDuration });
       }
 
@@ -237,7 +238,7 @@ export class HeartbeatMonitor {
       parts.push('\nUse DELEGATE to assign ready tasks, QUERY_CREW to check agents, or HALT_HEARTBEAT to pause reminders.');
       const nudge = parts.join('\n');
 
-      logger.info('lead', `Heartbeat reminder #${nudgeCount} → ${lead.role.name} (${lead.id.slice(0, 8)}): idle ${Math.floor(idleDuration / 1000)}s`);
+      logger.info('lead', `Heartbeat reminder #${nudgeCount} → ${lead.role.name} (${shortAgentId(lead.id)}): idle ${Math.floor(idleDuration / 1000)}s`);
       lead.sendMessage(nudge);
 
       this.ctx.emit('agent:message_sent', {
@@ -277,7 +278,7 @@ export class HeartbeatMonitor {
       agent.queueMessage(message);
       this.lastCommandReminder.set(agent.id, now);
 
-      logger.info('heartbeat', `Command reminder → ${agent.role.name} (${agent.id.slice(0, 8)})`);
+      logger.info('heartbeat', `Command reminder → ${agent.role.name} (${shortAgentId(agent.id)})`);
 
       this.ctx.emit('agent:message_sent', {
         from: 'system',

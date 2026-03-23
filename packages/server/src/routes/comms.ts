@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { shortAgentId } from '@flightdeck/shared';
 import type { AppContext } from './context.js';
 import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
@@ -93,7 +94,7 @@ export function commsRoutes(ctx: AppContext): Router {
           nodes.push({
             id: agent.id,
             role: agent.role?.name ?? agent.role?.id ?? 'unknown',
-            shortId: agent.id.slice(0, 8),
+            shortId: shortAgentId(agent.id),
             status: agent.status,
           });
         }

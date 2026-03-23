@@ -2,6 +2,7 @@ import { Agent, isTerminalStatus } from './Agent.js';
 import { generateProjectId } from '../utils/projectId.js';
 import { asProjectId } from '../types/brandedIds.js';
 import { join } from 'path';
+import { shortAgentId } from '@flightdeck/shared';
 
 import type { AgentContextInfo } from './Agent.js';
 import type { Role, RoleRegistry } from './RoleRegistry.js';
@@ -238,12 +239,12 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
       const target = this.agents.get(msg.to);
       if (target && (target.status === 'running' || target.status === 'idle')) {
         const fromAgent = this.agents.get(msg.from);
-        const fromLabel = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
+        const fromLabel = fromAgent ? `${fromAgent.role.name} (${shortAgentId(msg.from)})` : shortAgentId(msg.from);
         logger.info({ module: 'comms', msg: 'Delivering message', targetAgentId: msg.to, targetRole: target.role.name, fromAgentId: msg.from, contentPreview: msg.content.slice(0, 80) });
         target.queueMessage(`[Message from ${fromLabel}]: ${msg.content}`);
 
         // Persist DMs to the target's conversation as 'external' messages so they survive page reload
-        const fromRole = fromAgent ? `${fromAgent.role.name} (${msg.from.slice(0, 8)})` : msg.from.slice(0, 8);
+        const fromRole = fromAgent ? `${fromAgent.role.name} (${shortAgentId(msg.from)})` : shortAgentId(msg.from);
         this.persistExternalMessage(msg.to, msg.content, fromRole);
       } else {
         logger.warn({ module: 'comms', msg: 'Delivery failed — target not found/running', targetAgentId: msg.to });
@@ -497,7 +498,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     const leadId = agent.role.id === 'lead' ? agent.id : (agent.parentId || 'unknown');
     agent.artifactDir = join(
       FLIGHTDECK_STATE_DIR, 'artifacts', artifactProjectId,
-      'sessions', leadId, `${agent.role.id}-${agent.id.slice(0, 8)}`,
+      'sessions', leadId, `${agent.role.id}-${shortAgentId(agent.id)}`,
     );
 
     this.agents.set(agent.id, agent);
@@ -623,7 +624,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         if (!agent.resumeSessionId) {
           const parent = this.agents.get(agent.parentId);
           if (parent && (parent.status === 'running' || parent.status === 'idle')) {
-            const msg = `[System] ${agent.role.name} (${agent.id.slice(0, 8)}) session ready: ${sessionId}`;
+            const msg = `[System] ${agent.role.name} (${shortAgentId(agent.id)}) session ready: ${sessionId}`;
             parent.sendMessage(msg);
             this.emit('agent:message_sent', {
               from: agent.id,
@@ -645,7 +646,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
         const parent = this.agents.get(agent.parentId);
         if (parent && (parent.status === 'running' || parent.status === 'idle')) {
           parent.sendMessage(
-            `[System] ⚠️ ${agent.role.name} (${agent.id.slice(0, 8)}) failed to resume session: ${info.error}. ` +
+            `[System] ⚠️ ${agent.role.name} (${shortAgentId(agent.id)}) failed to resume session: ${info.error}. ` +
             `Consider re-spawning this agent or reassigning its task.`
           );
         }

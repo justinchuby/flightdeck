@@ -14,6 +14,7 @@ import {
   groupMessageSchema,
   reactSchema,
 } from './commandSchemas.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Regex patterns ──────────────────────────────────────────────────
 
@@ -36,9 +37,9 @@ export function getCommCommands(ctx: CommandHandlerContext): CommandEntry[] {
   return [
     { regex: AGENT_MESSAGE_REGEX, name: 'AGENT_MESSAGE', handler: (a, d) => handleAgentMessage(ctx, a, d), help: { description: 'Send a message to an agent', example: 'AGENT_MESSAGE {"to": "agent-id-or-role", "content": "your message"}', category: 'Communication', args: deriveArgs(agentMessageSchema) } },
     { regex: BROADCAST_REGEX, name: 'BROADCAST', handler: (a, d) => handleBroadcast(ctx, a, d), help: { description: 'Send a message to all agents', example: 'BROADCAST {"content": "attention everyone..."}', category: 'Communication', args: deriveArgs(broadcastSchema) } },
-    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d), help: { description: 'Create a chat group', example: 'CREATE_GROUP {"name": "backend-team", "members": ["id1", "id2"]}', category: 'Groups', args: deriveArgs(createGroupSchema) } },
-    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d), help: { description: 'Add members to a group', example: 'ADD_TO_GROUP {"group": "backend-team", "members": ["id3"]}', category: 'Groups', args: deriveArgs(addToGroupSchema) } },
-    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d), help: { description: 'Remove members from a group', example: 'REMOVE_FROM_GROUP {"group": "backend-team", "members": ["id2"]}', category: 'Groups', args: deriveArgs(removeFromGroupSchema) } },
+    { regex: CREATE_GROUP_REGEX, name: 'CREATE_GROUP', handler: (a, d) => handleCreateGroup(ctx, a, d), help: { description: 'Create a chat group', example: 'CREATE_GROUP {"name": "backend-team", "members": ["a1b2c3d4", "e5f6a7b8"]}', category: 'Groups', args: deriveArgs(createGroupSchema) } },
+    { regex: ADD_TO_GROUP_REGEX, name: 'ADD_TO_GROUP', handler: (a, d) => handleAddToGroup(ctx, a, d), help: { description: 'Add members to a group', example: 'ADD_TO_GROUP {"group": "backend-team", "members": ["c9d0e1f2"]}', category: 'Groups', args: deriveArgs(addToGroupSchema) } },
+    { regex: REMOVE_FROM_GROUP_REGEX, name: 'REMOVE_FROM_GROUP', handler: (a, d) => handleRemoveFromGroup(ctx, a, d), help: { description: 'Remove members from a group', example: 'REMOVE_FROM_GROUP {"group": "backend-team", "members": ["e5f6a7b8"]}', category: 'Groups', args: deriveArgs(removeFromGroupSchema) } },
     { regex: GROUP_MESSAGE_REGEX, name: 'GROUP_MESSAGE', handler: (a, d) => handleGroupMessage(ctx, a, d), help: { description: 'Send a message to a group', example: 'GROUP_MESSAGE {"group": "backend-team", "content": "sync up"}', category: 'Groups', args: deriveArgs(groupMessageSchema) } },
     { regex: LIST_GROUPS_REGEX, name: 'LIST_GROUPS', handler: (a, _d) => handleListGroups(ctx, a) },
     { regex: QUERY_GROUPS_REGEX, name: 'QUERY_GROUPS', handler: (a, _d) => handleListGroups(ctx, a), help: { description: 'List all groups you belong to', example: 'QUERY_GROUPS', category: 'Groups' } },
@@ -87,7 +88,7 @@ export function maybeAutoCreateGroup(
 
     const names = [...agentIds].map(id => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
     ctx.chatGroupRegistry.sendMessage(groupName, lead.id, 'system', 'system',
       `Auto-created coordination group for parallel ${keyword} work. Members: ${names}`);
@@ -151,6 +152,40 @@ export function resolveAgentInProject(
   return partial;
 }
 
+/**
+ * Resolve a list of member identifiers to full agent UUIDs.
+ * Accepts full UUIDs, short ID prefixes (8-char), role IDs, or role names.
+ * Reports ambiguous or unresolvable IDs back to the requesting agent.
+ */
+function resolveGroupMembers(
+  ctx: CommandHandlerContext,
+  memberIds: string[],
+  senderProjectId: string | undefined,
+  agent: Agent,
+): string[] {
+  const resolved: string[] = [];
+  for (const memberId of memberIds) {
+    // Check for ambiguous prefix matches before resolving
+    const candidates = ctx.getAllAgents().filter((a) =>
+      a.id.startsWith(memberId) && a.id !== memberId &&
+      (!senderProjectId || ctx.getProjectIdForAgent(a.id) === senderProjectId)
+    );
+    if (candidates.length > 1) {
+      const names = candidates.map((a) => `${a.role.name} (${shortAgentId(a.id)})`).join(', ');
+      agent.sendMessage(`[System] Ambiguous agent ID "${memberId}" matches ${candidates.length} agents: ${names}. Use a longer prefix or full UUID.`);
+      continue;
+    }
+
+    const found = resolveAgentInProject(ctx, memberId, senderProjectId);
+    if (found) {
+      if (!resolved.includes(found.id)) resolved.push(found.id);
+    } else {
+      agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
+    }
+  }
+  return resolved;
+}
+
 // ── Handler implementations ─────────────────────────────────────────
 
 function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: string): void {
@@ -186,7 +221,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
       toRole: targetAgent.role.name,
       content: msg.content,
     });
-    ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
+    ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${shortAgentId(targetId)})`, {
       toAgentId: targetId, toRole: targetAgent.role.id,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
@@ -219,7 +254,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
 
     logger.info({ module: 'comms', msg: 'Broadcast sent', recipientCount: recipients.length, contentPreview: msg.content.slice(0, 80) });
 
-    const fromLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
+    const fromLabel = `${agent.role.name} (${shortAgentId(agent.id)})`;
     if (recipients.length === 0) {
       agent.sendMessage('[System] Warning: Broadcast sent to 0 agents — no other agents exist yet.');
     }
@@ -265,15 +300,10 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
       }
     }
 
-    for (const memberId of (req.members ?? [])) {
-      const resolved = ctx.getAllAgents().find((a) =>
-        (a.id === memberId || a.id.startsWith(memberId)) && (a.parentId === leadId || a.id === leadId)
-      );
-      if (resolved) {
-        resolvedIds.push(resolved.id);
-      } else {
-        agent.sendMessage(`[System] Cannot resolve agent "${memberId}" for group. Use QUERY_CREW to see available agents.`);
-      }
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const memberResolved = resolveGroupMembers(ctx, req.members ?? [], senderProjectId, agent);
+    for (const id of memberResolved) {
+      if (!resolvedIds.includes(id)) resolvedIds.push(id);
     }
     if (!resolvedIds.includes(agent.id)) {
       resolvedIds.push(agent.id);
@@ -281,7 +311,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
     const group = ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds, agent.projectId, req.roles);
     const memberNames = group.memberIds.map((id: string) => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
     agent.sendMessage(`[System] Group "${req.name}" created with ${group.memberIds.length} members: ${memberNames}.`);
 
@@ -319,10 +349,8 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
       return;
     }
 
-    const resolvedIds = req.members.map((m: string) => {
-      const found = ctx.getAllAgents().find((a) => (a.id === m || a.id.startsWith(m)) && (a.parentId === leadId || a.id === leadId));
-      return found?.id;
-    }).filter(Boolean) as string[];
+    const senderProjectId = ctx.getProjectIdForAgent(agent.id);
+    const resolvedIds = resolveGroupMembers(ctx, req.members, senderProjectId, agent);
 
     const added = ctx.chatGroupRegistry.addMembers(leadId, req.group, resolvedIds);
     if (added.length > 0) {
@@ -333,16 +361,16 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
           const allMembers = ctx.chatGroupRegistry.getMembers(req.group, leadId);
           const memberNames = allMembers.map((id) => {
             const a = ctx.getAgent(id);
-            return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+            return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
           }).join(', ');
           let historyText = '';
           if (history.length > 0) {
-            historyText = '\nRecent messages:\n' + history.map((m) => `  [${m.fromRole} (${m.fromAgentId.slice(0, 8)})]: ${m.content}`).join('\n');
+            historyText = '\nRecent messages:\n' + history.map((m) => `  [${m.fromRole} (${shortAgentId(m.fromAgentId)})]: ${m.content}`).join('\n');
           }
           member.sendMessage(`[System] You've been added to group "${req.group}". Members: ${memberNames}.${historyText}\nSend messages: ⟦⟦ GROUP_MESSAGE {"group": "${req.group}", "content": "..."} ⟧⟧`);
         }
       }
-      const names = added.map((id) => ctx.getAgent(id)?.role.name || id.slice(0, 8)).join(', ');
+      const names = added.map((id) => ctx.getAgent(id)?.role.name || shortAgentId(id)).join(', ');
       agent.sendMessage(`[System] Added ${names} to group "${req.group}".`);
     } else {
       agent.sendMessage(`[System] No new members added to "${req.group}" (already members or not found).`);
@@ -366,7 +394,7 @@ function handleRemoveFromGroup(ctx: CommandHandlerContext, agent: Agent, data: s
 
     const removed = ctx.chatGroupRegistry.removeMembers(leadId, req.group, resolvedIds);
     if (removed.length > 0) {
-      const names = removed.map((id) => ctx.getAgent(id)?.role.name || id.slice(0, 8)).join(', ');
+      const names = removed.map((id) => ctx.getAgent(id)?.role.name || shortAgentId(id)).join(', ');
       agent.sendMessage(`[System] Removed ${names} from group "${req.group}".`);
     }
   } catch (err) { logger.debug({ module: 'command', msg: 'Parse failed', command: 'REMOVE_FROM_GROUP', err: (err as Error).message }); }
@@ -397,7 +425,7 @@ function handleGroupMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
       if (memberId === agent.id) continue;
       const member = ctx.getAgent(memberId);
       if (member && (member.status === 'running' || member.status === 'idle')) {
-        member.sendMessage(`[Group "${req.group}" — ${agent.role.name} (${agent.id.slice(0, 8)})]: ${req.content}`);
+        member.sendMessage(`[Group "${req.group}" — ${agent.role.name} (${shortAgentId(agent.id)})]: ${req.content}`);
         delivered++;
       }
     }
@@ -420,7 +448,7 @@ function handleListGroups(ctx: CommandHandlerContext, agent: Agent): void {
   const lines = groups.map((g) => {
     const memberNames = g.memberIds.map((id: string) => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
     const { messageCount, lastMessage } = ctx.chatGroupRegistry.getGroupSummary(g.name, g.leadId);
     const msgInfo = messageCount > 0
@@ -457,23 +485,23 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
 
     // Only parent agents can interrupt their children
     if (target.parentId !== agent.id) {
-      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${target.id.slice(0, 8)}) — you are not their parent agent.`);
+      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${shortAgentId(target.id)}) — you are not their parent agent.`);
       return;
     }
 
     // Cannot interrupt a terminated agent
     if (isTerminalStatus(target.status)) {
-      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${target.id.slice(0, 8)}) — agent is ${target.status}.`);
+      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${shortAgentId(target.id)}) — agent is ${target.status}.`);
       return;
     }
 
-    const formatted = `[PRIORITY — Interrupt from ${agent.role.name} (${agent.id.slice(0, 8)})]\n${req.content}\n\nThis message interrupted your current work. Address it immediately.`;
+    const formatted = `[PRIORITY — Interrupt from ${agent.role.name} (${shortAgentId(agent.id)})]\n${req.content}\n\nThis message interrupted your current work. Address it immediately.`;
     await target.interruptWithMessage(formatted);
 
-    agent.sendMessage(`[System] Interrupted ${target.role.name} (${target.id.slice(0, 8)}). New instructions delivered.`);
+    agent.sendMessage(`[System] Interrupted ${target.role.name} (${shortAgentId(target.id)}). New instructions delivered.`);
 
     ctx.activityLedger.log(agent.id, agent.role.id, 'agent_interrupted',
-      `Interrupted ${target.role.name} (${target.id.slice(0, 8)}): ${req.content.slice(0, 120)}`,
+      `Interrupted ${target.role.name} (${shortAgentId(target.id)}): ${req.content.slice(0, 120)}`,
       { toAgentId: target.id, toRole: target.role.id },
       ctx.getProjectIdForAgent(agent.id) ?? '');
 

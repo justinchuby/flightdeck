@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useLeadStore } from '../stores/leadStore';
+import type { DagTask } from '../types';
 
 export type RouteTier = 'starter' | 'active' | 'collaboration' | 'power';
 
@@ -11,6 +12,8 @@ export interface ProgressiveRoute {
   tier: RouteTier;
   badge?: number;
 }
+
+const EMPTY_TASKS: DagTask[] = [];
 
 const TIER_LEVEL: Record<RouteTier, number> = {
   starter: 0,
@@ -51,7 +54,7 @@ export function useProgressiveRoutes() {
   const agents = useAppStore(s => s.agents);
   const selectedLeadId = useLeadStore(s => s.selectedLeadId);
   const dagStatus = useLeadStore(s => s.projects[selectedLeadId ?? '']?.dagStatus);
-  const tasks = dagStatus?.tasks ?? [];
+  const tasks = dagStatus?.tasks ?? EMPTY_TASKS;
 
   const tier = useMemo((): RouteTier => {
     if (isManuallyExpanded() || getSessionCount() >= 3) return 'power';
