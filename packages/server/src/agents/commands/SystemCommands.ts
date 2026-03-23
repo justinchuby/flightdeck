@@ -54,11 +54,6 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
       contextWindowUsed: a.contextWindowUsed,
     }));
 
-  const running = ctx.getRunningCount();
-  const budget = agent.role.id === 'lead'
-    ? { running, max: ctx.maxConcurrent }
-    : undefined;
-
   // For sub-leads, scope to own children + sibling summary
   const isSubLead = agent.role.id === 'lead' && !!agent.parentId;
   let siblingSection: string | undefined;
@@ -107,7 +102,6 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
   const formatted = formatQueryCrew(visibleMembers, {
     viewerId: agent.id,
     viewerRole: agent.role.id,
-    budget,
     siblingSection,
     memorySection,
     humanMessageAlert,

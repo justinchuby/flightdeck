@@ -63,8 +63,6 @@ interface CrewFormatOptions {
   viewerRole: string;
   /** Pre-built health header (from ContextRefresher.buildHealthHeader) */
   healthHeader?: string;
-  /** Budget info */
-  budget?: { running: number; max: number };
   /** Alerts (stuck agents, context warnings, etc.) */
   alerts?: string[];
   /** Whether to show the RECENT ACTIVITY section */
@@ -164,15 +162,6 @@ function buildLockSection(members: CrewMember[]): string {
   return `== FILE LOCKS ==\n${lines.join('\n')}`;
 }
 
-// ── Budget section ────────────────────────────────────────────────────
-
-function buildBudgetSection(budget?: { running: number; max: number }): string {
-  if (!budget) return '';
-  const available = Math.max(0, budget.max - budget.running);
-  const warning = budget.running >= budget.max ? ' | ⚠ AT CAPACITY' : '';
-  return `== BUDGET ==\n  ${budget.running} / ${budget.max} slots · ${available} available${warning}`;
-}
-
 // ── Alerts section ────────────────────────────────────────────────────
 
 function buildAlertSection(alerts?: string[]): string {
@@ -197,8 +186,6 @@ export function formatCrewUpdate(members: CrewMember[], opts: CrewFormatOptions)
   sections.push(`== CREW ==\n${buildCrewTable(visibleMembers)}`);
 
   sections.push(buildLockSection(visibleMembers));
-
-  if (opts.budget) sections.push(buildBudgetSection(opts.budget));
 
   const alertSection = buildAlertSection(opts.alerts);
   if (alertSection) sections.push(alertSection);
@@ -225,8 +212,6 @@ export function formatQueryCrew(members: CrewMember[], opts: QueryCrewOptions): 
   sections.push(`== YOUR CREW (you can DELEGATE to these) ==\n${buildCrewTable(visibleMembers)}`);
 
   sections.push(buildLockSection(visibleMembers));
-
-  if (opts.budget && isLead) sections.push(buildBudgetSection(opts.budget));
 
   if (opts.siblingSection) sections.push(opts.siblingSection);
 

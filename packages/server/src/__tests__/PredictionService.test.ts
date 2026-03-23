@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   PredictionService,
   type AgentSnapshot,
-  type BudgetSnapshot,
 } from '../coordination/predictions/PredictionService.js';
 
 // ── Mock Database ─────────────────────────────────────────────────
@@ -29,16 +28,6 @@ function makeAgent(overrides: Partial<AgentSnapshot> = {}): AgentSnapshot {
     contextBurnRate: 0,
     estimatedExhaustionMinutes: null,
     lastActivityAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
-
-function makeBudget(overrides: Partial<BudgetSnapshot> = {}): BudgetSnapshot {
-  return {
-    currentSpend: 0,
-    limit: null,
-    utilization: 0,
-    burnRatePerMinute: 0,
     ...overrides,
   };
 }
@@ -118,7 +107,7 @@ describe('PredictionService', () => {
       });
       const config = service.getConfig();
       expect(config.types.context_exhaustion.enabled).toBe(false);
-      expect(config.types.cost_overrun.enabled).toBe(true); // untouched
+      expect(config.types.agent_stall.enabled).toBe(true); // untouched
     });
   });
 
@@ -272,58 +261,6 @@ describe('PredictionService', () => {
       expect(crit!.severity).toBe('critical'); // 2k/10k = 0.2 min
       expect(warn).toBeDefined();
       expect(warn!.severity).toBe('warning'); // 50k/5k = 10 min
-    });
-  });
-
-  // ── Cost Overrun ────────────────────────────────────────────
-
-  describe('predictCostOverrun', () => {
-    it('predicts overrun when utilization > 50% and burn rate positive', () => {
-      const budget = makeBudget({
-        currentSpend: 8,
-        limit: 10,
-        utilization: 0.8,
-        burnRatePerMinute: 0.1,
-      });
-
-      const predictions = service.generatePredictions([], budget);
-      const cost = predictions.find(p => p.type === 'cost_overrun');
-      expect(cost).toBeDefined();
-      expect(cost!.timeHorizon).toBe(20); // $2 remaining / $0.1/min = 20 min
-      expect(cost!.severity).toBe('warning');
-    });
-
-    it('does not predict when no budget limit', () => {
-      const budget = makeBudget({ limit: null, utilization: 0.8, burnRatePerMinute: 0.1 });
-      const predictions = service.generatePredictions([], budget);
-      expect(predictions.find(p => p.type === 'cost_overrun')).toBeUndefined();
-    });
-
-    it('does not predict when utilization is low', () => {
-      const budget = makeBudget({ currentSpend: 2, limit: 10, utilization: 0.2, burnRatePerMinute: 0.05 });
-      const predictions = service.generatePredictions([], budget);
-      expect(predictions.find(p => p.type === 'cost_overrun')).toBeUndefined();
-    });
-
-    it('does not predict when burn rate is zero', () => {
-      const budget = makeBudget({ currentSpend: 8, limit: 10, utilization: 0.8, burnRatePerMinute: 0 });
-      const predictions = service.generatePredictions([], budget);
-      expect(predictions.find(p => p.type === 'cost_overrun')).toBeUndefined();
-    });
-
-    it('marks critical when overrun is imminent', () => {
-      const budget = makeBudget({
-        currentSpend: 9.5,
-        limit: 10,
-        utilization: 0.95,
-        burnRatePerMinute: 0.1,
-      });
-
-      const predictions = service.generatePredictions([], budget);
-      const cost = predictions.find(p => p.type === 'cost_overrun');
-      expect(cost).toBeDefined();
-      expect(cost!.timeHorizon).toBe(5); // $0.5 / $0.1/min = 5 min
-      expect(cost!.severity).toBe('critical');
     });
   });
 

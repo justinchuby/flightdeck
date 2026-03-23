@@ -89,7 +89,7 @@ describe('NotificationService', () => {
   describe('preferences', () => {
     it('returns default preferences for all events', () => {
       const prefs = service.getPreferences();
-      expect(prefs.length).toBeGreaterThanOrEqual(8);
+      expect(prefs.length).toBeGreaterThanOrEqual(6);
       expect(prefs.map(p => p.event)).toContain('decision_pending');
       expect(prefs.map(p => p.event)).toContain('agent_crashed');
     });
@@ -174,13 +174,13 @@ describe('NotificationService', () => {
       const channel = service.createChannel('desktop', { sound: true, showPreview: true });
       service.updateChannel(channel.id, { enabled: false });
       service.updatePreferences([{
-        event: 'budget_warning',
+        event: 'context_critical',
         tier: 'summon',
         channels: [channel.id],
         enabled: true,
       }]);
 
-      const entries = service.routeEvent('budget_warning', 's1', 'Budget at 70%');
+      const entries = service.routeEvent('context_critical', 's1', 'Context at 90%');
       expect(entries).toHaveLength(0);
     });
 
@@ -229,16 +229,16 @@ describe('NotificationService', () => {
     it('logs routed events', () => {
       const channel = service.createChannel('desktop', { sound: true, showPreview: true });
       service.updatePreferences([{
-        event: 'budget_exceeded',
+        event: 'agent_crashed',
         tier: 'interrupt',
         channels: [channel.id],
         enabled: true,
       }]);
 
-      service.routeEvent('budget_exceeded', 'session-1', 'Budget hit 100%');
+      service.routeEvent('agent_crashed', 'session-1', 'Agent crashed');
       const log = service.getLog('session-1');
       expect(log).toHaveLength(1);
-      expect(log[0].event).toBe('budget_exceeded');
+      expect(log[0].event).toBe('agent_crashed');
       expect(log[0].status).toBe('sent');
     });
 

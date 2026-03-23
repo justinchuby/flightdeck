@@ -7,7 +7,6 @@ import { shortAgentId } from '@flightdeck/shared';
 
 type PredictionType =
   | 'context_exhaustion'
-  | 'cost_overrun'
   | 'agent_stall'
   | 'task_duration'
   | 'completion_estimate'
@@ -68,14 +67,6 @@ export interface AgentSnapshot {
   lastActivityAt: string;
 }
 
-/** Snapshot of budget state used for cost predictions */
-export interface BudgetSnapshot {
-  currentSpend: number;
-  limit: number | null;
-  utilization: number;         // 0-1
-  burnRatePerMinute: number;
-}
-
 // ── Constants ─────────────────────────────────────────────────────
 
 const SETTINGS_KEY_PREDICTIONS = 'predictions';
@@ -84,7 +75,6 @@ const MAX_PREDICTIONS = 200;
 
 const CONTEXT_EXPIRY_MINUTES = 15;
 const STALL_EXPIRY_MINUTES = 15;
-const COST_EXPIRY_MINUTES = 30;
 
 const STALL_THRESHOLD_MINUTES = 10;
 
@@ -93,7 +83,6 @@ const DEFAULT_CONFIG: PredictionConfig = {
   intervalMs: 60_000,
   types: {
     context_exhaustion: { enabled: true },
-    cost_overrun: { enabled: true },
     agent_stall: { enabled: true },
     task_duration: { enabled: true },
     completion_estimate: { enabled: true },
@@ -212,11 +201,11 @@ export class PredictionService {
   // ── Prediction Generation ─────────────────────────────────────
 
   /**
-   * Generate predictions based on current agent and budget state.
+   * Generate predictions based on current agent state.
    * Called periodically (e.g., every 60s from a check loop).
    * Returns newly created or updated predictions.
    */
-  generatePredictions(agents: AgentSnapshot[], budget?: BudgetSnapshot): Prediction[] {
+  generatePredictions(agents: AgentSnapshot[]): Prediction[] {
     if (!this.config.enabled) return [];
 
     this.expirePredictions();
@@ -225,9 +214,6 @@ export class PredictionService {
 
     if (this.config.types.context_exhaustion.enabled) {
       newPredictions.push(...this.predictContextExhaustion(agents));
-    }
-    if (this.config.types.cost_overrun.enabled && budget) {
-      newPredictions.push(...this.predictCostOverrun(budget));
     }
     if (this.config.types.agent_stall.enabled) {
       newPredictions.push(...this.predictAgentStall(agents));
@@ -335,62 +321,6 @@ export class PredictionService {
     }
 
     return results;
-  }
-
-  /**
-   * Cost Overrun: if budget.utilization > 0.5 and burnRatePerMinute > 0,
-   * extrapolate when budget will hit 100%. Confidence based on utilization
-   * (higher utilization = more data points = more confidence in linear trend).
-   */
-  private predictCostOverrun(budget: BudgetSnapshot): Prediction[] {
-    if (budget.limit == null || budget.limit <= 0) return [];
-    if (budget.utilization <= 0.5) return [];
-    if (budget.burnRatePerMinute <= 0) return [];
-
-    const remainingBudget = budget.limit - budget.currentSpend;
-    if (remainingBudget <= 0) return [];
-
-    const minutesUntilOverrun = remainingBudget / budget.burnRatePerMinute;
-
-    // Confidence: more utilization data means more reliable extrapolation
-    const dataPoints = Math.max(1, Math.round(budget.utilization * 15));
-    const confidence = Math.min(85, dataPoints * 6);
-
-    return [
-      {
-        id: generateId(),
-        type: 'cost_overrun',
-        severity: minutesUntilOverrun <= 10 ? 'critical' : minutesUntilOverrun <= 30 ? 'warning' : 'info',
-        confidence,
-        title: 'Budget overrun predicted',
-        detail: `Current spend: $${budget.currentSpend.toFixed(2)} of $${budget.limit.toFixed(2)} ` +
-          `(${Math.round(budget.utilization * 100)}%). ` +
-          `At $${budget.burnRatePerMinute.toFixed(4)}/min, budget will be exhausted in ~${Math.round(minutesUntilOverrun)} minutes.`,
-        timeHorizon: Math.round(minutesUntilOverrun),
-        dataPoints,
-        actions: [
-          {
-            label: 'Increase budget',
-            description: 'Raise the budget limit to avoid interruption',
-            actionType: 'api_call',
-            endpoint: '/api/budget',
-            method: 'POST',
-            body: { limit: Math.round(budget.limit * 1.5 * 100) / 100 },
-            confidence: 70,
-          },
-          {
-            label: 'Dismiss',
-            description: 'Dismiss this prediction',
-            actionType: 'dismiss',
-            endpoint: '',
-            method: 'POST',
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        expiresAt: minutesFromNow(COST_EXPIRY_MINUTES),
-        outcome: null,
-      },
-    ];
   }
 
   /**

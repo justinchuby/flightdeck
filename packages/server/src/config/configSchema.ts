@@ -35,17 +35,6 @@ const roleOverrideSchema = z.object({
   model: z.string().optional(),
 }).passthrough();
 
-const budgetThresholdsSchema = z.object({
-  warning: z.number().min(0).max(1).default(0.7),
-  critical: z.number().min(0).max(1).default(0.9),
-  pause: z.number().min(0).max(1).default(1.0),
-});
-
-const budgetSchema = z.object({
-  limit: z.number().nullable().default(null),
-  thresholds: budgetThresholdsSchema.optional(),
-});
-
 // ── Provider schema ────────────────────────────────────────
 
 // Provider IDs derived from the central ProviderRegistry.
@@ -209,7 +198,6 @@ export const flightdeckConfigSchema = z.preprocess(
     heartbeat: sectionDefault(heartbeatSchema),
     models: sectionDefault(modelsSchema),
     roles: z.preprocess((val) => val ?? {}, z.record(z.string(), roleOverrideSchema)),
-    budget: sectionDefault(budgetSchema),
     provider: sectionDefault(providerSchema),
     oversight: sectionDefault(oversightSchema),
     telegram: sectionDefault(telegramSchema),

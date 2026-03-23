@@ -55,14 +55,11 @@ describe('CrewFormatter', () => {
         viewerId: 'viewer-id',
         viewerRole: 'lead',
         healthHeader: '== PROJECT HEALTH ==\n✅ 50% complete · 1 active, 1 idle',
-        budget: { running: 2, max: 10 },
       });
 
       expect(result).toContain('== CREW ==');
       expect(result).toContain('== FILE LOCKS ==');
-      expect(result).toContain('== BUDGET ==');
       expect(result).toContain('PROJECT HEALTH');
-      expect(result).toContain('2 / 10 slots');
     });
 
     it('excludes the viewer from the crew table', () => {
@@ -174,15 +171,6 @@ describe('CrewFormatter', () => {
       expect(result).toContain('3');
     });
 
-    it('shows AT CAPACITY warning when budget full', () => {
-      const result = formatCrewUpdate([makeMember()], {
-        viewerId: 'other',
-        viewerRole: 'lead',
-        budget: { running: 10, max: 10 },
-      });
-
-      expect(result).toContain('AT CAPACITY');
-    });
   });
 
   describe('formatQueryCrew', () => {
@@ -230,22 +218,6 @@ describe('CrewFormatter', () => {
 
       expect(result).toContain('UNREAD HUMAN MESSAGE');
       expect(result).toContain('fix the build');
-    });
-
-    it('shows budget only for leads', () => {
-      const leaderResult = formatQueryCrew([makeMember()], {
-        viewerId: 'viewer-id',
-        viewerRole: 'lead',
-        budget: { running: 5, max: 20 },
-      });
-      expect(leaderResult).toContain('== BUDGET ==');
-
-      const devResult = formatQueryCrew([makeMember()], {
-        viewerId: 'viewer-id',
-        viewerRole: 'developer',
-        budget: { running: 5, max: 20 },
-      });
-      expect(devResult).not.toContain('== BUDGET ==');
     });
   });
 });

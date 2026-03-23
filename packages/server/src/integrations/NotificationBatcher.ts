@@ -16,7 +16,7 @@ const CATEGORY_TO_NOTIFIABLE: Partial<Record<NotificationCategory, NotifiableEve
   agent_completed: 'agent_recovered',
   task_completed: 'task_completed',
   decision_needs_approval: 'decision_pending',
-  system_alert: 'budget_warning',
+  system_alert: 'context_critical',
 };
 
 interface NotificationBatcherEvents {

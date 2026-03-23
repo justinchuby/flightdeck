@@ -3,15 +3,10 @@ import type { ServerConfig } from '../config.js';
 import { updateConfig, getConfig } from '../config.js';
 import { validateBody, configPatchSchema } from '../validation/schemas.js';
 import type { AppContext } from './context.js';
-import { BudgetEnforcer } from '../coordination/scheduling/BudgetEnforcer.js';
-import { CostTracker } from '../agents/CostTracker.js';
 import { logger } from '../utils/logger.js';
 
 export function configRoutes(ctx: AppContext): Router {
-  const { agentManager, db: _db } = ctx;
-  // Use the container's costTracker if available, otherwise create one for backward compat
-  const costTracker = ctx.costTracker ?? new CostTracker(_db);
-  const budgetEnforcer = new BudgetEnforcer(_db, costTracker);
+  const { agentManager } = ctx;
   const router = Router();
 
   // --- Config ---
@@ -71,32 +66,6 @@ export function configRoutes(ctx: AppContext): Router {
 
   router.get('/system/status', (_req, res) => {
     res.json({ paused: agentManager.isSystemPaused });
-  });
-
-  // --- Budget ---
-  router.get('/budget', (req, res) => {
-    const projectId = req.query.projectId as string | undefined;
-    if (projectId) budgetEnforcer.setProject(projectId);
-    res.json(budgetEnforcer.getStatus());
-  });
-
-  router.post('/budget', (req, res) => {
-    const { limit, thresholds, projectId } = req.body;
-    if (limit !== undefined && limit !== null && (typeof limit !== 'number' || limit < 0)) {
-      return res.status(400).json({ error: 'limit must be a positive number, 0 (disabled), or null (unlimited)' });
-    }
-    budgetEnforcer.setConfig({ limit, thresholds }, projectId);
-    res.json({ updated: true, ...budgetEnforcer.getStatus() });
-  });
-
-  router.post('/budget/check', (req, res) => {
-    const projectId = (req.body?.projectId ?? req.query.projectId) as string | undefined;
-    if (projectId) budgetEnforcer.setProject(projectId);
-    const result = budgetEnforcer.check();
-    if (result.level === 'pause') {
-      agentManager.pauseSystem();
-    }
-    res.json({ ...result, ...budgetEnforcer.getStatus() });
   });
 
   return router;

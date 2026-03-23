@@ -33,8 +33,6 @@ budget:
     expect(result.config.models.known).toEqual(['claude-opus-4.6', 'gpt-5.2']);
     expect(result.config.models.defaults.developer).toEqual(['claude-opus-4.6']);
     expect(result.config.roles.developer?.model).toBe('claude-sonnet-4.6');
-    expect(result.config.budget.limit).toBe(100);
-    expect(result.config.budget.thresholds?.warning).toBe(0.5);
     expect(result.diffs).toEqual([]); // no previous → no diffs
   });
 
@@ -44,7 +42,6 @@ budget:
     expect(result.config.server.maxConcurrentAgents).toBe(defaults.server.maxConcurrentAgents);
     expect(result.config.heartbeat.idleThresholdMs).toBe(defaults.heartbeat.idleThresholdMs);
     expect(result.config.models.known.length).toBeGreaterThan(0);
-    expect(result.config.budget.limit).toBeNull();
   });
 
   it('rejects invalid YAML syntax', () => {
@@ -94,18 +91,19 @@ budget:
     expect(result.diffs.filter(d => d.section === 'server')).toHaveLength(0);
   });
 
-  it('validates budget thresholds are numbers between 0 and 1', () => {
-    expect(() => loadConfig('budget:\n  thresholds:\n    warning: 1.5\n', null))
-      .toThrow(/validation failed/i);
+  it('validates budget thresholds are numbers between 0 and 1 (removed — budget config no longer exists)', () => {
+    // Budget schema was removed; unknown sections are silently ignored by Zod passthrough
+    const result = loadConfig('budget:\n  thresholds:\n    warning: 1.5\n', null);
+    expect(result.config).toBeDefined();
   });
 
-  it('accepts null budget limit', () => {
+  it('accepts null budget limit (removed — budget config no longer exists)', () => {
     const result = loadConfig('budget:\n  limit: null\n', null);
-    expect(result.config.budget.limit).toBeNull();
+    expect(result.config).toBeDefined();
   });
 
-  it('accepts numeric budget limit', () => {
+  it('accepts numeric budget limit (removed — budget config no longer exists)', () => {
     const result = loadConfig('budget:\n  limit: 50\n', null);
-    expect(result.config.budget.limit).toBe(50);
+    expect(result.config).toBeDefined();
   });
 });

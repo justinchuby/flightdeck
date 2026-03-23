@@ -455,15 +455,10 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     // Convert AgentContextInfo to CrewMember (compatible interfaces)
     const members: CrewMember[] = peers;
 
-    const budget = this.budget
-      ? { running: this.budget.runningCount, max: this.budget.maxConcurrent }
-      : undefined;
-
     const formatted = formatCrewUpdate(members, {
       viewerId: this.id,
       viewerRole: this.role.id,
       healthHeader,
-      budget,
       alerts,
     });
 

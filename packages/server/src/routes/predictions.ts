@@ -56,14 +56,14 @@ export function predictionRoutes(ctx: AppContext): Router {
 
   // POST /predictions/generate — manually trigger prediction generation
   // In production this would be called by a periodic check loop
-  // Accepts { agents: AgentSnapshot[], budget?: BudgetSnapshot }
+  // Accepts { agents: AgentSnapshot[] }
   router.post('/predictions/generate', (req, res) => {
-    const { agents, budget } = req.body;
+    const { agents } = req.body;
     if (!agents || !Array.isArray(agents)) {
       return res.status(400).json({ error: 'Missing required field: agents (array)' });
     }
     try {
-      const predictions = service.generatePredictions(agents, budget);
+      const predictions = service.generatePredictions(agents);
       res.json({ predictions, count: predictions.length });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });

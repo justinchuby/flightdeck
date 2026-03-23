@@ -164,18 +164,4 @@ describe('CREW_UPDATE content hashing', () => {
     expect(third).toBe(true);
   });
 
-  it('handles budget changes for lead agents', () => {
-    const leadRole = makeRole({ id: 'lead', name: 'Project Lead' });
-    const lead = new Agent(leadRole, makeConfig() as any, 'coordinate', undefined, []);
-    lead.budget = { maxConcurrent: 10, runningCount: 3 };
-
-    const peers = makePeers({ id: asAgentId('child-1'), task: 'task', parentId: lead.id });
-
-    lead.injectContextUpdate(peers, []);
-
-    // Budget changes → new hash
-    lead.budget = { maxConcurrent: 10, runningCount: 5 };
-    const result = lead.injectContextUpdate(peers, []);
-    expect(result).toBe(true);
-  });
 });

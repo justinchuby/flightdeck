@@ -8,7 +8,7 @@ The Predictions API endpoints have been removed. See the [removal notice](/guide
 
 The Workflow Automation feature remains fully functional. Workflows use an event-trigger model:
 
-- **12 event triggers**: agent_spawned, task_completed, agent_crashed, budget_exceeded, etc.
+- **12 event triggers**: agent_spawned, task_completed, agent_crashed, context_critical, etc.
 - **12 action types**: pause_agent, send_notification, create_task, etc.
 
 ### `GET /api/workflows`

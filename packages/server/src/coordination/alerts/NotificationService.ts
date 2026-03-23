@@ -12,8 +12,6 @@ export type NotifiableEvent =
   | 'decision_pending'
   | 'agent_crashed'
   | 'agent_recovered'
-  | 'budget_warning'
-  | 'budget_exceeded'
   | 'session_completed'
   | 'task_completed'
   | 'context_critical';
@@ -83,13 +81,12 @@ const LOG_KEY = 'notification_log';
 
 const ALL_EVENTS: NotifiableEvent[] = [
   'decision_pending', 'agent_crashed', 'agent_recovered',
-  'budget_warning', 'budget_exceeded', 'session_completed',
-  'task_completed', 'context_critical',
+  'session_completed', 'task_completed', 'context_critical',
 ];
 
 const DEFAULT_PREFERENCES: NotificationPreference[] = ALL_EVENTS.map(event => ({
   event,
-  tier: ['agent_crashed', 'budget_exceeded'].includes(event) ? 'interrupt' : 'summon',
+  tier: ['agent_crashed'].includes(event) ? 'interrupt' : 'summon',
   channels: [],
   enabled: false,
 }));
