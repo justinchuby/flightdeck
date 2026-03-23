@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { ActivityEntry } from './ActivityFeedItem';
 import { ACTIVITY_ICONS } from './ActivityFeedItem';
+import { formatFullTimestamp } from '../../utils/format';
 
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   progress_update: 'Progress Update',
@@ -67,7 +68,7 @@ export function ActivityDetailModal({
           <div>
             <div className="text-xs text-th-text-muted mb-0.5">Timestamp</div>
             <span className="text-xs text-th-text">
-              {new Date(entry.timestamp).toLocaleString()}
+              {formatFullTimestamp(entry.timestamp)}
             </span>
           </div>
         </div>

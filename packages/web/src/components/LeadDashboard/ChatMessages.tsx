@@ -7,6 +7,7 @@ import { PromptNav, hasUserMention } from '../PromptNav';
 import { useAppStore } from '../../stores/appStore';
 import { hasUnclosedCommandBlock } from '../../utils/commandParser';
 import type { AcpTextChunk, AgentInfo } from '../../types';
+import { formatTime } from '../../utils/format';
 
 export interface CatchUpSummary {
   tasksCompleted: number;
@@ -34,7 +35,7 @@ function buildChatItems(messages: AcpTextChunk[], isActive: boolean): ChatItem[]
   for (let i = 0; i < filtered.length; i++) {
     if (mergedIndices.has(i)) continue;
     const msg = filtered[i];
-    const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const ts = formatTime(msg.timestamp);
 
     if (msg.sender === 'user') {
       items.push({ kind: 'user', msg, ts, originalIndex: i });

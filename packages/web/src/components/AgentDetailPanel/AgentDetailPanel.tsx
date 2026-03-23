@@ -28,7 +28,7 @@ import type { AgentComm, ActivityEvent } from '../../stores/leadStore';
 import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { agentStatusText } from '../../utils/statusColors';
-import { formatTokens } from '../../utils/format';
+import { formatTokens, formatTime, formatFullTimestamp } from '../../utils/format';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { getRoleIcon } from '../../utils/getRoleIcon';
 import { MentionText } from '../../utils/markdown';
@@ -435,8 +435,8 @@ function DetailsTab({ agent, agentId, profile, task, outputPreview, exitError, e
               <div><span className="text-th-text-muted">Project:</span> <span className="text-th-text">{profile.projectId}</span></div>
             )}
             <div><span className="text-th-text-muted">Knowledge:</span> <span className="text-th-text">{profile.knowledgeCount} entries</span></div>
-            <div><span className="text-th-text-muted">Created:</span> <span className="text-th-text">{new Date(profile.createdAt).toLocaleString()}</span></div>
-            <div><span className="text-th-text-muted">Last Active:</span> <span className="text-th-text">{new Date(profile.updatedAt).toLocaleString()} ({formatRelativeTime(profile.updatedAt)})</span></div>
+            <div><span className="text-th-text-muted">Created:</span> <span className="text-th-text">{formatFullTimestamp(profile.createdAt)}</span></div>
+            <div><span className="text-th-text-muted">Last Active:</span> <span className="text-th-text">{formatFullTimestamp(profile.updatedAt)} ({formatRelativeTime(profile.updatedAt)})</span></div>
           </div>
         </div>
       )}
@@ -537,7 +537,7 @@ function DetailsTab({ agent, agentId, profile, task, outputPreview, exitError, e
           </h4>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {agentComms.slice(-20).map((c) => {
-              const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const time = formatTime(c.timestamp);
               const isSender = c.fromId === agentId;
               return (
                 <div
@@ -569,7 +569,7 @@ function DetailsTab({ agent, agentId, profile, task, outputPreview, exitError, e
           </h4>
           <div className="space-y-1 max-h-40 overflow-y-auto">
             {agentActivity.slice(-15).map((evt) => {
-              const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const time = formatTime(evt.timestamp);
               return (
                 <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
                   <span className="text-th-text-muted">{time}</span>
@@ -610,7 +610,7 @@ function DetailsTab({ agent, agentId, profile, task, outputPreview, exitError, e
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
+                  {formatTime(selectedComm.timestamp)}
                 </span>
                 <button type="button" aria-label="Close communication detail" onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
               </div>

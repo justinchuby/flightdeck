@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { formatAgentId, relativeTime, formatDuration, formatTokens, formatDate, formatDateTime } from '../format';
+import { formatAgentId, relativeTime, formatDuration, formatTokens, formatDate, formatDateTime, formatTime, formatFullTimestamp } from '../format';
 
 describe('formatAgentId', () => {
   it('formats role + first 4 chars', () => {
@@ -158,5 +158,58 @@ describe('formatDateTime', () => {
   it('handles unparseable input gracefully', () => {
     const result = formatDateTime('bad');
     expect(result).toContain('Invalid Date');
+  });
+});
+
+describe('formatTime', () => {
+  it('formats a timestamp to HH:MM', () => {
+    const result = formatTime('2026-03-08T14:30:00Z');
+    expect(result).toBeTruthy();
+    expect(result.length).toBeGreaterThan(3);
+  });
+
+  it('returns empty string for null/undefined', () => {
+    expect(formatTime(null)).toBe('');
+    expect(formatTime(undefined)).toBe('');
+  });
+
+  it('accepts a Date object', () => {
+    const d = new Date('2026-03-08T14:30:00Z');
+    const result = formatTime(d);
+    expect(result).toBeTruthy();
+  });
+
+  it('accepts a numeric timestamp', () => {
+    const result = formatTime(1741444200000);
+    expect(result).toBeTruthy();
+  });
+
+  it('includes seconds when requested', () => {
+    const withSec = formatTime('2026-03-08T14:30:45Z', { seconds: true });
+    const without = formatTime('2026-03-08T14:30:45Z');
+    // With seconds should be longer (includes :SS)
+    expect(withSec.length).toBeGreaterThan(without.length);
+  });
+
+  it('returns raw value for invalid input', () => {
+    expect(formatTime('not-a-date')).toBe('Invalid Date');
+  });
+});
+
+describe('formatFullTimestamp', () => {
+  it('formats a timestamp as a full locale string', () => {
+    const result = formatFullTimestamp('2026-03-08T14:30:00Z');
+    expect(result).toBeTruthy();
+    expect(result.length).toBeGreaterThan(10);
+  });
+
+  it('accepts a Date object', () => {
+    const result = formatFullTimestamp(new Date('2026-03-08T14:30:00Z'));
+    expect(result).toBeTruthy();
+  });
+
+  it('accepts a numeric timestamp', () => {
+    const result = formatFullTimestamp(1741444200000);
+    expect(result).toBeTruthy();
   });
 });

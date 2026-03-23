@@ -1,7 +1,7 @@
 import { apiFetch } from '../../hooks/useApi';
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { formatTokens } from '../../utils/format';
+import { formatTokens, formatTime } from '../../utils/format';
 import { shortAgentId } from '../../utils/agentLabel';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import type { AgentCostSummary, TaskCostSummary, AgentInfo } from '../../types';
@@ -299,7 +299,7 @@ function TaskCostTable({
                       const d = new Date(cost.lastUpdatedAt.endsWith('Z') ? cost.lastUpdatedAt : cost.lastUpdatedAt.replace(' ', 'T') + 'Z');
                       return (
                         <span title={formatRelativeTime(cost.lastUpdatedAt)}>
-                          {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatTime(d)}
                         </span>
                       );
                     })()

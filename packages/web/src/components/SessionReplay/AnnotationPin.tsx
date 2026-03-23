@@ -1,4 +1,5 @@
 import type { ReplayAnnotation } from './types';
+import { formatTime } from '../../utils/format';
 
 interface AnnotationPinProps {
   annotation: ReplayAnnotation;
@@ -32,7 +33,7 @@ export function AnnotationPin({ annotation, position, onClick }: AnnotationPinPr
             <span className="text-xs">{style.icon}</span>
             <span className="text-[10px] text-th-text-muted capitalize">{annotation.type}</span>
             <span className="text-[9px] text-th-text-muted ml-auto">
-              {new Date(annotation.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              {formatTime(annotation.timestamp)}
             </span>
           </div>
           <p className="text-[11px] text-th-text-alt line-clamp-2">{annotation.text}</p>

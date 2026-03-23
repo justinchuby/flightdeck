@@ -7,6 +7,7 @@ import { MentionText } from '../../utils/markdown';
 import { shortAgentId } from '../../utils/agentLabel';
 import type { ChatGroup, GroupMessage } from '../../types';
 import { roleColor } from './CommsPanel';
+import { formatTime } from '../../utils/format';
 
 export function GroupsPanelContent({
   groups,
@@ -128,7 +129,7 @@ export function GroupsPanelContent({
                     <p className="text-[10px] text-th-text-muted text-center py-2 font-mono">No messages</p>
                   ) : (
                     msgs.map((m) => {
-                      const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      const time = formatTime(m.timestamp, { seconds: true });
                       const shortId = m.fromAgentId ? shortAgentId(m.fromAgentId) : '';
                       return (
                         <div key={m.id} className="px-2 py-1 rounded bg-th-bg-alt/50 text-xs font-mono">
