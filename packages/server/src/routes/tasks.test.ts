@@ -4,6 +4,7 @@ import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { tasksRoutes } from './tasks.js';
 import type { AppContext } from './context.js';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
 import type { AgentStatus } from '@flightdeck/shared';
 
@@ -73,6 +74,7 @@ function createTestServer(ctx: Partial<AppContext>) {
   const app = express();
   app.use(express.json());
   app.use(tasksRoutes(ctx as AppContext));
+  app.use(apiErrorHandler);
   let server: Server;
   return {
     app,

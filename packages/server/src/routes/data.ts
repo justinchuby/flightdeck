@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ApiError, badRequest } from '../errors/index.js';
 import { sql, inArray, or, isNull } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import fs from 'node:fs';
@@ -150,7 +151,7 @@ export function dataRoutes(ctx: AppContext): Router {
         oldestSession: oldest?.startedAt ?? null,
       });
     } catch (err: any) {
-      res.status(500).json({ error: 'Failed to load database stats', detail: (err as Error).message });
+      throw new ApiError(500, 'Failed to load database stats', { details: (err as Error).message });
     }
   });
 
@@ -159,7 +160,7 @@ export function dataRoutes(ctx: AppContext): Router {
     try {
       const { olderThanDays, dryRun = false } = req.body ?? {};
       if (olderThanDays === undefined || typeof olderThanDays !== 'number' || olderThanDays < 0) {
-        return res.status(400).json({ error: 'olderThanDays must be a non-negative number (0 = all data)' });
+        throw badRequest('olderThanDays must be a non-negative number (0 = all data)');
       }
 
       // ── Purge ALL data (olderThanDays === 0) ────────────────────────
@@ -285,7 +286,8 @@ export function dataRoutes(ctx: AppContext): Router {
 
       res.json({ deleted: counts, totalDeleted, sessionsDeleted: oldSessions.length, dryRun: false, cutoffDate: cutoff });
     } catch (err: any) {
-      res.status(500).json({ error: 'Failed to purge data', detail: (err as Error).message });
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(500, 'Failed to purge data', { details: (err as Error).message });
     }
   });
 
