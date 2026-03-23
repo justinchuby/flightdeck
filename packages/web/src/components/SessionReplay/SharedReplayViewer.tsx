@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Users, Clock, Play, Pause, SkipBack, SkipForward, MapPin } from 'lucide-react';
+import { Users, Clock, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 import type { ShareableReplay } from './types';
 import { AnnotationPin } from './AnnotationPin';
 import { ReplayContent } from './ReplayContent';
@@ -14,7 +13,6 @@ import { useSharedReplay } from '../../hooks/useSharedReplay';
 export function SharedReplayViewer() {
   const { token } = useParams<{ token: string }>();
   const [_searchParams] = useSearchParams();
-  const [showAnnotations, setShowAnnotations] = useState(false);
 
   // Single source of truth for playback state and world data
   const {
@@ -57,7 +55,8 @@ export function SharedReplayViewer() {
   const title = replay?.title ?? sharedData.label ?? 'Session Replay';
   const annotations = replay?.annotations ?? [];
   const createdBy = replay?.createdBy;
-  const createdAt = replay?.createdAt ?? sharedData.keyframes[0]?.timestamp;
+  // Use session start (first keyframe) for annotation time offsets, not share creation time
+  const sessionStart = sharedData.keyframes[0]?.timestamp;
   const statsDuration = replay?.stats?.duration;
   const statsAgents = replay?.stats?.agentCount;
 
@@ -120,8 +119,8 @@ export function SharedReplayViewer() {
             <div className="absolute inset-y-0 left-0 bg-accent/15 rounded" style={{ width: `${progressPct}%` }} />
             {/* Annotation pins */}
             {annotations.map((ann) => {
-              const annTime = createdAt
-                ? new Date(ann.timestamp).getTime() - new Date(createdAt).getTime()
+              const annTime = sessionStart
+                ? new Date(ann.timestamp).getTime() - new Date(sessionStart).getTime()
                 : 0;
               const pos = duration > 0 ? (annTime / duration) * 100 : 0;
               return (
@@ -139,14 +138,11 @@ export function SharedReplayViewer() {
             />
           </div>
 
-          {/* Annotations button */}
+          {/* Annotation count */}
           {annotations.length > 0 && (
-            <button
-              onClick={() => setShowAnnotations(!showAnnotations)}
-              className="flex items-center gap-1 px-2 py-1 text-[11px] text-th-text-muted hover:text-th-text rounded"
-            >
-              <MapPin className="w-3 h-3" /> {annotations.length}
-            </button>
+            <span className="flex items-center gap-1 px-2 py-1 text-[11px] text-th-text-muted">
+              📌 {annotations.length}
+            </span>
           )}
         </div>
       </div>

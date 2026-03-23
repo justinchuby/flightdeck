@@ -173,10 +173,10 @@ describe('SharedReplayViewer', () => {
     expect(screen.getByTestId('annotation-ann-2')).toBeInTheDocument();
   });
 
-  it('shows annotation count button', () => {
+  it('shows annotation count', () => {
     mockHookReturn = makeHookReturn({ sharedData: sharedDataWithAnnotations });
     render(<SharedReplayViewer />);
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText(/📌 2/)).toBeInTheDocument();
   });
 
   it('does not show annotation button when no annotations', () => {
