@@ -184,8 +184,17 @@ export function OverviewPage() {
     [projectAgents, decisions, dagStatus],
   );
 
-  // ── Activity feed (all types — used for progress feed + accumulated stats) ──
+  // ── Activity feed (progress feed display) ──
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
+
+  // ── Accumulated stats from summary endpoint (not limited by activity page size) ──
+  interface SummaryData {
+    totalActions: number;
+    byAgent: Record<string, number>;
+    byType: Record<string, number>;
+    recentFiles: string[];
+  }
+  const [summary, setSummary] = useState<SummaryData | null>(null);
 
   // ── File locks ──
   const [locks, setLocks] = useState<FileLock[]>([]);
@@ -220,6 +229,21 @@ export function OverviewPage() {
     return () => clearInterval(interval);
   }, [effectiveId]);
 
+  useEffect(() => {
+    if (!effectiveId) return;
+    const poll = async () => {
+      try {
+        const data = await apiFetch<SummaryData>(
+          `/coordination/summary?projectId=${effectiveId}`,
+        );
+        if (mountedRef.current && data && typeof data === 'object' && !Array.isArray(data)) setSummary(data);
+      } catch { /* ignore */ }
+    };
+    poll();
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [effectiveId]);
+
   // ── Derived data: progress feed + accumulated stats ────────────
   const progressActivity = useMemo(
     () => activity.filter(a => a.actionType === 'progress_update'),
@@ -227,14 +251,10 @@ export function OverviewPage() {
   );
 
   const accumulatedStats = useMemo(() => {
-    const agentIds = new Set(activity.map(a => a.agentId));
-    for (const agent of projectAgents) agentIds.add(agent.id);
-    return {
-      totalAgents: agentIds.size,
-      totalTasksCompleted: activity.filter(a => a.actionType === 'task_completed').length,
-      totalDecisions: decisions.length,
-    };
-  }, [activity, decisions, projectAgents]);
+    const totalAgents = summary?.byAgent ? Object.keys(summary.byAgent).length : 0;
+    const totalTasksCompleted = summary?.byType?.task_completed ?? 0;
+    return { totalAgents, totalTasksCompleted, totalDecisions: decisions.length };
+  }, [summary, decisions]);
 
   const hasAccumulatedData = accumulatedStats.totalAgents > 0 ||
     accumulatedStats.totalDecisions > 0 ||

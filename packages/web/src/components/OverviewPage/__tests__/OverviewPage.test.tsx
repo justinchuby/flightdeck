@@ -378,7 +378,7 @@ describe('OverviewPage', () => {
 
   it('renders activity feed items from API data', async () => {
     const activities = [
-      { id: 'a1', agentId: 'agent-1', summary: 'Built auth module', actionType: 'progress_update', timestamp: '2024-01-01' },
+      { id: 1, agentId: 'agent-1', agentRole: 'developer', actionType: 'progress_update', summary: 'Built auth module', timestamp: '2024-01-01', projectId: 'proj-1' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/coordination/activity')) return Promise.resolve(activities);
@@ -394,7 +394,7 @@ describe('OverviewPage', () => {
 
   it('opens activity detail modal on activity click', async () => {
     const activities = [
-      { id: 'a1', agentId: 'agent-1', summary: 'Built auth module', actionType: 'progress_update', timestamp: '2024-01-01' },
+      { id: 1, agentId: 'agent-1', agentRole: 'developer', actionType: 'progress_update', summary: 'Built auth module', timestamp: '2024-01-01', projectId: 'proj-1' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/coordination/activity')) return Promise.resolve(activities);
@@ -412,7 +412,7 @@ describe('OverviewPage', () => {
 
   it('closes activity detail modal on close button', async () => {
     const activities = [
-      { id: 'a1', agentId: 'agent-1', summary: 'Built auth module', actionType: 'progress_update', timestamp: '2024-01-01' },
+      { id: 1, agentId: 'agent-1', agentRole: 'developer', actionType: 'progress_update', summary: 'Built auth module', timestamp: '2024-01-01', projectId: 'proj-1' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
       if (path.includes('/coordination/activity')) return Promise.resolve(activities);
@@ -507,16 +507,17 @@ describe('OverviewPage', () => {
   // ── Accumulated stats (cross-session) ───────────────────────────
 
   it('shows accumulated stats when activity and decisions exist', async () => {
-    const activities = [
-      { id: 1, agentId: 'agent-1', agentRole: 'developer', actionType: 'progress_update', summary: 'Built feature', timestamp: '2024-01-01', projectId: 'proj-1' },
-      { id: 2, agentId: 'agent-2', agentRole: 'developer', actionType: 'task_completed', summary: 'Done task', timestamp: '2024-01-01', projectId: 'proj-1' },
-      { id: 3, agentId: 'agent-3', agentRole: 'lead', actionType: 'task_completed', summary: 'Done task 2', timestamp: '2024-01-01', projectId: 'proj-1' },
-    ];
+    const summaryData = {
+      totalActions: 3,
+      byAgent: { 'agent-1': 1, 'agent-2': 1, 'agent-3': 1 },
+      byType: { progress_update: 1, task_completed: 2 },
+      recentFiles: [],
+    };
     const decisions = [
       { id: 'd1', title: 'Use TS', status: 'recorded', needsConfirmation: false, agentId: 'a1', rationale: 'r', timestamp: '2024-01-01', category: 'architecture' },
     ];
     mockApiFetch.mockImplementation((path: string) => {
-      if (path.includes('/coordination/activity')) return Promise.resolve(activities);
+      if (path.includes('/coordination/summary')) return Promise.resolve(summaryData);
       if (path.includes('/decisions')) return Promise.resolve(decisions);
       return Promise.resolve([]);
     });
