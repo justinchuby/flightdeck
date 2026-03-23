@@ -54,7 +54,7 @@ Multiple agents work simultaneously — a developer writes code while a reviewer
 
 ## Multi-Provider Support
 
-Flightdeck is provider-agnostic. All agents communicate through the **Agent Client Protocol (ACP)**, so you can mix and match providers in the same crew.
+Flightdeck is provider-agnostic. All agents communicate through the **Agent Client Protocol (ACP)** — a standardized message-passing interface that abstracts away provider differences — so you can mix and match providers in the same crew.
 
 ### Supported Providers
 
@@ -324,6 +324,33 @@ All pages load from the REST API when no live agents are present — no empty st
 ### Contextual Coach
 
 Behavior-triggered tips appear as toasts when specific conditions are met — for example, after your first approval, after repeated manual approvals (suggesting you adjust the Trust Dial), or on first agent crash. Tips appear once per trigger and are tracked in localStorage.
+
+### QuickStart Templates
+
+Pre-configured project templates let new users launch their first crew in seconds. Five built-in templates cover common workflows:
+
+- **Code Review** — Lead + 2 developers + reviewer
+- **Bug Fix** — Architect + 2 developers + QA
+- **Quick Fix** — Lead + developer (recommended for first-time users)
+- **Docs Blitz** — Writer + developer
+- **Full Build** — Lead + architect + 3 developers + reviewer + QA
+
+### Spotlight Tour
+
+A 6-step interactive guided tour that highlights key UI elements — the pulse strip, agent cards, approval queue, chat panel, sidebar, and command palette. Each step spotlights one element with a tooltip explanation. Progress is tracked and the tour only appears once.
+
+### Progressive Route Disclosure
+
+The sidebar starts minimal and reveals more navigation items as you gain experience:
+
+| Tier | Visible Routes | Unlocked When |
+|------|---------------|---------------|
+| **Starter** | Lead, Overview, Crews, Settings | Always |
+| **Active** | + Tasks, Timeline | 2+ agents spawned or any tasks created |
+| **Collaboration** | + Mission Control | 3+ agents in a session |
+| **Power** | + Analytics, Groups, Org Chart, Database | 3+ sessions or manual expansion |
+
+All routes remain accessible via the command palette and direct URLs regardless of tier.
 
 ### Data Management
 

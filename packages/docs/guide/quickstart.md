@@ -17,7 +17,7 @@ Get a multi-agent team running in under 2 minutes.
 | [Cursor](https://www.cursor.com/) | Install Cursor agent | Set `CURSOR_API_KEY` |
 | [OpenCode](https://github.com/nicholasgriffintn/opencode) | `npm i -g opencode` | (manages own keys) |
 | [Kimi CLI](https://github.com/MoonshotAI/kimi-cli) | See [GitHub](https://github.com/MoonshotAI/kimi-cli) | `kimi login` |
-| [Qwen Code](https://github.com/nicholasgriffintn/opencode) | See docs | Qwen auth |
+| [Qwen Code](https://github.com/QwenLM/qwen-code) | See [GitHub](https://github.com/QwenLM/qwen-code) | Qwen auth |
 
 ## Install & Launch
 
