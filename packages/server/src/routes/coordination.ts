@@ -6,6 +6,7 @@ import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
 import { asAgentId } from '../types/brandedIds.js';
+import { getCrewDescendants } from '@flightdeck/shared';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -129,8 +130,12 @@ export function coordinationRoutes(ctx: AppContext): Router {
     const crewAgentIds = new Set<string>();
     if (leadId) {
       crewAgentIds.add(leadId);
+      for (const agent of getCrewDescendants(leadId, agentManager.getAll())) {
+        crewAgentIds.add(agent.id);
+      }
+      // Also include agents linked by projectId
       for (const agent of agentManager.getAll()) {
-        if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
+        if (agent.projectId === leadId) {
           crewAgentIds.add(agent.id);
         }
       }

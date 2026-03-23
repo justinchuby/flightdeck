@@ -4,6 +4,7 @@ import { useLeadStore } from '../../stores/leadStore';
 import { useMessageStore } from '../../stores/messageStore';
 import type { AgentInfo, DagStatus, DecisionStatus } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
+import { isCrewDescendant } from '@flightdeck/shared';
 
 type StoreApi = ReturnType<typeof useLeadStore.getState>;
 
@@ -146,8 +147,8 @@ function handleStatus(msg: WsAgentStatus, _store: StoreApi, storeKey: string) {
 
 function handleToolCall(msg: WsToolCall, store: StoreApi, agents: AgentInfo[], leadId: string) {
   const { agentId, toolCall } = msg;
-  const isChild = agents.some((a) => a.id === agentId && a.parentId === leadId);
-  if (agentId !== leadId && !isChild) return;
+  const isChild = agentId === leadId || isCrewDescendant(agentId, leadId, agents);
+  if (!isChild) return;
 
   const agent = agents.find((a) => a.id === agentId);
   const roleName = agent?.role?.name ?? 'Agent';
@@ -250,7 +251,9 @@ function handleMessageSent(msg: WsMessageSent, store: StoreApi, agents: AgentInf
   const fromAgent = agents.find((a) => a.id === msg.from);
   const toAgent = agents.find((a) => a.id === msg.to);
   const isBroadcast = msg.to === 'all';
-  if (!(msg.from === leadId || fromAgent?.parentId === leadId || toAgent?.parentId === leadId || isBroadcast)) return;
+  const isFromCrew = msg.from === leadId || isCrewDescendant(msg.from, leadId, agents);
+  const isToCrew = isCrewDescendant(msg.to, leadId, agents);
+  if (!(isFromCrew || isToCrew || isBroadcast)) return;
 
   store.addComm(leadId, {
     id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

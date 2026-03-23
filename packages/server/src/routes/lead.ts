@@ -6,6 +6,7 @@ import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
+import { getCrewDescendants } from '@flightdeck/shared';
 
 /** Build ContentBlock array from text + optional attachments */
 function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
@@ -416,8 +417,7 @@ export function leadRoutes(ctx: AppContext): Router {
       contextWindowUsed?: number;
     }
 
-    let children: ProgressAgent[] = agentManager.getAll()
-      .filter((a) => a.parentId === leadId)
+    let children: ProgressAgent[] = getCrewDescendants(leadId, agentManager.getAll())
       .map((a) => ({
         id: a.id,
         role: a.role,
@@ -434,10 +434,15 @@ export function leadRoutes(ctx: AppContext): Router {
     // query agentRoster for crew members linked via metadata.parentId
     if (children.length === 0 && ctx.agentRoster) {
       const rosterAgents = ctx.agentRoster.getAllAgents();
-      const rosterChildren = rosterAgents.filter((a) => {
-        const meta = a.metadata ?? {};
-        return meta.parentId === leadId && a.agentId !== leadId;
-      });
+      // Map roster agents to HierarchyAgent shape for recursive descendant lookup
+      const rosterAsHierarchy = rosterAgents.map(a => ({
+        ...a,
+        id: a.agentId,
+        parentId: (a.metadata ?? {}).parentId as string | undefined,
+      }));
+      const rosterChildren = getCrewDescendants(leadId, rosterAsHierarchy)
+        .map(h => rosterAgents.find(r => r.agentId === h.id)!)
+        .filter(Boolean);
       if (rosterChildren.length > 0) {
         // Pull real token data from CostTracker if available
         const costTracker = agentManager.getCostTracker();

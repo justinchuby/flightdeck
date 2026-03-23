@@ -6,6 +6,7 @@ import { EmptyState } from '../Shared';
 import { Network, MessageSquare, Grid3X3, Users, BarChart3, Share2 } from 'lucide-react';
 import { idColor } from '../../utils/markdown';
 import { shortAgentId } from '../../utils/agentLabel';
+import { getCrewMembers } from '@flightdeck/shared';
 import { CommHeatmap } from '../FleetOverview/CommHeatmap';
 import type { HeatmapMessage, CommType as HeatmapCommType } from '../FleetOverview/CommHeatmap';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
@@ -369,14 +370,9 @@ export function OrgChart() {
 
   const groupMsgCount = allEntries.filter((e) => e.groupName).length;
 
-  // Build team: lead + any agent whose parentId chain leads to the selected lead
+  // Build team: lead + all descendants at any depth
   const teamAgents: AgentInfo[] = selectedLeadId
-    ? agents.filter((a) => {
-        if (a.id === selectedLeadId) return true;
-        if (a.parentId === selectedLeadId) return true;
-        // grandchildren
-        return agents.some((p) => p.parentId === selectedLeadId && a.parentId === p.id);
-      })
+    ? getCrewMembers(selectedLeadId, agents)
     : agents; // Show all when no lead selected
 
   // Derive heatmap data from allEntries for the CommHeatmap view

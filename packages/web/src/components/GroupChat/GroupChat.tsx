@@ -9,6 +9,7 @@ import { Markdown } from '../ui/Markdown';
 import { FilterTabs } from '../FilterTabs';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import { shortAgentId } from '../../utils/agentLabel';
+import { getCrewMembers } from '@flightdeck/shared';
 
 const EMPTY_GROUP_MSGS: GroupMessage[] = [];
 
@@ -467,7 +468,7 @@ export function GroupChat() {
   }, [newGroupName, newGroupLeadId, newGroupMembers, creating, selectGroup]);
 
   // All agents belonging to a selected lead (for the create dialog)
-  const availableAgents = agents.filter((a) => a.parentId === newGroupLeadId || a.id === newGroupLeadId);
+  const availableAgents = newGroupLeadId ? getCrewMembers(newGroupLeadId, agents) : [];
 
   /* ---- Selected group metadata ---- */
   const selectedGroupData = selectedGroup
