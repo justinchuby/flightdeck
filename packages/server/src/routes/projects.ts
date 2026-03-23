@@ -15,6 +15,7 @@ import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
 import { parseIntBounded } from '../utils/validation.js';
 import { ResumeError } from '../agents/SessionResumeManager.js';
+import { ApiError, badRequest, notFound, conflict, internalError, serviceUnavailable, tooManyRequests, forbidden } from '../errors/index.js';
 
 const PROJECT_TITLE_MAX = 100;
 
@@ -112,9 +113,9 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   router.get('/projects/:id', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const sessions = projectRegistry.getSessions(project.id);
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
@@ -137,9 +138,9 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   // Enriched session history for SessionHistory UI component
   router.get('/projects/:id/sessions/detail', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const sessions = projectRegistry.getSessions(project.id);
     const taskDAG = agentManager.getTaskDAG();
@@ -249,24 +250,24 @@ export function projectsRoutes(ctx: AppContext): Router {
     const { status } = req.body as { status?: string };
 
     if (!status || typeof status !== 'string') {
-      return res.status(400).json({ error: 'status is required' });
+      throw badRequest('status is required');
     }
 
     const validStatuses = ['pending', 'ready', 'running', 'done', 'failed', 'blocked', 'paused', 'skipped'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      throw badRequest(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
 
     const taskDAG = agentManager.getTaskDAG();
 
     // Find the task to get its leadId (TaskDAG methods require leadId)
-    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    if (!_db) throw internalError('Database unavailable');
     const task = _db.drizzle.select().from(dagTasks)
       .where(eq(dagTasks.id, taskId))
       .get();
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (!task) throw notFound('Task not found');
     if (task.projectId && task.projectId !== projectId) {
-      return res.status(404).json({ error: 'Task not found in this project' });
+      throw notFound('Task not found in this project');
     }
 
     const leadId = task.leadId;
@@ -285,7 +286,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       switch (status) {
         case 'running':
           // Can't manually start a task without an agent assignment
-          return res.status(400).json({ error: 'Cannot manually transition to running — tasks must be assigned to an agent' });
+          throw badRequest('Cannot manually transition to running — tasks must be assigned to an agent');
         case 'done':
           result = taskDAG.completeTask(leadId, taskId);
           break;
@@ -329,18 +330,14 @@ export function projectsRoutes(ctx: AppContext): Router {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      return res.status(500).json({ error: `Transition failed: ${message}` });
+      throw internalError(`Transition failed: ${message}`);
     }
 
     if (errorMsg) {
-      return res.status(400).json({ error: errorMsg, currentStatus });
+      throw badRequest(errorMsg!, { currentStatus });
     }
     if (result === null || result === false) {
-      return res.status(409).json({
-        error: `Invalid transition from '${currentStatus}' to '${status}'`,
-        currentStatus,
-        targetStatus: status,
-      });
+      throw conflict(`Invalid transition from '${currentStatus}' to '${status}'`, { currentStatus, targetStatus: status });
     }
 
     // Re-fetch the updated task
@@ -354,20 +351,20 @@ export function projectsRoutes(ctx: AppContext): Router {
     const { priority } = req.body as { priority?: number };
 
     if (typeof priority !== 'number' || !Number.isFinite(priority)) {
-      return res.status(400).json({ error: 'priority must be a finite number' });
+      throw badRequest('priority must be a finite number');
     }
 
     const taskDAG = agentManager.getTaskDAG();
 
-    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    if (!_db) throw internalError('Database unavailable');
     const task = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    if (!task) throw notFound('Task not found');
     if (task.projectId && task.projectId !== projectId) {
-      return res.status(404).json({ error: 'Task not found in this project' });
+      throw notFound('Task not found in this project');
     }
 
     const result = taskDAG.updatePriority(task.leadId, taskId, priority);
-    if (!result) return res.status(500).json({ error: 'Failed to update priority' });
+    if (!result) throw internalError('Failed to update priority');
 
     const updated = _db.drizzle.select().from(dagTasks).where(eq(dagTasks.id, taskId)).get();
     return res.json({ ok: true, task: updated ? formatTask(updated) : null });
@@ -386,14 +383,14 @@ export function projectsRoutes(ctx: AppContext): Router {
     };
 
     if (!role || typeof role !== 'string') {
-      return res.status(400).json({ error: 'role is required' });
+      throw badRequest('role is required');
     }
     if (!title && !description) {
-      return res.status(400).json({ error: 'title or description is required' });
+      throw badRequest('title or description is required');
     }
 
     // Find an active lead for this project
-    if (!_db) return res.status(500).json({ error: 'Database unavailable' });
+    if (!_db) throw internalError('Database unavailable');
     const session = _db.drizzle.select({ leadId: projectSessions.leadId })
       .from(projectSessions)
       .where(eq(projectSessions.projectId, projectId))
@@ -402,7 +399,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       .get();
 
     if (!session) {
-      return res.status(400).json({ error: 'No active session for this project. Start a session first.' });
+      throw badRequest('No active session for this project. Start a session first.');
     }
 
     const taskDAG = agentManager.getTaskDAG();
@@ -426,7 +423,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      return res.status(500).json({ error: `Failed to create task: ${message}` });
+      throw internalError(`Failed to create task: ${message}`);
     }
   });
 
@@ -553,12 +550,12 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   router.post('/projects', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const { name, description, cwd } = req.body;
     const titleError = validateProjectTitle(name);
-    if (titleError) return res.status(400).json({ error: titleError });
+    if (titleError) throw badRequest(titleError);
     const cwdError = validateCwd(cwd);
-    if (cwdError) return res.status(400).json({ error: cwdError });
+    if (cwdError) throw badRequest(cwdError);
     const trimmedName = (name as string).trim();
     const project = projectRegistry.create(trimmedName, description, cwd);
     logger.info({ module: 'project', msg: 'Project created', projectId: project.id, name: trimmedName });
@@ -567,44 +564,39 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   // ── POST /projects/import — import project from existing .flightdeck/ directory ──
   router.post('/projects/import', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
 
     const { cwd, name } = req.body;
     if (!cwd || typeof cwd !== 'string') {
-      return res.status(400).json({ error: 'cwd is required (path to project directory)' });
+      throw badRequest('cwd is required (path to project directory)');
     }
 
     // Validate the CWD path
     const cwdError = validateCwd(cwd);
-    if (cwdError) return res.status(400).json({ error: cwdError });
+    if (cwdError) throw badRequest(cwdError);
 
     const normalizedCwd = normalize(cwd);
 
     // Check for .flightdeck/ directory
     const flightdeckDir = join(normalizedCwd, '.flightdeck');
     if (!existsSync(flightdeckDir)) {
-      return res.status(400).json({
-        error: 'No .flightdeck/ directory found. This directory may not contain a Flightdeck project.',
-      });
+      throw badRequest('No .flightdeck/ directory found. This directory may not contain a Flightdeck project.');
     }
 
     // Check it's actually a directory
     try {
       const stat = statSync(flightdeckDir);
       if (!stat.isDirectory()) {
-        return res.status(400).json({ error: '.flightdeck exists but is not a directory' });
+        throw badRequest('.flightdeck exists but is not a directory');
       }
     } catch {
-      return res.status(400).json({ error: 'Cannot access .flightdeck/ directory' });
+      throw badRequest('Cannot access .flightdeck/ directory');
     }
 
     // Check if this CWD is already registered
     const existing = projectRegistry.list().find(p => p.cwd && normalize(p.cwd) === normalizedCwd);
     if (existing) {
-      return res.status(409).json({
-        error: `A project already exists for this directory: "${existing.name}" (${existing.id})`,
-        existingProjectId: existing.id,
-      });
+      throw conflict(`A project already exists for this directory: "${existing.name}" (${existing.id})`, { existingProjectId: existing.id });
     }
 
     // Derive project name: explicit name > flightdeck.config.yaml > directory basename
@@ -630,7 +622,7 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     // Validate final project name — no blank titles allowed
     const titleError = validateProjectTitle(projectName);
-    if (titleError) return res.status(400).json({ error: `Could not derive project name: ${titleError}. Provide an explicit name.` });
+    if (titleError) throw badRequest(`Could not derive project name: ${titleError}. Provide an explicit name.`);
 
     // Gather metadata about existing artifacts
     const organizedArtifactDir = join(FLIGHTDECK_STATE_DIR, 'artifacts');
@@ -669,20 +661,20 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   router.patch('/projects/:id', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const { name, description, cwd, status, oversightLevel } = req.body;
 
     // Validate CWD if provided
     const cwdError = validateCwd(cwd);
-    if (cwdError) return res.status(400).json({ error: cwdError });
+    if (cwdError) throw badRequest(cwdError);
 
     // Validate oversight level if provided
     if (oversightLevel !== undefined && oversightLevel !== null &&
         !['supervised', 'balanced', 'autonomous'].includes(oversightLevel)) {
-      return res.status(400).json({ error: 'Invalid oversight level. Must be supervised, balanced, or autonomous.' });
+      throw badRequest('Invalid oversight level. Must be supervised, balanced, or autonomous.');
     }
 
     const updates: Record<string, unknown> = {};
@@ -703,23 +695,23 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   router.get('/projects/:id/briefing', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const briefing = projectRegistry.buildBriefing(req.params.id);
-    if (!briefing) return res.status(404).json({ error: 'Project not found' });
+    if (!briefing) throw notFound('Project not found');
     res.json({ ...briefing, formatted: projectRegistry.formatBriefing(briefing) });
   });
 
   // Resume a project — resumes a specific session (or the latest) with optional team respawn
   router.post('/projects/:id/resume', spawnLimiter, (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const project = projectRegistry.get(String(req.params.id));
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const activeLeadId = projectRegistry.getActiveLeadId(project.id);
     if (activeLeadId) {
       const agent = agentManager.get(activeLeadId);
       if (agent && (agent.status === 'running' || agent.status === 'idle')) {
-        return res.status(409).json({ error: 'Project already has an active lead', leadId: activeLeadId });
+        throw conflict('Project already has an active lead', { leadId: activeLeadId });
       }
     }
 
@@ -732,12 +724,12 @@ export function projectsRoutes(ctx: AppContext): Router {
         if (targetSessionId != null) {
           // Resume a specific session selected by the user
           lastSession = lastSessions.find((s) => s.id === Number(targetSessionId)) ?? null;
-          if (!lastSession) return res.status(404).json({ error: 'Specified session not found for this project' });
+          if (!lastSession) throw notFound('Specified session not found for this project');
         } else {
           lastSession = lastSessions.length > 0 ? lastSessions[0] : null;
         }
         if (!lastSession) {
-          return res.status(404).json({ error: 'No session found to resume. Use freshStart to create a new session.' });
+          throw notFound('No session found to resume. Use freshStart to create a new session.');
         }
       }
 
@@ -748,7 +740,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       if (lastSession) {
         // Resume existing session via SessionResumeManager (atomic claim, spawn, reactivate)
         if (!sessionResumeManager || !projectRegistry) {
-          return res.status(500).json({ error: 'Resume not available — missing session manager' });
+          throw internalError('Resume not available — missing session manager');
         }
         const result = sessionResumeManager.resumeLeadSession(
           { session: lastSession, project, task: requestTask, model },
@@ -759,7 +751,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       } else {
         // Fresh start (explicitly requested) — create new lead + new session
         const role = roleRegistry.get('lead');
-        if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
+        if (!role) throw internalError('Project Lead role not found');
         task = requestTask;
         agent = agentManager.spawn(role, task, undefined, model, project.cwd ?? undefined, undefined, undefined, { projectName: project.name, projectId: project.id });
         projectRegistry.startSession(project.id, agent.id, task);
@@ -808,22 +800,21 @@ export function projectsRoutes(ctx: AppContext): Router {
       res.status(201).json({ ...agent.toJSON(), respawning: respawnedCount });
     } catch (err: any) {
       if (err instanceof ResumeError) {
-        return res.status(err.statusCode).json({ error: err.message });
+        throw new ApiError(err.statusCode, err.message);
       }
-      logger.error({ module: 'project', msg: 'Failed to resume project', err: err.message });
-      // Only expose rate-limit messages; sanitize all other errors
       const isRateLimit = err.message?.toLowerCase().includes('rate') || err.message?.toLowerCase().includes('limit');
-      res.status(isRateLimit ? 429 : 500).json({
-        error: isRateLimit ? err.message : 'Failed to resume project. Please try again.',
-      });
+      if (isRateLimit) {
+        throw tooManyRequests(err.message);
+      }
+      throw internalError('Failed to resume project. Please try again.');
     }
   });
 
   // Stop all running agents for a project
   router.post('/projects/:id/stop', async (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const agents = agentManager.getByProject(project.id);
     let terminated = 0;
@@ -849,18 +840,18 @@ export function projectsRoutes(ctx: AppContext): Router {
 
   // Delete a project and all its sessions (archived projects only)
   router.delete('/projects/:id', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const project = projectRegistry.get(req.params.id as string);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
     if (project.status !== 'archived') {
-      return res.status(400).json({ error: 'Only archived projects can be deleted' });
+      throw badRequest('Only archived projects can be deleted');
     }
 
     // Cascade: remove all roster agents for this project
     const rosterDeleted = agentRoster?.deleteByProject(req.params.id as string) ?? 0;
 
     const deleted = projectRegistry.delete(req.params.id as string);
-    if (!deleted) return res.status(404).json({ error: 'Project not found' });
+    if (!deleted) throw notFound('Project not found');
     logger.info({ module: 'project', msg: 'Project deleted', projectId: req.params.id, rosterDeleted });
     res.json({ ok: true, rosterDeleted });
   });
@@ -879,24 +870,24 @@ export function projectsRoutes(ctx: AppContext): Router {
   });
 
   router.get('/projects/:id/model-config', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
     res.json(projectRegistry.getModelConfig(req.params.id));
   });
 
   router.put('/projects/:id/model-config', (req, res) => {
-    if (!projectRegistry) return res.status(500).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw internalError('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const { config } = req.body;
     const shapeError = validateModelConfigShape(config);
-    if (shapeError) return res.status(400).json({ error: shapeError });
+    if (shapeError) throw badRequest(shapeError);
 
     const unknownIds = validateModelConfig(config);
     if (unknownIds.length > 0) {
-      return res.status(400).json({ error: `Unknown model IDs: ${unknownIds.join(', ')}` });
+      throw badRequest(`Unknown model IDs: ${unknownIds.join(', ')}`);
     }
 
     projectRegistry.setModelConfig(req.params.id, config);
@@ -933,17 +924,17 @@ export function projectsRoutes(ctx: AppContext): Router {
    * Returns directory listing for the project's CWD.
    */
   router.get('/projects/:id/files', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (!project.cwd) return res.status(400).json({ error: 'Project has no working directory' });
+    if (!project) throw notFound('Project not found');
+    if (!project.cwd) throw badRequest('Project has no working directory');
 
     const subPath = typeof req.query.path === 'string' ? req.query.path : '';
-    if (subPath.includes('\0')) return res.status(400).json({ error: 'Invalid path' });
+    if (subPath.includes('\0')) throw badRequest('Invalid path');
 
     const result = resolveAndValidate(project.cwd, subPath);
     if (!result) {
-      return res.status(403).json({ error: 'Path outside project directory' });
+      throw forbidden('Path outside project directory');
     }
 
     try {
@@ -963,7 +954,7 @@ export function projectsRoutes(ctx: AppContext): Router {
       res.json({ path: subPath || '.', items });
     } catch (err: any) {
       logger.warn({ module: 'project-files', msg: 'Cannot read directory', error: err.message, projectId: project.id });
-      res.status(400).json({ error: 'Cannot read directory' });
+      throw badRequest('Cannot read directory');
     }
   });
 
@@ -972,32 +963,32 @@ export function projectsRoutes(ctx: AppContext): Router {
    * Returns file content (text only, max 512 KB).
    */
   router.get('/projects/:id/file-contents', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (!project.cwd) return res.status(400).json({ error: 'Project has no working directory' });
+    if (!project) throw notFound('Project not found');
+    if (!project.cwd) throw badRequest('Project has no working directory');
 
     const filePath = typeof req.query.path === 'string' ? req.query.path : '';
-    if (!filePath) return res.status(400).json({ error: 'path query parameter required' });
-    if (filePath.includes('\0')) return res.status(400).json({ error: 'Invalid path' });
+    if (!filePath) throw badRequest('path query parameter required');
+    if (filePath.includes('\0')) throw badRequest('Invalid path');
 
     const result = resolveAndValidate(project.cwd, filePath);
     if (!result) {
-      return res.status(403).json({ error: 'Path outside project directory' });
+      throw forbidden('Path outside project directory');
     }
 
     try {
       const stat = statSync(result.resolved);
-      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
-      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large (max 512 KB)' });
+      if (!stat.isFile()) throw badRequest('Not a file');
+      if (stat.size > 512 * 1024) throw new ApiError(413, 'File too large (max 512 KB)');
 
       const content = readFileSync(result.resolved, 'utf-8');
       const ext = extname(filePath).slice(1);
       res.json({ path: filePath, content, size: stat.size, ext });
     } catch (err: any) {
       logger.warn({ module: 'project-files', msg: 'Cannot read file', error: err.message, projectId: project.id });
-      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
-      res.status(400).json({ error: 'Cannot read file' });
+      if (err.code === 'ENOENT') throw notFound('File not found');
+      throw badRequest('Cannot read file');
     }
   });
 
@@ -1007,9 +998,9 @@ export function projectsRoutes(ctx: AppContext): Router {
    * grouped by agent directory and session.
    */
   router.get('/projects/:id/artifacts', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     type ArtifactFile = { name: string; path: string; ext: string; title: string; modifiedAt: string };
     type ArtifactSource = 'flightdeck' | 'copilot-session';
@@ -1136,31 +1127,31 @@ export function projectsRoutes(ctx: AppContext): Router {
    * Separate from file-contents because artifacts live outside project.cwd.
    */
   router.get('/projects/:id/artifact-contents', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const filePath = typeof req.query.path === 'string' ? req.query.path : '';
     if (!filePath || filePath.includes('\0') || filePath.includes('..')) {
-      return res.status(400).json({ error: 'Invalid path' });
+      throw badRequest('Invalid path');
     }
 
     const organizedDir = join(FLIGHTDECK_STATE_DIR, 'artifacts', req.params.id, 'sessions');
     const resolved = join(organizedDir, filePath);
     // Security: ensure resolved path stays within organizedDir
     if (!normalize(resolved).startsWith(normalize(organizedDir) + sep)) {
-      return res.status(403).json({ error: 'Path outside artifact directory' });
+      throw forbidden('Path outside artifact directory');
     }
 
     try {
       const stat = statSync(resolved);
-      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
-      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large' });
+      if (!stat.isFile()) throw badRequest('Not a file');
+      if (stat.size > 512 * 1024) throw new ApiError(413, 'File too large');
       const content = readFileSync(resolved, 'utf-8');
       res.json({ path: filePath, content, size: stat.size, ext: extname(filePath).slice(1) });
     } catch (err: any) {
-      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
-      res.status(400).json({ error: 'Cannot read file' });
+      if (err.code === 'ENOENT') throw notFound('File not found');
+      throw badRequest('Cannot read file');
     }
   });
 
@@ -1170,33 +1161,33 @@ export function projectsRoutes(ctx: AppContext): Router {
    * Security: only serves files matching the allowlist (plan.md, checkpoints/, files/, research/).
    */
   router.get('/projects/:id/session-artifact', (req, res) => {
-    if (!projectRegistry) return res.status(404).json({ error: 'Projects not available' });
+    if (!projectRegistry) throw notFound('Projects not available');
     const project = projectRegistry.get(req.params.id);
-    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (!project) throw notFound('Project not found');
 
     const agentId = typeof req.query.agentId === 'string' ? req.query.agentId : '';
     const filePath = typeof req.query.path === 'string' ? req.query.path : '';
 
     if (!agentId || !filePath) {
-      return res.status(400).json({ error: 'Missing agentId or path parameter' });
+      throw badRequest('Missing agentId or path parameter');
     }
     if (filePath.includes('\0') || filePath.includes('..')) {
-      return res.status(400).json({ error: 'Invalid path' });
+      throw badRequest('Invalid path');
     }
 
     // Look up agent's sessionId from roster
     const agent = agentRoster?.getAgent(agentId);
-    if (!agent?.sessionId) return res.status(404).json({ error: 'Agent session not found' });
+    if (!agent?.sessionId) throw notFound('Agent session not found');
 
     // Validate project scoping — agent must belong to this project
     if (agent.projectId !== req.params.id) {
-      return res.status(403).json({ error: 'Agent not in this project' });
+      throw forbidden('Agent not in this project');
     }
 
     // Allowlist: only serve known safe paths
     const ALLOWED_PREFIXES = ['plan.md', 'checkpoints/', 'files/', 'research/'];
     if (!ALLOWED_PREFIXES.some(prefix => filePath === prefix || filePath.startsWith(prefix))) {
-      return res.status(403).json({ error: 'File not accessible' });
+      throw forbidden('File not accessible');
     }
 
     const sessionDir = join(homedir(), '.copilot', 'session-state', agent.sessionId);
@@ -1204,18 +1195,18 @@ export function projectsRoutes(ctx: AppContext): Router {
 
     // Security: ensure resolved path stays within session dir
     if (!normalize(resolved).startsWith(normalize(sessionDir) + sep)) {
-      return res.status(403).json({ error: 'Path outside session directory' });
+      throw forbidden('Path outside session directory');
     }
 
     try {
       const stat = statSync(resolved);
-      if (!stat.isFile()) return res.status(400).json({ error: 'Not a file' });
-      if (stat.size > 512 * 1024) return res.status(413).json({ error: 'File too large' });
+      if (!stat.isFile()) throw badRequest('Not a file');
+      if (stat.size > 512 * 1024) throw new ApiError(413, 'File too large');
       const content = readFileSync(resolved, 'utf-8');
       res.json({ path: filePath, content, size: stat.size, ext: extname(filePath).slice(1) });
     } catch (err: any) {
-      if (err.code === 'ENOENT') return res.status(404).json({ error: 'File not found' });
-      res.status(400).json({ error: 'Cannot read file' });
+      if (err.code === 'ENOENT') throw notFound('File not found');
+      throw badRequest('Cannot read file');
     }
   });
 
