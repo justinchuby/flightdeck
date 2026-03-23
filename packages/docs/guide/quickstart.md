@@ -10,12 +10,14 @@ Get a multi-agent team running in under 2 minutes.
 
 | Provider | Install | Auth |
 |----------|---------|------|
-| [GitHub Copilot](https://docs.github.com/en/copilot) | `npm i -g @anthropic-ai/copilot` | `gh auth login` |
-| [Claude Code](https://docs.anthropic.com/en/docs/agents/claude-code) | `npm i -g @anthropic-ai/claude-code` | Set `ANTHROPIC_API_KEY` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @anthropic-ai/gemini-cli` | Set `GEMINI_API_KEY` |
-| [Codex](https://github.com/openai/codex) | `npm i -g @openai/codex` | Set `OPENAI_API_KEY` |
+| [GitHub Copilot](https://docs.github.com/en/copilot/github-copilot-in-the-cli) | Install via [GitHub CLI](https://cli.github.com/) or npm | `gh auth login` |
+| [Claude Code](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview) | See [claude-agent-acp](https://github.com/zed-industries/claude-agent-acp) | Set `ANTHROPIC_API_KEY` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | See [installation guide](https://geminicli.com/docs/get-started/installation/) | Set `GEMINI_API_KEY` |
+| [Codex](https://github.com/openai/codex) | See [codex-acp](https://github.com/zed-industries/codex-acp) | Set `OPENAI_API_KEY` |
 | [Cursor](https://www.cursor.com/) | Install Cursor agent | Set `CURSOR_API_KEY` |
-| [OpenCode](https://github.com/opencode-ai/opencode) | `npm i -g opencode` | (none) |
+| [OpenCode](https://github.com/nicholasgriffintn/opencode) | `npm i -g opencode` | (manages own keys) |
+| [Kimi CLI](https://github.com/MoonshotAI/kimi-cli) | See [GitHub](https://github.com/MoonshotAI/kimi-cli) | `kimi login` |
+| [Qwen Code](https://github.com/nicholasgriffintn/opencode) | See docs | Qwen auth |
 
 ## Install & Launch
 
@@ -149,11 +151,11 @@ The Trust Dial controls how much autonomy agents have:
 
 | Level | Behavior |
 |-------|----------|
+| **Supervised** | Agents explain reasoning before changes. Significant actions require explicit approval |
+| **Balanced** | Key decisions need approval; routine work proceeds automatically (default) |
 | **Autonomous** | Agents work independently, minimal human approval needed |
-| **Supervised** | Agents request confirmation for significant actions |
-| **Strict** | Every action requires explicit human approval |
 
-Toggle the Trust Dial from the Lead Dashboard header.
+Toggle the Trust Dial from the AttentionBar at the top of the dashboard.
 
 ### Command Palette
 
