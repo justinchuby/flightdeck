@@ -8,7 +8,7 @@ import { logger } from '../../utils/logger.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
-import type { Alert } from '@flightdeck/shared';
+import { shortAgentId, type Alert } from '@flightdeck/shared';
 export type { Alert, AlertSeverity, AlertAction } from '@flightdeck/shared';
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export class AlertEngine extends EventEmitter {
         this.addAlert({
           type: 'stuck_agent',
           severity: 'warning',
-          message: `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) has been running with no activity for ${Math.round((now - lastActivity) / 60_000)}min`,
+          message: `Agent ${agent.role.name} (${shortAgentId(agent.id)}) has been running with no activity for ${Math.round((now - lastActivity) / 60_000)}min`,
           agentId: agent.id,
         });
       }
@@ -137,7 +137,7 @@ export class AlertEngine extends EventEmitter {
       this.addAlert({
         type: 'long_running_prompt',
         severity: 'warning',
-        message: `Agent ${agent.role.name} (${agent.id.slice(0, 8)}) has been prompting for ${Math.round(elapsed / 60_000)}min — may be stalled`,
+        message: `Agent ${agent.role.name} (${shortAgentId(agent.id)}) has been prompting for ${Math.round(elapsed / 60_000)}min — may be stalled`,
         agentId: agent.id,
       });
     }
@@ -155,7 +155,7 @@ export class AlertEngine extends EventEmitter {
       if (agentIds.length > 1) {
         const names = agentIds.map(id => {
           const a = this.agentManager.get(id);
-          return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+          return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
         }).join(', ');
         this.addAlert({
           type: 'duplicate_file_edit',
@@ -183,7 +183,7 @@ export class AlertEngine extends EventEmitter {
       if (teamIdle.length === 0) continue;
 
       const taskNames = readyTasks.slice(0, 3).map(t => t.id).join(', ');
-      const agentNames = teamIdle.slice(0, 3).map(a => `${a.role.name} (${a.id.slice(0, 8)})`).join(', ');
+      const agentNames = teamIdle.slice(0, 3).map(a => `${a.role.name} (${shortAgentId(a.id)})`).join(', ');
       this.addAlert({
         type: 'idle_agents_ready_tasks',
         severity: 'info',

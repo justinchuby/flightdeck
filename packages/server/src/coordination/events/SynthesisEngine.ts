@@ -8,6 +8,7 @@ import type { ActivityEntry, ActionType } from '../activity/ActivityLedger.js';
 import type { ActivityLedger } from '../activity/ActivityLedger.js';
 import type { AgentManager } from '../../agents/AgentManager.js';
 import { isTerminalStatus } from '../../agents/Agent.js';
+import { shortAgentId } from '@flightdeck/shared';
 import { asAgentId } from '../../types/brandedIds.js';
 
 // ── Classification patterns ─────────────────────────────────────────
@@ -147,7 +148,7 @@ export class SynthesisEngine {
         const used = (agent as any).contextWindowUsed ?? 0;
         const total = (agent as any).contextWindowSize ?? 0;
         if (total > 0 && used / total > 0.85) {
-          highContextAgents.push(`${agent.id.slice(0, 8)} (${agent.role.name}, ${Math.round(used / total * 100)}%)`);
+          highContextAgents.push(`${shortAgentId(agent.id)} (${agent.role.name}, ${Math.round(used / total * 100)}%)`);
         }
       }
     }
@@ -168,7 +169,7 @@ export class SynthesisEngine {
     if (health.criticalEvents.length > 0) {
       lines.push('== ⚠️ CRITICAL EVENTS ==');
       for (const evt of health.criticalEvents) {
-        const shortId = evt.agentId.slice(0, 8);
+        const shortId = shortAgentId(evt.agentId);
         const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         lines.push(`[${time}] ${shortId} (${evt.agentRole}): ${evt.summary.slice(0, 120)}`);
       }

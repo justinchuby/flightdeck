@@ -19,6 +19,7 @@ import {
   terminateAgentSchema,
   cancelDelegationSchema,
 } from './commandSchemas.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       a => a.role.id === role.id && a.status === 'idle' && a.parentId === agent.id
     );
     if (idleSameRole.length > 0) {
-      const ids = idleSameRole.map(a => a.id.slice(0, 8)).join(', ');
+      const ids = idleSameRole.map(a => shortAgentId(a.id)).join(', ');
       agent.sendMessage(
         `[System] Note: You have ${idleSameRole.length} idle ${role.name} agent(s) in your roster (${ids}). ` +
         `Consider reusing them with DELEGATE before creating new ones.`
@@ -124,32 +125,32 @@ function handleCreateAgent(ctx: CommandHandlerContext, agent: Agent, data: strin
       child.sendMessage(taskPrompt);
 
       const dupMatch = req.task ? findSimilarActiveDelegation(ctx, req.task, child.id) : null;
-      const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
-      const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''}${dagNote}${dupNote}`;
+      const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${shortAgentId(dupMatch.agentId)}): "${dupMatch.task}"` : '';
+      const ackMsg = `[System] Queued: ${role.name} (${shortAgentId(child.id)})${req.model ? ` [${req.model}]` : ''}${dagNote}${dupNote}`;
       agent.sendMessage(ackMsg);
       ctx.emit('agent:message_sent', {
         from: child.id, fromRole: role.name,
         to: agent.id, toRole: agent.role.name,
         content: ackMsg,
       });
-      ctx.activityLedger.log(child.id, role.id, 'message_sent', `Created & delegated ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
+      ctx.activityLedger.log(child.id, role.id, 'message_sent', `Created & delegated ack → ${agent.role.name} (${shortAgentId(agent.id)})`, {
         toAgentId: agent.id, toRole: agent.role.id,
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
       ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
-      notifySecretary(ctx, agent.id, `[System] Task delegated to ${role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 120)}`);
+      notifySecretary(ctx, agent.id, `[System] Task delegated to ${role.name} (${shortAgentId(child.id)}): ${req.task.slice(0, 120)}`);
 
       ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Created & delegated to ${role.name}: ${req.task.slice(0, 100)}`, {
         toAgentId: child.id, toRole: role.id, childId: child.id, childRole: role.id, delegationId: delegation.id,
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
     } else {
-      const ackMsg = `[System] Queued: ${role.name} (${child.id.slice(0, 8)})${req.model ? ` [${req.model}]` : ''} — ready for tasks.`;
+      const ackMsg = `[System] Queued: ${role.name} (${shortAgentId(child.id)})${req.model ? ` [${req.model}]` : ''} — ready for tasks.`;
       agent.sendMessage(ackMsg);
       ctx.emit('agent:message_sent', {
         from: child.id, fromRole: role.name,
         to: agent.id, toRole: agent.role.name,
         content: ackMsg,
       });
-      ctx.activityLedger.log(child.id, role.id, 'message_sent', `Agent created ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
+      ctx.activityLedger.log(child.id, role.id, 'message_sent', `Agent created ack → ${agent.role.name} (${shortAgentId(agent.id)})`, {
         toAgentId: agent.id, toRole: agent.role.id,
       }, ctx.getProjectIdForAgent(agent.id) ?? '');
     }
@@ -265,8 +266,8 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
     const statusNote = child.status === 'running' ? ' (task queued)' : '';
     child.sendMessage(taskPrompt);
     const dupMatch = findSimilarActiveDelegation(ctx, req.task, child.id);
-    const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${dupMatch.agentId.slice(0, 8)}): "${dupMatch.task}"` : '';
-    const ackMsg = `[System] Task delegated: ${child.role.name} (${child.id.slice(0, 8)})${statusNote}${dagNote} — ${req.task.slice(0, 120)}${dupNote}`;
+    const dupNote = dupMatch ? `\n⚠ Note: Similar task already delegated to ${dupMatch.role} (${shortAgentId(dupMatch.agentId)}): "${dupMatch.task}"` : '';
+    const ackMsg = `[System] Task delegated: ${child.role.name} (${shortAgentId(child.id)})${statusNote}${dagNote} — ${req.task.slice(0, 120)}${dupNote}`;
     agent.sendMessage(ackMsg);
     ctx.emit('agent:message_sent', {
       from: child.id,
@@ -275,16 +276,16 @@ function handleDelegate(ctx: CommandHandlerContext, agent: Agent, data: string):
       toRole: agent.role.name,
       content: ackMsg,
     });
-    ctx.activityLedger.log(child.id, child.role.id, 'message_sent', `Delegation ack → ${agent.role.name} (${agent.id.slice(0, 8)})`, {
+    ctx.activityLedger.log(child.id, child.role.id, 'message_sent', `Delegation ack → ${agent.role.name} (${shortAgentId(agent.id)})`, {
       toAgentId: agent.id, toRole: agent.role.id,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
-    ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 100)}`, {
+    ctx.activityLedger.log(agent.id, agent.role.id, 'delegated', `Delegated to ${child.role.name} (${shortAgentId(child.id)}): ${req.task.slice(0, 100)}`, {
       toAgentId: child.id, toRole: child.role.id, childId: child.id, childRole: child.role.id, delegationId: delegation.id,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
     ctx.emit('agent:delegated', { parentId: agent.id, childId: child.id, delegation });
-    notifySecretary(ctx, agent.id, `[System] Task delegated to ${child.role.name} (${child.id.slice(0, 8)}): ${req.task.slice(0, 120)}`);
+    notifySecretary(ctx, agent.id, `[System] Task delegated to ${child.role.name} (${shortAgentId(child.id)}): ${req.task.slice(0, 120)}`);
 
     maybeAutoCreateGroup(ctx, agent, ctx.delegations);
     maybeSuggestDagGroup(ctx, agent.id);
@@ -318,13 +319,13 @@ function handleTerminateAgent(ctx: CommandHandlerContext, agent: Agent, data: st
     }
 
     if (!isAncestor(agent.id, target, allAgents)) {
-      agent.sendMessage(`[System] Cannot terminate ${target.role.name} (${target.id.slice(0, 8)}): it belongs to another lead. You can only terminate your own agents and sub-lead agents.`);
+      agent.sendMessage(`[System] Cannot terminate ${target.role.name} (${shortAgentId(target.id)}): it belongs to another lead. You can only terminate your own agents and sub-lead agents.`);
       return;
     }
 
     const sessionId = target.sessionId;
     const roleName = target.role.name;
-    const shortId = target.id.slice(0, 8);
+    const shortId = shortAgentId(target.id);
 
     Promise.resolve(ctx.terminateAgent(target.id)).catch(() => {});
 
@@ -386,10 +387,10 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
 
       const cleared = targetAgent.clearPendingMessages();
 
-      const summary = `[System] Cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${targetId.slice(0, 8)}). Cleared ${cleared.count} queued message(s).`;
+      const summary = `[System] Cancelled ${cancelledCount} delegation(s) to ${targetAgent.role.name} (${shortAgentId(targetId)}). Cleared ${cleared.count} queued message(s).`;
       agent.sendMessage(summary);
 
-      ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegations to ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
+      ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegations to ${targetAgent.role.name} (${shortAgentId(targetId)})`, {
         toAgentId: targetId, toRole: targetAgent.role.id,
         targetAgentId: targetId,
         cancelledDelegations: cancelledCount,
@@ -424,7 +425,7 @@ function handleCancelDelegation(ctx: CommandHandlerContext, agent: Agent, data: 
       const targetAgent = ctx.getAgent(del.toAgentId);
       const cleared = targetAgent ? targetAgent.clearPendingMessages() : { count: 0, previews: [] };
 
-      agent.sendMessage(`[System] Delegation ${req.delegationId} cancelled. Cleared ${cleared.count} queued message(s) from ${del.toRole} (${del.toAgentId.slice(0, 8)}).`);
+      agent.sendMessage(`[System] Delegation ${req.delegationId} cancelled. Cleared ${cleared.count} queued message(s) from ${del.toRole} (${shortAgentId(del.toAgentId)}).`);
 
       ctx.activityLedger.log(agent.id, agent.role.id, 'delegation_cancelled', `Cancelled delegation ${req.delegationId}`, {
         toAgentId: del.toAgentId, toRole: del.toRole,
@@ -875,7 +876,7 @@ export function maybeSuggestDagGroup(
 
     const memberList = [...agentIds].map(id => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
 
     const memberIds = JSON.stringify([...agentIds, leadId]);

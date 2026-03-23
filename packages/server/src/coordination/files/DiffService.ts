@@ -4,6 +4,7 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import type { FileLockRegistry } from './FileLockRegistry.js';
 import { logger } from '../../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -123,7 +124,7 @@ export class DiffService {
         }
       }
     } catch (err) {
-      logger.warn('diff', `Failed to get diff for agent ${agentId.slice(0, 8)}`, {
+      logger.warn('diff', `Failed to get diff for agent ${shortAgentId(agentId)}`, {
         error: (err as Error).message,
       });
     }

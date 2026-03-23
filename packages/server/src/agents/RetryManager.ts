@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 export interface RetryRecord {
   taskId: string;
@@ -49,7 +50,7 @@ export class RetryManager extends EventEmitter {
       };
       this.retries.set(taskId, record);
       this.emit('retry:exhausted', record);
-      logger.warn('retry', `Task ${taskId.slice(0, 8)} exhausted all ${this.maxAttempts} retries`);
+      logger.warn('retry', `Task ${shortAgentId(taskId)} exhausted all ${this.maxAttempts} retries`);
       return record;
     }
 
@@ -61,7 +62,7 @@ export class RetryManager extends EventEmitter {
     };
     this.retries.set(taskId, record);
     this.emit('retry:scheduled', record);
-    logger.info('retry', `Scheduled retry ${attempts}/${this.maxAttempts} for task ${taskId.slice(0, 8)} in ${delay / 1000}s`);
+    logger.info('retry', `Scheduled retry ${attempts}/${this.maxAttempts} for task ${shortAgentId(taskId)} in ${delay / 1000}s`);
     return record;
   }
 
@@ -81,7 +82,7 @@ export class RetryManager extends EventEmitter {
       if (record.status === 'pending' && now >= record.nextRetryAt) {
         record.status = 'retrying';
         this.emit('retry:ready', record);
-        logger.info('retry', `Retry ${record.attempts}/${record.maxAttempts} ready for task ${taskId.slice(0, 8)}`);
+        logger.info('retry', `Retry ${record.attempts}/${record.maxAttempts} ready for task ${shortAgentId(taskId)}`);
       }
     }
   }

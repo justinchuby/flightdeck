@@ -12,7 +12,7 @@ import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
 
 import type { AgentStatus, AgentPhase } from '@flightdeck/shared';
-import { isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus } from '@flightdeck/shared';
+import { isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus, shortAgentId } from '@flightdeck/shared';
 export type { AgentStatus, AgentPhase } from '@flightdeck/shared';
 export { isTerminalPhase } from '@flightdeck/shared';
 import type { MessageQueueStore } from '../persistence/MessageQueueStore.js';
@@ -277,7 +277,7 @@ export class Agent {
   }
 
   buildContextManifest(peers: AgentContextInfo[], budget?: { maxConcurrent: number; runningCount: number }): string {
-    const shortId = this.id.slice(0, 8);
+    const shortId = shortAgentId(this.id);
     const taskLine = this.task ? this.task : 'Awaiting assignment';
 
     // For leads: show "YOUR AGENTS" (children) separately from sibling leads
@@ -292,7 +292,7 @@ export class Agent {
 
     const childLines = myChildren
       .map((p) => {
-        const pShort = p.id.slice(0, 8);
+        const pShort = shortAgentId(p.id);
         const modelStr = p.model ? ` [${p.model}]` : '';
         const systemStr = p.isSystemAgent ? ' (system)' : '';
         return `- ${pShort} — ${p.roleName}${systemStr}${modelStr} — ${p.status}${p.task ? `, task: ${p.task.slice(0, 80)}` : ''}`;
@@ -301,7 +301,7 @@ export class Agent {
 
     const siblingLines = siblingPeers
       .map((p) => {
-        const pShort = p.id.slice(0, 8);
+        const pShort = shortAgentId(p.id);
         const systemStr = p.isSystemAgent ? ' (system)' : '';
         return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task ? p.task.slice(0, 80) : 'idle'}`;
       })
@@ -309,7 +309,7 @@ export class Agent {
 
     const peerLines = otherPeers
       .map((p) => {
-        const pShort = p.id.slice(0, 8);
+        const pShort = shortAgentId(p.id);
         const files = p.lockedFiles.length > 0 ? p.lockedFiles.join(', ') : 'none';
         const systemStr = p.isSystemAgent ? ' (system)' : '';
         return `- Agent ${pShort} (${p.roleName}${systemStr}) — Status: ${p.status}, Working on: ${p.task || 'idle'}, Files locked: ${files}`;
@@ -332,7 +332,7 @@ ${budget.runningCount >= budget.maxConcurrent ? '⚠ AT CAPACITY — reuse idle 
       ? `== YOUR AGENTS ==
 ${childLines || '(no agents created yet — use CREATE_AGENT to create specialists)'}
 Use agent IDs above with DELEGATE to assign tasks, or AGENT_MESSAGE to communicate.
-${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${this.parentId.slice(0, 8)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}${siblingSection}`
+${this.role.id === 'lead' && this.parentId ? `\n== HIERARCHY ==\nYou are a SUB-LEAD (level ${this.hierarchyLevel}). You report to lead ${shortAgentId(this.parentId)}.\nFocus on your assigned domain. Create and manage your own sub-agents.\n${budget ? `Budget: ${budget.maxConcurrent} max concurrent agents total (shared across all leads).` : ''}` : ''}${siblingSection}`
       : `== ACTIVE CREW MEMBERS ==
 ${peerLines || '(no other agents)'}`;
 
@@ -347,7 +347,7 @@ ${crewSection}
 ${budgetSection}
 
 == SHARED WORKSPACE ==
-Your artifact directory: ${this.artifactDir || `${FLIGHTDECK_STATE_DIR}/artifacts/${this.projectId || '_unscoped'}/sessions/${this.parentId || this.id}/${this.role.id}-${this.id.slice(0, 8)}/`}
+Your artifact directory: ${this.artifactDir || `${FLIGHTDECK_STATE_DIR}/artifacts/${this.projectId || '_unscoped'}/sessions/${this.parentId || this.id}/${this.role.id}-${shortAgentId(this.id)}/`}
 Write reports, designs, and analysis files here. All crew members can read this directory.
 Convention: Write files directly to your artifact directory shown above.
 All team members have access to all artifact directories under the same session.

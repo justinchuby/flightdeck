@@ -2,6 +2,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { Database } from '../../db/database.js';
 import { agentFileHistory, utcNow } from '../../db/schema.js';
 import type { FileLockRegistry } from '../files/FileLockRegistry.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ export class CapabilityRegistry {
       if (score > 0) {
         results.push({
           agentId: agent.id,
-          shortId: agent.id.slice(0, 8),
+          shortId: shortAgentId(agent.id),
           roleName: agent.role.name,
           status: agent.status,
           task: agent.task,

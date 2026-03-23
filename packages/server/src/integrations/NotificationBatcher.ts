@@ -3,6 +3,7 @@
 // for delivery to messaging adapters. Uses a 5-second debounce window
 // to group related events and prevent rate-limit issues.
 
+import { shortAgentId } from '@flightdeck/shared';
 import { TypedEmitter } from '../utils/TypedEmitter.js';
 import { logger } from '../utils/logger.js';
 import type { AgentManager } from '../agents/AgentManager.js';
@@ -130,7 +131,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
         category: 'agent_spawned',
         projectId,
         title: `Agent spawned: ${roleName}`,
-        body: `${roleName} (${data.id?.slice(0, 8) ?? '?'}) joined the project.`,
+        body: `${roleName} (${shortAgentId(data.id ?? '?')}) joined the project.`,
         timestamp: Date.now(),
         metadata: { agentId: data.id, role: roleName },
       });
@@ -141,7 +142,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
       this.queueEvent({
         category: 'agent_completed',
         projectId,
-        title: `Agent exited: ${data.agentId.slice(0, 8)}`,
+        title: `Agent exited: ${shortAgentId(data.agentId)}`,
         body: data.error
           ? `Agent exited with error: ${data.error}`
           : `Agent exited cleanly (code ${data.code}).`,
@@ -155,7 +156,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
       this.queueEvent({
         category: 'agent_crashed',
         projectId,
-        title: `⚠️ Agent crashed: ${data.agentId.slice(0, 8)}`,
+        title: `⚠️ Agent crashed: ${shortAgentId(data.agentId)}`,
         body: `Agent crashed with exit code ${data.code}.`,
         timestamp: Date.now(),
         metadata: { agentId: data.agentId, code: data.code },
@@ -183,7 +184,7 @@ export class NotificationBatcher extends TypedEmitter<NotificationBatcherEvents>
       this.queueEvent({
         category: 'task_completed',
         projectId: data.parentId ?? 'system',
-        title: `Task completed by ${data.childId.slice(0, 8)}`,
+        title: `Task completed by ${shortAgentId(data.childId)}`,
         body: `Status: ${data.status}`,
         timestamp: Date.now(),
         metadata: { childId: data.childId, parentId: data.parentId },

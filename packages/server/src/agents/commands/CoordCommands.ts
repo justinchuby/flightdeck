@@ -19,7 +19,7 @@ import {
   commitSchema,
   progressSchema,
 } from './commandSchemas.js';
-import { getProvider } from '@flightdeck/shared';
+import { getProvider, shortAgentId } from '@flightdeck/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,7 +51,7 @@ function handleLockRequest(ctx: CommandHandlerContext, agent: Agent, data: strin
       }, projectId);
       agent.sendMessage(`[System] Lock acquired on \`${request.filePath}\`. You may proceed with edits. Remember to release it when done with ⟦⟦ UNLOCK_FILE {"filePath": "${request.filePath}"} ⟧⟧`);
     } else {
-      const holderShort = result.holder?.slice(0, 8) ?? 'unknown';
+      const holderShort = shortAgentId(result.holder ?? '');
       agent.sendMessage(`[System] Lock DENIED on \`${request.filePath}\` — currently held by agent ${holderShort}. Wait for them to release it, or coordinate via AGENT_MESSAGE.`);
       ctx.activityLedger.log(agent.id, agentRole, 'lock_denied', `Lock denied on ${request.filePath} (held by ${holderShort})`, {
         filePath: request.filePath,
@@ -199,7 +199,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
       (a) => a.role.id === 'secretary' && (a.parentId === parentId || a.id === parentId) && a.id !== agent.id,
     );
     for (const secretary of secretaries) {
-      const progressMsg = `[Progress Update from ${agent.role.name} (${agent.id.slice(0, 8)})]\n${JSON.stringify(progress, null, 2)}`;
+      const progressMsg = `[Progress Update from ${agent.role.name} (${shortAgentId(agent.id)})]\n${JSON.stringify(progress, null, 2)}`;
       secretary.sendMessage(progressMsg);
     }
   } catch (err) {
@@ -213,7 +213,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
   try {
     const req = parseCommandPayload(agent, match[1], commitSchema, 'COMMIT');
     if (!req) return;
-    const message = req.message || `Changes by ${agent.role.name} (${agent.id.slice(0, 8)})`;
+    const message = req.message || `Changes by ${agent.role.name} (${shortAgentId(agent.id)})`;
 
     // Fix 2: Merge locked files with explicitly specified files
     const currentLocks = ctx.lockRegistry.getByAgent(agent.id);
@@ -258,7 +258,7 @@ async function handleCommit(ctx: CommandHandlerContext, agent: Agent, data: stri
 
     const modelName = agent.model || agent.role.model || 'unknown';
     const providerName = agent.provider || 'unknown';
-    const signoff = `Agent-signed-off: ${agent.role.name} (${agent.id.slice(0, 8)}) [${modelName} via ${providerName}]`;
+    const signoff = `Agent-signed-off: ${agent.role.name} (${shortAgentId(agent.id)}) [${modelName} via ${providerName}]`;
 
     // Only include Co-authored-by trailer if the provider defines one
     const providerDef = getProvider(providerName);

@@ -8,6 +8,7 @@
 import type { Agent } from '../Agent.js';
 import type { ActivityLedger } from '../../coordination/activity/ActivityLedger.js';
 import { logger } from '../../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Capability definition ────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export class CapabilityInjector {
 
     logger.info(
       'capability',
-      `Agent ${agent.id.slice(0, 8)} (${agent.role.id}) acquired "${cap.name}": ${reason}`,
+      `Agent ${shortAgentId(agent.id)} (${agent.role.id}) acquired "${cap.name}": ${reason}`,
     );
 
     const message = `✅ Capability acquired: **${cap.name}**\nReason: ${reason}\n\n== ADDITIONAL INSTRUCTIONS ==\n${cap.instructions}\n== END ==`;

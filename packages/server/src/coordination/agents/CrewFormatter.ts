@@ -4,6 +4,7 @@
  * Both messages use the same compact tabular layout so agents see a
  * consistent view of the crew.
  */
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Model shortname mapping ───────────────────────────────────────────
 
@@ -120,7 +121,7 @@ function buildCrewTable(members: CrewMember[]): string {
   if (members.length === 0) return '  (no agents)';
 
   const rows = members.map((m) => ({
-    id: m.id.slice(0, 8),
+    id: shortAgentId(m.id),
     role: m.roleName,
     model: shortenModel(m.model),
     status: `${statusIcon(m.status)} ${m.status}`,
@@ -155,7 +156,7 @@ function buildLockSection(members: CrewMember[]): string {
   const lockedFiles: { file: string; agentId: string; roleName: string }[] = [];
   for (const m of members) {
     for (const f of m.lockedFiles) {
-      lockedFiles.push({ file: f, agentId: m.id.slice(0, 8), roleName: m.roleName });
+      lockedFiles.push({ file: f, agentId: shortAgentId(m.id), roleName: m.roleName });
     }
   }
   if (lockedFiles.length === 0) return '== FILE LOCKS ==\n  None';

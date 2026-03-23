@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 export interface CrashReport {
   agentId: string;
@@ -53,7 +54,7 @@ export class CrashForensics {
       this.reports = this.reports.slice(-this.maxReports);
     }
 
-    logger.error('crash-forensics', `Agent ${params.agentId.slice(0, 8)} (${params.agentRole}) crashed: ${params.error}`, {
+    logger.error('crash-forensics', `Agent ${shortAgentId(params.agentId)} (${params.agentRole}) crashed: ${params.error}`, {
       task: params.task?.slice(0, 100),
       uptime: report.uptime,
       restarts: params.restartCount,

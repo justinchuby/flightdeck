@@ -12,6 +12,7 @@ import {
   setTimerSchema,
   cancelTimerSchema,
 } from './commandSchemas.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ function handleSetTimer(ctx: CommandHandlerContext, agent: Agent, data: string):
 
     const repeatNote = timer.repeat ? ' (repeating)' : '';
     agent.sendMessage(`[System] Timer "${timer.label}" set — fires in ${delay}s${repeatNote}. ID: ${timer.id}`);
-    logger.info('timer', `${agent.role.name} (${agent.id.slice(0, 8)}) set timer "${timer.label}" for ${delay}s${repeatNote}`);
+    logger.info('timer', `${agent.role.name} (${shortAgentId(agent.id)}) set timer "${timer.label}" for ${delay}s${repeatNote}`);
   } catch (err) {
     logger.debug('command', 'Failed to parse SET_TIMER command', { error: (err as Error).message });
   }
@@ -96,7 +97,7 @@ function handleListTimers(ctx: CommandHandlerContext, agent: Agent, _data: strin
   const lines = timers.map(t => {
     const remaining = Math.max(0, Math.round((t.fireAt - Date.now()) / 1000));
     const repeat = t.repeat ? ' 🔁' : '';
-    const owner = isLeadOrSecretary ? ` (${t.agentId.slice(0, 8)})` : '';
+    const owner = isLeadOrSecretary ? ` (${shortAgentId(t.agentId)})` : '';
     return `  • ${t.label}${owner}: "${t.message.slice(0, 60)}" — ${remaining}s remaining${repeat}`;
   });
 
