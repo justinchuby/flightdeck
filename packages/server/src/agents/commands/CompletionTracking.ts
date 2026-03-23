@@ -9,6 +9,7 @@ import type { CommandHandlerContext, Delegation } from './types.js';
 import type { DagTask } from '../../tasks/TaskDAG.js';
 import { logger } from '../../utils/logger.js';
 import { redact } from '../../utils/redaction.js';
+import { shortAgentId } from '@flightdeck/shared';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -37,7 +38,7 @@ export function formatNewlyReadyMessage(
     const idleLines = newlyReady.map(task => {
       const matching = idleAgents.filter(a => a.role.id === task.role);
       if (matching.length > 0) {
-        return `  ${task.id} (${task.role}): idle agents → ${matching.map(a => `${a.role.name} (${a.id.slice(0, 8)})`).join(', ')}`;
+        return `  ${task.id} (${task.role}): idle agents → ${matching.map(a => `${a.role.name} (${shortAgentId(a.id)})`).join(', ')}`;
       }
       return `  ${task.id} (${task.role}): no idle agents with matching role`;
     });
@@ -98,9 +99,9 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
   const sessionLine = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
   const dagLabel = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
-  const summary = `[Agent Report]${dagLabel} ${agent.role.name} (${agent.id.slice(0, 8)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput: ${outputNote}`;
+  const summary = `[Agent Report]${dagLabel} ${agent.role.name} (${shortAgentId(agent.id)}) finished work.\nTask: ${taskBrief}${sessionLine}\nOutput: ${outputNote}`;
 
-  logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) finished → notifying parent ${parent.role.name} (${parent.id.slice(0, 8)})`);
+  logger.info('delegation', `Child ${agent.role.name} (${shortAgentId(agent.id)}) finished → notifying parent ${parent.role.name} (${shortAgentId(parent.id)})`);
   parent.sendMessage(summary);
   ctx.emit('agent:message_sent', {
     from: agent.id,
@@ -109,7 +110,7 @@ export function notifyParentOfIdle(ctx: CommandHandlerContext, agent: Agent): vo
     toRole: parent.role.name,
     content: summary,
   });
-  ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Completion report → ${parent.role.name} (${parent.id.slice(0, 8)})`, {
+  ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Completion report → ${parent.role.name} (${shortAgentId(parent.id)})`, {
     toAgentId: parent.id, toRole: parent.role.id,
   }, ctx.getProjectIdForAgent(agent.id) ?? '');
   ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status: 'completed' });
@@ -219,9 +220,9 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
   const sessionLine2 = agent.sessionId ? `\nSession ID: ${agent.sessionId}` : '';
   const taskBrief2 = agent.task ? (agent.task.length > 150 ? agent.task.slice(0, 150) + '...' : agent.task) : 'none';
   const dagLabel2 = agent.dagTaskId ? ` [${agent.dagTaskId}]` : '';
-  const summary = `[Agent Report]${dagLabel2} ${agent.role.name} (${agent.id.slice(0, 8)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput: ${outputNote2}`;
+  const summary = `[Agent Report]${dagLabel2} ${agent.role.name} (${shortAgentId(agent.id)}) ${status}.\nTask: ${taskBrief2}${sessionLine2}\nOutput: ${outputNote2}`;
 
-  logger.info('delegation', `Child ${agent.role.name} (${agent.id.slice(0, 8)}) → parent ${parent.role.name} (${parent.id.slice(0, 8)}): ${status}`);
+  logger.info('delegation', `Child ${agent.role.name} (${shortAgentId(agent.id)}) → parent ${parent.role.name} (${shortAgentId(parent.id)}): ${status}`);
   parent.sendMessage(summary);
 
   // Fix 4: Pre-termination commit check — warn parent if agent has dirty locked files
@@ -233,7 +234,7 @@ export function notifyParentOfCompletion(ctx: CommandHandlerContext, agent: Agen
     toRole: parent.role.name,
     content: summary,
   });
-  ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Exit report (${status}) → ${parent.role.name} (${parent.id.slice(0, 8)})`, {
+  ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Exit report (${status}) → ${parent.role.name} (${shortAgentId(parent.id)})`, {
     toAgentId: parent.id, toRole: parent.role.id,
   }, ctx.getProjectIdForAgent(agent.id) ?? '');
   ctx.emit('agent:completion_reported', { childId: agent.id, parentId: agent.parentId, status });
@@ -352,7 +353,7 @@ function checkDirtyLockedFiles(ctx: CommandHandlerContext, agent: Agent, parent:
       if (dirtyFiles.length > 0) {
         const listed = dirtyFiles.slice(0, 10).join(', ');
         const more = dirtyFiles.length > 10 ? ` (and ${dirtyFiles.length - 10} more)` : '';
-        parent.sendMessage(`[System] ⚠ Warning: Agent ${agent.role.name} (${agent.id.slice(0, 8)}) terminated with uncommitted changes in locked files: ${listed}${more}. These changes may be lost.`);
+        parent.sendMessage(`[System] ⚠ Warning: Agent ${agent.role.name} (${shortAgentId(agent.id)}) terminated with uncommitted changes in locked files: ${listed}${more}. These changes may be lost.`);
       }
     })
     .catch(() => {

@@ -13,6 +13,7 @@ import { deriveArgs } from './CommandHelp.js';
 import { formatQueryCrew } from '../../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../../coordination/agents/CrewFormatter.js';
 import { PROVIDER_PRESETS } from '../../adapters/presets.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Regex patterns ────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
     visibleMembers = members.filter(m => m.parentId === agent.id);
     const siblingLeads = members.filter(m => m.role === 'lead' && m.parentId === agent.parentId && m.id !== agent.id);
     if (siblingLeads.length > 0) {
-      const lines = siblingLeads.map(r => `- ${r.id.slice(0, 8)} (${r.roleName}) — ${r.status}`);
+      const lines = siblingLeads.map(r => `- ${shortAgentId(r.id)} (${r.roleName}) — ${r.status}`);
       siblingSection = `== SIBLING LEADS ==\n${lines.join('\n')}`;
     }
   } else {
@@ -88,7 +89,7 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
       const lines: string[] = [];
       for (const [agentId, entries] of byAgent) {
         const facts = entries.map(e => `${e.key}: ${e.value}`).join(', ');
-        lines.push(`  - ${agentId.slice(0, 8)}: ${facts}`);
+        lines.push(`  - ${shortAgentId(agentId)}: ${facts}`);
       }
       memorySection = `== AGENT MEMORY ==\nRecorded facts about your agents:\n${lines.join('\n')}`;
     }
@@ -114,14 +115,14 @@ function handleQueryCrew(ctx: CommandHandlerContext, agent: Agent): void {
 
   const response = `⟦⟦ CREW_ROSTER\n${formatted}\nCREW_ROSTER ⟧⟧`;
 
-  logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${agent.id.slice(0, 8)}): ${visibleMembers.length} agents`);
+  logger.info('agent', `QUERY_CREW response sent to ${agent.role.name} (${shortAgentId(agent.id)}): ${visibleMembers.length} agents`);
   agent.sendMessage(response);
 }
 
 function handleHaltHeartbeat(ctx: CommandHandlerContext, agent: Agent): void {
   const newlyHalted = ctx.haltHeartbeat(agent.id);
   if (!newlyHalted) return; // Already halted — don't spam the notification
-  logger.info('agent', `Heartbeat halted by ${agent.role.name} (${agent.id.slice(0, 8)})`);
+  logger.info('agent', `Heartbeat halted by ${agent.role.name} (${shortAgentId(agent.id)})`);
   ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'heartbeat_halted', `Heartbeat halted by ${agent.role.name}`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');
   agent.sendMessage('[System] Heartbeat paused (lead idle nudges). Command reminders are unaffected. Use RESUME_HEARTBEAT to re-enable nudges.');
 }
@@ -129,7 +130,7 @@ function handleHaltHeartbeat(ctx: CommandHandlerContext, agent: Agent): void {
 function handleResumeHeartbeat(ctx: CommandHandlerContext, agent: Agent): void {
   const wasHalted = ctx.resumeHeartbeat(agent.id);
   if (!wasHalted) return; // Wasn't halted — nothing to resume
-  logger.info('agent', `Heartbeat resumed by ${agent.role.name} (${agent.id.slice(0, 8)})`);
+  logger.info('agent', `Heartbeat resumed by ${agent.role.name} (${shortAgentId(agent.id)})`);
   ctx.activityLedger.log(agent.id, agent.role?.id ?? 'unknown', 'status_change', `Heartbeat resumed by ${agent.role.name}`, {}, ctx.getProjectIdForAgent(agent.id) ?? '');
   agent.sendMessage('[System] Heartbeat resumed. Lead idle nudges are active again.');
 }
@@ -156,7 +157,7 @@ function handleRequestLimitChange(ctx: CommandHandlerContext, agent: Agent, data
     );
     ctx.pendingSystemActions.set(decision.id, { type: 'set_max_concurrent', value: newLimit, agentId: agent.id });
     ctx.decisionLog.markSystemDecision(decision.id);
-    logger.info('lead', `Limit change requested by ${agent.role.name} (${agent.id.slice(0, 8)}): ${currentLimit} → ${newLimit}`);
+    logger.info('lead', `Limit change requested by ${agent.role.name} (${shortAgentId(agent.id)}): ${currentLimit} → ${newLimit}`);
     ctx.activityLedger.log(agent.id, agent.role.id, 'limit_change_requested', `Requested agent limit change: ${currentLimit} → ${newLimit}`, { currentLimit, newLimit, reason: req.reason }, ctx.getProjectIdForAgent(agent.id) ?? '');
     agent.sendMessage(`[System] Your request to change the agent limit from ${currentLimit} to ${newLimit} has been submitted for user approval. You will be notified when the user responds.`);
   } catch {
@@ -214,7 +215,7 @@ function handleQueryProviders(ctx: CommandHandlerContext, agent: Agent): void {
   }
 
   const response = `[System]\n${lines.join('\n')}`;
-  logger.info('agent', `QUERY_PROVIDERS response sent to ${agent.role.name} (${agent.id.slice(0, 8)})`);
+  logger.info('agent', `QUERY_PROVIDERS response sent to ${agent.role.name} (${shortAgentId(agent.id)})`);
   agent.sendMessage(response);
 }
 

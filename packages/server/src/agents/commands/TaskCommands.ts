@@ -22,6 +22,7 @@ import {
 } from './commandSchemas.js';
 import { deriveArgs } from './CommandHelp.js';
 import { notifySecretary } from './secretaryNotifier.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -183,21 +184,21 @@ function handleTaskStatus(ctx: CommandHandlerContext, agent: Agent, _data: strin
     msg += `\n  ${statusIcon} [${task.dagStatus.toUpperCase()}] ${task.id} (${task.role})`;
     if (task.priority && task.priority > 0) msg += ` [P${task.priority}]`;
     if (task.description) msg += ` — ${task.description.slice(0, 80)}`;
-    if (task.assignedAgentId) msg += ` [agent: ${task.assignedAgentId.slice(0, 8)}]`;
+    if (task.assignedAgentId) msg += ` [agent: ${shortAgentId(task.assignedAgentId)}]`;
     if (task.dependsOn.length > 0) msg += `\n      dependsOn: [${task.dependsOn.join(', ')}]`;
     if (task.files.length > 0) msg += `\n      files: [${task.files.join(', ')}]`;
   }
   if (Object.keys(fileLockMap).length > 0) {
     msg += '\n\nFile Lock Map:';
     for (const [file, info] of Object.entries(fileLockMap)) {
-      msg += `\n  ${file} → ${info.taskId}${info.agentId ? ` (${info.agentId.slice(0, 8)})` : ''}`;
+      msg += `\n  ${file} → ${info.taskId}${info.agentId ? ` (${shortAgentId(info.agentId)})` : ''}`;
     }
   }
   // Coverage metric
   if (status.coverage && status.coverage.total > 0) {
     msg += `\n\n📊 DAG Coverage: ${status.coverage.percentage}% (${status.coverage.tracked}/${status.coverage.total} active agents tracked)`;
     if (status.coverage.untrackedAgents.length > 0) {
-      msg += `\n⚠️ Untracked agents: ${status.coverage.untrackedAgents.map(a => `${a.role} (${a.id.slice(0, 8)})`).join(', ')}`;
+      msg += `\n⚠️ Untracked agents: ${status.coverage.untrackedAgents.map(a => `${a.role} (${shortAgentId(a.id)})`).join(', ')}`;
     }
   }
   agent.sendMessage(msg);
@@ -411,7 +412,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
           }
           // Task not completable — still notify parent via message
           if (parent) {
-            parent.sendMessage(`[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) completed task "${taskId}".\nStatus: ${status}\nSummary: ${summary}`);
+            parent.sendMessage(`[Agent Report] ${agent.role.name} (${shortAgentId(agent.id)}) completed task "${taskId}".\nStatus: ${status}\nSummary: ${summary}`);
           }
           agent.sendMessage(`[System] Task "${taskId}" could not be marked done in DAG (status: ${error.currentStatus}). Parent notified.`);
           return;
@@ -425,7 +426,7 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
           { taskId }, ctx.getProjectIdForAgent(agent.id) ?? '');
 
         // Notify parent with completion details and newly ready tasks
-        let parentMsg = `[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) completed DAG task "${taskId}".\nStatus: ${status}\nSummary: ${summary}`;
+        let parentMsg = `[Agent Report] ${agent.role.name} (${shortAgentId(agent.id)}) completed DAG task "${taskId}".\nStatus: ${status}\nSummary: ${summary}`;
         if (newlyReady && newlyReady.length > 0) {
           parentMsg += '\n' + formatNewlyReadyMessage(ctx, agent.parentId!, taskId, newlyReady);
         }
@@ -441,12 +442,12 @@ function handleCompleteTask(ctx: CommandHandlerContext, agent: Agent, data: stri
         ctx.reportedCompletions.add(`${agent.id}:idle`);
         markAgentDelegations(ctx, agent.id, 'to', 'completed', summary);
         ctx.emit('dag:updated', { leadId: agent.parentId });
-        notifySecretary(ctx, agent.parentId!, `[System] Task "${taskId}" completed by ${agent.role.name} (${agent.id.slice(0, 8)}): ${summary}`, agent.id);
+        notifySecretary(ctx, agent.parentId!, `[System] Task "${taskId}" completed by ${agent.role.name} (${shortAgentId(agent.id)}): ${summary}`, agent.id);
         agent.sendMessage(`[System] Task "${taskId}" marked as done in DAG.${newlyReady && newlyReady.length > 0 ? ` ${newlyReady.length} task(s) now ready.` : ''}`);
       } else {
         // No DAG task ID — fallback to message-only notification
         if (parent) {
-          parent.sendMessage(`[Agent Report] ${agent.role.name} (${agent.id.slice(0, 8)}) completed task.\nStatus: ${status}\nSummary: ${summary}`);
+          parent.sendMessage(`[Agent Report] ${agent.role.name} (${shortAgentId(agent.id)}) completed task.\nStatus: ${status}\nSummary: ${summary}`);
           ctx.emit('agent:message_sent', {
             from: agent.id, fromRole: agent.role.name,
             to: parent.id, toRole: parent.role.name,
@@ -598,7 +599,7 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
     // Prevent self-reassignment
     const currentTask = ctx.taskDAG.getTask(agent.id, req.taskId);
     if (currentTask?.assignedAgentId === newAgent.id) {
-      agent.sendMessage(`[System] Task "${req.taskId}" is already assigned to @${newAgent.id.slice(0, 8)}.`);
+      agent.sendMessage(`[System] Task "${req.taskId}" is already assigned to @${shortAgentId(newAgent.id)}.`);
       return;
     }
 
@@ -646,9 +647,9 @@ function handleReassignTask(ctx: CommandHandlerContext, agent: Agent, data: stri
     newAgent.task = taskText;
     newAgent.sendMessage(`[DAG Task: ${req.taskId}]\n${taskText}`);
 
-    const oldLabel = oldAgent ? `@${result.oldAgentId.slice(0, 8)}` : result.oldAgentId.slice(0, 8);
-    agent.sendMessage(`[System] Task "${req.taskId}" reassigned from ${oldLabel} to @${newAgent.id.slice(0, 8)}. Old agent notified to stop; new agent has the task.`);
-    notifySecretary(ctx, agent.id, `[System] Task "${req.taskId}" reassigned from ${oldLabel} to ${newAgent.role.name} (${newAgent.id.slice(0, 8)})`);
+    const oldLabel = oldAgent ? `@${shortAgentId(result.oldAgentId)}` : shortAgentId(result.oldAgentId);
+    agent.sendMessage(`[System] Task "${req.taskId}" reassigned from ${oldLabel} to @${shortAgentId(newAgent.id)}. Old agent notified to stop; new agent has the task.`);
+    notifySecretary(ctx, agent.id, `[System] Task "${req.taskId}" reassigned from ${oldLabel} to ${newAgent.role.name} (${shortAgentId(newAgent.id)})`);
   } catch { agent.sendMessage('[System] REASSIGN_TASK error: invalid payload.'); }
 }
 
@@ -684,7 +685,7 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
 
     // Better error for already-running tasks
     if (existing.dagStatus === 'running') {
-      const currentOwner = existing.assignedAgentId ? existing.assignedAgentId.slice(0, 8) : 'unknown';
+      const currentOwner = existing.assignedAgentId ? shortAgentId(existing.assignedAgentId) : 'unknown';
       agent.sendMessage(`[System] Cannot assign task "${req.taskId}": already running, assigned to ${currentOwner}. Use REASSIGN_TASK to change.`);
       return;
     }
@@ -712,9 +713,9 @@ function handleAssignTask(ctx: CommandHandlerContext, agent: Agent, data: string
       ctx.delegations.set(delegation.id, delegation);
       targetAgent.sendMessage(`[DAG Task: ${req.taskId}]\n${taskText}`);
 
-      agent.sendMessage(`[System] Task "${req.taskId}" assigned to @${targetAgent.id.slice(0, 8)} and moved to running.`);
+      agent.sendMessage(`[System] Task "${req.taskId}" assigned to @${shortAgentId(targetAgent.id)} and moved to running.`);
       ctx.emit('dag:updated', { leadId: agent.id });
-      notifySecretary(ctx, agent.id, `[System] Task "${req.taskId}" assigned to ${targetAgent.role.name} (${targetAgent.id.slice(0, 8)})`);
+      notifySecretary(ctx, agent.id, `[System] Task "${req.taskId}" assigned to ${targetAgent.role.name} (${shortAgentId(targetAgent.id)})`);
     } else {
       agent.sendMessage(`[System] Cannot assign task "${req.taskId}": current status is "${existing.dagStatus}". Task may already be completed or skipped.`);
     }

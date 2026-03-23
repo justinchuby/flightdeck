@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
+import { shortAgentId } from '@flightdeck/shared';
 import type { ContentBlock } from '../adapters/types.js';
 import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
@@ -59,11 +60,11 @@ export function leadRoutes(ctx: AppContext): Router {
         // No project registry available — still ensure a valid project ID
         // so activities and agents are always scoped to a project.
         resolvedProjectId = randomUUID();
-        logger.warn('lead', `ProjectRegistry unavailable — generated fallback projectId ${resolvedProjectId.slice(0, 8)}`);
+        logger.warn('lead', `ProjectRegistry unavailable — generated fallback projectId ${shortAgentId(resolvedProjectId)}`);
       }
 
       const agent = agentManager.spawn(role, task, undefined, model, cwd, resumeSessionId, undefined, { projectName: resolvedProjectName, projectId: resolvedProjectId });
-      logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${agent.id.slice(0, 8)})`, {
+      logger.info('lead', `${resumeSessionId ? 'Resumed' : 'Started'} project "${agent.projectName}" (${shortAgentId(agent.id)})`, {
         task: task?.slice(0, 80),
         model: model || role.model,
         cwd: cwd || process.cwd(),
@@ -82,7 +83,7 @@ export function leadRoutes(ctx: AppContext): Router {
       // agent initializes and auto-delivered once the initial prompt completes
       // (via the prompt_complete → _drainOneMessage pipeline).
       if (!resumingProject && task) {
-        logger.info('lead', `Queuing initial task for ${agent.id.slice(0, 8)}: "${task.slice(0, 80)}"`);
+        logger.info('lead', `Queuing initial task for ${shortAgentId(agent.id)}: "${task.slice(0, 80)}"`);
         agentManager.persistHumanMessage(agent.id, task);
         agent.queueMessage(task);
       }
@@ -134,11 +135,11 @@ export function leadRoutes(ctx: AppContext): Router {
     const content = buildContentBlocks(formatted, attachments, agent.supportsImages);
 
     if (mode === 'queue') {
-      logger.info('lead', `Queued message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      logger.info('lead', `Queued message → ${agent.projectName || shortAgentId(agent.id)}: "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
       agent.queueMessage(content);
       res.json({ ok: true, mode: 'queue', pending: agent.pendingMessageCount });
     } else {
-      logger.info('lead', `User message → ${agent.projectName || agent.id.slice(0, 8)}: "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
+      logger.info('lead', `User message → ${agent.projectName || shortAgentId(agent.id)}: "${text.slice(0, 80)}"${attachments?.length ? ` +${attachments.length} attachment(s)` : ''}`);
       agentManager.markHumanInterrupt(agent.id);
       await agent.interruptWithMessage(content);
       res.json({ ok: true, mode: 'interrupt' });
@@ -151,7 +152,7 @@ export function leadRoutes(ctx: AppContext): Router {
     const { cwd, projectName } = req.body;
     if (cwd !== undefined) {
       agent.cwd = cwd;
-      logger.info('lead', `Updated cwd for ${agent.projectName || agent.id.slice(0, 8)}: ${cwd}`);
+      logger.info('lead', `Updated cwd for ${agent.projectName || shortAgentId(agent.id)}: ${cwd}`);
     }
     if (projectName !== undefined) {
       agent.projectName = projectName;

@@ -13,6 +13,7 @@ import { isTerminalStatus } from '../Agent.js';
 import { parseCommandPayload, directMessageSchema } from './commandSchemas.js';
 import { deriveArgs } from './CommandHelp.js';
 import { resolveAgentInProject } from './CommCommands.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 const DM_REGEX = /⟦⟦\s*DIRECT_MESSAGE\s*(\{.*?\})\s*⟧⟧/s;
 const QUERY_PEERS_REGEX = /⟦⟦\s*QUERY_PEERS\s*(?:\{[^}]*\})?\s*⟧⟧/s;
@@ -36,23 +37,23 @@ function handleDirectMessage(ctx: CommandHandlerContext, agent: Agent, data: str
     }
 
     if (isTerminalStatus(target.status)) {
-      agent.sendMessage(`[System] Agent ${target.id.slice(0, 8)} is ${target.status} and cannot receive messages.`);
+      agent.sendMessage(`[System] Agent ${shortAgentId(target.id)} is ${target.status} and cannot receive messages.`);
       return;
     }
 
     // Deliver message to target — queue so it doesn't interrupt current work
-    const senderLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
+    const senderLabel = `${agent.role.name} (${shortAgentId(agent.id)})`;
     target.queueMessage(`[Direct Message from ${senderLabel}]\n${content}`);
 
     // Acknowledge to sender
-    agent.sendMessage(`[System] ✉️ Direct message sent to ${target.role.name} (${target.id.slice(0, 8)}).`);
+    agent.sendMessage(`[System] ✉️ Direct message sent to ${target.role.name} (${shortAgentId(target.id)}).`);
 
     // Log the peer communication
     ctx.activityLedger.log(
       agent.id,
       agent.role.id,
       'message_sent',
-      `DM to ${target.role.id} (${target.id.slice(0, 8)}): ${content.slice(0, 100)}`,
+      `DM to ${target.role.id} (${shortAgentId(target.id)}): ${content.slice(0, 100)}`,
       { type: 'direct_message', targetId: target.id, targetRole: target.role.id },
       ctx.getProjectIdForAgent(agent.id) ?? '',
     );
@@ -83,7 +84,7 @@ function handleQueryPeers(ctx: CommandHandlerContext, agent: Agent): void {
   let msg = '== Active Peers ==\n';
   for (const peer of peers) {
     const statusIcon = peer.status === 'running' ? '🟢' : peer.status === 'idle' ? '🟡' : '⚪';
-    msg += `${statusIcon} ${peer.role.name} (${peer.id.slice(0, 8)}) — ${peer.status}`;
+    msg += `${statusIcon} ${peer.role.name} (${shortAgentId(peer.id)}) — ${peer.status}`;
     if (peer.task) msg += ` — "${peer.task.slice(0, 60)}"`;
     msg += '\n';
   }

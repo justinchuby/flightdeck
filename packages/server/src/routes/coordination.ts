@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { shortAgentId } from '@flightdeck/shared';
 import { normalize, isAbsolute } from 'node:path';
 import type { ActionType } from '../coordination/activity/ActivityLedger.js';
 import { validateBody, acquireLockSchema } from '../validation/schemas.js';
@@ -253,7 +254,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
       }));
       return {
         id,
-        shortId: id.slice(0, 8),
+        shortId: shortAgentId(id),
         role: meta.role,
         model: meta.model,
         createdAt: meta.createdAt,

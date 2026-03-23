@@ -14,6 +14,7 @@ import {
   groupMessageSchema,
   reactSchema,
 } from './commandSchemas.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Regex patterns ──────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ export function maybeAutoCreateGroup(
 
     const names = [...agentIds].map(id => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
     ctx.chatGroupRegistry.sendMessage(groupName, lead.id, 'system', 'system',
       `Auto-created coordination group for parallel ${keyword} work. Members: ${names}`);
@@ -186,7 +187,7 @@ function handleAgentMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
       toRole: targetAgent.role.name,
       content: msg.content,
     });
-    ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${targetId.slice(0, 8)})`, {
+    ctx.activityLedger.log(agent.id, agent.role.id, 'message_sent', `Message → ${targetAgent.role.name} (${shortAgentId(targetId)})`, {
       toAgentId: targetId, toRole: targetAgent.role.id,
     }, ctx.getProjectIdForAgent(agent.id) ?? '');
   } catch (err) {
@@ -219,7 +220,7 @@ function handleBroadcast(ctx: CommandHandlerContext, agent: Agent, data: string)
 
     logger.info({ module: 'comms', msg: 'Broadcast sent', recipientCount: recipients.length, contentPreview: msg.content.slice(0, 80) });
 
-    const fromLabel = `${agent.role.name} (${agent.id.slice(0, 8)})`;
+    const fromLabel = `${agent.role.name} (${shortAgentId(agent.id)})`;
     if (recipients.length === 0) {
       agent.sendMessage('[System] Warning: Broadcast sent to 0 agents — no other agents exist yet.');
     }
@@ -281,7 +282,7 @@ function handleCreateGroup(ctx: CommandHandlerContext, agent: Agent, data: strin
     const group = ctx.chatGroupRegistry.create(leadId, req.name, resolvedIds, agent.projectId, req.roles);
     const memberNames = group.memberIds.map((id: string) => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
     agent.sendMessage(`[System] Group "${req.name}" created with ${group.memberIds.length} members: ${memberNames}.`);
 
@@ -333,16 +334,16 @@ function handleAddToGroup(ctx: CommandHandlerContext, agent: Agent, data: string
           const allMembers = ctx.chatGroupRegistry.getMembers(req.group, leadId);
           const memberNames = allMembers.map((id) => {
             const a = ctx.getAgent(id);
-            return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+            return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
           }).join(', ');
           let historyText = '';
           if (history.length > 0) {
-            historyText = '\nRecent messages:\n' + history.map((m) => `  [${m.fromRole} (${m.fromAgentId.slice(0, 8)})]: ${m.content}`).join('\n');
+            historyText = '\nRecent messages:\n' + history.map((m) => `  [${m.fromRole} (${shortAgentId(m.fromAgentId)})]: ${m.content}`).join('\n');
           }
           member.sendMessage(`[System] You've been added to group "${req.group}". Members: ${memberNames}.${historyText}\nSend messages: ⟦⟦ GROUP_MESSAGE {"group": "${req.group}", "content": "..."} ⟧⟧`);
         }
       }
-      const names = added.map((id) => ctx.getAgent(id)?.role.name || id.slice(0, 8)).join(', ');
+      const names = added.map((id) => ctx.getAgent(id)?.role.name || shortAgentId(id)).join(', ');
       agent.sendMessage(`[System] Added ${names} to group "${req.group}".`);
     } else {
       agent.sendMessage(`[System] No new members added to "${req.group}" (already members or not found).`);
@@ -366,7 +367,7 @@ function handleRemoveFromGroup(ctx: CommandHandlerContext, agent: Agent, data: s
 
     const removed = ctx.chatGroupRegistry.removeMembers(leadId, req.group, resolvedIds);
     if (removed.length > 0) {
-      const names = removed.map((id) => ctx.getAgent(id)?.role.name || id.slice(0, 8)).join(', ');
+      const names = removed.map((id) => ctx.getAgent(id)?.role.name || shortAgentId(id)).join(', ');
       agent.sendMessage(`[System] Removed ${names} from group "${req.group}".`);
     }
   } catch (err) { logger.debug({ module: 'command', msg: 'Parse failed', command: 'REMOVE_FROM_GROUP', err: (err as Error).message }); }
@@ -397,7 +398,7 @@ function handleGroupMessage(ctx: CommandHandlerContext, agent: Agent, data: stri
       if (memberId === agent.id) continue;
       const member = ctx.getAgent(memberId);
       if (member && (member.status === 'running' || member.status === 'idle')) {
-        member.sendMessage(`[Group "${req.group}" — ${agent.role.name} (${agent.id.slice(0, 8)})]: ${req.content}`);
+        member.sendMessage(`[Group "${req.group}" — ${agent.role.name} (${shortAgentId(agent.id)})]: ${req.content}`);
         delivered++;
       }
     }
@@ -420,7 +421,7 @@ function handleListGroups(ctx: CommandHandlerContext, agent: Agent): void {
   const lines = groups.map((g) => {
     const memberNames = g.memberIds.map((id: string) => {
       const a = ctx.getAgent(id);
-      return a ? `${a.role.name} (${id.slice(0, 8)})` : id.slice(0, 8);
+      return a ? `${a.role.name} (${shortAgentId(id)})` : shortAgentId(id);
     }).join(', ');
     const { messageCount, lastMessage } = ctx.chatGroupRegistry.getGroupSummary(g.name, g.leadId);
     const msgInfo = messageCount > 0
@@ -457,23 +458,23 @@ async function handleInterrupt(ctx: CommandHandlerContext, agent: Agent, data: s
 
     // Only parent agents can interrupt their children
     if (target.parentId !== agent.id) {
-      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${target.id.slice(0, 8)}) — you are not their parent agent.`);
+      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${shortAgentId(target.id)}) — you are not their parent agent.`);
       return;
     }
 
     // Cannot interrupt a terminated agent
     if (isTerminalStatus(target.status)) {
-      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${target.id.slice(0, 8)}) — agent is ${target.status}.`);
+      agent.sendMessage(`[System] Cannot interrupt ${target.role.name} (${shortAgentId(target.id)}) — agent is ${target.status}.`);
       return;
     }
 
-    const formatted = `[PRIORITY — Interrupt from ${agent.role.name} (${agent.id.slice(0, 8)})]\n${req.content}\n\nThis message interrupted your current work. Address it immediately.`;
+    const formatted = `[PRIORITY — Interrupt from ${agent.role.name} (${shortAgentId(agent.id)})]\n${req.content}\n\nThis message interrupted your current work. Address it immediately.`;
     await target.interruptWithMessage(formatted);
 
-    agent.sendMessage(`[System] Interrupted ${target.role.name} (${target.id.slice(0, 8)}). New instructions delivered.`);
+    agent.sendMessage(`[System] Interrupted ${target.role.name} (${shortAgentId(target.id)}). New instructions delivered.`);
 
     ctx.activityLedger.log(agent.id, agent.role.id, 'agent_interrupted',
-      `Interrupted ${target.role.name} (${target.id.slice(0, 8)}): ${req.content.slice(0, 120)}`,
+      `Interrupted ${target.role.name} (${shortAgentId(target.id)}): ${req.content.slice(0, 120)}`,
       { toAgentId: target.id, toRole: target.role.id },
       ctx.getProjectIdForAgent(agent.id) ?? '');
 

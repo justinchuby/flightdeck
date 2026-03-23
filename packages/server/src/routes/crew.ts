@@ -8,6 +8,7 @@
  *   GET  /crews/:crewId         — crew details
  */
 import { Router } from 'express';
+import { shortAgentId } from '@flightdeck/shared';
 import { logger } from '../utils/logger.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { isTerminalStatus } from '../agents/Agent.js';
@@ -405,7 +406,7 @@ export function crewRoutes(ctx: AppContext): Router {
         return res.status(404).json({ error: `Agent ${agentId} not found` });
       }
 
-      const newId = `${agentId.slice(0, 8)}-clone-${Date.now().toString(36)}`;
+      const newId = `${shortAgentId(agentId)}-clone-${Date.now().toString(36)}`;
       const clone = agentRoster.cloneAgent(agentId, newId);
       if (!clone) {
         return res.status(500).json({ error: 'Failed to clone agent' });

@@ -8,6 +8,7 @@ import type { FileLockRegistry } from '../files/FileLockRegistry.js';
 import { sessionRetros } from '../../db/schema.js';
 import { logger } from '../../utils/logger.js';
 import { asAgentId } from '../../types/brandedIds.js';
+import { shortAgentId } from '@flightdeck/shared';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ export class SessionRetro {
       .values({ leadId, data: JSON.stringify(data) })
       .run();
 
-    logger.info('retro', `Session retro generated for lead ${leadId.slice(0, 8)}: ${data.scorecards.length} agents, ${data.summary.totalEvents} events`);
+    logger.info('retro', `Session retro generated for lead ${shortAgentId(leadId)}: ${data.scorecards.length} agents, ${data.summary.totalEvents} events`);
     return data;
   }
 
@@ -237,7 +238,7 @@ export class SessionRetro {
         role: s.role,
         type: 'idle_time',
         value: s.idleTimeMs,
-        description: `${s.role} (${s.agentId.slice(0, 8)}) was idle for ${idleMin}min`,
+        description: `${s.role} (${shortAgentId(s.agentId)}) was idle for ${idleMin}min`,
       });
     }
 
@@ -253,7 +254,7 @@ export class SessionRetro {
         role: s.role,
         type: 'context_pressure',
         value: s.contextUtilization,
-        description: `${s.role} (${s.agentId.slice(0, 8)}) used ${pct}% of context window`,
+        description: `${s.role} (${shortAgentId(s.agentId)}) used ${pct}% of context window`,
       });
     }
 
@@ -265,7 +266,7 @@ export class SessionRetro {
           role: s.role,
           type: 'stuck',
           value: s.activeTimeMs,
-          description: `${s.role} (${s.agentId.slice(0, 8)}) ran for ${Math.round(s.activeTimeMs / 60_000)}min with no completed tasks`,
+          description: `${s.role} (${shortAgentId(s.agentId)}) ran for ${Math.round(s.activeTimeMs / 60_000)}min with no completed tasks`,
         });
       }
     }

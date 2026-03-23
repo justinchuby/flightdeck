@@ -6,6 +6,7 @@ import { type Server as HttpServer } from 'http';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
+import { shortAgentId } from '@flightdeck/shared';
 import type { ServerConfig } from './config.js';
 import { updateConfig, getConfig } from './config.js';
 import type { AppContext } from './routes/context.js';
@@ -526,7 +527,7 @@ function wireEvents(c: ServiceContainer): void {
   eagerScheduler!.on('task:ready', ({ taskId }: { taskId: string }) => {
     const lead = agentManager.getAll().find(a => a.role?.id === 'lead' && a.status === 'running' && !a.isResuming);
     if (lead) {
-      lead.sendMessage(`[System] ⚡ Eager Scheduler: task now ready: ${taskId.slice(0, 8)}`);
+      lead.sendMessage(`[System] ⚡ Eager Scheduler: task now ready: ${shortAgentId(taskId)}`);
     }
   });
 

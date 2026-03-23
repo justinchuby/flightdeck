@@ -4,6 +4,7 @@
 // project lead, and formats outbound responses.
 
 import { randomInt } from 'node:crypto';
+import { shortAgentId } from '@flightdeck/shared';
 import { logger } from '../utils/logger.js';
 import type { AgentManager } from '../agents/AgentManager.js';
 import type { ProjectRegistry } from '../projects/ProjectRegistry.js';
@@ -594,7 +595,7 @@ export class IntegrationRouter {
     for (const a of agents.slice(0, 30)) {
       const roleStr = typeof a.role === 'string' ? a.role : a.role?.id ?? 'unknown';
       const statusEmoji = a.status === 'running' ? '🟢' : a.status === 'idle' ? '🟡' : '⚪';
-      lines.push(`${statusEmoji} \`${a.id.slice(0, 8)}\` — ${roleStr} (${a.status})`);
+      lines.push(`${statusEmoji} \`${shortAgentId(a.id)}\` — ${roleStr} (${a.status})`);
     }
 
     if (agents.length > 30) {
