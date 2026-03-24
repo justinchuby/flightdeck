@@ -143,11 +143,18 @@ function CrewGroup({ leadId, agents, summary, statusFilter, defaultExpanded = tr
     return a.role.localeCompare(b.role);
   });
 
+  // Effective status prefers real-time liveStatus over DB-persisted status
+  const effectiveStatus = (a: { status: RosterStatus; liveStatus: LiveStatus }): string =>
+    a.liveStatus ?? a.status;
+
   // Apply status filter to agent rows (crew header always shows)
   const visibleAgents = statusFilter === 'active'
-    ? sorted.filter(a => a.status !== 'terminated' && a.status !== 'failed')
+    ? sorted.filter(a => {
+        const s = effectiveStatus(a);
+        return s !== 'terminated' && s !== 'failed' && s !== 'completed';
+      })
     : statusFilter && statusFilter !== 'all'
-      ? sorted.filter(a => a.status === statusFilter)
+      ? sorted.filter(a => effectiveStatus(a) === statusFilter)
       : sorted;
 
   const lead = sorted.find(a => a.agentId === leadId || a.role === 'lead');
