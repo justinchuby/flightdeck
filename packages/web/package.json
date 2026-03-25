@@ -32,7 +32,7 @@
     "d3-array": "^3.2.1",
     "fuse.js": "^7.1.0",
     "highlight.js": "^11.11.1",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.6.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
