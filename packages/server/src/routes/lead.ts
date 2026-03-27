@@ -160,6 +160,13 @@ export function leadRoutes(ctx: AppContext): Router {
     res.json(agent.toJSON());
   });
 
+  router.post('/lead/:id/clear-history', (req, res) => {
+    const agent = agentManager.get(req.params.id);
+    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    const result = agentManager.clearHistory(req.params.id);
+    res.json(result);
+  });
+
   router.get('/lead/:id/decisions', (req, res) => {
     const leadId = req.params.id;
     const decisionLog = agentManager.getDecisionLog();

@@ -121,6 +121,19 @@ export class AgentMessageService {
     }
   }
 
+  /** Clear all conversation history for an agent and start a fresh thread */
+  clearHistory(agentId: string, task?: string): void {
+    // Flush pending buffers first so nothing is lost mid-flight
+    this.flushThinkingMessage(agentId);
+    this.flushAgentMessage(agentId);
+
+    if (!this.conversationStore) return;
+    this.conversationStore.clearByAgent(agentId);
+    // Create a fresh thread so new messages are still persisted
+    const thread = this.conversationStore.createThread(agentId, task);
+    this.agentThreads.set(agentId, thread.id);
+  }
+
   /** Flush all buffered agent messages (e.g. on new client connection) */
   flushAllMessages(): void {
     for (const agentId of this.messageBuffers.keys()) {

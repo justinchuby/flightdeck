@@ -92,6 +92,27 @@ The dashboard opens at `http://localhost:3001`. That's it.
 
 **CLI options:** `--port=4000` · `--host=0.0.0.0` · `--no-browser` · `-v` / `--version` · `-h` / `--help`
 
+### Terminal Control (Flightdeck CLI)
+
+Prefer the terminal over the web dashboard? The `flightdeckcli` command lets you manage projects, agents, tasks, and decisions from the command line:
+
+```bash
+flightdeckcli health              # check server status
+flightdeckcli project list        # list all projects
+flightdeckcli agent list          # list all agents
+flightdeckcli task stats          # show task DAG statistics
+flightdeckcli                     # interactive REPL mode
+```
+
+The CLI is included in the monorepo — no extra install needed. After `npm install && npm run build`, run it with `npx flightdeckcli` from the project root. To make it available globally:
+
+```bash
+npm link --workspace=packages/cli   # one-time setup
+flightdeckcli --help                # works from anywhere
+```
+
+Full command reference: [中文](flightdeckcli_CN.md) · [English](flightdeckcli_EN.md)
+
 <details>
 <summary><strong>Local development setup</strong></summary>
 
@@ -442,6 +463,10 @@ Flightdeck has extensive documentation across guides, references, and design doc
 | [Session Management](packages/docs/guide/session-management.md) | Resume, replay, and manage sessions |
 | [Chat Groups](packages/docs/guide/chat-groups.md) | Multi-agent group communication |
 | [Timeline](packages/docs/guide/timeline.md) | Swim-lane visualization and session replay |
+| **CLI & API** | |
+| [Flightdeck CLI (中文)](flightdeckcli_CN.md) | 终端命令行工具完整参考 |
+| [Flightdeck CLI (English)](flightdeckcli_EN.md) | Terminal CLI command reference |
+| [REST API (Integration)](docs/REST_API.md) | REST API for external agent integration (e.g., OpenClaw) |
 | **Reference** | |
 | [REST API](packages/docs/reference/api.md) | Full REST API reference |
 | [Database Schema](packages/docs/reference/database.md) | SQLite schema and Drizzle ORM |

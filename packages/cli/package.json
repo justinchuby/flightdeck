@@ -1,0 +1,22 @@
+{
+  "name": "@flightdeck/cli",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "description": "Flightdeck CLI — control your AI agent crew from the terminal",
+  "bin": {
+    "flightdeckcli": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.0.0"
+  }
+}
