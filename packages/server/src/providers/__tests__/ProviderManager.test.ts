@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProviderManager } from '../ProviderManager.js';
+import { WHICH_COMMAND } from '../../utils/platform.js';
 import type { Database } from '../../db/database.js';
 
 // ── Mock DB ──────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ describe('ProviderManager', () => {
     it('uses correct binary name from preset', () => {
       exec.mockReturnValue('/usr/bin/agent');
       createManager().detectInstalled('cursor');
-      expect(exec).toHaveBeenCalledWith('which agent');
+      expect(exec).toHaveBeenCalledWith(`${WHICH_COMMAND} agent`);
     });
   });
 
@@ -190,7 +191,7 @@ describe('ProviderManager', () => {
       const result = await createManager().detectInstalledAsync('claude');
       expect(result.installed).toBe(true);
       expect(result.binaryPath).toBe('/usr/local/bin/claude');
-      expect(execAsync).toHaveBeenCalledWith('which', ['claude-agent-acp']);
+      expect(execAsync).toHaveBeenCalledWith(WHICH_COMMAND, ['claude-agent-acp']);
     });
 
     it('detects missing CLI binary', async () => {
@@ -295,7 +296,7 @@ describe('ProviderManager', () => {
 
       // which + version on first call only (2 calls); second call is cached
       const whichCalls = execAsync.mock.calls.filter(
-        (c: string[]) => c[0] === 'which',
+        (c: string[]) => c[0] === WHICH_COMMAND,
       );
       expect(whichCalls).toHaveLength(1);
     });
@@ -309,7 +310,7 @@ describe('ProviderManager', () => {
       await mgr.getProviderStatusAsync('claude');
 
       const whichCalls = execAsync.mock.calls.filter(
-        (c: string[]) => c[0] === 'which',
+        (c: string[]) => c[0] === WHICH_COMMAND,
       );
       expect(whichCalls).toHaveLength(2);
     });
@@ -324,7 +325,7 @@ describe('ProviderManager', () => {
 
       // Two rounds of `which` calls (8 providers each)
       const whichCalls = execAsync.mock.calls.filter(
-        (c: string[]) => c[0] === 'which',
+        (c: string[]) => c[0] === WHICH_COMMAND,
       );
       expect(whichCalls).toHaveLength(16);
     });
@@ -339,7 +340,7 @@ describe('ProviderManager', () => {
       await mgr.getProviderStatusAsync('claude');
 
       const whichCalls = execAsync.mock.calls.filter(
-        (c: string[]) => c[0] === 'which',
+        (c: string[]) => c[0] === WHICH_COMMAND,
       );
       expect(whichCalls).toHaveLength(2);
     });
@@ -414,7 +415,7 @@ describe('ProviderManager', () => {
 
       // Mock: claude binary is installed
       exec.mockImplementation((cmd: string) => {
-        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
         throw new Error('not found');
       });
 
@@ -429,7 +430,7 @@ describe('ProviderManager', () => {
 
       // Mock: copilot binary is NOT installed, but claude is
       exec.mockImplementation((cmd: string) => {
-        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
         throw new Error('not found');
       });
 
@@ -447,7 +448,7 @@ describe('ProviderManager', () => {
 
       // Mock: copilot is installed but disabled
       exec.mockImplementation((cmd: string) => {
-        if (cmd.startsWith('which ')) return '/usr/local/bin/some-binary';
+        if (cmd.startsWith(`${WHICH_COMMAND} `)) return '/usr/local/bin/some-binary';
         throw new Error('not found');
       });
 
@@ -478,7 +479,7 @@ describe('ProviderManager', () => {
 
       // Mock: only claude is installed
       exec.mockImplementation((cmd: string) => {
-        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
         throw new Error('not found');
       });
 
@@ -510,7 +511,7 @@ describe('ProviderManager', () => {
     it('uses configured provider when installed (providers enabled by default)', () => {
       const configStore = createMockConfigStore({ providerId: 'claude' });
       exec.mockImplementation((cmd: string) => {
-        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
         throw new Error('not found');
       });
 
@@ -524,7 +525,7 @@ describe('ProviderManager', () => {
       // has no explicit entry. isProviderEnabled should default to true.
       const configStore = createMockConfigStore({ providerId: 'claude', providerSettings: {} });
       exec.mockImplementation((cmd: string) => {
-        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
         throw new Error('not found');
       });
 
@@ -539,7 +540,7 @@ describe('ProviderManager', () => {
         providerRanking: ['copilot', 'claude'],
       });
       exec.mockImplementation((cmd: string) => {
-        if (cmd.startsWith('which ')) return '/usr/local/bin/some-binary';
+        if (cmd.startsWith(`${WHICH_COMMAND} `)) return '/usr/local/bin/some-binary';
         throw new Error('not found');
       });
 
@@ -555,7 +556,7 @@ describe('ProviderManager', () => {
         providerRanking: ['copilot', 'claude', 'gemini'],
       });
       exec.mockImplementation((cmd: string) => {
-        if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
         throw new Error('not found');
       });
 
@@ -576,7 +577,7 @@ describe('ProviderManager', () => {
       // No DB, no configStore — only exec
       const mgr = new ProviderManager({
         execCommand: (cmd: string) => {
-          if (cmd === 'which claude-agent-acp') return '/usr/local/bin/claude-agent-acp';
+          if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
           throw new Error('not found');
         },
       });
