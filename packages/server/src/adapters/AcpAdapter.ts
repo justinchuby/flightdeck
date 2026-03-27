@@ -13,6 +13,7 @@ import { spawn, execFileSync, ChildProcess } from 'child_process';
 import { Readable, Writable } from 'stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { logger } from '../utils/logger.js';
+import { WHICH_COMMAND } from '../utils/platform.js';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -171,8 +172,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
 
   private validateCliCommand(command: string): void {
     try {
-      const checkCmd = process.platform === 'win32' ? 'where' : 'which';
-      execFileSync(checkCmd, [command], { timeout: 3000, stdio: 'ignore' });
+      execFileSync(WHICH_COMMAND, [command], { timeout: 3000, stdio: 'ignore' });
     } catch {
       throw new Error(
         `CLI binary "${command}" not found in PATH. ` +

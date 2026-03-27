@@ -14,6 +14,7 @@ import {
   PROVIDER_REGISTRY, PROVIDER_IDS,
   type ProviderId, type ProviderDefinition,
 } from '@flightdeck/shared';
+import { WHICH_COMMAND } from '../utils/platform.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -94,9 +95,8 @@ export { isValidProviderId } from '@flightdeck/shared';
  * Uses `which` on Unix, `where` on Windows.
  */
 async function isBinaryAvailable(binary: string): Promise<boolean> {
-  const checkCmd = process.platform === 'win32' ? 'where' : 'which';
   try {
-    await execFileAsync(checkCmd, [binary], { timeout: 3000 });
+    await execFileAsync(WHICH_COMMAND, [binary], { timeout: 3000 });
     return true;
   } catch {
     return false;

@@ -18,6 +18,7 @@ import { promisify } from 'node:util';
 import type { Database } from '../db/database.js';
 import type { ConfigStore } from '../config/ConfigStore.js';
 import { PROVIDER_PRESETS, type ProviderId } from '../adapters/presets.js';
+import { WHICH_COMMAND } from '../utils/platform.js';
 import { PROVIDER_REGISTRY, PROVIDER_IDS } from '@flightdeck/shared';
 import { logger } from '../utils/logger.js';
 
@@ -139,7 +140,7 @@ export class ProviderManager {
     if (!preset) throw new Error(`Unknown provider: ${provider}`);
 
     try {
-      const path = this.exec(`which ${preset.binary}`);
+      const path = this.exec(`${WHICH_COMMAND} ${preset.binary}`);
       return { installed: true, binaryPath: path };
     } catch {
       return { installed: false, binaryPath: null };
@@ -211,7 +212,7 @@ export class ProviderManager {
     if (!preset) throw new Error(`Unknown provider: ${provider}`);
 
     try {
-      const path = await this.execAsync('which', [preset.binary]);
+      const path = await this.execAsync(WHICH_COMMAND, [preset.binary]);
       return { installed: true, binaryPath: path };
     } catch {
       return { installed: false, binaryPath: null };
