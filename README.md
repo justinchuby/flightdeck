@@ -463,6 +463,10 @@ Flightdeck has extensive documentation across guides, references, and design doc
 | [Session Management](packages/docs/guide/session-management.md) | Resume, replay, and manage sessions |
 | [Chat Groups](packages/docs/guide/chat-groups.md) | Multi-agent group communication |
 | [Timeline](packages/docs/guide/timeline.md) | Swim-lane visualization and session replay |
+| **CLI & API** | |
+| [Flightdeck CLI (中文)](flightdeckcli_CN.md) | 终端命令行工具完整参考 |
+| [Flightdeck CLI (English)](flightdeckcli_EN.md) | Terminal CLI command reference |
+| [REST API (Integration)](docs/REST_API.md) | REST API for external agent integration (e.g., OpenClaw) |
 | **Reference** | |
 | [REST API](packages/docs/reference/api.md) | Full REST API reference |
 | [Database Schema](packages/docs/reference/database.md) | SQLite schema and Drizzle ORM |
