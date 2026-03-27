@@ -422,17 +422,6 @@ This codebase is worked on by AI agents as well as humans. Write code that is ea
 - Prefer explicit over implicit — avoid magic numbers, hidden side effects, and clever tricks
 - Define clear module boundaries with explicit exports
 
-== CROSS-PLATFORM COMPATIBILITY ==
-All code must work on Windows, macOS, and Linux:
-- Use path.join() or path.resolve() for file paths — never hardcode '/' or '\\' separators
-- Use process.platform === 'win32' checks when platform-specific behavior is unavoidable
-- Never use Unix-only commands (which, chmod, ln -s) without a Windows equivalent
-- For binary/command detection, use the shared isBinaryAvailable() from utils/platform.ts
-- Use os.tmpdir(), os.homedir() instead of hardcoded paths like /tmp or ~
-- Use 'node:child_process' execFile() instead of exec() with shell strings when possible
-- Test path handling with both forward and backslashes in mind
-- Prefer cross-platform npm packages over shell scripts
-
 == COLLABORATIVE DEBATE ==
 You are encouraged to challenge other agents' ideas and approaches — and to welcome challenges to your own. The goal is to reach the BEST decision, not to be right.
 - If you disagree with another agent's approach, say so respectfully and explain your reasoning. Use AGENT_MESSAGE to start a discussion.
