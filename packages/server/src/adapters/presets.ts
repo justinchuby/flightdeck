@@ -8,15 +8,11 @@
  * NOTE: Preset data is derived from the central ProviderRegistry in @flightdeck/shared.
  * To add a new provider, update the registry — presets are auto-generated.
  */
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import {
   PROVIDER_REGISTRY, PROVIDER_IDS,
   type ProviderId, type ProviderDefinition,
 } from '@flightdeck/shared';
-import { WHICH_COMMAND } from '../utils/platform.js';
-
-const execFileAsync = promisify(execFile);
+import { isBinaryAvailable } from '../utils/platform.js';
 
 // Re-export ProviderId from the shared registry (canonical source)
 export type { ProviderId } from '@flightdeck/shared';
@@ -89,19 +85,6 @@ export function listPresets(): ProviderPreset[] {
 export { isValidProviderId } from '@flightdeck/shared';
 
 // ── Detection ───────────────────────────────────────────────
-
-/**
- * Check if a binary is available on PATH.
- * Uses `which` on Unix, `where` on Windows.
- */
-async function isBinaryAvailable(binary: string): Promise<boolean> {
-  try {
-    await execFileAsync(WHICH_COMMAND, [binary], { timeout: 3000 });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /** Signature for the binary checker function used by detectInstalledProviders. */
 export type BinaryChecker = (binary: string) => Promise<boolean>;

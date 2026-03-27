@@ -9,11 +9,11 @@
  * new interface boundary.
  */
 import { EventEmitter } from 'events';
-import { spawn, execFileSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { Readable, Writable } from 'stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { logger } from '../utils/logger.js';
-import { WHICH_COMMAND } from '../utils/platform.js';
+import { isBinaryAvailableSync } from '../utils/platform.js';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -171,9 +171,7 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
   }
 
   private validateCliCommand(command: string): void {
-    try {
-      execFileSync(WHICH_COMMAND, [command], { timeout: 3000, stdio: 'ignore' });
-    } catch {
+    if (!isBinaryAvailableSync(command)) {
       throw new Error(
         `CLI binary "${command}" not found in PATH. ` +
         `Install the provider CLI or set the binary path in your config.`,
