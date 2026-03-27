@@ -14,14 +14,10 @@ import { PassThrough } from 'stream';
 // ── Mock child_process ────────────────────────────────────────────
 const mockSpawn = vi.fn();
 const mockExecFileSync = vi.fn();
-const mockExecFile = vi.fn((_cmd: string, _args: string[], _opts: any, cb?: Function) => {
-  if (cb) cb(null, '', '');
-  return { on: vi.fn(), stdout: null, stderr: null };
-});
 vi.mock('child_process', () => ({
   spawn: (...args: any[]) => mockSpawn(...args),
   execFileSync: (...args: any[]) => mockExecFileSync(...args),
-  execFile: (...args: any[]) => mockExecFile(...args),
+  execFile: vi.fn(),
   ChildProcess: EventEmitter,
 }));
 
