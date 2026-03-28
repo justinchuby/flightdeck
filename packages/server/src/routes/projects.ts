@@ -14,6 +14,7 @@ import { dagTasks, projectSessions, chatGroups, chatGroupMessages, chatGroupMemb
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { slugify } from '../utils/projectId.js';
 import { parseIntBounded } from '../utils/validation.js';
+import { getCrewDescendants } from '@flightdeck/shared';
 import { ResumeError } from '../agents/SessionResumeManager.js';
 
 const PROJECT_TITLE_MAX = 100;
@@ -144,15 +145,17 @@ export function projectsRoutes(ctx: AppContext): Router {
     const sessions = projectRegistry.getSessions(project.id);
     const taskDAG = agentManager.getTaskDAG();
     const rosterAgents = ctx.agentRoster?.getAllAgents() ?? [];
+    // Precompute hierarchy shape once for all sessions
+    const rosterAsHierarchy = rosterAgents.map(a => ({
+      id: a.agentId,
+      parentId: (a.metadata ?? {}).parentId as string | undefined,
+    }));
 
     const detailed = sessions.map((session: any) => {
-      // Agent composition: filter roster by metadata.parentId === leadId OR agentId === leadId
+      // Agent composition: filter roster by hierarchy (lead + all descendants)
+      const descendantIds = new Set(getCrewDescendants(session.leadId, rosterAsHierarchy).map(a => a.id));
       const agents = rosterAgents
-        .filter(a => {
-          if (a.agentId === session.leadId) return true;
-          const meta = a.metadata ?? {};
-          return meta.parentId === session.leadId;
-        })
+        .filter(a => a.agentId === session.leadId || descendantIds.has(a.agentId))
         .map(a => ({
           role: a.role,
           model: a.model || 'unknown',

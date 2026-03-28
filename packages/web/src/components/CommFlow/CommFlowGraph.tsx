@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useLeadStore, type AgentComm } from '../../stores/leadStore';
 import type { AgentInfo } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
+import { getCrewMembers } from '@flightdeck/shared';
 
 const EMPTY_COMMS: AgentComm[] = [];
 
@@ -196,7 +197,7 @@ export function CommFlowGraph({ leadId, width = 500, height = 400, agents: agent
   const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
 
   const teamAgents = useMemo(
-    () => agents.filter((a) => a.parentId === leadId || a.id === leadId),
+    () => leadId ? getCrewMembers(leadId, agents) : [],
     [agents, leadId],
   );
 
