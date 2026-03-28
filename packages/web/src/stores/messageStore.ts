@@ -66,6 +66,9 @@ interface MessageStoreState {
   /** Merge history messages, deduplicating against existing */
   mergeHistory: (channelId: string, history: AcpTextChunk[]) => void;
 
+  /** Prepend older messages to the beginning of a channel (for pagination) */
+  prependHistory: (channelId: string, older: AcpTextChunk[]) => void;
+
   // ── Lifecycle ───────────────────────────────────────────────────
 
   /** Initialize a channel (no-op if exists) */
@@ -156,6 +159,21 @@ export const useMessageStore = create<MessageStoreState>((set, get) => ({
         return ts > latestHistTs || (ts >= latestHistTs && !histIds.has(messageId(m)));
       });
       const merged = [...history, ...liveOnly];
+      return {
+        channels: {
+          ...s.channels,
+          [channelId]: { ...ch, messages: merged, knownIds: buildIdSet(merged) },
+        },
+      };
+    }),
+
+  prependHistory: (channelId, older) =>
+    set((s) => {
+      const ch = s.channels[channelId] || emptyChannel();
+      // Filter out messages we already have
+      const newMsgs = older.filter((m) => !ch.knownIds.has(messageId(m)));
+      if (newMsgs.length === 0) return s;
+      const merged = [...newMsgs, ...ch.messages];
       return {
         channels: {
           ...s.channels,
