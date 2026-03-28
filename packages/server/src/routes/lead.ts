@@ -6,6 +6,7 @@ import { logger } from '../utils/logger.js';
 import { validateBody, leadMessageSchema } from '../validation/schemas.js';
 import { spawnLimiter, messageLimiter } from './context.js';
 import type { AppContext } from './context.js';
+import { badRequest, notFound, conflict, internalError, serviceUnavailable, tooManyRequests, forbidden } from '../errors/index.js';
 
 /** Build ContentBlock array from text + optional attachments */
 function buildContentBlocks(text: string, attachments?: Array<{ name: string; mimeType: string; data: string }>, supportsImages = true): ContentBlock[] {
@@ -30,7 +31,7 @@ export function leadRoutes(ctx: AppContext): Router {
   router.post('/lead/start', spawnLimiter, (req, res) => {
     const { task, name, model, cwd, sessionId: resumeSessionId, projectId } = req.body;
     const role = roleRegistry.get('lead');
-    if (!role) return res.status(500).json({ error: 'Project Lead role not found' });
+    if (!role) throw internalError('Project Lead role not found');
 
     let resolvedProjectId: string | undefined;
     let resumingProject = false;
@@ -92,13 +93,12 @@ export function leadRoutes(ctx: AppContext): Router {
       agentManager.autoSpawnSecretary(agent);
 
       res.status(201).json(agent.toJSON());
-    } catch (err: any) {
-      // Clean up orphan project row if spawn failed after project creation
+    } catch (err) {
       if (resolvedProjectId && projectRegistry && !resumingProject) {
         try { projectRegistry.delete(resolvedProjectId); } catch { /* best-effort */ }
       }
-      logger.error('lead', `Failed to start project: ${err.message}`);
-      res.status(429).json({ error: err.message });
+      logger.error('lead', `Failed to start project: ${(err as Error).message}`);
+      throw tooManyRequests((err as Error).message);
     }
   });
 
@@ -115,14 +115,14 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.get('/lead/:id', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    if (!agent || agent.role.id !== 'lead') throw notFound('Lead not found');
     res.json(agent.toJSON());
   });
 
   router.post('/lead/:id/message', messageLimiter, validateBody(leadMessageSchema), async (req, res) => {
     const { text, mode = 'interrupt', attachments } = req.body;
     const agent = agentManager.get(req.params.id as string);
-    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    if (!agent || agent.role.id !== 'lead') throw notFound('Lead not found');
 
     agent.lastHumanMessageAt = new Date();
     agent.lastHumanMessageText = text.slice(0, 200);
@@ -148,7 +148,7 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.patch('/lead/:id', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    if (!agent || agent.role.id !== 'lead') throw notFound('Lead not found');
     const { cwd, projectName } = req.body;
     if (cwd !== undefined) {
       agent.cwd = cwd;
@@ -180,7 +180,7 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.post('/lead/:id/groups', (req, res) => {
     const { name, memberIds } = req.body;
-    if (!name) return res.status(400).json({ error: 'name required' });
+    if (!name) throw badRequest('name required');
     const chatGroups = agentManager.getChatGroupRegistry();
     const leadId = req.params.id;
     const members = Array.isArray(memberIds) ? memberIds : [];
@@ -189,8 +189,8 @@ export function leadRoutes(ctx: AppContext): Router {
     try {
       const group = chatGroups.create(leadId, name, members);
       res.status(201).json(group);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
+    } catch (err) {
+      throw badRequest((err as Error).message);
     }
   });
 
@@ -202,17 +202,17 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.post('/lead/:id/groups/:name/messages', (req, res) => {
     const { content } = req.body;
-    if (!content) return res.status(400).json({ error: 'content required' });
+    if (!content) throw badRequest('content required');
     const chatGroups = agentManager.getChatGroupRegistry();
     const leadId = req.params.id;
     const groupName = req.params.name;
     if (!chatGroups.exists(groupName, leadId)) {
-      return res.status(404).json({ error: 'Group not found' });
+      throw notFound('Group not found');
     }
     // Add human as member if not already (human can join any group)
     chatGroups.addMembers(leadId, groupName, ['human']);
     const message = chatGroups.sendMessage(groupName, leadId, 'human', 'Human User', content);
-    if (!message) return res.status(500).json({ error: 'Failed to send message' });
+    if (!message) throw internalError('Failed to send message');
 
     // Deliver to agent members and wake idle agents
     const members = chatGroups.getMembers(groupName, leadId).filter((id: string) => id !== 'human');
@@ -229,7 +229,7 @@ export function leadRoutes(ctx: AppContext): Router {
   // --- Reactions ---
   router.post('/lead/:id/groups/:name/messages/:messageId/reactions', (req, res) => {
     const { emoji } = req.body;
-    if (!emoji || typeof emoji !== 'string' || emoji.length > 8) return res.status(400).json({ error: 'emoji required (max 8 chars)' });
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 8) throw badRequest('emoji required (max 8 chars)');
     const chatGroups = agentManager.getChatGroupRegistry();
     const success = chatGroups.addReaction(req.params.messageId, 'human', emoji);
     res.json({ success });
@@ -247,7 +247,7 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.get('/lead/:id/dag', (req, res) => {
     const agent = agentManager.get(req.params.id);
-    if (!agent || agent.role.id !== 'lead') return res.status(404).json({ error: 'Lead not found' });
+    if (!agent || agent.role.id !== 'lead') throw notFound('Lead not found');
     const includeArchived = req.query.includeArchived === 'true';
     const status = agentManager.getTaskDAG().getStatus(agent.id, undefined, { includeArchived });
     res.json(status);
@@ -262,7 +262,7 @@ export function leadRoutes(ctx: AppContext): Router {
       res.json(tracker.getAgentCosts(projectId));
     } catch (err) {
       logger.error({ module: 'costs', msg: 'Failed to get agent costs', err: (err as Error).message });
-      res.status(500).json({ error: 'Failed to retrieve agent cost data' });
+      throw internalError('Failed to retrieve agent cost data');
     }
   });
 
@@ -275,7 +275,7 @@ export function leadRoutes(ctx: AppContext): Router {
       res.json(tracker.getTaskCosts(leadId, projectId));
     } catch (err) {
       logger.error({ module: 'costs', msg: 'Failed to get task costs', err: (err as Error).message });
-      res.status(500).json({ error: 'Failed to retrieve task cost data' });
+      throw internalError('Failed to retrieve task cost data');
     }
   });
 
@@ -286,7 +286,7 @@ export function leadRoutes(ctx: AppContext): Router {
       res.json(tracker.getAgentTaskCosts(req.params.agentId));
     } catch (err) {
       logger.error({ module: 'costs', msg: 'Failed to get agent task costs', agentId: req.params.agentId, err: (err as Error).message });
-      res.status(500).json({ error: 'Failed to retrieve agent task cost data' });
+      throw internalError('Failed to retrieve agent task cost data');
     }
   });
 
@@ -297,7 +297,7 @@ export function leadRoutes(ctx: AppContext): Router {
       res.json(tracker.getProjectCosts());
     } catch (err) {
       logger.error({ module: 'costs', msg: 'Failed to get project costs', err: (err as Error).message });
-      res.status(500).json({ error: 'Failed to retrieve project cost data' });
+      throw internalError('Failed to retrieve project cost data');
     }
   });
 
@@ -305,12 +305,12 @@ export function leadRoutes(ctx: AppContext): Router {
     const tracker = agentManager.getCostTracker();
     if (!tracker) return res.json([]);
     const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined;
-    if (!projectId) return res.status(400).json({ error: 'projectId query parameter is required' });
+    if (!projectId) throw badRequest('projectId query parameter is required');
     try {
       res.json(tracker.getSessionCosts(projectId));
     } catch (err) {
       logger.error({ module: 'costs', msg: 'Failed to get session costs', projectId, err: (err as Error).message });
-      res.status(500).json({ error: 'Failed to retrieve session cost data' });
+      throw internalError('Failed to retrieve session cost data');
     }
   });
 
@@ -336,28 +336,28 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.post('/timers', (req, res) => {
     const registry = agentManager.getTimerRegistry();
-    if (!registry) return res.status(503).json({ error: 'Timer system not available' });
+    if (!registry) throw serviceUnavailable('Timer system not available');
 
     const { agentId, label, message, delaySeconds, repeat } = req.body;
     if (!agentId || typeof agentId !== 'string') {
-      return res.status(400).json({ error: 'agentId is required' });
+      throw badRequest('agentId is required');
     }
     if (!label || typeof label !== 'string') {
-      return res.status(400).json({ error: 'label is required' });
+      throw badRequest('label is required');
     }
     if (typeof delaySeconds !== 'number' || delaySeconds <= 0 || delaySeconds > 86400) {
-      return res.status(400).json({ error: 'delaySeconds must be a number between 1 and 86400' });
+      throw badRequest('delaySeconds must be a number between 1 and 86400');
     }
 
     const agent = agentManager.get(agentId);
-    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent) throw notFound('Agent not found');
 
     // Project scoping: if projectId provided, verify agent belongs to that project
     const { projectId } = req.body;
     if (projectId && typeof projectId === 'string') {
       const agentProjectId = agentManager.getProjectIdForAgent(agentId);
       if (agentProjectId && agentProjectId !== projectId) {
-        return res.status(403).json({ error: 'Agent does not belong to this project' });
+        throw forbidden('Agent does not belong to this project');
       }
     }
 
@@ -368,7 +368,7 @@ export function leadRoutes(ctx: AppContext): Router {
       agent.parentId ?? null,
     );
     if (!timer) {
-      return res.status(429).json({ error: 'Timer limit reached for this agent (max 20)' });
+      throw tooManyRequests('Timer limit reached for this agent (max 20)');
     }
 
     res.status(201).json({
@@ -388,15 +388,15 @@ export function leadRoutes(ctx: AppContext): Router {
 
   router.delete('/timers/:timerId', (req, res) => {
     const registry = agentManager.getTimerRegistry();
-    if (!registry) return res.status(404).json({ error: 'Timer system not available' });
+    if (!registry) throw notFound('Timer system not available');
 
     const timer = registry.getAllTimers().find(t => t.id === req.params.timerId);
-    if (!timer) return res.status(404).json({ error: 'Timer not found' });
-    if (timer.status !== 'pending') return res.status(409).json({ error: `Timer already ${timer.status}` });
+    if (!timer) throw notFound('Timer not found');
+    if (timer.status !== 'pending') throw conflict(`Timer already ${timer.status}`);
 
     // Web user (operator) can cancel any timer — use the timer's own agentId
     const ok = registry.cancel(timer.id, timer.agentId);
-    if (!ok) return res.status(500).json({ error: 'Cancel failed' });
+    if (!ok) throw internalError('Cancel failed');
     res.json({ success: true });
   });
 

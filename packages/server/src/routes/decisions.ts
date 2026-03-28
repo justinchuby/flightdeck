@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { logger } from '../utils/logger.js';
+import { badRequest, notFound } from '../errors/index.js';
 import type { AppContext } from './context.js';
 
 export function decisionsRoutes(ctx: AppContext): Router {
@@ -28,7 +29,7 @@ export function decisionsRoutes(ctx: AppContext): Router {
     const decisionId = req.params.id as string;
     const { reason } = req.body ?? {};
     const decision = decisionLog.confirm(decisionId);
-    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    if (!decision) throw notFound('Decision not found');
 
     // Check for pending system actions tied to this decision
     const sysAction = agentManager.consumePendingSystemAction(decisionId);
@@ -52,7 +53,7 @@ export function decisionsRoutes(ctx: AppContext): Router {
     const decisionId = req.params.id as string;
     const { reason } = req.body ?? {};
     const decision = decisionLog.reject(decisionId);
-    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    if (!decision) throw notFound('Decision not found');
 
     // Discard any pending system action
     agentManager.consumePendingSystemAction(decisionId);
@@ -71,7 +72,7 @@ export function decisionsRoutes(ctx: AppContext): Router {
   router.post('/decisions/:id/dismiss', (req, res) => {
     const decisionId = req.params.id as string;
     const decision = decisionLog.dismiss(decisionId);
-    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    if (!decision) throw notFound('Decision not found');
     // Discard any pending system action
     agentManager.consumePendingSystemAction(decisionId);
     // No lead notification — dismiss is silent
@@ -80,9 +81,9 @@ export function decisionsRoutes(ctx: AppContext): Router {
 
   router.post('/decisions/:id/respond', (req, res) => {
     const { message } = req.body;
-    if (!message) return res.status(400).json({ error: 'message required' });
+    if (!message) throw badRequest('message required');
     const decision = decisionLog.confirm(req.params.id);
-    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    if (!decision) throw notFound('Decision not found');
     const agent = agentManager.get(decision.agentId);
     if (agent && (agent.status === 'running' || agent.status === 'idle')) {
       agent.sendMessage(`[User feedback on decision "${decision.title}"] ${message}`);
@@ -93,9 +94,9 @@ export function decisionsRoutes(ctx: AppContext): Router {
   // User feedback on a non-confirmation decision (doesn't change status, just notifies the lead)
   router.post('/decisions/:id/feedback', (req, res) => {
     const { message } = req.body;
-    if (!message) return res.status(400).json({ error: 'message required' });
+    if (!message) throw badRequest('message required');
     const decision = decisionLog.getById(req.params.id as string);
-    if (!decision) return res.status(404).json({ error: 'Decision not found' });
+    if (!decision) throw notFound('Decision not found');
     // Send feedback to the lead agent
     const leadId = decision.leadId || decision.agentId;
     const lead = agentManager.get(leadId);
@@ -109,10 +110,10 @@ export function decisionsRoutes(ctx: AppContext): Router {
   router.post('/decisions/batch', (req, res) => {
     const { ids, action, reason } = req.body ?? {};
     if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'ids must be a non-empty array' });
+      throw badRequest('ids must be a non-empty array');
     }
     if (action !== 'confirm' && action !== 'reject' && action !== 'dismiss') {
-      return res.status(400).json({ error: 'action must be "confirm", "reject", or "dismiss"' });
+      throw badRequest('action must be "confirm", "reject", or "dismiss"');
     }
 
     const result = action === 'confirm'
@@ -156,7 +157,7 @@ export function decisionsRoutes(ctx: AppContext): Router {
   router.post('/decisions/pause-timer', (req, res) => {
     const { paused } = req.body;
     if (typeof paused !== 'boolean') {
-      return res.status(400).json({ error: 'paused must be a boolean' });
+      throw badRequest('paused must be a boolean');
     }
     if (paused) {
       decisionLog.pauseTimers();

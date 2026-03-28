@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { AppContext } from './context.js';
 import { ShareLinkService } from '../coordination/sharing/ShareLinkService.js';
 import { SessionReplay } from '../coordination/sessions/SessionReplay.js';
+import { badRequest, notFound, serviceUnavailable, internalError } from '../errors/index.js';
+import { logger } from '../utils/logger.js';
 
 export function sharedRoutes(ctx: AppContext): Router {
   const { db, agentManager, activityLedger, decisionLog, lockRegistry } = ctx;
@@ -26,7 +28,8 @@ export function sharedRoutes(ctx: AppContext): Router {
       const link = shareService.create({ leadId, expiresInHours, label });
       res.status(201).json(link);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to create share link', detail: (err as Error).message });
+      logger.error({ module: 'shared', msg: 'Failed to create share link', err: (err as Error).message });
+      throw internalError('Failed to create share link');
     }
   });
 
@@ -38,7 +41,7 @@ export function sharedRoutes(ctx: AppContext): Router {
   // DELETE /api/shared/:token — revoke a share link
   router.delete('/shared/:token', (req, res) => {
     const revoked = shareService.revoke(req.params.token);
-    if (!revoked) return res.status(404).json({ error: 'Share link not found' });
+    if (!revoked) throw notFound('Share link not found');
     res.json({ revoked: true });
   });
 
@@ -46,11 +49,11 @@ export function sharedRoutes(ctx: AppContext): Router {
   router.get('/shared/:token', (req, res) => {
     const link = shareService.validate(req.params.token);
     if (!link) {
-      return res.status(404).json({ error: 'Share link not found or expired' });
+      throw notFound('Share link not found or expired');
     }
 
     const r = getReplay();
-    if (!r) return res.status(503).json({ error: 'Replay service not available' });
+    if (!r) throw serviceUnavailable('Replay service not available');
 
     try {
       // Return keyframes + latest state for the shared session
@@ -68,26 +71,28 @@ export function sharedRoutes(ctx: AppContext): Router {
         state,
       });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to load shared replay', detail: (err as Error).message });
+      logger.error({ module: 'shared', msg: 'Failed to load shared replay', err: (err as Error).message });
+      throw internalError('Failed to load shared replay');
     }
   });
 
   // GET /api/shared/:token/state?at=<ISO> — public replay state at timestamp
   router.get('/shared/:token/state', (req, res) => {
     const link = shareService.validate(req.params.token);
-    if (!link) return res.status(404).json({ error: 'Share link not found or expired' });
+    if (!link) throw notFound('Share link not found or expired');
 
     const timestamp = req.query.at as string;
-    if (!timestamp) return res.status(400).json({ error: 'Missing required query param: at' });
+    if (!timestamp) throw badRequest('Missing required query param: at');
 
     const r = getReplay();
-    if (!r) return res.status(503).json({ error: 'Replay service not available' });
+    if (!r) throw serviceUnavailable('Replay service not available');
 
     try {
       const state = r.getWorldStateAt(link.leadId, timestamp);
       res.json(state);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to reconstruct state', detail: (err as Error).message });
+      logger.error({ module: 'shared', msg: 'Failed to reconstruct state', err: (err as Error).message });
+      throw internalError('Failed to reconstruct state');
     }
   });
 
