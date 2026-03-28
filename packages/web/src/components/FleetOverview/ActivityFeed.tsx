@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AgentInfo } from '../../types';
 import type { ActivityEntry } from './FleetOverview';
 import { shortAgentId } from '../../utils/agentLabel';
+import { formatFullTimestamp } from '../../utils/format';
 
 interface Props {
   activity: ActivityEntry[];
@@ -114,7 +115,7 @@ export function ActivityFeed({ activity, agents }: Props) {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selected.timestamp).toLocaleString()}
+                  {formatFullTimestamp(selected.timestamp)}
                 </span>
                 <button onClick={() => setSelected(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
               </div>
@@ -160,7 +161,7 @@ export function ActivityFeed({ activity, agents }: Props) {
               {/* Timestamp */}
               <div>
                 <span className="text-[10px] text-th-text-muted uppercase tracking-wider">Time</span>
-                <p className="text-xs font-mono text-th-text-muted mt-0.5">{new Date(selected.timestamp).toLocaleString()} ({timeAgo(selected.timestamp)})</p>
+                <p className="text-xs font-mono text-th-text-muted mt-0.5">{formatFullTimestamp(selected.timestamp)} ({timeAgo(selected.timestamp)})</p>
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import type { ScaleTime } from '@visx/vendor/d3-scale';
 import { formatTimestamp } from './formatTimestamp';
 import type { TimeRange } from './formatTimestamp';
 import { shortAgentId } from '../../utils/agentLabel';
+import { formatTime } from '../../utils/format';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -299,7 +300,7 @@ export function CommunicationLinks({
               <span className="text-th-text-muted text-[10px]">
                 {fullRange
                   ? formatTimestamp(new Date(tooltipData.timestamp), fullRange)
-                  : new Date(tooltipData.timestamp).toLocaleTimeString()}
+                  : formatTime(tooltipData.timestamp)}
               </span>
             </div>
             <div className="text-[10px] text-th-text-muted">

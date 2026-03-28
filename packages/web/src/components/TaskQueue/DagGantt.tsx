@@ -29,6 +29,7 @@ export interface DagGanttProps {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 import { dagStatusBar } from '../../utils/statusColors';
+import { formatTime } from '../../utils/format';
 
 const ROW_H   = 28; // bar height in px
 const ROW_GAP = 6;  // vertical gap between rows
@@ -39,7 +40,7 @@ const TIME_AXIS_H = 20; // top offset for time axis labels
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return formatTime(ms, { seconds: true });
 }
 
 function fmtDuration(ms: number): string {

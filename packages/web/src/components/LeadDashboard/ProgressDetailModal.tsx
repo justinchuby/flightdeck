@@ -4,6 +4,7 @@ import type { LeadProgress, Delegation } from '../../types';
 import { agentStatusDot } from '../../utils/statusColors';
 import { shortAgentId } from '../../utils/agentLabel';
 import { AgentReportBlock } from './AgentReportBlock';
+import { formatTime, formatFullTimestamp } from '../../utils/format';
 
 interface ProgressHistoryEntry {
   summary: string;
@@ -120,7 +121,7 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
                   </div>
                 )}
                 <p className="text-[10px] text-th-text-muted font-mono mt-2">
-                  {new Date(latest.timestamp).toLocaleString()}
+                  {formatFullTimestamp(latest.timestamp)}
                 </p>
               </div>
             );
@@ -139,7 +140,7 @@ export function ProgressDetailModal({ progress, progressHistory, onClose }: Prog
                         {snap.completed.length > 0 && <span className="text-purple-500">✓{snap.completed.length}</span>}
                         {snap.inProgress.length > 0 && <span className="text-blue-400">⟳{snap.inProgress.length}</span>}
                         {snap.blocked.length > 0 && <span className="text-red-400">⚠{snap.blocked.length}</span>}
-                        <span>{new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{formatTime(snap.timestamp)}</span>
                       </div>
                     </div>
                   </div>
@@ -196,7 +197,7 @@ export function AgentReportDetailModal({ report, onClose }: AgentReportDetailMod
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs font-mono text-th-text-muted">
-              {new Date(report.timestamp).toLocaleTimeString()}
+              {formatTime(report.timestamp)}
             </span>
             <button type="button" aria-label="Close report" onClick={onClose} className="text-th-text-muted hover:text-th-text">
               <X className="w-4 h-4" />

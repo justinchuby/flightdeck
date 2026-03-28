@@ -11,6 +11,7 @@ import type { HeatmapMessage, CommType as HeatmapCommType } from '../FleetOvervi
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
 import { CommFlowGraph } from '../CommFlow/CommFlowGraph';
 import { AgentDetailPanel } from '../AgentDetailPanel';
+import { formatTime } from '../../utils/format';
 
 // Unified message entry covering both 1:1 comms and group messages
 interface CommEntry {
@@ -172,11 +173,7 @@ function CommsList({ entries }: { entries: CommEntry[] }) {
         .slice()
         .sort((a, b) => b.timestamp - a.timestamp)
         .map((c) => {
-          const time = new Date(c.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          });
+          const time = formatTime(c.timestamp, { seconds: true });
           const isLong = c.content?.length > 120;
           const isExpanded = expandedIds.has(c.id);
           const preview = isLong && !isExpanded ? `${c.content.slice(0, 120)}…` : c.content;

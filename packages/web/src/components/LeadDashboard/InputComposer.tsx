@@ -4,6 +4,7 @@ import type { AcpTextChunk } from '../../types';
 import type { Attachment } from '../../hooks/useAttachments';
 import { AttachmentBar } from '../AttachmentBar';
 import { apiFetch } from '../../hooks/useApi';
+import { formatTime } from '../../utils/format';
 
 interface InputComposerProps {
   input: string;
@@ -58,7 +59,7 @@ export function InputComposer({
                 </button>
               </div>
               <span className="text-[10px] text-th-text-muted">
-                {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                {formatTime(msg.timestamp)}
               </span>
               <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
                 {msg.text}

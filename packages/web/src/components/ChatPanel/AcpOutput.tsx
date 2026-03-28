@@ -11,6 +11,7 @@ import { splitCommandBlocks } from '../../utils/commandParser';
 import { PromptNav, hasUserMention } from '../PromptNav';
 import { splitToolOutput, CollapsibleToolOutput } from '../Shared/toolOutput';
 import { groupTimeline, type TimelineItem, type GroupedTimelineItem } from './groupTimeline';
+import { formatTime } from '../../utils/format';
 
 /** Context providing the current agentId to nested components (avoids O(agents) scans) */
 const AgentIdContext = createContext<string>('');
@@ -111,7 +112,7 @@ function AcpVirtuosoFooter({ context }: { context?: AcpVirtuosoContext }) {
             </button>
           </div>
           <span className="text-[10px] text-th-text-muted">
-            {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            {formatTime(msg.timestamp)}
           </span>
           <div className="max-w-[70%] rounded-lg px-3 py-1.5 bg-blue-600/40 text-blue-600 dark:text-blue-200 font-mono text-sm whitespace-pre-wrap border border-blue-500/30">
             {typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text)}
@@ -401,7 +402,7 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
   if (item.kind === 'agent-group') {
     const group = item;
     const lastMsg = group.messages[group.messages.length - 1];
-    const lastTs = lastMsg.msg.timestamp ? new Date(lastMsg.msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const lastTs = formatTime(lastMsg.msg.timestamp);
     const hasMention = group.messages.some((m) => hasUserMention(typeof m.msg.text === 'string' ? m.msg.text : ''));
     const mentionAttr = hasMention ? { 'data-user-prompt': group.messages[0].index } : {};
 
@@ -450,7 +451,7 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
           .filter((e) => e.kind === 'message' && typeof e.msg.text === 'string' && e.msg.text.startsWith('📨'))
           .map((e, i) => {
             const msg = (e as { kind: 'message'; msg: { text: string; timestamp?: number }; index: number }).msg;
-            const dmTs = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            const dmTs = formatTime(msg.timestamp);
             return <CollapsibleIncomingMessage key={`dm-${i}`} text={msg.text} timestamp={dmTs} />;
           })}
         {/* Remaining system events in collapsible toggle */}
@@ -470,7 +471,7 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
 
   if (item.kind === 'activity') {
     const evt = item.evt;
-    const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = formatTime(evt.timestamp);
     return (
       <div className="flex items-center gap-2 py-0.5 px-1">
         <span className="text-[10px] text-th-text-muted">{time}</span>
@@ -485,7 +486,7 @@ const TimelineRow = memo(function TimelineRow({ item }: { item: GroupedTimelineI
   // Standalone message rendering
   const msg = item.msg;
   const sender = msg.sender ?? 'agent';
-  const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const ts = formatTime(msg.timestamp);
 
   if (sender === 'user') {
     const rawText = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
@@ -600,7 +601,7 @@ function ToolCallBadge({ msg }: { msg: AcpTextChunk }) {
   const status = msg.toolStatus ?? 'in_progress';
   const kind = msg.toolKind ?? '';
   const title = typeof msg.text === 'string' ? msg.text : String(msg.text);
-  const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const ts = formatTime(msg.timestamp);
 
   // Narrow lookup to the current agent's toolCalls — O(agents) find + O(toolCalls) find
   const agentId = useContext(AgentIdContext);
@@ -726,7 +727,7 @@ function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; 
           {events.map((item, i) => {
             if (item.kind === 'activity') {
               const evt = item.evt;
-              const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const time = formatTime(evt.timestamp);
               return (
                 <div key={`sysevt-${i}`} className="flex items-center gap-2 text-[10px] text-th-text-muted">
                   <span>{time}</span>
@@ -743,7 +744,7 @@ function CollapsibleSystemEvents({ events }: { events: Array<{ kind: 'message'; 
               return <ToolCallBadge key={`sysevt-${i}`} msg={msg} />;
             }
             const text = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text);
-            const ts = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            const ts = formatTime(msg.timestamp);
             return (
               <div key={`sysevt-${i}`} className="flex items-center gap-2 text-[10px] text-th-text-muted">
                 <span>{ts}</span>

@@ -3,6 +3,7 @@ import { Group } from '@visx/group';
 import { AreaStack, LinePath } from '@visx/shape';
 import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
+import { formatTime } from '../../utils/format';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -116,10 +117,7 @@ export function ProgressTimeline({ data, width = 800, height = 240 }: ProgressTi
             scale={xScale}
             numTicks={6}
             hideZero
-            tickFormat={(d) => {
-              const date = d instanceof Date ? d : new Date(d as number);
-              return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }}
+            tickFormat={(d) => formatTime(d instanceof Date ? d : new Date(d as number))}
             stroke="#6b7280"
             tickStroke="#6b7280"
             tickLabelProps={() => ({

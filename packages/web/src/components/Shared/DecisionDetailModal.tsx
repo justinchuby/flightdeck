@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Decision } from '../../types';
 import { DECISION_CATEGORY_ICONS } from './DecisionFeedItem';
+import { formatFullTimestamp } from '../../utils/format';
 
 const DECISION_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   confirmed: { label: 'Confirmed', color: 'text-green-400' },
@@ -84,14 +85,14 @@ export function DecisionDetailModal({
             <div>
               <div className="text-xs text-th-text-muted mb-0.5">Timestamp</div>
               <span className="text-xs text-th-text">
-                {new Date(decision.timestamp).toLocaleString()}
+                {formatFullTimestamp(decision.timestamp)}
               </span>
             </div>
             {decision.confirmedAt && (
               <div>
                 <div className="text-xs text-th-text-muted mb-0.5">Confirmed At</div>
                 <span className="text-xs text-th-text">
-                  {new Date(decision.confirmedAt).toLocaleString()}
+                  {formatFullTimestamp(decision.confirmedAt)}
                 </span>
               </div>
             )}
