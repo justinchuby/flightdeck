@@ -54,7 +54,7 @@ describe('TimerDisplay', () => {
 
   it('shows empty state when no timers', async () => {
     await act(async () => { render(<TimerDisplay />); });
-    expect(screen.getByText('No active timers')).toBeTruthy();
+    expect(screen.getByText('No timers')).toBeTruthy();
   });
 
   it('renders timer label and countdown', async () => {
@@ -112,7 +112,12 @@ describe('TimerDisplay', () => {
     setupTimers([active, fired]);
     await act(async () => { render(<TimerDisplay />); });
 
-    // Default: active filter — only active timer shown
+    // Default: all filter — both timers shown
+    expect(screen.getByText('active-timer')).toBeTruthy();
+    expect(screen.getByText('fired-timer')).toBeTruthy();
+
+    // Switch to active
+    fireEvent.click(screen.getByText(/Active/));
     expect(screen.getByText('active-timer')).toBeTruthy();
     expect(screen.queryByText('fired-timer')).toBeNull();
 
