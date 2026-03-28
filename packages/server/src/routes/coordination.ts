@@ -5,7 +5,6 @@ import type { ActionType } from '../coordination/activity/ActivityLedger.js';
 import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
-import { asAgentId } from '../types/brandedIds.js';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -84,28 +83,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
 
   router.get('/coordination/summary', (req, res) => {
     const projectId = req.query.projectId as string | undefined;
-    if (projectId) {
-      const projectAgentIds = new Set(
-        agentManager.getByProject(projectId).map(a => a.id),
-      );
-      const full = activityLedger.getSummary();
-      // Filter summary entries to only include project agents
-      const filtered: Record<string, any> = {};
-      for (const [key, value] of Object.entries(full)) {
-        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-          const scoped: Record<string, any> = {};
-          for (const [agentId, data] of Object.entries(value as Record<string, any>)) {
-            if (projectAgentIds.has(asAgentId(agentId))) scoped[agentId] = data;
-          }
-          filtered[key] = scoped;
-        } else {
-          filtered[key] = value;
-        }
-      }
-      res.json(filtered);
-    } else {
-      res.json(activityLedger.getSummary());
-    }
+    res.json(activityLedger.getSummary(projectId));
   });
 
   // ── Helper: build timeline data from activity events ──────────────────────
