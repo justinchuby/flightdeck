@@ -4,6 +4,7 @@
  * Commands: LOCK_FILE, UNLOCK_FILE, ACTIVITY, DECISION, PROGRESS, COMMIT
  */
 import type { Agent } from '../Agent.js';
+import { isCrewMember } from '../crewUtils.js';
 import type { CommandHandlerContext, CommandEntry } from './types.js';
 import { logger } from '../../utils/logger.js';
 import { execFile } from 'child_process';
@@ -196,7 +197,7 @@ function handleProgress(ctx: CommandHandlerContext, agent: Agent, data: string):
 
     const parentId = agent.parentId || agent.id;
     const secretaries = ctx.getAllAgents().filter(
-      (a) => a.role.id === 'secretary' && (a.parentId === parentId || a.id === parentId) && a.id !== agent.id,
+      (a) => a.role.id === 'secretary' && isCrewMember(a, parentId) && a.id !== agent.id,
     );
     for (const secretary of secretaries) {
       const progressMsg = `[Progress Update from ${agent.role.name} (${shortAgentId(agent.id)})]\n${JSON.stringify(progress, null, 2)}`;
