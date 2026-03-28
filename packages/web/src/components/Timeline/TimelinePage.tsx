@@ -1,5 +1,5 @@
-import { useMemo, useEffect, useRef, useCallback } from 'react';
-import { RefreshCw, Filter, Trash2 } from 'lucide-react';
+import { useMemo, useEffect, useRef, useCallback, useState } from 'react';
+import { RefreshCw, Filter, Trash2, Share2 } from 'lucide-react';
 import { useTimelineData } from './useTimelineData';
 import type { TimelineData, CommType, TimelineStatus } from './useTimelineData';
 import { TimelineContainer } from './TimelineContainer';
@@ -17,6 +17,7 @@ import { useSessionReplay } from '../../hooks/useSessionReplay';
 import { useProjects } from '../../hooks/useProjects';
 import { ProjectTabs } from '../ProjectTabs';
 import { useOptionalProjectId } from '../../contexts/ProjectContext';
+import { ShareDialog } from './ShareDialog';
 import './timeline-a11y.css';
 
 // ── Filter config ────────────────────────────────────────────────────
@@ -121,6 +122,9 @@ export function TimelinePage() {
 
   const getCachedData = useTimelineStore((s) => s.getCachedData);
   const clearCachedData = useTimelineStore((s) => s.clearCachedData);
+
+  // Share dialog state
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Lead selection — live agents and historical projects
   const leads = storeAgents.filter(a => !a.parentId || a.role?.id === 'lead');
@@ -376,6 +380,16 @@ export function TimelinePage() {
             <Trash2 size={14} aria-hidden="true" />
             Clear
           </button>
+          {effectiveLeadId && (
+            <button
+              onClick={() => setShowShareDialog(true)}
+              aria-label="Share session replay"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-th-bg-alt text-th-text-alt hover:bg-th-bg-muted hover:text-th-text transition-colors"
+            >
+              <Share2 size={14} aria-hidden="true" />
+              Share
+            </button>
+          )}
         </div>
       </div>
 
@@ -474,6 +488,11 @@ export function TimelinePage() {
             onGoLive={() => setLiveMode(true)}
           />
         </div>
+      )}
+
+      {/* Share dialog */}
+      {showShareDialog && effectiveLeadId && (
+        <ShareDialog leadId={effectiveLeadId} onClose={() => setShowShareDialog(false)} />
       )}
     </div>
   );
