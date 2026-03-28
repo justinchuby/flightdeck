@@ -1,6 +1,19 @@
+/**
+ * Token-authenticated session replay hook for public share links.
+ *
+ * Routes ALL requests through /shared/:token/* endpoints to ensure
+ * token validation and expiry checks on every state fetch.
+ * This prevents the bypass where useSessionReplay(leadId) would
+ * skip token validation after the initial metadata load.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './useApi';
+import type {
+  ReplayKeyframe,
+  ReplayWorldState,
+  UseSessionReplayResult,
+} from './useSessionReplay';
 import {
   PLAYBACK_TICK_MS,
   STATE_FETCH_DEBOUNCE_MS,
@@ -9,112 +22,71 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export interface ReplayKeyframe {
-  timestamp: string;
-  label: string;
-  type: 'spawn' | 'agent_exit' | 'delegation' | 'task' | 'milestone' | 'decision' | 'progress' | 'error' | 'commit';
-  agentId?: string;
-}
-
-export interface ReplayAgentState {
-  id: string;
-  role: string;
-  status: string;
-  contextUsedPct?: number;
-}
-
-export interface ReplayWorldState {
-  timestamp: string;
-  agents: ReplayAgentState[];
-  /** Full task DAG state at this point in time (from server WorldState) */
-  dagTasks?: ReplayDagTask[];
-  /** Decision log entries at this point in time */
-  decisions?: ReplayDecision[];
-  /** Recent activity entries near this timestamp */
-  recentActivity?: ReplayActivityEntry[];
-}
-
-export interface ReplayDagTask {
-  id: string;
-  description?: string;
-  role?: string;
-  dagStatus: string;
-  assignedAgentId?: string;
-  dependencies?: string[];
-}
-
-export interface ReplayDecision {
-  id: string;
-  title: string;
-  status: string;
-  agentRole?: string;
-  timestamp?: string;
-}
-
-export interface ReplayActivityEntry {
-  id: number;
-  agentId: string;
-  agentRole: string;
-  actionType: string;
-  summary: string;
-  timestamp: string;
-}
-
-export interface UseSessionReplayResult {
+/** Response from GET /shared/:token — initial metadata + keyframes */
+export interface SharedReplayData {
+  leadId: string;
+  label?: string;
+  expiresAt?: string;
   keyframes: ReplayKeyframe[];
-  worldState: ReplayWorldState | null;
-  playing: boolean;
-  currentTime: number; // ms since session start
-  duration: number;    // total session duration ms
-  loading: boolean;
-  error: string | null;
-  play: () => void;
-  pause: () => void;
-  seek: (timeMs: number) => void;
-  setSpeed: (speed: number) => void;
-  speed: number;
+  state?: ReplayWorldState;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────
 
 /**
- * Manages session replay state: keyframe loading, playback, and world state reconstruction.
- * Fetches keyframes from GET /api/replay/:leadId/keyframes
- * On seek, fetches GET /api/replay/:leadId/state?at=<iso>
+ * Token-routed replay hook for shared/public replay viewers.
+ * All requests go through /shared/:token/* — never /replay/:leadId/*.
  */
-export function useSessionReplay(leadId: string | null): UseSessionReplayResult {
+export function useSharedReplay(token: string | null): UseSessionReplayResult & {
+  /** Initial metadata from the share link */
+  sharedData: SharedReplayData | null;
+} {
   const [worldState, setWorldState] = useState<ReplayWorldState | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(4);
+  const [tokenError, setTokenError] = useState<string | null>(null);
 
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionStartRef = useRef<number>(0);
 
-  // Load keyframes via TanStack Query
-  const { data: keyframeData, isLoading: loading, error: queryError } = useQuery({
-    queryKey: ['replay', 'keyframes', leadId],
+  // Load initial data (keyframes + metadata) via share token
+  const { data: sharedData, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['shared-replay', token],
     queryFn: async ({ signal }) => {
-      const data = await apiFetch<{ keyframes: ReplayKeyframe[] }>(
-        `/replay/${leadId}/keyframes`,
+      const data = await apiFetch<SharedReplayData>(
+        `/shared/${token}`,
         { signal },
       );
-      return data.keyframes ?? [];
+      return data;
     },
-    enabled: !!leadId,
+    enabled: !!token,
+    retry: (failureCount, error) => {
+      // Don't retry on auth failures (expired/revoked tokens)
+      if (error instanceof Error && /40[134]/.test(error.message)) return false;
+      return failureCount < 2;
+    },
   });
 
-  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null;
-  const keyframes = keyframeData ?? [];
+  const keyframes = sharedData?.keyframes ?? [];
+  const error = tokenError
+    ?? (queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : null);
+
+  // Set initial world state from the metadata response
+  useEffect(() => {
+    if (sharedData?.state) {
+      setWorldState(sharedData.state);
+    }
+  }, [sharedData]);
 
   // Derive duration and sessionStart from keyframes
   useEffect(() => {
-    // Reset playback state when switching projects
     setCurrentTime(0);
     setPlaying(false);
-    setWorldState(null);
+    setWorldState(sharedData?.state ?? null);
     sessionStartRef.current = 0;
+    setTokenError(null);
 
     if (keyframes.length > 0) {
       const start = new Date(keyframes[0].timestamp).getTime();
@@ -124,21 +96,28 @@ export function useSessionReplay(leadId: string | null): UseSessionReplayResult 
     } else {
       setDuration(0);
     }
-  }, [leadId, keyframes]);
+  }, [token, keyframes, sharedData?.state]);
 
-  // Fetch world state at a given time offset
+  // Fetch world state at a given time offset — routed through share token
   const fetchStateAt = useCallback(async (timeMs: number) => {
-    if (!leadId || sessionStartRef.current === 0) return;
+    if (!token || sessionStartRef.current === 0) return;
     const iso = new Date(sessionStartRef.current + timeMs).toISOString();
     try {
       const state = await apiFetch<ReplayWorldState>(
-        `/replay/${leadId}/state?at=${encodeURIComponent(iso)}`,
+        `/shared/${token}/state?at=${encodeURIComponent(iso)}`,
       );
       setWorldState(state);
-    } catch {
-      // Best-effort — don't interrupt playback
+      setTokenError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/40[134]/.test(msg)) {
+        // Token expired or revoked — surface error, stop playback
+        setTokenError('Share link has expired or been revoked');
+        setPlaying(false);
+      }
+      // Other errors: best-effort, don't interrupt playback
     }
-  }, [leadId]);
+  }, [token]);
 
   // Playback loop
   useEffect(() => {
@@ -160,7 +139,7 @@ export function useSessionReplay(leadId: string | null): UseSessionReplayResult 
     };
   }, [playing, speed, duration]);
 
-  // Fetch world state when currentTime changes significantly (debounce 300ms)
+  // Fetch world state when currentTime changes (debounced)
   const lastFetchRef = useRef(0);
   useEffect(() => {
     const now = Date.now();
@@ -186,5 +165,6 @@ export function useSessionReplay(leadId: string | null): UseSessionReplayResult 
   return {
     keyframes, worldState, playing, currentTime, duration,
     loading, error, play, pause, seek, setSpeed, speed,
+    sharedData: sharedData ?? null,
   };
 }
