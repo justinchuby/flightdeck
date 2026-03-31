@@ -1229,6 +1229,42 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return this.messageService.getMessageHistory(agentId, limit);
   }
 
+  /** Clear conversation history for a lead and all its child agents */
+  clearHistory(leadId: string): { cleared: string[]; skipped: string[] } {
+    const cleared: string[] = [];
+    const skipped: string[] = [];
+
+    const agentsToClear: Agent[] = [];
+    const lead = this.agents.get(leadId);
+    if (lead) agentsToClear.push(lead);
+
+    // Include all child agents of this lead
+    for (const agent of this.agents.values()) {
+      if (agent.parentId === leadId && agent !== lead) {
+        agentsToClear.push(agent);
+      }
+    }
+
+    for (const agent of agentsToClear) {
+      const isWorking = agent.status === 'running' || agent.status === 'idle';
+      if (isWorking && agent.id !== leadId) {
+        skipped.push(agent.id);
+        continue;
+      }
+
+      // Clear in-memory output buffer
+      agent.messages.length = 0;
+      agent.taskOutputStartIndex = 0;
+
+      // Clear persisted conversation history and start fresh thread
+      this.messageService.clearHistory(agent.id, agent.task);
+
+      cleared.push(agent.id);
+    }
+
+    return { cleared, skipped };
+  }
+
   /**
    * Fail running DAG task assigned to an agent and notify the parent lead.
    * Shared by both onExit (crash path) and terminate (explicit kill path).

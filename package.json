@@ -19,7 +19,8 @@
     "packages/shared",
     "packages/server",
     "packages/web",
-    "packages/docs"
+    "packages/docs",
+    "packages/cli"
   ],
   "files": [
     "bin/",
@@ -48,7 +49,7 @@
     "predev:server": "npm run build:shared",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
-    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web && npm run build --workspace=packages/cli",
     "lint": "eslint packages/*/src/",
     "test:e2e": "npm run test:e2e --workspace=packages/web",
     "test": "npm run test --workspace=packages/server",
@@ -70,6 +71,7 @@
     "express": "^5.2.1",
     "grammy": "^1.41.1",
     "helmet": "^8.1.0",
+    "lightningcss-win32-x64-msvc": "^1.32.0",
     "pino": "^10.3.1",
     "uuid": "^13.0.0",
     "ws": "^8.19.0",
@@ -85,6 +87,9 @@
     "typescript": "^5.9.3"
   },
   "bundledDependencies": [
+    "@flightdeck/shared"
+  ],
+  "bundleDependencies": [
     "@flightdeck/shared"
   ]
 }

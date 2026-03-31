@@ -1,5 +1,6 @@
-import { GitBranch, FolderOpen, Download } from 'lucide-react';
+import { GitBranch, FolderOpen, Download, Trash2 } from 'lucide-react';
 import { apiFetch } from '../../hooks/useApi';
+import { useMessageStore } from '../../stores/messageStore';
 import type { AgentInfo } from '../../types';
 
 interface Props {
@@ -50,6 +51,22 @@ export function LeadSessionInfoBar({ leadAgent, selectedLeadId }: Props) {
             title="Export session to disk"
           >
             <Download className="w-2.5 h-2.5" />
+          </button>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!confirm('Clear chat history for this session?')) return;
+              try {
+                await apiFetch(`/lead/${selectedLeadId}/clear-history`, { method: 'POST' });
+                useMessageStore.getState().removeChannel(selectedLeadId);
+              } catch {
+                alert('Failed to clear history');
+              }
+            }}
+            className="text-th-text-muted hover:text-red-500 dark:hover:text-red-400 text-[10px] shrink-0 flex items-center gap-0.5"
+            title="Clear chat history"
+          >
+            <Trash2 className="w-2.5 h-2.5" />
           </button>
         </span>
       )}
