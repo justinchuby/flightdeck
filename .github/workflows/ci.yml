@@ -91,7 +91,7 @@ jobs:
 
       - name: Upload server coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: packages/server/coverage/lcov.info
           flags: server
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload web coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: packages/web/coverage/lcov.info
           flags: web
