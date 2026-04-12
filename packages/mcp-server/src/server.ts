@@ -324,9 +324,9 @@ export function createServer(opts?: FlightdeckMcpOptions) {
 
   server.tool(
     'flightdeck_costs_by_session',
-    'Get token usage and cost breakdown by session',
-    { leadId: z.string().optional().describe('Filter by lead session ID') },
-    async ({ leadId }) => safe(() => client.getCostsBySession(leadId)),
+    'Get token usage and cost breakdown by session. Requires a project ID.',
+    { projectId: z.string().describe('Project ID to get session costs for') },
+    async ({ projectId }) => safe(() => client.getCostsBySession(projectId)),
   );
 
   // ── Search ────────────────────────────────────────────────────
@@ -358,16 +358,22 @@ export function createServer(opts?: FlightdeckMcpOptions) {
 
   server.tool(
     'flightdeck_nl_execute',
-    'Execute a natural language command against Flightdeck (e.g., "spawn a coder to fix the login bug")',
-    { text: z.string().describe('Natural language command') },
-    async ({ text }) => safe(() => client.nlExecute(text)),
+    'Execute a natural language command against Flightdeck (e.g., "spawn a coder to fix the login bug"). Requires a lead session ID.',
+    {
+      text: z.string().describe('Natural language command'),
+      leadId: z.string().describe('Lead session ID to execute in context of'),
+    },
+    async ({ text, leadId }) => safe(() => client.nlExecute(text, leadId)),
   );
 
   server.tool(
     'flightdeck_nl_preview',
-    'Preview what a natural language command would do without executing it',
-    { text: z.string().describe('Natural language command') },
-    async ({ text }) => safe(() => client.nlPreview(text)),
+    'Preview what a natural language command would do without executing it. Requires a lead session ID.',
+    {
+      text: z.string().describe('Natural language command'),
+      leadId: z.string().describe('Lead session ID to preview in context of'),
+    },
+    async ({ text, leadId }) => safe(() => client.nlPreview(text, leadId)),
   );
 
   // ── Projects ──────────────────────────────────────────────────

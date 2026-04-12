@@ -10,7 +10,9 @@ export class FlightdeckClient {
   private baseUrl: string;
 
   constructor(opts: FlightdeckClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
+    // Ensure base URL ends with /api (Flightdeck mounts routes under /api)
+    const raw = opts.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = raw.endsWith('/api') ? raw : `${raw}/api`;
   }
 
   private async request<T = unknown>(
@@ -214,9 +216,9 @@ export class FlightdeckClient {
     return this.request('GET', '/costs/by-task');
   }
 
-  async getCostsBySession(leadId?: string): Promise<unknown> {
+  async getCostsBySession(projectId?: string): Promise<unknown> {
     const params = new URLSearchParams();
-    if (leadId) params.set('leadId', leadId);
+    if (projectId) params.set('projectId', projectId);
     const qs = params.toString();
     return this.request('GET', `/costs/by-session${qs ? `?${qs}` : ''}`);
   }
@@ -224,7 +226,8 @@ export class FlightdeckClient {
   // ── Search ──────────────────────────────────────────────────────
 
   async search(query: string): Promise<unknown> {
-    return this.request('POST', '/search', { query });
+    const params = new URLSearchParams({ q: query });
+    return this.request('GET', `/search?${params.toString()}`);
   }
 
   // ── Decisions ───────────────────────────────────────────────────
@@ -257,11 +260,11 @@ export class FlightdeckClient {
 
   // ── Natural Language ────────────────────────────────────────────
 
-  async nlPreview(text: string): Promise<unknown> {
-    return this.request('POST', '/nl/preview', { text });
+  async nlPreview(text: string, leadId: string): Promise<unknown> {
+    return this.request('POST', '/nl/preview', { command: text, leadId });
   }
 
-  async nlExecute(text: string): Promise<unknown> {
-    return this.request('POST', '/nl/execute', { text });
+  async nlExecute(text: string, leadId: string): Promise<unknown> {
+    return this.request('POST', '/nl/execute', { command: text, leadId });
   }
 }
