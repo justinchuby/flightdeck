@@ -265,13 +265,69 @@ export class Agent {
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
   /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
   /** @internal */ _notifyModelFallback(info: ModelFallbackInfo): void { this.events.notifyModelFallback(info); }
-  /** @internal */ _drainOneMessage(): void {
-    if (this.pendingMessages.length > 0) {
+  /** @internal — legacy single-message drain (kept for compatibility) */
+  _drainOneMessage(): void {
+    this._drainCoalesced();
+  }
+
+  /**
+   * @internal Drain pending messages, coalescing consecutive text-only messages
+   * into a single prompt. This mirrors OpenClaw's queued-message merging pattern:
+   * when multiple messages arrive while the agent is busy, they are delivered
+   * together as one combined message instead of triggering separate prompt cycles.
+   *
+   * Messages with ContentBlock[] payloads (e.g., attachments) are NOT coalesced
+   * — they are sent individually to preserve their structured content.
+   */
+  _drainCoalesced(): void {
+    if (this.pendingMessages.length === 0) return;
+
+    // Collect consecutive text-only messages from the front of the queue
+    const textParts: string[] = [];
+    const mqIds: number[] = [];
+    let drained = 0;
+
+    while (drained < this.pendingMessages.length) {
+      const entry = this.pendingMessages[drained];
+      if (typeof entry.content !== 'string') break; // stop at first non-text message
+      textParts.push(entry.content);
+      if (entry.mqId) mqIds.push(entry.mqId);
+      drained++;
+    }
+
+    if (drained === 0) {
+      // First message is non-text — drain it individually
       const next = this.pendingMessages.shift()!;
       if (this.pendingPriorityCount > 0) this.pendingPriorityCount--;
       this.write(next.content);
       if (next.mqId && this.messageQueueStore) {
         try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
+      }
+      return;
+    }
+
+    // Remove drained entries
+    this.pendingMessages.splice(0, drained);
+    this.pendingPriorityCount = Math.max(0, this.pendingPriorityCount - drained);
+
+    // Coalesce into single message
+    const coalesced = drained === 1
+      ? textParts[0]
+      : `[${drained} queued messages delivered together]\n\n${textParts.join('\n\n---\n\n')}`;
+
+    if (drained > 1) {
+      logger.debug({
+        module: 'agent', msg: 'Coalesced pending messages',
+        agentId: this.id, count: drained,
+      });
+    }
+
+    this.write(coalesced);
+
+    // Mark all coalesced DB rows as delivered
+    if (this.messageQueueStore) {
+      for (const mqId of mqIds) {
+        try { this.messageQueueStore.markDelivered(mqId); } catch { /* non-critical */ }
       }
     }
   }
@@ -604,15 +660,10 @@ When you discover something important about the codebase, a pattern, a gotcha, o
     return this.acpConnection?.promptingStartedAt ?? null;
   }
 
-  /** Drain one pending message if idle — called when system resumes */
+  /** Drain pending messages if idle — called when system resumes. Uses coalescing. */
   drainPendingMessages(): void {
     if (this._phase === 'idle' && this.pendingMessages.length > 0 && !this.systemPaused) {
-      const next = this.pendingMessages.shift()!;
-      this.write(next.content);
-      // Mark delivered in DB after successful write
-      if (next.mqId && this.messageQueueStore) {
-        try { this.messageQueueStore.markDelivered(next.mqId); } catch { /* non-critical */ }
-      }
+      this._drainCoalesced();
     }
   }
 
