@@ -1,0 +1,39 @@
+{
+  "name": "@flightdeck-ai/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Flightdeck — expose task management, agents, and crew operations as MCP tools",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "flightdeck-mcp": "./bin/flightdeck-mcp.mjs"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "bin/",
+    "dist/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node bin/flightdeck-mcp.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/justinchuby/flightdeck.git",
+    "directory": "packages/mcp-server"
+  }
+}

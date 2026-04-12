@@ -19,7 +19,8 @@
     "packages/shared",
     "packages/server",
     "packages/web",
-    "packages/docs"
+    "packages/docs",
+    "packages/mcp-server"
   ],
   "files": [
     "bin/",
