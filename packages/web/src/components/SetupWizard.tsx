@@ -11,6 +11,11 @@ import {
   Loader2,
   ToggleLeft,
   ToggleRight,
+  User,
+  Users,
+  Shield,
+  Zap,
+  Scale,
 } from 'lucide-react';
 import { apiFetch } from '../hooks/useApi';
 import { getProvider } from '@flightdeck/shared';
@@ -42,7 +47,40 @@ interface ProviderView {
   authenticated: boolean | null;
 }
 
-type Step = 'welcome' | 'providers' | 'done';
+type Step = 'welcome' | 'providers' | 'preferences' | 'done';
+type UserType = 'personal' | 'team';
+type OversightLevel = 'supervised' | 'balanced' | 'autonomous';
+
+const USER_TYPE_CONFIG: Record<UserType, { defaultAgents: number; label: string; description: string }> = {
+  personal: {
+    defaultAgents: 5,
+    label: 'Personal / Solo',
+    description: 'Defaults to 5 concurrent agents — great for solo projects.',
+  },
+  team: {
+    defaultAgents: 50,
+    label: 'Team / Company',
+    description: 'Defaults to 50 concurrent agents — suited for larger codebases.',
+  },
+};
+
+const OVERSIGHT_CONFIG: Record<OversightLevel, { label: string; description: string; Icon: React.ElementType }> = {
+  supervised: {
+    label: 'Supervised',
+    description: 'Agents explain reasoning and show plans before acting',
+    Icon: Shield,
+  },
+  balanced: {
+    label: 'Balanced',
+    description: 'Explains key decisions, works efficiently on routine tasks',
+    Icon: Scale,
+  },
+  autonomous: {
+    label: 'Autonomous',
+    description: 'Works independently with minimal explanation — fewest tokens',
+    Icon: Zap,
+  },
+};
 
 const STORAGE_KEY = 'flightdeck-setup-completed';
 
@@ -50,10 +88,25 @@ const STORAGE_KEY = 'flightdeck-setup-completed';
 
 export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState<Step>('welcome');
+  const [userType, setUserType] = useState<UserType | null>(null);
+  const [oversightLevel, setOversightLevel] = useState<OversightLevel | null>(null);
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [configLoading, setConfigLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const applyPreferences = useCallback(async (type: UserType, oversight: OversightLevel) => {
+    try {
+      await apiFetch('/config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          maxConcurrentAgents: USER_TYPE_CONFIG[type].defaultAgents,
+          oversightLevel: oversight,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch { /* non-blocking — user can adjust in Settings */ }
+  }, []);
 
   // Phase 1: instant config (id, name, enabled)
   useEffect(() => {
@@ -112,6 +165,13 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const installedCount = providers.filter((p) => p.installed === true).length;
   const enabledCount = providers.filter((p) => p.enabled).length;
 
+  const handlePreferencesContinue = async () => {
+    const type = userType ?? 'personal';
+    const oversight = oversightLevel ?? 'autonomous';
+    await applyPreferences(type, oversight);
+    setStep('done');
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
@@ -141,9 +201,8 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
               <Rocket className="w-12 h-12 text-accent mx-auto" />
               <h3 className="text-lg font-semibold text-th-text">Welcome to Flightdeck!</h3>
               <p className="text-sm text-th-text-muted leading-relaxed">
-                Let's check your AI agent providers. Flightdeck orchestrates
-                multiple AI coding agents — you'll need at least one provider
-                installed to get started.
+                Let's get you set up. We'll check your AI agent providers and
+                configure a few defaults to match how you work.
               </p>
             </div>
           )}
@@ -247,6 +306,72 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
             </div>
           )}
 
+          {step === 'preferences' && (
+            <div className="space-y-5" data-testid="step-preferences">
+              {/* User type */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-th-text-muted uppercase tracking-wide">How will you use Flightdeck?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['personal', 'team'] as UserType[]).map((type) => {
+                    const cfg = USER_TYPE_CONFIG[type];
+                    const selected = userType === type;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setUserType(type)}
+                        className={`flex items-center gap-3 rounded-lg border-2 px-3 py-3 transition-colors text-left ${
+                          selected
+                            ? 'border-accent bg-accent/10 text-th-text'
+                            : 'border-th-border bg-th-bg-alt text-th-text-muted hover:border-th-border-alt hover:text-th-text'
+                        }`}
+                        data-testid={`user-type-${type}`}
+                      >
+                        {type === 'personal'
+                          ? <User className={`w-5 h-5 flex-shrink-0 ${selected ? 'text-accent' : ''}`} />
+                          : <Users className={`w-5 h-5 flex-shrink-0 ${selected ? 'text-accent' : ''}`} />
+                        }
+                        <div>
+                          <div className="text-xs font-semibold">{cfg.label}</div>
+                          <div className="text-[11px] leading-relaxed">{cfg.description}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Oversight level */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-th-text-muted uppercase tracking-wide">Oversight level</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['supervised', 'balanced', 'autonomous'] as OversightLevel[]).map((level) => {
+                    const cfg = OVERSIGHT_CONFIG[level];
+                    const selected = oversightLevel === level;
+                    return (
+                      <button
+                        key={level}
+                        onClick={() => setOversightLevel(level)}
+                        className={`flex flex-col items-center gap-2 rounded-lg border-2 px-2 py-3 transition-colors text-center ${
+                          selected
+                            ? 'border-accent bg-accent/10 text-th-text'
+                            : 'border-th-border bg-th-bg-alt text-th-text-muted hover:border-th-border-alt hover:text-th-text'
+                        }`}
+                        data-testid={`oversight-${level}`}
+                      >
+                        <cfg.Icon className={`w-4 h-4 ${selected ? 'text-accent' : ''}`} />
+                        <div>
+                          <div className="text-xs font-semibold">{cfg.label}</div>
+                          <div className="text-[10px] leading-relaxed mt-0.5">{cfg.description}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-th-text-muted">Defaults to Autonomous if not selected. Adjustable any time in Settings.</p>
+              </div>
+            </div>
+          )}
+
           {step === 'done' && (
             <div className="text-center space-y-4" data-testid="step-done">
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto" />
@@ -256,6 +381,21 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                   ? `${enabledCount} provider${enabledCount > 1 ? 's' : ''} enabled. Create your first project to start working with AI agents.`
                   : 'You can set up providers later in Settings. Create a project to explore the interface.'}
               </p>
+              {(userType || oversightLevel) && (
+                <div className="text-xs text-th-text-muted space-y-1">
+                  {userType && (
+                    <p>
+                      <span className="text-th-text font-medium">{USER_TYPE_CONFIG[userType].label}</span>
+                      {' '}— {USER_TYPE_CONFIG[userType].defaultAgents} agents by default
+                    </p>
+                  )}
+                  {oversightLevel && (
+                    <p>
+                      Oversight: <span className="text-th-text font-medium">{OVERSIGHT_CONFIG[oversightLevel].label}</span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -272,7 +412,11 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
           <div className="flex items-center gap-2">
             {step !== 'welcome' && (
               <button
-                onClick={() => setStep(step === 'done' ? 'providers' : 'welcome')}
+                onClick={() => {
+                  if (step === 'done') setStep('preferences');
+                  else if (step === 'preferences') setStep('providers');
+                  else setStep('welcome');
+                }}
                 className="flex items-center gap-1 px-3 py-1.5 text-xs text-th-text-muted hover:text-th-text border border-th-border rounded"
                 data-testid="wizard-back"
               >
@@ -288,13 +432,22 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
               >
                 Get Started
               </button>
-            ) : (
+            ) : step === 'preferences' ? (
               <button
-                onClick={() => setStep(step === 'welcome' ? 'providers' : 'done')}
+                onClick={handlePreferencesContinue}
                 className="flex items-center gap-1 px-4 py-1.5 text-xs font-medium bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30 rounded"
                 data-testid="wizard-next"
               >
-                {step === 'welcome' ? 'Check Providers' : 'Continue'}
+                Continue
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setStep(step === 'welcome' ? 'providers' : 'preferences')}
+                className="flex items-center gap-1 px-4 py-1.5 text-xs font-medium bg-accent/20 text-accent hover:bg-accent/30 border border-accent/30 rounded"
+                data-testid="wizard-next"
+              >
+                {step === 'welcome' ? 'Get Started' : 'Continue'}
                 <ChevronRight className="w-3 h-3" />
               </button>
             )}
