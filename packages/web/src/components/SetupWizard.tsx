@@ -16,7 +16,12 @@ import {
   Shield,
   Zap,
   Scale,
+  GripVertical,
 } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { apiFetch } from '../hooks/useApi';
 import { getProvider } from '@flightdeck/shared';
 import { ProviderIcon } from './ui/ProviderIcon';
@@ -84,6 +89,113 @@ const OVERSIGHT_CONFIG: Record<OversightLevel, { label: string; description: str
 
 const STORAGE_KEY = 'flightdeck-setup-completed';
 
+// ── Sortable Provider Row ────────────────────────────────────────────
+
+function SortableProviderRow({
+  provider,
+  togglingId,
+  onToggle,
+}: {
+  provider: ProviderView;
+  togglingId: string | null;
+  onToggle: (id: string, enabled: boolean) => void;
+}) {
+  const def = getProvider(provider.id);
+  const links = def?.setupLinks ?? [];
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: provider.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-lg border bg-th-bg-alt transition-opacity ${
+        provider.enabled ? 'border-th-border' : 'border-th-border/50 opacity-60'
+      }`}
+      data-testid={`provider-${provider.id}`}
+    >
+      <div className="flex items-center justify-between px-3 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            {...attributes}
+            {...listeners}
+            className="touch-none p-0.5 text-th-text-muted/40 hover:text-th-text-muted cursor-grab active:cursor-grabbing transition-colors shrink-0"
+            aria-label={`Drag to reorder ${provider.name}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <span className="text-lg flex-shrink-0"><ProviderIcon provider={def} className="w-5 h-5 inline" /></span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-th-text">{provider.name}</span>
+              {(def?.isPreview ?? true) && (
+                <span className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                  Preview
+                </span>
+              )}
+            </div>
+            {provider.id === 'copilot' && (
+              <div className="text-[10px] text-th-text-muted">Requires Copilot ≥ 1.0.4</div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {provider.installed === null ? (
+            <Loader2 className="w-3.5 h-3.5 text-th-text-muted animate-spin" />
+          ) : provider.installed ? (
+            <span className="flex items-center gap-1 text-xs text-green-400">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Installed
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs text-th-text-muted">
+              <XCircle className="w-3.5 h-3.5" />
+              Not found
+            </span>
+          )}
+          <button
+            onClick={() => onToggle(provider.id, !provider.enabled)}
+            disabled={togglingId === provider.id}
+            className="text-th-text-muted hover:text-th-text transition-colors disabled:opacity-50"
+            aria-label={provider.enabled ? `Disable ${provider.name}` : `Enable ${provider.name}`}
+            data-testid={`toggle-${provider.id}`}
+          >
+            {provider.enabled ? (
+              <ToggleRight className="w-6 h-6 text-accent" />
+            ) : (
+              <ToggleLeft className="w-6 h-6" />
+            )}
+          </button>
+        </div>
+      </div>
+      {links.length > 0 && (
+        <div className="flex items-center gap-3 px-4 pb-2.5 -mt-1">
+          {links.map((link) => (
+            <a
+              key={link.url}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-accent hover:underline"
+            >
+              {link.label}
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Component ───────────────────────────────────────────────────────
 
 export function SetupWizard({ onComplete }: { onComplete: () => void }) {
@@ -91,6 +203,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   const [userType, setUserType] = useState<UserType | null>(null);
   const [oversightLevel, setOversightLevel] = useState<OversightLevel | null>(null);
   const [providers, setProviders] = useState<ProviderView[]>([]);
+  const [ranking, setRanking] = useState<string[]>([]);
   const [configLoading, setConfigLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -108,14 +221,18 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
     } catch { /* non-blocking — user can adjust in Settings */ }
   }, []);
 
-  // Phase 1: instant config (id, name, enabled)
+  // Phase 1: instant config (id, name, enabled) + ranking
   useEffect(() => {
-    apiFetch<ProviderConfig[]>('/settings/providers')
-      .then((configs) => {
+    Promise.all([
+      apiFetch<ProviderConfig[]>('/settings/providers'),
+      apiFetch<{ ranking: string[] }>('/settings/provider-ranking'),
+    ])
+      .then(([configs, { ranking: r }]) => {
         setProviders(configs.map((c) => ({
           id: c.id, name: c.name, enabled: c.enabled,
           installed: null, authenticated: null,
         })));
+        setRanking(r);
       })
       .catch(() => { /* initial fetch — will retry */ })
       .finally(() => setConfigLoading(false));
@@ -161,6 +278,35 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
       setTogglingId(null);
     }
   }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = ranking.indexOf(active.id as string);
+    const newIndex = ranking.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newRanking = arrayMove(ranking, oldIndex, newIndex);
+    setRanking(newRanking);
+    try {
+      await apiFetch('/settings/provider-ranking', {
+        method: 'PUT',
+        body: JSON.stringify({ ranking: newRanking }),
+      });
+    } catch {
+      setRanking(ranking);
+    }
+  }, [ranking]);
+
+  const sortedProviders = [...providers].sort((a, b) => {
+    const ai = ranking.indexOf(a.id);
+    const bi = ranking.indexOf(b.id);
+    return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+  });
 
   const installedCount = providers.filter((p) => p.installed === true).length;
   const enabledCount = providers.filter((p) => p.enabled).length;
@@ -213,7 +359,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                 {statusLoading
                   ? 'Detecting providers…'
                   : installedCount > 0
-                    ? `${installedCount} of ${providers.length} providers detected. Toggle to enable or disable.`
+                    ? `${installedCount} of ${providers.length} providers detected. Drag to reorder, toggle to enable or disable.`
                     : 'No providers detected. Install at least one to start.'}
               </p>
               {configLoading ? (
@@ -221,87 +367,20 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                   <div className="w-5 h-5 border-2 border-th-text-muted/30 border-t-accent rounded-full animate-spin" />
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[360px] overflow-y-auto">
-                  {providers.map((p) => {
-                    const def = getProvider(p.id);
-                    const links = def?.setupLinks ?? [];
-                    return (
-                      <div
-                        key={p.id}
-                        className={`rounded-lg border bg-th-bg-alt transition-opacity ${
-                          p.enabled ? 'border-th-border' : 'border-th-border/50 opacity-60'
-                        }`}
-                        data-testid={`provider-${p.id}`}
-                      >
-                        <div className="flex items-center justify-between px-4 py-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-lg flex-shrink-0"><ProviderIcon provider={def} className="w-5 h-5 inline" /></span>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-th-text">{p.name}</span>
-                                {(def?.isPreview ?? true) && (
-                                  <span className="inline-flex items-center text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
-                                    Preview
-                                  </span>
-                                )}
-                              </div>
-                              {p.id === 'copilot' && (
-                                <div className="text-[10px] text-th-text-muted">Requires Copilot ≥ 1.0.4</div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {/* Install status badge */}
-                            {p.installed === null ? (
-                              <Loader2 className="w-3.5 h-3.5 text-th-text-muted animate-spin" />
-                            ) : p.installed ? (
-                              <span className="flex items-center gap-1 text-xs text-green-400">
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                Installed
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-xs text-th-text-muted">
-                                <XCircle className="w-3.5 h-3.5" />
-                                Not found
-                              </span>
-                            )}
-                            {/* Enable/disable toggle */}
-                            <button
-                              onClick={() => handleToggle(p.id, !p.enabled)}
-                              disabled={togglingId === p.id}
-                              className="text-th-text-muted hover:text-th-text transition-colors disabled:opacity-50"
-                              aria-label={p.enabled ? `Disable ${p.name}` : `Enable ${p.name}`}
-                              data-testid={`toggle-${p.id}`}
-                            >
-                              {p.enabled ? (
-                                <ToggleRight className="w-6 h-6 text-accent" />
-                              ) : (
-                                <ToggleLeft className="w-6 h-6" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                        {/* Setup links (always visible for providers needing CLI + adapter) */}
-                        {links.length > 0 && (
-                          <div className="flex items-center gap-3 px-4 pb-2.5 -mt-1">
-                            {links.map((link) => (
-                              <a
-                                key={link.url}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-[11px] text-accent hover:underline"
-                              >
-                                {link.label}
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={ranking} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2 max-h-[360px] overflow-y-auto">
+                      {sortedProviders.map((p) => (
+                        <SortableProviderRow
+                          key={p.id}
+                          provider={p}
+                          togglingId={togglingId}
+                          onToggle={handleToggle}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           )}
