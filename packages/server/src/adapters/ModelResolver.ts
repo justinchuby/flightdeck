@@ -79,6 +79,7 @@ function detectModelProvider(model: string): string {
 
 const EQUIVALENCES: Record<string, Record<string, string>> = {
   // Anthropic → others
+  'claude-opus-4.7': { openai: 'gpt-5.4', google: 'gemini-3.1-pro' },
   'claude-opus-4.6': { openai: 'gpt-5.2-codex', google: 'gemini-3.1-pro' },
   'claude-opus-4.5': { openai: 'gpt-5.1-codex-max', google: 'gemini-3.1-pro' },
   'claude-sonnet-4.6': { openai: 'gpt-5.3-codex', google: 'gemini-3.1-flash' },

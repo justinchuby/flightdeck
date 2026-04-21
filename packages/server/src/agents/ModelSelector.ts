@@ -27,6 +27,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     bestFor: ['implementation', 'debugging', 'testing', 'analysis'],
   },
   {
+    id: 'claude-opus-4.7',
+    name: 'Claude Opus 4.7',
+    tier: 'premium',
+    contextWindow: 200000,
+    costPer1kTokens: 15.0,
+    bestFor: ['architecture', 'complex-debugging', 'design', 'critical-review'],
+  },
+  {
     id: 'claude-opus-4.6',
     name: 'Claude Opus 4.6',
     tier: 'premium',
