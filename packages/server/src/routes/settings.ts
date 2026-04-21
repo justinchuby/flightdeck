@@ -122,6 +122,13 @@ export function settingsRoutes(ctx: AppContext): Router {
   });
 
   /**
+   * GET /settings/provider — get the active provider ID.
+   */
+  router.get('/settings/provider', (_req, res) => {
+    res.json({ activeProvider: pm.getActiveProviderId() });
+  });
+
+  /**
    * PUT /settings/provider — set the active provider.
    */
   router.put('/settings/provider', (req, res) => {

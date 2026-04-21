@@ -105,12 +105,16 @@ function StatusBadgeSkeleton() {
 function ProviderCard({
   provider,
   rank,
+  isActive,
   onToggle,
+  onSetActive,
   statusLoading,
 }: {
   provider: ProviderStatus;
   rank: number;
+  isActive: boolean;
   onToggle: (id: string, enabled: boolean) => void;
+  onSetActive: (id: string) => void;
   statusLoading: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -193,6 +197,11 @@ function ProviderCard({
             <span className="text-[10px] font-mono text-th-text-muted w-4 text-center">{rank}</span>
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
             {providerDef?.isPreview && <PreviewBadge />}
+            {isActive && (
+              <span className="inline-flex items-center text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded-full" data-testid={`active-badge-${provider.id}`}>
+                Active
+              </span>
+            )}
             {statusLoading ? <StatusBadgeSkeleton /> : <StatusBadge {...providerStatusProps(provider)} />}
           </div>
           <div className="text-xs text-th-text-muted">
@@ -347,6 +356,16 @@ function ProviderCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Set as active */}
+            {provider.installed && !isActive && (
+              <button
+                onClick={() => onSetActive(provider.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-th-bg-hover text-th-text-alt hover:bg-th-bg-alt border border-th-border rounded-md transition-colors"
+                data-testid={`set-active-${provider.id}`}
+              >
+                Use this provider
+              </button>
+            )}
             {/* Test Connection */}
             {provider.installed && (
               <button
@@ -389,17 +408,20 @@ function ProviderCard({
 export function ProvidersSection() {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [ranking, setRanking] = useState<string[]>([]);
+  const [activeProviderId, setActiveProviderId] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Phase 1: Load config + ranking instantly (no CLI calls)
+  // Phase 1: Load config + ranking + active provider instantly (no CLI calls)
   useEffect(() => {
     Promise.all([
       apiFetch<ProviderConfig[]>('/settings/providers'),
       apiFetch<{ ranking: string[] }>('/settings/provider-ranking'),
+      apiFetch<{ activeProvider: string }>('/settings/provider'),
     ])
-      .then(([configs, { ranking: r }]) => {
+      .then(([configs, { ranking: r }, { activeProvider }]) => {
+        setActiveProviderId(activeProvider);
         // Build initial provider list from config (no status yet)
         setProviders(configs.map((c) => ({
           ...c,
@@ -444,6 +466,18 @@ export function ProvidersSection() {
     const bi = ranking.indexOf(b.id);
     return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
   });
+
+  const handleSetActive = useCallback(async (id: string) => {
+    setActiveProviderId(id);
+    try {
+      await apiFetch('/settings/provider', {
+        method: 'PUT',
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      setActiveProviderId(activeProviderId);
+    }
+  }, [activeProviderId]);
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
     setProviders((prev) =>
@@ -539,7 +573,9 @@ export function ProvidersSection() {
                   key={provider.id}
                   provider={provider}
                   rank={idx + 1}
+                  isActive={provider.id === activeProviderId}
                   onToggle={handleToggle}
+                  onSetActive={handleSetActive}
                   statusLoading={statusLoading}
                 />
               ))}
