@@ -8,6 +8,7 @@ import type { CommandHandlerContext, CommandEntry, Delegation } from './types.js
 import { descriptionSimilarity } from '../../tasks/TaskDAG.js';
 import { MAX_CONCURRENCY_LIMIT } from '../../config.js';
 import { maybeAutoCreateGroup } from './CommCommands.js';
+import { isCrewMember } from '../crewUtils.js';
 import { logger } from '../../utils/logger.js';
 import { asTaskId, type TaskId } from '../../types/brandedIds.js';
 import { deriveArgs } from './CommandHelp.js';
@@ -460,7 +461,7 @@ function resolveAgentId(ctx: CommandHandlerContext, lead: Agent, idOrPrefix: str
   const allAgents = ctx.getAllAgents();
   const match = allAgents.find((a) =>
     (a.id === idOrPrefix || a.id.startsWith(idOrPrefix)) &&
-    (a.parentId === lead.id || a.id === lead.id)
+    isCrewMember(a, lead.id)
   );
   return match?.id ?? null;
 }
@@ -766,7 +767,7 @@ export function requestSecretaryDependencyAnalysis(
 ): void {
   // Find secretary agent for this lead
   const secretary = ctx.getAllAgents().find(a =>
-    a.parentId === leadId && a.role.id === 'secretary' && a.status !== 'terminated'
+    isCrewMember(a, leadId) && a.id !== leadId && a.role.id === 'secretary' && a.status !== 'terminated'
   );
   if (!secretary) return;
 
