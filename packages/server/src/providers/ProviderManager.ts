@@ -341,13 +341,28 @@ export class ProviderManager {
   }
 
   setProviderEnabled(provider: ProviderId, enabled: boolean): void {
+    const activeProvider = this.getActiveProviderId();
+    let fallbackProvider: ProviderId | null = null;
+    if (!enabled && activeProvider === provider) {
+      fallbackProvider = this.findFirstUsableProvider(provider);
+      if (!fallbackProvider) {
+        throw new Error(`Cannot disable active provider '${provider}' without another installed and enabled provider`);
+      }
+    }
+
     if (this.configStore) {
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
       this.configStore.writePartial({ providerSettings: { [provider]: { ...current, enabled } } }).catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
+      if (fallbackProvider) {
+        this.persistActiveProvider(fallbackProvider);
+      }
       return;
     }
     if (!this.db) return;
     this.db.setSetting(`${SETTING_PREFIX}${provider}:enabled`, String(enabled));
+    if (fallbackProvider) {
+      this.persistActiveProvider(fallbackProvider);
+    }
   }
 
   // ── Model Preferences ────────────────────────────────────
@@ -408,15 +423,11 @@ export class ProviderManager {
     logger.warn({ module: 'provider', msg: 'Configured provider not available, searching for fallback', provider: configured, installed });
 
     // Walk the provider ranking to find the first installed+enabled provider
-    const ranking = this.getProviderRanking();
-    for (const candidateId of ranking) {
-      if (candidateId === configured) continue; // already checked
-      const { installed: candidateInstalled } = this.detectInstalled(candidateId);
-      if (candidateInstalled && this.isProviderEnabled(candidateId)) {
-        logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: candidateId });
-        this.setActiveProviderId(candidateId);
-        return candidateId;
-      }
+    const fallbackProvider = this.findFirstUsableProvider(configured);
+    if (fallbackProvider) {
+      logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: fallbackProvider });
+      this.persistActiveProvider(fallbackProvider);
+      return fallbackProvider;
     }
 
     // No provider found — keep the configured one and let downstream handle the error
@@ -439,7 +450,19 @@ export class ProviderManager {
     return 'copilot'; // absolute last resort
   }
 
-  setActiveProviderId(provider: ProviderId): void {
+  private findFirstUsableProvider(excludeProvider?: ProviderId): ProviderId | null {
+    const ranking = this.getProviderRanking();
+    for (const candidateId of ranking) {
+      if (candidateId === excludeProvider) continue;
+      const { installed } = this.detectInstalled(candidateId);
+      if (installed && this.isProviderEnabled(candidateId)) {
+        return candidateId;
+      }
+    }
+    return null;
+  }
+
+  private persistActiveProvider(provider: ProviderId): void {
     if (this.configStore) {
       // Only update the provider id — don't spread the current provider config,
       // which may contain overrides (binary, args, env, cloud) for a different provider.
@@ -448,6 +471,19 @@ export class ProviderManager {
     }
     if (!this.db) return;
     this.db.setSetting(`${SETTING_PREFIX}active`, provider);
+  }
+
+  setActiveProviderId(provider: ProviderId): void {
+    if (!this.isProviderEnabled(provider)) {
+      throw new Error(`Provider '${provider}' is disabled`);
+    }
+
+    const { installed } = this.detectInstalled(provider);
+    if (!installed) {
+      throw new Error(`Provider '${provider}' is not installed`);
+    }
+
+    this.persistActiveProvider(provider);
   }
 
   // ── Provider Ranking ───────────────────────────────────────

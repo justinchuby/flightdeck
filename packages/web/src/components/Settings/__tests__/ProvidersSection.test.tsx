@@ -6,8 +6,12 @@ import { ProvidersSection } from '../ProvidersSection';
 // ── Mocks ─────────────────────────────────────────────────
 
 const mockApiFetch = vi.fn();
+const mockUpdateCachedActiveProvider = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
+}));
+vi.mock('../../../hooks/useModels', () => ({
+  updateCachedActiveProvider: (...args: any[]) => mockUpdateCachedActiveProvider(...args),
 }));
 
 // ── Fixtures ──────────────────────────────────────────────
@@ -68,6 +72,7 @@ function mockProviderApisConfigOnly() {
 describe('ProvidersSection', () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    mockUpdateCachedActiveProvider.mockReset();
   });
 
   it('renders loading state initially', () => {
@@ -117,11 +122,11 @@ describe('ProvidersSection', () => {
     });
   });
 
-  it('shows the active badge for the fetched active provider', async () => {
+  it('hydrates the cached active provider from startup data', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
     await waitFor(() => {
-      expect(screen.getByTestId('active-badge-copilot')).toBeInTheDocument();
+      expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('copilot');
     });
   });
 
@@ -167,7 +172,7 @@ describe('ProvidersSection', () => {
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
-    mockApiFetch.mockResolvedValueOnce({ ...MOCK_CONFIGS[0], enabled: false });
+    mockApiFetch.mockResolvedValueOnce({ ...MOCK_STATUSES[0], enabled: false, activeProvider: 'claude' });
     fireEvent.click(screen.getByTestId('toggle-copilot'));
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
@@ -186,7 +191,7 @@ describe('ProvidersSection', () => {
 
     const claudeCard = screen.getByTestId('provider-card-claude');
     fireEvent.click(claudeCard.querySelector('[role="button"]')!);
-    mockApiFetch.mockResolvedValueOnce(undefined);
+    mockApiFetch.mockResolvedValueOnce({ activeProvider: 'claude' });
     fireEvent.click(screen.getByTestId('set-active-claude'));
 
     await waitFor(() => {
@@ -198,6 +203,8 @@ describe('ProvidersSection', () => {
         }),
       );
     });
+    expect(screen.getByTestId('active-badge-claude')).toBeInTheDocument();
+    expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('claude');
   });
 
   it('expands a card and shows test connection button', async () => {
@@ -261,6 +268,59 @@ describe('ProvidersSection', () => {
     expect(screen.getByText('GitHub Copilot SDK')).toBeInTheDocument();
     expect(screen.getByTestId('toggle-copilot')).toBeInTheDocument();
     spy.mockRestore();
+  });
+
+  it('still renders cards when provider ranking fetch fails', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_CONFIGS)
+      .mockRejectedValueOnce(new Error('ranking timeout'))
+      .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
+      .mockResolvedValueOnce(MOCK_STATUSES);
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await act(async () => { render(<ProvidersSection />); });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    const cards = screen.getAllByTestId(/provider-card-/);
+    expect(cards[0]).toHaveAttribute('data-testid', 'provider-card-copilot');
+    expect(cards[1]).toHaveAttribute('data-testid', 'provider-card-claude');
+
+    spy.mockRestore();
+  });
+
+  it('still renders cards when active provider fetch fails', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_CONFIGS)
+      .mockResolvedValueOnce(MOCK_RANKING)
+      .mockRejectedValueOnce(new Error('active provider unavailable'))
+      .mockResolvedValueOnce(MOCK_STATUSES);
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await act(async () => { render(<ProvidersSection />); });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('GitHub Copilot SDK')).toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it('hides "Use this provider" for disabled installed providers', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    const cursorCard = screen.getByTestId('provider-card-cursor');
+    fireEvent.click(cursorCard.querySelector('[role="button"]')!);
+
+    expect(screen.queryByTestId('set-active-cursor')).not.toBeInTheDocument();
   });
 
   it('does not show preview badge for Codex', async () => {

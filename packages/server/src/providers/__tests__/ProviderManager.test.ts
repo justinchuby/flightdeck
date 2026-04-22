@@ -370,6 +370,35 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ execCommand: exec as any });
       expect(mgr.isProviderEnabled('claude')).toBe(true);
     });
+
+    it('falls back to another usable provider when disabling the active provider', () => {
+      const mgr = createManager();
+      mgr.setActiveProviderId('copilot');
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
+
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      mgr.setProviderEnabled('copilot', false);
+      expect(mgr.getActiveProviderId()).toBe('claude');
+    });
+
+    it('rejects disabling the active provider when no fallback is available', () => {
+      const mgr = createManager();
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        throw new Error('not found');
+      });
+      mgr.setActiveProviderId('copilot');
+
+      expect(() => mgr.setProviderEnabled('copilot', false)).toThrow(
+        "Cannot disable active provider 'copilot' without another installed and enabled provider",
+      );
+      expect(mgr.isProviderEnabled('copilot')).toBe(true);
+    });
   });
 
   // ── model preferences ────────────────────────────────────
@@ -445,6 +474,7 @@ describe('ProviderManager', () => {
       const mgr = createManager();
       mgr.setActiveProviderId('copilot');
       mgr.setProviderEnabled('copilot', true);
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
 
       // Mock: copilot is installed but disabled
       exec.mockImplementation((cmd: string) => {
@@ -455,7 +485,6 @@ describe('ProviderManager', () => {
       // Disable copilot, enable claude
       mgr.setProviderEnabled('copilot', false);
       mgr.setProviderEnabled('claude', true);
-      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
 
       const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
@@ -571,6 +600,31 @@ describe('ProviderManager', () => {
   });
 
   // ── getActiveProviderId fallback ────────────────────────
+
+  describe('setActiveProviderId', () => {
+    it('persists a usable provider', () => {
+      const mgr = createManager();
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      mgr.setActiveProviderId('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
+    });
+
+    it('rejects disabled providers', () => {
+      const mgr = createManager();
+      mgr.setProviderEnabled('claude', false);
+      expect(() => mgr.setActiveProviderId('claude')).toThrow("Provider 'claude' is disabled");
+    });
+
+    it('rejects uninstalled providers', () => {
+      const mgr = createManager();
+      exec.mockImplementation(() => { throw new Error('not found'); });
+      expect(() => mgr.setActiveProviderId('gemini')).toThrow("Provider 'gemini' is not installed");
+    });
+  });
 
   describe('getActiveProviderId without db or configStore', () => {
     it('returns first installed provider instead of hardcoded copilot', () => {

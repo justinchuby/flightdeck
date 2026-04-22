@@ -105,8 +105,14 @@ export function settingsRoutes(ctx: AppContext): Router {
       modelPreferences?: { defaultModel?: string; preferredModels?: string[] };
     };
 
+    let activeProvider = pm.getActiveProviderId();
     if (enabled !== undefined) {
-      pm.setProviderEnabled(provider, enabled);
+      try {
+        pm.setProviderEnabled(provider, enabled);
+        activeProvider = pm.resolveAndPersistProvider();
+      } catch (err: any) {
+        return res.status(409).json({ error: err.message || 'Failed to update provider enabled state' });
+      }
     }
     if (modelPreferences) {
       pm.setModelPreferences(provider, modelPreferences);
@@ -115,7 +121,7 @@ export function settingsRoutes(ctx: AppContext): Router {
     try {
       const status = await pm.getProviderStatusAsync(provider);
       const prefs = pm.getModelPreferences(provider);
-      res.json({ ...status, modelPreferences: prefs });
+      res.json({ ...status, modelPreferences: prefs, activeProvider });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Failed to get provider status' });
     }
@@ -125,7 +131,7 @@ export function settingsRoutes(ctx: AppContext): Router {
    * GET /settings/provider — get the active provider ID.
    */
   router.get('/settings/provider', (_req, res) => {
-    res.json({ activeProvider: pm.getActiveProviderId() });
+    res.json({ activeProvider: pm.resolveAndPersistProvider() });
   });
 
   /**
@@ -136,8 +142,12 @@ export function settingsRoutes(ctx: AppContext): Router {
     if (!id || !isValidProviderId(id)) {
       return res.status(400).json({ error: `Invalid provider: ${id}` });
     }
-    pm.setActiveProviderId(id as ProviderId);
-    res.json({ activeProvider: id });
+    try {
+      pm.setActiveProviderId(id as ProviderId);
+      res.json({ activeProvider: id });
+    } catch (err: any) {
+      res.status(409).json({ error: err.message || 'Failed to set active provider' });
+    }
   });
 
   /**
@@ -165,4 +175,3 @@ export function settingsRoutes(ctx: AppContext): Router {
 
   return router;
 }
-

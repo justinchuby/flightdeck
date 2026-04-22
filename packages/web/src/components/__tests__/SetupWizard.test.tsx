@@ -56,14 +56,18 @@ function mockWizardApis({
   configs = MOCK_CONFIGS,
   statuses = MOCK_STATUSES,
   ranking = MOCK_RANKING,
+  rankingError,
 }: {
   configs?: typeof MOCK_CONFIGS;
   statuses?: typeof MOCK_STATUSES;
   ranking?: { ranking: string[] };
+  rankingError?: Error;
 } = {}) {
   mockApiFetch.mockImplementation((url: string) => {
     if (url === '/settings/providers') return Promise.resolve(configs);
-    if (url === '/settings/provider-ranking') return Promise.resolve(ranking);
+    if (url === '/settings/provider-ranking') {
+      return rankingError ? Promise.reject(rankingError) : Promise.resolve(ranking);
+    }
     if (url === '/settings/providers/status') return Promise.resolve(statuses);
     return Promise.resolve(undefined);
   });
@@ -148,6 +152,21 @@ describe('SetupWizard', () => {
     await waitFor(() => {
       expect(screen.getByText(/no providers detected/i)).toBeInTheDocument();
     });
+  });
+
+  it('keeps provider setup usable when ranking fetch fails', async () => {
+    mockWizardApis({ rankingError: new Error('ranking unavailable') });
+    await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
+
+    await goToProvidersStep();
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 of 8 providers detected/i)).toBeInTheDocument();
+    });
+
+    const providerRows = screen.getAllByTestId(/provider-/);
+    expect(providerRows[0]).toHaveAttribute('data-testid', 'provider-copilot');
+    expect(providerRows[1]).toHaveAttribute('data-testid', 'provider-claude');
   });
 
   it('navigates through welcome, providers, preferences, and done steps', async () => {

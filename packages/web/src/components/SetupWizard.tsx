@@ -27,6 +27,7 @@ import { useAppStore } from '../stores/appStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getProvider } from '@flightdeck/shared';
 import { ProviderIcon } from './ui/ProviderIcon';
+import { normalizeProviderRanking } from './providerPreferences';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -52,6 +53,16 @@ interface ProviderView {
   enabled: boolean;
   installed: boolean | null;  // null = still detecting
   authenticated: boolean | null;
+}
+
+function buildProviderViews(configs: ProviderConfig[]): ProviderView[] {
+  return configs.map((config) => ({
+    id: config.id,
+    name: config.name,
+    enabled: config.enabled,
+    installed: null,
+    authenticated: null,
+  }));
 }
 
 type Step = 'welcome' | 'providers' | 'preferences' | 'done';
@@ -228,26 +239,39 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
 
   // Phase 1: instant config (id, name, enabled) + ranking
   useEffect(() => {
-    Promise.all([
-      apiFetch<ProviderConfig[]>('/settings/providers'),
-      apiFetch<{ ranking: string[] }>('/settings/provider-ranking'),
-    ])
-      .then(([configs, { ranking: r }]) => {
-        setProviders(configs.map((c) => ({
-          id: c.id, name: c.name, enabled: c.enabled,
-          installed: null, authenticated: null,
-        })));
-        setRanking(r);
+    let mounted = true;
+
+    apiFetch<ProviderConfig[]>('/settings/providers')
+      .then((configs) => {
+        if (!mounted) return;
+        setProviders(buildProviderViews(configs));
+        setRanking(normalizeProviderRanking(configs));
+        setConfigLoading(false);
+
+        apiFetch<{ ranking: string[] }>('/settings/provider-ranking')
+          .then(({ ranking: nextRanking }) => {
+            if (!mounted) return;
+            setRanking(normalizeProviderRanking(configs, nextRanking));
+          })
+          .catch(() => { /* ranking preference is optional in setup wizard */ });
       })
-      .catch(() => { /* initial fetch — will retry */ })
-      .finally(() => setConfigLoading(false));
+      .catch(() => {
+        if (!mounted) return;
+        setConfigLoading(false);
+        setStatusLoading(false);
+      });
+
+    return () => { mounted = false; };
   }, []);
 
   // Phase 2: async CLI detection (installed, authenticated)
   useEffect(() => {
     if (configLoading) return;
+    let mounted = true;
+
     apiFetch<ProviderStatusData[]>('/settings/providers/status')
       .then((statuses) => {
+        if (!mounted) return;
         const statusMap = new Map(statuses.map((s) => [s.id, s]));
         setProviders((prev) =>
           prev.map((p) => {
@@ -257,7 +281,11 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
         );
       })
       .catch(() => { /* status detection failed — badges stay as loading */ })
-      .finally(() => setStatusLoading(false));
+      .finally(() => {
+        if (mounted) setStatusLoading(false);
+      });
+
+    return () => { mounted = false; };
   }, [configLoading]);
 
   const handleDismiss = useCallback(() => {
@@ -542,7 +570,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-/** Check if the setup wizard should be shown (no providers configured + not dismissed). */
+/** Check if the setup wizard has been dismissed in local storage. */
 export function shouldShowSetupWizard(): boolean {
   try { return localStorage.getItem(STORAGE_KEY) !== 'true'; } catch { return true; }
 }
