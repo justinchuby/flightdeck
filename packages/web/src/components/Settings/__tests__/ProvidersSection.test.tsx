@@ -182,6 +182,55 @@ describe('ProvidersSection', () => {
     });
   });
 
+  it('updates the active badge immediately when disabling the active provider triggers a fallback', async () => {
+    const rankedConfigs = [
+      { id: 'copilot', name: 'GitHub Copilot SDK', enabled: true },
+      { id: 'codex', name: 'Codex CLI', enabled: true },
+      { id: 'claude', name: 'Claude Code', enabled: true },
+    ];
+    const rankedStatuses = [
+      { id: 'copilot', installed: true, authenticated: true, binaryPath: '/usr/bin/copilot', version: '1.0.0' },
+      { id: 'codex', installed: true, authenticated: true, binaryPath: '/usr/bin/codex', version: '0.5.0' },
+      { id: 'claude', installed: true, authenticated: true, binaryPath: '/usr/bin/claude', version: '2.1.0' },
+    ];
+
+    mockApiFetch
+      .mockResolvedValueOnce(rankedConfigs)
+      .mockResolvedValueOnce({ ranking: ['copilot', 'codex', 'claude'] })
+      .mockResolvedValueOnce({ activeProvider: 'copilot' })
+      .mockResolvedValueOnce(rankedStatuses);
+
+    render(<ProvidersSection />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-copilot')).toBeInTheDocument();
+    });
+
+    const codexCard = screen.getByTestId('provider-card-codex');
+    fireEvent.click(codexCard.querySelector('[role="button"]')!);
+
+    mockApiFetch.mockResolvedValueOnce({ activeProvider: 'codex' });
+    fireEvent.click(screen.getByTestId('set-active-codex'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-codex')).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      ...rankedStatuses[1],
+      enabled: false,
+      activeProvider: 'copilot',
+    });
+
+    fireEvent.click(screen.getByTestId('toggle-codex'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-copilot')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('active-badge-codex')).not.toBeInTheDocument();
+    expect(mockUpdateCachedActiveProvider).toHaveBeenLastCalledWith('copilot');
+  });
+
   it('calls API when setting a provider active', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
