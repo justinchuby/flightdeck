@@ -747,12 +747,15 @@ describe('ProviderManager', () => {
       });
 
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+      const runtimeChanged = vi.fn();
+      mgr.on('provider:runtime-changed', runtimeChanged);
 
       await expect(mgr.setProviderEnabledPersisted('copilot', false)).rejects.toThrow('write failed');
       expect(mgr.getActiveProviderId()).toBe('copilot');
       expect(mgr.resolveAndPersistProvider()).toBe('copilot');
       expect(configStore.current.provider.id).toBe('copilot');
       expect(configStore.current.providerSettings.copilot.enabled).toBe(true);
+      expect(runtimeChanged).toHaveBeenCalledTimes(2);
     });
 
     it('clears a stale fallback override after a later successful provider change', async () => {

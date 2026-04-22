@@ -366,6 +366,7 @@ export class ProviderManager extends EventEmitter {
   private rollbackResolvedProviderOverride(configuredProviderId?: ProviderId): void {
     this.resolvedProviderOverride = null;
     this.failedProviderPersistenceConfiguredId = configuredProviderId ?? null;
+    this.emit('provider:runtime-changed');
   }
 
   private shouldSuppressFallback(configuredProviderId: ProviderId): boolean {
