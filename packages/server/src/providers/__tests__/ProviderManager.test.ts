@@ -576,9 +576,18 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
       // copilot is installed but explicitly disabled — should fall back to claude
       const result = mgr.resolveAndPersistProvider();
-      expect(result).toBe('copilot');
+      expect(result).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
       expect(configStore.writePartial).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: expect.objectContaining({ id: 'claude' }) }),
+        expect.objectContaining({
+          provider: {
+            id: 'claude',
+            binaryOverride: undefined,
+            argsOverride: undefined,
+            envOverride: undefined,
+            cloudProvider: undefined,
+          },
+        }),
       );
     });
 
@@ -594,14 +603,23 @@ describe('ProviderManager', () => {
 
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
       const result = mgr.resolveAndPersistProvider();
-      expect(result).toBe('copilot');
+      expect(result).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
       // Should persist the fallback
       expect(configStore.writePartial).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: expect.objectContaining({ id: 'claude' }) }),
+        expect.objectContaining({
+          provider: {
+            id: 'claude',
+            binaryOverride: undefined,
+            argsOverride: undefined,
+            envOverride: undefined,
+            cloudProvider: undefined,
+          },
+        }),
       );
     });
 
-    it('keeps resolveAndPersistProvider aligned with current active provider until fallback persistence completes', async () => {
+    it('switches reads to the fallback immediately while fallback persistence is pending', async () => {
       let resolveWrite: (() => void) | undefined;
       const configStore = createMockConfigStore({
         providerId: 'copilot',
@@ -611,6 +629,9 @@ describe('ProviderManager', () => {
         },
         providerRanking: ['copilot', 'claude', 'gemini'],
       });
+      configStore.current.provider.binaryOverride = '/custom/copilot';
+      configStore.current.provider.argsOverride = ['--copilot-only'];
+      configStore.current.provider.envOverride = { COPILOT_ONLY: '1' };
       configStore.writePartial = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
         resolveWrite = resolve;
       }));
@@ -622,14 +643,21 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
 
       expect(mgr.getActiveProviderId()).toBe('copilot');
-      expect(mgr.resolveAndPersistProvider()).toBe('copilot');
-      expect(mgr.getActiveProviderId()).toBe('copilot');
+      expect(mgr.resolveAndPersistProvider()).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
 
       resolveWrite?.();
       await Promise.resolve();
 
       expect(mgr.getActiveProviderId()).toBe('claude');
       expect(mgr.resolveAndPersistProvider()).toBe('claude');
+      expect(configStore.current.provider).toEqual({
+        id: 'claude',
+        binaryOverride: undefined,
+        argsOverride: undefined,
+        envOverride: undefined,
+        cloudProvider: undefined,
+      });
     });
 
     it('updates config-store reads after a successful persisted provider write', async () => {
@@ -655,11 +683,17 @@ describe('ProviderManager', () => {
       expect(configStore.current.providerSettings.copilot.enabled).toBe(false);
       expect(configStore.writePartial).toHaveBeenCalledWith({
         providerSettings: { copilot: { enabled: false, models: [] } },
-        provider: { id: 'claude' },
+        provider: {
+          id: 'claude',
+          binaryOverride: undefined,
+          argsOverride: undefined,
+          envOverride: undefined,
+          cloudProvider: undefined,
+        },
       });
     });
 
-    it('does not mutate config-store reads before a provider write succeeds', async () => {
+    it('switches runtime reads immediately while a persisted provider write is pending', async () => {
       let resolveWrite: (() => void) | undefined;
       const configStore = createMockConfigStore({
         providerId: 'copilot',
@@ -681,7 +715,7 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
       const writePromise = mgr.setProviderEnabledPersisted('copilot', false);
 
-      expect(mgr.getActiveProviderId()).toBe('copilot');
+      expect(mgr.getActiveProviderId()).toBe('claude');
       expect(configStore.current.provider.id).toBe('copilot');
       expect(configStore.current.providerSettings.copilot.enabled).toBe(true);
 
@@ -711,7 +745,7 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
 
       await expect(mgr.setProviderEnabledPersisted('copilot', false)).rejects.toThrow('write failed');
-      expect(mgr.getActiveProviderId()).toBe('copilot');
+      expect(mgr.getActiveProviderId()).toBe('claude');
       expect(configStore.current.provider.id).toBe('copilot');
       expect(configStore.current.providerSettings.copilot.enabled).toBe(true);
     });

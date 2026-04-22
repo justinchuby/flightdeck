@@ -97,6 +97,8 @@ export class ProviderManager {
 
   /** In-memory cache for CLI detection results (keyed by provider ID). */
   private readonly detectionCache = new Map<ProviderId, CachedDetection>();
+  /** Runtime fallback used while config-store persistence catches up or fails. */
+  private resolvedProviderOverride: ProviderId | null = null;
 
   /** Configurable TTL for testing. */
   readonly cacheTtlMs: number;
@@ -328,6 +330,26 @@ export class ProviderManager {
     return this.configStore ? this.configStore.current as FlightdeckConfig : null;
   }
 
+  private clearResolvedProviderOverrideIfAligned(providerId?: ProviderId): void {
+    if (!this.configStore || !this.resolvedProviderOverride) return;
+    if (providerId && this.resolvedProviderOverride !== providerId) return;
+    if (this.configStore.current.provider.id === this.resolvedProviderOverride) {
+      this.resolvedProviderOverride = null;
+    }
+  }
+
+  private buildProviderSwitchPatch(provider: ProviderId): { provider: Partial<FlightdeckConfig['provider']> } {
+    return {
+      provider: {
+        id: provider,
+        binaryOverride: undefined,
+        argsOverride: undefined,
+        envOverride: undefined,
+        cloudProvider: undefined,
+      },
+    };
+  }
+
   private applyConfigStorePatchAfterWrite(patch: {
     provider?: Partial<FlightdeckConfig['provider']>;
     providerSettings?: FlightdeckConfig['providerSettings'];
@@ -338,6 +360,9 @@ export class ProviderManager {
 
     if (patch.provider) {
       config.provider = { ...config.provider, ...patch.provider };
+      if (patch.provider.id) {
+        this.clearResolvedProviderOverrideIfAligned(patch.provider.id as ProviderId);
+      }
     }
     if (patch.providerSettings) {
       config.providerSettings = {
@@ -434,7 +459,7 @@ export class ProviderManager {
 
   getActiveProviderId(): ProviderId {
     if (this.configStore) {
-      return this.configStore.current.provider.id as ProviderId;
+      return this.resolvedProviderOverride ?? this.configStore.current.provider.id as ProviderId;
     }
     if (!this.db) return this.findFirstInstalledProvider();
     const raw = this.db.getSetting(`${SETTING_PREFIX}active`);
@@ -451,7 +476,9 @@ export class ProviderManager {
    * the active provider is actually usable.
    */
   resolveAndPersistProvider(): ProviderId {
-    const configured = this.getActiveProviderId();
+    const configured = this.configStore
+      ? this.configStore.current.provider.id as ProviderId
+      : this.getActiveProviderId();
 
     // Check if the configured provider is installed and enabled
     const { installed } = this.detectInstalled(configured);
@@ -466,8 +493,9 @@ export class ProviderManager {
     const fallbackProvider = this.findFirstUsableProvider(configured);
     if (fallbackProvider) {
       logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: fallbackProvider });
+      this.resolvedProviderOverride = fallbackProvider;
       this.persistActiveProvider(fallbackProvider);
-      return this.configStore ? this.getActiveProviderId() : fallbackProvider;
+      return fallbackProvider;
     }
 
     // No provider found — keep the configured one and let downstream handle the error
@@ -504,7 +532,7 @@ export class ProviderManager {
 
   private persistActiveProvider(provider: ProviderId): void {
     if (this.configStore) {
-      const patch = { provider: { id: provider } } satisfies { provider: Partial<FlightdeckConfig['provider']> };
+      const patch = this.buildProviderSwitchPatch(provider);
       // Only update the provider id — don't spread the current provider config,
       // which may contain overrides (binary, args, env, cloud) for a different provider.
       this.configStore.writePartial(patch)
@@ -543,11 +571,14 @@ export class ProviderManager {
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
       const patch = {
         providerSettings: { [provider]: { ...current, enabled } },
-        ...(fallbackProvider ? { provider: { id: fallbackProvider } } : {}),
+        ...(fallbackProvider ? this.buildProviderSwitchPatch(fallbackProvider) : {}),
       } satisfies {
         providerSettings: FlightdeckConfig['providerSettings'];
         provider?: Partial<FlightdeckConfig['provider']>;
       };
+      if (fallbackProvider) {
+        this.resolvedProviderOverride = fallbackProvider;
+      }
       await this.configStore.writePartial(patch);
       this.applyConfigStorePatchAfterWrite(patch);
       return fallbackProvider ?? activeProvider;
@@ -568,7 +599,7 @@ export class ProviderManager {
     }
 
     if (this.configStore) {
-      const patch = { provider: { id: provider } } satisfies { provider: Partial<FlightdeckConfig['provider']> };
+      const patch = this.buildProviderSwitchPatch(provider);
       await this.configStore.writePartial(patch);
       this.applyConfigStorePatchAfterWrite(patch);
       return provider;
