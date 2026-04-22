@@ -88,9 +88,19 @@ describe('ReplayScrubber – extra coverage', () => {
         { id: 'a2', status: 'running' },
         { id: 'a3', status: 'idle' },
       ],
-      totalTasks: 10,
-      completedTasks: 5,
-      pendingDecisions: 0,
+      dagTasks: [
+        { id: 't1', dagStatus: 'done' },
+        { id: 't2', dagStatus: 'done' },
+        { id: 't3', dagStatus: 'done' },
+        { id: 't4', dagStatus: 'done' },
+        { id: 't5', dagStatus: 'done' },
+        { id: 't6', dagStatus: 'running' },
+        { id: 't7', dagStatus: 'running' },
+        { id: 't8', dagStatus: 'pending' },
+        { id: 't9', dagStatus: 'pending' },
+        { id: 't10', dagStatus: 'pending' },
+      ],
+      decisions: [],
     };
     const kf: ReplayKeyframe[] = [
       { type: 'spawn', timestamp: '2024-01-01T00:00:00Z', label: 'A', agentId: 'a1' },
@@ -110,9 +120,12 @@ describe('ReplayScrubber – extra coverage', () => {
   it('renders pending decisions in world state', () => {
     const worldState = {
       agents: [{ id: 'a1', status: 'running' }],
-      totalTasks: 0,
-      completedTasks: 0,
-      pendingDecisions: 3,
+      dagTasks: [],
+      decisions: [
+        { id: 'd1', title: 'D1', status: 'pending' },
+        { id: 'd2', title: 'D2', status: 'pending' },
+        { id: 'd3', title: 'D3', status: 'pending' },
+      ],
     };
     const kf: ReplayKeyframe[] = [
       { type: 'spawn', timestamp: '2024-01-01T00:00:00Z', label: 'A', agentId: 'a1' },
@@ -127,12 +140,11 @@ describe('ReplayScrubber – extra coverage', () => {
     expect(screen.getByText('3 pending')).toBeInTheDocument();
   });
 
-  it('does not show tasks when totalTasks is 0', () => {
+  it('does not show tasks when dagTasks is empty', () => {
     const worldState = {
       agents: [{ id: 'a1', status: 'idle' }],
-      totalTasks: 0,
-      completedTasks: 0,
-      pendingDecisions: 0,
+      dagTasks: [],
+      decisions: [],
     };
     const kf: ReplayKeyframe[] = [
       { type: 'spawn', timestamp: '2024-01-01T00:00:00Z', label: 'A', agentId: 'a1' },
