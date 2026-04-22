@@ -39,15 +39,16 @@ const MOCK_STATUSES = [
 const MOCK_RANKING = {
   ranking: ['copilot', 'claude', 'gemini', 'opencode', 'cursor', 'codex', 'kimi', 'qwen-code'],
 };
+const MOCK_ACTIVE_PROVIDER = { activeProvider: 'copilot' };
 
 /**
- * Mock the two-phase loading: configs + ranking (Phase 1), then statuses (Phase 2).
- * Calls are: [0] /settings/providers, [1] /settings/provider-ranking, [2] /settings/providers/status
+ * Mock the startup loading: configs + ranking + active provider, then statuses.
  */
 function mockProviderApis() {
   mockApiFetch
     .mockResolvedValueOnce(MOCK_CONFIGS)
     .mockResolvedValueOnce(MOCK_RANKING)
+    .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
     .mockResolvedValueOnce(MOCK_STATUSES);
 }
 
@@ -58,6 +59,7 @@ function mockProviderApisConfigOnly() {
   mockApiFetch
     .mockResolvedValueOnce(MOCK_CONFIGS)
     .mockResolvedValueOnce(MOCK_RANKING)
+    .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
     .mockReturnValueOnce(new Promise(() => {})); // status never resolves
 }
 
@@ -115,6 +117,14 @@ describe('ProvidersSection', () => {
     });
   });
 
+  it('shows the active badge for the fetched active provider', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-copilot')).toBeInTheDocument();
+    });
+  });
+
   it('shows "Ready" badge for installed+authenticated providers', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
@@ -163,6 +173,29 @@ describe('ProvidersSection', () => {
       expect(mockApiFetch).toHaveBeenCalledWith(
         '/settings/providers/copilot',
         expect.objectContaining({ method: 'PUT' }),
+      );
+    });
+  });
+
+  it('calls API when setting a provider active', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    const claudeCard = screen.getByTestId('provider-card-claude');
+    fireEvent.click(claudeCard.querySelector('[role="button"]')!);
+    mockApiFetch.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByTestId('set-active-claude'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/settings/provider',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ id: 'claude' }),
+        }),
       );
     });
   });
@@ -216,6 +249,7 @@ describe('ProvidersSection', () => {
     mockApiFetch
       .mockResolvedValueOnce(MOCK_CONFIGS)
       .mockResolvedValueOnce(MOCK_RANKING)
+      .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
       .mockRejectedValueOnce(new Error('status timeout'));
     // Suppress expected warning from ProvidersSection error path
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});

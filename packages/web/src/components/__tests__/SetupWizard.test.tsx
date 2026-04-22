@@ -50,12 +50,45 @@ const MOCK_STATUSES = [
 ];
 
 const ALL_NOT_INSTALLED_STATUSES = MOCK_STATUSES.map((s) => ({ ...s, installed: false, binaryPath: null }));
+const MOCK_RANKING = { ranking: MOCK_CONFIGS.map(({ id }) => id) };
 
-function mockTwoPhase(configs = MOCK_CONFIGS, statuses = MOCK_STATUSES) {
+function mockWizardApis({
+  configs = MOCK_CONFIGS,
+  statuses = MOCK_STATUSES,
+  ranking = MOCK_RANKING,
+}: {
+  configs?: typeof MOCK_CONFIGS;
+  statuses?: typeof MOCK_STATUSES;
+  ranking?: { ranking: string[] };
+} = {}) {
   mockApiFetch.mockImplementation((url: string) => {
     if (url === '/settings/providers') return Promise.resolve(configs);
+    if (url === '/settings/provider-ranking') return Promise.resolve(ranking);
     if (url === '/settings/providers/status') return Promise.resolve(statuses);
     return Promise.resolve(undefined);
+  });
+}
+
+async function goToProvidersStep() {
+  fireEvent.click(screen.getByTestId('wizard-next'));
+  await waitFor(() => {
+    expect(screen.getByTestId('step-providers')).toBeInTheDocument();
+  });
+}
+
+async function goToPreferencesStep() {
+  await goToProvidersStep();
+  fireEvent.click(screen.getByTestId('wizard-next'));
+  await waitFor(() => {
+    expect(screen.getByTestId('step-preferences')).toBeInTheDocument();
+  });
+}
+
+async function goToDoneStep() {
+  await goToPreferencesStep();
+  fireEvent.click(screen.getByTestId('wizard-next'));
+  await waitFor(() => {
+    expect(screen.getByTestId('step-done')).toBeInTheDocument();
   });
 }
 
@@ -71,7 +104,7 @@ describe('SetupWizard', () => {
   });
 
   it('renders welcome step initially', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
     expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
@@ -80,14 +113,10 @@ describe('SetupWizard', () => {
   });
 
   it('navigates to providers step and shows installed count after detection', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    fireEvent.click(screen.getByTestId('wizard-next'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('step-providers')).toBeInTheDocument();
-    });
+    await goToProvidersStep();
 
     // After status loads, should show installed count
     await waitFor(() => {
@@ -96,11 +125,10 @@ describe('SetupWizard', () => {
   });
 
   it('shows installed status for configured providers', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    fireEvent.click(screen.getByTestId('wizard-next'));
-
+    await goToProvidersStep();
     await waitFor(() => {
       expect(screen.getByTestId('provider-copilot')).toBeInTheDocument();
     });
@@ -113,50 +141,46 @@ describe('SetupWizard', () => {
   });
 
   it('shows no providers message when none detected', async () => {
-    mockTwoPhase(MOCK_CONFIGS, ALL_NOT_INSTALLED_STATUSES);
+    mockWizardApis({ configs: MOCK_CONFIGS, statuses: ALL_NOT_INSTALLED_STATUSES });
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    fireEvent.click(screen.getByTestId('wizard-next'));
-
+    await goToProvidersStep();
     await waitFor(() => {
       expect(screen.getByText(/no providers detected/i)).toBeInTheDocument();
     });
   });
 
-  it('navigates through all three steps', async () => {
-    mockTwoPhase();
+  it('navigates through welcome, providers, preferences, and done steps', async () => {
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    // Step 1: Welcome
     expect(screen.getByTestId('step-welcome')).toBeInTheDocument();
+    await goToProvidersStep();
     fireEvent.click(screen.getByTestId('wizard-next'));
-
-    // Step 2: Providers
     await waitFor(() => {
-      expect(screen.getByTestId('step-providers')).toBeInTheDocument();
+      expect(screen.getByTestId('step-preferences')).toBeInTheDocument();
     });
     fireEvent.click(screen.getByTestId('wizard-next'));
+    await waitFor(() => {
+      expect(screen.getByTestId('step-done')).toBeInTheDocument();
+    });
 
-    // Step 3: Done
     expect(screen.getByTestId('step-done')).toBeInTheDocument();
     expect(screen.getByText(/you're ready/i)).toBeInTheDocument();
   });
 
   it('back button navigates to previous step', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    fireEvent.click(screen.getByTestId('wizard-next'));
-    await waitFor(() => {
-      expect(screen.getByTestId('step-providers')).toBeInTheDocument();
-    });
+    await goToProvidersStep();
 
     fireEvent.click(screen.getByTestId('wizard-back'));
     expect(screen.getByTestId('step-welcome')).toBeInTheDocument();
   });
 
   it('dismiss sets localStorage and calls onComplete', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
     fireEvent.click(screen.getByTestId('wizard-dismiss'));
@@ -165,7 +189,7 @@ describe('SetupWizard', () => {
   });
 
   it('skip sets localStorage and calls onComplete', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
     fireEvent.click(screen.getByTestId('wizard-skip'));
@@ -174,24 +198,43 @@ describe('SetupWizard', () => {
   });
 
   it('finish on done step sets localStorage and calls onComplete', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    // Navigate to done
-    fireEvent.click(screen.getByTestId('wizard-next'));
-    await waitFor(() => screen.getByTestId('step-providers'));
-    fireEvent.click(screen.getByTestId('wizard-next'));
+    await goToDoneStep();
 
     fireEvent.click(screen.getByTestId('wizard-finish'));
     expect(localStorage.getItem('flightdeck-setup-completed')).toBe('true');
     expect(onComplete).toHaveBeenCalled();
   });
 
-  it('shows setup links for providers with multiple links', async () => {
-    mockTwoPhase();
+  it('applies selected preferences before continuing to done', async () => {
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
+    await goToPreferencesStep();
+
+    fireEvent.click(screen.getByTestId('user-type-team'));
+    fireEvent.click(screen.getByTestId('oversight-balanced'));
     fireEvent.click(screen.getByTestId('wizard-next'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/config',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ maxConcurrentAgents: 50, oversightLevel: 'balanced' }),
+        }),
+      );
+    });
+    expect(screen.getByTestId('step-done')).toBeInTheDocument();
+  });
+
+  it('shows setup links for providers with multiple links', async () => {
+    mockWizardApis();
+    await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
+
+    await goToProvidersStep();
     await waitFor(() => screen.getByTestId('provider-claude'));
 
     // Claude should show ACP adapter link
@@ -201,10 +244,10 @@ describe('SetupWizard', () => {
   });
 
   it('enable/disable toggle calls API and updates UI', async () => {
-    mockTwoPhase();
+    mockWizardApis();
     await act(async () => { render(<SetupWizard onComplete={onComplete} />); });
 
-    fireEvent.click(screen.getByTestId('wizard-next'));
+    await goToProvidersStep();
     await waitFor(() => screen.getByTestId('toggle-copilot'));
 
     // Toggle copilot off
