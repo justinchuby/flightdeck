@@ -122,7 +122,7 @@ export function LeadDashboard({ readOnly = false }: Props) {
   const { catchUpSummary, dismissCatchUp } = useCatchUpSummary(selectedLeadId, agents, currentProject);
 
   const chatInitialScroll = useRef(false);
-  useLeadMessages(selectedLeadId, readOnly, ws, chatInitialScroll);
+  const { hasMore, loadingOlder, loadOlderMessages } = useLeadMessages(selectedLeadId, readOnly, ws, chatInitialScroll);
 
   const isActiveAgent = selectedLeadId != null && !readOnly && isActive === true;
   useLeadPolling(selectedLeadId, isActiveAgent, historicalProjectId);
@@ -266,6 +266,9 @@ export function LeadDashboard({ readOnly = false }: Props) {
               catchUpSummary={catchUpSummary}
               onDismissCatchUp={dismissCatchUp}
               onScrollToBottom={handleScrollToBottom}
+              onLoadOlder={loadOlderMessages}
+              hasMore={hasMore}
+              loadingOlder={loadingOlder}
             />
 
             {readOnly ? (
