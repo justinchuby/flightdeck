@@ -223,9 +223,16 @@ describe('ReplayScrubber', () => {
               { id: 'a1', role: 'dev', status: 'running' },
               { id: 'a2', role: 'arch', status: 'idle' },
             ],
-            pendingDecisions: 1,
-            completedTasks: 3,
-            totalTasks: 5,
+            dagTasks: [
+              { id: 't1', dagStatus: 'done' },
+              { id: 't2', dagStatus: 'done' },
+              { id: 't3', dagStatus: 'done' },
+              { id: 't4', dagStatus: 'running' },
+              { id: 't5', dagStatus: 'pending' },
+            ],
+            decisions: [
+              { id: 'd1', title: 'Dec', status: 'pending' },
+            ],
           },
         }}
       />,

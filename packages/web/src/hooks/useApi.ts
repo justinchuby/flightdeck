@@ -7,6 +7,21 @@ const API_BASE = '/api';
 /** Default request timeout in milliseconds */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * Error thrown when an API request returns a non-2xx HTTP status.
+ * Carries the HTTP status code so callers can branch on it
+ * (e.g. don't retry 401/403/404).
+ */
+export class ApiHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiHttpError';
+  }
+}
+
 export interface ApiFetchOptions extends RequestInit {
   /** Per-request timeout in ms (default: 30 000). Set to 0 to disable. */
   timeoutMs?: number;
@@ -55,7 +70,7 @@ export async function apiFetch<T = unknown>(path: string, opts?: ApiFetchOptions
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(body.error || `HTTP ${res.status}`);
+      throw new ApiHttpError(body.error || `HTTP ${res.status}`, res.status);
     }
     return res.json();
   } catch (err: unknown) {
