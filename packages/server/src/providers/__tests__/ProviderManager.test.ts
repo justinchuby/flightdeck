@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProviderManager } from '../ProviderManager.js';
 import { WHICH_COMMAND } from '../../utils/platform.js';
@@ -370,6 +371,86 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ execCommand: exec as any });
       expect(mgr.isProviderEnabled('claude')).toBe(true);
     });
+
+    it('clears provider overrides when config-store fallback disables the active provider', async () => {
+      const emitter = new EventEmitter();
+      const configStore = {
+        current: {
+          provider: {
+            id: 'copilot',
+            binaryOverride: '/custom/copilot',
+            argsOverride: ['--copilot-only'],
+            envOverride: { COPILOT_ONLY: '1' },
+          },
+          providerSettings: {
+            copilot: { enabled: true, models: [] },
+            claude: { enabled: true, models: [] },
+          },
+          providerRanking: ['copilot', 'claude'],
+        },
+        writePartial: vi.fn().mockResolvedValue(undefined),
+        on: emitter.on.bind(emitter),
+        emit: emitter.emit.bind(emitter),
+      };
+
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+
+      mgr.setProviderEnabled('copilot', false);
+      await Promise.resolve();
+
+      expect(configStore.writePartial).toHaveBeenCalledWith({
+        providerSettings: { copilot: { enabled: false, models: [] } },
+        provider: {
+          id: 'claude',
+          binaryOverride: undefined,
+          argsOverride: undefined,
+          envOverride: undefined,
+          cloudProvider: undefined,
+        },
+      });
+      expect(configStore.current.provider).toEqual({
+        id: 'claude',
+        binaryOverride: undefined,
+        argsOverride: undefined,
+        envOverride: undefined,
+        cloudProvider: undefined,
+      });
+    });
+
+    it('falls back to another usable provider when disabling the active provider', () => {
+      const mgr = createManager();
+      mgr.setActiveProviderId('copilot');
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
+
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      mgr.setProviderEnabled('copilot', false);
+      expect(mgr.getActiveProviderId()).toBe('claude');
+    });
+
+    it('rejects disabling the active provider when no fallback is available', () => {
+      const mgr = createManager();
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        throw new Error('not found');
+      });
+      mgr.setActiveProviderId('copilot');
+
+      expect(() => mgr.setProviderEnabled('copilot', false)).toThrow(
+        "Cannot disable active provider 'copilot' without another installed and enabled provider",
+      );
+      expect(mgr.isProviderEnabled('copilot')).toBe(true);
+    });
   });
 
   // ── model preferences ────────────────────────────────────
@@ -445,6 +526,7 @@ describe('ProviderManager', () => {
       const mgr = createManager();
       mgr.setActiveProviderId('copilot');
       mgr.setProviderEnabled('copilot', true);
+      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
 
       // Mock: copilot is installed but disabled
       exec.mockImplementation((cmd: string) => {
@@ -455,7 +537,6 @@ describe('ProviderManager', () => {
       // Disable copilot, enable claude
       mgr.setProviderEnabled('copilot', false);
       mgr.setProviderEnabled('claude', true);
-      mgr.setProviderRanking(['copilot', 'claude', 'gemini', 'codex', 'cursor', 'opencode']);
 
       const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
@@ -497,6 +578,7 @@ describe('ProviderManager', () => {
       providerSettings?: Record<string, { enabled: boolean; models: string[] }>;
       providerRanking?: string[];
     }) {
+      const emitter = new EventEmitter();
       const config = {
         provider: { id: overrides?.providerId ?? 'copilot' },
         providerSettings: overrides?.providerSettings ?? {},
@@ -505,6 +587,8 @@ describe('ProviderManager', () => {
       return {
         current: config,
         writePartial: vi.fn().mockResolvedValue(undefined),
+        on: emitter.on.bind(emitter),
+        emit: emitter.emit.bind(emitter),
       };
     }
 
@@ -548,6 +632,18 @@ describe('ProviderManager', () => {
       // copilot is installed but explicitly disabled — should fall back to claude
       const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
+      expect(configStore.writePartial).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: {
+            id: 'claude',
+            binaryOverride: undefined,
+            argsOverride: undefined,
+            envOverride: undefined,
+            cloudProvider: undefined,
+          },
+        }),
+      );
     });
 
     it('falls back through ranking when configured provider not installed', () => {
@@ -563,14 +659,254 @@ describe('ProviderManager', () => {
       const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
       const result = mgr.resolveAndPersistProvider();
       expect(result).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
       // Should persist the fallback
       expect(configStore.writePartial).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: expect.objectContaining({ id: 'claude' }) }),
+        expect.objectContaining({
+          provider: {
+            id: 'claude',
+            binaryOverride: undefined,
+            argsOverride: undefined,
+            envOverride: undefined,
+            cloudProvider: undefined,
+          },
+        }),
       );
+    });
+
+    it('switches reads to the fallback immediately while fallback persistence is pending', async () => {
+      let resolveWrite: (() => void) | undefined;
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      configStore.current.provider.binaryOverride = '/custom/copilot';
+      configStore.current.provider.argsOverride = ['--copilot-only'];
+      configStore.current.provider.envOverride = { COPILOT_ONLY: '1' };
+      configStore.writePartial = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+        resolveWrite = resolve;
+      }));
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+
+      expect(mgr.getActiveProviderId()).toBe('copilot');
+      expect(mgr.resolveAndPersistProvider()).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
+
+      resolveWrite?.();
+      await Promise.resolve();
+
+      expect(mgr.getActiveProviderId()).toBe('claude');
+      expect(mgr.resolveAndPersistProvider()).toBe('claude');
+      expect(configStore.current.provider).toEqual({
+        id: 'claude',
+        binaryOverride: undefined,
+        argsOverride: undefined,
+        envOverride: undefined,
+        cloudProvider: undefined,
+      });
+    });
+
+    it('updates config-store reads after a successful persisted provider write', async () => {
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+      await expect(mgr.setProviderEnabledPersisted('copilot', false)).resolves.toBe('claude');
+
+      expect(mgr.getActiveProviderId()).toBe('claude');
+      expect(configStore.current.provider.id).toBe('claude');
+      expect(configStore.current.providerSettings.copilot.enabled).toBe(false);
+      expect(configStore.writePartial).toHaveBeenCalledWith({
+        providerSettings: { copilot: { enabled: false, models: [] } },
+        provider: {
+          id: 'claude',
+          binaryOverride: undefined,
+          argsOverride: undefined,
+          envOverride: undefined,
+          cloudProvider: undefined,
+        },
+      });
+    });
+
+    it('switches runtime reads immediately while a persisted provider write is pending', async () => {
+      let resolveWrite: (() => void) | undefined;
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      configStore.writePartial = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+        resolveWrite = resolve;
+      }));
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+      const writePromise = mgr.setProviderEnabledPersisted('copilot', false);
+
+      expect(mgr.getActiveProviderId()).toBe('claude');
+      expect(configStore.current.provider.id).toBe('copilot');
+      expect(configStore.current.providerSettings.copilot.enabled).toBe(true);
+
+      resolveWrite?.();
+      await expect(writePromise).resolves.toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
+      expect(configStore.current.provider.id).toBe('claude');
+      expect(configStore.current.providerSettings.copilot.enabled).toBe(false);
+    });
+
+    it('rolls back runtime override state when provider write fails', async () => {
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      configStore.writePartial = vi.fn().mockRejectedValue(new Error('write failed'));
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+      const runtimeChanged = vi.fn();
+      mgr.on('provider:runtime-changed', runtimeChanged);
+
+      await expect(mgr.setProviderEnabledPersisted('copilot', false)).rejects.toThrow('write failed');
+      expect(mgr.getActiveProviderId()).toBe('copilot');
+      expect(mgr.resolveAndPersistProvider()).toBe('copilot');
+      expect(configStore.current.provider.id).toBe('copilot');
+      expect(configStore.current.providerSettings.copilot.enabled).toBe(true);
+      expect(runtimeChanged).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears a stale fallback override after a later successful provider change', async () => {
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+          gemini: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      configStore.writePartial = vi.fn()
+        .mockRejectedValueOnce(new Error('write failed'))
+        .mockResolvedValueOnce(undefined);
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} gemini`) return '/usr/local/bin/gemini';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+
+      await expect(mgr.setProviderEnabledPersisted('copilot', false)).rejects.toThrow('write failed');
+      expect(mgr.getActiveProviderId()).toBe('copilot');
+      expect(configStore.current.provider.id).toBe('copilot');
+      expect(mgr.resolveAndPersistProvider()).toBe('copilot');
+
+      await expect(mgr.setActiveProviderIdPersisted('gemini')).resolves.toBe('gemini');
+
+      expect(mgr.getActiveProviderId()).toBe('gemini');
+      expect(configStore.current.provider.id).toBe('gemini');
+    });
+
+    it('clears stale runtime override state on external config reloads', async () => {
+      let resolveWrite: (() => void) | undefined;
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+          gemini: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      configStore.writePartial = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+        resolveWrite = resolve;
+      }));
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        if (cmd === `${WHICH_COMMAND} gemini`) return '/usr/local/bin/gemini';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+
+      expect(mgr.resolveAndPersistProvider()).toBe('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
+
+      configStore.current.provider.id = 'gemini';
+      configStore.emit('config:provider:changed', { config: configStore.current.provider, diffs: [] });
+      configStore.emit('config:reloaded', { config: configStore.current, diffs: [], previous: configStore.current });
+
+      expect(mgr.getActiveProviderId()).toBe('gemini');
+      expect(mgr.resolveAndPersistProvider()).toBe('gemini');
+
+      resolveWrite?.();
+      await Promise.resolve();
+
+      expect(mgr.getActiveProviderId()).toBe('gemini');
     });
   });
 
   // ── getActiveProviderId fallback ────────────────────────
+
+  describe('setActiveProviderId', () => {
+    it('persists a usable provider', () => {
+      const mgr = createManager();
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      mgr.setActiveProviderId('claude');
+      expect(mgr.getActiveProviderId()).toBe('claude');
+    });
+
+    it('rejects disabled providers', () => {
+      const mgr = createManager();
+      mgr.setProviderEnabled('claude', false);
+      expect(() => mgr.setActiveProviderId('claude')).toThrow("Provider 'claude' is disabled");
+    });
+
+    it('rejects uninstalled providers', () => {
+      const mgr = createManager();
+      exec.mockImplementation(() => { throw new Error('not found'); });
+      expect(() => mgr.setActiveProviderId('gemini')).toThrow("Provider 'gemini' is not installed");
+    });
+  });
 
   describe('getActiveProviderId without db or configStore', () => {
     it('returns first installed provider instead of hardcoded copilot', () => {

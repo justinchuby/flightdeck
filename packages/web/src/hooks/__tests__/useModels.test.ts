@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useModels, _resetModelsCache, deriveModelName } from '../useModels';
+import { useModels, _resetModelsCache, deriveModelName, updateCachedActiveProvider } from '../useModels';
 
 const mockApiFetch = vi.fn();
 vi.mock('../useApi', () => ({
@@ -76,6 +76,23 @@ describe('useModels', () => {
 
     expect(result.current.modelsByProvider).toEqual(MOCK_RESPONSE.modelsByProvider);
     expect(result.current.activeProvider).toBe('claude');
+  });
+
+  it('updates cached consumers immediately when the active provider changes', async () => {
+    mockApiFetch.mockResolvedValue(MOCK_RESPONSE);
+
+    const { result } = renderHook(() => useModels());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.activeProvider).toBe('claude');
+    expect(result.current.filteredModels).toEqual(['claude-opus-4.6', 'claude-sonnet-4.6']);
+
+    updateCachedActiveProvider('copilot');
+
+    await waitFor(() => {
+      expect(result.current.activeProvider).toBe('copilot');
+    });
+    expect(result.current.filteredModels).toEqual(['gpt-5.1']);
   });
 });
 

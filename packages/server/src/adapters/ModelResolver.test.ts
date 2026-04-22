@@ -154,9 +154,9 @@ describe('ModelResolver', () => {
       expect(result.reason).toContain('equivalent');
     });
 
-    it('maps claude-opus-4.6 to gpt-5.2-codex on Codex', () => {
+    it('maps claude-opus-4.6 to gpt-5.4 on Codex', () => {
       const result = resolveModel('claude-opus-4.6', 'codex')!;
-      expect(result.model).toBe('gpt-5.2-codex');
+      expect(result.model).toBe('gpt-5.4');
       expect(result.translated).toBe(true);
     });
 
@@ -185,9 +185,9 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
-    it('maps gemini-3.1-pro to gpt-5.2-codex on Codex', () => {
+    it('maps gemini-3.1-pro to gpt-5.4 on Codex', () => {
       const result = resolveModel('gemini-3.1-pro', 'codex')!;
-      expect(result.model).toBe('gpt-5.2-codex');
+      expect(result.model).toBe('gpt-5.4');
       expect(result.translated).toBe(true);
     });
 
@@ -296,7 +296,7 @@ describe('ModelResolver', () => {
       expect(resolveModel('claude-opus-4.6', 'claude')?.model).toBe('opus');
       expect(resolveModel('claude-opus-4.6', 'gemini')?.model).toBe('gemini-3.1-pro');
       expect(resolveModel('claude-opus-4.6', 'cursor')?.model).toBe('claude-opus-4.6');
-      expect(resolveModel('claude-opus-4.6', 'codex')?.model).toBe('gpt-5.2-codex');
+      expect(resolveModel('claude-opus-4.6', 'codex')?.model).toBe('gpt-5.4');
       expect(resolveModel('claude-opus-4.6', 'opencode')?.model).toBe('anthropic/claude-opus-4.6');
     });
 

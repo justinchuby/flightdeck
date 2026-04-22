@@ -121,6 +121,21 @@ export interface ServiceContainer extends AppContext {
   };
 }
 
+function syncRuntimeProviderConfig(providerManager: ProviderManager, configStore: ConfigStore): void {
+  const resolvedProvider = providerManager.getActiveProviderId();
+  if (resolvedProvider !== configStore.current.provider.id) {
+    updateConfig({
+      provider: resolvedProvider,
+      providerBinaryOverride: undefined,
+      providerArgsOverride: undefined,
+      providerEnvOverride: undefined,
+      cloudProvider: undefined,
+    });
+    return;
+  }
+  updateConfig(toProviderConfig(configStore.current.provider));
+}
+
 // ── Helpers ─────────────────────────────────────────────────
 
 /** Map YAML provider config to the flat ServerConfig fields. */
@@ -264,20 +279,9 @@ export async function createContainer(opts: ContainerConfig): Promise<ServiceCon
   // Resolve the best available provider at startup — if the configured provider
   // (from YAML or default 'copilot') isn't installed, fall back to the first
   // available one from the provider ranking.
-  const resolvedProvider = providerManager.resolveAndPersistProvider();
-  if (resolvedProvider !== configStore.current.provider.id) {
-    // Falling back to a different provider — clear YAML overrides so the
-    // original provider's binary/args/env/cloud settings don't bleed through.
-    updateConfig({
-      provider: resolvedProvider,
-      providerBinaryOverride: undefined,
-      providerArgsOverride: undefined,
-      providerEnvOverride: undefined,
-      cloudProvider: undefined,
-    });
-  } else {
-    updateConfig({ provider: resolvedProvider });
-  }
+  providerManager.resolveAndPersistProvider();
+  syncRuntimeProviderConfig(providerManager, configStore);
+  providerManager.on('provider:runtime-changed', () => syncRuntimeProviderConfig(providerManager, configStore));
 
   const skillsLoader = new SkillsLoader(join(repoRoot, '.github/skills'));
   skillsLoader.loadAll();
@@ -555,19 +559,8 @@ function wireEvents(c: ServiceContainer): void {
     updateConfig(toProviderConfig(providerCfg));
     // Re-resolve in case the new provider isn't installed
     if (c.providerManager) {
-      const resolved = c.providerManager.resolveAndPersistProvider();
-      if (resolved !== providerCfg.id) {
-        // Falling back — clear overrides from the unreachable provider
-        updateConfig({
-          provider: resolved,
-          providerBinaryOverride: undefined,
-          providerArgsOverride: undefined,
-          providerEnvOverride: undefined,
-          cloudProvider: undefined,
-        });
-      } else {
-        updateConfig({ provider: resolved });
-      }
+      c.providerManager.resolveAndPersistProvider();
+      syncRuntimeProviderConfig(c.providerManager, configStore);
     }
   });
 

@@ -6,8 +6,12 @@ import { ProvidersSection } from '../ProvidersSection';
 // ── Mocks ─────────────────────────────────────────────────
 
 const mockApiFetch = vi.fn();
+const mockUpdateCachedActiveProvider = vi.fn();
 vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: any[]) => mockApiFetch(...args),
+}));
+vi.mock('../../../hooks/useModels', () => ({
+  updateCachedActiveProvider: (...args: any[]) => mockUpdateCachedActiveProvider(...args),
 }));
 
 // ── Fixtures ──────────────────────────────────────────────
@@ -39,15 +43,16 @@ const MOCK_STATUSES = [
 const MOCK_RANKING = {
   ranking: ['copilot', 'claude', 'gemini', 'opencode', 'cursor', 'codex', 'kimi', 'qwen-code'],
 };
+const MOCK_ACTIVE_PROVIDER = { activeProvider: 'copilot' };
 
 /**
- * Mock the two-phase loading: configs + ranking (Phase 1), then statuses (Phase 2).
- * Calls are: [0] /settings/providers, [1] /settings/provider-ranking, [2] /settings/providers/status
+ * Mock the startup loading: configs + ranking + active provider, then statuses.
  */
 function mockProviderApis() {
   mockApiFetch
     .mockResolvedValueOnce(MOCK_CONFIGS)
     .mockResolvedValueOnce(MOCK_RANKING)
+    .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
     .mockResolvedValueOnce(MOCK_STATUSES);
 }
 
@@ -58,7 +63,18 @@ function mockProviderApisConfigOnly() {
   mockApiFetch
     .mockResolvedValueOnce(MOCK_CONFIGS)
     .mockResolvedValueOnce(MOCK_RANKING)
+    .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
     .mockReturnValueOnce(new Promise(() => {})); // status never resolves
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 // ── Tests ─────────────────────────────────────────────────
@@ -66,6 +82,7 @@ function mockProviderApisConfigOnly() {
 describe('ProvidersSection', () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    mockUpdateCachedActiveProvider.mockReset();
   });
 
   it('renders loading state initially', () => {
@@ -115,6 +132,14 @@ describe('ProvidersSection', () => {
     });
   });
 
+  it('hydrates the cached active provider from startup data', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('copilot');
+    });
+  });
+
   it('shows "Ready" badge for installed+authenticated providers', async () => {
     mockProviderApis();
     render(<ProvidersSection />);
@@ -157,7 +182,7 @@ describe('ProvidersSection', () => {
     await waitFor(() => {
       expect(screen.getByTestId('providers-list')).toBeInTheDocument();
     });
-    mockApiFetch.mockResolvedValueOnce({ ...MOCK_CONFIGS[0], enabled: false });
+    mockApiFetch.mockResolvedValueOnce({ ...MOCK_STATUSES[0], enabled: false, activeProvider: 'claude' });
     fireEvent.click(screen.getByTestId('toggle-copilot'));
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith(
@@ -165,6 +190,98 @@ describe('ProvidersSection', () => {
         expect.objectContaining({ method: 'PUT' }),
       );
     });
+  });
+
+  it('updates the active badge immediately when disabling the active provider triggers a fallback', async () => {
+    const rankedConfigs = [
+      { id: 'copilot', name: 'GitHub Copilot SDK', enabled: true },
+      { id: 'codex', name: 'Codex CLI', enabled: true },
+      { id: 'claude', name: 'Claude Code', enabled: true },
+    ];
+    const rankedStatuses = [
+      { id: 'copilot', installed: true, authenticated: true, binaryPath: '/usr/bin/copilot', version: '1.0.0' },
+      { id: 'codex', installed: true, authenticated: true, binaryPath: '/usr/bin/codex', version: '0.5.0' },
+      { id: 'claude', installed: true, authenticated: true, binaryPath: '/usr/bin/claude', version: '2.1.0' },
+    ];
+
+    mockApiFetch
+      .mockResolvedValueOnce(rankedConfigs)
+      .mockResolvedValueOnce({ ranking: ['copilot', 'codex', 'claude'] })
+      .mockResolvedValueOnce({ activeProvider: 'copilot' })
+      .mockResolvedValueOnce(rankedStatuses);
+
+    render(<ProvidersSection />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-copilot')).toBeInTheDocument();
+    });
+
+    const codexCard = screen.getByTestId('provider-card-codex');
+    fireEvent.click(codexCard.querySelector('[role="button"]')!);
+
+    mockApiFetch.mockResolvedValueOnce({ activeProvider: 'codex' });
+    fireEvent.click(screen.getByTestId('set-active-codex'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-codex')).toBeInTheDocument();
+    });
+
+    const disableRequest = createDeferred<{
+      id: string;
+      installed: boolean;
+      authenticated: boolean | null;
+      binaryPath: string | null;
+      version: string | null;
+      enabled: boolean;
+      activeProvider: string;
+    }>();
+    mockApiFetch.mockReturnValueOnce(disableRequest.promise);
+
+    fireEvent.click(screen.getByTestId('toggle-codex'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-badge-copilot')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('active-badge-codex')).not.toBeInTheDocument();
+    expect(mockUpdateCachedActiveProvider).toHaveBeenLastCalledWith('copilot');
+
+    disableRequest.resolve({
+      ...rankedStatuses[1],
+      enabled: false,
+      activeProvider: 'copilot',
+    });
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/settings/providers/codex',
+        expect.objectContaining({ method: 'PUT' }),
+      );
+    });
+  });
+
+  it('calls API when setting a provider active', async () => {
+    mockProviderApis();
+    render(<ProvidersSection />);
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    const claudeCard = screen.getByTestId('provider-card-claude');
+    fireEvent.click(claudeCard.querySelector('[role="button"]')!);
+    mockApiFetch.mockResolvedValueOnce({ activeProvider: 'claude' });
+    fireEvent.click(screen.getByTestId('set-active-claude'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/settings/provider',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ id: 'claude' }),
+        }),
+      );
+    });
+    expect(screen.getByTestId('active-badge-claude')).toBeInTheDocument();
+    expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('claude');
   });
 
   it('expands a card and shows test connection button', async () => {
@@ -216,6 +333,7 @@ describe('ProvidersSection', () => {
     mockApiFetch
       .mockResolvedValueOnce(MOCK_CONFIGS)
       .mockResolvedValueOnce(MOCK_RANKING)
+      .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
       .mockRejectedValueOnce(new Error('status timeout'));
     // Suppress expected warning from ProvidersSection error path
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -227,6 +345,102 @@ describe('ProvidersSection', () => {
     expect(screen.getByText('GitHub Copilot SDK')).toBeInTheDocument();
     expect(screen.getByTestId('toggle-copilot')).toBeInTheDocument();
     spy.mockRestore();
+  });
+
+  it('still renders cards when provider ranking fetch fails', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_CONFIGS)
+      .mockRejectedValueOnce(new Error('ranking timeout'))
+      .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
+      .mockResolvedValueOnce(MOCK_STATUSES);
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await act(async () => { render(<ProvidersSection />); });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    const cards = screen.getAllByTestId(/provider-card-/);
+    expect(cards[0]).toHaveAttribute('data-testid', 'provider-card-copilot');
+    expect(cards[1]).toHaveAttribute('data-testid', 'provider-card-claude');
+
+    spy.mockRestore();
+  });
+
+  it('still renders cards when active provider fetch fails', async () => {
+    const rankedConfigs = [
+      { id: 'copilot', name: 'GitHub Copilot SDK', enabled: true },
+      { id: 'claude', name: 'Claude Code', enabled: true },
+      { id: 'codex', name: 'Codex CLI', enabled: true },
+    ];
+    const rankedStatuses = [
+      { id: 'copilot', installed: true, authenticated: true, binaryPath: '/usr/bin/copilot', version: '1.0.0' },
+      { id: 'claude', installed: true, authenticated: true, binaryPath: '/usr/bin/claude', version: '2.1.0' },
+      { id: 'codex', installed: true, authenticated: true, binaryPath: '/usr/bin/codex', version: '0.5.0' },
+    ];
+    mockApiFetch
+      .mockResolvedValueOnce(rankedConfigs)
+      .mockResolvedValueOnce({ ranking: ['codex', 'claude', 'copilot'] })
+      .mockRejectedValueOnce(new Error('active provider unavailable'))
+      .mockResolvedValueOnce(rankedStatuses);
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await act(async () => { render(<ProvidersSection />); });
+
+    await waitFor(() => {
+      expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('codex');
+    });
+
+    expect(screen.getByTestId('active-badge-codex')).toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it('falls back to the highest-ranked usable provider when the fetched active provider is unusable', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_CONFIGS)
+      .mockResolvedValueOnce({ ranking: ['claude', 'copilot', 'gemini', 'opencode', 'cursor', 'codex', 'kimi', 'qwen-code'] })
+      .mockResolvedValueOnce({ activeProvider: 'gemini' })
+      .mockResolvedValueOnce(MOCK_STATUSES);
+
+    render(<ProvidersSection />);
+
+    await waitFor(() => {
+      expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('claude');
+    });
+    expect(screen.getByTestId('active-badge-claude')).toBeInTheDocument();
+  });
+
+  it('hides "Use this provider" for disabled installed providers', async () => {
+    const configs = MOCK_CONFIGS.map((provider) => (
+      provider.id === 'cursor' ? { ...provider, enabled: false } : provider
+    ));
+    const statuses = MOCK_STATUSES.map((provider) => (
+      provider.id === 'cursor'
+        ? { ...provider, installed: true, authenticated: true, binaryPath: '/usr/bin/cursor', version: '1.2.3' }
+        : provider
+    ));
+
+    mockApiFetch
+      .mockResolvedValueOnce(configs)
+      .mockResolvedValueOnce(MOCK_RANKING)
+      .mockResolvedValueOnce(MOCK_ACTIVE_PROVIDER)
+      .mockResolvedValueOnce(statuses);
+
+    render(<ProvidersSection />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+    });
+
+    const cursorCard = screen.getByTestId('provider-card-cursor');
+    fireEvent.click(cursorCard.querySelector('[role="button"]')!);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('test-connection-cursor')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('set-active-cursor')).not.toBeInTheDocument();
   });
 
   it('does not show preview badge for Codex', async () => {

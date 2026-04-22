@@ -9,7 +9,7 @@
  * authentication guidance, and default CLI arguments.
  * Drag-and-drop reordering via @dnd-kit/sortable.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Cpu, Loader2, Zap, ExternalLink, ChevronDown, ChevronRight, Terminal, Settings2, GripVertical, LogIn, Check, X, Minus } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -17,9 +17,11 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, s
 import { CSS } from '@dnd-kit/utilities';
 import { getProvider, getAcpCapabilities } from '@flightdeck/shared';
 import { apiFetch } from '../../hooks/useApi';
+import { updateCachedActiveProvider } from '../../hooks/useModels';
 import { StatusBadge, providerStatusProps } from '../ui/StatusBadge';
 import { ProviderIcon } from '../ui/ProviderIcon';
 import { EmptyState } from '../ui/EmptyState';
+import { findUsableProviderId, normalizeProviderRanking } from '../providerPreferences';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -55,6 +57,21 @@ interface ProviderStatus {
 interface TestResult {
   success: boolean;
   message: string;
+}
+
+interface ProviderUpdateResponse extends ProviderStatusData {
+  enabled: boolean;
+  activeProvider?: string;
+}
+
+function buildProviderStatuses(configs: ProviderConfig[]): ProviderStatus[] {
+  return configs.map((config) => ({
+    ...config,
+    installed: false,
+    authenticated: null,
+    binaryPath: null,
+    version: null,
+  }));
 }
 
 // ── Provider display metadata ───────────────────────────────────────
@@ -105,12 +122,16 @@ function StatusBadgeSkeleton() {
 function ProviderCard({
   provider,
   rank,
+  isActive,
   onToggle,
+  onSetActive,
   statusLoading,
 }: {
   provider: ProviderStatus;
   rank: number;
+  isActive: boolean;
   onToggle: (id: string, enabled: boolean) => void;
+  onSetActive: (id: string) => void;
   statusLoading: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -193,6 +214,11 @@ function ProviderCard({
             <span className="text-[10px] font-mono text-th-text-muted w-4 text-center">{rank}</span>
             <span className="text-sm font-medium text-th-text-alt">{provider.name}</span>
             {providerDef?.isPreview && <PreviewBadge />}
+            {isActive && (
+              <span className="inline-flex items-center text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded-full" data-testid={`active-badge-${provider.id}`}>
+                Active
+              </span>
+            )}
             {statusLoading ? <StatusBadgeSkeleton /> : <StatusBadge {...providerStatusProps(provider)} />}
           </div>
           <div className="text-xs text-th-text-muted">
@@ -347,6 +373,16 @@ function ProviderCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Set as active */}
+            {provider.installed && provider.enabled && !isActive && (
+              <button
+                onClick={() => onSetActive(provider.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-th-bg-hover text-th-text-alt hover:bg-th-bg-alt border border-th-border rounded-md transition-colors"
+                data-testid={`set-active-${provider.id}`}
+              >
+                Use this provider
+              </button>
+            )}
             {/* Test Connection */}
             {provider.installed && (
               <button
@@ -389,54 +425,108 @@ function ProviderCard({
 export function ProvidersSection() {
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [ranking, setRanking] = useState<string[]>([]);
+  const [activeProviderId, setActiveProviderId] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const activeProviderIdRef = useRef<string | null>(null);
 
-  // Phase 1: Load config + ranking instantly (no CLI calls)
+  const syncActiveProvider = useCallback((nextActiveProviderId: string | null) => {
+    activeProviderIdRef.current = nextActiveProviderId;
+    setActiveProviderId(nextActiveProviderId);
+    if (nextActiveProviderId) {
+      updateCachedActiveProvider(nextActiveProviderId);
+    }
+  }, []);
+
+  // Phase 1: load config instantly, then hydrate ranking/active provider without blocking the UI.
   useEffect(() => {
-    Promise.all([
-      apiFetch<ProviderConfig[]>('/settings/providers'),
-      apiFetch<{ ranking: string[] }>('/settings/provider-ranking'),
-    ])
-      .then(([configs, { ranking: r }]) => {
-        // Build initial provider list from config (no status yet)
-        setProviders(configs.map((c) => ({
-          ...c,
-          installed: false,
-          authenticated: null,
-          binaryPath: null,
-          version: null,
-        })));
-        setRanking(r);
+    let mounted = true;
+
+    apiFetch<ProviderConfig[]>('/settings/providers')
+      .then((configs) => {
+        if (!mounted) return;
+
+        setProviders(buildProviderStatuses(configs));
+        setRanking(normalizeProviderRanking(configs));
         setConfigLoading(false);
 
-        // Phase 2: Load CLI detection statuses asynchronously
-        apiFetch<ProviderStatusData[]>('/settings/providers/status')
-          .then((statuses) => {
-            const statusMap = new Map(statuses.map((s) => [s.id, s]));
-            setProviders((prev) =>
-              prev.map((p) => {
-                const status = statusMap.get(p.id);
-                return status
-                  ? { ...p, installed: status.installed, authenticated: status.authenticated, binaryPath: status.binaryPath, version: status.version }
-                  : p;
-              }),
-            );
+        apiFetch<{ ranking: string[] }>('/settings/provider-ranking')
+          .then(({ ranking: nextRanking }) => {
+            if (!mounted) return;
+            setRanking(normalizeProviderRanking(configs, nextRanking));
           })
           .catch((err) => {
-            // Status fetch failure is non-critical — toggles still work
+            logger.warn('Failed to load provider ranking, using default order:', err);
+          });
+
+        apiFetch<{ activeProvider: string }>('/settings/provider')
+          .then(({ activeProvider }) => {
+            if (!mounted) return;
+            syncActiveProvider(activeProvider);
+          })
+          .catch((err) => {
+            logger.warn('Failed to load active provider, waiting for usable status:', err);
+          });
+
+        apiFetch<ProviderStatusData[]>('/settings/providers/status')
+          .then((statuses) => {
+            if (!mounted) return;
+
+            const statusMap = new Map(statuses.map((status) => [status.id, status]));
+            let nextActiveProviderId: string | null = null;
+
+            setProviders((prev) => {
+              const nextProviders = prev.map((provider) => {
+                const status = statusMap.get(provider.id);
+                return status
+                  ? {
+                      ...provider,
+                      installed: status.installed,
+                      authenticated: status.authenticated,
+                      binaryPath: status.binaryPath,
+                      version: status.version,
+                    }
+                  : provider;
+              });
+              nextActiveProviderId = findUsableProviderId(nextProviders, ranking, activeProviderIdRef.current);
+              return nextProviders;
+            });
+
+            if (nextActiveProviderId !== activeProviderIdRef.current) {
+              syncActiveProvider(nextActiveProviderId);
+            }
+          })
+          .catch((err) => {
             logger.warn('Failed to load provider statuses:', err);
           })
-          .finally(() => setStatusLoading(false));
+          .finally(() => {
+            if (mounted) {
+              setStatusLoading(false);
+            }
+          });
       })
       .catch((err: unknown) => {
+        if (!mounted) return;
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
         setConfigLoading(false);
         setStatusLoading(false);
       });
-  }, []);
+
+    return () => {
+      mounted = false;
+    };
+  }, [syncActiveProvider]);
+
+  useEffect(() => {
+    if (statusLoading) return;
+
+    const nextActiveProviderId = findUsableProviderId(providers, ranking, activeProviderIdRef.current);
+    if (nextActiveProviderId !== activeProviderIdRef.current) {
+      syncActiveProvider(nextActiveProviderId);
+    }
+  }, [providers, ranking, statusLoading, syncActiveProvider]);
 
   // Sort providers by ranking
   const sortedProviders = [...providers].sort((a, b) => {
@@ -445,21 +535,64 @@ export function ProvidersSection() {
     return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
   });
 
-  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
-    setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, enabled } : p)),
-    );
+  const handleSetActive = useCallback(async (id: string) => {
+    const previousActiveProviderId = activeProviderIdRef.current;
+    syncActiveProvider(id);
     try {
-      await apiFetch(`/settings/providers/${id}`, {
+      const response = await apiFetch<{ activeProvider: string }>('/settings/provider', {
+        method: 'PUT',
+        body: JSON.stringify({ id }),
+      });
+      syncActiveProvider(response.activeProvider);
+    } catch {
+      syncActiveProvider(previousActiveProviderId);
+    }
+  }, [syncActiveProvider]);
+
+  const handleToggle = useCallback(async (id: string, enabled: boolean) => {
+    const previousProviders = providers;
+    const previousActiveProviderId = activeProviderIdRef.current;
+    const nextProviders = previousProviders.map((provider) =>
+      provider.id === id ? { ...provider, enabled } : provider,
+    );
+    const shouldSyncFallbackImmediately =
+      !enabled && !statusLoading && previousActiveProviderId === id;
+    const optimisticActiveProviderId = shouldSyncFallbackImmediately
+      ? findUsableProviderId(nextProviders, ranking, previousActiveProviderId)
+      : previousActiveProviderId;
+
+    setProviders(nextProviders);
+    if (optimisticActiveProviderId !== previousActiveProviderId) {
+      syncActiveProvider(optimisticActiveProviderId);
+    }
+    try {
+      const response = await apiFetch<ProviderUpdateResponse>(`/settings/providers/${id}`, {
         method: 'PUT',
         body: JSON.stringify({ enabled }),
       });
-    } catch {
-      setProviders((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, enabled: !enabled } : p)),
+      const persistedProviders = nextProviders.map((provider) =>
+        provider.id === id
+          ? {
+              ...provider,
+              enabled: response.enabled,
+              installed: response.installed,
+              authenticated: response.authenticated,
+              binaryPath: response.binaryPath,
+              version: response.version,
+            }
+          : provider,
       );
+      setProviders(persistedProviders);
+      const nextActiveProviderId = response.activeProvider
+        ?? findUsableProviderId(persistedProviders, ranking, optimisticActiveProviderId);
+      if (nextActiveProviderId !== activeProviderIdRef.current) {
+        syncActiveProvider(nextActiveProviderId);
+      }
+    } catch {
+      setProviders(previousProviders);
+      syncActiveProvider(previousActiveProviderId);
     }
-  }, []);
+  }, [providers, ranking, statusLoading, syncActiveProvider]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -539,7 +672,9 @@ export function ProvidersSection() {
                   key={provider.id}
                   provider={provider}
                   rank={idx + 1}
+                  isActive={provider.id === activeProviderId}
                   onToggle={handleToggle}
+                  onSetActive={handleSetActive}
                   statusLoading={statusLoading}
                 />
               ))}
