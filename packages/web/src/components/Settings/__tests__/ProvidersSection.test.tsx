@@ -292,21 +292,46 @@ describe('ProvidersSection', () => {
   });
 
   it('still renders cards when active provider fetch fails', async () => {
+    const rankedConfigs = [
+      { id: 'copilot', name: 'GitHub Copilot SDK', enabled: true },
+      { id: 'claude', name: 'Claude Code', enabled: true },
+      { id: 'codex', name: 'Codex CLI', enabled: true },
+    ];
+    const rankedStatuses = [
+      { id: 'copilot', installed: true, authenticated: true, binaryPath: '/usr/bin/copilot', version: '1.0.0' },
+      { id: 'claude', installed: true, authenticated: true, binaryPath: '/usr/bin/claude', version: '2.1.0' },
+      { id: 'codex', installed: true, authenticated: true, binaryPath: '/usr/bin/codex', version: '0.5.0' },
+    ];
     mockApiFetch
-      .mockResolvedValueOnce(MOCK_CONFIGS)
-      .mockResolvedValueOnce(MOCK_RANKING)
+      .mockResolvedValueOnce(rankedConfigs)
+      .mockResolvedValueOnce({ ranking: ['codex', 'claude', 'copilot'] })
       .mockRejectedValueOnce(new Error('active provider unavailable'))
-      .mockResolvedValueOnce(MOCK_STATUSES);
+      .mockResolvedValueOnce(rankedStatuses);
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await act(async () => { render(<ProvidersSection />); });
 
     await waitFor(() => {
-      expect(screen.getByTestId('providers-list')).toBeInTheDocument();
+      expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('codex');
     });
 
-    expect(screen.getByText('GitHub Copilot SDK')).toBeInTheDocument();
+    expect(screen.getByTestId('active-badge-codex')).toBeInTheDocument();
     spy.mockRestore();
+  });
+
+  it('falls back to the highest-ranked usable provider when the fetched active provider is unusable', async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(MOCK_CONFIGS)
+      .mockResolvedValueOnce({ ranking: ['claude', 'copilot', 'gemini', 'opencode', 'cursor', 'codex', 'kimi', 'qwen-code'] })
+      .mockResolvedValueOnce({ activeProvider: 'gemini' })
+      .mockResolvedValueOnce(MOCK_STATUSES);
+
+    render(<ProvidersSection />);
+
+    await waitFor(() => {
+      expect(mockUpdateCachedActiveProvider).toHaveBeenCalledWith('claude');
+    });
+    expect(screen.getByTestId('active-badge-claude')).toBeInTheDocument();
   });
 
   it('hides "Use this provider" for disabled installed providers', async () => {

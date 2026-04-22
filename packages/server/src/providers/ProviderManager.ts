@@ -17,6 +17,7 @@ import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Database } from '../db/database.js';
 import type { ConfigStore } from '../config/ConfigStore.js';
+import type { FlightdeckConfig } from '../config/configSchema.js';
 import { PROVIDER_PRESETS, type ProviderId } from '../adapters/presets.js';
 import { WHICH_COMMAND } from '../utils/platform.js';
 import { PROVIDER_REGISTRY, PROVIDER_IDS } from '@flightdeck/shared';
@@ -323,6 +324,10 @@ export class ProviderManager {
 
   // ── Helpers ─────────────────────────────────────────────
 
+  private getMutableConfigStoreCurrent(): FlightdeckConfig | null {
+    return this.configStore ? this.configStore.current as FlightdeckConfig : null;
+  }
+
   /** Extract version-like pattern from CLI output. */
   private parseVersion(raw: string): string {
     const match = raw.match(/v?(\d+\.\d+(?:\.\d+)?(?:[-.]\w+)*)/);
@@ -351,11 +356,25 @@ export class ProviderManager {
     }
 
     if (this.configStore) {
+      const config = this.getMutableConfigStoreCurrent();
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
-      this.configStore.writePartial({ providerSettings: { [provider]: { ...current, enabled } } }).catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
-      if (fallbackProvider) {
-        this.persistActiveProvider(fallbackProvider);
+      const nextProviderSettings = { ...current, enabled };
+      if (config) {
+        config.providerSettings = {
+          ...config.providerSettings,
+          [provider]: nextProviderSettings,
+        };
+        if (fallbackProvider) {
+          config.provider = { ...config.provider, id: fallbackProvider };
+        }
       }
+      const patch: Record<string, unknown> = {
+        providerSettings: { [provider]: nextProviderSettings },
+      };
+      if (fallbackProvider) {
+        patch.provider = { id: fallbackProvider };
+      }
+      this.configStore.writePartial(patch).catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
       return;
     }
     if (!this.db) return;
@@ -380,9 +399,17 @@ export class ProviderManager {
 
   setModelPreferences(provider: ProviderId, prefs: ModelPreferences): void {
     if (this.configStore) {
+      const config = this.getMutableConfigStoreCurrent();
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
+      const nextModels = prefs.preferredModels ?? [];
+      if (config) {
+        config.providerSettings = {
+          ...config.providerSettings,
+          [provider]: { ...current, models: nextModels },
+        };
+      }
       this.configStore.writePartial({
-        providerSettings: { [provider]: { ...current, models: prefs.preferredModels ?? [] } },
+        providerSettings: { [provider]: { ...current, models: nextModels } },
       }).catch(err => logger.warn({ msg: 'Failed to persist model preferences', provider, error: err }));
       return;
     }
@@ -464,6 +491,10 @@ export class ProviderManager {
 
   private persistActiveProvider(provider: ProviderId): void {
     if (this.configStore) {
+      const config = this.getMutableConfigStoreCurrent();
+      if (config) {
+        config.provider = { ...config.provider, id: provider };
+      }
       // Only update the provider id — don't spread the current provider config,
       // which may contain overrides (binary, args, env, cloud) for a different provider.
       this.configStore.writePartial({ provider: { id: provider } }).catch(err => logger.warn({ msg: 'Failed to persist active provider', provider, error: err }));
@@ -510,6 +541,10 @@ export class ProviderManager {
 
   setProviderRanking(ranking: ProviderId[]): void {
     if (this.configStore) {
+      const config = this.getMutableConfigStoreCurrent();
+      if (config) {
+        config.providerRanking = ranking;
+      }
       this.configStore.writePartial({ providerRanking: ranking }).catch(err =>
         logger.warn({ msg: 'Failed to persist provider ranking', error: err }),
       );

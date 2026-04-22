@@ -314,7 +314,7 @@ describe('settings routes', () => {
     it('returns updated status in response', async () => {
       mockGetStatusAsync.mockResolvedValue({ ...MOCK_STATUSES[0], enabled: false });
       mockGetModelPrefs.mockReturnValue({ defaultModel: 'gpt-5' });
-      mockResolveAndPersistProvider.mockReturnValue('claude');
+      mockGetActiveProviderId.mockReturnValue('claude');
       const res = await fetch(`${baseUrl}/settings/providers/copilot`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -323,6 +323,24 @@ describe('settings routes', () => {
       const body = await res.json();
       expect(body.enabled).toBe(false);
       expect(body.modelPreferences).toEqual({ defaultModel: 'gpt-5' });
+      expect(body.activeProvider).toBe('claude');
+    });
+
+    it('returns the immediately updated active provider after disabling the current one', async () => {
+      mockSetEnabled.mockImplementation(() => {
+        mockGetActiveProviderId.mockReturnValue('claude');
+      });
+      mockResolveAndPersistProvider.mockReturnValue('copilot');
+      mockGetStatusAsync.mockResolvedValue({ ...MOCK_STATUSES[0], enabled: false });
+
+      const res = await fetch(`${baseUrl}/settings/providers/copilot`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
       expect(body.activeProvider).toBe('claude');
     });
 
@@ -362,6 +380,7 @@ describe('settings routes', () => {
 
   describe('PUT /settings/provider', () => {
     it('sets the active provider when it is usable', async () => {
+      mockGetActiveProviderId.mockReturnValue('claude');
       const res = await fetch(`${baseUrl}/settings/provider`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

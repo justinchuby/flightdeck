@@ -489,7 +489,7 @@ export function ProvidersSection() {
                     }
                   : provider;
               });
-              nextActiveProviderId = findUsableProviderId(nextProviders, activeProviderIdRef.current);
+              nextActiveProviderId = findUsableProviderId(nextProviders, ranking, activeProviderIdRef.current);
               return nextProviders;
             });
 
@@ -518,6 +518,15 @@ export function ProvidersSection() {
       mounted = false;
     };
   }, [syncActiveProvider]);
+
+  useEffect(() => {
+    if (statusLoading) return;
+
+    const nextActiveProviderId = findUsableProviderId(providers, ranking, activeProviderIdRef.current);
+    if (nextActiveProviderId !== activeProviderIdRef.current) {
+      syncActiveProvider(nextActiveProviderId);
+    }
+  }, [providers, ranking, statusLoading, syncActiveProvider]);
 
   // Sort providers by ranking
   const sortedProviders = [...providers].sort((a, b) => {

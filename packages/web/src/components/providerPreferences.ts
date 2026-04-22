@@ -22,6 +22,7 @@ export function normalizeProviderRanking<T extends ProviderWithId>(
 
 export function findUsableProviderId<T extends UsableProvider>(
   providers: T[],
+  ranking?: string[],
   preferredId?: string | null,
 ): string | null {
   if (preferredId) {
@@ -31,5 +32,12 @@ export function findUsableProviderId<T extends UsableProvider>(
     }
   }
 
-  return providers.find((provider) => provider.enabled && provider.installed === true)?.id ?? null;
+  const usableProviders = providers.filter((provider) => provider.enabled && provider.installed === true);
+  if (usableProviders.length === 0) {
+    return null;
+  }
+
+  const rankingOrder = normalizeProviderRanking(providers, ranking);
+  const usableProviderIds = new Set(usableProviders.map((provider) => provider.id));
+  return rankingOrder.find((providerId) => usableProviderIds.has(providerId)) ?? usableProviders[0]?.id ?? null;
 }

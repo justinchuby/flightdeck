@@ -109,7 +109,7 @@ export function settingsRoutes(ctx: AppContext): Router {
     if (enabled !== undefined) {
       try {
         pm.setProviderEnabled(provider, enabled);
-        activeProvider = pm.resolveAndPersistProvider();
+        activeProvider = pm.getActiveProviderId();
       } catch (err: any) {
         return res.status(409).json({ error: err.message || 'Failed to update provider enabled state' });
       }
@@ -144,7 +144,7 @@ export function settingsRoutes(ctx: AppContext): Router {
     }
     try {
       pm.setActiveProviderId(id as ProviderId);
-      res.json({ activeProvider: id });
+      res.json({ activeProvider: pm.getActiveProviderId() });
     } catch (err: any) {
       res.status(409).json({ error: err.message || 'Failed to set active provider' });
     }

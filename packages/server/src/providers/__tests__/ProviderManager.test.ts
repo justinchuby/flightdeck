@@ -597,6 +597,33 @@ describe('ProviderManager', () => {
         expect.objectContaining({ provider: expect.objectContaining({ id: 'claude' }) }),
       );
     });
+
+    it('updates config-store reads immediately when disabling the active provider', () => {
+      const configStore = createMockConfigStore({
+        providerId: 'copilot',
+        providerSettings: {
+          copilot: { enabled: true, models: [] },
+          claude: { enabled: true, models: [] },
+        },
+        providerRanking: ['copilot', 'claude', 'gemini'],
+      });
+      exec.mockImplementation((cmd: string) => {
+        if (cmd === `${WHICH_COMMAND} copilot`) return '/usr/local/bin/copilot';
+        if (cmd === `${WHICH_COMMAND} claude-agent-acp`) return '/usr/local/bin/claude-agent-acp';
+        throw new Error('not found');
+      });
+
+      const mgr = new ProviderManager({ configStore: configStore as any, execCommand: exec as any });
+      mgr.setProviderEnabled('copilot', false);
+
+      expect(mgr.getActiveProviderId()).toBe('claude');
+      expect(configStore.current.provider.id).toBe('claude');
+      expect(configStore.current.providerSettings.copilot.enabled).toBe(false);
+      expect(configStore.writePartial).toHaveBeenCalledWith({
+        providerSettings: { copilot: { enabled: false, models: [] } },
+        provider: { id: 'claude' },
+      });
+    });
   });
 
   // ── getActiveProviderId fallback ────────────────────────
