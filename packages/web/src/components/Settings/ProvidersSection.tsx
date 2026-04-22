@@ -550,39 +550,49 @@ export function ProvidersSection() {
   }, [syncActiveProvider]);
 
   const handleToggle = useCallback(async (id: string, enabled: boolean) => {
+    const previousProviders = providers;
     const previousActiveProviderId = activeProviderIdRef.current;
-    setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, enabled } : p)),
+    const nextProviders = previousProviders.map((provider) =>
+      provider.id === id ? { ...provider, enabled } : provider,
     );
+    const shouldSyncFallbackImmediately =
+      !enabled && !statusLoading && previousActiveProviderId === id;
+    const optimisticActiveProviderId = shouldSyncFallbackImmediately
+      ? findUsableProviderId(nextProviders, ranking, previousActiveProviderId)
+      : previousActiveProviderId;
+
+    setProviders(nextProviders);
+    if (optimisticActiveProviderId !== previousActiveProviderId) {
+      syncActiveProvider(optimisticActiveProviderId);
+    }
     try {
       const response = await apiFetch<ProviderUpdateResponse>(`/settings/providers/${id}`, {
         method: 'PUT',
         body: JSON.stringify({ enabled }),
       });
-      setProviders((prev) =>
-        prev.map((provider) =>
-          provider.id === id
-            ? {
-                ...provider,
-                enabled: response.enabled,
-                installed: response.installed,
-                authenticated: response.authenticated,
-                binaryPath: response.binaryPath,
-                version: response.version,
-              }
-            : provider,
-        ),
+      const persistedProviders = nextProviders.map((provider) =>
+        provider.id === id
+          ? {
+              ...provider,
+              enabled: response.enabled,
+              installed: response.installed,
+              authenticated: response.authenticated,
+              binaryPath: response.binaryPath,
+              version: response.version,
+            }
+          : provider,
       );
-      if (response.activeProvider) {
-        syncActiveProvider(response.activeProvider);
+      setProviders(persistedProviders);
+      const nextActiveProviderId = response.activeProvider
+        ?? findUsableProviderId(persistedProviders, ranking, optimisticActiveProviderId);
+      if (nextActiveProviderId !== activeProviderIdRef.current) {
+        syncActiveProvider(nextActiveProviderId);
       }
     } catch {
-      setProviders((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, enabled: !enabled } : p)),
-      );
+      setProviders(previousProviders);
       syncActiveProvider(previousActiveProviderId);
     }
-  }, [syncActiveProvider]);
+  }, [providers, ranking, statusLoading, syncActiveProvider]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

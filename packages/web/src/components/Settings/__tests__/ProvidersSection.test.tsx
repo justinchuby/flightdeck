@@ -67,6 +67,16 @@ function mockProviderApisConfigOnly() {
     .mockReturnValueOnce(new Promise(() => {})); // status never resolves
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 // ── Tests ─────────────────────────────────────────────────
 
 describe('ProvidersSection', () => {
@@ -216,11 +226,16 @@ describe('ProvidersSection', () => {
       expect(screen.getByTestId('active-badge-codex')).toBeInTheDocument();
     });
 
-    mockApiFetch.mockResolvedValueOnce({
-      ...rankedStatuses[1],
-      enabled: false,
-      activeProvider: 'copilot',
-    });
+    const disableRequest = createDeferred<{
+      id: string;
+      installed: boolean;
+      authenticated: boolean | null;
+      binaryPath: string | null;
+      version: string | null;
+      enabled: boolean;
+      activeProvider: string;
+    }>();
+    mockApiFetch.mockReturnValueOnce(disableRequest.promise);
 
     fireEvent.click(screen.getByTestId('toggle-codex'));
 
@@ -229,6 +244,19 @@ describe('ProvidersSection', () => {
     });
     expect(screen.queryByTestId('active-badge-codex')).not.toBeInTheDocument();
     expect(mockUpdateCachedActiveProvider).toHaveBeenLastCalledWith('copilot');
+
+    disableRequest.resolve({
+      ...rankedStatuses[1],
+      enabled: false,
+      activeProvider: 'copilot',
+    });
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/settings/providers/codex',
+        expect.objectContaining({ method: 'PUT' }),
+      );
+    });
   });
 
   it('calls API when setting a provider active', async () => {
