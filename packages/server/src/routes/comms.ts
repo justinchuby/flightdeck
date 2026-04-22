@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { shortAgentId } from '@flightdeck/shared';
+import { ApiError } from '../errors/index.js';
 import type { AppContext } from './context.js';
 import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
 
@@ -147,7 +148,7 @@ export function commsRoutes(ctx: AppContext): Router {
         timeline,
       });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to build comm flows', detail: (err as Error).message });
+      throw new ApiError(500, 'Failed to build comm flows', { details: (err as Error).message });
     }
   });
 
@@ -193,7 +194,7 @@ export function commsRoutes(ctx: AppContext): Router {
       mostActive: mostActive.agentId ? mostActive : null,
     });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to compute comm stats', detail: (err as Error).message });
+      throw new ApiError(500, 'Failed to compute comm stats', { details: (err as Error).message });
     }
   });
 

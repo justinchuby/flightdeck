@@ -5,6 +5,7 @@ import type { AddressInfo } from 'net';
 import { Database } from '../db/database.js';
 import { ProjectRegistry } from '../projects/ProjectRegistry.js';
 import { projectsRoutes } from '../routes/projects.js';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 import { DEFAULT_MODEL_CONFIG } from '../projects/ModelConfigDefaults.js';
 
 vi.mock('../utils/logger.js', () => ({
@@ -36,6 +37,7 @@ describe('Model Config API Routes', () => {
     const app = express();
     app.use(express.json());
     app.use(projectsRoutes(ctx));
+    app.use(apiErrorHandler);
 
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {

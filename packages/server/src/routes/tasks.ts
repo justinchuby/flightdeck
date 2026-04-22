@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { badRequest, notFound } from '../errors/index.js';
 import type { AppContext } from './context.js';
 import type { DagTask } from '../tasks/TaskDAG.js';
 import { isTerminalStatus } from '../agents/Agent.js';
@@ -48,13 +49,13 @@ export function tasksRoutes(ctx: AppContext): Router {
     if (scope === 'project') {
       // Project scope: ALL tasks for the project across ALL sessions.
       if (!projectId) {
-        return res.status(400).json({ error: 'projectId is required when scope=project' });
+        throw badRequest('projectId is required when scope=project');
       }
       tasks = taskDAG.getTasksByProject(projectId, { includeArchived });
     } else if (scope === 'lead') {
       // Lead scope: only tasks owned by a specific lead agent (session-scoped).
       if (!leadId) {
-        return res.status(400).json({ error: 'leadId is required when scope=lead' });
+        throw badRequest('leadId is required when scope=lead');
       }
       const allTasks = taskDAG.getAll({ includeArchived });
       tasks = allTasks.filter(t => t.leadId === leadId);
@@ -111,7 +112,7 @@ export function tasksRoutes(ctx: AppContext): Router {
     const { leadId, taskId } = req.params;
     const restored = taskDAG.unarchiveTask(leadId, taskId);
     if (!restored) {
-      return res.status(404).json({ error: 'Task not found or not archived' });
+      throw notFound('Task not found or not archived');
     }
     return res.json(restored);
   });

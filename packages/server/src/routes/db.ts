@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { badRequest } from '../errors/index.js';
 import { agentMemory, conversations, messages, decisions, activityLog, dagTasks } from '../db/schema.js';
 import { eq, desc, sql } from 'drizzle-orm';
 import type { AppContext } from './context.js';
@@ -16,7 +17,7 @@ export function dbRoutes(ctx: AppContext): Router {
 
   router.delete('/db/memory/:id', (req, res) => {
     const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+    if (isNaN(id)) throw badRequest('Invalid ID');
     _db.drizzle.delete(agentMemory).where(eq(agentMemory.id, id)).run();
     res.json({ ok: true });
   });
@@ -61,7 +62,7 @@ export function dbRoutes(ctx: AppContext): Router {
 
   router.delete('/db/activity/:id', (req, res) => {
     const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+    if (isNaN(id)) throw badRequest('Invalid ID');
     _db.drizzle.delete(activityLog).where(eq(activityLog.id, id)).run();
     res.json({ ok: true });
   });

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { badRequest } from '../errors/index.js';
 import { messages, conversations, chatGroupMessages, dagTasks, decisions, activityLog } from '../db/schema.js';
 import { eq, like, desc, or } from 'drizzle-orm';
 import type { AppContext } from './context.js';
@@ -10,8 +11,8 @@ export function searchRoutes(ctx: AppContext): Router {
   // --- Search ---
   router.get('/search', (req, res) => {
     const q = (req.query.q as string ?? '').trim();
-    if (!q || q.length < 2) return res.status(400).json({ error: 'query must be at least 2 characters' });
-    if (q.length > 200) return res.status(400).json({ error: 'query too long (max 200 chars)' });
+    if (!q || q.length < 2) throw badRequest('query must be at least 2 characters');
+    if (q.length > 200) throw badRequest('query too long (max 200 chars)');
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
     const pattern = `%${q}%`;
 

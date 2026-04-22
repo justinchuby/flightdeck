@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { badRequest, serviceUnavailable } from '../errors/index.js';
 import type { ServerConfig } from '../config.js';
 import { updateConfig, getConfig } from '../config.js';
 import { validateBody, configPatchSchema } from '../validation/schemas.js';
@@ -17,7 +18,7 @@ export function configRoutes(ctx: AppContext): Router {
   // GET /config/yaml — returns only the oversight section (never expose secrets like API keys)
   router.get('/config/yaml', (_req, res) => {
     if (!ctx.configStore) {
-      return res.status(503).json({ error: 'Config store not available' });
+      throw serviceUnavailable('Config store not available');
     }
     res.json({ oversight: ctx.configStore.current.oversight });
   });
