@@ -28,6 +28,7 @@ function useAgentRole(agentId: string): string {
 }
 
 function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
   const roleName = useAgentRole(timer.agentId);
   const isPending = timer.status === 'pending';
   const isFired = timer.status === 'fired';
@@ -37,13 +38,18 @@ function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: strin
   return (
     <div
       data-testid={`timer-${timer.id}`}
-      className={`rounded border px-2 py-1.5 transition-all duration-300 ${
+      className={`rounded border px-2 py-1.5 transition-all duration-300 cursor-pointer ${
         isRecentlyFired
           ? 'border-green-500/50 bg-green-500/10'
           : isFired
             ? 'border-th-border/50 bg-th-bg-muted/30 opacity-60'
             : 'border-th-border bg-th-bg-muted/50'
       }`}
+      onClick={() => setExpanded(prev => !prev)}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(prev => !prev); } }}
     >
       <div className="flex items-center justify-between">
         <span className="font-medium text-th-text-alt truncate">{timer.label}</span>
@@ -69,7 +75,7 @@ function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: strin
           </span>
           {isPending && (
             <button
-              onClick={() => onCancel(timer.id)}
+              onClick={(e) => { e.stopPropagation(); onCancel(timer.id); }}
               className="text-[10px] text-red-400 hover:text-red-300 px-1 py-0.5 rounded hover:bg-red-500/10"
               title="Cancel timer"
               aria-label={`Cancel timer ${timer.label}`}
@@ -85,7 +91,27 @@ function TimerCard({ timer, onCancel }: { timer: TimerInfo; onCancel: (id: strin
         </span>
         {timer.repeat && isPending && <span>every {timer.delaySeconds}s</span>}
       </div>
-      {timer.message && (
+      {/* Expanded detail view */}
+      {expanded && (
+        <div className="mt-2 pt-2 border-t border-th-border/50 space-y-1" data-testid={`timer-detail-${timer.id}`}>
+          {timer.message && (
+            <div className="text-th-text-alt whitespace-pre-wrap break-words">
+              💬 {timer.message}
+            </div>
+          )}
+          <div className="text-th-text-muted">
+            ⏱ Delay: {timer.delaySeconds}s{timer.repeat ? ' (repeating)' : ''}
+          </div>
+          <div className="text-th-text-muted">
+            📅 Created: {new Date(timer.createdAt).toLocaleString()}
+          </div>
+          <div className="text-th-text-muted">
+            Status: {timer.status}
+          </div>
+        </div>
+      )}
+      {/* Collapsed message preview */}
+      {!expanded && timer.message && (
         <div className="mt-0.5 text-th-text-muted truncate" title={timer.message}>
           💬 {timer.message}
         </div>
@@ -98,7 +124,7 @@ export function TimerDisplay({ projectAgentIds }: { projectAgentIds?: Set<string
   const allTimers = useTimerStore((s) => s.timers);
   const setTimers = useTimerStore((s) => s.setTimers);
   const removeTimer = useTimerStore((s) => s.removeTimer);
-  const [filter, setFilter] = useState<TimerFilter>('active');
+  const [filter, setFilter] = useState<TimerFilter>('all');
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
