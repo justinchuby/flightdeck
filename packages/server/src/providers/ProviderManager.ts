@@ -14,9 +14,11 @@
 
 import { execSync } from 'node:child_process';
 import { execFile as execFileCb } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { promisify } from 'node:util';
 import type { Database } from '../db/database.js';
 import type { ConfigStore } from '../config/ConfigStore.js';
+import type { FlightdeckConfig } from '../config/configSchema.js';
 import { PROVIDER_PRESETS, type ProviderId } from '../adapters/presets.js';
 import { WHICH_COMMAND } from '../utils/platform.js';
 import { PROVIDER_REGISTRY, PROVIDER_IDS } from '@flightdeck/shared';
@@ -88,7 +90,7 @@ const ASYNC_EXEC_TIMEOUT_MS = 5_000;
 
 // ── ProviderManager ──────────────────────────────────────────────
 
-export class ProviderManager {
+export class ProviderManager extends EventEmitter {
   private readonly db: Database | undefined;
   private readonly configStore: ConfigStore | undefined;
   private readonly exec: (cmd: string) => string;
@@ -96,6 +98,12 @@ export class ProviderManager {
 
   /** In-memory cache for CLI detection results (keyed by provider ID). */
   private readonly detectionCache = new Map<ProviderId, CachedDetection>();
+  /** Runtime fallback used while config-store persistence catches up or fails. */
+  private resolvedProviderOverride: ProviderId | null = null;
+  /** Configured provider whose fallback write most recently failed. */
+  private failedProviderPersistenceConfiguredId: ProviderId | null = null;
+  /** Monotonic guard against stale async provider writes applying after reload/recovery. */
+  private providerResolutionVersion = 0;
 
   /** Configurable TTL for testing. */
   readonly cacheTtlMs: number;
@@ -107,6 +115,7 @@ export class ProviderManager {
     execCommandAsync?: (cmd: string, args: string[]) => Promise<string>;
     cacheTtlMs?: number;
   } = {}) {
+    super();
     this.db = opts.db;
     this.configStore = opts.configStore;
     this.exec = opts.execCommand ?? ((cmd) => execSync(cmd, { encoding: 'utf8', timeout: 5_000 }).trim());
@@ -118,6 +127,11 @@ export class ProviderManager {
       return stdout.trim();
     });
     this.cacheTtlMs = opts.cacheTtlMs ?? CACHE_TTL_MS;
+
+    if (this.configStore) {
+      this.configStore.on('config:provider:changed', () => this.resetRuntimeProviderResolution());
+      this.configStore.on('config:reloaded', () => this.resetRuntimeProviderResolution());
+    }
   }
 
   // ── Config (instant, no CLI calls) ──────────────────────
@@ -323,6 +337,83 @@ export class ProviderManager {
 
   // ── Helpers ─────────────────────────────────────────────
 
+  private getMutableConfigStoreCurrent(): FlightdeckConfig | null {
+    return this.configStore ? this.configStore.current as FlightdeckConfig : null;
+  }
+
+  private resetRuntimeProviderResolution(): void {
+    this.providerResolutionVersion += 1;
+    this.resolvedProviderOverride = null;
+    this.failedProviderPersistenceConfiguredId = null;
+    this.emit('provider:runtime-changed');
+  }
+
+  private beginProviderResolutionTransition(): number {
+    this.providerResolutionVersion += 1;
+    return this.providerResolutionVersion;
+  }
+
+  private isCurrentProviderResolutionTransition(version: number): boolean {
+    return this.providerResolutionVersion === version;
+  }
+
+  private clearResolvedProviderOverride(providerId?: ProviderId): void {
+    if (!this.configStore || !this.resolvedProviderOverride) return;
+    if (providerId && this.configStore.current.provider.id !== providerId) return;
+    this.resetRuntimeProviderResolution();
+  }
+
+  private rollbackResolvedProviderOverride(configuredProviderId?: ProviderId): void {
+    this.resolvedProviderOverride = null;
+    this.failedProviderPersistenceConfiguredId = configuredProviderId ?? null;
+    this.emit('provider:runtime-changed');
+  }
+
+  private shouldSuppressFallback(configuredProviderId: ProviderId): boolean {
+    return Boolean(
+      this.configStore &&
+      this.failedProviderPersistenceConfiguredId === configuredProviderId &&
+      this.configStore.current.provider.id === configuredProviderId,
+    );
+  }
+
+  private buildProviderSwitchPatch(provider: ProviderId): { provider: Partial<FlightdeckConfig['provider']> } {
+    return {
+      provider: {
+        id: provider,
+        binaryOverride: undefined,
+        argsOverride: undefined,
+        envOverride: undefined,
+        cloudProvider: undefined,
+      },
+    };
+  }
+
+  private applyConfigStorePatchAfterWrite(patch: {
+    provider?: Partial<FlightdeckConfig['provider']>;
+    providerSettings?: FlightdeckConfig['providerSettings'];
+    providerRanking?: FlightdeckConfig['providerRanking'];
+  }): void {
+    const config = this.getMutableConfigStoreCurrent();
+    if (!config) return;
+
+    if (patch.provider) {
+      config.provider = { ...config.provider, ...patch.provider };
+      if (patch.provider.id) {
+        this.clearResolvedProviderOverride(patch.provider.id as ProviderId);
+      }
+    }
+    if (patch.providerSettings) {
+      config.providerSettings = {
+        ...config.providerSettings,
+        ...patch.providerSettings,
+      };
+    }
+    if (patch.providerRanking) {
+      config.providerRanking = patch.providerRanking;
+    }
+  }
+
   /** Extract version-like pattern from CLI output. */
   private parseVersion(raw: string): string {
     const match = raw.match(/v?(\d+\.\d+(?:\.\d+)?(?:[-.]\w+)*)/);
@@ -341,13 +432,37 @@ export class ProviderManager {
   }
 
   setProviderEnabled(provider: ProviderId, enabled: boolean): void {
+    const activeProvider = this.getActiveProviderId();
+    let fallbackProvider: ProviderId | null = null;
+    if (!enabled && activeProvider === provider) {
+      fallbackProvider = this.findFirstUsableProvider(provider);
+      if (!fallbackProvider) {
+        throw new Error(`Cannot disable active provider '${provider}' without another installed and enabled provider`);
+      }
+    }
+
     if (this.configStore) {
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
-      this.configStore.writePartial({ providerSettings: { [provider]: { ...current, enabled } } }).catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
+      const nextProviderSettings = { ...current, enabled };
+      const patch = {
+        providerSettings: { [provider]: nextProviderSettings },
+      } as {
+        providerSettings: FlightdeckConfig['providerSettings'];
+        provider?: Partial<FlightdeckConfig['provider']>;
+      };
+      if (fallbackProvider) {
+        patch.provider = this.buildProviderSwitchPatch(fallbackProvider).provider;
+      }
+      this.configStore.writePartial(patch)
+        .then(() => this.applyConfigStorePatchAfterWrite(patch))
+        .catch(err => logger.warn({ msg: 'Failed to persist provider enabled state', provider, error: err }));
       return;
     }
     if (!this.db) return;
     this.db.setSetting(`${SETTING_PREFIX}${provider}:enabled`, String(enabled));
+    if (fallbackProvider) {
+      this.persistActiveProvider(fallbackProvider);
+    }
   }
 
   // ── Model Preferences ────────────────────────────────────
@@ -366,9 +481,13 @@ export class ProviderManager {
   setModelPreferences(provider: ProviderId, prefs: ModelPreferences): void {
     if (this.configStore) {
       const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
-      this.configStore.writePartial({
-        providerSettings: { [provider]: { ...current, models: prefs.preferredModels ?? [] } },
-      }).catch(err => logger.warn({ msg: 'Failed to persist model preferences', provider, error: err }));
+      const nextModels = prefs.preferredModels ?? [];
+      const patch = {
+        providerSettings: { [provider]: { ...current, models: nextModels } },
+      } satisfies { providerSettings: FlightdeckConfig['providerSettings'] };
+      this.configStore.writePartial(patch)
+        .then(() => this.applyConfigStorePatchAfterWrite(patch))
+        .catch(err => logger.warn({ msg: 'Failed to persist model preferences', provider, error: err }));
       return;
     }
     if (!this.db) return;
@@ -379,7 +498,7 @@ export class ProviderManager {
 
   getActiveProviderId(): ProviderId {
     if (this.configStore) {
-      return this.configStore.current.provider.id as ProviderId;
+      return this.resolvedProviderOverride ?? this.configStore.current.provider.id as ProviderId;
     }
     if (!this.db) return this.findFirstInstalledProvider();
     const raw = this.db.getSetting(`${SETTING_PREFIX}active`);
@@ -396,7 +515,9 @@ export class ProviderManager {
    * the active provider is actually usable.
    */
   resolveAndPersistProvider(): ProviderId {
-    const configured = this.getActiveProviderId();
+    const configured = this.configStore
+      ? this.configStore.current.provider.id as ProviderId
+      : this.getActiveProviderId();
 
     // Check if the configured provider is installed and enabled
     const { installed } = this.detectInstalled(configured);
@@ -407,16 +528,20 @@ export class ProviderManager {
 
     logger.warn({ module: 'provider', msg: 'Configured provider not available, searching for fallback', provider: configured, installed });
 
+    if (this.shouldSuppressFallback(configured)) {
+      logger.warn({ module: 'provider', msg: 'Skipping fallback after failed provider persistence until config changes', provider: configured });
+      return configured;
+    }
+
     // Walk the provider ranking to find the first installed+enabled provider
-    const ranking = this.getProviderRanking();
-    for (const candidateId of ranking) {
-      if (candidateId === configured) continue; // already checked
-      const { installed: candidateInstalled } = this.detectInstalled(candidateId);
-      if (candidateInstalled && this.isProviderEnabled(candidateId)) {
-        logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: candidateId });
-        this.setActiveProviderId(candidateId);
-        return candidateId;
-      }
+    const fallbackProvider = this.findFirstUsableProvider(configured);
+    if (fallbackProvider) {
+      logger.info({ module: 'provider', msg: 'Falling back to available provider', from: configured, to: fallbackProvider });
+      const transitionVersion = this.beginProviderResolutionTransition();
+      this.resolvedProviderOverride = fallbackProvider;
+      this.emit('provider:runtime-changed');
+      this.persistActiveProvider(fallbackProvider, configured, transitionVersion);
+      return fallbackProvider;
     }
 
     // No provider found — keep the configured one and let downstream handle the error
@@ -439,15 +564,120 @@ export class ProviderManager {
     return 'copilot'; // absolute last resort
   }
 
-  setActiveProviderId(provider: ProviderId): void {
+  private findFirstUsableProvider(excludeProvider?: ProviderId): ProviderId | null {
+    const ranking = this.getProviderRanking();
+    for (const candidateId of ranking) {
+      if (candidateId === excludeProvider) continue;
+      const { installed } = this.detectInstalled(candidateId);
+      if (installed && this.isProviderEnabled(candidateId)) {
+        return candidateId;
+      }
+    }
+    return null;
+  }
+
+  private persistActiveProvider(provider: ProviderId, configuredProviderId?: ProviderId, transitionVersion?: number): void {
     if (this.configStore) {
+      const patch = this.buildProviderSwitchPatch(provider);
+      const version = transitionVersion ?? this.beginProviderResolutionTransition();
       // Only update the provider id — don't spread the current provider config,
       // which may contain overrides (binary, args, env, cloud) for a different provider.
-      this.configStore.writePartial({ provider: { id: provider } }).catch(err => logger.warn({ msg: 'Failed to persist active provider', provider, error: err }));
+      this.configStore.writePartial(patch)
+        .then(() => {
+          if (!this.isCurrentProviderResolutionTransition(version)) return;
+          this.applyConfigStorePatchAfterWrite(patch);
+        })
+        .catch(err => {
+          if (this.isCurrentProviderResolutionTransition(version)) {
+            this.rollbackResolvedProviderOverride(configuredProviderId);
+          }
+          logger.warn({ msg: 'Failed to persist active provider', provider, error: err });
+        });
       return;
     }
     if (!this.db) return;
     this.db.setSetting(`${SETTING_PREFIX}active`, provider);
+  }
+
+  setActiveProviderId(provider: ProviderId): void {
+    if (!this.isProviderEnabled(provider)) {
+      throw new Error(`Provider '${provider}' is disabled`);
+    }
+
+    const { installed } = this.detectInstalled(provider);
+    if (!installed) {
+      throw new Error(`Provider '${provider}' is not installed`);
+    }
+
+    this.persistActiveProvider(provider);
+  }
+
+  async setProviderEnabledPersisted(provider: ProviderId, enabled: boolean): Promise<ProviderId> {
+    const activeProvider = this.getActiveProviderId();
+    let fallbackProvider: ProviderId | null = null;
+    if (!enabled && activeProvider === provider) {
+      fallbackProvider = this.findFirstUsableProvider(provider);
+      if (!fallbackProvider) {
+        throw new Error(`Cannot disable active provider '${provider}' without another installed and enabled provider`);
+      }
+    }
+
+    if (this.configStore) {
+      const current = this.configStore.current.providerSettings[provider] ?? { enabled: true, models: [] };
+      const patch = {
+        providerSettings: { [provider]: { ...current, enabled } },
+        ...(fallbackProvider ? this.buildProviderSwitchPatch(fallbackProvider) : {}),
+      } satisfies {
+        providerSettings: FlightdeckConfig['providerSettings'];
+        provider?: Partial<FlightdeckConfig['provider']>;
+      };
+      const transitionVersion = fallbackProvider ? this.beginProviderResolutionTransition() : 0;
+      if (fallbackProvider) {
+        this.resolvedProviderOverride = fallbackProvider;
+        this.emit('provider:runtime-changed');
+      }
+      try {
+        await this.configStore.writePartial(patch);
+        if (fallbackProvider && !this.isCurrentProviderResolutionTransition(transitionVersion)) {
+          return fallbackProvider;
+        }
+        this.applyConfigStorePatchAfterWrite(patch);
+        return fallbackProvider ?? activeProvider;
+      } catch (error) {
+        if (fallbackProvider && this.isCurrentProviderResolutionTransition(transitionVersion)) {
+          this.rollbackResolvedProviderOverride(activeProvider);
+        }
+        throw error;
+      }
+    }
+
+    this.setProviderEnabled(provider, enabled);
+    return this.getActiveProviderId();
+  }
+
+  async setActiveProviderIdPersisted(provider: ProviderId): Promise<ProviderId> {
+    if (!this.isProviderEnabled(provider)) {
+      throw new Error(`Provider '${provider}' is disabled`);
+    }
+
+    const { installed } = this.detectInstalled(provider);
+    if (!installed) {
+      throw new Error(`Provider '${provider}' is not installed`);
+    }
+
+    if (this.configStore) {
+      const patch = this.buildProviderSwitchPatch(provider);
+      const transitionVersion = this.beginProviderResolutionTransition();
+      await this.configStore.writePartial(patch);
+      if (!this.isCurrentProviderResolutionTransition(transitionVersion)) {
+        return provider;
+      }
+      this.applyConfigStorePatchAfterWrite(patch);
+      return provider;
+    }
+
+    this.persistActiveProvider(provider);
+    return provider;
   }
 
   // ── Provider Ranking ───────────────────────────────────────
@@ -474,9 +704,10 @@ export class ProviderManager {
 
   setProviderRanking(ranking: ProviderId[]): void {
     if (this.configStore) {
-      this.configStore.writePartial({ providerRanking: ranking }).catch(err =>
-        logger.warn({ msg: 'Failed to persist provider ranking', error: err }),
-      );
+      const patch = { providerRanking: ranking } satisfies { providerRanking: FlightdeckConfig['providerRanking'] };
+      this.configStore.writePartial(patch)
+        .then(() => this.applyConfigStorePatchAfterWrite(patch))
+        .catch(err => logger.warn({ msg: 'Failed to persist provider ranking', error: err }));
       return;
     }
     if (!this.db) return;

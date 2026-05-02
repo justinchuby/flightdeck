@@ -80,7 +80,7 @@ function detectModelProvider(model: string): string {
 const EQUIVALENCES: Record<string, Record<string, string>> = {
   // Anthropic → others
   'claude-opus-4.7': { openai: 'gpt-5.4', google: 'gemini-3.1-pro' },
-  'claude-opus-4.6': { openai: 'gpt-5.2-codex', google: 'gemini-3.1-pro' },
+  'claude-opus-4.6': { openai: 'gpt-5.4', google: 'gemini-3.1-pro' },
   'claude-opus-4.5': { openai: 'gpt-5.1-codex-max', google: 'gemini-3.1-pro' },
   'claude-sonnet-4.6': { openai: 'gpt-5.3-codex', google: 'gemini-3.1-flash' },
   'claude-sonnet-4.5': { openai: 'gpt-5.3-codex', google: 'gemini-3.1-flash' },
@@ -101,9 +101,9 @@ const EQUIVALENCES: Record<string, Record<string, string>> = {
   'gpt-4.1': { anthropic: 'claude-sonnet-4', google: 'gemini-3.1-flash' },
 
   // Google → others
-  'gemini-3-pro-preview': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
+  'gemini-3-pro-preview': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.4' },
   'gemini-3-flash-preview': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
-  'gemini-3.1-pro': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.2-codex' },
+  'gemini-3.1-pro': { anthropic: 'claude-opus-4.6', openai: 'gpt-5.4' },
   'gemini-3.1-flash': { anthropic: 'claude-sonnet-4.6', openai: 'gpt-5.3-codex' },
   'gemini-3.1-flash-lite': { anthropic: 'claude-haiku-4.5', openai: 'gpt-5.1-codex-mini' },
 };
