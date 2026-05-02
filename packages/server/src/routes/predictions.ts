@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import { PredictionService } from '../coordination/predictions/PredictionService.js';
+import { badRequest, notFound, internalError } from '../errors/index.js';
 
 export function predictionRoutes(ctx: AppContext): Router {
   const service = new PredictionService(ctx.db, ctx.configStore);
@@ -32,14 +33,14 @@ export function predictionRoutes(ctx: AppContext): Router {
       const config = service.updateConfig(req.body);
       res.json(config);
     } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
+      throw badRequest((err as Error).message);
     }
   });
 
   // POST /predictions/:id/dismiss — dismiss a prediction
   router.post('/predictions/:id/dismiss', (req, res) => {
     const dismissed = service.dismiss(req.params.id);
-    if (!dismissed) return res.status(404).json({ error: 'Prediction not found' });
+    if (!dismissed) throw notFound('Prediction not found');
     res.json({ ok: true });
   });
 
@@ -47,10 +48,10 @@ export function predictionRoutes(ctx: AppContext): Router {
   router.post('/predictions/:id/resolve', (req, res) => {
     const { outcome } = req.body as { outcome?: string };
     if (!outcome || !['correct', 'avoided', 'wrong'].includes(outcome)) {
-      return res.status(400).json({ error: 'Invalid outcome. Must be: correct, avoided, or wrong' });
+      throw badRequest('Invalid outcome. Must be: correct, avoided, or wrong');
     }
     const resolved = service.resolve(req.params.id, outcome as 'correct' | 'avoided' | 'wrong');
-    if (!resolved) return res.status(404).json({ error: 'Prediction not found' });
+    if (!resolved) throw notFound('Prediction not found');
     res.json({ ok: true });
   });
 
@@ -60,13 +61,13 @@ export function predictionRoutes(ctx: AppContext): Router {
   router.post('/predictions/generate', (req, res) => {
     const { agents } = req.body;
     if (!agents || !Array.isArray(agents)) {
-      return res.status(400).json({ error: 'Missing required field: agents (array)' });
+      throw badRequest('Missing required field: agents (array)');
     }
     try {
       const predictions = service.generatePredictions(agents);
       res.json({ predictions, count: predictions.length });
     } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
+      throw internalError((err as Error).message);
     }
   });
 

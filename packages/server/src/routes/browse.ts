@@ -3,6 +3,7 @@ import { readdirSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, normalize, sep } from 'node:path';
 import { homedir } from 'node:os';
 import type { AppContext } from './context.js';
+import { badRequest, forbidden } from '../errors/index.js';
 
 export function browseRoutes(_ctx: AppContext): Router {
   const router = Router();
@@ -61,8 +62,7 @@ export function browseRoutes(_ctx: AppContext): Router {
 
     // Reject null bytes before any path operations
     if (dir.includes('\0')) {
-      res.status(400).json({ error: 'Invalid path' });
-      return;
+      throw badRequest('Invalid path');
     }
 
     let resolved: string;
@@ -70,14 +70,12 @@ export function browseRoutes(_ctx: AppContext): Router {
       // Resolve symlinks to get the real path (prevents symlink-based escapes)
       resolved = realpathSync(resolve(dir));
     } catch {
-      res.status(400).json({ error: 'Path does not exist' });
-      return;
+      throw badRequest('Path does not exist');
     }
 
     const check = isPathAllowed(resolved);
     if (!check.allowed) {
-      res.status(403).json({ error: check.reason });
-      return;
+      throw forbidden(check.reason);
     }
 
     try {
@@ -96,8 +94,8 @@ export function browseRoutes(_ctx: AppContext): Router {
       const parentDir = dirname(resolved);
       const parentAllowed = isPathAllowed(parentDir).allowed ? parentDir : null;
       res.json({ current: resolved, parent: parentAllowed, folders });
-    } catch (err: any) {
-      res.status(400).json({ error: `Cannot read directory: ${err.message}`, current: resolved });
+    } catch (err) {
+      throw badRequest(`Cannot read directory: ${(err as Error).message}`);
     }
   });
 

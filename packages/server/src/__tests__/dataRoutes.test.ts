@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { dataRoutes } from '../routes/data.js';
+import { ApiError } from '../errors/index.js';
 
 /** Build a minimal mock drizzle chain that returns configurable values */
 function makeMockDb(overrides?: { getReturnValue?: any; allReturnValue?: any[] }) {
@@ -91,16 +92,20 @@ describe('POST /data/cleanup', () => {
   it('rejects missing olderThanDays', () => {
     const handler = getCleanupHandler();
     const res = mockRes();
-    handler({ body: {} }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res._body.error).toMatch(/olderThanDays/);
+    expect(() => handler({ body: {} }, res)).toThrow(ApiError);
+    try { handler({ body: {} }, res); } catch (e: any) {
+      expect(e.status).toBe(400);
+      expect(e.message).toMatch(/olderThanDays/);
+    }
   });
 
   it('rejects negative days', () => {
     const handler = getCleanupHandler();
     const res = mockRes();
-    handler({ body: { olderThanDays: -5 } }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(() => handler({ body: { olderThanDays: -5 } }, res)).toThrow(ApiError);
+    try { handler({ body: { olderThanDays: -5 } }, res); } catch (e: any) {
+      expect(e.status).toBe(400);
+    }
   });
 
   it('accepts zero days as purge-all', () => {
@@ -114,8 +119,10 @@ describe('POST /data/cleanup', () => {
   it('rejects string days', () => {
     const handler = getCleanupHandler();
     const res = mockRes();
-    handler({ body: { olderThanDays: 'thirty' } }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(() => handler({ body: { olderThanDays: 'thirty' } }, res)).toThrow(ApiError);
+    try { handler({ body: { olderThanDays: 'thirty' } }, res); } catch (e: any) {
+      expect(e.status).toBe(400);
+    }
   });
 
   it('returns zero counts when no old sessions exist', () => {

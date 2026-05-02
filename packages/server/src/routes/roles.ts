@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { badRequest } from '../errors/index.js';
 import { validateBody, registerRoleSchema } from '../validation/schemas.js';
 import { writeAgentFiles } from '../agents/agentFiles.js';
 import type { AppContext } from './context.js';
@@ -26,8 +27,8 @@ export function rolesRoutes(ctx: AppContext): Router {
   // POST /roles/test — dry-run a custom role with a test message
   router.post('/roles/test', (req, res) => {
     const { role, message } = req.body as { role?: Record<string, unknown>; message?: string };
-    if (!role) return res.status(400).json({ error: 'Missing required field: role' });
-    if (!message) return res.status(400).json({ error: 'Missing required field: message' });
+    if (!role) throw badRequest('Missing required field: role');
+    if (!message) throw badRequest('Missing required field: message');
 
     const name = (role.name as string) || 'Custom Role';
     const systemPrompt = (role.systemPrompt as string) || '';

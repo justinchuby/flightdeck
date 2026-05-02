@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import { Database } from '../db/database.js';
 import { dataRoutes } from '../routes/data.js';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 import {
   projects,
   projectSessions,
@@ -116,6 +117,7 @@ describe('POST /data/cleanup', () => {
     app.use(express.json());
     const ctx = { db, config: { dbPath: ':memory:' } } as any;
     app.use(dataRoutes(ctx));
+    app.use(apiErrorHandler);
 
     await new Promise<void>((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {

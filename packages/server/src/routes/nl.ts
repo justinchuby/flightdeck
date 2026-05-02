@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import { NLCommandService } from '../coordination/commands/NLCommandService.js';
+import { ApiError, badRequest, notFound } from '../errors/index.js';
 
 export function nlRoutes(ctx: AppContext): Router {
   const { agentManager, decisionLog, activityLedger } = ctx;
@@ -15,56 +16,58 @@ export function nlRoutes(ctx: AppContext): Router {
   // POST /api/nl/preview — preview what a command would do (no execution)
   router.post('/nl/preview', (req, res) => {
     const { command, leadId } = req.body as { command?: string; leadId?: string };
-    if (!command) return res.status(400).json({ error: 'Missing required field: command' });
-    if (!leadId) return res.status(400).json({ error: 'Missing required field: leadId' });
+    if (!command) throw badRequest('Missing required field: command');
+    if (!leadId) throw badRequest('Missing required field: leadId');
 
     try {
       const plan = service.preview(command, leadId);
-      if (!plan) return res.status(404).json({ error: 'No matching command found', command });
+      if (!plan) throw notFound('No matching command found');
       res.json(plan);
     } catch (err) {
-      res.status(500).json({ error: 'Preview failed', detail: (err as Error).message });
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(500, 'Preview failed', { details: (err as Error).message });
     }
   });
 
   // POST /api/nl/execute — match, plan, and execute a command
   router.post('/nl/execute', (req, res) => {
     const { command, leadId } = req.body as { command?: string; leadId?: string };
-    if (!command) return res.status(400).json({ error: 'Missing required field: command' });
-    if (!leadId) return res.status(400).json({ error: 'Missing required field: leadId' });
+    if (!command) throw badRequest('Missing required field: command');
+    if (!leadId) throw badRequest('Missing required field: leadId');
 
     try {
       const result = service.execute(command, leadId);
-      if (!result) return res.status(404).json({ error: 'No matching command found', command });
+      if (!result) throw notFound('No matching command found');
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: 'Execution failed', detail: (err as Error).message });
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(500, 'Execution failed', { details: (err as Error).message });
     }
   });
 
   // POST /api/nl/undo — undo a previously executed command
   router.post('/nl/undo', (req, res) => {
     const { commandId } = req.body as { commandId?: string };
-    if (!commandId) return res.status(400).json({ error: 'Missing required field: commandId' });
+    if (!commandId) throw badRequest('Missing required field: commandId');
 
     try {
       const result = service.undo(commandId);
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: 'Undo failed', detail: (err as Error).message });
+      throw new ApiError(500, 'Undo failed', { details: (err as Error).message });
     }
   });
 
   // GET /api/nl/suggestions — context-aware action suggestions
   router.get('/nl/suggestions', (req, res) => {
     const leadId = req.query.leadId as string;
-    if (!leadId) return res.status(400).json({ error: 'Missing required query param: leadId' });
+    if (!leadId) throw badRequest('Missing required query param: leadId');
 
     try {
       const suggestions = service.getSuggestions(leadId);
       res.json({ suggestions });
     } catch (err) {
-      res.status(500).json({ error: 'Suggestions failed', detail: (err as Error).message });
+      throw new ApiError(500, 'Suggestions failed', { details: (err as Error).message });
     }
   });
 
@@ -84,7 +87,7 @@ export function nlRoutes(ctx: AppContext): Router {
       };
       res.json(state);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to get onboarding status', detail: (err as Error).message });
+      throw new ApiError(500, 'Failed to get onboarding status', { details: (err as Error).message });
     }
   });
 
@@ -120,7 +123,7 @@ export function nlRoutes(ctx: AppContext): Router {
       ctx.db.setSetting(`onboarding_${userId}`, JSON.stringify(state));
       res.json(state);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to update onboarding', detail: (err as Error).message });
+      throw new ApiError(500, 'Failed to update onboarding', { details: (err as Error).message });
     }
   });
 

@@ -11,6 +11,7 @@ import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import type { Request, Response, NextFunction } from 'express';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 
 // Bypass rate limiters in tests
 vi.mock('../middleware/rateLimit.js', () => ({
@@ -96,6 +97,7 @@ function createTestServer(): {
   const app = express();
   app.use(express.json());
   app.use(settingsRoutes(ctx));
+  app.use(apiErrorHandler);
 
   let server: Server;
   return {

@@ -4,6 +4,7 @@ import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { integrationRoutes } from './integrations.js';
 import type { AppContext } from './context.js';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 import type { MessagingAdapter, OutboundMessage, ChatSession } from '../integrations/types.js';
 
 vi.mock('../utils/logger.js', () => ({
@@ -52,6 +53,7 @@ function createTestServer(ctx: Partial<AppContext>) {
   const app = express();
   app.use(express.json());
   app.use(integrationRoutes(ctx as AppContext));
+  app.use(apiErrorHandler);
   let server: Server;
   return {
     app,

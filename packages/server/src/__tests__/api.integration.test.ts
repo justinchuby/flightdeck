@@ -2,6 +2,7 @@ import express from 'express';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { apiRouter } from '../api.js';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 import { getDefaultConfig } from '../config/configSchema.js';
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
 
@@ -198,6 +199,7 @@ beforeAll(async () => {
     decisionLog: mockDecisionLog,
   } as any);
   app.use('/api', router);
+  app.use(apiErrorHandler);
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, '127.0.0.1', () => {
@@ -494,8 +496,8 @@ describe('Coordination', () => {
     });
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.ok).toBe(false);
-    expect(body.holder).toBe('agent-other');
+    expect(body.error).toBe('File already locked');
+    expect(body.details.holder).toBe('agent-other');
   });
 
   it('GET /api/coordination/activity returns recent activity', async () => {
