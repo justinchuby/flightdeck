@@ -68,3 +68,86 @@ export function phaseToStatus(phase: AgentPhase, exitCode: number | null): Agent
     case 'error':     return 'failed';
   }
 }
+
+// ── Crew hierarchy utilities ──────────────────────────────────────
+
+/** Minimal shape required for hierarchy traversal */
+export interface HierarchyAgent {
+  id: string;
+  parentId?: string | null;
+}
+
+/**
+ * Collect all descendants of `leadId` via depth-first traversal of a parent→children index.
+ * Returns agents whose ancestry leads back to `leadId` (not including the lead itself).
+ * Protected against circular references via a visited set.
+ */
+export function getCrewDescendants<T extends HierarchyAgent>(
+  leadId: string,
+  agents: T[],
+): T[] {
+  // Build parent→children index for O(n) traversal
+  const childrenOf = new Map<string, T[]>();
+  for (const agent of agents) {
+    if (agent.parentId) {
+      let list = childrenOf.get(agent.parentId);
+      if (!list) {
+        list = [];
+        childrenOf.set(agent.parentId, list);
+      }
+      list.push(agent);
+    }
+  }
+
+  const result: T[] = [];
+  const visited = new Set<string>();
+  visited.add(leadId); // never revisit the root
+
+  function walk(parentId: string): void {
+    const children = childrenOf.get(parentId);
+    if (!children) return;
+    for (const child of children) {
+      if (visited.has(child.id)) continue; // circular reference protection
+      visited.add(child.id);
+      result.push(child);
+      walk(child.id);
+    }
+  }
+
+  walk(leadId);
+  return result;
+}
+
+/**
+ * Collect the lead plus all descendants — convenience wrapper for filtering
+ * agents that belong to a crew rooted at `leadId`.
+ */
+export function getCrewMembers<T extends HierarchyAgent>(
+  leadId: string,
+  agents: T[],
+): T[] {
+  const lead = agents.find(a => a.id === leadId);
+  const descendants = getCrewDescendants(leadId, agents);
+  return lead ? [lead, ...descendants] : descendants;
+}
+
+/**
+ * Check if `agentId` is a descendant of `leadId` (at any depth).
+ */
+export function isCrewDescendant<T extends HierarchyAgent>(
+  agentId: string,
+  leadId: string,
+  agents: T[],
+): boolean {
+  if (agentId === leadId) return false;
+  const agentMap = new Map(agents.map(a => [a.id, a]));
+  const visited = new Set<string>();
+  let current = agentMap.get(agentId);
+  while (current?.parentId) {
+    if (current.parentId === leadId) return true;
+    if (visited.has(current.parentId)) return false; // circular reference protection
+    visited.add(current.parentId);
+    current = agentMap.get(current.parentId);
+  }
+  return false;
+}

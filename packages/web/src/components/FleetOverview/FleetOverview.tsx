@@ -12,6 +12,7 @@ import type { HeatmapMessage } from './CommHeatmap';
 import type { AgentInfo } from '../../types';
 import { ProjectTabs } from '../ProjectTabs';
 import { shortAgentId } from '../../utils/agentLabel';
+import { getCrewMembers } from '@flightdeck/shared';
 
 interface CoordinationStatus {
   locks: FileLock[];
@@ -54,10 +55,10 @@ export function FleetOverview() {
   // Auto-select first lead if none selected
   const effectiveLeadId = selectedLeadFilter ?? (leads.length > 0 ? leads[0].id : null);
 
-  // Filter agents by selected project (lead + their children)
+  // Filter agents by selected project (lead + all descendants)
   const projectAgents = useMemo(() => {
     if (!effectiveLeadId || leads.length <= 1) return agents;
-    return agents.filter((a) => a.id === effectiveLeadId || a.parentId === effectiveLeadId);
+    return getCrewMembers(effectiveLeadId, agents);
   }, [agents, effectiveLeadId, leads.length]);
 
   const fetchCoordination = useCallback(async () => {
