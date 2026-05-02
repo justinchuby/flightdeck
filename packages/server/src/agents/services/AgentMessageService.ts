@@ -64,6 +64,12 @@ export class AgentMessageService {
     return this.conversationStore.getRecentMessages(agentId, limit).reverse();
   }
 
+  /** Get messages older than a cursor ID (for pagination). Returns oldest-first. */
+  getMessagesBefore(agentId: string, beforeId: number, limit = 50): ThreadMessage[] {
+    if (!this.conversationStore) return [];
+    return this.conversationStore.getMessagesBefore(agentId, beforeId, limit).reverse();
+  }
+
   /** Buffer agent output text, flushing after 2s of silence */
   bufferAgentMessage(agentId: string, data: string): void {
     // Flush any pending thinking text first so messages stay chronological

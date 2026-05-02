@@ -1229,6 +1229,11 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
     return this.messageService.getMessageHistory(agentId, limit);
   }
 
+  /** Get messages older than a cursor ID (for pagination). Returns oldest-first. */
+  getMessagesBefore(agentId: string, beforeId: number, limit = 50): import('../db/ConversationStore.js').ThreadMessage[] {
+    return this.messageService.getMessagesBefore(agentId, beforeId, limit);
+  }
+
   /**
    * Fail running DAG task assigned to an agent and notify the parent lead.
    * Shared by both onExit (crash path) and terminate (explicit kill path).

@@ -504,4 +504,60 @@ describe('messageStore', () => {
       expect(s1).toBe(EMPTY_MESSAGES);
     });
   });
+
+  describe('prependHistory', () => {
+    it('prepends older messages before existing messages', () => {
+      const store = useMessageStore.getState();
+      store.addMessage(CH, { type: 'text', text: 'Msg 3', sender: 'agent', timestamp: 3000 });
+      store.addMessage(CH, { type: 'text', text: 'Msg 4', sender: 'agent', timestamp: 4000 });
+
+      store.prependHistory(CH, [
+        { type: 'text', text: 'Msg 1', sender: 'agent', timestamp: 1000 },
+        { type: 'text', text: 'Msg 2', sender: 'agent', timestamp: 2000 },
+      ]);
+
+      const msgs = useMessageStore.getState().channels[CH].messages;
+      expect(msgs.length).toBe(4);
+      expect(msgs[0].text).toBe('Msg 1');
+      expect(msgs[1].text).toBe('Msg 2');
+      expect(msgs[2].text).toBe('Msg 3');
+      expect(msgs[3].text).toBe('Msg 4');
+    });
+
+    it('deduplicates against existing messages', () => {
+      const store = useMessageStore.getState();
+      store.addMessage(CH, { type: 'text', text: 'Same msg', sender: 'agent', timestamp: 1000 });
+
+      store.prependHistory(CH, [
+        { type: 'text', text: 'Same msg', sender: 'agent', timestamp: 1000 },
+        { type: 'text', text: 'New msg', sender: 'agent', timestamp: 500 },
+      ]);
+
+      const msgs = useMessageStore.getState().channels[CH].messages;
+      expect(msgs.length).toBe(2);
+      expect(msgs[0].text).toBe('New msg');
+      expect(msgs[1].text).toBe('Same msg');
+    });
+
+    it('handles empty older array as no-op', () => {
+      const store = useMessageStore.getState();
+      store.addMessage(CH, { type: 'text', text: 'Existing', sender: 'agent', timestamp: 1000 });
+      const before = useMessageStore.getState().channels[CH];
+
+      store.prependHistory(CH, []);
+      const after = useMessageStore.getState().channels[CH];
+      expect(after).toBe(before); // Same reference — no state change
+    });
+
+    it('works on a non-existent channel', () => {
+      const store = useMessageStore.getState();
+      store.prependHistory('new-ch', [
+        { type: 'text', text: 'First', sender: 'agent', timestamp: 1000 },
+      ]);
+
+      const msgs = useMessageStore.getState().channels['new-ch'].messages;
+      expect(msgs.length).toBe(1);
+      expect(msgs[0].text).toBe('First');
+    });
+  });
 });
