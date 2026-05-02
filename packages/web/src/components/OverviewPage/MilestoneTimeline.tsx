@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { ReplayKeyframe } from '../../hooks/useSessionReplay';
+import { formatTime } from '../../utils/format';
 
 /** Only show meaningful progress events — filter out routine system noise */
 const MILESTONE_TYPES = new Set(['milestone', 'task', 'decision', 'progress', 'commit', 'error']);
@@ -48,8 +49,7 @@ export function MilestoneTimeline({ keyframes, onSeek }: MilestoneTimelineProps)
 
         {[...milestones].reverse().map((kf, idx) => {
           const icon = TYPE_ICONS[kf.type] ?? '⏱';
-          const time = new Date(kf.timestamp);
-          const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const timeStr = formatTime(kf.timestamp);
 
           return (
             <button

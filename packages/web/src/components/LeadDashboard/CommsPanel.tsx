@@ -8,6 +8,7 @@ import { MentionText } from '../../utils/markdown';
 import { classifyMessage, tierPassesFilter, TIER_CONFIG, type TierFilter, type FeedItem } from '../../utils/messageTiers';
 import { AgentReportBlock } from './AgentReportBlock';
 import { Markdown } from '../ui/Markdown';
+import { formatTime } from '../../utils/format';
 
 export function roleColor(role: string): string {
   const colors = [
@@ -104,7 +105,7 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
 
             if (entry.type === 'group') {
               const gm = entry.item;
-              const time = new Date(gm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+              const time = formatTime(gm.timestamp, { seconds: true });
               return (
                 <div
                   key={gm.id || `gm-${i}`}
@@ -128,7 +129,7 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
               );
             }
             const c = entry.item as AgentComm;
-            const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const time = formatTime(c.timestamp, { seconds: true });
             const isToUser = leadId && c.toId === leadId;
             return (
               <div
@@ -174,7 +175,7 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
+                  {formatTime(selectedComm.timestamp)}
                 </span>
                 <button
                   onClick={() => setSelectedComm(null)}
@@ -217,7 +218,7 @@ export function CommsPanelContent({ comms, groupMessages, leadId }: { comms: Age
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedGroupMsg.timestamp).toLocaleTimeString()}
+                  {formatTime(selectedGroupMsg.timestamp)}
                 </span>
                 <button
                   onClick={() => setSelectedGroupMsg(null)}

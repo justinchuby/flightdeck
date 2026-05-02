@@ -6,6 +6,7 @@ import { AxisBottom, AxisLeft } from '@visx/axis';
 import { curveMonotoneX } from '@visx/curve';
 import { ParentSize } from '@visx/responsive';
 import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
+import { formatTime } from '../../utils/format';
 
 export interface FlowPoint {
   time: number;
@@ -161,10 +162,7 @@ function CumulativeFlowInner({ data, width, height }: CumulativeFlowProps) {
             scale={xScale}
             numTicks={4}
             hideZero
-            tickFormat={(d) => {
-              const date = d instanceof Date ? d : new Date(d as number);
-              return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }}
+            tickFormat={(d) => formatTime(d instanceof Date ? d : new Date(d as number))}
             stroke="var(--th-border)"
             tickStroke="var(--th-border)"
             tickLabelProps={() => ({
@@ -201,7 +199,7 @@ function CumulativeFlowInner({ data, width, height }: CumulativeFlowProps) {
           style={CHART_TOOLTIP_STYLES}
         >
           <div style={{ fontWeight: 600, marginBottom: 3 }}>
-            {new Date(tooltipData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {formatTime(tooltipData.time, { seconds: true })}
           </div>
           {SERIES.map((s) => (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

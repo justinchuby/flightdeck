@@ -5,6 +5,7 @@ import { scaleLinear, scaleTime } from '@visx/scale';
 import { AxisBottom, AxisLeft } from '@visx/axis';
 import { ParentSize } from '@visx/responsive';
 import { useChartTooltip, TooltipWithBounds, CHART_TOOLTIP_STYLES } from '../../hooks/useChartTooltip';
+import { formatTime } from '../../utils/format';
 
 export interface CostPoint {
   time: number;
@@ -249,10 +250,7 @@ function CostCurveInner({ data, width, height }: CostCurveProps) {
             scale={xScale}
             numTicks={4}
             hideZero
-            tickFormat={(d) => {
-              const date = d instanceof Date ? d : new Date(d as number);
-              return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }}
+            tickFormat={(d) => formatTime(d instanceof Date ? d : new Date(d as number))}
             tickLabelProps={() => ({
               fill: 'var(--th-text-muted)',
               fontSize: 9,
@@ -286,7 +284,7 @@ function CostCurveInner({ data, width, height }: CostCurveProps) {
           style={CHART_TOOLTIP_STYLES}
         >
           <div style={{ fontWeight: 600, marginBottom: 3 }}>
-            {new Date(tooltipData.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {formatTime(tooltipData.time, { seconds: true })}
           </div>
           {hasBreakdown ? (
             <>

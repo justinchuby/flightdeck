@@ -18,6 +18,7 @@ import { apiFetch } from '../../hooks/useApi';
 import { getRoleIcon } from '../../utils/getRoleIcon';
 import { useToastStore } from '../Toast';
 import type { AgentInfo } from '../../types';
+import { formatFullTimestamp } from '../../utils/format';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ function AgentCard({ agent }: { agent: AgentInfo }) {
             {agent.provider && (
               <div><span className="text-th-text-alt">CLI:</span> <span className="text-th-text capitalize">{agent.provider}{agent.backend && agent.backend !== 'acp' ? ` (${agent.backend})` : ''}</span></div>
             )}
-            <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{new Date(agent.createdAt).toLocaleString()}</span></div>
+            <div><span className="text-th-text-alt">Created:</span> <span className="text-th-text">{formatFullTimestamp(agent.createdAt)}</span></div>
             {agent.projectId && (
               <div><span className="text-th-text-alt">Project:</span> <span className="text-th-text">{agent.projectName ?? agent.projectId}</span></div>
             )}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import { parseAgentReport } from './AgentReportBlock';
 import type { AgentReport } from '../../stores/leadStore';
+import { formatTime } from '../../utils/format';
 
 interface Props {
   agentReports: AgentReport[];
@@ -28,7 +29,7 @@ export function LeadAgentReportsBanner({ agentReports, reportsScrollRef, onExpan
       {reportsExpanded && (
         <div ref={reportsScrollRef} className="max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
           {agentReports.slice(-20).map((r) => {
-            const time = new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const time = formatTime(r.timestamp);
             const parsed = parseAgentReport(r.content);
             const summary = parsed.isReport
               ? [parsed.header, parsed.task].filter(Boolean).join(' — ')
