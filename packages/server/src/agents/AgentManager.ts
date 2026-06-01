@@ -64,7 +64,7 @@ export interface AgentManagerEvents {
   'agent:plan': { agentId: string; plan: PlanEntry[] };
   'agent:session_ready': { agentId: string; sessionId: string };
   'agent:session_resume_failed': { agentId: string; requestedSessionId: string; error: string };
-  'agent:model_substituted': { agentId: string; requested: string; selected: string; reason: string };
+  'agent:model_substituted': { agentId: string; requested: string; selected: string; reason: string; detail?: string };
   'agent:message_sent': { from: string; fromRole: string; to: string; toRole: string; content: string };
   'agent:context_compacted': { agentId: string; previousUsed: number; currentUsed: number; percentDrop: number };
   'agent:usage': { agentId: string; inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; contextWindowUsed?: number; contextWindowSize?: number };
@@ -670,6 +670,7 @@ export class AgentManager extends TypedEmitter<AgentManagerEvents> {
           requested: info.requested,
           selected: info.selected,
           reason: info.reason,
+          detail: info.detail,
         });
         this.activityLedger.log(
           agent.id,

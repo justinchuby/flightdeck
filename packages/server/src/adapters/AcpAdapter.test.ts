@@ -358,7 +358,7 @@ describe('AcpAdapter', () => {
       expect(substituted).not.toHaveBeenCalled();
     });
 
-    it('(c) switches once and emits model_substituted when a downgrade target exists', async () => {
+    it('(c) emits substitution WITHOUT an RPC when the downgrade target already equals the current model', async () => {
       setupSuccessfulStart('session-downgrade');
       mockNewSession.mockResolvedValue({
         sessionId: 'session-downgrade',
@@ -378,11 +378,13 @@ describe('AcpAdapter', () => {
       await adapter.start({
         ...DEFAULT_START_OPTS,
         provider: 'copilot',
-        model: 'claude-opus-4.8', // premium, unavailable → downgrade to sonnet
+        model: 'claude-opus-4.8', // premium, unavailable → downgrade resolves to sonnet
       });
 
-      // currentModelId is claude-sonnet-4.6 and selection is also claude-sonnet-4.6,
-      // so no RPC switch is needed, but a substitution still occurred.
+      // The fallback (claude-sonnet-4.6) is ALREADY the running model, so no RPC
+      // switch is needed — but the requested model WAS unavailable, so the genuine
+      // substitution is still surfaced to the user.
+      expect(mockSetSessionModel).not.toHaveBeenCalled();
       expect(substitutedEvents).toHaveLength(1);
       expect(substitutedEvents[0]).toMatchObject({
         requested: 'claude-opus-4.8',
@@ -450,6 +452,87 @@ describe('AcpAdapter', () => {
         module: 'acp-adapter',
         msg: 'setSessionModel failed; degrading to CLI default model',
       }));
+    });
+
+    it('(e) does NOT emit model_substituted when a downgrade switch rejects', async () => {
+      setupSuccessfulStart('session-reject-noemit');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-reject-noemit',
+        models: {
+          currentModelId: 'claude-haiku-4.5',
+          availableModels: [
+            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-haiku-4.5', name: 'Haiku' },
+          ],
+        },
+      });
+      mockSetSessionModel.mockRejectedValue(new Error('not supported'));
+
+      const adapter = new AcpAdapter();
+      const substituted = vi.fn();
+      adapter.on('model_substituted', substituted);
+
+      await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'copilot',
+        model: 'claude-opus-4.8', // downgrade to sonnet (differs from haiku) → switch attempted
+      });
+
+      expect(mockSetSessionModel).toHaveBeenCalledTimes(1);
+      // Switch threw → no real substitution took effect → must NOT emit.
+      expect(substituted).not.toHaveBeenCalled();
+    });
+
+    it('(f) no-ops (no switch/emit) when the selector returns no-op despite a non-empty model list', async () => {
+      setupSuccessfulStart('session-noop-list');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-noop-list',
+        models: {
+          currentModelId: 'not-in-list',
+          availableModels: [{ modelId: 'some-unknown-model-xyz', name: 'Unknown' }],
+        },
+      });
+
+      const adapter = new AcpAdapter();
+      const substituted = vi.fn();
+      adapter.on('model_substituted', substituted);
+
+      const sessionId = await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'claude',
+        model: 'gpt-5.5', // cross-family, no available match, current not in list → no-op
+      });
+
+      expect(sessionId).toBe('session-noop-list');
+      expect(mockSetSessionModel).not.toHaveBeenCalled();
+      expect(substituted).not.toHaveBeenCalled();
+    });
+
+    it('(g) tolerates malformed availableModels entries without throwing (MAJOR-E)', async () => {
+      setupSuccessfulStart('session-malformed');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-malformed',
+        models: {
+          currentModelId: null,
+          // Only malformed entries → after filtering the list is empty → no-op.
+          availableModels: [{ modelId: null }, { modelId: '' }, {}, null],
+        },
+      });
+
+      const adapter = new AcpAdapter();
+      const substituted = vi.fn();
+      adapter.on('model_substituted', substituted);
+
+      const sessionId = await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'claude',
+        model: 'claude-opus-4.8',
+      });
+
+      expect(sessionId).toBe('session-malformed');
+      expect(mockSetSessionModel).not.toHaveBeenCalled();
+      expect(substituted).not.toHaveBeenCalled();
+      expect(adapter.isConnected).toBe(true);
     });
   });
 

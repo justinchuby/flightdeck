@@ -164,9 +164,9 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
       );
       sessionId = sessionResult.sessionId;
 
-      // v1: reconcile model availability on the new-session path ONLY.
-      // No-ops to exactly today's behavior when the provider reports no models
-      // or no model was requested.
+      // Reconciliation runs on new sessions only; session resume reuses the
+      // provider's existing model. No-ops to exactly today's behavior when the
+      // provider reports no models or no model was requested.
       if (opts.model) {
         await this.reconcileSessionModel(sessionResult.models ?? null, sessionId, opts);
       }
@@ -185,37 +185,59 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
    * `unstable_setSessionModel` when a safe substitute is found.
    *
    * NO-OP guarantees (zero regression vs. today's behavior):
-   * - Returns immediately when the provider reports no models.
-   * - Only switches when the selected id differs from the current model.
+   * - Returns immediately when the provider reports no (or no valid) models.
+   * - Only switches for an 'exact'/'downgrade' selection that differs from the
+   *   current model (never re-sends an unresolved 'no-op' id).
    * - Any RPC failure is logged and swallowed (degrade to the CLI default).
    *
-   * v1 is wired on the new-session path only (resume stays a no-op).
+   * Reconciliation runs on new sessions only; session resume reuses the
+   * provider's existing model.
    */
   private async reconcileSessionModel(
     models: acp.SessionModelState | null,
     sessionId: string,
     opts: AdapterStartOptions,
   ): Promise<void> {
-    if (!models || !models.availableModels || models.availableModels.length === 0) {
+    // Defensively sanitize provider-reported availability at the ACP boundary.
+    // A malformed payload must NOT throw inside start() — it should no-op to
+    // today's behavior, exactly like an empty list.
+    if (!models || !Array.isArray(models.availableModels)) {
       return; // provider reports nothing → behave exactly like today
     }
-    if (!opts.model) return;
 
-    const availableModels: AvailableModel[] = models.availableModels.map((m) => ({
-      modelId: m.modelId,
-      name: m.name,
-    }));
+    const availableModels: AvailableModel[] = models.availableModels
+      .filter((m): boolean => !!m && typeof m.modelId === 'string' && m.modelId.length > 0)
+      .map((m) => ({ modelId: m.modelId, name: m.name }));
+
+    if (availableModels.length === 0) {
+      return; // nothing usable after filtering → no-op
+    }
+
+    // Treat currentModelId as a string only if it actually is one.
+    const currentModelId =
+      typeof models.currentModelId === 'string' ? models.currentModelId : undefined;
+
+    // opts.model is guaranteed non-empty by the sole caller's guard.
+    const requested = opts.model as string;
 
     const selection = selectAvailableModel({
-      requested: opts.model,
+      requested,
       availableModels,
-      currentModelId: models.currentModelId,
+      currentModelId,
       provider: opts.provider as ProviderId,
     });
 
-    let switched = false;
+    // Switch gate: only switch for a resolved selection ('exact' or 'downgrade')
+    // whose id differs from the current model. Never re-send an unresolved
+    // 'no-op' id (it may not be in availableModels) or an 'already-current' id.
+    let rpcSwitchSucceeded = false;
+    const shouldSwitch =
+      selection.reason !== 'no-op' &&
+      selection.reason !== 'already-current' &&
+      selection.modelId !== currentModelId;
+
     if (
-      selection.modelId !== models.currentModelId &&
+      shouldSwitch &&
       this.connection &&
       typeof this.connection.unstable_setSessionModel === 'function'
     ) {
@@ -225,33 +247,39 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
           SDK_TIMEOUT_MS,
           'setSessionModel',
         );
-        switched = true;
+        rpcSwitchSucceeded = true;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         logger.warn({
           module: 'acp-adapter',
           msg: 'setSessionModel failed; degrading to CLI default model',
-          requested: opts.model,
+          requested,
           selected: selection.modelId,
           error: message,
         });
       }
     }
 
-    if (selection.substituted || switched) {
+    // Emit model_substituted ONLY for a real substitution: a 'downgrade' that is
+    // actually in effect — either the RPC switch succeeded, or the chosen fallback
+    // already equals the running model (so no switch was needed). Do NOT emit for
+    // 'exact' activation (the requested model was available) nor for a failed/threw
+    // switch — both would produce false "model unavailable" entries downstream.
+    const downgradeInEffect = rpcSwitchSucceeded || selection.modelId === currentModelId;
+    if (selection.reason === 'downgrade' && downgradeInEffect) {
       logger.info({
         module: 'acp-adapter',
         msg: 'Model availability reconciled',
-        requested: opts.model,
+        requested,
         selected: selection.modelId,
-        currentModelId: models.currentModelId,
+        currentModelId,
         reason: selection.reason,
         detail: selection.detail,
       });
       this.emit('model_substituted', {
-        requested: opts.model,
+        requested,
         selected: selection.modelId,
-        currentModelId: models.currentModelId,
+        currentModelId,
         reason: selection.reason,
         detail: selection.detail,
       });

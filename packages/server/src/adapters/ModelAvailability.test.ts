@@ -153,7 +153,9 @@ describe('selectAvailableModel', () => {
   });
 
   it('only crosses family when no same-family model is available', () => {
-    // requested claude (premium); only gemini models available → cross-family allowed
+    // requested claude (premium); only gemini models available → cross-family allowed.
+    // With class-based tier inference (MAJOR-A) the requested opus is premium, so
+    // the nearest available cross-family model is the premium gemini (pro), not flash.
     const result = selectAvailableModel(
       ctx({
         requested: 'claude-opus-4.8',
@@ -164,6 +166,50 @@ describe('selectAvailableModel', () => {
     );
     expect(result.substituted).toBe(true);
     expect(result.reason).toBe('downgrade');
-    expect(result.modelId).toBe('gemini-3.1-flash');
+    expect(result.modelId).toBe('gemini-3.1-pro');
+  });
+
+  it('infers tier from the requested model CLASS, not the provider tier-triple (MAJOR-A)', () => {
+    // copilot premium=claude-opus-4.8, standard=claude-sonnet-4.6, fast=claude-haiku-4.5.
+    // The requested id (claude-opus-4.6) is NOT in copilot's tier-triple, but it
+    // IS a known premium model class — so we must downgrade to the available
+    // premium Opus (4.8), NOT over-downgrade to Sonnet.
+    const result = selectAvailableModel(
+      ctx({
+        requested: 'claude-opus-4.6', // premium class, unavailable as-is
+        availableModels: [
+          { modelId: 'claude-opus-4.8' },
+          { modelId: 'claude-sonnet-4.6' },
+          { modelId: 'claude-haiku-4.5' },
+        ],
+        currentModelId: 'claude-sonnet-4.6',
+        provider: 'copilot',
+      }),
+    );
+    expect(result.substituted).toBe(true);
+    expect(result.reason).toBe('downgrade');
+    expect(result.modelId).toBe('claude-opus-4.8');
+  });
+
+  it('skips an ambiguous tier candidate (>1 normalized match) rather than guessing (MAJOR-E)', () => {
+    // copilot premium=claude-opus-4.8 has TWO normalized matches available
+    // (claude-opus-4.8 and claude-opus-4-8) → premium tier is ambiguous and must
+    // be skipped. The next tier (standard=claude-sonnet-4.6) has a single match
+    // and is selected instead.
+    const result = selectAvailableModel(
+      ctx({
+        requested: 'claude-opus-4.6', // premium class, unavailable as-is
+        availableModels: [
+          { modelId: 'claude-opus-4.8' },
+          { modelId: 'claude-opus-4-8' },
+          { modelId: 'claude-sonnet-4.6' },
+        ],
+        currentModelId: 'claude-sonnet-4.6',
+        provider: 'copilot',
+      }),
+    );
+    expect(result.substituted).toBe(true);
+    expect(result.reason).toBe('downgrade');
+    expect(result.modelId).toBe('claude-sonnet-4.6');
   });
 });

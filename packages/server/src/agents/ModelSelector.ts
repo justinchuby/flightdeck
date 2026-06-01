@@ -84,6 +84,17 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
   },
 ];
 
+/**
+ * Tier-by-id lookup derived from {@link AVAILABLE_MODELS}, keyed by lowercased
+ * model id (the model "class"). Used by the availability selector to infer the
+ * intended tier of an arbitrary requested model — independent of any single
+ * provider's tier-triple — without creating an import-boundary/circular-dep
+ * problem (this module imports nothing from `adapters/`).
+ */
+export const MODEL_TIERS: Record<string, ModelTier> = Object.fromEntries(
+  AVAILABLE_MODELS.map((m) => [m.id.toLowerCase(), m.tier]),
+);
+
 export interface TaskProfile {
   role: string;
   description: string;

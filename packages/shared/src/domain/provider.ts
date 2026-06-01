@@ -207,6 +207,8 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     // These 3 IDs come from the CLI's newSession response: 'default', 'opus', 'haiku'.
     // Other providers accept full model names directly, so they don't need aliases.
     modelAliases: {
+      'claude-opus-4.8': 'opus',
+      'claude-opus-4.7': 'opus',
       'claude-opus-4.6': 'opus',
       'claude-sonnet-4.6': 'default',
       'claude-haiku-4.5': 'haiku',
@@ -236,7 +238,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     modelArgStrategy: 'config',
     configModelPrefix: ['-c', 'model='],
     nativeModelProviders: ['openai'],
-    tierModels: { fast: 'gpt-5.1-codex-mini', standard: 'gpt-5.3-codex', premium: 'gpt-5.5' },
+    tierModels: { fast: 'gpt-5.1-codex-mini', standard: 'gpt-5.3-codex', premium: 'gpt-5.3-codex' },
     authLabel: 'Authenticated via OpenAI',
     color: { bg: 'bg-green-500/15', text: 'text-green-400', border: 'border-l-green-500', tab: 'text-green-400 border-green-400' },
     docsUrl: 'https://github.com/openai/codex',

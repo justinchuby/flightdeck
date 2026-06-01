@@ -12,6 +12,7 @@
  */
 import { PROVIDER_REGISTRY, type ProviderId } from '@flightdeck/shared';
 import { detectModelProvider, type ModelTier } from './ModelResolver.js';
+import { MODEL_TIERS } from '../agents/ModelSelector.js';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -71,6 +72,25 @@ function normalize(id: string): string {
 const TIER_LADDER: ModelTier[] = ['premium', 'standard', 'fast'];
 
 /**
+ * Tier-by-id lookup keyed by the NORMALIZED model id (see {@link normalize}).
+ * Derived from {@link MODEL_TIERS} so the selector can infer the requested
+ * model's tier from its model CLASS rather than from exact equality to a
+ * provider's tier-triple.
+ */
+const MODEL_TIERS_NORMALIZED: Record<string, ModelTier> = Object.fromEntries(
+  Object.entries(MODEL_TIERS).map(([id, tier]) => [normalize(id), tier]),
+);
+
+/**
+ * Infer the requested model's tier from its model class (the shared model
+ * metadata), independent of any single provider's tier-triple. Returns
+ * undefined when the requested id isn't a known model class.
+ */
+function inferTierFromClass(requested: string): ModelTier | undefined {
+  return MODEL_TIERS_NORMALIZED[normalize(requested)];
+}
+
+/**
  * Build the ordered list of tiers to try: start at the intended tier, walk DOWN
  * (premium → standard → fast), then append any remaining higher tiers (UP).
  */
@@ -89,7 +109,8 @@ function buildTierOrder(intended: ModelTier): ModelTier[] {
  * Safe-by-default contract:
  * - No models reported → no-op (today's behavior).
  * - Exact or unambiguous normalized match → use the real model id (no substitution).
- * - Ambiguous fuzzy match → NEVER guess; defer to currentModelId or no-op.
+ * - Ambiguous normalized match → skip fuzzy resolution and attempt tier downgrade
+ *   (Step 4); only if no downgrade target is found → defer to currentModelId/no-op.
  * - Otherwise downgrade by tier within the same model family when possible.
  */
 export function selectAvailableModel(ctx: SelectContext): ModelSelection {
@@ -118,9 +139,13 @@ export function selectAvailableModel(ctx: SelectContext): ModelSelection {
   // Step 4: downgrade by tier + family.
   const tierModels = PROVIDER_REGISTRY[provider]?.tierModels;
   if (tierModels) {
-    // Determine the intended tier: explicit hint, else infer from the registry,
-    // else default to 'standard'.
-    const tier: ModelTier = intendedTier ?? inferTier(tierModels, requested) ?? 'standard';
+    // Determine the intended tier. Priority:
+    //   1. explicit intendedTier hint
+    //   2. provider tier-triple match (requested IS one of fast/standard/premium)
+    //   3. requested model's CLASS tier (from shared model metadata)
+    //   4. default to 'standard'
+    const tier: ModelTier =
+      intendedTier ?? inferTier(tierModels, requested) ?? inferTierFromClass(requested) ?? 'standard';
 
     const order = buildTierOrder(tier);
     const requestedFamily = detectModelProvider(requested);
@@ -136,8 +161,12 @@ export function selectAvailableModel(ctx: SelectContext): ModelSelection {
         continue;
       }
       const candidateNorm = normalize(candidate);
-      const match = availableModels.find((m) => normalize(m.modelId) === candidateNorm);
-      if (match) {
+      // Safe-by-default: only resolve a tier when EXACTLY ONE available model
+      // normalizes to the tier's mapped model. If two or more match, the tier
+      // is ambiguous — skip it rather than guess (don't pick the first).
+      const tierMatches = availableModels.filter((m) => normalize(m.modelId) === candidateNorm);
+      if (tierMatches.length === 1) {
+        const match = tierMatches[0];
         return {
           modelId: match.modelId,
           substituted: true,
