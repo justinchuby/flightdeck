@@ -9,7 +9,12 @@ export { deriveModelName } from '../hooks/useModels';
 
 /** @deprecated Use useModels() hook instead — this is a static fallback only */
 export const AVAILABLE_MODELS: string[] = [
+  // NOTE: This list is the frontend fallback only. It cannot import the canonical
+  // KNOWN_MODEL_IDS from packages/server (web→server imports are forbidden by the
+  // package import-boundary rule), so it must be kept manually in sync with
+  // packages/server/src/projects/ModelConfigDefaults.ts (KNOWN_MODEL_IDS).
   // Anthropic
+  'claude-opus-4.8',
   'claude-opus-4.7',
   'claude-opus-4.6',
   'claude-opus-4.5',
@@ -24,6 +29,7 @@ export const AVAILABLE_MODELS: string[] = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   // OpenAI
+  'gpt-5.5',
   'gpt-5.4',
   'gpt-5.3-codex',
   'gpt-5.2-codex',

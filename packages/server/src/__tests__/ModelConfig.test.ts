@@ -96,31 +96,31 @@ describe('ModelConfigDefaults', () => {
 
   describe('DEFAULT_MODEL_CONFIG', () => {
     it('has developer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.developer).toEqual(['claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.developer).toEqual(['claude-opus-4.8']);
     });
 
     it('has architect defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.architect).toEqual(['claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.architect).toEqual(['claude-opus-4.8']);
     });
 
     it('has code-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gemini-3-pro-preview', 'claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gpt-5.3-codex', 'claude-opus-4.8']);
     });
 
     it('has critical-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gemini-3-pro-preview']);
+      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gpt-5.5']);
     });
 
     it('has readability-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['readability-reviewer']).toEqual(['gemini-3-pro-preview']);
+      expect(DEFAULT_MODEL_CONFIG['readability-reviewer']).toEqual(['claude-sonnet-4.6']);
     });
 
     it('has tech-writer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['gpt-5.5', 'claude-sonnet-4.6']);
     });
 
     it('has secretary defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-4.1', 'gpt-5.2', 'gpt-5.1']);
+      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-5.1', 'gpt-4.1']);
     });
 
     it('has qa-tester defaults', () => {
@@ -128,19 +128,19 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has designer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.designer).toEqual(['claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.designer).toEqual(['claude-opus-4.8']);
     });
 
     it('has product-manager defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['product-manager']).toEqual(['gpt-5.3-codex']);
+      expect(DEFAULT_MODEL_CONFIG['product-manager']).toEqual(['gpt-5.5']);
     });
 
     it('has generalist defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.generalist).toEqual(['claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.generalist).toEqual(['claude-opus-4.8']);
     });
 
     it('has radical-thinker defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['radical-thinker']).toEqual(['gemini-3-pro-preview']);
+      expect(DEFAULT_MODEL_CONFIG['radical-thinker']).toEqual(['gpt-5.5']);
     });
 
     it('has agent defaults', () => {
@@ -148,7 +148,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has lead defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.lead).toEqual(['claude-opus-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.lead).toEqual(['claude-opus-4.8']);
     });
 
     it('has defaults for all 14 built-in roles', () => {

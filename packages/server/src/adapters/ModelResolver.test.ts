@@ -42,11 +42,11 @@ describe('ModelResolver', () => {
     });
 
     it('resolves "premium" to provider-specific models', () => {
-      expect(resolveModel('premium', 'copilot')?.model).toBe('claude-opus-4.6');
+      expect(resolveModel('premium', 'copilot')?.model).toBe('claude-opus-4.8');
       expect(resolveModel('premium', 'claude')?.model).toBe('opus');
       expect(resolveModel('premium', 'gemini')?.model).toBe('gemini-3.1-pro');
-      expect(resolveModel('premium', 'cursor')?.model).toBe('claude-opus-4.6');
-      expect(resolveModel('premium', 'codex')?.model).toBe('gpt-5.4');
+      expect(resolveModel('premium', 'cursor')?.model).toBe('claude-opus-4.8');
+      expect(resolveModel('premium', 'codex')?.model).toBe('gpt-5.3-codex');
       expect(resolveModel('premium', 'opencode')?.model).toBe('anthropic/claude-opus-4-6');
     });
 
@@ -111,6 +111,18 @@ describe('ModelResolver', () => {
     it('translates claude-haiku-4.5 to "haiku" for Claude CLI', () => {
       const result = resolveModel('claude-haiku-4.5', 'claude')!;
       expect(result.model).toBe('haiku');
+      expect(result.translated).toBe(true);
+    });
+
+    it('translates claude-opus-4.8 to "opus" for Claude CLI (new Opus alias)', () => {
+      const result = resolveModel('claude-opus-4.8', 'claude')!;
+      expect(result.model).toBe('opus');
+      expect(result.translated).toBe(true);
+    });
+
+    it('translates claude-opus-4.7 to "opus" for Claude CLI (new Opus alias)', () => {
+      const result = resolveModel('claude-opus-4.7', 'claude')!;
+      expect(result.model).toBe('opus');
       expect(result.translated).toBe(true);
     });
 
@@ -334,9 +346,9 @@ describe('ModelResolver', () => {
     it('returns provider map for valid tier', () => {
       const models = getTierModels('premium');
       expect(models).toBeDefined();
-      expect(models!['copilot']).toBe('claude-opus-4.6');
+      expect(models!['copilot']).toBe('claude-opus-4.8');
       expect(models!['gemini']).toBe('gemini-3.1-pro');
-      expect(models!['codex']).toBe('gpt-5.4');
+      expect(models!['codex']).toBe('gpt-5.3-codex');
     });
 
     it('returns undefined for invalid tier', () => {

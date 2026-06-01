@@ -42,6 +42,15 @@ export interface ModelFallbackInfo {
   provider: string;
 }
 
+/** Info emitted when the provider reported the requested model unavailable and a substitute was used */
+export interface ModelSubstitutedInfo {
+  requested: string;
+  selected: string;
+  currentModelId?: string;
+  reason: string;
+  detail?: string;
+}
+
 /**
  * Manages all event listener arrays for Agent.
  * Instantiated inside Agent; methods are exposed via Agent's public API.
@@ -60,7 +69,7 @@ export class AgentEventEmitter {
   private usageListeners: Array<(info: UsageInfo) => void> = [];
   private responseStartListeners: Array<() => void> = [];
   private modelFallbackListeners: Array<(info: ModelFallbackInfo) => void> = [];
-
+  private modelSubstitutedListeners: Array<(info: ModelSubstitutedInfo) => void> = [];
   private _idleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly IDLE_DEBOUNCE_MS = 500;
 
@@ -79,6 +88,7 @@ export class AgentEventEmitter {
   onUsage(listener: (info: UsageInfo) => void): void { this.usageListeners.push(listener); }
   onResponseStart(listener: () => void): void { this.responseStartListeners.push(listener); }
   onModelFallback(listener: (info: ModelFallbackInfo) => void): void { this.modelFallbackListeners.push(listener); }
+  onModelSubstituted(listener: (info: ModelSubstitutedInfo) => void): void { this.modelSubstitutedListeners.push(listener); }
 
   // ── Notification (called by AgentAcpBridge and Agent internals) ─────────
 
@@ -94,6 +104,7 @@ export class AgentEventEmitter {
   notifyUsage(info: UsageInfo): void { for (const l of this.usageListeners) l(info); }
   notifyResponseStart(): void { for (const l of this.responseStartListeners) l(); }
   notifyModelFallback(info: ModelFallbackInfo): void { for (const l of this.modelFallbackListeners) l(info); }
+  notifyModelSubstituted(info: ModelSubstitutedInfo): void { for (const l of this.modelSubstitutedListeners) l(info); }
 
   /**
    * Debounced status notification. Idle transitions are delayed to avoid
@@ -130,6 +141,7 @@ export class AgentEventEmitter {
     this.usageListeners.length = 0;
     this.responseStartListeners.length = 0;
     this.modelFallbackListeners.length = 0;
+    this.modelSubstitutedListeners.length = 0;
     if (this._idleDebounceTimer) {
       clearTimeout(this._idleDebounceTimer);
       this._idleDebounceTimer = null;

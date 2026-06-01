@@ -14,6 +14,7 @@ import { logger } from '../utils/logger.js';
 import { runWithAgentContext } from '../middleware/requestContext.js';
 import { agentFlagForRole } from './agentFiles.js';
 import type { Agent } from './Agent.js';
+import type { ModelSubstitutedInfo } from './AgentEvents.js';
 
 /** Set of provider IDs that have a RoleFileWriter. Cached at module load. */
 const ROLE_FILE_PROVIDERS = new Set(listRoleFileWriterProviders());
@@ -259,6 +260,10 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
   conn.on('session_resume_failed', (info: { requestedSessionId: string; error: string }) => withCtx(() => {
     agent._finishResuming();
     agent._notifySessionResumeFailed(info);
+  }));
+
+  conn.on('model_substituted', (info: ModelSubstitutedInfo) => withCtx(() => {
+    agent._notifyModelSubstituted(info);
   }));
 
   conn.on('usage', (usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; durationMs?: number; model?: string }) => withCtx(() => {

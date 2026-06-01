@@ -151,7 +151,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     modelArgStrategy: 'flag',
     nativeModelProviders: ['anthropic', 'openai', 'google', 'xai'],
     restrictedModels: { google: ['gemini-3-pro-preview'] },
-    tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.6' },
+    tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.8' },
     authCommand: 'gh auth status',
     authLabel: 'Authenticated via GitHub',
     coAuthoredBy: 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>',
@@ -207,6 +207,8 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     // These 3 IDs come from the CLI's newSession response: 'default', 'opus', 'haiku'.
     // Other providers accept full model names directly, so they don't need aliases.
     modelAliases: {
+      'claude-opus-4.8': 'opus',
+      'claude-opus-4.7': 'opus',
       'claude-opus-4.6': 'opus',
       'claude-sonnet-4.6': 'default',
       'claude-haiku-4.5': 'haiku',
@@ -236,7 +238,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     modelArgStrategy: 'config',
     configModelPrefix: ['-c', 'model='],
     nativeModelProviders: ['openai'],
-    tierModels: { fast: 'gpt-5.1-codex-mini', standard: 'gpt-5.3-codex', premium: 'gpt-5.4' },
+    tierModels: { fast: 'gpt-5.1-codex-mini', standard: 'gpt-5.3-codex', premium: 'gpt-5.3-codex' },
     authLabel: 'Authenticated via OpenAI',
     color: { bg: 'bg-green-500/15', text: 'text-green-400', border: 'border-l-green-500', tab: 'text-green-400 border-green-400' },
     docsUrl: 'https://github.com/openai/codex',
@@ -261,7 +263,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     agentFileFormat: '.cursorrules',
     modelArgStrategy: 'none',
     nativeModelProviders: ['anthropic', 'openai', 'google'],
-    tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.6' },
+    tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.8' },
     authLabel: 'Authenticated via Cursor',
     color: { bg: 'bg-cyan-500/15', text: 'text-cyan-400', border: 'border-l-cyan-500', tab: 'text-cyan-400 border-cyan-400' },
     docsUrl: 'https://www.cursor.com/',

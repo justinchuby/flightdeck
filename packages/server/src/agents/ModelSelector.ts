@@ -27,6 +27,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     bestFor: ['implementation', 'debugging', 'testing', 'analysis'],
   },
   {
+    id: 'claude-opus-4.8',
+    name: 'Claude Opus 4.8',
+    tier: 'premium',
+    contextWindow: 200000,
+    costPer1kTokens: 15.0,
+    bestFor: ['architecture', 'complex-debugging', 'design', 'critical-review'],
+  },
+  {
     id: 'claude-opus-4.7',
     name: 'Claude Opus 4.7',
     tier: 'premium',
@@ -66,7 +74,26 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     costPer1kTokens: 2.5,
     bestFor: ['code-generation', 'implementation', 'testing'],
   },
+  {
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
+    tier: 'premium',
+    contextWindow: 200000,
+    costPer1kTokens: 2.5,
+    bestFor: ['code-generation', 'implementation', 'testing', 'critical-review'],
+  },
 ];
+
+/**
+ * Tier-by-id lookup derived from {@link AVAILABLE_MODELS}, keyed by lowercased
+ * model id (the model "class"). Used by the availability selector to infer the
+ * intended tier of an arbitrary requested model — independent of any single
+ * provider's tier-triple — without creating an import-boundary/circular-dep
+ * problem (this module imports nothing from `adapters/`).
+ */
+export const MODEL_TIERS: Record<string, ModelTier> = Object.fromEntries(
+  AVAILABLE_MODELS.map((m) => [m.id.toLowerCase(), m.tier]),
+);
 
 export interface TaskProfile {
   role: string;

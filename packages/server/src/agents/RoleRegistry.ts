@@ -26,7 +26,7 @@ Exploration-first pattern:
     color: '#f0883e',
     icon: '🏗️',
     builtIn: true,
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4.8',
   },
   {
     id: 'code-reviewer',
@@ -64,7 +64,7 @@ Crew awareness:
     color: '#a371f7',
     icon: '📖',
     builtIn: true,
-    model: 'gemini-3-pro-preview',
+    model: 'gpt-5.3-codex',
   },
   {
     id: 'critical-reviewer',
@@ -104,7 +104,7 @@ Security is a foundational design principle, not an afterthought. Review all cod
     color: '#f85149',
     icon: '🛡️',
     builtIn: true,
-    model: 'gemini-3-pro-preview',
+    model: 'gpt-5.5',
   },
   {
     id: 'readability-reviewer',
@@ -136,7 +136,7 @@ Crew awareness:
     color: '#7ee787',
     icon: '👁️',
     builtIn: true,
-    model: 'gemini-3-pro-preview',
+    model: 'claude-sonnet-4.6',
   },
   {
     id: 'developer',
@@ -163,7 +163,7 @@ Coordination:
     color: '#3fb950',
     icon: '💻',
     builtIn: true,
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4.8',
   },
   {
     id: 'product-manager',
@@ -185,7 +185,7 @@ Break complex work into clear, user-focused tasks with acceptance criteria that 
     color: '#d29922',
     icon: '🎯',
     builtIn: true,
-    model: 'gpt-5.3-codex',
+    model: 'gpt-5.5',
   },
   {
     id: 'tech-writer',
@@ -205,7 +205,7 @@ You have a unique superpower: if something is hard for you to explain, it's prob
     color: '#f778ba',
     icon: '📝',
     builtIn: true,
-    model: 'gpt-5.2',
+    model: 'gpt-5.5',
   },
   {
     id: 'designer',
@@ -227,7 +227,7 @@ Collaborate closely with the Product Manager (what to build) and Developer (how 
     color: '#c084fc',
     icon: '🎨',
     builtIn: true,
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4.8',
   },
   {
     id: 'generalist',
@@ -260,7 +260,7 @@ You bring BREADTH to the team. When the specialists go deep, you go wide.`,
     color: '#38bdf8',
     icon: '🔧',
     builtIn: true,
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4.8',
   },
   {
     id: 'agent',
@@ -300,7 +300,7 @@ Rules of engagement:
     color: '#fb923c',
     icon: '🚀',
     builtIn: true,
-    model: 'gemini-3-pro-preview',
+    model: 'gpt-5.5',
   },
   {
     id: 'secretary',
@@ -341,7 +341,7 @@ When you start a task, immediately report what you're tracking:
     color: '#94a3b8',
     icon: '📋',
     builtIn: true,
-    model: 'gpt-4.1',
+    model: 'gpt-5.1',
     receivesStatusUpdates: true,
   },
   {
@@ -421,12 +421,12 @@ Prioritize quality over speed in all work. With an AI crew, quality does not sac
 
 == AVAILABLE COMMANDS ==
 Create a new agent with a specific role and model (optionally assign a task immediately):
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6"} ⟧⟧\`
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Implement the login API endpoint", "context": "Use JWT tokens, see auth/ directory"} ⟧⟧\`
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.8"} ⟧⟧\`
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.8", "task": "Implement the login API endpoint", "context": "Use JWT tokens, see auth/ directory"} ⟧⟧\`
 \`⟦⟦ CREATE_AGENT {"role": "code-reviewer", "model": "gemini-3-pro-preview", "task": "Review the auth implementation"} ⟧⟧\`
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "sessionId": "session-id-to-resume"} ⟧⟧\`
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.8", "sessionId": "session-id-to-resume"} ⟧⟧\`
 
-\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Extract RoPEConfig", "dagTaskId": "rope-config"} ⟧⟧\`  ← always include dagTaskId when a DAG task exists (see AUTO-DAG section below)
+\`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.8", "task": "Extract RoPEConfig", "dagTaskId": "rope-config"} ⟧⟧\`  ← always include dagTaskId when a DAG task exists (see AUTO-DAG section below)
 
 Delegate a task to an existing agent (use the agent's ID from QUERY_CREW or creation ACK):
 \`⟦⟦ DELEGATE {"to": "agent-id", "task": "Fix the remaining test failures", "context": "See reviewer feedback above"} ⟧⟧\`
@@ -521,7 +521,7 @@ When you CREATE_AGENT or DELEGATE with a task, the system auto-creates a DAG tas
 
 **IMPORTANT — Always use \`dagTaskId\` when linking to existing DAG tasks:**
 - If you used DECLARE_TASKS or ADD_TASK to create tasks, you already have task IDs. Pass \`dagTaskId\` in CREATE_AGENT/DELEGATE to bind the agent directly:
-  \`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.6", "task": "Remove dead fields", "dagTaskId": "dead-fields"} ⟧⟧\`
+  \`⟦⟦ CREATE_AGENT {"role": "developer", "model": "claude-opus-4.8", "task": "Remove dead fields", "dagTaskId": "dead-fields"} ⟧⟧\`
   \`⟦⟦ DELEGATE {"to": "agent-id", "task": "Review RoPEConfig changes", "dagTaskId": "review-rope"} ⟧⟧\`
 - Without \`dagTaskId\`, the system falls back to fuzzy matching by role and description. This is unreliable — it can match the wrong task or create duplicates.
 - Rule of thumb: every delegation should include \`dagTaskId\`. For pre-declared tasks, you already have the ID. For ad-hoc work, use ADD_TASK first to create one (see below).
@@ -538,7 +538,7 @@ This ensures the task is properly tracked in the DAG with correct dependencies, 
 
 == MODEL SELECTION ==
 Each role has a recommended default model, but YOU decide the best model for each task. Assemble a diverse set of models — different models have different strengths. Override the default by setting "model" in CREATE_AGENT.
-Known model families: Claude (opus, sonnet, haiku), GPT (gpt-5.4, gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, gpt-4.1), Gemini (gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash).
+Known model families: Claude (opus, sonnet, haiku — e.g. claude-opus-4.8, claude-sonnet-4.6), GPT (gpt-5.5, gpt-5.4, gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, gpt-4.1), Gemini (gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash).
 Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Haiku/GPT-4.1 for quick simple tasks, Gemini for a fresh perspective.
 
 == PROVIDER SELECTION ==
@@ -614,7 +614,7 @@ Example: \`CREATE_AGENT {"role": "developer", "model": "gemini-3-pro-preview", "
     color: '#e3b341',
     icon: '👑',
     builtIn: true,
-    model: 'claude-opus-4.6',
+    model: 'claude-opus-4.8',
     receivesStatusUpdates: true,
   },
 ];

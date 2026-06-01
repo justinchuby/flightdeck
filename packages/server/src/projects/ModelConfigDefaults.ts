@@ -14,6 +14,7 @@ export type ProjectModelConfig = Record<string, string[]>;
  */
 export const KNOWN_MODEL_IDS: readonly string[] = [
   // Anthropic
+  'claude-opus-4.8',
   'claude-opus-4.7',
   'claude-opus-4.6',
   'claude-opus-4.5',
@@ -31,6 +32,7 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
   // OpenAI
+  'gpt-5.5',
   'gpt-5.4',
   'gpt-5.3-codex',
   'gpt-5.2-codex',
@@ -60,20 +62,20 @@ export const DEFAULT_MODEL = 'claude-sonnet-4.6';
 
 /** Default model config used when a project has no custom config. */
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
-  developer: ['claude-opus-4.6'],
-  architect: ['claude-opus-4.6'],
-  'code-reviewer': ['gemini-3-pro-preview', 'claude-opus-4.6'],
-  'critical-reviewer': ['gemini-3-pro-preview'],
-  'readability-reviewer': ['gemini-3-pro-preview'],
-  'tech-writer': ['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6'],
-  secretary: ['gpt-4.1', 'gpt-5.2', 'gpt-5.1'],
+  developer: ['claude-opus-4.8'],
+  architect: ['claude-opus-4.8'],
+  'code-reviewer': ['gpt-5.3-codex', 'claude-opus-4.8'],
+  'critical-reviewer': ['gpt-5.5'],
+  'readability-reviewer': ['claude-sonnet-4.6'],
+  'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
+  secretary: ['gpt-5.1', 'gpt-4.1'],
   'qa-tester': ['claude-sonnet-4.6'],
-  designer: ['claude-opus-4.6'],
-  'product-manager': ['gpt-5.3-codex'],
-  generalist: ['claude-opus-4.6'],
-  'radical-thinker': ['gemini-3-pro-preview'],
+  designer: ['claude-opus-4.8'],
+  'product-manager': ['gpt-5.5'],
+  generalist: ['claude-opus-4.8'],
+  'radical-thinker': ['gpt-5.5'],
   agent: ['claude-sonnet-4.6'],
-  lead: ['claude-opus-4.6'],
+  lead: ['claude-opus-4.8'],
 };
 
 /** Validate that all model IDs in a config are known. Returns unknown IDs. */
