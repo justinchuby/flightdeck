@@ -27,6 +27,7 @@ const mockNewSession = vi.fn();
 const mockLoadSession = vi.fn();
 const mockPrompt = vi.fn();
 const mockCancel = vi.fn();
+const mockSetSessionModel = vi.fn();
 
 let capturedClientFactory: ((agent: any) => any) | null = null;
 
@@ -40,6 +41,7 @@ vi.mock('@agentclientprotocol/sdk', () => ({
     this.loadSession = mockLoadSession;
     this.prompt = mockPrompt;
     this.cancel = mockCancel;
+    this.unstable_setSessionModel = mockSetSessionModel;
   }),
 }));
 
@@ -87,6 +89,7 @@ function setupSuccessfulStart(sessionId = 'test-session-123') {
   mockSpawn.mockReturnValue(fakeProc);
   mockInitialize.mockResolvedValue({ agentCapabilities: { promptCapabilities: { image: true } } });
   mockNewSession.mockResolvedValue({ sessionId });
+  mockSetSessionModel.mockResolvedValue({});
   return fakeProc;
 }
 
@@ -283,6 +286,170 @@ describe('AcpAdapter', () => {
       await adapter.start(DEFAULT_START_OPTS);
 
       expect(adapter.supportsImages).toBe(false);
+    });
+  });
+
+  // ── 2b. Model availability reconciliation (new-session path) ─────
+
+  describe('model availability reconciliation', () => {
+    it('(a) no-ops when provider reports models:null — no switch, still connects', async () => {
+      setupSuccessfulStart('session-noop');
+      mockNewSession.mockResolvedValue({ sessionId: 'session-noop', models: null });
+
+      const adapter = new AcpAdapter();
+      const substituted = vi.fn();
+      adapter.on('model_substituted', substituted);
+      const connected = vi.fn();
+      adapter.on('connected', connected);
+
+      const sessionId = await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'claude',
+        model: 'claude-opus-4.8',
+      });
+
+      expect(sessionId).toBe('session-noop');
+      expect(mockSetSessionModel).not.toHaveBeenCalled();
+      expect(substituted).not.toHaveBeenCalled();
+      expect(connected).toHaveBeenCalledWith('session-noop');
+      expect(adapter.isConnected).toBe(true);
+    });
+
+    it('skips reconciliation entirely when no model is requested', async () => {
+      setupSuccessfulStart('session-nomodel');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-nomodel',
+        models: {
+          currentModelId: 'claude-sonnet-4.6',
+          availableModels: [{ modelId: 'claude-sonnet-4.6', name: 'Sonnet' }],
+        },
+      });
+
+      const adapter = new AcpAdapter();
+      await adapter.start({ ...DEFAULT_START_OPTS, provider: 'claude' });
+
+      expect(mockSetSessionModel).not.toHaveBeenCalled();
+    });
+
+    it('(b) does not switch when the requested model is already available', async () => {
+      setupSuccessfulStart('session-exact');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-exact',
+        models: {
+          currentModelId: 'claude-opus-4.8',
+          availableModels: [
+            { modelId: 'claude-opus-4.8', name: 'Opus' },
+            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+          ],
+        },
+      });
+
+      const adapter = new AcpAdapter();
+      const substituted = vi.fn();
+      adapter.on('model_substituted', substituted);
+
+      await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'claude',
+        model: 'claude-opus-4.8',
+      });
+
+      expect(mockSetSessionModel).not.toHaveBeenCalled();
+      expect(substituted).not.toHaveBeenCalled();
+    });
+
+    it('(c) switches once and emits model_substituted when a downgrade target exists', async () => {
+      setupSuccessfulStart('session-downgrade');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-downgrade',
+        models: {
+          currentModelId: 'claude-sonnet-4.6',
+          availableModels: [
+            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-haiku-4.5', name: 'Haiku' },
+          ],
+        },
+      });
+
+      const adapter = new AcpAdapter();
+      const substitutedEvents: any[] = [];
+      adapter.on('model_substituted', (info: any) => substitutedEvents.push(info));
+
+      await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'copilot',
+        model: 'claude-opus-4.8', // premium, unavailable → downgrade to sonnet
+      });
+
+      // currentModelId is claude-sonnet-4.6 and selection is also claude-sonnet-4.6,
+      // so no RPC switch is needed, but a substitution still occurred.
+      expect(substitutedEvents).toHaveLength(1);
+      expect(substitutedEvents[0]).toMatchObject({
+        requested: 'claude-opus-4.8',
+        selected: 'claude-sonnet-4.6',
+        reason: 'downgrade',
+      });
+    });
+
+    it('(c2) calls setSessionModel exactly once with the selected id when it differs from current', async () => {
+      setupSuccessfulStart('session-switch');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-switch',
+        models: {
+          currentModelId: 'claude-haiku-4.5',
+          availableModels: [
+            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-haiku-4.5', name: 'Haiku' },
+          ],
+        },
+      });
+
+      const adapter = new AcpAdapter();
+      const substituted = vi.fn();
+      adapter.on('model_substituted', substituted);
+
+      await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'copilot',
+        model: 'claude-opus-4.8', // premium → downgrade to standard (sonnet), differs from current haiku
+      });
+
+      expect(mockSetSessionModel).toHaveBeenCalledTimes(1);
+      expect(mockSetSessionModel).toHaveBeenCalledWith({
+        sessionId: 'session-switch',
+        modelId: 'claude-sonnet-4.6',
+      });
+      expect(substituted).toHaveBeenCalledTimes(1);
+    });
+
+    it('(d) warns and still resolves start() when setSessionModel rejects', async () => {
+      setupSuccessfulStart('session-reject');
+      mockNewSession.mockResolvedValue({
+        sessionId: 'session-reject',
+        models: {
+          currentModelId: 'claude-haiku-4.5',
+          availableModels: [
+            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-haiku-4.5', name: 'Haiku' },
+          ],
+        },
+      });
+      mockSetSessionModel.mockRejectedValue(new Error('not supported'));
+
+      const adapter = new AcpAdapter();
+
+      const sessionId = await adapter.start({
+        ...DEFAULT_START_OPTS,
+        provider: 'copilot',
+        model: 'claude-opus-4.8',
+      });
+
+      expect(sessionId).toBe('session-reject');
+      expect(adapter.isConnected).toBe(true);
+      expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({
+        module: 'acp-adapter',
+        msg: 'setSessionModel failed; degrading to CLI default model',
+      }));
     });
   });
 

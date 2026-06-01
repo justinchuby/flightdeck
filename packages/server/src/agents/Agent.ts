@@ -6,7 +6,7 @@ import { FLIGHTDECK_STATE_DIR, type ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { redact } from '../utils/redaction.js';
 import { AgentEventEmitter } from './AgentEvents.js';
-import type { UsageInfo, CompactionInfo, ModelFallbackInfo } from './AgentEvents.js';
+import type { UsageInfo, CompactionInfo, ModelFallbackInfo, ModelSubstitutedInfo } from './AgentEvents.js';
 import { startAcp as startAcpBridge, ensureSharedWorkspace } from './AgentAcpBridge.js';
 import { formatCrewUpdate } from '../coordination/agents/CrewFormatter.js';
 import type { CrewMember } from '../coordination/agents/CrewFormatter.js';
@@ -265,6 +265,7 @@ export class Agent {
   /** @internal */ _notifyUsage(info: UsageInfo): void { this.events.notifyUsage(info); }
   /** @internal */ _notifyResponseStart(): void { this.events.notifyResponseStart(); }
   /** @internal */ _notifyModelFallback(info: ModelFallbackInfo): void { this.events.notifyModelFallback(info); }
+  /** @internal */ _notifyModelSubstituted(info: ModelSubstitutedInfo): void { this.events.notifyModelSubstituted(info); }
   /** @internal */ _drainOneMessage(): void {
     if (this.pendingMessages.length > 0) {
       const next = this.pendingMessages.shift()!;
@@ -702,6 +703,7 @@ When you discover something important about the codebase, a pattern, a gotcha, o
   onThinking(listener: (text: string) => void): void { this.events.onThinking(listener); }
   onResponseStart(listener: () => void): void { this.events.onResponseStart(listener); }
   onModelFallback(listener: (info: ModelFallbackInfo) => void): void { this.events.onModelFallback(listener); }
+  onModelSubstituted(listener: (info: ModelSubstitutedInfo) => void): void { this.events.onModelSubstituted(listener); }
 
   getBufferedOutput(): string {
     return this.messages.join('');

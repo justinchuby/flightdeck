@@ -125,13 +125,13 @@ Returns all providers mapped to their supported models. Used by the `GET /models
 
 ```json
 {
-  "models": ["claude-opus-4.6", "claude-sonnet-4.6", ...],
+  "models": ["claude-opus-4.8", "claude-sonnet-4.6", ...],
   "defaults": { ... },
   "modelsByProvider": {
-    "copilot": ["claude-opus-4.6", "claude-sonnet-4.6", ..., "gemini-3-pro-preview"],
-    "claude": ["claude-opus-4.6", "claude-sonnet-4.6", "claude-haiku-4.5"],
+    "copilot": ["claude-opus-4.8", "claude-sonnet-4.6", ..., "gemini-3-pro-preview"],
+    "claude": ["claude-opus-4.8", "claude-sonnet-4.6", "claude-haiku-4.5"],
     "gemini": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-pro-preview"],
-    "codex": ["gpt-5.4", "gpt-5.3-codex", ...],
+    "codex": ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex", ...],
     ...
   }
 }
@@ -143,7 +143,7 @@ The `modelsByProvider` field enables the frontend ModelConfigPanel to show only 
 
 When `resolveModel()` returns `translated: true`, the system should:
 
-1. **Lead notification** — Send a system message to the lead agent: `"Model claude-opus-4.6 not available on Gemini provider. Fell back to gemini-2.5-pro."`
+1. **Lead notification** — Send a system message to the lead agent: `"Model claude-opus-4.8 not available on Gemini provider. Fell back to gemini-2.5-pro."`
 2. **UI notification** — Show a toast to the human user with the same info
 3. **Agent metadata** — Store both `requestedModel` and `resolvedModel` in agent metadata so the UI can show what was actually used
 

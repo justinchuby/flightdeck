@@ -27,6 +27,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     bestFor: ['implementation', 'debugging', 'testing', 'analysis'],
   },
   {
+    id: 'claude-opus-4.8',
+    name: 'Claude Opus 4.8',
+    tier: 'premium',
+    contextWindow: 200000,
+    costPer1kTokens: 15.0,
+    bestFor: ['architecture', 'complex-debugging', 'design', 'critical-review'],
+  },
+  {
     id: 'claude-opus-4.7',
     name: 'Claude Opus 4.7',
     tier: 'premium',
@@ -65,6 +73,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     contextWindow: 200000,
     costPer1kTokens: 2.5,
     bestFor: ['code-generation', 'implementation', 'testing'],
+  },
+  {
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
+    tier: 'premium',
+    contextWindow: 200000,
+    costPer1kTokens: 2.5,
+    bestFor: ['code-generation', 'implementation', 'testing', 'critical-review'],
   },
 ];
 

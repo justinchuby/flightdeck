@@ -261,6 +261,10 @@ export function wireAcpEvents(agent: Agent, conn: AgentAdapter): void {
     agent._notifySessionResumeFailed(info);
   }));
 
+  conn.on('model_substituted', (info: { requested: string; selected: string; currentModelId?: string; reason: string; detail?: string }) => withCtx(() => {
+    agent._notifyModelSubstituted(info);
+  }));
+
   conn.on('usage', (usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheWriteTokens?: number; costUsd?: number; durationMs?: number; model?: string }) => withCtx(() => {
     // Not suppressed during resume — usage/cost data should always be recorded
     agent.inputTokens = usage.inputTokens;

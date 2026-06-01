@@ -65,7 +65,7 @@ const CLAUDE_ALIASES: Record<string, string> = PROVIDER_REGISTRY.claude.modelAli
 const OPENCODE_PREFIXES: Record<string, string> = PROVIDER_REGISTRY.opencode.modelPrefixes ?? {};
 
 /** Detect which model provider a model name belongs to */
-function detectModelProvider(model: string): string {
+export function detectModelProvider(model: string): string {
   if (model.startsWith('claude-') || model === 'opus' || model === 'sonnet' || model === 'haiku') return 'anthropic';
   if (model.startsWith('gpt-') || model.startsWith('o3') || model.startsWith('o4')) return 'openai';
   if (model.startsWith('gemini-')) return 'google';
@@ -79,6 +79,7 @@ function detectModelProvider(model: string): string {
 
 const EQUIVALENCES: Record<string, Record<string, string>> = {
   // Anthropic → others
+  'claude-opus-4.8': { openai: 'gpt-5.5', google: 'gemini-3.1-pro' },
   'claude-opus-4.7': { openai: 'gpt-5.4', google: 'gemini-3.1-pro' },
   'claude-opus-4.6': { openai: 'gpt-5.2-codex', google: 'gemini-3.1-pro' },
   'claude-opus-4.5': { openai: 'gpt-5.1-codex-max', google: 'gemini-3.1-pro' },
@@ -88,6 +89,7 @@ const EQUIVALENCES: Record<string, Record<string, string>> = {
   'claude-haiku-4.5': { openai: 'gpt-5.1-codex-mini', google: 'gemini-3.1-flash-lite' },
 
   // OpenAI → others
+  'gpt-5.5': { anthropic: 'claude-opus-4.8', google: 'gemini-3.1-pro' },
   'gpt-5.4': { anthropic: 'claude-opus-4.6', google: 'gemini-3.1-pro' },
   'gpt-5.3-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-3.1-pro' },
   'gpt-5.2-codex': { anthropic: 'claude-opus-4.6', google: 'gemini-3.1-pro' },

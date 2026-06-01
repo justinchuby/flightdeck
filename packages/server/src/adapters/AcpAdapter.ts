@@ -14,6 +14,8 @@ import { Readable, Writable } from 'stream';
 import * as acp from '@agentclientprotocol/sdk';
 import { logger } from '../utils/logger.js';
 import { isBinaryAvailableSync } from '../utils/platform.js';
+import { selectAvailableModel, type AvailableModel } from './ModelAvailability.js';
+import type { ProviderId } from '@flightdeck/shared';
 import type {
   AgentAdapter,
   AdapterStartOptions,
@@ -161,6 +163,13 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
         SDK_TIMEOUT_MS, 'newSession',
       );
       sessionId = sessionResult.sessionId;
+
+      // v1: reconcile model availability on the new-session path ONLY.
+      // No-ops to exactly today's behavior when the provider reports no models
+      // or no model was requested.
+      if (opts.model) {
+        await this.reconcileSessionModel(sessionResult.models ?? null, sessionId, opts);
+      }
     }
 
     this.sessionId = sessionId;
@@ -168,6 +177,85 @@ export class AcpAdapter extends EventEmitter implements AgentAdapter {
     this.emit('connected', sessionId);
 
     return sessionId;
+  }
+
+  /**
+   * Reconcile the requested model against the models the provider actually
+   * reports as available (ACP `SessionModelState`), switching via
+   * `unstable_setSessionModel` when a safe substitute is found.
+   *
+   * NO-OP guarantees (zero regression vs. today's behavior):
+   * - Returns immediately when the provider reports no models.
+   * - Only switches when the selected id differs from the current model.
+   * - Any RPC failure is logged and swallowed (degrade to the CLI default).
+   *
+   * v1 is wired on the new-session path only (resume stays a no-op).
+   */
+  private async reconcileSessionModel(
+    models: acp.SessionModelState | null,
+    sessionId: string,
+    opts: AdapterStartOptions,
+  ): Promise<void> {
+    if (!models || !models.availableModels || models.availableModels.length === 0) {
+      return; // provider reports nothing → behave exactly like today
+    }
+    if (!opts.model) return;
+
+    const availableModels: AvailableModel[] = models.availableModels.map((m) => ({
+      modelId: m.modelId,
+      name: m.name,
+    }));
+
+    const selection = selectAvailableModel({
+      requested: opts.model,
+      availableModels,
+      currentModelId: models.currentModelId,
+      provider: opts.provider as ProviderId,
+    });
+
+    let switched = false;
+    if (
+      selection.modelId !== models.currentModelId &&
+      this.connection &&
+      typeof this.connection.unstable_setSessionModel === 'function'
+    ) {
+      try {
+        await withTimeout(
+          this.connection.unstable_setSessionModel({ sessionId, modelId: selection.modelId }),
+          SDK_TIMEOUT_MS,
+          'setSessionModel',
+        );
+        switched = true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warn({
+          module: 'acp-adapter',
+          msg: 'setSessionModel failed; degrading to CLI default model',
+          requested: opts.model,
+          selected: selection.modelId,
+          error: message,
+        });
+      }
+    }
+
+    if (selection.substituted || switched) {
+      logger.info({
+        module: 'acp-adapter',
+        msg: 'Model availability reconciled',
+        requested: opts.model,
+        selected: selection.modelId,
+        currentModelId: models.currentModelId,
+        reason: selection.reason,
+        detail: selection.detail,
+      });
+      this.emit('model_substituted', {
+        requested: opts.model,
+        selected: selection.modelId,
+        currentModelId: models.currentModelId,
+        reason: selection.reason,
+        detail: selection.detail,
+      });
+    }
   }
 
   private validateCliCommand(command: string): void {
