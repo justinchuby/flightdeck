@@ -22,7 +22,10 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
   'claude-sonnet-4.5',
   'claude-sonnet-4',
   'claude-haiku-4.5',
-  // Google
+  // Google — Copilot CLI native ids (verified against the live CLI bundle)
+  'gemini-3.1-pro-preview',
+  'gemini-3.5-flash',
+  // Google — native Gemini CLI ids
   'gemini-3.1-pro',
   'gemini-3.1-flash',
   'gemini-3.1-flash-lite',
@@ -65,10 +68,10 @@ export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   developer: ['claude-opus-4.8'],
   architect: ['claude-opus-4.8'],
   'code-reviewer': ['gpt-5.3-codex', 'claude-opus-4.8'],
-  'critical-reviewer': ['gpt-5.5'],
+  'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
   'readability-reviewer': ['claude-sonnet-4.6'],
   'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
-  secretary: ['gpt-5.1', 'gpt-4.1'],
+  secretary: ['gpt-5.1'],
   'qa-tester': ['claude-sonnet-4.6'],
   designer: ['claude-opus-4.8'],
   'product-manager': ['gpt-5.5'],

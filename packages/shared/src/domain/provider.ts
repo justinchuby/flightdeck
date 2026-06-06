@@ -150,7 +150,7 @@ export const PROVIDER_REGISTRY: Record<ProviderId, ProviderDefinition> = {
     supportsAgentFlag: true,
     modelArgStrategy: 'flag',
     nativeModelProviders: ['anthropic', 'openai', 'google', 'xai'],
-    restrictedModels: { google: ['gemini-3-pro-preview'] },
+    restrictedModels: { google: ['gemini-3-pro-preview', 'gemini-3.1-pro-preview', 'gemini-3.5-flash'] },
     tierModels: { fast: 'claude-haiku-4.5', standard: 'claude-sonnet-4.6', premium: 'claude-opus-4.8' },
     authCommand: 'gh auth status',
     authLabel: 'Authenticated via GitHub',
