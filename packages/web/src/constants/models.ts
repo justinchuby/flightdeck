@@ -23,6 +23,11 @@ export const AVAILABLE_MODELS: string[] = [
   'claude-sonnet-4',
   'claude-haiku-4.5',
   // Google
+  'gemini-3.1-pro-preview',
+  'gemini-3.5-flash',
+  'gemini-3.1-pro',
+  'gemini-3.1-flash',
+  'gemini-3.1-flash-lite',
   'gemini-3-pro-preview',
   'gemini-3-flash-preview',
   'gemini-2.5-pro',
@@ -40,4 +45,14 @@ export const AVAILABLE_MODELS: string[] = [
   'gpt-5.1-codex-mini',
   'gpt-5-mini',
   'gpt-4.1',
+  // Moonshot (Kimi)
+  'moonshot-v1-8k',
+  'moonshot-v1-32k',
+  'moonshot-v1-128k',
+  'kimi-latest',
+  // Qwen
+  'qwen-turbo',
+  'qwen-plus',
+  'qwen-max',
+  'qwen-coder-plus-latest',
 ];

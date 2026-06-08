@@ -108,7 +108,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has critical-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gpt-5.5']);
+      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gemini-3.1-pro-preview', 'gpt-5.5']);
     });
 
     it('has readability-reviewer defaults', () => {
@@ -120,7 +120,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has secretary defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-5.1', 'gpt-4.1']);
+      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-5.1']);
     });
 
     it('has qa-tester defaults', () => {
