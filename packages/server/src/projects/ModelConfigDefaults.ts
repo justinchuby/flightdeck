@@ -22,10 +22,11 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
   'claude-sonnet-4.5',
   'claude-sonnet-4',
   'claude-haiku-4.5',
-  // Google — Copilot CLI native ids (verified against the live CLI bundle)
+  // Google (Gemini) — superset across providers; per-provider availability is
+  // gated by ProviderRegistry.restrictedModels (e.g. Copilot exposes the
+  // *-preview ids verified against the live CLI bundle).
   'gemini-3.1-pro-preview',
   'gemini-3.5-flash',
-  // Google — native Gemini CLI ids
   'gemini-3.1-pro',
   'gemini-3.1-flash',
   'gemini-3.1-flash-lite',
