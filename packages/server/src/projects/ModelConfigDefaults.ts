@@ -68,11 +68,11 @@ export const DEFAULT_MODEL = 'claude-sonnet-4.6';
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   developer: ['claude-opus-4.8'],
   architect: ['claude-opus-4.8'],
-  'code-reviewer': ['gpt-5.3-codex', 'claude-opus-4.8'],
+  'code-reviewer': ['gpt-5.5', 'claude-opus-4.8'],
   'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
   'readability-reviewer': ['claude-sonnet-4.6'],
   'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
-  secretary: ['gpt-5.1'],
+  secretary: ['claude-haiku-4.5'],
   'qa-tester': ['claude-sonnet-4.6'],
   designer: ['claude-opus-4.8'],
   'product-manager': ['gpt-5.5'],

@@ -106,14 +106,14 @@ Configure default models for each agent role:
 ```yaml
 models:
   defaults:
-    lead: [claude-opus-4.6]
-    developer: [claude-opus-4.6]
-    architect: [claude-opus-4.6]
-    code-reviewer: [gemini-3-pro-preview, claude-opus-4.6]
-    critical-reviewer: [gemini-3-pro-preview]
-    readability-reviewer: [gemini-3-pro-preview]
-    tech-writer: [claude-sonnet-4.6, gpt-5.2]
-    secretary: [gpt-4.1, gpt-5.2]
+    lead: [claude-opus-4.8]
+    developer: [claude-opus-4.8]
+    architect: [claude-opus-4.8]
+    code-reviewer: [gpt-5.5, claude-opus-4.8]
+    critical-reviewer: [gemini-3.1-pro-preview, gpt-5.5]
+    readability-reviewer: [claude-sonnet-4.6]
+    tech-writer: [gpt-5.5, claude-sonnet-4.6]
+    secretary: [claude-haiku-4.5]
     qa-tester: [claude-sonnet-4.6]
 ```
 

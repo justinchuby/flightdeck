@@ -41,26 +41,26 @@ interface ServerConfig {
 
 ## 14 Built-In Roles (with Default Models)
 
-### Analysis & Review (Gemini-based)
-- **code-reviewer** (gemini-3-pro-preview) — Correctness, patterns, tests
-- **critical-reviewer** (gemini-3-pro-preview) — Architecture, security, perf
-- **readability-reviewer** (gemini-3-pro-preview) — Naming, org, documentation
-- **radical-thinker** (gemini-3-pro-preview) — First-principles, innovation
+### Analysis & Review
+- **code-reviewer** (gpt-5.5) — Correctness, patterns, tests
+- **critical-reviewer** (gemini-3.1-pro-preview) — Architecture, security, perf
+- **readability-reviewer** (claude-sonnet-4.6) — Naming, org, documentation
+- **radical-thinker** (gpt-5.5) — First-principles, innovation
 
 ### Implementation
-- **developer** (claude-opus-4.6) — Code, tests, features, fixes
-- **architect** (claude-opus-4.6) — System design, exploration, mapping
+- **developer** (claude-opus-4.8) — Code, tests, features, fixes
+- **architect** (claude-opus-4.8) — System design, exploration, mapping
 
 ### Support Roles
-- **product-manager** (gpt-5.3-codex) — User needs, quality bar
-- **tech-writer** (gpt-5.2) — Documentation, examples, API design
-- **designer** (claude-opus-4.6) — UX/UI, interaction design
+- **product-manager** (gpt-5.5) — User needs, quality bar
+- **tech-writer** (gpt-5.5) — Documentation, examples, API design
+- **designer** (claude-opus-4.8) — UX/UI, interaction design
 - **qa-tester** (claude-sonnet-4.6) — End-to-end testing, verification
-- **generalist** (claude-opus-4.6) — Hardware, mechanics, 3D, research
+- **generalist** (claude-opus-4.8) — Hardware, mechanics, 3D, research
 
 ### Management
-- **lead** (claude-opus-4.6) — Supervision, delegation ⭐
-- **secretary** (gpt-4.1) — Progress tracking ⭐
+- **lead** (claude-opus-4.8) — Supervision, delegation ⭐
+- **secretary** (claude-haiku-4.5) — Progress tracking ⭐
 - **agent** (none) — General-purpose, neutral
 
 ⭐ = receives status updates (receivesStatusUpdates: true)

@@ -64,7 +64,7 @@ Crew awareness:
     color: '#a371f7',
     icon: '📖',
     builtIn: true,
-    model: 'gpt-5.3-codex',
+    model: 'gpt-5.5',
   },
   {
     id: 'critical-reviewer',
@@ -341,7 +341,7 @@ When you start a task, immediately report what you're tracking:
     color: '#94a3b8',
     icon: '📋',
     builtIn: true,
-    model: 'gpt-5.1',
+    model: 'claude-haiku-4.5',
     receivesStatusUpdates: true,
   },
   {

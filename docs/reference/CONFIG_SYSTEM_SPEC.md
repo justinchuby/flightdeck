@@ -131,20 +131,20 @@ All defined as `BUILT_IN_ROLES` array:
 
 | ID | Name | Model | Purpose |
 |---|---|---|---|
-| `architect` | Architect | claude-opus-4.6 | System design, exploration, mapping |
-| `developer` | Developer | claude-opus-4.6 | Implementation, testing, fixes |
-| `code-reviewer` | Code Reviewer | gemini-3-pro-preview | Correctness, patterns, tests |
-| `critical-reviewer` | Critical Reviewer | gemini-3-pro-preview | Architecture, security, perf |
-| `readability-reviewer` | Readability Reviewer | gemini-3-pro-preview | Naming, organization, docs |
-| `product-manager` | Product Manager | gpt-5.3-codex | User needs, quality bar |
-| `tech-writer` | Tech Writer | gpt-5.2 | Documentation, API design |
-| `designer` | Designer | claude-opus-4.6 | UX/UI, interaction design |
-| `generalist` | Generalist | claude-opus-4.6 | Cross-disciplinary work |
+| `architect` | Architect | claude-opus-4.8 | System design, exploration, mapping |
+| `developer` | Developer | claude-opus-4.8 | Implementation, testing, fixes |
+| `code-reviewer` | Code Reviewer | gpt-5.5 | Correctness, patterns, tests |
+| `critical-reviewer` | Critical Reviewer | gemini-3.1-pro-preview | Architecture, security, perf |
+| `readability-reviewer` | Readability Reviewer | claude-sonnet-4.6 | Naming, organization, docs |
+| `product-manager` | Product Manager | gpt-5.5 | User needs, quality bar |
+| `tech-writer` | Tech Writer | gpt-5.5 | Documentation, API design |
+| `designer` | Designer | claude-opus-4.8 | UX/UI, interaction design |
+| `generalist` | Generalist | claude-opus-4.8 | Cross-disciplinary work |
 | `agent` | Agent | (none) | General-purpose, no special role |
-| `radical-thinker` | Radical Thinker | gemini-3-pro-preview | Innovation, first-principles |
-| `secretary` | Secretary | gpt-4.1 | Progress tracking* |
+| `radical-thinker` | Radical Thinker | gpt-5.5 | Innovation, first-principles |
+| `secretary` | Secretary | claude-haiku-4.5 | Progress tracking* |
 | `qa-tester` | QA Tester | claude-sonnet-4.6 | End-to-end testing |
-| `lead` | Project Lead | claude-opus-4.6 | Supervision, delegation* |
+| `lead` | Project Lead | claude-opus-4.8 | Supervision, delegation* |
 
 *Receives status updates (receivesStatusUpdates: true)
 
@@ -277,13 +277,17 @@ const AVAILABLE_MODELS: ModelConfig[] = [
 
 In `ModelConfigDefaults.ts`:
 ```
-claude-opus-4.6, claude-opus-4.5,
+claude-opus-4.8, claude-opus-4.7, claude-opus-4.6, claude-opus-4.5,
 claude-sonnet-4.6, claude-sonnet-4.5, claude-sonnet-4,
 claude-haiku-4.5,
-gemini-3-pro-preview,
-gpt-5.3-codex, gpt-5.2-codex, gpt-5.2,
+gemini-3.1-pro-preview, gemini-3.5-flash, gemini-3.1-pro, gemini-3.1-flash,
+gemini-3.1-flash-lite, gemini-3-pro-preview, gemini-3-flash-preview,
+gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite,
+gpt-5.5, gpt-5.4, gpt-5.3-codex, gpt-5.2-codex, gpt-5.2,
 gpt-5.1-codex-max, gpt-5.1-codex, gpt-5.1, gpt-5.1-codex-mini, gpt-5-mini,
-gpt-4.1
+gpt-4.1,
+moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k, kimi-latest,
+qwen-turbo, qwen-plus, qwen-max, qwen-coder-plus-latest
 ```
 
 **Note:** KNOWN_MODEL_IDS is longer than AVAILABLE_MODELS for backward compatibility.
@@ -292,20 +296,20 @@ gpt-4.1
 
 ```typescript
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
-  developer: ['claude-opus-4.6'],
-  architect: ['claude-opus-4.6'],
-  'code-reviewer': ['gemini-3-pro-preview', 'claude-opus-4.6'],
-  'critical-reviewer': ['gemini-3-pro-preview'],
-  'readability-reviewer': ['gemini-3-pro-preview'],
-  'tech-writer': ['claude-sonnet-4.6', 'gpt-5.2', 'claude-opus-4.6'],
-  secretary: ['gpt-4.1', 'gpt-5.2', 'gpt-5.1'],
+  developer: ['claude-opus-4.8'],
+  architect: ['claude-opus-4.8'],
+  'code-reviewer': ['gpt-5.5', 'claude-opus-4.8'],
+  'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
+  'readability-reviewer': ['claude-sonnet-4.6'],
+  'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
+  secretary: ['claude-haiku-4.5'],
   'qa-tester': ['claude-sonnet-4.6'],
-  designer: ['claude-opus-4.6'],
-  'product-manager': ['gpt-5.3-codex'],
-  generalist: ['claude-opus-4.6'],
-  'radical-thinker': ['gemini-3-pro-preview'],
+  designer: ['claude-opus-4.8'],
+  'product-manager': ['gpt-5.5'],
+  generalist: ['claude-opus-4.8'],
+  'radical-thinker': ['gpt-5.5'],
   agent: ['claude-sonnet-4.6'],
-  lead: ['claude-opus-4.6'],
+  lead: ['claude-opus-4.8'],
 };
 ```
 
