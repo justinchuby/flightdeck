@@ -18,7 +18,7 @@ const heartbeatSchema = z.object({
 });
 
 // Derived from the canonical KNOWN_MODEL_IDS so the two lists can never drift.
-const DEFAULT_KNOWN_MODELS = [...KNOWN_MODEL_IDS] as const;
+const DEFAULT_KNOWN_MODELS: readonly string[] = [...KNOWN_MODEL_IDS];
 
 const modelsSchema = z.object({
   known: z.array(z.string()).min(1).default([...DEFAULT_KNOWN_MODELS]),

@@ -64,5 +64,7 @@ describe('Model config consistency', () => {
 
   it('configSchema DEFAULT_KNOWN_MODELS matches KNOWN_MODEL_IDS exactly', () => {
     expect([...DEFAULT_KNOWN_MODELS]).toEqual([...KNOWN_MODEL_IDS]);
+    // Must be a distinct copy so mutating the config default can't corrupt the canonical list.
+    expect(DEFAULT_KNOWN_MODELS as unknown).not.toBe(KNOWN_MODEL_IDS as unknown);
   });
 });
