@@ -104,7 +104,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has code-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gpt-5.3-codex', 'claude-opus-4.8']);
+      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gpt-5.5', 'claude-opus-4.8']);
     });
 
     it('has critical-reviewer defaults', () => {

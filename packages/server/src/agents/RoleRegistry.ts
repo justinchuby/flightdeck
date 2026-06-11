@@ -64,7 +64,7 @@ Crew awareness:
     color: '#a371f7',
     icon: '📖',
     builtIn: true,
-    model: 'gpt-5.3-codex',
+    model: 'gpt-5.5',
   },
   {
     id: 'critical-reviewer',

@@ -42,7 +42,7 @@ interface ServerConfig {
 ## 14 Built-In Roles (with Default Models)
 
 ### Analysis & Review
-- **code-reviewer** (gpt-5.3-codex) — Correctness, patterns, tests
+- **code-reviewer** (gpt-5.5) — Correctness, patterns, tests
 - **critical-reviewer** (gemini-3.1-pro-preview) — Architecture, security, perf
 - **readability-reviewer** (claude-sonnet-4.6) — Naming, org, documentation
 - **radical-thinker** (gpt-5.5) — First-principles, innovation

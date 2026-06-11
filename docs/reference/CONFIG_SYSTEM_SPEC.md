@@ -133,7 +133,7 @@ All defined as `BUILT_IN_ROLES` array:
 |---|---|---|---|
 | `architect` | Architect | claude-opus-4.8 | System design, exploration, mapping |
 | `developer` | Developer | claude-opus-4.8 | Implementation, testing, fixes |
-| `code-reviewer` | Code Reviewer | gpt-5.3-codex | Correctness, patterns, tests |
+| `code-reviewer` | Code Reviewer | gpt-5.5 | Correctness, patterns, tests |
 | `critical-reviewer` | Critical Reviewer | gemini-3.1-pro-preview | Architecture, security, perf |
 | `readability-reviewer` | Readability Reviewer | claude-sonnet-4.6 | Naming, organization, docs |
 | `product-manager` | Product Manager | gpt-5.5 | User needs, quality bar |
@@ -298,7 +298,7 @@ qwen-turbo, qwen-plus, qwen-max, qwen-coder-plus-latest
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   developer: ['claude-opus-4.8'],
   architect: ['claude-opus-4.8'],
-  'code-reviewer': ['gpt-5.3-codex', 'claude-opus-4.8'],
+  'code-reviewer': ['gpt-5.5', 'claude-opus-4.8'],
   'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
   'readability-reviewer': ['claude-sonnet-4.6'],
   'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
