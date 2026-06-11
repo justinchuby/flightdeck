@@ -17,13 +17,22 @@ const heartbeatSchema = z.object({
 });
 
 const DEFAULT_KNOWN_MODELS = [
-  'claude-opus-4.6', 'claude-sonnet-4.6', 'claude-sonnet-4.5', 'claude-haiku-4.5',
-  'claude-opus-4.5', 'claude-sonnet-4',
-  'gemini-3-pro-preview', 'gemini-3-flash-preview',
+  // Keep in sync with KNOWN_MODEL_IDS in packages/server/src/projects/ModelConfigDefaults.ts
+  // Anthropic
+  'claude-opus-4.8', 'claude-opus-4.7', 'claude-opus-4.6', 'claude-opus-4.5',
+  'claude-sonnet-4.6', 'claude-sonnet-4.5', 'claude-sonnet-4', 'claude-haiku-4.5',
+  // Google (Gemini)
+  'gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash',
+  'gemini-3.1-flash-lite', 'gemini-3-pro-preview', 'gemini-3-flash-preview',
   'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-  'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2',
+  // OpenAI
+  'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2',
   'gpt-5.1-codex-max', 'gpt-5.1-codex', 'gpt-5.1', 'gpt-5.1-codex-mini',
   'gpt-5-mini', 'gpt-4.1',
+  // Moonshot (Kimi)
+  'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-latest',
+  // Qwen
+  'qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-coder-plus-latest',
 ] as const;
 
 const modelsSchema = z.object({

@@ -120,7 +120,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has secretary defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['gpt-5.1']);
+      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['claude-haiku-4.5']);
     });
 
     it('has qa-tester defaults', () => {
