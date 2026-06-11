@@ -6,6 +6,7 @@ import {
 } from '../projects/ModelConfigDefaults.js';
 import { AVAILABLE_MODELS } from '../agents/ModelSelector.js';
 import { RoleRegistry } from '../agents/RoleRegistry.js';
+import { DEFAULT_KNOWN_MODELS } from '../config/configSchema.js';
 
 /**
  * Cross-check that the several hardcoded model-ID sources in the server package
@@ -59,5 +60,9 @@ describe('Model config consistency', () => {
         expect(knownSet.has(role.model), `Built-in role "${role.id}" uses unknown model "${role.model}"`).toBe(true);
       }
     }
+  });
+
+  it('configSchema DEFAULT_KNOWN_MODELS matches KNOWN_MODEL_IDS exactly', () => {
+    expect([...DEFAULT_KNOWN_MODELS]).toEqual([...KNOWN_MODEL_IDS]);
   });
 });

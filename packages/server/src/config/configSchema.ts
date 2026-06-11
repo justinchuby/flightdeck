@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import { PROVIDER_IDS } from '@flightdeck/shared';
+import { KNOWN_MODEL_IDS } from '../projects/ModelConfigDefaults.js';
 
 // ── Section schemas ────────────────────────────────────────
 
@@ -16,24 +17,8 @@ const heartbeatSchema = z.object({
   staleTimerCleanupDays: z.number().int().min(1).max(90).default(7),
 });
 
-const DEFAULT_KNOWN_MODELS = [
-  // Keep in sync with KNOWN_MODEL_IDS in packages/server/src/projects/ModelConfigDefaults.ts
-  // Anthropic
-  'claude-opus-4.8', 'claude-opus-4.7', 'claude-opus-4.6', 'claude-opus-4.5',
-  'claude-sonnet-4.6', 'claude-sonnet-4.5', 'claude-sonnet-4', 'claude-haiku-4.5',
-  // Google (Gemini)
-  'gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash',
-  'gemini-3.1-flash-lite', 'gemini-3-pro-preview', 'gemini-3-flash-preview',
-  'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-  // OpenAI
-  'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2',
-  'gpt-5.1-codex-max', 'gpt-5.1-codex', 'gpt-5.1', 'gpt-5.1-codex-mini',
-  'gpt-5-mini', 'gpt-4.1',
-  // Moonshot (Kimi)
-  'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-latest',
-  // Qwen
-  'qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-coder-plus-latest',
-] as const;
+// Derived from the canonical KNOWN_MODEL_IDS so the two lists can never drift.
+const DEFAULT_KNOWN_MODELS = [...KNOWN_MODEL_IDS] as const;
 
 const modelsSchema = z.object({
   known: z.array(z.string()).min(1).default([...DEFAULT_KNOWN_MODELS]),
