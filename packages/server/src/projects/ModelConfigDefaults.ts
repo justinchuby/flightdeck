@@ -72,7 +72,7 @@ export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
   'readability-reviewer': ['claude-sonnet-4.6'],
   'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
-  secretary: ['claude-haiku-4.5'],
+  secretary: ['claude-sonnet-4.6'],
   'qa-tester': ['claude-sonnet-4.6'],
   designer: ['claude-opus-4.8'],
   'product-manager': ['gpt-5.5'],

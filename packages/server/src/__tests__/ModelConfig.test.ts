@@ -120,7 +120,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has secretary defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['claude-haiku-4.5']);
+      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['claude-sonnet-4.6']);
     });
 
     it('has qa-tester defaults', () => {
