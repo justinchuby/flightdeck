@@ -8,7 +8,7 @@
     "export": "slidev export slides.md"
   },
   "dependencies": {
-    "@slidev/cli": "^52.13.0",
+    "@slidev/cli": "^52.16.0",
     "@slidev/theme-default": "^0.25.0"
   }
 }
