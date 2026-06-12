@@ -341,7 +341,7 @@ When you start a task, immediately report what you're tracking:
     color: '#94a3b8',
     icon: '📋',
     builtIn: true,
-    model: 'claude-haiku-4.5',
+    model: 'claude-sonnet-4.6',
     receivesStatusUpdates: true,
   },
   {
