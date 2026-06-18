@@ -63,6 +63,11 @@ export function deriveModelName(id: string): string {
 
 let cachedData: { models: string[]; defaults: Record<string, string[]>; modelsByProvider: Record<string, string[]>; activeProvider: string } | null = null;
 let fetchPromise: Promise<void> | null = null;
+const subscribers = new Set<() => void>();
+
+function notifySubscribers(): void {
+  subscribers.forEach((subscriber) => subscriber());
+}
 
 function fetchModels(): Promise<void> {
   if (cachedData) return Promise.resolve();
@@ -75,6 +80,7 @@ function fetchModels(): Promise<void> {
         modelsByProvider: data.modelsByProvider ?? {},
         activeProvider: data.activeProvider ?? 'copilot',
       };
+      notifySubscribers();
     })
     .catch(() => {
       // Allow retry on next mount
@@ -91,16 +97,21 @@ export function useModels(): ModelsData {
   const [, setTick] = useState(0);
 
   useEffect(() => {
+    const rerender = () => setTick((t) => t + 1);
+    subscribers.add(rerender);
+
     if (cachedData) {
       setLoading(false);
-      return;
+      return () => {
+        subscribers.delete(rerender);
+      };
     }
     let mounted = true;
     fetchModels()
       .then(() => {
         if (mounted) {
           setLoading(false);
-          setTick((t) => t + 1);
+          rerender();
         }
       })
       .catch(() => {
@@ -109,7 +120,10 @@ export function useModels(): ModelsData {
           setLoading(false);
         }
       });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      subscribers.delete(rerender);
+    };
   }, []);
 
   const models = cachedData?.models ?? [];
@@ -131,8 +145,15 @@ export function useModels(): ModelsData {
   };
 }
 
+export function updateCachedActiveProvider(activeProvider: string): void {
+  if (!cachedData || cachedData.activeProvider === activeProvider) return;
+  cachedData = { ...cachedData, activeProvider };
+  notifySubscribers();
+}
+
 /** Clear cached data (useful for tests) */
 export function _resetModelsCache(): void {
   cachedData = null;
   fetchPromise = null;
+  subscribers.clear();
 }

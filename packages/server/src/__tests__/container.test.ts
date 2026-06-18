@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createContainer, createTestContainer, type ServiceContainer, type ContainerConfig } from '../container.js';
-import type { ServerConfig } from '../config.js';
+import { updateConfig, type ServerConfig } from '../config.js';
+import { ProviderManager } from '../providers/ProviderManager.js';
 import { logger } from '../utils/logger.js';
 
 // Mock config module so container's updateConfig/getConfig don't affect global state
@@ -251,6 +252,48 @@ describe('createContainer', () => {
     // because [...stopList].reverse() creates a copy each time
     expect(schedulerSpy).toHaveBeenCalledTimes(2);
     container = null;
+  });
+
+  it('keeps runtime config aligned when startup fallback rolls back after provider recovery', async () => {
+    const updateConfigMock = vi.mocked(updateConfig);
+    let activeProvider = 'claude';
+    const resolveSpy = vi.spyOn(ProviderManager.prototype, 'resolveAndPersistProvider').mockImplementation(() => activeProvider as any);
+    const getActiveSpy = vi.spyOn(ProviderManager.prototype, 'getActiveProviderId').mockImplementation(() => activeProvider as any);
+
+    try {
+      container = await createContainer(createTestContainerConfig());
+
+      expect(updateConfigMock).toHaveBeenCalledWith({
+        provider: 'claude',
+        providerBinaryOverride: undefined,
+        providerArgsOverride: undefined,
+        providerEnvOverride: undefined,
+        cloudProvider: undefined,
+      });
+
+      updateConfigMock.mockClear();
+
+      activeProvider = 'copilot';
+      container.internal.configStore.current.provider = {
+        id: 'copilot',
+        binaryOverride: '/custom/copilot',
+        argsOverride: ['--copilot-only'],
+        envOverride: { COPILOT_ONLY: '1' },
+      } as any;
+
+      container.providerManager?.emit('provider:runtime-changed');
+
+      expect(updateConfigMock).toHaveBeenCalledWith({
+        provider: 'copilot',
+        providerBinaryOverride: '/custom/copilot',
+        providerArgsOverride: ['--copilot-only'],
+        providerEnvOverride: { COPILOT_ONLY: '1' },
+        cloudProvider: undefined,
+      });
+    } finally {
+      resolveSpy.mockRestore();
+      getActiveSpy.mockRestore();
+    }
   });
 });
 
