@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2026-06-16
+
+### Changed
+
+- **Agent model lineup refreshed** — Updated default agent models to the latest generation and added a model-availability fallback so agents degrade gracefully when a configured model is unavailable (#266).
+- **Critical reviewer uses Gemini 3.1 Pro** — Enabled Gemini 3.1 Pro and assigned it to the critical-reviewer role for cross-family adversarial review (#269).
+- **Secretary default model** — Set the secretary's default model to Claude Sonnet 4.6 and aligned the shared/server/web model id lists (#270, #272).
+
 ## [0.4.4] - 2026-05-01
 
 ### Changed
