@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { projectsRoutes } from './projects.js';
 import type { AppContext } from './context.js';
+import { apiErrorHandler } from '../middleware/errorHandler.js';
 
 const mockStateDir = vi.hoisted(() => {
   const { mkdtempSync } = require('node:fs');
@@ -28,6 +29,7 @@ function createTestServer(ctx: Partial<AppContext>) {
   const app = express();
   app.use(express.json());
   app.use(projectsRoutes(ctx as AppContext));
+  app.use(apiErrorHandler);
   let server: Server;
   return {
     app,

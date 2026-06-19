@@ -11,6 +11,7 @@ import { originValidation } from './middleware/originValidation.js';
 import { authMiddleware, initAuth, getAuthSecret } from './middleware/auth.js';
 import { requestContextMiddleware } from './middleware/requestContext.js';
 import { httpLoggerMiddleware } from './middleware/httpLogger.js';
+import { apiErrorHandler } from './middleware/errorHandler.js';
 import { createContainer, wireHttpLayer } from './container.js';
 import { apiRouter } from './api.js';
 import { WebSocketServer } from './comms/WebSocketServer.js';
@@ -58,14 +59,8 @@ app.get('/health', (_req, res) => {
 app.use('/api', authMiddleware);
 app.use('/api', apiRouter(container));
 
-// Global error handler — catches unhandled route/middleware errors so they
-// return a 500 instead of crashing the process.
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  logger.error({ module: 'api', msg: 'Unhandled route error', err: err.message, stack: err.stack });
-  if (!res.headersSent) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Global error handler — catches ApiError (typed) and unhandled errors.
+app.use(apiErrorHandler);
 
 // Serve built web frontend in production
 const webDistPath = path.resolve(__dirname, '../../web/dist');

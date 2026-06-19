@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import type { AppContext } from './context.js';
 import { SessionReplay } from '../coordination/sessions/SessionReplay.js';
+import { ApiError, badRequest, serviceUnavailable, internalError } from '../errors/index.js';
+import { logger } from '../utils/logger.js';
 
 export function replayRoutes(ctx: AppContext): Router {
   const { agentManager, activityLedger, decisionLog, lockRegistry } = ctx;
@@ -24,16 +26,17 @@ export function replayRoutes(ctx: AppContext): Router {
   // GET /api/replay/:leadId/state?at=<ISO-timestamp>
   router.get('/replay/:leadId/state', (req, res) => {
     const r = getReplay();
-    if (!r) return res.status(503).json({ error: 'Replay service not available' });
+    if (!r) throw serviceUnavailable('Replay service not available');
 
     const timestamp = req.query.at as string;
-    if (!timestamp) return res.status(400).json({ error: 'Missing required query param: at (ISO timestamp)' });
+    if (!timestamp) throw badRequest('Missing required query param: at (ISO timestamp)');
 
     try {
       const state = r.getWorldStateAt(resolveLeadId(req.params.leadId), timestamp);
       res.json(state);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to reconstruct state', detail: (err as Error).message });
+      logger.error({ module: 'replay', msg: 'Failed to reconstruct state', err: (err as Error).message });
+      throw internalError('Failed to reconstruct state');
     }
   });
 
@@ -41,7 +44,7 @@ export function replayRoutes(ctx: AppContext): Router {
   // Also supports ?limit=N (returns most recent N events)
   router.get('/replay/:leadId/events', (req, res) => {
     const r = getReplay();
-    if (!r) return res.status(503).json({ error: 'Replay service not available' });
+    if (!r) throw serviceUnavailable('Replay service not available');
 
     const leadId = resolveLeadId(req.params.leadId);
     const from = req.query.from as string;
@@ -49,7 +52,7 @@ export function replayRoutes(ctx: AppContext): Router {
     const limitStr = req.query.limit as string;
 
     if (!from && !to && !limitStr) {
-      return res.status(400).json({ error: 'Missing required query params: from & to (ISO timestamps), or limit (number)' });
+      throw badRequest('Missing required query params: from & to (ISO timestamps), or limit (number)');
     }
 
     const types = req.query.types ? (req.query.types as string).split(',').map(t => t.trim()) : undefined;
@@ -69,20 +72,22 @@ export function replayRoutes(ctx: AppContext): Router {
         res.json({ events: events.slice(-limit) });
       }
     } catch (err) {
-      res.status(500).json({ error: 'Failed to query events', detail: (err as Error).message });
+      logger.error({ module: 'replay', msg: 'Failed to query events', err: (err as Error).message });
+      throw internalError('Failed to query events');
     }
   });
 
   // GET /api/replay/:leadId/keyframes
   router.get('/replay/:leadId/keyframes', (req, res) => {
     const r = getReplay();
-    if (!r) return res.status(503).json({ error: 'Replay service not available' });
+    if (!r) throw serviceUnavailable('Replay service not available');
 
     try {
       const keyframes = r.getKeyframes(resolveLeadId(req.params.leadId));
       res.json({ keyframes });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to get keyframes', detail: (err as Error).message });
+      logger.error({ module: 'replay', msg: 'Failed to get keyframes', err: (err as Error).message });
+      throw internalError('Failed to get keyframes');
     }
   });
 

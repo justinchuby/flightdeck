@@ -6,6 +6,7 @@ import { validateBody, acquireLockSchema } from '../validation/schemas.js';
 import { extractCommFromActivity } from '../coordination/events/CommEventExtractor.js';
 import type { AppContext } from './context.js';
 import { asAgentId } from '../types/brandedIds.js';
+import { badRequest, conflict } from '../errors/index.js';
 
 /** Reject paths with traversal sequences or absolute paths. */
 function isTraversalPath(p: string): boolean {
@@ -39,7 +40,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
   router.post('/coordination/locks', validateBody(acquireLockSchema), (req, res) => {
     const { agentId, filePath, reason } = req.body;
     if (isTraversalPath(filePath)) {
-      return res.status(400).json({ error: 'Invalid file path' });
+      throw badRequest('Invalid file path');
     }
     const agent = agentManager.get(agentId);
     const agentRole = agent?.role?.id ?? 'unknown';
@@ -48,18 +49,18 @@ export function coordinationRoutes(ctx: AppContext): Router {
     if (result.ok) {
       res.status(201).json({ ok: true });
     } else {
-      res.status(409).json({ ok: false, holder: result.holder });
+      throw conflict('File already locked', { holder: result.holder });
     }
   });
 
   router.delete('/coordination/locks/:filePath', (req, res) => {
     const filePath = String(req.params.filePath);
     if (isTraversalPath(filePath)) {
-      return res.status(400).json({ error: 'Invalid file path' });
+      throw badRequest('Invalid file path');
     }
     const agentId = (req.query.agentId as string) ?? req.body?.agentId;
     if (!agentId) {
-      return res.status(400).json({ error: 'agentId is required' });
+      throw badRequest('agentId is required');
     }
     const ok = lockRegistry.release(agentId, filePath);
     res.json({ ok });
@@ -295,7 +296,7 @@ export function coordinationRoutes(ctx: AppContext): Router {
   router.get('/coordination/timeline/stream', (req, res) => {
     const leadId = req.query.leadId as string | undefined;
     if (!leadId) {
-      return res.status(400).json({ error: 'leadId query parameter is required' });
+      throw badRequest('leadId query parameter is required');
     }
 
     // SSE headers

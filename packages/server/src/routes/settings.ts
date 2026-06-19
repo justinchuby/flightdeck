@@ -17,6 +17,7 @@ import { isValidProviderId } from '../adapters/presets.js';
 import type { ProviderId } from '../adapters/presets.js';
 import { ProviderManager } from '../providers/ProviderManager.js';
 import type { AppContext } from './context.js';
+import { badRequest, notFound, internalError } from '../errors/index.js';
 
 // ── Routes ──────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ export function settingsRoutes(ctx: AppContext): Router {
       const statuses = await pm.getAllProviderStatusesAsync();
       res.json(statuses);
     } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to detect provider statuses' });
+      throw internalError((err as Error).message || 'Failed to detect provider statuses');
     }
   });
 
@@ -53,14 +54,14 @@ export function settingsRoutes(ctx: AppContext): Router {
   router.get('/settings/providers/:provider', async (req, res) => {
     const { provider } = req.params;
     if (!isValidProviderId(provider)) {
-      return res.status(404).json({ error: `Unknown provider: ${provider}` });
+      throw notFound(`Unknown provider: ${provider}`);
     }
     try {
       const status = await pm.getProviderStatusAsync(provider);
       const modelPrefs = pm.getModelPreferences(provider);
       res.json({ ...status, modelPreferences: modelPrefs });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to get provider status' });
+      throw internalError((err as Error).message || 'Failed to get provider status');
     }
   });
 
@@ -70,7 +71,7 @@ export function settingsRoutes(ctx: AppContext): Router {
   router.post('/settings/providers/:provider/test', async (req, res) => {
     const { provider } = req.params;
     if (!isValidProviderId(provider)) {
-      return res.status(404).json({ error: `Unknown provider: ${provider}` });
+      throw notFound(`Unknown provider: ${provider}`);
     }
     try {
       const { installed } = await pm.detectInstalledAsync(provider);
@@ -87,7 +88,7 @@ export function settingsRoutes(ctx: AppContext): Router {
           : `Auth check failed: ${auth.error ?? 'unknown error'}`,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Test failed' });
+      throw internalError((err as Error).message || 'Test failed');
     }
   });
 
@@ -98,7 +99,7 @@ export function settingsRoutes(ctx: AppContext): Router {
   router.put('/settings/providers/:provider', async (req, res) => {
     const { provider } = req.params;
     if (!isValidProviderId(provider)) {
-      return res.status(404).json({ error: `Unknown provider: ${provider}` });
+      throw notFound(`Unknown provider: ${provider}`);
     }
     const { enabled, modelPreferences } = req.body as {
       enabled?: boolean;
@@ -117,7 +118,7 @@ export function settingsRoutes(ctx: AppContext): Router {
       const prefs = pm.getModelPreferences(provider);
       res.json({ ...status, modelPreferences: prefs });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to get provider status' });
+      throw internalError((err as Error).message || 'Failed to get provider status');
     }
   });
 
@@ -127,7 +128,7 @@ export function settingsRoutes(ctx: AppContext): Router {
   router.put('/settings/provider', (req, res) => {
     const { id } = req.body as { id?: string };
     if (!id || !isValidProviderId(id)) {
-      return res.status(400).json({ error: `Invalid provider: ${id}` });
+      throw badRequest(`Invalid provider: ${id}`);
     }
     pm.setActiveProviderId(id as ProviderId);
     res.json({ activeProvider: id });
@@ -146,11 +147,11 @@ export function settingsRoutes(ctx: AppContext): Router {
   router.put('/settings/provider-ranking', (req, res) => {
     const { ranking } = req.body as { ranking?: string[] };
     if (!ranking || !Array.isArray(ranking)) {
-      return res.status(400).json({ error: 'ranking must be an array of provider IDs' });
+      throw badRequest('ranking must be an array of provider IDs');
     }
     const valid = ranking.filter(isValidProviderId) as ProviderId[];
     if (valid.length === 0) {
-      return res.status(400).json({ error: 'No valid provider IDs in ranking' });
+      throw badRequest('No valid provider IDs in ranking');
     }
     pm.setProviderRanking(valid);
     res.json({ ranking: pm.getProviderRanking() });
