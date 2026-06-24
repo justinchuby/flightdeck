@@ -168,15 +168,18 @@ describe('timerStore', () => {
   });
 
   describe('scheduleFireRemoval', () => {
-    it('removes timer after delay', () => {
+    it('clears recently-fired state after delay but keeps timer', () => {
       const store = useTimerStore.getState();
       store.addTimer(makeTimer({ id: 't1' }));
       store.fireTimer('t1');
       store.scheduleFireRemoval('t1', 2000);
 
       expect(useTimerStore.getState().timers).toHaveLength(1);
+      expect(useTimerStore.getState().recentlyFiredIds).toContain('t1');
       vi.advanceTimersByTime(2000);
-      expect(useTimerStore.getState().timers).toHaveLength(0);
+      // Timer stays in the store, but recently-fired flash is cleared
+      expect(useTimerStore.getState().timers).toHaveLength(1);
+      expect(useTimerStore.getState().recentlyFiredIds).not.toContain('t1');
     });
 
     it('clears previous timeout if called again', () => {
@@ -188,12 +191,13 @@ describe('timerStore', () => {
       store.scheduleFireRemoval('t1', 5000);
 
       vi.advanceTimersByTime(2000);
-      // Should still exist (first timeout was cleared)
-      expect(useTimerStore.getState().timers).toHaveLength(1);
+      // Should still be recently fired (first timeout was cleared)
+      expect(useTimerStore.getState().recentlyFiredIds).toContain('t1');
 
       vi.advanceTimersByTime(3000);
-      // Now it should be removed
-      expect(useTimerStore.getState().timers).toHaveLength(0);
+      // Now recently-fired state should be cleared, but timer remains
+      expect(useTimerStore.getState().timers).toHaveLength(1);
+      expect(useTimerStore.getState().recentlyFiredIds).not.toContain('t1');
     });
 
     it('removeTimer clears pending fire timeout', () => {

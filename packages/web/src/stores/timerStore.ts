@@ -77,7 +77,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     if (existing) clearTimeout(existing);
     const timeout = setTimeout(() => {
       fireTimeouts.delete(timerId);
-      get().removeTimer(timerId);
+      get().clearRecentlyFired(timerId);
     }, delayMs);
     fireTimeouts.set(timerId, timeout);
   },
