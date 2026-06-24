@@ -59,11 +59,11 @@ describe('AgentMessageService', () => {
       svc.bufferThinkingMessage('a1', 'thinking...');
       svc.persistHumanMessage('a1', 'user msg');
       const msgs = svc.getMessageHistory('a1');
-      // getMessageHistory returns newest-first; agent was flushed first, user last
+      // getMessageHistory returns oldest-first; agent was flushed first, user last
       expect(msgs).toHaveLength(3);
-      expect(msgs[0].sender).toBe('user');
+      expect(msgs[0].sender).toBe('agent');
       expect(msgs[1].sender).toBe('thinking');
-      expect(msgs[2].sender).toBe('agent');
+      expect(msgs[2].sender).toBe('user');
     });
 
     it('ignores messages for unknown threads', () => {
@@ -168,9 +168,9 @@ describe('AgentMessageService', () => {
 
       const msgs = svc.getMessageHistory('a1');
       expect(msgs).toHaveLength(2);
-      // newest-first: thinking was stored after agent
-      expect(msgs[0].sender).toBe('thinking');
-      expect(msgs[1].sender).toBe('agent');
+      // oldest-first: agent was stored before thinking
+      expect(msgs[0].sender).toBe('agent');
+      expect(msgs[1].sender).toBe('thinking');
     });
   });
 
@@ -195,14 +195,14 @@ describe('AgentMessageService', () => {
 
   // -- getMessageHistory ---------------------------------------------------
   describe('getMessageHistory', () => {
-    it('returns messages newest-first', () => {
+    it('returns messages oldest-first (chronological order)', () => {
       svc.createThread('a1');
       svc.persistSystemMessage('a1', 'first');
       svc.persistSystemMessage('a1', 'second');
       svc.persistSystemMessage('a1', 'third');
 
       const msgs = svc.getMessageHistory('a1');
-      expect(msgs.map((m) => m.content)).toEqual(['third', 'second', 'first']);
+      expect(msgs.map((m) => m.content)).toEqual(['first', 'second', 'third']);
     });
 
     it('returns empty array without a database', () => {

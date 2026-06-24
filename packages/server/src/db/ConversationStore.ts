@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, desc, asc, lt, and } from 'drizzle-orm';
 import type { Database } from '../db/database.js';
 import { conversations, messages } from '../db/schema.js';
 import { redact } from '../utils/redaction.js';
@@ -94,7 +94,37 @@ export class ConversationStore {
       .from(messages)
       .innerJoin(conversations, eq(messages.conversationId, conversations.id))
       .where(eq(conversations.agentId, agentId))
-      .orderBy(desc(messages.timestamp))
+      .orderBy(desc(messages.id))
+      .limit(limit)
+      .all();
+    return rows.map((r) => ({
+      id: r.id,
+      conversationId: r.conversationId,
+      sender: r.sender,
+      content: r.content,
+      fromRole: r.fromRole ?? undefined,
+      timestamp: r.timestamp!,
+    }));
+  }
+
+  /**
+   * Fetch messages older than a given cursor (message ID).
+   * Returns `limit` messages ordered newest-first (caller should reverse for display).
+   */
+  getMessagesBefore(agentId: string, beforeId: number, limit = 50): ThreadMessage[] {
+    const rows = this.db.drizzle
+      .select({
+        id: messages.id,
+        conversationId: messages.conversationId,
+        sender: messages.sender,
+        content: messages.content,
+        fromRole: messages.fromRole,
+        timestamp: messages.timestamp,
+      })
+      .from(messages)
+      .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+      .where(and(eq(conversations.agentId, agentId), lt(messages.id, beforeId)))
+      .orderBy(desc(messages.id))
       .limit(limit)
       .all();
     return rows.map((r) => ({

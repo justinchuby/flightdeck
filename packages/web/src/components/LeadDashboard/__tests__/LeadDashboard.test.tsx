@@ -61,7 +61,9 @@ vi.mock('../../../hooks/useAttachments', () => ({
 vi.mock('../useLeadWebSocket', () => ({ useLeadWebSocket: vi.fn() }));
 vi.mock('../useDragResize', () => ({ useDragResize: () => vi.fn() }));
 vi.mock('../useLeadPolling', () => ({ useLeadPolling: vi.fn() }));
-vi.mock('../useLeadMessages', () => ({ useLeadMessages: vi.fn() }));
+vi.mock('../useLeadMessages', () => ({
+  useLeadMessages: vi.fn(() => ({ hasMore: false, loadingOlder: false, loadOlderMessages: vi.fn() })),
+}));
 vi.mock('../useCatchUpSummary', () => ({
   useCatchUpSummary: () => ({ catchUpSummary: null, dismissCatchUp: vi.fn() }),
 }));
