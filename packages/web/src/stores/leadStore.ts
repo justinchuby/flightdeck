@@ -59,13 +59,17 @@ interface ProjectState {
 interface LeadState {
   /** All known lead agent IDs mapped to per-project state */
   projects: Record<string, ProjectState>;
+  /** Maps projectId → leadId so consumers can look up by either key */
+  projectToLead: Record<string, string>;
   /** Currently selected lead agent ID */
   selectedLeadId: string | null;
   /** Unsent chat drafts per lead */
   drafts: Record<string, string>;
 
   selectLead: (id: string | null) => void;
-  addProject: (id: string) => void;
+  addProject: (leadId: string, projectId?: string) => void;
+  /** Register a projectId → leadId alias so resolveProject() finds data by either key */
+  linkProjectId: (projectId: string, leadId: string) => void;
   removeProject: (id: string) => void;
   setDraft: (leadId: string, text: string) => void;
 
@@ -89,26 +93,57 @@ function emptyProject(): ProjectState {
   return { decisions: [], progress: null, progressSummary: null, progressHistory: [], agentReports: [], toolCalls: [], activity: [], comms: [], groups: [], groupMessages: {}, dagStatus: null };
 }
 
+/**
+ * Resolve project state by any key — works with both leadId and projectId.
+ * Use this in zustand selectors instead of direct `s.projects[id]` access.
+ */
+export function resolveProject(state: LeadState, id: string | null | undefined): ProjectState | undefined {
+  if (!id) return undefined;
+  const direct = state.projects[id];
+  if (direct) return direct;
+  const leadId = state.projectToLead[id];
+  return leadId ? state.projects[leadId] : undefined;
+}
+
 export const useLeadStore = create<LeadState>((set) => ({
   projects: {},
+  projectToLead: {},
   selectedLeadId: null,
   drafts: {},
 
   selectLead: (id) => set({ selectedLeadId: id }),
 
-  addProject: (id) =>
+  addProject: (id, projectId) =>
     set((s) => {
-      if (s.projects[id]) return s;
-      return { projects: { ...s.projects, [id]: emptyProject() } };
+      const updates: Partial<LeadState> = {};
+      if (!s.projects[id]) {
+        updates.projects = { ...s.projects, [id]: emptyProject() };
+      }
+      if (projectId && s.projectToLead[projectId] !== id) {
+        updates.projectToLead = { ...s.projectToLead, [projectId]: id };
+      }
+      return Object.keys(updates).length > 0 ? updates : s;
+    }),
+
+  linkProjectId: (projectId, leadId) =>
+    set((s) => {
+      if (s.projectToLead[projectId] === leadId) return s;
+      return { projectToLead: { ...s.projectToLead, [projectId]: leadId } };
     }),
 
   removeProject: (id) =>
     set((s) => {
       const { [id]: _, ...rest } = s.projects;
       const { [id]: _d, ...restDrafts } = s.drafts;
+      // Remove any alias pointing to this leadId
+      const projectToLead = { ...s.projectToLead };
+      for (const [pid, lid] of Object.entries(projectToLead)) {
+        if (lid === id) delete projectToLead[pid];
+      }
       return {
         projects: rest,
         drafts: restDrafts,
+        projectToLead,
         selectedLeadId: s.selectedLeadId === id ? null : s.selectedLeadId,
       };
     }),
@@ -238,6 +273,6 @@ export const useLeadStore = create<LeadState>((set) => ({
 
   reset: () => {
     useMessageStore.getState().reset();
-    set({ projects: {}, selectedLeadId: null });
+    set({ projects: {}, projectToLead: {}, selectedLeadId: null });
   },
 }));

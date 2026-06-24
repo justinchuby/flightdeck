@@ -8,10 +8,17 @@ vi.mock('../../../hooks/useApi', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
-const mockLeadStore: Record<string, unknown> = { projects: {} };
+const mockLeadStore: Record<string, unknown> = { projects: {}, projectToLead: {} };
 vi.mock('../../../stores/leadStore', () => ({
   useLeadStore: (selector: (s: Record<string, unknown>) => unknown) =>
     typeof selector === 'function' ? selector(mockLeadStore) : mockLeadStore,
+  resolveProject: (state: any, id: string | null | undefined) => {
+    if (!id) return undefined;
+    const direct = state.projects?.[id];
+    if (direct) return direct;
+    const leadId = state.projectToLead?.[id];
+    return leadId ? state.projects?.[leadId] : undefined;
+  },
 }));
 
 import { DagMinimap } from '../DagMinimap';

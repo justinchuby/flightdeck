@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useLeadStore } from '../leadStore';
+import { useLeadStore, resolveProject } from '../leadStore';
 import { useMessageStore } from '../messageStore';
 import type { AcpToolCall, LeadProgress, Decision, DagStatus, ChatGroup, GroupMessage } from '../../types';
 import type { ActivityEvent, AgentComm, AgentReport, ProgressSnapshot } from '../leadStore';
@@ -143,6 +143,69 @@ describe('leadStore', () => {
       useLeadStore.getState().removeProject('other-lead');
       expect(useLeadStore.getState().selectedLeadId).toBe(LEAD_ID);
     });
+
+    it('cleans up projectToLead aliases when project is removed', () => {
+      useLeadStore.getState().addProject(LEAD_ID, 'project-abc');
+      expect(useLeadStore.getState().projectToLead['project-abc']).toBe(LEAD_ID);
+      useLeadStore.getState().removeProject(LEAD_ID);
+      expect(useLeadStore.getState().projectToLead['project-abc']).toBeUndefined();
+    });
+  });
+
+  describe('addProject with projectId alias', () => {
+    it('registers projectId → leadId alias', () => {
+      useLeadStore.getState().addProject('lead-xyz', 'project-xyz');
+      expect(useLeadStore.getState().projectToLead['project-xyz']).toBe('lead-xyz');
+    });
+
+    it('does not register alias when projectId is undefined', () => {
+      useLeadStore.getState().addProject('lead-no-project');
+      expect(Object.keys(useLeadStore.getState().projectToLead)).not.toContain('undefined');
+    });
+  });
+
+  describe('linkProjectId', () => {
+    it('creates a projectId → leadId mapping', () => {
+      useLeadStore.getState().linkProjectId('project-123', LEAD_ID);
+      expect(useLeadStore.getState().projectToLead['project-123']).toBe(LEAD_ID);
+    });
+
+    it('is idempotent', () => {
+      useLeadStore.getState().linkProjectId('project-123', LEAD_ID);
+      const stateBefore = useLeadStore.getState();
+      useLeadStore.getState().linkProjectId('project-123', LEAD_ID);
+      expect(useLeadStore.getState().projectToLead).toEqual(stateBefore.projectToLead);
+    });
+  });
+
+  describe('resolveProject', () => {
+    it('resolves by leadId directly', () => {
+      const state = useLeadStore.getState();
+      const proj = resolveProject(state, LEAD_ID);
+      expect(proj).toBeDefined();
+      expect(proj?.decisions).toEqual([]);
+    });
+
+    it('resolves by projectId via alias', () => {
+      useLeadStore.getState().linkProjectId('project-abc', LEAD_ID);
+      useLeadStore.getState().addDecision(LEAD_ID, makeDecision({ id: 'dec-alias' }));
+      const state = useLeadStore.getState();
+      const proj = resolveProject(state, 'project-abc');
+      expect(proj).toBeDefined();
+      expect(proj?.decisions).toHaveLength(1);
+      expect(proj?.decisions[0].id).toBe('dec-alias');
+    });
+
+    it('returns undefined for unknown key', () => {
+      const state = useLeadStore.getState();
+      expect(resolveProject(state, 'nonexistent')).toBeUndefined();
+    });
+
+    it('returns undefined for null/undefined', () => {
+      const state = useLeadStore.getState();
+      expect(resolveProject(state, null)).toBeUndefined();
+      expect(resolveProject(state, undefined)).toBeUndefined();
+    });
   });
 
   describe('setDraft', () => {
@@ -153,11 +216,13 @@ describe('leadStore', () => {
   });
 
   describe('reset', () => {
-    it('clears all state', () => {
+    it('clears all state including aliases', () => {
       useLeadStore.getState().selectLead(LEAD_ID);
       useLeadStore.getState().setDraft(LEAD_ID, 'draft');
+      useLeadStore.getState().linkProjectId('project-abc', LEAD_ID);
       useLeadStore.getState().reset();
       expect(useLeadStore.getState().projects).toEqual({});
+      expect(useLeadStore.getState().projectToLead).toEqual({});
       expect(useLeadStore.getState().selectedLeadId).toBeNull();
     });
   });

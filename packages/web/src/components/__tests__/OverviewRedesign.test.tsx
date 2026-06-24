@@ -23,7 +23,9 @@ vi.mock('../../stores/leadStore', () => ({
   useLeadStore: (sel: any) => sel({
     selectedLeadId: 'lead-1',
     projects: {},
+    projectToLead: {},
   }),
+  resolveProject: () => undefined,
 }));
 
 vi.mock('../../hooks/useApi', () => ({

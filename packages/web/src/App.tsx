@@ -240,11 +240,11 @@ function AppContent() {
     queryKey: ['app', 'leads'],
     queryFn: async ({ signal }) => {
       try {
-        const leads: Array<{ id: string; status: string; task?: string }> = await apiFetch('/lead', { signal });
+        const leads: Array<{ id: string; status: string; task?: string; projectId?: string }> = await apiFetch('/lead', { signal });
         if (!Array.isArray(leads)) return [];
         const store = useLeadStore.getState();
         leads.forEach((l) => {
-          store.addProject(l.id);
+          store.addProject(l.id, l.projectId);
           useMessageStore.getState().ensureChannel(l.id);
           apiFetch<{ messages: Array<{ sender?: string; text?: string; content?: string; timestamp?: string | number }> }>(`/agents/${l.id}/messages?limit=200`, { signal })
             .then((data) => {

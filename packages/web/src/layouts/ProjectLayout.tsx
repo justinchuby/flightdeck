@@ -171,8 +171,8 @@ export function ProjectLayout() {
     );
 
     if (lead) {
-      // Live lead found — always use its real agent ID
-      store.addProject(lead.id);
+      // Live lead found — register with both leadId and projectId keys
+      store.addProject(lead.id, id);
       if (store.selectedLeadId !== lead.id) {
         store.selectLead(lead.id);
       }
