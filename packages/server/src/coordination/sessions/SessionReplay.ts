@@ -2,6 +2,7 @@ import type { ActivityLedger, ActivityEntry } from '../activity/ActivityLedger.j
 import type { TaskDAG, DagTask } from '../../tasks/TaskDAG.js';
 import type { DecisionLog, Decision } from '../decisions/DecisionLog.js';
 import type { FileLockRegistry, FileLock } from '../files/FileLockRegistry.js';
+import { isCrewMember } from '../../agents/crewUtils.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -111,7 +112,7 @@ export class SessionReplay {
     if (this.agentSource) {
       const crewIds = new Set<string>([leadId]);
       for (const agent of this.agentSource.getAll()) {
-        if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
+        if (isCrewMember(agent, leadId)) {
           crewIds.add(agent.id);
         }
       }

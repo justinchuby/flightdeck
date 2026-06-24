@@ -9,6 +9,7 @@ import { sessionRetros } from '../../db/schema.js';
 import { logger } from '../../utils/logger.js';
 import { asAgentId } from '../../types/brandedIds.js';
 import { shortAgentId } from '@flightdeck/shared';
+import { getCrewAgents } from '../../agents/crewUtils.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -101,9 +102,7 @@ export class SessionRetro {
   // ── Data collection ─────────────────────────────────────────────
 
   private buildRetroData(leadId: string): SessionRetroData {
-    const crewAgents = this.agentManager.getAll().filter(
-      a => a.id === leadId || a.parentId === leadId,
-    );
+    const crewAgents = getCrewAgents(this.agentManager.getAll(), leadId);
 
     const allEvents = this.activityLedger.getRecent(100_000);
     const crewAgentIds = new Set(crewAgents.map(a => a.id));

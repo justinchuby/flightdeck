@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { shortAgentId } from '@flightdeck/shared';
 import type { AppContext } from './context.js';
 import type { ActivityEntry } from '../coordination/activity/ActivityLedger.js';
+import { getCrewIds as resolveCrewIds } from '../agents/crewUtils.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -47,14 +48,7 @@ export function commsRoutes(ctx: AppContext): Router {
 
   /** Resolve crew agent IDs for a lead */
   function getCrewIds(leadId: string): Set<string> {
-    const ids = new Set<string>();
-    ids.add(leadId);
-    for (const agent of agentManager.getAll()) {
-      if (agent.parentId === leadId || agent.id === leadId || agent.projectId === leadId) {
-        ids.add(agent.id);
-      }
-    }
-    return ids;
+    return resolveCrewIds(agentManager.getAll(), leadId);
   }
 
   /** Filter activity entries to comm events for a crew */

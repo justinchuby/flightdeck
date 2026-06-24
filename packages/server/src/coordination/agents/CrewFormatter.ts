@@ -36,6 +36,12 @@ export function shortenModel(model: string | undefined): string {
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/**
+ * Represents an agent within a session's crew.
+ *
+ * A crew is the set of agents led by a single lead agent within one session.
+ * `parentId` links this agent to its lead (or sub-lead).
+ */
 export interface CrewMember {
   id: string;
   role: string;
