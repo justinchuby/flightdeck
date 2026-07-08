@@ -363,9 +363,9 @@ describe('AcpAdapter', () => {
       mockNewSession.mockResolvedValue({
         sessionId: 'session-downgrade',
         models: {
-          currentModelId: 'claude-sonnet-4.6',
+          currentModelId: 'claude-sonnet-5',
           availableModels: [
-            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-sonnet-5', name: 'Sonnet' },
             { modelId: 'claude-haiku-4.5', name: 'Haiku' },
           ],
         },
@@ -381,14 +381,14 @@ describe('AcpAdapter', () => {
         model: 'claude-opus-4.8', // premium, unavailable → downgrade resolves to sonnet
       });
 
-      // The fallback (claude-sonnet-4.6) is ALREADY the running model, so no RPC
+      // The fallback (claude-sonnet-5) is ALREADY the running model, so no RPC
       // switch is needed — but the requested model WAS unavailable, so the genuine
       // substitution is still surfaced to the user.
       expect(mockSetSessionModel).not.toHaveBeenCalled();
       expect(substitutedEvents).toHaveLength(1);
       expect(substitutedEvents[0]).toMatchObject({
         requested: 'claude-opus-4.8',
-        selected: 'claude-sonnet-4.6',
+        selected: 'claude-sonnet-5',
         reason: 'downgrade',
       });
     });
@@ -400,7 +400,7 @@ describe('AcpAdapter', () => {
         models: {
           currentModelId: 'claude-haiku-4.5',
           availableModels: [
-            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-sonnet-5', name: 'Sonnet' },
             { modelId: 'claude-haiku-4.5', name: 'Haiku' },
           ],
         },
@@ -419,7 +419,7 @@ describe('AcpAdapter', () => {
       expect(mockSetSessionModel).toHaveBeenCalledTimes(1);
       expect(mockSetSessionModel).toHaveBeenCalledWith({
         sessionId: 'session-switch',
-        modelId: 'claude-sonnet-4.6',
+        modelId: 'claude-sonnet-5',
       });
       expect(substituted).toHaveBeenCalledTimes(1);
     });
@@ -431,7 +431,7 @@ describe('AcpAdapter', () => {
         models: {
           currentModelId: 'claude-haiku-4.5',
           availableModels: [
-            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-sonnet-5', name: 'Sonnet' },
             { modelId: 'claude-haiku-4.5', name: 'Haiku' },
           ],
         },
@@ -461,7 +461,7 @@ describe('AcpAdapter', () => {
         models: {
           currentModelId: 'claude-haiku-4.5',
           availableModels: [
-            { modelId: 'claude-sonnet-4.6', name: 'Sonnet' },
+            { modelId: 'claude-sonnet-5', name: 'Sonnet' },
             { modelId: 'claude-haiku-4.5', name: 'Haiku' },
           ],
         },

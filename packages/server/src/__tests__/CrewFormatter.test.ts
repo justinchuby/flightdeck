@@ -27,7 +27,8 @@ describe('CrewFormatter', () => {
   describe('shortenModel', () => {
     it('shortens known model names', () => {
       expect(shortenModel('claude-opus-4.6')).toBe('opus');
-      expect(shortenModel('claude-sonnet-4.6')).toBe('sonnet');
+      expect(shortenModel('claude-sonnet-5')).toBe('sonnet');
+      expect(shortenModel('claude-sonnet-4.6')).toBe('sonnet-4.6');
       expect(shortenModel('claude-haiku-4.5')).toBe('haiku');
       expect(shortenModel('gemini-3-pro-preview')).toBe('gemini-pro');
       expect(shortenModel('gpt-5.2-codex')).toBe('codex');

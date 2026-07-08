@@ -44,7 +44,7 @@ interface ServerConfig {
 ### Analysis & Review
 - **code-reviewer** (gpt-5.5) — Correctness, patterns, tests
 - **critical-reviewer** (gemini-3.1-pro-preview) — Architecture, security, perf
-- **readability-reviewer** (claude-sonnet-4.6) — Naming, org, documentation
+- **readability-reviewer** (claude-sonnet-5) — Naming, org, documentation
 - **radical-thinker** (gpt-5.5) — First-principles, innovation
 
 ### Implementation
@@ -55,7 +55,7 @@ interface ServerConfig {
 - **product-manager** (gpt-5.5) — User needs, quality bar
 - **tech-writer** (gpt-5.5) — Documentation, examples, API design
 - **designer** (claude-opus-4.8) — UX/UI, interaction design
-- **qa-tester** (claude-sonnet-4.6) — End-to-end testing, verification
+- **qa-tester** (claude-sonnet-5) — End-to-end testing, verification
 - **generalist** (claude-opus-4.8) — Hardware, mechanics, 3D, research
 
 ### Management
@@ -71,7 +71,7 @@ interface ServerConfig {
 | Model | Tier | Context | Cost/1k | Best For |
 |-------|------|---------|---------|----------|
 | claude-haiku-4.5 | fast | 200k | $0.25 | Quick tasks, formatting |
-| claude-sonnet-4.6 | standard | 200k | $3.00 | Implementation, debugging |
+| claude-sonnet-5 | standard | 200k | $3.00 | Implementation, debugging |
 | claude-opus-4.6 | premium | 200k | $15.00 | Complex work, architecture |
 | gemini-3-pro-preview | standard | 1M | $1.25 | Large context, research |
 | gpt-5.1-codex | standard | 200k | $2.50 | Code generation |

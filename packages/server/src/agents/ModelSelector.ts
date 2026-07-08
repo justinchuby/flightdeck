@@ -19,6 +19,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     bestFor: ['simple-tasks', 'code-review', 'formatting', 'docs'],
   },
   {
+    id: 'claude-sonnet-5',
+    name: 'Claude Sonnet 5',
+    tier: 'standard',
+    contextWindow: 200000,
+    costPer1kTokens: 3.0,
+    bestFor: ['implementation', 'debugging', 'testing', 'analysis'],
+  },
+  {
     id: 'claude-sonnet-4.6',
     name: 'Claude Sonnet 4.6',
     tier: 'standard',

@@ -11,7 +11,8 @@ import { shortAgentId } from '@flightdeck/shared';
 const MODEL_SHORT: Record<string, string> = {
   'claude-opus-4.6': 'opus',
   'claude-opus-4.5': 'opus-4.5',
-  'claude-sonnet-4.6': 'sonnet',
+  'claude-sonnet-5': 'sonnet',
+  'claude-sonnet-4.6': 'sonnet-4.6',
   'claude-sonnet-4.5': 'sonnet-4.5',
   'claude-sonnet-4': 'sonnet-4',
   'claude-haiku-4.5': 'haiku',

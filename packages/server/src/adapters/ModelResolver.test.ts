@@ -33,12 +33,12 @@ describe('ModelResolver', () => {
     });
 
     it('resolves "standard" to provider-specific models', () => {
-      expect(resolveModel('standard', 'copilot')?.model).toBe('claude-sonnet-4.6');
+      expect(resolveModel('standard', 'copilot')?.model).toBe('claude-sonnet-5');
       expect(resolveModel('standard', 'claude')?.model).toBe('default');
       expect(resolveModel('standard', 'gemini')?.model).toBe('gemini-3.1-flash');
-      expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-4.6');
+      expect(resolveModel('standard', 'cursor')?.model).toBe('claude-sonnet-5');
       expect(resolveModel('standard', 'codex')?.model).toBe('gpt-5.3-codex');
-      expect(resolveModel('standard', 'opencode')?.model).toBe('anthropic/claude-sonnet-4-6');
+      expect(resolveModel('standard', 'opencode')?.model).toBe('anthropic/claude-sonnet-5');
     });
 
     it('resolves "premium" to provider-specific models', () => {

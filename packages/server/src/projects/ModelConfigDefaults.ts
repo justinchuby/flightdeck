@@ -18,6 +18,7 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
   'claude-opus-4.7',
   'claude-opus-4.6',
   'claude-opus-4.5',
+  'claude-sonnet-5',
   'claude-sonnet-4.6',
   'claude-sonnet-4.5',
   'claude-sonnet-4',
@@ -62,7 +63,7 @@ export const KNOWN_MODEL_IDS: readonly string[] = [
 const knownSet = new Set<string>(KNOWN_MODEL_IDS);
 
 /** Fallback model when no project config or role default is available. */
-export const DEFAULT_MODEL = 'claude-sonnet-4.6';
+export const DEFAULT_MODEL = 'claude-sonnet-5';
 
 /** Default model config used when a project has no custom config. */
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
@@ -70,15 +71,15 @@ export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   architect: ['claude-opus-4.8'],
   'code-reviewer': ['gpt-5.5', 'claude-opus-4.8'],
   'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
-  'readability-reviewer': ['claude-sonnet-4.6'],
-  'tech-writer': ['gpt-5.5', 'claude-sonnet-4.6'],
-  secretary: ['claude-sonnet-4.6'],
-  'qa-tester': ['claude-sonnet-4.6'],
+  'readability-reviewer': ['claude-sonnet-5'],
+  'tech-writer': ['gpt-5.5', 'claude-sonnet-5'],
+  secretary: ['claude-sonnet-5'],
+  'qa-tester': ['claude-sonnet-5'],
   designer: ['claude-opus-4.8'],
   'product-manager': ['gpt-5.5'],
   generalist: ['claude-opus-4.8'],
   'radical-thinker': ['gpt-5.5'],
-  agent: ['claude-sonnet-4.6'],
+  agent: ['claude-sonnet-5'],
   lead: ['claude-opus-4.8'],
 };
 
