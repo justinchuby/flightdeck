@@ -60,7 +60,7 @@ interface ServerConfig {
 
 ### Management
 - **lead** (claude-opus-4.8) — Supervision, delegation ⭐
-- **secretary** (claude-haiku-4.5) — Progress tracking ⭐
+- **secretary** (claude-sonnet-5) — Progress tracking ⭐
 - **agent** (none) — General-purpose, neutral
 
 ⭐ = receives status updates (receivesStatusUpdates: true)

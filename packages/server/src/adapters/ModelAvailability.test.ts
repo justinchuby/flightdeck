@@ -170,7 +170,7 @@ describe('selectAvailableModel', () => {
   });
 
   it('infers tier from the requested model CLASS, not the provider tier-triple (MAJOR-A)', () => {
-    // copilot premium=claude-opus-4.8, standard=claude-sonnet-4.6, fast=claude-haiku-4.5.
+    // copilot premium=claude-opus-4.8, standard=claude-sonnet-5, fast=claude-haiku-4.5.
     // The requested id (claude-opus-4.6) is NOT in copilot's tier-triple, but it
     // IS a known premium model class — so we must downgrade to the available
     // premium Opus (4.8), NOT over-downgrade to Sonnet.

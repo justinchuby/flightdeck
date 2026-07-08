@@ -142,7 +142,7 @@ All defined as `BUILT_IN_ROLES` array:
 | `generalist` | Generalist | claude-opus-4.8 | Cross-disciplinary work |
 | `agent` | Agent | (none) | General-purpose, no special role |
 | `radical-thinker` | Radical Thinker | gpt-5.5 | Innovation, first-principles |
-| `secretary` | Secretary | claude-haiku-4.5 | Progress tracking* |
+| `secretary` | Secretary | claude-sonnet-5 | Progress tracking* |
 | `qa-tester` | QA Tester | claude-sonnet-5 | End-to-end testing |
 | `lead` | Project Lead | claude-opus-4.8 | Supervision, delegation* |
 
@@ -310,7 +310,7 @@ export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
   'readability-reviewer': ['claude-sonnet-5'],
   'tech-writer': ['gpt-5.5', 'claude-sonnet-5'],
-  secretary: ['claude-haiku-4.5'],
+  secretary: ['claude-sonnet-5'],
   'qa-tester': ['claude-sonnet-5'],
   designer: ['claude-opus-4.8'],
   'product-manager': ['gpt-5.5'],

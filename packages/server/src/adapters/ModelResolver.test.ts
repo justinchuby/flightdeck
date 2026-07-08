@@ -102,6 +102,12 @@ describe('ModelResolver', () => {
       expect(result.reason).toContain('alias');
     });
 
+    it('translates claude-sonnet-5 to "default" for Claude CLI', () => {
+      const result = resolveModel('claude-sonnet-5', 'claude')!;
+      expect(result.model).toBe('default');
+      expect(result.translated).toBe(true);
+    });
+
     it('translates claude-sonnet-4.6 to "default" for Claude CLI', () => {
       const result = resolveModel('claude-sonnet-4.6', 'claude')!;
       expect(result.model).toBe('default');

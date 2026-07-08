@@ -41,19 +41,19 @@ interface ModelResolution {
    - Reason: `"tier 'fast' → claude-haiku-4.5"`
 
 2. **Claude aliases** — Simplified names for Claude CLI compatibility
-   - Example: `claude-sonnet-4.6` on claude → `sonnet`
+   - Example: `claude-sonnet-5` on claude → `default`
    - Reason: `"alias for Claude CLI"`
 
 3. **OpenCode prefix** — Adds provider prefix for opencode
-   - Example: `claude-sonnet-4.6` on opencode → `anthropic:claude-sonnet-4.6`
+   - Example: `claude-sonnet-5` on opencode → `anthropic:claude-sonnet-5`
    - Reason: `"OpenCode provider prefix"`
 
 4. **Native provider check** — If model is natively supported, pass through
    - `translated: false`, no reason needed
 
 5. **Cross-provider equivalence** — Map to closest equivalent on target provider
-   - Example: `claude-sonnet-4.6` on codex → `gpt-5.3-codex`
-   - Reason: `"claude-sonnet-4.6 → gpt-5.3-codex (copilot equivalent)"`
+   - Example: `claude-sonnet-5` on codex → `gpt-5.3-codex`
+   - Reason: `"claude-sonnet-5 → gpt-5.3-codex (copilot equivalent)"`
 
 6. **Fallback** — If no mapping exists, fall back to standard tier
    - Reason: `"unmapped model, fell back to standard tier"`
