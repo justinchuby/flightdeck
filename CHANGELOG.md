@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Claude Sonnet 5 is the new standard-tier default** — Added `claude-sonnet-5` to the known-model registries and switched the standard tier plus the `readability-reviewer`, `tech-writer`, `secretary`, `qa-tester`, and `agent` role defaults from Claude Sonnet 4.6 to Claude Sonnet 5. Sonnet 4.6 remains selectable.
+
 ## [0.4.5] - 2026-06-16
 
 ### Changed

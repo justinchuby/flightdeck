@@ -46,16 +46,16 @@ describe('selectAvailableModel', () => {
     const result = selectAvailableModel(
       ctx({
         requested: 'claude-opus-4.8', // premium, unavailable
-        availableModels: [{ modelId: 'claude-sonnet-4.6' }, { modelId: 'claude-haiku-4.5' }],
-        currentModelId: 'claude-sonnet-4.6',
+        availableModels: [{ modelId: 'claude-sonnet-5' }, { modelId: 'claude-haiku-4.5' }],
+        currentModelId: 'claude-sonnet-5',
         provider: 'copilot',
       }),
     );
     expect(result.substituted).toBe(true);
     expect(result.reason).toBe('downgrade');
-    expect(result.modelId).toBe('claude-sonnet-4.6');
+    expect(result.modelId).toBe('claude-sonnet-5');
     expect(result.detail).toContain('claude-opus-4.8');
-    expect(result.detail).toContain('claude-sonnet-4.6');
+    expect(result.detail).toContain('claude-sonnet-5');
   });
 
   it('resolves a single normalized variant to the real id (separator + prefix)', () => {
@@ -124,18 +124,18 @@ describe('selectAvailableModel', () => {
   });
 
   it('infers premium tier and downgrades to standard when premium is unavailable', () => {
-    // copilot premium = claude-opus-4.8, standard = claude-sonnet-4.6, fast = claude-haiku-4.5
+    // copilot premium = claude-opus-4.8, standard = claude-sonnet-5, fast = claude-haiku-4.5
     const result = selectAvailableModel(
       ctx({
         requested: 'claude-opus-4.8', // premium, unavailable
-        availableModels: [{ modelId: 'claude-sonnet-4.6' }],
-        currentModelId: 'claude-sonnet-4.6',
+        availableModels: [{ modelId: 'claude-sonnet-5' }],
+        currentModelId: 'claude-sonnet-5',
         provider: 'copilot',
       }),
     );
     expect(result.substituted).toBe(true);
     expect(result.reason).toBe('downgrade');
-    expect(result.modelId).toBe('claude-sonnet-4.6');
+    expect(result.modelId).toBe('claude-sonnet-5');
   });
 
   it('respects an explicit intendedTier hint for the downgrade ladder', () => {
@@ -170,7 +170,7 @@ describe('selectAvailableModel', () => {
   });
 
   it('infers tier from the requested model CLASS, not the provider tier-triple (MAJOR-A)', () => {
-    // copilot premium=claude-opus-4.8, standard=claude-sonnet-4.6, fast=claude-haiku-4.5.
+    // copilot premium=claude-opus-4.8, standard=claude-sonnet-5, fast=claude-haiku-4.5.
     // The requested id (claude-opus-4.6) is NOT in copilot's tier-triple, but it
     // IS a known premium model class — so we must downgrade to the available
     // premium Opus (4.8), NOT over-downgrade to Sonnet.
@@ -194,7 +194,7 @@ describe('selectAvailableModel', () => {
   it('skips an ambiguous tier candidate (>1 normalized match) rather than guessing (MAJOR-E)', () => {
     // copilot premium=claude-opus-4.8 has TWO normalized matches available
     // (claude-opus-4.8 and claude-opus-4-8) → premium tier is ambiguous and must
-    // be skipped. The next tier (standard=claude-sonnet-4.6) has a single match
+    // be skipped. The next tier (standard=claude-sonnet-5) has a single match
     // and is selected instead.
     const result = selectAvailableModel(
       ctx({
@@ -202,14 +202,14 @@ describe('selectAvailableModel', () => {
         availableModels: [
           { modelId: 'claude-opus-4.8' },
           { modelId: 'claude-opus-4-8' },
-          { modelId: 'claude-sonnet-4.6' },
+          { modelId: 'claude-sonnet-5' },
         ],
-        currentModelId: 'claude-sonnet-4.6',
+        currentModelId: 'claude-sonnet-5',
         provider: 'copilot',
       }),
     );
     expect(result.substituted).toBe(true);
     expect(result.reason).toBe('downgrade');
-    expect(result.modelId).toBe('claude-sonnet-4.6');
+    expect(result.modelId).toBe('claude-sonnet-5');
   });
 });

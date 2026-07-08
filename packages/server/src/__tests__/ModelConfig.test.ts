@@ -112,19 +112,19 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has readability-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['readability-reviewer']).toEqual(['claude-sonnet-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['readability-reviewer']).toEqual(['claude-sonnet-5']);
     });
 
     it('has tech-writer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['gpt-5.5', 'claude-sonnet-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['gpt-5.5', 'claude-sonnet-5']);
     });
 
     it('has secretary defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['claude-sonnet-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.secretary).toEqual(['claude-sonnet-5']);
     });
 
     it('has qa-tester defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['qa-tester']).toEqual(['claude-sonnet-4.6']);
+      expect(DEFAULT_MODEL_CONFIG['qa-tester']).toEqual(['claude-sonnet-5']);
     });
 
     it('has designer defaults', () => {
@@ -144,7 +144,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has agent defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG.agent).toEqual(['claude-sonnet-4.6']);
+      expect(DEFAULT_MODEL_CONFIG.agent).toEqual(['claude-sonnet-5']);
     });
 
     it('has lead defaults', () => {

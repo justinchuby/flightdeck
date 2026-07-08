@@ -85,19 +85,19 @@ Each provider maps models to three quality tiers:
 | Tier | Use Case | Example Models |
 |------|----------|---------------|
 | **fast** | Quick tasks, low cost | claude-haiku-4.5, gemini-2.5-flash-lite, gpt-5.1-codex-mini |
-| **standard** | General development | claude-sonnet-4.6, gemini-2.5-flash, gpt-5.3-codex |
-| **premium** | Complex architecture | claude-opus-4.6, gemini-2.5-pro, gpt-5.4 |
+| **standard** | General development | claude-sonnet-5, gemini-2.5-flash, gpt-5.3-codex |
+| **premium** | Complex architecture | claude-opus-4.8, gemini-2.5-pro, gpt-5.4 |
 
 ### Provider Tier Mappings
 
 | Provider | Fast | Standard | Premium |
 |----------|------|----------|---------|
-| GitHub Copilot | claude-haiku-4.5 | claude-sonnet-4.6 | claude-opus-4.6 |
+| GitHub Copilot | claude-haiku-4.5 | claude-sonnet-5 | claude-opus-4.8 |
 | Gemini CLI | gemini-2.5-flash-lite | gemini-2.5-flash | gemini-2.5-pro |
 | Claude Agent | haiku | default | opus |
-| Codex | gpt-5.1-codex-mini | gpt-5.3-codex | gpt-5.4 |
-| Cursor | claude-haiku-4.5 | claude-sonnet-4.6 | claude-opus-4.6 |
-| OpenCode | anthropic/claude-haiku-4-5 | anthropic/claude-sonnet-4-6 | anthropic/claude-opus-4-6 |
+| Codex | gpt-5.1-codex-mini | gpt-5.3-codex | gpt-5.3-codex |
+| Cursor | claude-haiku-4.5 | claude-sonnet-5 | claude-opus-4.8 |
+| OpenCode | anthropic/claude-haiku-4-5 | anthropic/claude-sonnet-5 | anthropic/claude-opus-4-6 |
 
 ### Per-Role Model Defaults
 
@@ -111,10 +111,10 @@ models:
     architect: [claude-opus-4.8]
     code-reviewer: [gpt-5.5, claude-opus-4.8]
     critical-reviewer: [gemini-3.1-pro-preview, gpt-5.5]
-    readability-reviewer: [claude-sonnet-4.6]
-    tech-writer: [gpt-5.5, claude-sonnet-4.6]
-    secretary: [claude-sonnet-4.6]
-    qa-tester: [claude-sonnet-4.6]
+    readability-reviewer: [claude-sonnet-5]
+    tech-writer: [gpt-5.5, claude-sonnet-5]
+    secretary: [claude-sonnet-5]
+    qa-tester: [claude-sonnet-5]
 ```
 
 When a list is provided, Flightdeck uses the first available model based on the active provider's capabilities.
@@ -127,6 +127,7 @@ The `models.known` list defines which models appear in the UI model selector:
 models:
   known:
     - claude-opus-4.6
+    - claude-sonnet-5
     - claude-sonnet-4.6
     - claude-haiku-4.5
     - gemini-3-pro-preview
