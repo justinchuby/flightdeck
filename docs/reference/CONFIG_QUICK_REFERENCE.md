@@ -72,7 +72,7 @@ interface ServerConfig {
 |-------|------|---------|---------|----------|
 | claude-haiku-4.5 | fast | 200k | $0.25 | Quick tasks, formatting |
 | claude-sonnet-5 | standard | 200k | $3.00 | Implementation, debugging |
-| claude-opus-4.6 | premium | 200k | $15.00 | Complex work, architecture |
+| claude-opus-4.8 | premium | 200k | $15.00 | Complex work, architecture |
 | gemini-3-pro-preview | standard | 1M | $1.25 | Large context, research |
 | gpt-5.1-codex | standard | 200k | $2.50 | Code generation |
 

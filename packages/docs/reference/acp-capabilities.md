@@ -141,7 +141,7 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | **Embedded Context** | ✅ |
 | **Model Selection** | `--model <name>` flag |
 | **Models** | Anthropic (sonnet, haiku, opus), OpenAI (gpt-4.1), Google (gemini-3-pro-preview), xAI |
-| **Model Tiers** | fast: `claude-haiku-4.5`, standard: `claude-sonnet-5`, premium: `claude-opus-4.6` |
+| **Model Tiers** | fast: `claude-haiku-4.5`, standard: `claude-sonnet-5`, premium: `claude-opus-4.8` |
 | **System Prompt** | First user message |
 | **Agent File** | `.agent.md` |
 | **Unique** | Multi-backend access, `--agent=<name>` flag, widest model selection |
@@ -247,7 +247,7 @@ The static presets drive the UI (model selectors, provider badges, setup wizard)
 | **Resume** | Unknown (static preset only) |
 | **Model Selection** | Not configurable via CLI (`modelArgStrategy: 'none'`) |
 | **Models** | Multi-backend: Anthropic, OpenAI, Google |
-| **Model Tiers** | fast: `claude-haiku-4.5`, standard: `claude-sonnet-5`, premium: `claude-opus-4.6` |
+| **Model Tiers** | fast: `claude-haiku-4.5`, standard: `claude-sonnet-5`, premium: `claude-opus-4.8` |
 | **System Prompt** | `.cursorrules` file |
 | **Unique** | Multi-backend like Copilot; model selection managed by Cursor, not CLI args; `.cursorrules` for system prompt |
 

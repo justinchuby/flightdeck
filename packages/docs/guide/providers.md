@@ -86,17 +86,17 @@ Each provider maps models to three quality tiers:
 |------|----------|---------------|
 | **fast** | Quick tasks, low cost | claude-haiku-4.5, gemini-2.5-flash-lite, gpt-5.1-codex-mini |
 | **standard** | General development | claude-sonnet-5, gemini-2.5-flash, gpt-5.3-codex |
-| **premium** | Complex architecture | claude-opus-4.6, gemini-2.5-pro, gpt-5.4 |
+| **premium** | Complex architecture | claude-opus-4.8, gemini-2.5-pro, gpt-5.4 |
 
 ### Provider Tier Mappings
 
 | Provider | Fast | Standard | Premium |
 |----------|------|----------|---------|
-| GitHub Copilot | claude-haiku-4.5 | claude-sonnet-5 | claude-opus-4.6 |
+| GitHub Copilot | claude-haiku-4.5 | claude-sonnet-5 | claude-opus-4.8 |
 | Gemini CLI | gemini-2.5-flash-lite | gemini-2.5-flash | gemini-2.5-pro |
 | Claude Agent | haiku | default | opus |
-| Codex | gpt-5.1-codex-mini | gpt-5.3-codex | gpt-5.4 |
-| Cursor | claude-haiku-4.5 | claude-sonnet-5 | claude-opus-4.6 |
+| Codex | gpt-5.1-codex-mini | gpt-5.3-codex | gpt-5.3-codex |
+| Cursor | claude-haiku-4.5 | claude-sonnet-5 | claude-opus-4.8 |
 | OpenCode | anthropic/claude-haiku-4-5 | anthropic/claude-sonnet-5 | anthropic/claude-opus-4-6 |
 
 ### Per-Role Model Defaults
