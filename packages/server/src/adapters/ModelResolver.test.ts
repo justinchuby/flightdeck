@@ -221,6 +221,49 @@ describe('ModelResolver', () => {
       expect(result.translated).toBe(true);
     });
 
+    it('maps gpt-5.6-sol to gemini-3.1-pro on Gemini', () => {
+      const result = resolveModel('gpt-5.6-sol', 'gemini')!;
+      expect(result.model).toBe('gemini-3.1-pro');
+      expect(result.translated).toBe(true);
+      expect(result.reason).toContain('equivalent');
+    });
+
+    it('maps gpt-5.6-sol to opus (claude-opus-4.8) on Claude', () => {
+      const result = resolveModel('gpt-5.6-sol', 'claude')!;
+      expect(result.model).toBe('opus');
+      expect(result.translated).toBe(true);
+    });
+
+    it('maps gpt-5.6-terra to gemini-3.1-flash on Gemini', () => {
+      const result = resolveModel('gpt-5.6-terra', 'gemini')!;
+      expect(result.model).toBe('gemini-3.1-flash');
+      expect(result.translated).toBe(true);
+    });
+
+    it('maps gpt-5.6-terra to "default" (claude-sonnet-5) on Claude', () => {
+      const result = resolveModel('gpt-5.6-terra', 'claude')!;
+      expect(result.model).toBe('default');
+      expect(result.translated).toBe(true);
+    });
+
+    it('maps gpt-5.6-luna to gemini-3.1-flash-lite on Gemini', () => {
+      const result = resolveModel('gpt-5.6-luna', 'gemini')!;
+      expect(result.model).toBe('gemini-3.1-flash-lite');
+      expect(result.translated).toBe(true);
+    });
+
+    it('maps gpt-5.6-luna to haiku (claude-haiku-4.5) on Claude', () => {
+      const result = resolveModel('gpt-5.6-luna', 'claude')!;
+      expect(result.model).toBe('haiku');
+      expect(result.translated).toBe(true);
+    });
+
+    it('maps claude-opus-4.8 to gpt-5.6-sol on Codex (repointed openai equivalent)', () => {
+      const result = resolveModel('claude-opus-4.8', 'codex')!;
+      expect(result.model).toBe('gpt-5.6-sol');
+      expect(result.translated).toBe(true);
+    });
+
     it('maps cross-provider models with OpenCode prefix', () => {
       // claude-opus-4.6 on OpenCode → passthrough with prefix (Anthropic is native)
       const result = resolveModel('claude-opus-4.6', 'opencode')!;

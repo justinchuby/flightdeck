@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **GPT-5.6 model family added** — Added `gpt-5.6-sol` (premium), `gpt-5.6-terra` (standard), and `gpt-5.6-luna` (fast) to the known-model registries, the `ModelSelector` catalog, and cross-provider equivalences. Reassigned the `code-reviewer` and `radical-thinker` roles to `gpt-5.6-sol`, `tech-writer` and `product-manager` to `gpt-5.6-terra`, and the `critical-reviewer` GPT fallback to `gpt-5.6-sol` (Gemini 3.1 Pro kept primary). GPT-5.5 remains selectable.
 - **Claude Sonnet 5 is the new standard-tier default** — Added `claude-sonnet-5` to the known-model registries and switched the standard tier plus the `readability-reviewer`, `tech-writer`, `secretary`, `qa-tester`, and `agent` role defaults from Claude Sonnet 4.6 to Claude Sonnet 5. Sonnet 4.6 remains selectable.
 
 ## [0.4.5] - 2026-06-16

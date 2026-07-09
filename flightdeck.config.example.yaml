@@ -34,6 +34,9 @@ models:
     - gemini-3.5-flash
     - gemini-3-pro-preview
     - gemini-2.5-pro
+    - gpt-5.6-sol
+    - gpt-5.6-terra
+    - gpt-5.6-luna
     - gpt-5.5
     - gpt-5.4
     - gpt-5.3-codex
@@ -48,16 +51,16 @@ models:
   defaults:
     developer: [claude-opus-4.8]
     architect: [claude-opus-4.8]
-    code-reviewer: [gpt-5.5, claude-opus-4.8]
-    critical-reviewer: [gemini-3.1-pro-preview, gpt-5.5]
+    code-reviewer: [gpt-5.6-sol, claude-opus-4.8]
+    critical-reviewer: [gemini-3.1-pro-preview, gpt-5.6-sol]
     readability-reviewer: [claude-sonnet-5]
-    tech-writer: [gpt-5.5, claude-sonnet-5]
+    tech-writer: [gpt-5.6-terra, claude-sonnet-5]
     secretary: [claude-sonnet-5]
     qa-tester: [claude-sonnet-5]
     designer: [claude-opus-4.8]
-    product-manager: [gpt-5.5]
+    product-manager: [gpt-5.6-terra]
     generalist: [claude-opus-4.8]
-    radical-thinker: [gpt-5.5]
+    radical-thinker: [gpt-5.6-sol]
     agent: [claude-sonnet-5]
     lead: [claude-opus-4.8]
 

@@ -133,15 +133,15 @@ All defined as `BUILT_IN_ROLES` array:
 |---|---|---|---|
 | `architect` | Architect | claude-opus-4.8 | System design, exploration, mapping |
 | `developer` | Developer | claude-opus-4.8 | Implementation, testing, fixes |
-| `code-reviewer` | Code Reviewer | gpt-5.5 | Correctness, patterns, tests |
+| `code-reviewer` | Code Reviewer | gpt-5.6-sol | Correctness, patterns, tests |
 | `critical-reviewer` | Critical Reviewer | gemini-3.1-pro-preview | Architecture, security, perf |
 | `readability-reviewer` | Readability Reviewer | claude-sonnet-5 | Naming, organization, docs |
-| `product-manager` | Product Manager | gpt-5.5 | User needs, quality bar |
-| `tech-writer` | Tech Writer | gpt-5.5 | Documentation, API design |
+| `product-manager` | Product Manager | gpt-5.6-terra | User needs, quality bar |
+| `tech-writer` | Tech Writer | gpt-5.6-terra | Documentation, API design |
 | `designer` | Designer | claude-opus-4.8 | UX/UI, interaction design |
 | `generalist` | Generalist | claude-opus-4.8 | Cross-disciplinary work |
 | `agent` | Agent | (none) | General-purpose, no special role |
-| `radical-thinker` | Radical Thinker | gpt-5.5 | Innovation, first-principles |
+| `radical-thinker` | Radical Thinker | gpt-5.6-sol | Innovation, first-principles |
 | `secretary` | Secretary | claude-sonnet-5 | Progress tracking* |
 | `qa-tester` | QA Tester | claude-sonnet-5 | End-to-end testing |
 | `lead` | Project Lead | claude-opus-4.8 | Supervision, delegation* |
@@ -278,6 +278,30 @@ const AVAILABLE_MODELS: ModelConfig[] = [
     costPer1kTokens: 2.5,
     bestFor: ['code-generation', 'implementation', 'testing'],
   },
+  {
+    id: 'gpt-5.6-sol',
+    name: 'GPT-5.6 Sol',
+    tier: 'premium',
+    contextWindow: 200000,
+    costPer1kTokens: 5.0,
+    bestFor: ['code-generation', 'implementation', 'testing', 'critical-review'],
+  },
+  {
+    id: 'gpt-5.6-terra',
+    name: 'GPT-5.6 Terra',
+    tier: 'standard',
+    contextWindow: 200000,
+    costPer1kTokens: 2.5,
+    bestFor: ['implementation', 'testing', 'analysis'],
+  },
+  {
+    id: 'gpt-5.6-luna',
+    name: 'GPT-5.6 Luna',
+    tier: 'fast',
+    contextWindow: 200000,
+    costPer1kTokens: 1.0,
+    bestFor: ['simple-tasks', 'formatting', 'docs'],
+  },
 ];
 ```
 
@@ -291,6 +315,7 @@ claude-haiku-4.5,
 gemini-3.1-pro-preview, gemini-3.5-flash, gemini-3.1-pro, gemini-3.1-flash,
 gemini-3.1-flash-lite, gemini-3-pro-preview, gemini-3-flash-preview,
 gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite,
+gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna,
 gpt-5.5, gpt-5.4, gpt-5.3-codex, gpt-5.2-codex, gpt-5.2,
 gpt-5.1-codex-max, gpt-5.1-codex, gpt-5.1, gpt-5.1-codex-mini, gpt-5-mini,
 gpt-4.1,
@@ -306,16 +331,16 @@ qwen-turbo, qwen-plus, qwen-max, qwen-coder-plus-latest
 export const DEFAULT_MODEL_CONFIG: ProjectModelConfig = {
   developer: ['claude-opus-4.8'],
   architect: ['claude-opus-4.8'],
-  'code-reviewer': ['gpt-5.5', 'claude-opus-4.8'],
-  'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.5'],
+  'code-reviewer': ['gpt-5.6-sol', 'claude-opus-4.8'],
+  'critical-reviewer': ['gemini-3.1-pro-preview', 'gpt-5.6-sol'],
   'readability-reviewer': ['claude-sonnet-5'],
-  'tech-writer': ['gpt-5.5', 'claude-sonnet-5'],
+  'tech-writer': ['gpt-5.6-terra', 'claude-sonnet-5'],
   secretary: ['claude-sonnet-5'],
   'qa-tester': ['claude-sonnet-5'],
   designer: ['claude-opus-4.8'],
-  'product-manager': ['gpt-5.5'],
+  'product-manager': ['gpt-5.6-terra'],
   generalist: ['claude-opus-4.8'],
-  'radical-thinker': ['gpt-5.5'],
+  'radical-thinker': ['gpt-5.6-sol'],
   agent: ['claude-sonnet-5'],
   lead: ['claude-opus-4.8'],
 };

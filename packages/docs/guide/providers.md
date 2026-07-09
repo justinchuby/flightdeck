@@ -84,9 +84,9 @@ Each provider maps models to three quality tiers:
 
 | Tier | Use Case | Example Models |
 |------|----------|---------------|
-| **fast** | Quick tasks, low cost | claude-haiku-4.5, gemini-2.5-flash-lite, gpt-5.1-codex-mini |
-| **standard** | General development | claude-sonnet-5, gemini-2.5-flash, gpt-5.3-codex |
-| **premium** | Complex architecture | claude-opus-4.8, gemini-2.5-pro, gpt-5.4 |
+| **fast** | Quick tasks, low cost | claude-haiku-4.5, gemini-2.5-flash-lite, gpt-5.6-luna |
+| **standard** | General development | claude-sonnet-5, gemini-2.5-flash, gpt-5.6-terra |
+| **premium** | Complex architecture | claude-opus-4.8, gemini-2.5-pro, gpt-5.6-sol |
 
 ### Provider Tier Mappings
 
@@ -109,10 +109,10 @@ models:
     lead: [claude-opus-4.8]
     developer: [claude-opus-4.8]
     architect: [claude-opus-4.8]
-    code-reviewer: [gpt-5.5, claude-opus-4.8]
-    critical-reviewer: [gemini-3.1-pro-preview, gpt-5.5]
+    code-reviewer: [gpt-5.6-sol, claude-opus-4.8]
+    critical-reviewer: [gemini-3.1-pro-preview, gpt-5.6-sol]
     readability-reviewer: [claude-sonnet-5]
-    tech-writer: [gpt-5.5, claude-sonnet-5]
+    tech-writer: [gpt-5.6-terra, claude-sonnet-5]
     secretary: [claude-sonnet-5]
     qa-tester: [claude-sonnet-5]
 ```
@@ -131,6 +131,9 @@ models:
     - claude-sonnet-4.6
     - claude-haiku-4.5
     - gemini-3-pro-preview
+    - gpt-5.6-sol
+    - gpt-5.6-terra
+    - gpt-5.6-luna
     - gpt-5.4
     - gpt-5.3-codex
     # ... see flightdeck.config.example.yaml for full list
