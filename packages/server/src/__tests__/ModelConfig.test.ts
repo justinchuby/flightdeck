@@ -104,11 +104,11 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has code-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gpt-5.5', 'claude-opus-4.8']);
+      expect(DEFAULT_MODEL_CONFIG['code-reviewer']).toEqual(['gpt-5.6-sol', 'claude-opus-4.8']);
     });
 
     it('has critical-reviewer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gemini-3.1-pro-preview', 'gpt-5.5']);
+      expect(DEFAULT_MODEL_CONFIG['critical-reviewer']).toEqual(['gemini-3.1-pro-preview', 'gpt-5.6-sol']);
     });
 
     it('has readability-reviewer defaults', () => {
@@ -116,7 +116,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has tech-writer defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['gpt-5.5', 'claude-sonnet-5']);
+      expect(DEFAULT_MODEL_CONFIG['tech-writer']).toEqual(['gpt-5.6-terra', 'claude-sonnet-5']);
     });
 
     it('has secretary defaults', () => {
@@ -132,7 +132,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has product-manager defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['product-manager']).toEqual(['gpt-5.5']);
+      expect(DEFAULT_MODEL_CONFIG['product-manager']).toEqual(['gpt-5.6-terra']);
     });
 
     it('has generalist defaults', () => {
@@ -140,7 +140,7 @@ describe('ModelConfigDefaults', () => {
     });
 
     it('has radical-thinker defaults', () => {
-      expect(DEFAULT_MODEL_CONFIG['radical-thinker']).toEqual(['gpt-5.5']);
+      expect(DEFAULT_MODEL_CONFIG['radical-thinker']).toEqual(['gpt-5.6-sol']);
     });
 
     it('has agent defaults', () => {
