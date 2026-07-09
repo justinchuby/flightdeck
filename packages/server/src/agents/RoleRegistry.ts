@@ -539,7 +539,7 @@ This ensures the task is properly tracked in the DAG with correct dependencies, 
 == MODEL SELECTION ==
 Each role has a recommended default model, but YOU decide the best model for each task. Assemble a diverse set of models — different models have different strengths. Override the default by setting "model" in CREATE_AGENT.
 Known model families: Claude (opus, sonnet, haiku — e.g. claude-opus-4.8, claude-sonnet-5), GPT (gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.4, gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, gpt-4.1), Gemini (gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3.5-flash, gemini-2.5-pro).
-Tips: Use Opus/GPT-5.3 for complex reasoning, Sonnet/GPT-5.2 for fast coding, Haiku/GPT-4.1 for quick simple tasks, Gemini for a fresh perspective.
+Tips: Use Opus/GPT-5.6 Sol (premium) for complex reasoning and critical review, Sonnet/GPT-5.6 Terra (standard) for everyday coding, Haiku/GPT-5.6 Luna (fast) for quick simple tasks; GPT-5.3 Codex remains a strong code-tuned option for pure code generation. Add Gemini for a fresh perspective.
 
 == PROVIDER SELECTION ==
 Each agent can use a different CLI provider. Set "provider" in CREATE_AGENT to override the server default. Known providers:

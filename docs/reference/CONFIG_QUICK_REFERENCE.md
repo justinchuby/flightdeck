@@ -42,18 +42,18 @@ interface ServerConfig {
 ## 14 Built-In Roles (with Default Models)
 
 ### Analysis & Review
-- **code-reviewer** (gpt-5.5) — Correctness, patterns, tests
+- **code-reviewer** (gpt-5.6-sol) — Correctness, patterns, tests
 - **critical-reviewer** (gemini-3.1-pro-preview) — Architecture, security, perf
 - **readability-reviewer** (claude-sonnet-5) — Naming, org, documentation
-- **radical-thinker** (gpt-5.5) — First-principles, innovation
+- **radical-thinker** (gpt-5.6-sol) — First-principles, innovation
 
 ### Implementation
 - **developer** (claude-opus-4.8) — Code, tests, features, fixes
 - **architect** (claude-opus-4.8) — System design, exploration, mapping
 
 ### Support Roles
-- **product-manager** (gpt-5.5) — User needs, quality bar
-- **tech-writer** (gpt-5.5) — Documentation, examples, API design
+- **product-manager** (gpt-5.6-terra) — User needs, quality bar
+- **tech-writer** (gpt-5.6-terra) — Documentation, examples, API design
 - **designer** (claude-opus-4.8) — UX/UI, interaction design
 - **qa-tester** (claude-sonnet-5) — End-to-end testing, verification
 - **generalist** (claude-opus-4.8) — Hardware, mechanics, 3D, research
@@ -65,9 +65,9 @@ interface ServerConfig {
 
 ⭐ = receives status updates (receivesStatusUpdates: true)
 
-## Available Models (5 Main + 11 Known)
+## Available Models (8 Main + 11 Known)
 
-### 5 Fully Configured
+### 8 Fully Configured
 | Model | Tier | Context | Cost/1k | Best For |
 |-------|------|---------|---------|----------|
 | claude-haiku-4.5 | fast | 200k | $0.25 | Quick tasks, formatting |
@@ -75,6 +75,9 @@ interface ServerConfig {
 | claude-opus-4.8 | premium | 200k | $15.00 | Complex work, architecture |
 | gemini-3-pro-preview | standard | 1M | $1.25 | Large context, research |
 | gpt-5.1-codex | standard | 200k | $2.50 | Code generation |
+| gpt-5.6-sol | premium | 200k | $5.00 | Code generation, critical review |
+| gpt-5.6-terra | standard | 200k | $2.50 | Implementation, testing, analysis |
+| gpt-5.6-luna | fast | 200k | $1.00 | Simple tasks, formatting, docs |
 
 ### 11 Additional Known IDs
 claude-opus-4.5, claude-sonnet-4.5, claude-sonnet-4, claude-haiku-4.5,

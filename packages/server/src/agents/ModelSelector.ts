@@ -75,14 +75,6 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     bestFor: ['large-context', 'fast-iteration', 'multi-file'],
   },
   {
-    id: 'gpt-5.3-codex',
-    name: 'GPT-5.3 Codex',
-    tier: 'standard',
-    contextWindow: 200000,
-    costPer1kTokens: 2.5,
-    bestFor: ['code-generation', 'implementation', 'testing'],
-  },
-  {
     id: 'gpt-5.6-sol',
     name: 'GPT-5.6 Sol',
     tier: 'premium',
@@ -96,7 +88,7 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     tier: 'standard',
     contextWindow: 200000,
     costPer1kTokens: 2.5,
-    bestFor: ['implementation', 'testing', 'analysis', 'docs'],
+    bestFor: ['implementation', 'testing', 'analysis'],
   },
   {
     id: 'gpt-5.6-luna',
@@ -105,6 +97,14 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     contextWindow: 200000,
     costPer1kTokens: 1.0,
     bestFor: ['simple-tasks', 'formatting', 'docs'],
+  },
+  {
+    id: 'gpt-5.3-codex',
+    name: 'GPT-5.3 Codex',
+    tier: 'standard',
+    contextWindow: 200000,
+    costPer1kTokens: 2.5,
+    bestFor: ['code-generation', 'implementation', 'testing'],
   },
   {
     id: 'gpt-5.5',
