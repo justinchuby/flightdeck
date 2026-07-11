@@ -495,6 +495,48 @@ describe('UnifiedCrewPage', () => {
     });
   });
 
+  it('Active filter includes idle agents, not just running', async () => {
+    mockProjectId = 'proj-1';
+    const agents = [
+      makeAgent({ agentId: 'lead-1', role: 'lead', liveStatus: 'running', status: 'running', teamId: 'lead-1', parentId: null }),
+      makeAgent({ agentId: 'running-1', role: 'developer', liveStatus: 'running', status: 'running', teamId: 'lead-1', parentId: 'lead-1' }),
+      makeAgent({ agentId: 'idle-1', role: 'architect', liveStatus: 'idle', status: 'idle', teamId: 'lead-1', parentId: 'lead-1' }),
+      makeAgent({ agentId: 'term-1', role: 'reviewer', liveStatus: 'terminated', status: 'terminated', teamId: 'lead-1', parentId: 'lead-1' }),
+    ];
+    setupApiMocks(agents);
+    renderPage({ scope: 'project' });
+
+    // Default filter is 'active' in project scope — should show running + idle
+    await waitFor(() => {
+      expect(screen.getByText('developer')).toBeInTheDocument();
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+
+    // Terminated agent should NOT appear under 'active' filter
+    expect(screen.queryByText('reviewer')).not.toBeInTheDocument();
+  });
+
+  it('Active filter uses liveStatus over DB status', async () => {
+    mockProjectId = 'proj-1';
+    const agents = [
+      makeAgent({ agentId: 'lead-1', role: 'lead', liveStatus: 'running', status: 'running', teamId: 'lead-1', parentId: null }),
+      // DB says running but live says terminated — should be filtered out
+      makeAgent({ agentId: 'stale-1', role: 'developer', liveStatus: 'terminated', status: 'running', teamId: 'lead-1', parentId: 'lead-1' }),
+      // DB says terminated but live says idle — should be shown
+      makeAgent({ agentId: 'revived-1', role: 'architect', liveStatus: 'idle', status: 'terminated', teamId: 'lead-1', parentId: 'lead-1' }),
+    ];
+    setupApiMocks(agents);
+    renderPage({ scope: 'project' });
+
+    // Default 'active' filter — liveStatus takes precedence
+    await waitFor(() => {
+      expect(screen.getByText('architect')).toBeInTheDocument();
+    });
+
+    // Stale agent with liveStatus=terminated should NOT appear
+    expect(screen.queryByText('developer')).not.toBeInTheDocument();
+  });
+
   // ─── Title & header ─────────────────────────────────────
 
   it('shows "Agents" title in global scope', async () => {
