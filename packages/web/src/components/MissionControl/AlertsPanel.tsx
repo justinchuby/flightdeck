@@ -6,6 +6,7 @@ import { apiFetch } from '../../hooks/useApi';
 import type { DagStatus, Decision } from '../../types';
 import type { AgentInfo } from '../../types';
 import { shortAgentId } from '../../utils/agentLabel';
+import { getCrewMembers } from '@flightdeck/shared';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ export function AlertsPanel({ leadId }: AlertsPanelProps) {
   const [executingAction, setExecutingAction] = useState<string | null>(null);
 
   const teamAgents = useMemo(
-    () => agents.filter((a) => a.parentId === leadId || a.id === leadId),
+    () => leadId ? getCrewMembers(leadId, agents) : [],
     [agents, leadId],
   );
 

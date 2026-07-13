@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AgentComm, AgentReport } from '../../stores/leadStore';
 import type { Decision } from '../../types';
 import type { CatchUpSummary } from './ChatMessages';
+import { getCrewDescendants } from '@flightdeck/shared';
 
 const EMPTY_DECISIONS: Decision[] = [];
 const EMPTY_COMMS: AgentComm[] = [];
@@ -40,7 +41,9 @@ export function useCatchUpSummary(
   useEffect(() => {
     if (!currentProject) return;
     const currentCounts = {
-      tasks: agents.filter(a => a.parentId === selectedLeadId && (a.status === 'completed' || a.status === 'failed')).length,
+      tasks: selectedLeadId
+        ? getCrewDescendants(selectedLeadId, agents).filter(a => a.status === 'completed' || a.status === 'failed').length
+        : 0,
       decisions: (currentProject.decisions ?? EMPTY_DECISIONS).filter((d: Decision) => d.needsConfirmation && d.status === 'recorded').length,
       comms: (currentProject.comms ?? EMPTY_COMMS).length,
       reports: (currentProject.agentReports ?? EMPTY_REPORTS).length,

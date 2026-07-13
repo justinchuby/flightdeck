@@ -16,6 +16,7 @@ export {
   AgentStatusSchema, type AgentStatus,
   AgentPhaseSchema, type AgentPhase,
   isTerminalPhase, PHASE_TRANSITIONS, phaseToStatus,
+  type HierarchyAgent, getCrewDescendants, getCrewMembers, isCrewDescendant,
 } from './agent.js';
 export { RoleSchema, type Role } from './role.js';
 export {

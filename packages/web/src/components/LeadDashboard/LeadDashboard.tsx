@@ -23,6 +23,7 @@ import { useWebSocketContext } from '../../contexts/WebSocketContext';
 import { useLeadPolling } from './useLeadPolling';
 import { useLeadMessages } from './useLeadMessages';
 import { useCatchUpSummary } from './useCatchUpSummary';
+import { getCrewMembers } from '@flightdeck/shared';
 import { useDecisionActions } from './useDecisionActions';
 import { useMessageActions } from './useMessageActions';
 import { LeadProgressBanner } from './LeadProgressBanner';
@@ -214,7 +215,7 @@ export function LeadDashboard({ readOnly = false }: Props) {
   const groupMessages = currentProject?.groupMessages ?? EMPTY_GROUP_MESSAGES;
   const dagStatus = currentProject?.dagStatus ?? null;
   const teamAgents = (() => {
-    const live = agents.filter((a) => a.id === selectedLeadId || a.parentId === selectedLeadId);
+    const live = selectedLeadId ? getCrewMembers(selectedLeadId, agents) : [];
     if (live.length > 0) return live;
     // Fallback: progress endpoint, then keyframe-derived agents
     const progressTeam = progress?.crewAgents ?? EMPTY_CREW_AGENTS;
