@@ -15,6 +15,28 @@ export function formatAgentId(role: string | undefined, id: string): string {
 }
 
 /**
+ * Format a timestamp as a short time string (e.g., "02:30 PM").
+ * Accepts any date-like value; returns '' for null/undefined.
+ * Note: `0` is treated as a valid epoch timestamp (1970-01-01).
+ */
+export function formatTime(
+  ts: string | number | Date | null | undefined,
+  opts?: { seconds?: boolean },
+): string {
+  if (!ts && ts !== 0) return '';
+  try {
+    const d = ts instanceof Date ? ts : new Date(ts);
+    return d.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      ...(opts?.seconds ? { second: '2-digit' } : {}),
+    });
+  } catch {
+    return String(ts);
+  }
+}
+
+/**
  * Format an ISO date as a short date string (e.g., "Mar 8, 2026").
  */
 export function formatDate(iso: string): string {
@@ -39,6 +61,21 @@ export function formatDateTime(iso: string): string {
       ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   } catch {
     return iso;
+  }
+}
+
+/**
+ * Format a timestamp as a full locale string (e.g., "3/8/2026, 2:30:00 PM").
+ * Use for detail modals and tooltips where full precision is needed.
+ * Returns '' for null/undefined, consistent with formatTime.
+ */
+export function formatFullTimestamp(ts: string | number | Date | null | undefined): string {
+  if (!ts && ts !== 0) return '';
+  try {
+    const d = ts instanceof Date ? ts : new Date(ts);
+    return d.toLocaleString();
+  } catch {
+    return String(ts);
   }
 }
 

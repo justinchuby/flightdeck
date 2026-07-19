@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { SessionSummary } from './types';
 import { shortAgentId } from '../../utils/agentLabel';
+import { formatDateTime } from '../../utils/format';
 
 interface SessionHistoryTableProps {
   sessions: SessionSummary[];
@@ -64,9 +65,7 @@ export function SessionHistoryTable({
   }
 
   function formatDate(iso: string): string {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
-      ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return formatDateTime(iso);
   }
 
   return (

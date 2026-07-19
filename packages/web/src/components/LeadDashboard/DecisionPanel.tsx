@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Check, X, Lightbulb, EyeOff } from 'lucide-react';
 import type { Decision } from '../../types';
+import { formatTime, formatFullTimestamp } from '../../utils/format';
 
 /** Decision with optional detail fields that may arrive from the API */
 type DecisionDetail = Decision & { alternatives?: string[]; impact?: string };
@@ -91,7 +92,7 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss
                     )}
                   </div>
                   {d.rationale && <p className="text-xs font-mono text-th-text-muted mt-1 line-clamp-2">{d.rationale}</p>}
-                  <p className="text-xs text-th-text-muted mt-1">{new Date(d.timestamp).toLocaleTimeString()}</p>
+                  <p className="text-xs text-th-text-muted mt-1">{formatTime(d.timestamp)}</p>
                   {d.needsConfirmation && d.status === 'recorded' && (
                     <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -150,7 +151,7 @@ export function DecisionPanelContent({ decisions, onConfirm, onReject, onDismiss
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedDecision.timestamp).toLocaleString()}
+                  {formatFullTimestamp(selectedDecision.timestamp)}
                 </span>
                 <button type="button" aria-label="Close decision detail" onClick={() => setSelectedDecision(null)} className="text-th-text-muted hover:text-th-text">
                   <X className="w-4 h-4" />

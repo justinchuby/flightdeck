@@ -10,7 +10,7 @@ import { apiFetch } from '../../hooks/useApi';
 import { useToastStore } from '../Toast';
 import { AgentReportBlock } from './AgentReportBlock';
 import { ProviderBadge } from '../ProviderBadge';
-import { formatTokens } from '../../utils/format';
+import { formatTokens, formatTime } from '../../utils/format';
 
 /** Minimal agent shape accepted by CrewStatusContent — compatible with AgentInfo, LeadProgress.crewAgents, and DerivedAgent */
 export interface CrewAgent {
@@ -126,7 +126,7 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                 {(() => {
                   const latestAct = (activity ?? []).filter((e) => e.agentId === agent.id).slice(-1)[0];
                   if (!latestAct) return null;
-                  const actTime = new Date(latestAct.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const actTime = formatTime(latestAct.timestamp);
                   return (
                     <div className="flex items-center gap-1 mt-0.5">
                       <span className="text-[9px] text-th-text-muted">{actTime}</span>
@@ -270,7 +270,7 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {agentComms.slice(-20).map((c) => {
-                      const time = new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const time = formatTime(c.timestamp);
                       const isSender = c.fromId === selectedAgent.id;
                       return (
                         <div
@@ -302,7 +302,7 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
                   </h4>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {agentActivity.slice(-15).map((evt) => {
-                      const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const time = formatTime(evt.timestamp);
                       return (
                         <div key={evt.id} className="flex items-center gap-2 text-xs font-mono">
                           <span className="text-th-text-muted">{time}</span>
@@ -391,7 +391,7 @@ export function CrewStatusContent({ agents, delegations, comms, activity, allAge
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono text-th-text-muted">
-                  {new Date(selectedComm.timestamp).toLocaleTimeString()}
+                  {formatTime(selectedComm.timestamp)}
                 </span>
                 <button type="button" aria-label="Close communication detail" onClick={() => setSelectedComm(null)} className="text-th-text-muted hover:text-th-text text-lg leading-none">×</button>
               </div>

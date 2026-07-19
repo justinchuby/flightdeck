@@ -21,6 +21,7 @@ import type { DagStatus, DagTask } from '../../types';
 import { computeCriticalPath, formatElapsed, type CriticalPathTask } from './dagCriticalPath';
 import { AgentDetailPanel } from '../AgentDetailPanel';
 import { shortAgentId } from '../../utils/agentLabel';
+import { formatTime } from '../../utils/format';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -411,8 +412,8 @@ function DagNodeTooltip({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: 11, color: 'var(--graph-text-muted)' }}>
           {task.priority > 0 && <span>Priority: {task.priority}</span>}
           {duration && <span>Duration: {duration}</span>}
-          {task.createdAt && <span>Created: {new Date(task.createdAt).toLocaleTimeString()}</span>}
-          {task.completedAt && <span>Completed: {new Date(task.completedAt).toLocaleTimeString()}</span>}
+          {task.createdAt && <span>Created: {formatTime(task.createdAt)}</span>}
+          {task.completedAt && <span>Completed: {formatTime(task.completedAt)}</span>}
         </div>
         {task.files.length > 0 && (
           <div style={{ marginTop: 4 }}>

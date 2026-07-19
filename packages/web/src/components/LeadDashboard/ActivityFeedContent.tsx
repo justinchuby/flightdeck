@@ -4,6 +4,7 @@ import { EmptyState } from '../Shared';
 import type { ActivityEvent } from '../../stores/leadStore';
 import { shortAgentId } from '../../utils/agentLabel';
 import type { AgentInfo } from '../../types';
+import { formatTime } from '../../utils/format';
 
 export function ActivityFeedContent({ activity, agents }: { activity: ActivityEvent[]; agents: AgentInfo[] }) {
   const feedRef = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export function ActivityFeedContent({ activity, agents }: { activity: ActivityEv
         recent.map((evt) => {
           const agent = agents.find((a) => a.id === evt.agentId);
           const label = agent?.role?.name ?? evt.agentRole;
-          const time = new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const time = formatTime(evt.timestamp, { seconds: true });
           return (
             <div key={evt.id} className="cv-auto-sm px-3 py-1.5 border-b border-th-border/30 flex items-start gap-2">
               {getIcon(evt.type, evt.status)}

@@ -17,6 +17,7 @@ import {
   Bell,
   BellOff,
 } from 'lucide-react';
+import { formatTime } from '../../utils/format';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -534,7 +535,7 @@ export function TelegramSettings() {
                 <span className="font-mono">{s.chatId}</span>
                 <span className="text-th-text-muted">→ {s.projectId}</span>
                 <span className="text-th-text-muted text-[10px]">
-                  expires {new Date(s.expiresAt).toLocaleTimeString()}
+                  expires {formatTime(s.expiresAt)}
                 </span>
               </div>
             ))}
